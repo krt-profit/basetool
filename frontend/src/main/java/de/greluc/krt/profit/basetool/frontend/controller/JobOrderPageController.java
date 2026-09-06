@@ -1182,11 +1182,11 @@ public class JobOrderPageController {
    * offers every active Staffel + Spezialkommando, not just the caller's memberships; each option
    * carries its {@code isProfitEligible} flag so {@link #addOwnerPickerOptions} can derive the
    * responsible picker from the requesting one without a second, authenticated SK-catalog call.
-   * Read through the public client ({@code isPublic = true}) because the endpoint is {@code
-   * permitAll} and the catalogue carries no PII. Since ADR-0149 this is the degradation path rather
-   * than the guest path: {@link #fetchRequestingOrgUnitOptions} prefers the all-kinds catalogue and
-   * falls back here when that read fails, which costs the Bereich/OL tiers but keeps the form
-   * renderable.
+   * Read with the caller's token like every other backend call. It went through the anonymous
+   * client while the endpoint was {@code permitAll} and the form had an anonymous caller; both are
+   * gone (ADR-0149, ADR-0159). This is the degradation path: {@link #fetchRequestingOrgUnitOptions}
+   * prefers the all-kinds catalogue and falls back here when that read fails, which costs the
+   * Bereich/OL tiers but keeps the form renderable.
    *
    * @return picker options or empty list; never {@code null}.
    */

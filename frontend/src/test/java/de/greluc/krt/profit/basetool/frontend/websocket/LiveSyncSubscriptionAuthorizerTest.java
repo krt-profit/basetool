@@ -346,9 +346,10 @@ class LiveSyncSubscriptionAuthorizerTest {
   }
 
   @Test
-  void authorize_orgUnitBankWithOnlyGuestRole_denies() {
+  void authorize_orgUnitBankWithOnlyTheNoRoleMarker_denies() {
+    // ROLE_GUEST until V239 deleted the role; ROLE_NO_ROLE is its successor (REQ-SEC-053).
     LiveSyncTopic orgUnit = LiveSyncTopic.parse("orgunit-bank");
-    assertThat(authorizer.authorize(orgUnit, TOKEN, PIN, Set.of("ROLE_GUEST")))
+    assertThat(authorizer.authorize(orgUnit, TOKEN, PIN, Set.of("ROLE_NO_ROLE")))
         .isEqualTo(Decision.DENY);
   }
 
@@ -360,7 +361,7 @@ class LiveSyncSubscriptionAuthorizerTest {
     // authorized by its authentication alone, so the authorizer never touches the backend.
     LiveSyncTopic board = LiveSyncTopic.parse("materialboard");
     assertThat(authorizer.authorize(board, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
-    assertThat(authorizer.authorize(board, null, null, Set.of("ROLE_GUEST")))
+    assertThat(authorizer.authorize(board, null, null, Set.of("ROLE_NO_ROLE")))
         .isEqualTo(Decision.ALLOW);
     assertThat(server.getRequestCount()).isZero();
   }

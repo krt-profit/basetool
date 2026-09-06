@@ -377,16 +377,15 @@ public class JobOrderController {
   }
 
   /**
-   * Creates a new job order. {@code permitAll()} so any squadron member — including unauthenticated
-   * guests using the public request form — can file a request. Anonymous callers receive a redacted
-   * response that drops {@code assignees}, {@code handovers} and {@code version}: the created order
-   * has no assignees / handovers at create time anyway, and the optimistic-lock version has no
-   * purpose for a caller that cannot update the order (PUT/DELETE require LOGISTICIAN+). The {@code
-   * cleanup…ForGuest} naming follows the convention recognised by the ArchUnit rule {@code
-   * anonymousReadableMissionEndpointsMustRedactGuestPii}.
+   * Creates a new job order. Any member may file one; who may then <em>see</em> it is {@code
+   * canSeeJobOrder}'s question (REQ-ORG-003).
+   *
+   * <p>It was {@code permitAll()} for the public request form, and an anonymous caller got a
+   * response with {@code assignees}, {@code handovers} and {@code version} dropped. ADR-0149 closed
+   * the form and ADR-0159 the surface around it; the redaction went with its audience.
    *
    * @param dto create payload
-   * @return the persisted DTO (redacted for anonymous callers)
+   * @return the persisted DTO
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
@@ -403,13 +402,13 @@ public class JobOrderController {
   }
 
   /**
-   * Creates a new item-based job order. {@code permitAll()} for parity with the material-order
-   * create endpoint, with the same guest redaction. The required materials are derived server-side
-   * from each ordered item's chosen blueprint and snapshotted onto the order; the response carries
-   * the derived per-item materials and the aggregated material view.
+   * Creates a new item-based job order — the same gate as the material-order create above. The
+   * required materials are derived server-side from each ordered item's chosen blueprint and
+   * snapshotted onto the order; the response carries the derived per-item materials and the
+   * aggregated material view.
    *
    * @param dto item-order create payload (ordered finished items + per-material quality choices)
-   * @return the persisted DTO (redacted for anonymous callers)
+   * @return the persisted DTO
    */
   @PostMapping("/items")
   @ResponseStatus(HttpStatus.CREATED)
@@ -427,9 +426,9 @@ public class JobOrderController {
 
   /**
    * Paged picker of orderable items (blueprint outputs with at least one resolvable material) for
-   * the item-order create form. {@code permitAll()} for parity with the public create endpoint so
-   * the anonymous request form can populate its item picker. Returns game reference data only (no
-   * PII).
+   * the item-order create form. It was {@code permitAll()} so the anonymous request form could
+   * populate its item picker; both are gone (ADR-0149, ADR-0159). Returns game reference data only
+   * (no PII).
    *
    * @param search optional case-insensitive item-name filter
    * @param page zero-based page index

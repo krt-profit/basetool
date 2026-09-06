@@ -507,8 +507,12 @@ public class GlobalExceptionHandler {
    * caller — either no {@link Authentication} at all or an {@link AnonymousAuthenticationToken}
    * supplied by the {@code AnonymousAuthenticationFilter}. Used to decide whether a 403 message
    * should explain "you don't have permission" (authenticated user, insufficient role) versus
-   * "please sign in and try again" (anonymous caller hitting a {@code @PreAuthorize} gate behind a
-   * {@code permitAll()} route).
+   * "please sign in and try again".
+   *
+   * <p>The second branch was for an anonymous caller reaching a {@code @PreAuthorize} gate behind a
+   * {@code permitAll()} route. REQ-SEC-052 left four public routes and none of them carries a
+   * method gate, so nothing should reach it any more — it stays because a wrong message on a route
+   * that grows one is worse than a branch nobody takes.
    */
   private static boolean isAnonymous() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();

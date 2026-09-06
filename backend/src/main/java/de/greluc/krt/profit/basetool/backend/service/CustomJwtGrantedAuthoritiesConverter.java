@@ -314,22 +314,6 @@ public class CustomJwtGrantedAuthoritiesConverter
       return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
     }
 
-    // REQ-SEC-053 / ADR-0159: an approved account whose realm roles map to NO application role is
-    // refused, not admitted with an empty authority set. Until V239 it was mapped onto the
-    // authority-less GUEST role, which the URL matrix's anonymous families then let through — so
-    // "no role" quietly meant "the guest surface". With that surface gone the empty set would mean
-    // something worse: an authenticated principal that passes every isAuthenticated() gate and
-    // fails only the ones that name a role, which is a per-endpoint accident rather than a
-    // decision. ROLE_NO_ROLE is a marker, not a permission; PendingApprovalAccessFilter turns it
-    // into 403 NO_ROLE before a handler runs.
-    //
-    // It sits HERE rather than on the JWT path so both callers get it: the resource-server
-    // conversion above, and DatabaseActingMemberAuthorities on the ingest gateway's
-    // acting-member path, which installs an authentication without inspecting it.
-    if (roles.isEmpty()) {
-      return List.of(new SimpleGrantedAuthority(Roles.NO_ROLE_MARKER));
-    }
-
     Collection<GrantedAuthority> authorities =
         roles.stream()
             .flatMap(
@@ -348,6 +332,30 @@ public class CustomJwtGrantedAuthoritiesConverter
     // that carries `is_logistician = true` promotes the caller to the flat ROLE_LOGISTICIAN
     // authority (same for ROLE_MISSION_MANAGER).
     addMembershipDerivedRoles(user, authorities);
+
+    // REQ-SEC-053 / ADR-0159: an approved account that ends up with NO authority at all is refused,
+    // not admitted with an empty set. Until V239 it was mapped onto the authority-less GUEST role,
+    // which the URL matrix's anonymous families then let through — so "no role" quietly meant "the
+    // guest surface". With that surface gone the empty set would mean something worse: an
+    // authenticated principal that passes every isAuthenticated() gate and fails only the ones that
+    // name a role, which is a per-endpoint accident rather than a decision. ROLE_NO_ROLE is a
+    // marker, not a permission; PendingApprovalAccessFilter turns it into 403 NO_ROLE before a
+    // handler runs.
+    //
+    // <b>The check is on the ASSEMBLED set, not on the incoming role list.</b> A member can hold no
+    // realm role and still be authorised: `addMembershipDerivedRoles` promotes anyone whose OrgUnit
+    // membership carries `is_logistician` or `is_mission_manager`, and those flags live on the
+    // membership rather than in Keycloak. Short-circuiting on `roles.isEmpty()` would have refused
+    // exactly those people — an SK lead with no realm role is a real shape, and the converter's own
+    // tests are full of it.
+    //
+    // It sits in assembleFor rather than on the JWT path so both callers get it: the
+    // resource-server
+    // conversion above, and DatabaseActingMemberAuthorities on the ingest gateway's acting-member
+    // path (ADR-0129), which installs an authentication without inspecting it.
+    if (authorities.isEmpty()) {
+      return List.of(new SimpleGrantedAuthority(Roles.NO_ROLE_MARKER));
+    }
 
     return authorities;
   }

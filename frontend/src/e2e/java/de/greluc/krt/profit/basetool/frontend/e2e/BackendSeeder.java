@@ -1676,21 +1676,26 @@ public final class BackendSeeder {
    * de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto}, whose top-level {@code id} is the
    * mission id {@link #seedEntity} extracts and returns.
    *
-   * @param username the Keycloak username of the mission's creator (who can see, and thus sign up
-   *     to, their own mission)
+   * <p>Called {@code addGuestParticipant} until ADR-0159. The row is unchanged — a named person
+   * with no account — but its author is not: it used to be the person themselves, signing up
+   * anonymously, and it is now a member who can see the Einsatz recording them (decision D4).
+   *
+   * @param username the Keycloak username of the mission's creator (who can see, and thus record
+   *     participants on, their own mission)
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
-   * @param guestName the guest participant's display name; must not match any registered user's
-   *     name
+   * @param externalName the external participant's display name; must not match any registered
+   *     user's name, or the row is linked to that user instead and the caller needs {@code
+   *     canManageMission}
    * @return the mission id echoed back by the endpoint's {@code MissionDto} response
    */
-  public String addGuestParticipant(
-      String username, String password, String missionId, String guestName) {
+  public String addExternalParticipant(
+      String username, String password, String missionId, String externalName) {
     return seedEntity(
         username,
         password,
         "/api/v1/missions/" + missionId + "/participants/add",
-        "{\"guestName\":\"" + guestName + "\"}");
+        "{\"guestName\":\"" + externalName + "\"}");
   }
 
   /**
@@ -2396,53 +2401,6 @@ public final class BackendSeeder {
       throw e;
     } catch (Exception e) {
       throw new IllegalStateException("BackendSeeder.getBodyWithActiveOrgUnit failed", e);
-    }
-  }
-
-  /**
-   * Posts a material job order to {@code POST /api/v1/orders} with <strong>no</strong> credentials
-   * and returns the HTTP status.
-   *
-   * <p>It used to create one: the endpoint was {@code permitAll} — the public request form — and
-   * this helper returned the parsed body so a test could assert the guest redaction and the intake
-   * Spezialkommando fallback. Creating an order requires a login since ADR-0149, so the only thing
-   * left worth asserting is the refusal, and the helper returns a status rather than a body.
-   *
-   * <p>The payload is deliberately well-formed. A refusal that depended on a malformed body would
-   * pass for the wrong reason, and keep passing if the endpoint were ever reopened.
-   *
-   * @param requestingOrgUnitId the requesting (customer) OrgUnit id
-   * @param handle the order contact handle
-   * @param materialId the requested material id
-   * @param minQuality the minimum quality ({@code >= 650})
-   * @param amount the requested amount
-   * @return the HTTP status the backend answered with; {@code 401} is the expected one
-   */
-  public int anonymousCreateMaterialOrderStatus(
-      String requestingOrgUnitId, String handle, String materialId, int minQuality, double amount) {
-    String body =
-        "{\"responsibleOrgUnitId\":\""
-            + requestingOrgUnitId
-            + "\",\"requestingOrgUnitId\":\""
-            + requestingOrgUnitId
-            + "\",\"handle\":\""
-            + handle
-            + "\",\"materials\":[{\"materialId\":\""
-            + materialId
-            + "\",\"minQuality\":"
-            + minQuality
-            + ",\"amount\":"
-            + amount
-            + "}]}";
-    try {
-      HttpRequest request =
-          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/orders"))
-              .header("Content-Type", "application/json")
-              .POST(HttpRequest.BodyPublishers.ofString(body))
-              .build();
-      return http.send(request, BodyHandlers.ofString()).statusCode();
-    } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.anonymousCreateMaterialOrderStatus failed", e);
     }
   }
 

@@ -38,10 +38,10 @@ import java.util.UUID;
  *   <li>{@code payoutPreference} — fixes the per-mission payout choice at sign-up time. {@code
  *       null} keeps the existing default chain: the registered user's profile default
  *       (REQ-MISSION-002), falling back to the entity default {@code PAYOUT}. A non-null value wins
- *       over the profile default, matching {@code AddParticipantPublicRequest}.
+ *       over the profile default, matching {@code AddExternalParticipantRequest}.
  * </ul>
  *
- * <p>Deliberately <b>not</b> a copy of {@code AddParticipantPublicRequest}: that record can name
+ * <p>Deliberately <b>not</b> a copy of {@code AddExternalParticipantRequest}: that record can name
  * somebody else ({@code userId}, {@code guestName}, {@code orgUnitIds}) and needs a self-vs-manager
  * check to be safe. {@code join} derives the member from the JWT and can only ever enrol the
  * caller, so the narrower body is the point rather than an omission.

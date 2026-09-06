@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -62,8 +61,7 @@ class TermsControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(eq("/api/v1/terms/document"), eq(TermsDocumentDto.class)))
-        .thenReturn(document());
+    when(backendApiClient.getTermsDocumentAnonymously()).thenReturn(document());
   }
 
   /**

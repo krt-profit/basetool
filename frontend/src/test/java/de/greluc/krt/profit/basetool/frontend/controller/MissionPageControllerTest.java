@@ -453,38 +453,9 @@ class MissionPageControllerTest {
     verify(backendApiClient).get(anyString(), anyTypeRef());
   }
 
-  @Test
-  void listMissions_ShowPastTrue_Guest_ShouldIgnoreShowPast() {
-    // Arrange
-    BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    FrontendAuthHelperService authHelper = mock(FrontendAuthHelperService.class);
-    MissionPageController controller =
-        new MissionPageController(backendApiClient, authHelper, PARALLEL);
-    Model model = new ConcurrentModel();
-    // No user (null)
-
-    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    when(backendApiClient.get(uriCaptor.capture(), anyTypeRef()))
-        .thenReturn(
-            new de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<>(
-                Collections.emptyList(), 0, 0, 0, 0, Collections.emptyList()));
-
-    // Act
-    controller.listMissions(null, null, null, null, true, null, null, null, model, null);
-
-    // Assert
-    String uri = uriCaptor.getValue();
-    // Should NOT contain past statuses despite showPast=true
-    assertFalse(uri.contains("status=COMPLETED"));
-    assertFalse(uri.contains("status=CANCELLED"));
-    assertTrue(uri.contains("status=PLANNED"));
-    assertTrue(uri.contains("status=ACTIVE"));
-
-    // Model attribute should be false for guest
-    assertFalse((Boolean) model.getAttribute("showPast"));
-
-    verify(backendApiClient).get(anyString(), anyTypeRef());
-  }
+  // "showPast=true is ignored for a guest" stood here. The narrowing is gone with the caller
+  // (ADR-0159): every caller of the mission list holds a session, so the archive toggle means what
+  // it says. Keeping the case with a principal would have asserted the opposite of the truth.
 
   @Test
   void missionDetail_ShouldFetchMissionAndFilteredJobTypes() {

@@ -99,7 +99,7 @@ class MissionPeerRedactorTest {
   }
 
   @Test
-  void cleanupMissionForPeer_clearsOwnerManagersFlagsButKeepsDescriptionAndOrg() {
+  void cleanupMissionForPeer_clearsOwnerAndManagersButKeepsTheCallersOwnCapabilities() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
@@ -107,11 +107,15 @@ class MissionPeerRedactorTest {
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    // Owner / managers stripped, edit + manage flags forced off.
+    // Owner / managers stripped.
     assertThat(redacted.owner()).isNull();
     assertThat(redacted.managers()).isNull();
-    assertThat(redacted.canEdit()).isFalse();
-    assertThat(redacted.canManageManagers()).isFalse();
+    // canEdit / canManageManagers survive. They were forced off while this pass only ran for
+    // outsiders — for whom the answer was false anyway — and a MISSION_MANAGER is below
+    // Logistician, so since ADR-0159 forcing them would hide the management controls from the
+    // person who owns the Einsatz. They describe the caller, not the mission's other members.
+    assertThat(redacted.canEdit()).isTrue();
+    assertThat(redacted.canManageManagers()).isTrue();
     // Member-peer view keeps the free-text description, the organisation and the planning data.
     assertThat(redacted.description()).isEqualTo("secret plan");
     assertThat(redacted.owningSquadron()).isEqualTo(squadron);

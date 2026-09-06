@@ -820,7 +820,7 @@ public class MissionService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@code MissionParticipantService.resolveGuestSubmittedOrgUnits}
+   *       authorization filter in {@code MissionParticipantService.resolveSubmittedOrgUnits}
    *       (anonymous callers cannot label a guest at all; authenticated callers may label only org
    *       units they can edit).
    * </ul>

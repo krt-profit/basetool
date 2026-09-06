@@ -60,7 +60,7 @@ public class UserAccessControlTest {
         .perform(
             get("/api/v1/users/search")
                 .param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 
@@ -96,12 +96,12 @@ public class UserAccessControlTest {
   }
 
   @Test
-  void testSearchUsersForBank_Guest_Forbidden() throws Exception {
+  void testSearchUsersForBank_RoleLess_Forbidden() throws Exception {
     mockMvc
         .perform(
             get("/api/v1/users/search-bank")
                 .param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 

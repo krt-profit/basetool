@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -87,6 +88,38 @@ class RequestScopeResolverScopeTest {
     m.setId(new OrgUnitMembershipId(userId, orgUnitId));
     m.setKind(kind);
     return m;
+  }
+
+  /**
+   * REQ-SEC-052 / ADR-0159: a scope question asked by a caller with no identity has no honest
+   * answer, so {@code currentScopePredicate()} refuses it instead of inventing one.
+   */
+  @Nested
+  class UnauthenticatedCallerTests {
+
+    @Test
+    void currentScopePredicate_unauthenticatedCaller_throwsRatherThanScopingToNothing() {
+      // It used to return the all-empty predicate, which the repository fragments read as "no rows
+      // except the organisation-wide escape" — a plausible answer, and the reason an endpoint that
+      // lost its gate would have looked like it was working. Since ADR-0159 nothing anonymous
+      // reaches a scoped read, so an empty predicate could only come from a forgotten gate.
+      when(authHelper.isAuthenticated()).thenReturn(false);
+
+      IllegalStateException thrown =
+          assertThrows(IllegalStateException.class, resolver::currentScopePredicate);
+
+      assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
+    }
+
+    @Test
+    void currentScopePredicate_authenticatedCaller_stillAnswers() {
+      // The counterpart, so the case above cannot pass because the method throws for everyone.
+      when(authHelper.isAuthenticated()).thenReturn(true);
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(resolver.currentScopePredicate().adminAllScope());
+    }
   }
 
   @Nested

@@ -67,7 +67,7 @@ class MaterialTest {
 
   private User adminUser;
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
 
   @BeforeEach
   void setUp() {
@@ -83,10 +83,10 @@ class MaterialTest {
     officerUser.setUsername("officerMat");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestMat");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestMat");
+    userRepository.save(roleLessUser);
   }
 
   @Test
@@ -138,7 +138,7 @@ class MaterialTest {
   }
 
   @Test
-  void testCreateMaterial_Guest_Forbidden() throws Exception {
+  void testCreateMaterial_RoleLess_Forbidden() throws Exception {
     Material material = new Material();
     material.setName("Illegal Material");
     material.setType(MaterialType.REFINED);
@@ -149,8 +149,8 @@ class MaterialTest {
             post("/api/v1/materials")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(material)))
         .andExpect(status().isForbidden());

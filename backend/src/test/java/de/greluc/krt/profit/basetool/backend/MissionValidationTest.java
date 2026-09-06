@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.model.*;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantPublicRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
@@ -225,22 +225,27 @@ class MissionValidationTest {
   }
 
   @Test
-  void testAddParticipantPublic_GuestNameTaken_ShouldReturn400() throws Exception {
-    AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "officer1", null, null, null, null);
+  void testAddParticipantPublic_NameOfAnotherMember_ShouldReturn403() throws Exception {
+    // A free-text name that resolves to a registered member is LINKED to that member, which makes
+    // this a request to sign somebody else up — and that needs canManageMission. It answered 400
+    // ("Guest name is already taken") while the caller could be anonymous and the branch was
+    // spoofing protection; with the anonymous caller gone (REQ-SEC-052) one rule covers both
+    // spellings of "somebody else", by id and by resolved name.
+    AddExternalParticipantRequest request =
+        new AddExternalParticipantRequest(null, "officer1", null, null, null, null);
 
     mockMvc
         .perform(
             post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isForbidden());
   }
 
   @Test
   void testAddParticipantPublic_GuestNameUnique_ShouldReturn200() throws Exception {
-    AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(
+    AddExternalParticipantRequest request =
+        new AddExternalParticipantRequest(
             null,
             "UniqueGuestName",
             taskJobType.getId(),
@@ -276,8 +281,8 @@ class MissionValidationTest {
     userRepository.save(caller);
     saveIridiumMembership(caller);
 
-    AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "  Lord_Adley  ", null, null, null, null);
+    AddExternalParticipantRequest request =
+        new AddExternalParticipantRequest(null, "  Lord_Adley  ", null, null, null, null);
 
     mockMvc
         .perform(
@@ -319,8 +324,8 @@ class MissionValidationTest {
     userRepository.save(caller);
     saveIridiumMembership(caller);
 
-    AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "Lord_Adley", null, null, null, null);
+    AddExternalParticipantRequest request =
+        new AddExternalParticipantRequest(null, "Lord_Adley", null, null, null, null);
 
     mockMvc
         .perform(
@@ -360,8 +365,8 @@ class MissionValidationTest {
     userRepository.save(caller);
     saveIridiumMembership(caller);
 
-    AddParticipantPublicRequest request =
-        new AddParticipantPublicRequest(null, "Shared Alias", null, null, null, null);
+    AddExternalParticipantRequest request =
+        new AddExternalParticipantRequest(null, "Shared Alias", null, null, null, null);
 
     mockMvc
         .perform(

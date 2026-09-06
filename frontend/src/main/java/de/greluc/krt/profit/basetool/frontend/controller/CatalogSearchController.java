@@ -43,8 +43,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * in {@link JobOrderPageController#itemSearch(String)}. Both relays fetch one row more than their
  * combobox renders ({@link PickerSearch}) so an overflow is detectable and announced, and degrade
  * to an empty list on backend failure so the picker shows "no matches" instead of an error page.
- * Public ({@code /catalog/**} is {@code permitAll}) because the anonymous order form carries a
- * material picker; the backend endpoints are public catalog data themselves.
+ * {@code /catalog/**} was {@code permitAll} because the anonymous order form carried a material
+ * picker. That form went with ADR-0149 and the URL rule with ADR-0159; the relays are members-only
+ * now, like the pickers that call them.
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this

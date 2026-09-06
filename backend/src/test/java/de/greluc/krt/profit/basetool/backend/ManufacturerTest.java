@@ -65,7 +65,7 @@ class ManufacturerTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
 
   @BeforeEach
   void setUp() {
@@ -76,10 +76,10 @@ class ManufacturerTest {
     officerUser.setUsername("officerMfg");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestMfg");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestMfg");
+    userRepository.save(roleLessUser);
   }
 
   @Test
@@ -110,7 +110,7 @@ class ManufacturerTest {
   }
 
   @Test
-  void testToggleManufacturerVisibility_Guest_Forbidden() throws Exception {
+  void testToggleManufacturerVisibility_RoleLess_Forbidden() throws Exception {
     Manufacturer manufacturer = new Manufacturer();
     manufacturer.setName("Hacked Mfg");
     manufacturer.setAbbreviation("HACK");
@@ -122,8 +122,8 @@ class ManufacturerTest {
             put("/api/v1/manufacturers/" + manufacturer.getId() + "/visibility?hidden=true")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 }

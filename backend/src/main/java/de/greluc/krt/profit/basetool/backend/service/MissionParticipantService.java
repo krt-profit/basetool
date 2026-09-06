@@ -130,7 +130,7 @@ public class MissionParticipantService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@link #resolveGuestSubmittedOrgUnits(java.util.List)} (anonymous
+   *       authorization filter in {@link #resolveSubmittedOrgUnits(java.util.List)} (anonymous
    *       callers cannot label a guest at all; authenticated callers may label only org units they
    *       can edit).
    * </ul>
@@ -240,7 +240,7 @@ public class MissionParticipantService {
       // there is no anonymous sign-up left to mint one for, and every later write on a row with no
       // user is the mission leadership's (MissionSecurityService.canAccessParticipant).
       participant.setGuestName(effectiveGuestName);
-      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
+      participant.setOrgUnits(resolveSubmittedOrgUnits(orgUnitIds));
     }
 
     if (desiredJobTypeId != null) {
@@ -457,21 +457,25 @@ public class MissionParticipantService {
       // Audit finding M-3 (2026-05-20): logging the raw {@code guestName} leaks PII —
       // free-text names often contain real-life names of third parties that PiiMasker does not
       // catch (regex covers emails / JWTs / token keywords only). Log just the participant id;
-      // the linked-vs-guest distinction is implicit because the linked-user branch above logged
+      // the linked-vs-external distinction is implicit because the linked-user branch above logged
       // nothing either.
-      log.info("Updating guest participant: {}", participant.getId());
+      log.info("Updating external participant: {}", participant.getId());
       if (guestName != null) {
-        // Both anonymous CREATE paths refuse a guestName that resolves to a registered member, and
-        // refuse a name already used by another guest on the same mission. This update path had
-        // neither, so the rename was the loophole around both: sign up with a throwaway name, then
-        // PUT the byte-exact callsign of a real member. The row then renders under that member's
-        // name in the lead-type list, the ship crew and - with no "Gast" chip - the operation
-        // payout table; and because the payout key is "guest_" + guestName, the rename also merged
-        // two guest rows into one payout bucket and orphaned an already-settled
-        // OperationPayoutStatus, flipping a "Bezahlt" back to unpaid.
+        // Both CREATE paths refuse a free-text name that resolves to a registered member without
+        // canManageMission, and refuse a name already used by another external row on the same
+        // mission. This update path had neither, so the rename was the loophole around both:
+        // record a throwaway name, then PUT the byte-exact callsign of a real member. The row then
+        // renders under that member's name in the lead-type list, the ship crew and - with no
+        // "Extern" chip - the operation payout table; and because the payout key is "guest_" +
+        // guestName, the rename also merged two external rows into one payout bucket and orphaned
+        // an already-settled OperationPayoutStatus, flipping a "Bezahlt" back to unpaid.
         //
-        // Only enforced for a caller who cannot manage the mission: a mission manager renaming a
-        // guest row to a member's name is the documented promote-to-member flow, not spoofing.
+        // The loophole was reachable anonymously when it was found (ADR-0159 has since closed
+        // that); a member can still walk it, which is why the guard stays rather than following
+        // its original caller out.
+        //
+        // Only enforced for a caller who cannot manage the mission: a mission manager renaming an
+        // external row to a member's name is the documented promote-to-member flow, not spoofing.
         if (!callerMayManageMission) {
           String candidate = guestName.trim();
           if (!candidate.isEmpty()
@@ -494,7 +498,7 @@ public class MissionParticipantService {
         }
         participant.setGuestName(guestName);
       }
-      participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
+      participant.setOrgUnits(resolveSubmittedOrgUnits(orgUnitIds));
     }
 
     // The PLANNED mission job type is the organisation's assignment - it carries the Einsatzleiter
@@ -810,9 +814,8 @@ public class MissionParticipantService {
    * units to persist. A guest's org-unit affiliation is mission-scoped roster metadata only: it is
    * a label on a single mission's participant row, drives nothing but the roster badges (see {@code
    * MissionMapper.orgUnitsToReferenceDtos}), grants no permissions and touches no user data. Anyone
-   * who may add the guest at all — the endpoint's {@code canSeeMission} gate already governs that,
-   * including anonymous sign-ups on public (non-internal) missions — may therefore label it with
-   * any Staffel or SK:
+   * who may record the external participant at all — the endpoint's {@code canSeeMission} gate
+   * already governs that, cross-Staffel included — may therefore label it with any Staffel or SK:
    *
    * <ul>
    *   <li>{@code null} / empty input → empty list (no affiliation).
@@ -822,16 +825,16 @@ public class MissionParticipantService {
    * </ul>
    *
    * <p>This deliberately drops the former audit-H-3 authorization filter (admin / own-membership
-   * required) for guests: that gate denied an SK lead — and every anonymous sign-up — from tagging
-   * a guest with the relevant org unit, even though the tag carries no authority. Registered-user
-   * participants are unaffected: their affiliations are auto-derived from their actual memberships
-   * in the caller paths, never from this submitted list.
+   * required): that gate denied an SK lead from tagging an external participant with the relevant
+   * org unit, even though the tag carries no authority. Registered-user participants are
+   * unaffected: their affiliations are auto-derived from their actual memberships in the caller
+   * paths, never from this submitted list.
    *
    * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
-   * @return the managed org-unit entities to persist on the guest participant; never {@code null},
-   *     possibly empty.
+   * @return the managed org-unit entities to persist on the external participant; never {@code
+   *     null}, possibly empty.
    */
-  private java.util.List<OrgUnit> resolveGuestSubmittedOrgUnits(
+  private java.util.List<OrgUnit> resolveSubmittedOrgUnits(
       java.util.List<UUID> submittedOrgUnitIds) {
     if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
       return java.util.List.of();

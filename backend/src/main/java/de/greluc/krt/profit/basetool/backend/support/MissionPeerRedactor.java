@@ -115,8 +115,16 @@ public class MissionPeerRedactor {
         dto.operation(),
         null, // owner
         null, // managers
-        false, // canEdit
-        false, // canManageManagers
+        // canEdit / canManageManagers are answers ABOUT THE CALLER, computed per request by
+        // MissionMapper from their own authorities — not somebody else's data, and telling a
+        // caller what they may do cannot disclose anything they do not already have. They were
+        // forced to false while this pass only ever ran for outsiders, for whom the answer was
+        // false anyway. Since ADR-0159 the pass runs for every caller below Logistician, and a
+        // MISSION_MANAGER is one: the hierarchy declares ADMIN/OFFICER above both roles but never
+        // MISSION_MANAGER above LOGISTICIAN. Forcing them off would hide the management controls
+        // from the person who owns the Einsatz.
+        dto.canEdit(),
+        dto.canManageManagers(),
         dto.version(),
         dto.coreVersion(),
         dto.scheduleVersion(),

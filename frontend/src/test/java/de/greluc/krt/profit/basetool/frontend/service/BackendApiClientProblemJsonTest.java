@@ -30,6 +30,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Set;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -37,12 +39,19 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -78,6 +87,45 @@ class BackendApiClientProblemJsonTest {
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   @MockitoBean private OAuth2AuthorizedClientRepository authorizedClientRepository;
+
+  /**
+   * Gives the authenticated WebClient a resolvable {@code keycloak} registration and a live token.
+   *
+   * <p>These cases used to pass {@code isPublic = true} and go out on the anonymous WebClient,
+   * which carries no OAuth2 exchange filter — a way of reaching the Problem+JSON mapping without a
+   * Keycloak registration. That client is gone (ADR-0159), and routing around the authenticated
+   * chain was never the point of this class anyway: what it asserts is the mapping, and it now
+   * asserts it on the client the application actually uses.
+   */
+  @BeforeEach
+  void bearAToken() {
+    ClientRegistration registration =
+        ClientRegistration.withRegistrationId("keycloak")
+            .clientId("basetool-frontend")
+            .clientSecret("test-secret")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+            .authorizationUri("https://keycloak.invalid/auth")
+            .tokenUri("https://keycloak.invalid/token")
+            .userInfoUri("https://keycloak.invalid/userinfo")
+            .userNameAttributeName("sub")
+            .build();
+    Mockito.when(clientRegistrationRepository.findByRegistrationId("keycloak"))
+        .thenReturn(registration);
+    OAuth2AccessToken token =
+        new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "test-token",
+            Instant.now(),
+            Instant.now().plusSeconds(300),
+            Set.of());
+    Mockito.when(
+            authorizedClientRepository.loadAuthorizedClient(
+                ArgumentMatchers.eq("keycloak"),
+                ArgumentMatchers.any(),
+                ArgumentMatchers.<jakarta.servlet.http.HttpServletRequest>any()))
+        .thenReturn(new OAuth2AuthorizedClient(registration, "test-principal", token));
+  }
 
   @BeforeAll
   static void startServer() throws IOException {

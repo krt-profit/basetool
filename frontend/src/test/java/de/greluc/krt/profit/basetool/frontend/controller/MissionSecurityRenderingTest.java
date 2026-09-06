@@ -74,8 +74,10 @@ class MissionSecurityRenderingTest {
   }
 
   @Test
-  void missionDetail_AsAnonymous_ShouldDisableRegisteredParticipantPayoutDropdown()
-      throws Exception {
+  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
+  // REQ-SEC-052: the detail page needs a login to render. What the case asserts — a member
+  // may not change a registered participant's payout dropdown — is unchanged.
+  void missionDetail_AsPeer_ShouldDisableRegisteredParticipantPayoutDropdown() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();

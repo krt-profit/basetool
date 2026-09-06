@@ -197,6 +197,12 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
+    // The page walk is not an optimisation: a bounded single GET of a PAGE_WALK catalogue returns
+    // its first chunk, and the cache then holds that truncated answer for the whole TTL
+    // (REQ-ADMIN-003). A mid-walk failure propagates unchanged, so no partial catalogue is cached.
+    if (catalog.isPageWalked()) {
+      return fetchCompleteCatalog(catalog, responseType);
+    }
     return executeGet(webClient, catalog.getUri(), responseType);
   }
 
@@ -214,6 +220,13 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
+    if (catalog.isPageWalked()) {
+      throw new IllegalArgumentException(
+          "Catalogue "
+              + catalog.name()
+              + " is page-walked and must be read through the ParameterizedTypeReference overload"
+              + " of getCached — a single bounded GET would silently truncate it (REQ-ADMIN-003)");
+    }
     return executeGet(webClient, catalog.getUri(), responseType);
   }
 
@@ -226,7 +239,6 @@ public class BackendApiClient {
    * runaway cap logs a warning instead of a banner: these catalogues feed pickers and sidebar
    * fragments with no page-level truncation surface (REQ-ADMIN-003).
    *
-   * @param client the WebClient to fetch through (authenticated or public)
    * @param catalog the page-walked catalogue to assemble
    * @param responseType the caller's declared response type — always {@code PageResponse<E>} for a
    *     page-walked catalogue
@@ -238,12 +250,12 @@ public class BackendApiClient {
   // T <-> PageResponse casts below are the unavoidable Object->generic case.
   @SuppressWarnings("unchecked")
   private <T> T fetchCompleteCatalog(
-      WebClient client, CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
+      CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
     CatalogPages.CompleteCatalog<Object> walked =
         CatalogPages.fetchAll(
             page ->
                 (PageResponse<Object>)
-                    executeGet(client, catalog.getUri() + "&page=" + page, responseType));
+                    executeGet(webClient, catalog.getUri() + "&page=" + page, responseType));
     if (walked.truncated()) {
       log.warn(
           "Cached catalogue {} hit the page-walk safety cap of {} pages — the cached list is"

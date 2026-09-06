@@ -79,11 +79,12 @@ class FrontendAuthHelperServiceTest {
   }
 
   @Test
-  void isMemberOrAbove_withOnlyGuestRole_returnsFalse() {
-    // Given — a role-less GUEST carries no member authority
-    authenticateWith("ROLE_GUEST");
+  void isMemberOrAbove_withOnlyTheNoRoleMarker_returnsFalse() {
+    // Given — the marker that replaced the deleted GUEST role (V239 / REQ-SEC-053) carries no
+    // member authority
+    authenticateWith("ROLE_NO_ROLE");
     // When / Then
-    assertFalse(service.isMemberOrAbove(), "a role-less guest is not a member");
+    assertFalse(service.isMemberOrAbove(), "a role-less account is not a member");
   }
 
   @Test

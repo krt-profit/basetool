@@ -213,12 +213,11 @@ class MissionUnitCrewTest {
   }
 
   @Test
-  void testGetAllShips_Guest_Forbidden() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/hangar/ships")) // Anonymous
-        .andExpect(
-            status()
-                .isUnauthorized()); // Or Forbidden depending on config, usually Unauthorized if no
-    // JWT
+  void testGetAllShips_Member_Forbidden() throws Exception {
+    // The hangar is Logistician-and-above. This used to issue the request anonymously and expect a
+    // 401; the class carries a plain member now (REQ-SEC-052), so the same refusal arrives at the
+    // method gate as a 403. The anonymous refusal itself is swept for every path at once by
+    // AnonymousSurfaceSweepTest — it is not this case's job any more.
+    mockMvc.perform(get("/api/v1/hangar/ships")).andExpect(status().isForbidden());
   }
 }

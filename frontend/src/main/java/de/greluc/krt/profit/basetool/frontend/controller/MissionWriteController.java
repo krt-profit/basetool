@@ -1894,12 +1894,10 @@ public class MissionWriteController {
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      // Mirror the classical /missions/{id}/participant handler: anonymous guests
-      // hit the backend's slim endpoint via the public WebClient (no JWT) so the
-      // backend can apply its guest-signup branch (jwt == null + guestName).
-      // Previously this method was annotated with @PreAuthorize("isAuthenticated()")
-      // and always passed isPublic=false, which produced the AccessDeniedException
-      // observed in live-log/log.txt for anonymous mission signups.
+      // Relayed with the caller's token, like every other write. It used to go out on the
+      // anonymous client so the backend could take its guest-signup branch (jwt == null +
+      // guestName); that branch and that client are gone (ADR-0159). The row it created survives
+      // as an EXTERNAL participant — same shape, recorded by a member who can see the Einsatz.
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/slim", body, Object.class);

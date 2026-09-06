@@ -353,7 +353,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "test-none-pw",
+          "value": "test-norole-pw",
           "temporary": false
         }
       ],

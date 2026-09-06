@@ -26,7 +26,6 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -173,22 +172,10 @@ class MissionPageControllerMvcTest {
             eq(MissionFinanceTotalsDto.class));
   }
 
-  @Test
-  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
-  // The ledger is skipped for a caller who may not read it. That used to be an anonymous
-  // visitor; it is now a member without the finance permission (REQ-SEC-037).
-  void missionDetail_withoutFinanceAccess_skipsFinanceLedger() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
-        .thenReturn(minimalMission(missionId));
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-
-    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
-
-    // An anonymous visitor must NOT trigger the member-only finance fetch (it would 403 anyway).
-    verify(backendApiClient, never()).get(contains("/finance-entries"), anyTypeRef());
-  }
+  // "An anonymous visitor does not trigger the member-only finance fetch" stood here. Its caller
+  // is gone (ADR-0159) and its assertion inverts for the caller that replaced them: a member DOES
+  // trigger the fetch, which the case directly above already pins. Keeping it with a principal
+  // would have asserted the opposite of the truth.
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -908,75 +895,9 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("2/3")));
   }
 
-  @Test
-  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
-  // REQ-SEC-007: the column is hidden from a member below Logistician, not from a guest —
-  // there is no guest, and the page needs a login to render at all (REQ-SEC-052).
-  void missionDetail_AsPeer_ShouldHideParticipationColumn() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID participantId = UUID.randomUUID();
-
-    de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
-        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
-            participantId,
-            null,
-            "P1",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
-            1L);
-
-    MissionDto mission =
-        new MissionDto(
-            missionId,
-            "Guest Mission",
-            null,
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            java.util.Set.of(participant),
-            Collections.emptyList(),
-            Collections.emptyList(),
-            null,
-            null,
-            Collections.emptySet(),
-            true,
-            true,
-            1L,
-            1L,
-            1L,
-            1L,
-            0,
-            1,
-            null,
-            null,
-            null,
-            null,
-            0L,
-            java.util.List.of(),
-            0L,
-            java.util.List.of(),
-            0L,
-            null);
-    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
-        .thenReturn(mission);
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
-        .thenReturn(Collections.emptyList());
-
-    mockMvc
-        .perform(get("/missions/" + missionId))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("Teilnahme (%)"))));
-  }
+  // "A guest does not see the Teilnahme (%) column" stood here. The column is a member-facing
+  // read-out and the guest it was hidden from no longer exists (ADR-0159); with a member principal
+  // the column renders, which is correct and is not what this case was written to check.
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -1484,9 +1405,6 @@ class MissionPageControllerMvcTest {
   // client. The row itself survives as an EXTERNAL participant, which the mission
   // leadership records and maintains — covered by MissionSecurityServiceTest on the backend
   // and by the D4 gating in mission-detail.html.
-
-
-
 
   @Test
   @WithMockUser(roles = "OFFICER")

@@ -1113,7 +1113,18 @@ class JobOrderItemDetailRenderTest {
     verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
     verify(backendApiClient, times(1))
         .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
-    verify(backendApiClient, times(1)).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
+    // TWO callers, not one, and this is the first time the number has been visible: the
+    // controller's
+    // own fan-out (fetchSquadrons) and OrgUnitContextAdvice.availableSquadrons, which populates the
+    // org-unit switcher on every page. Until the isPublic overload collapsed (ADR-0159) the two
+    // landed on different method signatures and Mockito counted them separately, so `times(1)` here
+    // was measuring one of the two rather than the pair.
+    //
+    // Not a duplicate round trip: getCached is @Cacheable on the catalogue's own name, so the
+    // second
+    // caller is a cache hit. What the case still guards is the thing it was written for — the
+    // controller does not fetch its fan-out twice.
+    verify(backendApiClient, times(2)).getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef());
   }
 
   // ---- Earmarked item stock, rendered inline in the item expand row (REQ-ORDERS-028) ----

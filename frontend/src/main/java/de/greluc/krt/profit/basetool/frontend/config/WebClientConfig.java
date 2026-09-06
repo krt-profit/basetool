@@ -597,8 +597,9 @@ public class WebClientConfig {
    * — the mission list, the order queue, the catalogue pickers, the home page. Each of those was a
    * decision to send a request without an identity, taken by passing {@code true}, and none of them
    * needed to be. A boolean parameter is the wrong shape for "this request has no caller": {@code
-   * TermsDocumentClientUsageTest} asserts that nothing but {@code TermsController} injects this
-   * bean, which a boolean could never do.
+   * TermsDocumentClientUsageTest} asserts that {@code BackendApiClient} is the only class holding
+   * this bean and {@code getTermsDocumentAnonymously()} the only method reading it — which a
+   * boolean could never do.
    *
    * <p>Same resilience and logging chain as {@link #webClient}, without the OAuth2 bearer relay.
    */

@@ -103,10 +103,11 @@ class UserManagementTest {
   }
 
   @Test
-  void testGetAllUsers_Guest_Forbidden() throws Exception {
+  void testGetAllUsers_RoleLess_Forbidden() throws Exception {
     mockMvc
         .perform(
-            get("/api/v1/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+            get("/api/v1/users")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 

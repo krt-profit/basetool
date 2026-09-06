@@ -67,8 +67,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  *
  * <p>Every write is issued <b>with</b> a CSRF token. Without one the {@code CsrfFilter} answers
  * {@code 403} before the authorisation decision is reached — which looks like a refusal, passes a
- * naive assertion, and would hide a {@code 2xx} underneath. The sweep therefore fails on {@code 2xx}
- * and on {@code 403} alike: only a redirect or a {@code 401} proves the gate answered.
+ * naive assertion, and would hide a {@code 2xx} underneath. The sweep therefore fails on {@code
+ * 2xx} and on {@code 403} alike: only a redirect or a {@code 401} proves the gate answered.
  *
  * <p>Path variables are filled with a nil-shaped UUID and, where the segment is not an id, with
  * {@code x}. A refusal never depends on the row existing.
@@ -114,7 +114,8 @@ class AnonymousSurfaceSweepMvcTest {
    * and a stubbed client that returns {@code null} makes that visible as a clean refusal instead of
    * as a connection error, which would look like the same failure for a different reason.
    */
-  @MockitoBean private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
+  @MockitoBean
+  private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
 
   /** The frontend is an OAuth2 client; the registry is what the entry point redirects through. */
   @MockitoBean
@@ -289,8 +290,7 @@ class AnonymousSurfaceSweepMvcTest {
         MockMvcRequestBuilders.request(call.method(), call.path())
             .accept(MediaType.TEXT_HTML)
             .with(csrf());
-    String location =
-        mockMvc.perform(request).andReturn().getResponse().getRedirectedUrl();
+    String location = mockMvc.perform(request).andReturn().getResponse().getRedirectedUrl();
     return location != null && location.contains("/oauth2/authorization/keycloak");
   }
 
@@ -312,9 +312,9 @@ class AnonymousSurfaceSweepMvcTest {
     }
     Assertions.assertThat(served)
         .as(
-            "REQ-SEC-052 / REQ-SEC-012: a background call from an expired session must answer 401 so"
-                + " the page can re-authenticate in place. A 2xx is data served without a session; a"
-                + " 403 means the CSRF filter answered before the gate did.")
+            "REQ-SEC-052 / REQ-SEC-012: a background call from an expired session must answer 401"
+                + " so the page can re-authenticate in place. A 2xx is data served without a"
+                + " session; a 403 means the CSRF filter answered before the gate did.")
         .isEmpty();
   }
 }

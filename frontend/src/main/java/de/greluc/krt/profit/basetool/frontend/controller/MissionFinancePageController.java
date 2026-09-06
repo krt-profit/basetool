@@ -207,8 +207,8 @@ public class MissionFinancePageController {
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
    *     amount}); {@code missionId} is stamped from the path
-   * @param principal OIDC user bound from the security context; guest vs. authenticated routing now
-   *     goes through {@code authHelper.isAnonymous()}
+   * @param principal OIDC user bound from the security context. The guest-vs-authenticated routing
+   *     it used to steer is gone with the guest (ADR-0159)
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -131,8 +131,8 @@ public class OperationPageController {
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @param principal current OIDC user, bound from the security context; the {@code showPast}
-   *     honouring now consults {@code authHelper.isAnonymous()} rather than this parameter directly
+   * @param principal current OIDC user, bound from the security context. {@code showPast} used to
+   *     be honoured only for an authenticated caller; every caller is one now (ADR-0159)
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @GetMapping

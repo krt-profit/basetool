@@ -106,7 +106,10 @@ class HomeControllerMvcTest {
     // Then: index renders normally; the toast fragment's param-gated branches stay
     //       inactive, but the rest of fragments/toast (script + style block) still
     //       runs through Thymeleaf and SpEL.
-    mockMvc.perform(get("/").with(oidcLogin())).andExpect(status().isOk()).andExpect(view().name("index"));
+    mockMvc
+        .perform(get("/").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("index"));
   }
 
   /**

@@ -64,21 +64,21 @@ import org.springframework.web.context.WebApplicationContext;
  * closed to the internet either way — this test is about the number, because the number is what the
  * rollout check reads.
  *
+ * <p><strong>Re-pinned 2026-09-06 (ADR-0159).</strong> Almost every row here changed number, and
+ * none of them changed because the vhost did: the allow-list is untouched, and the backend now
+ * refuses the caller behind each admitted path (REQ-SEC-052).
  *
- * <p><strong>Re-pinned 2026-09-06 (ADR-0159).</strong> Almost every row here changed number,
- * and none of them changed because the vhost did: the allow-list is untouched, and the
- * backend now refuses the caller behind each admitted path (REQ-SEC-052).
+ * <p>The {@code 403} rows are the ones worth understanding rather than replacing. They said {@code
+ * 403} because their path sat under a {@code permitAll} stem — the request was dispatched, refused
+ * at the method seam, and the {@code @RestControllerAdvice} rendered that. With the stem gone they
+ * are turned away at the entry point, which writes {@code 401}. Same closure, different number, and
+ * the number is what the rollout check reads.
  *
- * <p>The {@code 403} rows are the ones worth understanding rather than replacing. They said
- * {@code 403} because their path sat under a {@code permitAll} stem — the request was
- * dispatched, refused at the method seam, and the {@code @RestControllerAdvice} rendered
- * that. With the stem gone they are turned away at the entry point, which writes {@code 401}.
- * Same closure, different number, and the number is what the rollout check reads.
+ * <p>Two paths still answer {@code 200}: {@code /api/v1/terms/document} and {@code
+ * /api/v1/app/version-policy}. Both are {@code GET}-scoped, so their {@code HEAD} answers {@code
+ * 401} — asserted here and by the nightly probe, because a method-scoped rule above an all-verb one
+ * is how REQ-SEC-032 leaked a price query to a {@code HEAD} once.
  *
- * <p>Two paths still answer {@code 200}: {@code /api/v1/terms/document} and
- * {@code /api/v1/app/version-policy}. Both are {@code GET}-scoped, so their {@code HEAD}
- * answers {@code 401} — asserted here and by the nightly probe, because a method-scoped rule
- * above an all-verb one is how REQ-SEC-032 leaked a price query to a {@code HEAD} once.
  * <p>The mission id is a constant that matches nothing. Method security runs before the controller
  * body, so the refusal never depends on the row existing — and a test that needed a seeded Einsatz
  * would assert the seed as much as the rule.
@@ -407,11 +407,10 @@ class ApiVhostAnonymousSurfaceTest {
   /**
    * The same path asked for with {@code HEAD}, which is refused.
    *
-   * <p>The rule is {@code GET}-scoped and Spring Security compares the verb with
-   * {@code String.equals}, so a {@code HEAD} falls to the authenticated catch-all. That is
-   * deliberate rather than incidental: a method-scoped rule sitting above an all-verb one is how
-   * REQ-SEC-032 once served a material price query to a {@code HEAD} and returned its
-   * {@code Content-Length}.
+   * <p>The rule is {@code GET}-scoped and Spring Security compares the verb with {@code
+   * String.equals}, so a {@code HEAD} falls to the authenticated catch-all. That is deliberate
+   * rather than incidental: a method-scoped rule sitting above an all-verb one is how REQ-SEC-032
+   * once served a material price query to a {@code HEAD} and returned its {@code Content-Length}.
    *
    * @throws Exception if the request could not be performed
    */
@@ -419,8 +418,9 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAHeadOnTheVersionPolicy() throws Exception {
     mockMvc
-        .perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
-            "/api/v1/app/version-policy"))
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head(
+                "/api/v1/app/version-policy"))
         .andExpect(status().isUnauthorized());
   }
 
@@ -578,18 +578,17 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
-   * The four participant writes resolve the row <strong>before</strong> they judge the caller, so
-   * an anonymous request against a row that does not exist answers {@code 404}.
+   * The four participant writes answer {@code 401} — and this is the entry on the allow-list that
+   * changed most with ADR-0159.
    *
-   * <p>That is not the usual shape and it is deliberate on the backend's side: {@code
-   * canAccessParticipant} looks the participant up first, because a <strong>guest</strong> sign-up
-   * is editable by the anonymous creator presenting the per-row capability token minted at sign-up
-   * (REQ-SEC-018). An anonymous caller is a legitimate one here, and the refusal for a row they may
-   * not touch is {@code 403} rather than {@code 401}.
-   *
-   * <p>What this pins is that nothing is written and no success is returned. The status is written
-   * down in REQ-SEC-037 as well, so the vhost's allow-list entry is never read as "authenticated
-   * only" — it is the one entry on the list that is not.
+   * <p>They used to resolve the row <strong>before</strong> judging the caller, so an anonymous
+   * request against a row that did not exist answered {@code 404}: {@code canAccessParticipant}
+   * looked the participant up first, because a guest sign-up was editable by the anonymous creator
+   * presenting the per-row capability token minted at sign-up (REQ-SEC-018). Both halves of that
+   * are gone — {@code V239} dropped {@code guest_edit_token_hash} and REQ-SEC-052 dropped the
+   * anonymous caller — so the request never reaches the lookup and is turned away at the entry
+   * point. This was the one entry on the list that was not authenticated-only; there is no longer
+   * one.
    *
    * @throws Exception if the request could not be performed
    */
@@ -598,20 +597,22 @@ class ApiVhostAnonymousSurfaceTest {
   void shouldRefuseAnonymousParticipationWritesOnAnAbsentRow() throws Exception {
     String participant =
         "/api/v1/missions/" + ABSENT_OPERATION + "/participants/" + ABSENT_OPERATION;
-    mockMvc.perform(delete(participant + "/slim").with(csrf())).andExpect(status().isNotFound());
+    mockMvc
+        .perform(delete(participant + "/slim").with(csrf()))
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(post(participant + "/check-in/slim").with(csrf()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(post(participant + "/check-out/slim").with(csrf()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
             put(participant + "/payout-preference/slim")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"preference\":\"PAYOUT\"}"))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isUnauthorized());
   }
 
   /**
@@ -846,8 +847,12 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     // Anonymous BY DESIGN, and pinned so it stays a decision: two integers in the same permitAll
     // catalogue block as /locations and /job-types.
-    mockMvc.perform(get("/api/v1/settings/job_order.age_yellow_days")).andExpect(status().isUnauthorized());
-    mockMvc.perform(get("/api/v1/settings/job_order.age_red_days")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/settings/job_order.age_yellow_days"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/settings/job_order.age_red_days"))
+        .andExpect(status().isUnauthorized());
   }
 
   /**
@@ -879,11 +884,14 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(get("/api/v1/materials/" + ABSENT_MISSION + "/prices"))
         .andExpect(status().isUnauthorized());
-    // `GET /materials/{id}` stays ANONYMOUS by decision (REQ-SEC-037). MaterialDto is catalogue
-    // only — name, quantity type, category, flags, no price — and `/materials/search` has published
-    // those same fields anonymously since phase 2. A 404 here is the absent id, not a refusal: a
-    // real one answers 200, and admitting the path at the edge publishes what search already does.
-    mockMvc.perform(get("/api/v1/materials/" + ABSENT_MISSION)).andExpect(status().isNotFound());
+    // `GET /materials/{id}` was the last anonymous read on this family, kept because MaterialDto
+    // is catalogue only — name, quantity type, category, flags, no price — and `/materials/search`
+    // had published those same fields anonymously since phase 2. REQ-SEC-052 closed both: the
+    // public surface is an enumerated list of four backend paths and no catalogue is on it. A 401
+    // here where a 404 used to stand is the whole change in one line.
+    mockMvc
+        .perform(get("/api/v1/materials/" + ABSENT_MISSION))
+        .andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/terminals")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(get("/api/v1/material-exchange/released-item-ids"))

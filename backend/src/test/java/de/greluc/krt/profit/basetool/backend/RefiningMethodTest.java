@@ -64,7 +64,7 @@ class RefiningMethodTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
 
   @BeforeEach
   void setUp() {
@@ -75,10 +75,10 @@ class RefiningMethodTest {
     officerUser.setUsername("officerMethod");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestMethod");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestMethod");
+    userRepository.save(roleLessUser);
   }
 
   @Test
@@ -107,7 +107,7 @@ class RefiningMethodTest {
   }
 
   @Test
-  void testCreateRefiningMethod_Guest_Forbidden() throws Exception {
+  void testCreateRefiningMethod_RoleLess_Forbidden() throws Exception {
     RefiningMethod method = new RefiningMethod();
     method.setName("Hacked Method");
 
@@ -116,8 +116,8 @@ class RefiningMethodTest {
             post("/api/v1/refining-methods")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(method)))
         .andExpect(status().isForbidden());

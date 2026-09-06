@@ -9246,7 +9246,7 @@
       "put" : {
         "tags" : [ "Missions" ],
         "summary" : "Set or clear the party lead of a mission",
-        "description" : "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text guestName, mirroring the participant-add resolution: a free-text name is resolved case-insensitively against registered members (unique match links the user, multiple matches return 409, no match stores a guest handle). Submitting neither clears the party lead. The version must match the mission's current partyLeadVersion or 409 (application/problem+json) is returned.",
+        "description" : "Assigns the mission's party lead by explicit userId (from autocomplete) or by free-text guestName, mirroring the participant-add resolution: a free-text name is resolved case-insensitively against registered members (unique match links the user, multiple matches return 409, no match stores an external handle). Submitting neither clears the party lead. The version must match the mission's current partyLeadVersion or 409 (application/problem+json) is returned.",
         "operationId" : "setPartyLead",
         "parameters" : [ {
           "name" : "id",
@@ -22718,7 +22718,7 @@
       "post" : {
         "tags" : [ "Missions" ],
         "summary" : "Add a participant (slim response)",
-        "description" : "Adds a participant and returns the updated participant list as slim DTOs. Mirrors the public add-participant logic: explicit userId (autocomplete) or free-text guestName (case-insensitive resolution against registered users). Authenticated users may always add themselves; adding other registered users is restricted to managers/officers/admins. Anonymous users may only add guest entries.",
+        "description" : "Adds a participant and returns the updated participant list as slim DTOs. Mirrors the public add-participant logic: explicit userId (autocomplete) or free-text guestName (case-insensitive resolution against registered users). Callers may always add themselves; adding anyone else is restricted to managers/officers/admins.",
         "operationId" : "addParticipantSlim",
         "parameters" : [ {
           "name" : "id",
@@ -22733,7 +22733,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AddParticipantPublicRequest"
+                "$ref" : "#/components/schemas/AddExternalParticipantRequest"
               }
             }
           },
@@ -22819,8 +22819,8 @@
     "/api/v1/missions/{id}/participants/add" : {
       "post" : {
         "tags" : [ "Missions" ],
-        "summary" : "Add a participant (public)",
-        "description" : "Adds a participant by explicit userId (from autocomplete) or by free-text guestName. Free-text names are resolved case-insensitively against existing users: a unique match links the participant as a registered member; no match falls back to the guest path; multiple matches return 409 (ambiguous name).",
+        "summary" : "Add a participant",
+        "description" : "Adds a participant by explicit userId (from autocomplete) or by free-text guestName. Free-text names are resolved case-insensitively against existing users: a unique match links the participant as a registered member; no match records an external participant; multiple matches return 409 (ambiguous name).",
         "operationId" : "addParticipantPublic",
         "parameters" : [ {
           "name" : "id",
@@ -22835,7 +22835,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/AddParticipantPublicRequest"
+                "$ref" : "#/components/schemas/AddExternalParticipantRequest"
               }
             }
           },
@@ -40993,7 +40993,7 @@
       "get" : {
         "tags" : [ "org-unit-controller" ],
         "summary" : "List every active org unit",
-        "description" : "Returns the full active Staffel + Spezialkommando catalog as picker options, each with its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job Orders are cross-staffel workspaces and the picker must offer the full active list, not the caller's memberships. Open to anonymous callers because the request form is public; the payload carries no PII.",
+        "description" : "Returns the full active Staffel + Spezialkommando catalog as picker options, each with its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job Orders are cross-staffel workspaces and the picker must offer the full active list, not the caller's memberships. Members only since REQ-SEC-052; it was open to anonymous callers while the request form was.",
         "operationId" : "listActiveOrgUnits",
         "responses" : {
           "200" : {
@@ -59699,7 +59699,7 @@
         },
         "required" : [ "userId" ]
       },
-      "AddParticipantPublicRequest" : {
+      "AddExternalParticipantRequest" : {
         "type" : "object",
         "properties" : {
           "userId" : {

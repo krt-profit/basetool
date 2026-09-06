@@ -85,8 +85,7 @@ class SecurityTest {
     // REQ-SEC-052, and the headers under test are set by the filter chain for every response.
     mockMvc
         .perform(
-            get("/v3/api-docs")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().exists("Content-Security-Policy"));
@@ -105,8 +104,7 @@ class SecurityTest {
   void contentSecurityPolicyIsLockedDownForJsonOnlyBackend() throws Exception {
     mockMvc
         .perform(
-            get("/v3/api-docs")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(
             header()

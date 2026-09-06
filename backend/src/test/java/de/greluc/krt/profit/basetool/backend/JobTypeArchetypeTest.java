@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend;
 
 import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,10 +31,10 @@ import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.repository.JobTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,7 +80,10 @@ public class JobTypeArchetypeTest {
   @Test
   void testFilterByMissionArchetype() throws Exception {
     mockMvc
-        .perform(get("/api/v1/job-types").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))).param("archetype", "MISSION"))
+        .perform(
+            get("/api/v1/job-types")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .param("archetype", "MISSION"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(1)))
         .andExpect(jsonPath("$.content[0].name").value("Mission Leader"))
@@ -90,7 +93,10 @@ public class JobTypeArchetypeTest {
   @Test
   void testFilterByCrewArchetype() throws Exception {
     mockMvc
-        .perform(get("/api/v1/job-types").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))).param("archetype", "CREW"))
+        .perform(
+            get("/api/v1/job-types")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+                .param("archetype", "CREW"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(1)))
         .andExpect(jsonPath("$.content[0].name").value("Gunner"))
@@ -100,7 +106,9 @@ public class JobTypeArchetypeTest {
   @Test
   void testNoFilterReturnsAll() throws Exception {
     mockMvc
-        .perform(get("/api/v1/job-types").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .perform(
+            get("/api/v1/job-types")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content", hasSize(2)));
   }

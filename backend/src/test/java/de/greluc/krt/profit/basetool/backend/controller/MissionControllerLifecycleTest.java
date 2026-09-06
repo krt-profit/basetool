@@ -68,7 +68,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
@@ -231,7 +230,6 @@ class MissionControllerLifecycleTest {
         .thenReturn(page);
     // Only the crowded mission has participants; the empty one produced no row at all.
     when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
 
     controller.getAllMissions(null, null, null);
 
@@ -248,7 +246,7 @@ class MissionControllerLifecycleTest {
   // referencing it in verify(...) triggers an expected, unavoidable [removal] warning.
   @Test
   @SuppressWarnings("removal")
-  void getAllMissions_authenticatedCaller_routesThroughSearchMissionsForSquadronScope() {
+  void getAllMissions_routesThroughSearchMissionsForSquadronScope() {
     Mission m = new Mission();
     MissionListDto listDto =
         new MissionListDto(
@@ -282,8 +280,8 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // Registered member (or above) → full scoped search, no anonymous status restriction.
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    // The member check that used to stand here is the @PreAuthorize gate now (REQ-SEC-052), so
+    // every caller reaching the method body is one and there is no second shape to distinguish.
 
     PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
 
@@ -301,135 +299,18 @@ class MissionControllerLifecycleTest {
     verify(missionService, never()).getAllMissions(any(Pageable.class));
   }
 
-  @Test
-  void getAllMissions_anonymousCaller_restrictedToPlannedAndActiveNonInternal() {
-    Mission m = new Mission();
-    MissionListDto listDto =
-        new MissionListDto(
-            UUID.randomUUID(),
-            "Op",
-            null,
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            0L,
-            1L);
-    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
-    when(missionService.searchMissions(
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(List.of("PLANNED", "ACTIVE")),
-            eq(false),
-            eq(null),
-            any(Pageable.class)))
-        .thenReturn(page);
-    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
-    when(authHelperService.isMemberOrAbove()).thenReturn(false);
-
-    PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
-
-    // Outsiders MUST be silently restricted to PLANNED+ACTIVE non-internal missions — this is the
-    // only place where the "guests do not see completed/cancelled/internal" rule is enforced on the
-    // list endpoint. Pin the exact argument shape so a refactor that "simplifies" the outsider
-    // branch cannot silently widen the guest view.
-    assertThat(result.content()).containsExactly(listDto);
-    verify(missionService)
-        .searchMissions(
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(List.of("PLANNED", "ACTIVE")),
-            eq(false),
-            eq(null),
-            any(Pageable.class));
-  }
+  // Three cases stood here: an outsider's list and search silently restricted to
+  // PLANNED+ACTIVE non-internal missions, and a forbidden status filter answered with an
+  // empty page instead of a 403. The branch they pinned is gone with its audience
+  // (ADR-0159): both endpoints now carry
+  // @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()"), so the
+  // caller the restriction existed for is refused before the method runs. What a member may
+  // see is decided in the service's org-unit scope, which OwnerScopeServiceTest covers.
 
   // ── GET /api/v1/missions/search (anonymous filtering / empty-after-filter) ──
 
   @Test
-  void searchMissions_anonymous_emptyAfterFilter_returnsEmptyPageWithoutHittingService() {
-    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
-    when(authHelperService.isMemberOrAbove()).thenReturn(false);
-    PageResponse<MissionListDto> result =
-        controller.searchMissions(
-            null, null, null, List.of("COMPLETED"), null, 0, 20, null); // guest wants COMPLETED
-
-    // Guest passed a status that is not in the allow-list. The controller MUST return an empty
-    // page (not 403, not "everything-anyway") and MUST NOT hit the service — pinning this
-    // protects the "UI degrades silently for guests" contract. A regression that falls through
-    // to the service would either leak completed missions OR fail with NPE on the empty filter.
-    assertThat(result.content()).isEmpty();
-    assertThat(result.totalElements()).isZero();
-    verify(missionService, never())
-        .searchMissions(any(), any(), any(), any(), any(), any(), any(Pageable.class));
-  }
-
-  @Test
-  void searchMissions_anonymous_statusFilterIntersectedWithAllowList() {
-    Mission m = new Mission();
-    MissionListDto listDto =
-        new MissionListDto(
-            UUID.randomUUID(),
-            "Op",
-            null,
-            null,
-            "ACTIVE",
-            null,
-            null,
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            0L,
-            1L);
-    Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
-    when(missionService.searchMissions(
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(List.of("ACTIVE")),
-            eq(false),
-            eq(null),
-            any(Pageable.class)))
-        .thenReturn(page);
-    when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // Outsider = anonymous OR authenticated role-less GUEST (isMemberOrAbove == false).
-    when(authHelperService.isMemberOrAbove()).thenReturn(false);
-
-    PageResponse<MissionListDto> result =
-        controller.searchMissions(
-            null, null, null, List.of("ACTIVE", "COMPLETED"), null, 0, 20, null);
-
-    // Guest passed ["ACTIVE", "COMPLETED"]; intersection with the allow-list ["PLANNED","ACTIVE"]
-    // is ["ACTIVE"]. Pin the intersection result — a refactor that swapped intersect for union
-    // would leak COMPLETED missions to anonymous viewers.
-    assertThat(result.content()).containsExactly(listDto);
-    verify(missionService)
-        .searchMissions(
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(List.of("ACTIVE")),
-            eq(false),
-            eq(null),
-            any(Pageable.class));
-  }
-
-  @Test
-  void searchMissions_authenticated_passesStatusFilterVerbatim() {
+  void searchMissions_passesStatusFilterVerbatim() {
     Mission m = new Mission();
     MissionListDto listDto =
         new MissionListDto(
@@ -463,8 +344,8 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // Registered member (or above) → status filter passes through verbatim, internals included.
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    // Verbatim for every caller now: the status filter had one other shape, and it belonged to the
+    // outsider the endpoint no longer admits (REQ-SEC-052).
 
     PageResponse<MissionListDto> result =
         controller.searchMissions(
@@ -482,85 +363,36 @@ class MissionControllerLifecycleTest {
             any(Pageable.class));
   }
 
-  // ── GET /api/v1/missions/{id} (guest blocks + redaction) ─────────────
+  // ── GET /api/v1/missions/{id} (peer redaction) ───────────────────────
 
   @Test
-  void getMissionById_authenticatedCaller_returnsFullDtoUnchanged() {
+  void getMissionById_logisticianCaller_returnsFullDtoUnchanged() {
     UUID id = UUID.randomUUID();
     Mission entity = new Mission();
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(entity);
     when(missionMapper.toDto(entity)).thenReturn(full);
-    // Registered member (or above) → not an outsider → full DTO, no redaction.
-    when(authHelperService.isMemberOrAbove()).thenReturn(true);
+    // Logistician or above → no redaction pass. The line used to read isMemberOrAbove: the DTO
+    // was full for every member and redacted only for the outsider tier. With that tier gone the
+    // one surviving distinction is REQ-SEC-007's, which is drawn at Logistician.
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     MissionDto result = controller.getMissionById(id);
 
-    // Member caller — owner/managers/PII flow through unchanged. Pin the "isSameAs" so a future
-    // change that ALWAYS goes through the outsider redaction (e.g. as a "safety net") would surface
-    // here as a different identity.
+    // Owner/managers/PII flow through unchanged. Pin the "isSameAs" so a future change that
+    // ALWAYS redacts (e.g. as a "safety net") would surface here as a different identity.
     assertThat(result).isSameAs(full);
   }
 
-  @Test
-  void getMissionById_guest_internalMission_throws403() {
-    UUID id = UUID.randomUUID();
-    Mission internal = new Mission();
-    internal.setIsInternal(true);
-    internal.setStatus("PLANNED");
-    when(missionService.getMissionById(id)).thenReturn(internal);
-    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
-
-    try {
-      controller.getMissionById(id);
-      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
-    } catch (AccessDeniedException expected) {
-      // ok
-    }
-
-    // Critical: the mapper MUST NOT be called for forbidden guest reads, otherwise an exception
-    // inside the mapper would leak data via the exception message in some edge case.
-    verify(missionMapper, never()).toDto(any(Mission.class));
-  }
+  // Three cases stood here: an outsider refused (403) on an internal mission and on a
+  // COMPLETED / CANCELLED one. Both throws lived in the controller and belonged to the
+  // outsider tier. Visibility for a member has always been decided one layer up by
+  // @ownerScopeService.canSeeMission(#id) — own Staffel, or any non-internal mission
+  // organisation-wide — which is where the internal-mission rule still is and where
+  // OwnerScopeServiceTest tests it. A terminal mission was never hidden from a member.
 
   @Test
-  void getMissionById_guest_completedMission_throws403() {
-    UUID id = UUID.randomUUID();
-    Mission completed = new Mission();
-    completed.setIsInternal(false);
-    completed.setStatus("COMPLETED");
-    when(missionService.getMissionById(id)).thenReturn(completed);
-    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
-
-    try {
-      controller.getMissionById(id);
-      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
-    } catch (AccessDeniedException expected) {
-      // ok
-    }
-    verify(missionMapper, never()).toDto(any(Mission.class));
-  }
-
-  @Test
-  void getMissionById_guest_cancelledMission_throws403() {
-    UUID id = UUID.randomUUID();
-    Mission cancelled = new Mission();
-    cancelled.setIsInternal(false);
-    cancelled.setStatus("CANCELLED");
-    when(missionService.getMissionById(id)).thenReturn(cancelled);
-    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
-
-    try {
-      controller.getMissionById(id);
-      org.junit.jupiter.api.Assertions.fail("Expected AccessDeniedException");
-    } catch (AccessDeniedException expected) {
-      // ok
-    }
-    verify(missionMapper, never()).toDto(any(Mission.class));
-  }
-
-  @Test
-  void getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii() {
+  void getMissionById_peer_keepsRosterButStripsPii() {
     UUID id = UUID.randomUUID();
     Mission planned = new Mission();
     planned.setIsInternal(false);
@@ -568,27 +400,28 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
-    // Outsider = anonymous OR authenticated role-less GUEST.
-    when(authHelperService.isMemberOrAbove()).thenReturn(false);
+    // A member below Logistician — the only redacted tier left (REQ-SEC-007).
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
     MissionDto result = controller.getMissionById(id);
 
-    // Outsider redaction (cleanupOutsiderMissionForPeer): on top of the member-peer redaction the
-    // free-text description is hidden and — per ADR-0034 / REQ-SEC-021 — each participant's
-    // payoutPreference and free-text comment are stripped. Organisation, the participant roster
-    // (public callsign tuple), units and frequencies stay visible (explicit product decision);
-    // participant PII and owner / managers / internal economy are still stripped, and the finance
-    // ledger stays member-only on its own endpoints.
+    // Peer redaction (cleanupMissionForPeer): the roster stays, its PII does not. Owner, managers
+    // and the edit flags are cleared; organisation, units, frequencies and the free-text
+    // description stay visible. The description used to be hidden here — that was the outsider
+    // tier's one extra field, and its audience was people outside the organisation. A peer is a
+    // member of it and reads the mission's own text (ADR-0159).
     assertThat(result).isNotNull();
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
-    // The only field hidden from outsiders beyond the peer redaction.
-    assertThat(result.description()).isNull();
-    // Still stripped: owner / managers / edit flags / internal economy.
+    assertThat(result.description()).isEqualTo("internal description");
+    // Stripped: owner / managers.
     assertThat(result.owner()).isNull();
     assertThat(result.managers()).isNull();
-    assertThat(result.canEdit()).isFalse();
-    assertThat(result.canManageManagers()).isFalse();
+    // NOT stripped: what the CALLER may do. A MISSION_MANAGER sits below Logistician (the
+    // hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN),
+    // so forcing these off would hide the management controls from the Einsatz's own manager.
+    assertThat(result.canEdit()).isTrue();
+    assertThat(result.canManageManagers()).isTrue();
     // #1138: the mission economy (inventory / refinery orders) is no longer part of MissionDto —
     // there is nothing to assert empty here; it is served member-gated at its own endpoints.
     // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
@@ -599,18 +432,17 @@ class MissionControllerLifecycleTest {
     assertThat(rosterUser.username()).isEqualTo("alice");
     assertThat(rosterUser.email()).isNull();
     assertThat(rosterUser.roles()).isNull();
-    // ADR-0034 / REQ-SEC-021: payout intent + free-text comment are NOT exposed to outsiders (the
-    // fixture sets payoutPreference=PAYOUT and comment="comment"; both come back null).
-    assertThat(rosterParticipant.payoutPreference()).isNull();
-    assertThat(rosterParticipant.comment()).isNull();
+    // Payout intent and the free-text comment survive the peer tier: they were stripped for the
+    // outsider (ADR-0034 / REQ-SEC-021), and among members they are what the sign-up sheet is for.
+    assertThat(rosterParticipant.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
+    assertThat(rosterParticipant.comment()).isEqualTo("comment");
   }
 
   // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────
 
   @Test
   void getNextMission_noMission_returns204() {
-    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider
-    when(missionService.getNextMission(false)).thenReturn(Optional.empty());
+    when(missionService.getNextMission(true)).thenReturn(Optional.empty());
 
     ResponseEntity<MissionDto> response = controller.getNextMission();
 
@@ -619,31 +451,32 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getNextMission_guest_allowInternalIsFalse_andResponseRedacted() {
+  void getNextMission_peer_allowInternalIsTrue_andResponseRedacted() {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
-    when(authHelperService.isMemberOrAbove()).thenReturn(false); // outsider (anonymous or GUEST)
-    when(missionService.getNextMission(false)).thenReturn(Optional.of(upcoming));
+    // A member below Logistician.
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+    when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
     ResponseEntity<MissionDto> response = controller.getNextMission();
 
-    // allowInternal=false MUST be passed to the service for an outsider — otherwise the service
-    // might surface an internal mission that the cleanup pass would only blank out a few fields of.
-    // Pin both the boolean AND the post-cleanup redacted owner.
-    verify(missionService).getNextMission(false);
+    // allowInternal is true for every caller now. It was false for the outsider tier, whose whole
+    // point was that internal missions must not surface at all; a peer is a member of the
+    // organisation, is scoped by canSeeMission like anyone else, and reads the redacted DTO.
+    verify(missionService).getNextMission(true);
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().owner()).isNull();
   }
 
   @Test
-  void getNextMission_member_allowInternalIsTrue_andDtoUnchanged() {
+  void getNextMission_logistician_dtoUnchanged() {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
-    when(authHelperService.isMemberOrAbove()).thenReturn(true); // registered member or above
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
     when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
@@ -666,6 +499,9 @@ class MissionControllerLifecycleTest {
     when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
+    // Logistician, so the response is not redacted and stays identity-comparable. What an
+    // ORDINARY member gets back is the subject of joinMission_member_getsTheRedactedMission().
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
@@ -693,6 +529,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, desiredJobTypeId, null, null, PayoutPreference.DONATE))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     MissionDto result =
         controller.joinMission(
@@ -719,6 +556,7 @@ class MissionControllerLifecycleTest {
             missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     // A member who picks a payout but no Funktion: the unanswered field means "no preference",
     // never "clear it".
@@ -729,6 +567,35 @@ class MissionControllerLifecycleTest {
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .addParticipant(missionId, callerId, null, null, null, null, PayoutPreference.PAYOUT);
+  }
+
+  /**
+   * The defect this endpoint carried until ADR-0159: {@code joinMission} returned the mission
+   * <b>unredacted</b> — roster, owner, managers and every participant's e-mail — to whoever had
+   * just joined. That caller is by definition an ordinary member, the one person on the mission
+   * surface most likely to sit below Logistician, so the endpoint leaked precisely to the audience
+   * REQ-SEC-007 exists for. The ArchUnit rule that should have caught it selected only gates
+   * WITHOUT {@code isAuthenticated()}, and this gate has always had one.
+   */
+  @Test
+  void joinMission_member_getsTheRedactedMission() {
+    Jwt jwt = jwt("alice-sub");
+    UUID callerId = UUID.randomUUID();
+    UUID missionId = UUID.randomUUID();
+    Mission persisted = new Mission();
+    MissionDto full = fullMissionDto(missionId);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
+    when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
+        .thenReturn(persisted);
+    when(missionMapper.toDto(persisted)).thenReturn(full);
+    when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
+
+    MissionDto result = controller.joinMission(jwt, missionId, null);
+
+    assertThat(result).isNotSameAs(full);
+    assertThat(result.owner()).isNull();
+    assertThat(result.managers()).isNull();
+    assertThat(result.participants().iterator().next().user().email()).isNull();
   }
 
   // ── PATCH /api/v1/missions/{id}/core ─────────────────────────────────

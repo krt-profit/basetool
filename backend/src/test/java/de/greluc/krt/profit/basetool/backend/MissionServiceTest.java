@@ -130,15 +130,22 @@ class MissionServiceTest {
     verify(missionRepository).findById(id);
   }
 
-  // covers REQ-MISSION-008 — an anonymous/membershipless caller keeps the unscoped public fallback
+  // covers REQ-MISSION-008 — the allowInternal=false branch of the unscoped fallback.
+  //
+  // Its caller was the anonymous/role-less tier, which ADR-0159 removed: MissionController passes
+  // `true` unconditionally now. The parameter and this repository variant are kept for API
+  // consumers that ask for the organisation-wide-only view, so the branch is pinned rather than
+  // deleted — an untested branch that nothing calls is how a wrong query survives until the day
+  // something calls it again.
   @Test
-  void getNextMission_guest_usesInternalFalseVariantThenRefetches() {
+  void getNextMission_allowInternalFalse_usesTheIsInternalFalseVariantThenRefetches() {
     UUID id = UUID.randomUUID();
     Mission head = new Mission();
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false → public.
+    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false narrows
+    // it to organisation-wide missions.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository

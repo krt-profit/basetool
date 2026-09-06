@@ -56,8 +56,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *       Empty for non-admin / anonymous callers (they never see the switcher control).
  *   <li>{@code availableOrgUnits} — the merged Squadron + SpecialCommand switcher catalogue.
  *   <li>{@code isAllSquadronsMode} — {@code true} when an admin is currently viewing the
- *       cross-staffel union (no active selection). Members and guests never enter this mode and
- *       always see {@code false}.
+ *       cross-staffel union (no active selection). A non-admin member never enters this mode and
+ *       always sees {@code false}.
  * </ul>
  *
  * <p>These attributes are consumed cross-bean: {@code appTitle} (in {@code LayoutMiscAdvice}) reads

@@ -74,8 +74,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * UserReconciliationService#syncUser(Jwt)} (the per-login hot path), {@link
  * UserReconciliationService#syncUser(KeycloakUserDto)} (the scheduled Admin-API sync), {@link
  * UserReconciliationService#markMissingUsers}, the role mapping ({@link
- * UserReconciliationService#extractRolesFromJwt} + the Guest fallback) and the sync-input catalogs
- * ({@link UserReconciliationService#getMappableRoleNames} / {@link
+ * UserReconciliationService#extractRolesFromJwt}) and the sync-input catalogs ({@link
+ * UserReconciliationService#getMappableRoleNames} / {@link
  * UserReconciliationService#getKnownDiscordLinkedUserIds}).
  *
  * <p>The subject is a real {@link UserReconciliationService} wired to a real {@link
@@ -199,8 +199,6 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(jwt).user();
@@ -208,8 +206,11 @@ class UserReconciliationServiceTest {
       assertEquals(USER_ID, result.getId());
       assertEquals("alice", result.getUsername());
       assertEquals("alice@example.com", result.getEmail());
-      assertEquals(1, result.getRoles().size());
-      assertEquals("Guest", result.getRoles().iterator().next().getName());
+      // REQ-SEC-053: a token carrying no realm role creates a role-less row. It used to be given
+      // the seeded Guest fallback, and the account then reached the anonymous families the URL
+      // matrix admitted — "no role" quietly meant "the guest surface". The row is honest now, and
+      // the next request on it is refused with 403 NO_ROLE until the realm grants something.
+      assertTrue(result.getRoles().isEmpty());
       verify(userRepository, times(1)).save(any(User.class));
       // A brand-new user is granted the default blueprints synchronously (REQ-INV-016).
       verify(defaultBlueprintProvisioningService).grantDefaultsToUser(USER_ID);
@@ -235,8 +236,6 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of(otherAccountId));
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(jwt).user();
@@ -258,8 +257,6 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of(UUID.randomUUID()));
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(jwt);
@@ -277,8 +274,6 @@ class UserReconciliationServiceTest {
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(jwt);
@@ -301,11 +296,13 @@ class UserReconciliationServiceTest {
       User existing = newUser(USER_ID, "alice");
       existing.setEmail("alice@example.com");
       existing.setVersion(2L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       User result = userReconciliationService.syncUser(jwt).user();
 
@@ -339,8 +336,11 @@ class UserReconciliationServiceTest {
 
       User existing = newUser(USER_ID, "alice");
       existing.setVersion(1L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
       when(roleRepository.findByNameIgnoreCase("ADMIN")).thenReturn(Optional.of(role(1L, "ADMIN")));
@@ -361,14 +361,12 @@ class UserReconciliationServiceTest {
       Jwt jwt = newJwt(USER_ID.toString(), Map.of()); // no claims at all
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(jwt).user();
 
       // Even though every JWT claim is null and every field stays null,
-      // changed==true via the role-sync block (empty Keycloak roles -> Guest)
+      // changed==true via the role-sync block (empty Keycloak roles -> the empty set)
       // and additionally user.isNew()==true.
       verify(userRepository, times(1)).save(result);
     }
@@ -394,12 +392,14 @@ class UserReconciliationServiceTest {
       existing.setEmail("alice@example.com");
       existing.setVersion(1L);
       oldFieldSetter.accept(existing, oldValue);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
       lenient().when(userRepository.findIdsByUsername(any())).thenReturn(List.of());
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(jwt);
@@ -419,8 +419,6 @@ class UserReconciliationServiceTest {
     @Test
     void newDiscordNonAdmin_landsPending_andNotifiesAdmins() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
@@ -455,8 +453,6 @@ class UserReconciliationServiceTest {
     @Test
     void newDiscordLogin_ignoresMatchingCredentialUsername_landsPending() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
@@ -480,8 +476,6 @@ class UserReconciliationServiceTest {
       // still notifies every admin.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
@@ -532,8 +526,6 @@ class UserReconciliationServiceTest {
       setField(userRegistrationService, "requireApproval", false);
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.findIdsByUsername("discorduser")).thenReturn(List.of());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(false, List.of())).user();
@@ -547,8 +539,6 @@ class UserReconciliationServiceTest {
       // covers REQ-DATA-008 — the per-guild server nickname claim is persisted (trimmed) for
       // display in the admin approval queue.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       Jwt jwt =
@@ -571,8 +561,6 @@ class UserReconciliationServiceTest {
       // covers REQ-DATA-008 — the nickname capture is best-effort/optional: an absent claim leaves
       // the field null rather than failing the login.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       User result = userReconciliationService.syncUser(discordJwt(true, List.of())).user();
@@ -607,9 +595,9 @@ class UserReconciliationServiceTest {
    *
    * <p>The omitted role these cases are written around was {@code Admin} until the 2026-09-02
    * reversal, and {@code Admin} is still the sharpest illustration — which is why the fixtures keep
-   * using it. It is now a stand-in for {@code Guest} / {@code Logistician} / {@code Mission
-   * Manager} rather than the live case, and the rule under test is unchanged either way: what
-   * matters is that the claim is *partial*, not which role is missing from it.
+   * using it. It is now a stand-in for {@code Logistician} / {@code Mission Manager} rather than
+   * the live case, and the rule under test is unchanged either way: what matters is that the claim
+   * is *partial*, not which role is missing from it.
    *
    * <p>These cases pin both halves, because either alone is a defect: the row must survive the
    * partial claim, and the request must still be authorised by it.
@@ -648,9 +636,11 @@ class UserReconciliationServiceTest {
      * An administrator opening the app keeps {@code Admin} in the database.
      *
      * <p>This is the regression that motivated the requirement. Measured on the test stack before
-     * the guard existed, an account holding Admin + Officer + KRT Member was left holding {@code
-     * Guest} alone after one app login - and the same mechanism, once the client's scope carried
-     * the member roles, still stripped {@code Admin} specifically.
+     * the guard existed, an account holding Admin + Officer + KRT Member was left holding the
+     * {@code Guest} fallback alone after one app login (the role {@code V239} has since deleted) -
+     * and the same mechanism, once the client's scope carried the member roles, still stripped
+     * {@code Admin} specifically. Since REQ-SEC-053 the same bug would lock the account out
+     * outright rather than reduce it to a guest view.
      */
     @Test
     void doesNotOverwriteTheStoredRoles_whenTheClaimComesFromAPartialScopeClient() {
@@ -726,8 +716,8 @@ class UserReconciliationServiceTest {
      * A first-ever login through the app does persist its roles.
      *
      * <p>There is no stored set to protect on a brand-new row, and the alternative is writing a
-     * member with no roles at all - which the Guest fallback would then stand in for permanently.
-     * The next complete-claim login or Admin-API pass widens it.
+     * member with no roles at all - which since REQ-SEC-053 is an account refused with {@code
+     * NO_ROLE} until something widens it. The next complete-claim login or Admin-API pass does.
      */
     @Test
     void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
@@ -814,8 +804,6 @@ class UserReconciliationServiceTest {
       existing.setVersion(1L);
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
 
       userReconciliationService.syncUser(
           new KeycloakUserDto(USER_ID, "alice", null, true, Set.of(), null));
@@ -827,8 +815,6 @@ class UserReconciliationServiceTest {
     @Test
     void createsNewUser_whenIdUnknown() {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
 
       userReconciliationService.syncUser(
           new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
@@ -842,8 +828,6 @@ class UserReconciliationServiceTest {
       // scheduled sync lands PENDING, so the scheduler can never pre-create an ACTIVE row that a
       // later login would inherit (created == false) and use to skip the approval gate.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
@@ -874,8 +858,6 @@ class UserReconciliationServiceTest {
       // interactive login) must also notify the admins. Gated on `created`, so it fires exactly
       // once across the two sync paths.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(role(99L, "Guest")));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
@@ -909,11 +891,13 @@ class UserReconciliationServiceTest {
       existing.setInKeycloak(true);
       existing.setApprovalStatus(ApprovalStatus.PENDING);
       existing.setVersion(2L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       userReconciliationService.syncUser(
           new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
@@ -927,11 +911,13 @@ class UserReconciliationServiceTest {
       existing.setEmail("alice@example.com");
       existing.setInKeycloak(true);
       existing.setVersion(3L);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       userReconciliationService.syncUser(
           new KeycloakUserDto(USER_ID, "alice", "alice@example.com", true, Set.of(), null));
@@ -949,11 +935,13 @@ class UserReconciliationServiceTest {
       existing.setInKeycloak(true);
       existing.setVersion(4L);
       existing.setDiscordUserId(null);
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
       userReconciliationService.syncUser(
@@ -974,11 +962,13 @@ class UserReconciliationServiceTest {
       existing.setInKeycloak(true);
       existing.setVersion(2L);
       existing.setDiscordUserId("123456789012345678");
-      Role guest = role(99L, "Guest");
-      existing.setRoles(new HashSet<>(Set.of(guest)));
+      // REQ-SEC-053: the account carries NO role. This used to be the seeded Guest fallback,
+      // which is what an account whose realm roles map to nothing was given until V239 deleted
+      // it. The empty set is the honest shape now — and, matching what the token maps to, it is
+      // what makes this a no-change sync.
+      existing.setRoles(new HashSet<>());
 
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-      when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(guest));
 
       userReconciliationService.syncUser(
           new KeycloakUserDto(USER_ID, "linked", "l@example.com", true, Set.of(), null));
@@ -1024,11 +1014,22 @@ class UserReconciliationServiceTest {
   }
 
   // ---------------------------------------------------------------
-  // mapRoles (via syncUser) — Guest fallback when none match
+  // mapRoles (via syncUser) — the honest empty set when none match
   // ---------------------------------------------------------------
 
+  /**
+   * REQ-SEC-053 / ADR-0159: a token whose realm roles resolve to nothing produces an account with
+   * NO roles, not one holding the {@code Guest} fallback.
+   *
+   * <p>The fallback existed so that "no role" still had somewhere to sit, and the URL matrix's
+   * anonymous families then let {@code GUEST} through — which made "no role" quietly mean "the
+   * guest surface". {@code V239} deleted the role; the empty set is what the sync now writes, and
+   * {@code CustomJwtGrantedAuthoritiesConverter} turns it into {@code ROLE_NO_ROLE}, which {@code
+   * PendingApprovalAccessFilter} refuses with {@code 403 NO_ROLE}. Writing a role the account does
+   * not hold was the thing that hid this state for years.
+   */
   @Test
-  void mapRoles_fallsBackToGuest_whenNoKeycloakRoleMatchesLocal() {
+  void mapRoles_writesNoRole_whenNoKeycloakRoleMatchesLocal() {
     Jwt jwt =
         newJwt(
             USER_ID.toString(),
@@ -1042,25 +1043,28 @@ class UserReconciliationServiceTest {
     when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
     when(roleRepository.findByNameIgnoreCase("UNKNOWN_ROLE_FROM_OTHER_REALM"))
         .thenReturn(Optional.empty());
-    when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
     User result = userReconciliationService.syncUser(jwt).user();
 
-    assertEquals(1, result.getRoles().size());
-    assertEquals("Guest", result.getRoles().iterator().next().getName());
+    assertTrue(result.getRoles().isEmpty(), "an unmatched realm role grants nothing");
   }
 
   @Test
-  void mapRoles_nullRoleNames_alsoFallsBackToGuest() {
-    // KeycloakUserDto.roles() == null is treated as empty.
+  void mapRoles_nullRoleNames_alsoWriteNoRole() {
+    // KeycloakUserDto.roles() == null is treated as empty. Nothing is looked up, because there is
+    // no longer a name to fall back to — the sync used to read the Guest row on this exact path.
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-    when(roleRepository.findByNameIgnoreCase("Guest")).thenReturn(Optional.of(role(99L, "Guest")));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
     userReconciliationService.syncUser(
         new KeycloakUserDto(USER_ID, "alice", null, true, null, null));
 
-    verify(roleRepository, times(1)).findByNameIgnoreCase("Guest");
+    // The Admin-API overload returns void, so the written row is captured instead.
+    org.mockito.ArgumentCaptor<User> saved = org.mockito.ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(saved.capture());
+    assertTrue(saved.getValue().getRoles().isEmpty(), "a null role list grants nothing");
+    verify(roleRepository, never()).findByNameIgnoreCase(any());
   }
 
   // ---------------------------------------------------------------
@@ -1137,12 +1141,11 @@ class UserReconciliationServiceTest {
     }
 
     @Test
-    void aMassGuestFallback_escalatesToWarn_withCountsOnly() {
+    void aMassRoleStrip_escalatesToWarn_withCountsOnly() {
       // A realm-side role rename: every holder's role name stops resolving, so each account is
-      // re-mapped onto the Guest fallback. Four accounts is one past the threshold.
+      // left with no role at all — which since REQ-SEC-053 means refused, not reduced. Four
+      // accounts is one past the threshold.
       when(roleRepository.findByNameIgnoreCase("Officer")).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       for (int i = 0; i < 4; i++) {
         syncDemotedAccount();
       }
@@ -1153,16 +1156,15 @@ class UserReconciliationServiceTest {
       assertEquals(Level.WARN, event.getLevel());
       String message = event.getFormattedMessage();
       assertTrue(message.contains("4 accounts changed roles"), message);
-      assertTrue(message.contains("4 of them re-mapped onto the Guest fallback"), message);
+      assertTrue(
+          message.contains("4 of them left with NO role and now refused with NO_ROLE"), message);
       // REQ-OBS-004: counts only — never the callsign / preferred_username of a demoted account.
       assertFalse(message.contains("demoted-callsign"), message);
     }
 
     @Test
-    void aSingleGuestFallback_staysAtInfo_andTheTalliesResetForTheNextRun() {
+    void aSingleRoleStrip_staysAtInfo_andTheTalliesResetForTheNextRun() {
       when(roleRepository.findByNameIgnoreCase("Officer")).thenReturn(Optional.empty());
-      when(roleRepository.findByNameIgnoreCase("Guest"))
-          .thenReturn(Optional.of(codeRole("GUEST", "Guest")));
       syncDemotedAccount();
 
       userReconciliationService.logRoleSyncSummary();
@@ -1222,10 +1224,11 @@ class UserReconciliationServiceTest {
 
     @Test
     void getMappableRoleNames_returnsTheLocalRoleCatalogNames() {
-      when(roleRepository.findAllNames()).thenReturn(Set.of("ADMIN", "OFFICER", "Guest"));
+      when(roleRepository.findAllNames()).thenReturn(Set.of("ADMIN", "OFFICER", "Bereichsleitung"));
 
       assertEquals(
-          Set.of("ADMIN", "OFFICER", "Guest"), userReconciliationService.getMappableRoleNames());
+          Set.of("ADMIN", "OFFICER", "Bereichsleitung"),
+          userReconciliationService.getMappableRoleNames());
       verify(roleRepository).findAllNames();
     }
 

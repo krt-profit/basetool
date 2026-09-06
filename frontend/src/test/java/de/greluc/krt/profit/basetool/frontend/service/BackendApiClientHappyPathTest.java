@@ -114,20 +114,6 @@ class BackendApiClientHappyPathTest {
   }
 
   @Test
-  void get_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.get("/api/v1/x", String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertNotNull(req);
-    assertEquals(
-        "public",
-        req.getHeader("X-Auth"),
-        "get(uri, Class, isPublic=true) must use the public WebClient");
-  }
-
-  @Test
   void get_withParameterizedType_parsesList() {
     server.enqueue(jsonOk("[\"a\",\"b\",\"c\"]"));
 
@@ -136,15 +122,14 @@ class BackendApiClientHappyPathTest {
     assertEquals(List.of("a", "b", "c"), result);
   }
 
-  @Test
-  void get_withParameterizedType_andIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("[]"));
-
-    client.get("/api/v1/list", new ParameterizedTypeReference<List<String>>() {});
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-  }
+  // Eight cases stood across this class, one per verb, each proving that passing
+  // `isPublic = true` selected the public WebClient. The flag, every `isPublic` overload
+  // and `getPublic` are gone (ADR-0159): there is no anonymous backend call left to make
+  // except the terms document, which has its own client and its own named method. What
+  // those cases were really protecting — that a caller cannot pick the unauthenticated
+  // transport by accident — is now a property of the API's shape, and is pinned once by
+  // everyVerbUsesTheAuthenticatedClient() and
+  // getTermsDocumentAnonymously_isTheOnlyCallOnTheAnonymousClient() below.
 
   @Test
   void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
@@ -171,6 +156,58 @@ class BackendApiClientHappyPathTest {
         "URI-variable GET must use the authenticated WebClient");
   }
 
+  /**
+   * REQ-SEC-052: every verb goes out on the authenticated client. The class used to prove the
+   * opposite eight times over — once per verb, that the {@code isPublic} flag selected the
+   * anonymous transport. One case each way is what the surface can still be wrong about.
+   *
+   * @throws Exception if a request could not be read back from the stub server
+   */
+  @Test
+  void everyVerbUsesTheAuthenticatedClient() throws Exception {
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("\"x\""));
+    server.enqueue(jsonOk("[]"));
+
+    client.get("/api/v1/things", String.class);
+    client.post("/api/v1/things", "body", String.class);
+    client.put("/api/v1/things/1", "body", String.class);
+    client.patch("/api/v1/things/1", "body", String.class);
+    client.delete("/api/v1/things/1", String.class);
+    client.get("/api/v1/list", new ParameterizedTypeReference<List<String>>() {});
+
+    for (int i = 0; i < 6; i++) {
+      RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+      assertNotNull(req);
+      assertEquals(
+          "authenticated",
+          req.getHeader("X-Auth"),
+          "no verb may reach the backend without the caller's token: " + req.getPath());
+    }
+  }
+
+  /**
+   * The one exception, and the reason it is a named method rather than a flag: the Nutzungs-
+   * bedingungen have to be readable before anyone has accepted them, so the consent gate has
+   * something to point at. It is one of the four public backend paths REQ-SEC-052 enumerates.
+   *
+   * @throws Exception if the request could not be read back from the stub server
+   */
+  @Test
+  void getTermsDocumentAnonymously_isTheOnlyCallOnTheAnonymousClient() throws Exception {
+    server.enqueue(jsonOk("{\"version\":\"1\",\"markdown\":\"text\"}"));
+
+    client.getTermsDocumentAnonymously();
+
+    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(req);
+    assertEquals("public", req.getHeader("X-Auth"));
+    assertEquals("/api/v1/terms/document", req.getPath());
+  }
+
   // ── getCached ───────────────────────────────────────────────────────────
   // The @Cacheable annotation is a no-op outside a Spring application
   // context, so the body executes normally — that's all we need to cover.
@@ -187,16 +224,6 @@ class BackendApiClientHappyPathTest {
   }
 
   @Test
-  void getCached_withClassResponseType_andIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-  }
-
-  @Test
   void getCached_withParameterizedType_parsesBody() {
     server.enqueue(jsonOk("[1,2,3]"));
 
@@ -204,17 +231,6 @@ class BackendApiClientHappyPathTest {
         client.getCached(CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<>() {});
 
     assertEquals(List.of(1, 2, 3), result);
-  }
-
-  @Test
-  void getCached_withParameterizedType_andIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("[]"));
-
-    client.getCached(
-        CachedCatalog.ORG_UNITS_ACTIVE, new ParameterizedTypeReference<List<Integer>>() {});
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
   }
 
   // ── getCached page walk (REQ-ADMIN-003) ─────────────────────────────────
@@ -247,17 +263,6 @@ class BackendApiClientHappyPathTest {
 
     assertEquals(List.of("only"), result.content());
     assertEquals(1, server.getRequestCount(), "a one-chunk catalogue must cost one request");
-  }
-
-  @Test
-  void getCached_pageWalkedCatalog_andIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk(pageJson(List.of("x"), 0, 1000, 1, 1)));
-
-    client.getCached(
-        CachedCatalog.SQUADRONS, new ParameterizedTypeReference<PageResponse<String>>() {});
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
   }
 
   @Test
@@ -367,17 +372,6 @@ class BackendApiClientHappyPathTest {
     assertEquals(0L, req.getBodySize(), "null body must not be serialised");
   }
 
-  @Test
-  void post_withIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.post("/api/v1/pub", "body", String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-    assertEquals("POST", req.getMethod());
-  }
-
   // ── PUT ─────────────────────────────────────────────────────────────────
 
   @Test
@@ -401,17 +395,6 @@ class BackendApiClientHappyPathTest {
     assertEquals("ok", result);
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals(0L, req.getBodySize());
-  }
-
-  @Test
-  void put_withIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.put("/api/v1/things/1", "x", String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-    assertEquals("PUT", req.getMethod());
   }
 
   // ── PATCH ───────────────────────────────────────────────────────────────
@@ -438,17 +421,6 @@ class BackendApiClientHappyPathTest {
     assertEquals(0L, req.getBodySize());
   }
 
-  @Test
-  void patch_withIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.patch("/api/v1/things/1", "x", String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-    assertEquals("PATCH", req.getMethod());
-  }
-
   // ── DELETE ──────────────────────────────────────────────────────────────
 
   @Test
@@ -461,17 +433,6 @@ class BackendApiClientHappyPathTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("DELETE", req.getMethod());
     assertEquals("/api/v1/things/1", req.getPath());
-  }
-
-  @Test
-  void delete_withIsPublicTrue_usesPublicClient() throws Exception {
-    server.enqueue(jsonOk("ok"));
-
-    client.delete("/api/v1/things/1", String.class);
-
-    RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
-    assertEquals("public", req.getHeader("X-Auth"));
-    assertEquals("DELETE", req.getMethod());
   }
 
   @Test
