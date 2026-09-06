@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -36,6 +37,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -682,6 +684,492 @@ class ApiVhostAnonymousSurfaceTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The four pickers phase S opens, refused without a token.
+   *
+   * <p>The class the audit called unreportable: each of these is swallowed on failure by design — a
+   * picker is one field on a form about something else — so a refused read renders as an
+   * <em>empty</em> list, and an empty picker reads as an answer rather than as a fault. {@code
+   * /job-types} is the worst of them: the tab does not merely show nothing, it states that the
+   * organisation has defined no CREW functions.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousPickerReadsWithUnauthorized() throws Exception {
+    // Pinned one at a time, because the four do NOT answer alike and grouping them hid that.
+    // `/api/v1/orders/**` and `/api/v1/operations/**` are authenticated in the filter chain, so the
+    // entry point turns them away before dispatch and writes 401.
+    mockMvc.perform(get("/api/v1/orders/lookup")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/operations/lookup")).andExpect(status().isUnauthorized());
+    // `GET /api/v1/missions/**` is permitAll — the whole Einsatz read surface is, so a guest can
+    // see the board — so this one is dispatched and refused at the method seam: 403.
+    // 403, not 401, and the difference is structural: `/api/v1/job-types` is `permitAll` in the
+    // filter chain (it sits in the catalogue block beside /locations and /refining-methods), so
+    // the request is DISPATCHED and the method-level guard refuses it — which
+    // GlobalExceptionHandler
+    // renders as 403, with nothing upgrading it to 401 because the MVC advice has already handled
+    // it. Identical in shape to /locations/home-locations, which phase M spent three red probe
+    // nights learning.
+    mockMvc.perform(get("/api/v1/missions/lookup")).andExpect(status().isForbidden());
+    // 200, and DELIBERATELY so (REQ-SEC-037). `JobTypeController`'s own Javadoc states the rule —
+    // "Read is public; mutations are OFFICER/ADMIN" — and the list carries role names and nothing
+    // else: no member, no org unit, no Einsatz is reachable through it. It sits in the same
+    // permitAll catalogue block as /ship-types, /materials/search and /refining-methods, all of
+    // which this class already records as anonymous. Admitting it at the edge therefore publishes
+    // a catalogue that was already public, and this assertion is what keeps that a decision.
+    mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isOk());
+  }
+
+  /**
+   * The two edits phase R opens, refused without a token.
+   *
+   * <p>These are the only two of the audit's 75 that answered {@code 405} rather than {@code 404}:
+   * the path was reachable and the verb was not. What this class can pin is the backend's own
+   * answer; that the exception stayed <em>method-scoped</em> — {@code DELETE} on both paths still
+   * refused by the edge — is a vhost behaviour and is asserted by the nightly probe instead.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousOrderAndOperationEditsWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"materials\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/operations/" + ABSENT_OPERATION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"x\",\"status\":\"PLANNED\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The last seven paths phase X opens, and the one that is anonymous by design.
+   *
+   * <p>Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age. The
+   * settings pair is the interesting one: {@code /api/v1/settings} sits in the {@code permitAll}
+   * catalogue block beside {@code /locations} and {@code /job-types}, so these reads are dispatched
+   * and answer with a value. They carry two integers — how many days before an Auftrag turns
+   * yellow, and before it turns red — and nothing else. What must NOT be open is the {@code PUT} on
+   * the same path, which is the admin write that changes them for the whole organisation; that is
+   * held shut by the read-only family rather than by a carve-out.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousBlueprintAndFleetImports() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/personal-blueprints/overview"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/personal-blueprints/overview/owners"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/personal-blueprints/batch")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/personal-blueprints/import/apply")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            multipart("/api/v1/personal-blueprints/import/preview")
+                .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            multipart("/api/v1/hangar/import/fleetview")
+                .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/hangar/ships/home-location")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    // Anonymous BY DESIGN, and pinned so it stays a decision: two integers in the same permitAll
+    // catalogue block as /locations and /job-types.
+    mockMvc.perform(get("/api/v1/settings/job_order.age_yellow_days")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/settings/job_order.age_red_days")).andExpect(status().isOk());
+  }
+
+  /**
+   * The Handel family phase W opens, and the two ways it answers.
+   *
+   * <p>The price screens sit under {@code /api/v1/materials}, which is a {@code permitAll}
+   * catalogue prefix — {@code /materials/search} has been recorded as anonymous since phase 2 — so
+   * these reads are dispatched and refused at the method seam rather than turned away at the entry
+   * point. The Materialbörse and the terminal catalogue are ordinary authenticated surfaces.
+   *
+   * <p>Pinned one at a time rather than in a loop, because that is exactly what phase S's four
+   * pickers proved: a group assertion hides a seam.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousTradeFamily() throws Exception {
+    // The four price reads are authenticated, and three of them only became so with this phase:
+    // measured anonymously first, `prices-overview` answered 200, `*/prices` answered 200 and
+    // `profit-calculation` answered 500 — dispatched and crashing, which is not a gate. They carry
+    // the UEX trade data REQ-SEC-032 exists to keep off the public vhost, so they joined the
+    // `matrix` carve-out rather than being admitted as they stood.
+    mockMvc.perform(get("/api/v1/materials/prices-overview")).andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/materials/profit-calculation"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/materials/" + ABSENT_MISSION + "/prices"))
+        .andExpect(status().isUnauthorized());
+    // `GET /materials/{id}` stays ANONYMOUS by decision (REQ-SEC-037). MaterialDto is catalogue
+    // only — name, quantity type, category, flags, no price — and `/materials/search` has published
+    // those same fields anonymously since phase 2. A 404 here is the absent id, not a refusal: a
+    // real one answers 200, and admitting the path at the edge publishes what search already does.
+    mockMvc.perform(get("/api/v1/materials/" + ABSENT_MISSION)).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/v1/terminals")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/material-exchange/released-item-ids"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/material-exchange/item-offers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/material-requests/item")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/material-exchange/offers/" + ABSENT_MISSION + "/remark")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/material-requests/" + ABSENT_MISSION)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Einsatz planning set phase V opens, refused without a token.
+   *
+   * <p>The audit's largest block: everything a Kommandoleiter builds an Einsatz out of. The writes
+   * are the interesting half here, because {@code GET /api/v1/missions/**} is {@code permitAll} —
+   * the whole Einsatz read surface is, so a guest can see the board — and that seam is what phase S
+   * met with {@code /missions/lookup} answering {@code 403} where its three neighbours answered
+   * {@code 401}. A write is not covered by that {@code permitAll}, so the entry point turns it away
+   * before dispatch and writes {@code 401}; the one read in this phase is the one to watch.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMissionPlanningWrites() throws Exception {
+    String mission = "/api/v1/missions/" + ABSENT_MISSION;
+    // The three section patches and the party lead. Each carries its own section counter, which is
+    // the reason they are separate endpoints at all.
+    for (String leaf : new String[] {"/core", "/schedule", "/flags"}) {
+      mockMvc
+          .perform(
+              patch(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"version\":0}"))
+          .andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            put(mission + "/party-lead")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post(mission + "/participants")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    // Einheiten, crew, Frequenzen and Verwalter — slim only, because the full-DTO twins are
+    // deprecation-marked with a sunset of 2026-10-20 and the app was moved off them.
+    for (String leaf :
+        new String[] {
+          "/units/slim",
+          "/units/" + ABSENT_OPERATION + "/crew/slim",
+          "/frequencies/custom/slim",
+          "/managers/" + ABSENT_OPERATION + "/slim",
+          "/steps/slim",
+          "/objectives/slim"
+        }) {
+      mockMvc
+          .perform(
+              post(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String leaf :
+        new String[] {
+          "/units/" + ABSENT_OPERATION + "/slim",
+          "/units/" + ABSENT_OPERATION + "/crew/" + ABSENT_OPERATION + "/slim",
+          "/steps/" + ABSENT_OPERATION + "/slim",
+          "/objectives/" + ABSENT_OPERATION + "/slim",
+          "/steps/reorder/slim",
+          "/objectives/reorder/slim"
+        }) {
+      mockMvc
+          .perform(
+              put(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String leaf :
+        new String[] {
+          "/units/" + ABSENT_OPERATION + "/slim",
+          "/frequencies/" + ABSENT_OPERATION + "/slim",
+          "/managers/" + ABSENT_OPERATION + "/slim",
+          "/steps/" + ABSENT_OPERATION + "/slim",
+          "/objectives/" + ABSENT_OPERATION + "/slim"
+        }) {
+      mockMvc.perform(delete(mission + leaf).with(csrf())).andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            patch(mission + "/steps/" + ABSENT_OPERATION + "/done/slim")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"done\":true}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The one read in phase V, pinned on its own because it sits behind the {@code permitAll} seam.
+   *
+   * <p>{@code GET /api/v1/missions/**} is {@code permitAll}, so this request is dispatched rather
+   * than turned away at the entry point, and whatever the method guard then decides is what the
+   * runbook's table and the nightly probe have to say. Phase M's lesson, and phase S's: the number
+   * is measured here first and written down afterwards.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousUnitShipOptions() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/missions/" + ABSENT_MISSION + "/unit-ship-options"))
+        .andExpect(status().isForbidden());
+  }
+
+  /**
+   * The three Lager writes phase U opens, refused without a token.
+   *
+   * <p>Sammel-Ausbuchen, Sammel-Umbuchen, and the earmark a Logistiker sets on a stock row. The
+   * allocation is three verbs on one path and all three were refused, which is what made it the
+   * worst of them: the save loop is sequential and version-chained, so the first row fails, {@code
+   * partial} stays at zero and <em>nothing</em> is ever written.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousInventoryBulkAndAllocationWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/bulk-checkout")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"itemIds\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/bulk-rebook")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"itemIds\":[],\"mode\":\"LOCATION\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            patch("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The Auftrags-Familie phase T opens, refused without a token.
+   *
+   * <p>Nine paths, and the audit's own block: four reads that made a working screen look empty or
+   * absent, and five writes that discarded what a Logistiker had typed. They are pinned together
+   * because they were admitted together — the Zusagen list carries its own upsert and withdrawal on
+   * the same path, and the Bestandszeilen read is what makes a Material-Übergabe submittable at
+   * all, an Übergabe being what closes an Auftrag.
+   *
+   * <p>All nine answer {@code 401}: nothing under {@code /api/v1/orders} is {@code permitAll}
+   * except the item catalogue and the two creates, and those are {@code authenticated} explicitly.
+   * Unlike phase S's pickers there is no seam to fall through — the entry point turns every one of
+   * these away before dispatch. Asserted rather than assumed, in the order this runbook fixed after
+   * phase M.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousJobOrderFamilyWithUnauthorized() throws Exception {
+    // The four reads.
+    mockMvc.perform(get("/api/v1/orders/material-demand")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/item-stock"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/claims"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            get(
+                "/api/v1/orders/"
+                    + ABSENT_OPERATION
+                    + "/materials/"
+                    + ABSENT_MISSION
+                    + "/inventory"))
+        .andExpect(status().isUnauthorized());
+    // The five writes. Bodies are shaped enough to reach the security gate and no further — an
+    // anonymous request never gets as far as validation.
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/claims")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"materialId\":\""
+                        + ABSENT_MISSION
+                        + "\",\"qualityRequirement\":\"NONE\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete("/api/v1/orders/" + ABSENT_OPERATION + "/claims/" + ABSENT_MISSION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientHandle\":\"x\",\"items\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/item-handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientHandle\":\"x\",\"propertyEntries\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/items/" + ABSENT_MISSION + "/production")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":1,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION + "/items")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"items\":[]}"))
+        .andExpect(status().isUnauthorized());
+    // A query parameter, not a body, and no version: the service reorders the whole queue under a
+    // pessimistic write lock, so there is nothing for an optimistic version to guard.
+    mockMvc
+        .perform(put("/api/v1/orders/" + ABSENT_OPERATION + "/priority?priority=1").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The member's own two settings and the Aushang's read marker, refused without a token.
+   *
+   * <p>Phase Q, and the quietest gap this allow-list has produced. Both settings rows are drawn
+   * {@code enabled} only once their value has arrived, and the {@code GET} that would deliver it
+   * was admitted by no rule — so it answered {@code 404}, the app logged it, and the rows sat in
+   * exactly the state a never-set value produces. Nobody could report it as a failure.
+   *
+   * <p>Read and write are pinned together for both, because they were admitted together: the two
+   * rows share one optimistic-lock version, and a client that could write but not read would echo
+   * {@code 0}.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMemberPreferenceReadsAndWritesWithUnauthorized() throws Exception {
+    mockMvc.perform(get("/api/v1/users/me/payout-preference")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/users/me/payout-preference")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"preference\":\"PAYOUT\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/users/me/blueprint-sharing")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/users/me/blueprint-sharing")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shareBlueprintsGlobally\":true,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(put("/api/v1/users/me/read-announcement/" + ABSENT_OPERATION).with(csrf()))
         .andExpect(status().isUnauthorized());
   }
 

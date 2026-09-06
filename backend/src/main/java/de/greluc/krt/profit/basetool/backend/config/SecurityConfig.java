@@ -564,7 +564,30 @@ public class SecurityConfig {
                         // since the phase-3 paste and got 200: the expectation was right and the
                         // carve-out was simply missing. Ordering matters — Spring Security takes
                         // the FIRST matching rule, so both must stay above /api/v1/materials/**.
-                        "/api/v1/materials/*/terminals")
+                        "/api/v1/materials/*/terminals",
+                        // 2026-09-06: the same data through three more doors, found while the app's
+                        // Handel screens were being admitted at the edge (runbook phase W). Each
+                        // was
+                        // measured anonymously before it was changed: `prices-overview` answered
+                        // 200, `*/prices` answered 200, and `profit-calculation` answered 500 —
+                        // dispatched anonymously and crashing rather than refusing, which is not a
+                        // gate either.
+                        //
+                        // `MaterialPriceOverviewDto` carries `minPriceBuy`/`maxPriceSell`,
+                        // `MaterialPriceDto` carries `priceBuy`/`priceSell`/`scu*`/`terminalName`,
+                        // and the profit calculation is the route arithmetic over both. That is the
+                        // UEX trade data the two lines above exist to keep off the public vhost,
+                        // reachable by a different path — so it joins them rather than getting a
+                        // rule of its own.
+                        //
+                        // `GET /api/v1/materials/{id}` deliberately stays anonymous: MaterialDto is
+                        // catalogue only — name, quantity type, category, flags, no price — and
+                        // `/api/v1/materials/search` has published those same fields anonymously
+                        // since phase 2. Closing it would be a different change with a different
+                        // reason.
+                        "/api/v1/materials/prices-overview",
+                        "/api/v1/materials/profit-calculation",
+                        "/api/v1/materials/*/prices")
                     .authenticated()
                     .requestMatchers(
                         "/api/v1/frequency-types", "/api/v1/frequency-types/**",

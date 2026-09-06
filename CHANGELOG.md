@@ -2,7 +2,35 @@
 
 ## [Unreleased]
 
+## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
+
 ### Fixed
+
+- **Die letzten sieben Pfade der App waren am API-Zugang abgewiesen.** Die Blaupausen-Übersicht, das Anlegen mehrerer Blaupausen, der Blaupausen- und der Fleetview-Import, „Heimatort für alle Schiffe" und die beiden Schwellen, ab denen ein Auftrag gelb oder rot wird. Damit ist die Liste aus dem App-Audit abgearbeitet (Runbook-Phase X).
+
+- **Der Upload am API-Zugang war auf 256 KB begrenzt.** Die beiden Importe hätten dort abgebrochen, bevor sie das Backend erreichen. Die Grenze liegt jetzt bei 4 MB — gemessen am Fleetview-Export, der bei rund 500 KB für 100 Schiffe liegt.
+
+- **Handelspreise waren ohne Anmeldung abrufbar.** Die Preisübersicht und die Preise je Material antworteten anonym mit Daten, die Profitberechnung mit einem Fehler statt einer Abweisung — dieselben UEX-Handelsdaten, die REQ-SEC-032 über die Preismatrix bereits vom öffentlichen API-Zugang fernhält, nur durch drei andere Türen. Alle drei verlangen jetzt eine Anmeldung. Der Materialkatalog selbst (`/materials/{id}`) bleibt bewusst offen: er trägt keine Preise und veröffentlicht nichts, was die Suche nicht schon zeigt.
+
+- **Handel und Materialbörse waren in der App größtenteils tot.** Preisübersicht, Preismatrix, Profitberechnung, Materialdetails, der Standort-Filter und das Freigeben von Gegenständen an die Börse waren am API-Zugang abgewiesen (Runbook-Phase W).
+
+- **Einen Einsatz zu planen ging in der App fast nirgends.** Kern, Zeitplan und Flags, Party-Lead, Teilnehmer hinzufügen, Einheiten und ihre Besatzung, Frequenzen, Verwalter, Ablauf und Ziele — alle Schreibwege waren am API-Zugang abgewiesen. Freigegeben sind die schlanken Endpunkte, nicht die veralteten: deren Abschaltung ist für den 20.10.2026 angekündigt (Runbook-Phase V).
+
+- **Sammel-Ausbuchen, Sammel-Umbuchen und die Zuordnung im Lager waren tot.** Alle drei waren am API-Zugang nicht freigegeben; beim Umbuchen füllte sich der Standort-Picker sogar, nur das Absenden starb. Die Zuordnung war die schlimmste: die Speicherschleife ist versionsverkettet, die erste Zeile scheitert — und damit wurde nie etwas geschrieben, auch nichts halb (Runbook-Phase U).
+
+- **Die Auftrags-Familie war in der App größtenteils tot.** Materialbedarf, Zusagen-Tab, Verfügbarkeits-Chip und die Lagerzeilen im Übergabe-Sheet waren am API-Zugang nicht freigegeben — und mit ihnen die Schreibvorgänge, die daran hängen: Zusage geben und zurückziehen, Material- und Gegenstands-Übergabe, Herstellung erfassen, Gegenstände bearbeiten, Priorität ändern. Lesen und Schreiben mussten zusammen freigegeben werden: ohne Lagerzeile gibt es nichts abzusenden, und eine Zusagenliste ohne ihre beiden Knöpfe ist eine Liste mit toten Knöpfen (Runbook-Phase T).
+
+- **Vier Auswahllisten in der App waren leer, ohne dass etwas nach einem Fehler aussah.** Auftrags- und Einsatz-Picker im Buchungsblatt, der Operations-Picker im Einsatz und der Funktionen-Katalog werden bei einem Fehler bewusst stillschweigend geschluckt; am API-Zugang abgewiesen hieß das leere Liste, und eine leere Liste liest sich als Antwort. Der Funktionen-Katalog behauptete sogar, die Organisation habe keine CREW-Funktionen (Runbook-Phase S).
+
+- **Auftrag und Operation liessen sich in der App nicht bearbeiten.** Beide Pfade waren am API-Zugang längst freigegeben — nur das Verb wurde abgewiesen (405 statt 404). Die Ausnahme ist **methoden-genau** geschrieben: der Server bietet auf beiden Pfaden auch ein Löschen an, die App ruft es nie auf, und es bleibt weiterhin gesperrt (Runbook-Phase R).
+
+- **Drei me-bezogene Pfade der App waren am API-Zugang nicht freigegeben.** In den App-Einstellungen blieben „Auszahlungspräferenz" und „Blueprints mit Org teilen" dadurch auf jedem Konto ausgegraut, und „als gelesen" am Aushang sprang zurück. Lesen und Schreiben mussten zusammen freigegeben werden — die beiden Einstellungen teilen sich eine Optimistic-Lock-Version, ein Client der schreiben aber nicht lesen kann würde eine `0` zurücksenden. Freigegeben, eingefroren und geprobt (Runbook-Phase Q); erste Ausnahme, die die Read-only-Sperre unter `/users` je bekommen hat.
+
+## [v1.6.21](https://github.com/krt-profit/basetool/releases/tag/v1.6.21) - 2026-09-05
+
+### Fixed
+
+- **Ein per Tastatur gewähltes Material füllte die abhängigen Felder nicht.** Wer im Raffinerieauftrag „asl" tippte und den einzigen Treffer mit Enter übernahm, bekam das Eingangsmaterial gesetzt, aber kein Ausgangsmaterial — dort blieb „-" stehen. Beim Anklicken derselben Zeile funktionierte es. Die Auswahllisten führten die Zusatzangaben einer Option nur auf dem Mausweg mit; jetzt auf beiden. Betrifft ebenso die Mengeneinheit (SCU/Stück), die bei Tastaturauswahl auf dem Wert des vorherigen Materials stehen blieb (REQ-FE-016).
 
 - **Der Reiter „Materialbörse" im Prüfprotokoll konnte weder exportiert noch aufgeräumt werden.** PDF, JSON und die Aufbewahrungs-Bereinigung antworteten dort mit einem Fehler, während jeder andere Reiter funktionierte: der Weiterleitungs-Endpunkt führte eine eigene, veraltete Liste der Reiter. Beide Stellen lesen jetzt dieselbe Liste.
 

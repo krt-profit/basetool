@@ -211,6 +211,128 @@ jobs:
           # admin write. It is inside the read-only family and nothing clears it, so 405.
           probe PATCH "/api/v1/users/$nil/memberships" 405
 
+          # Phase Q - the member's own two settings and the Aushang's read marker. Read AND write on
+          # both settings, because they were admitted together and for a reason the probe should
+          # keep testing: the two rows share one optimistic-lock version, so a client that could
+          # write but not read would echo 0. A 404 on any of the five means the paste lost a line;
+          # a 405 means the /users carve-out did -- this is the first one that prefix has.
+          for p in /api/v1/users/me/payout-preference /api/v1/users/me/blueprint-sharing; do
+            probe GET "$p" 401
+            probe PUT "$p" 401
+          done
+          probe PUT "/api/v1/users/me/read-announcement/$nil" 401
+
+          # Phase R - the two 405s, and the assertion that matters is the SECOND pair. Opening the
+          # PUT is one line; keeping the DELETE shut is the reason the carve-out was written
+          # method-scoped, because the backend serves DELETE on both of these paths and the app
+          # sends neither. A 401 on a DELETE here would mean the exception went verb-blind.
+          probe PUT "/api/v1/orders/$nil" 401
+          probe PUT "/api/v1/operations/$nil" 401
+          probe DELETE "/api/v1/orders/$nil" 405
+          probe DELETE "/api/v1/operations/$nil" 405
+
+          # Phase S - the four pickers, and they answer FOUR different ways. Grouping them is what
+          # hid that: /orders/** and /operations/** are authenticated (401), GET /missions/** is
+          # permitAll so the method seam refuses it (403), and /job-types is anonymous by design
+          # (200, REQ-SEC-037 - a role-name catalogue, like /ship-types).
+          probe GET /api/v1/orders/lookup 401
+          probe GET /api/v1/operations/lookup 401
+          probe GET /api/v1/missions/lookup 403
+          probe GET /api/v1/job-types 200
+
+          # Phase T - the Auftrags-Familie. All nine answer 401: nothing under /api/v1/orders is
+          # permitAll except the item catalogue, so there is no seam to fall through. The DELETE is
+          # the one to watch - it is the only destructive verb this phase opens, and it is opened
+          # on the claims LEAF, not on the Auftrag.
+          probe GET /api/v1/orders/material-demand 401
+          probe GET "/api/v1/orders/$nil/item-stock" 401
+          probe GET "/api/v1/orders/$nil/claims" 401
+          probe GET "/api/v1/orders/$nil/materials/$nil/inventory" 401
+          probe POST "/api/v1/orders/$nil/claims" 401
+          probe DELETE "/api/v1/orders/$nil/claims/$nil" 401
+          probe POST "/api/v1/orders/$nil/handovers" 401
+          probe POST "/api/v1/orders/$nil/item-handovers" 401
+          probe PUT "/api/v1/orders/$nil/items" 401
+          probe POST "/api/v1/orders/$nil/items/$nil/production" 401
+          probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
+
+          # Phase U - the three Lager writes. The allocation is three verbs on one path, and all
+          # three are probed: the app sends every one of them, and the carve-out that opens them
+          # rides the leaf group that already carried book-out and delivered.
+          probe POST /api/v1/inventory/bulk-checkout 401
+          probe POST /api/v1/inventory/bulk-rebook 401
+          probe POST "/api/v1/inventory/$nil/allocation" 401
+          probe PATCH "/api/v1/inventory/$nil/allocation" 401
+          probe DELETE "/api/v1/inventory/$nil/allocation" 401
+
+          # Phase V - the Einsatz planning set. The writes are all 401, and the ONE read is not:
+          # GET /api/v1/missions/** is permitAll, so unit-ship-options is dispatched and refused at
+          # the method seam with a 403 - the same seam /missions/lookup met in phase S.
+          probe GET "/api/v1/missions/$nil/unit-ship-options" 403
+          for leaf in core schedule flags; do
+            probe PATCH "/api/v1/missions/$nil/$leaf" 401
+          done
+          probe PUT "/api/v1/missions/$nil/party-lead" 401
+          probe POST "/api/v1/missions/$nil/participants" 401
+          probe POST "/api/v1/missions/$nil/units/slim" 401
+          probe PUT "/api/v1/missions/$nil/units/$nil/slim" 401
+          probe DELETE "/api/v1/missions/$nil/units/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/units/$nil/crew/slim" 401
+          probe PUT "/api/v1/missions/$nil/units/$nil/crew/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/frequencies/custom/slim" 401
+          probe DELETE "/api/v1/missions/$nil/frequencies/$nil/slim" 401
+          probe POST "/api/v1/missions/$nil/managers/$nil/slim" 401
+          probe DELETE "/api/v1/missions/$nil/managers/$nil/slim" 401
+          for section in steps objectives; do
+            probe POST "/api/v1/missions/$nil/$section/slim" 401
+            probe PUT "/api/v1/missions/$nil/$section/$nil/slim" 401
+            probe DELETE "/api/v1/missions/$nil/$section/$nil/slim" 401
+            probe PUT "/api/v1/missions/$nil/$section/reorder/slim" 401
+          done
+          probe PATCH "/api/v1/missions/$nil/steps/$nil/done/slim" 401
+          # And the Einsatz's own DELETE stays shut: every rule this phase adds is a leaf UNDER the
+          # id, none is the id itself.
+          probe DELETE "/api/v1/missions/$nil" 405
+
+          # Phase W - the Handel family, and the three lines that matter most are the price reads.
+          # They answered 200 (prices-overview, */prices) and 500 (profit-calculation) ANONYMOUSLY
+          # until the REQ-SEC-032 carve-out was widened to cover them; a 200 here again would mean
+          # UEX trade prices are back on the public internet.
+          probe GET /api/v1/materials/prices-overview 401
+          probe GET /api/v1/materials/profit-calculation 401
+          probe GET "/api/v1/materials/$nil/prices" 401
+          probe GET /api/v1/materials/matrix 401
+          # And this one is anonymous BY DECISION: MaterialDto is catalogue only, and
+          # /materials/search has published the same fields since phase 2 (REQ-SEC-037). A 404 is
+          # the absent id; the point of the assertion is that it is dispatched, not refused.
+          probe GET "/api/v1/materials/$nil" 404
+          probe GET /api/v1/terminals 401
+          probe GET /api/v1/material-exchange/released-item-ids 401
+          probe POST /api/v1/material-exchange/item-offers 401
+          probe POST /api/v1/material-requests/item 401
+          probe PUT "/api/v1/material-exchange/offers/$nil/remark" 401
+          probe PUT "/api/v1/material-requests/$nil" 401
+
+          # Phase X - the last seven. The two settings keys are anonymous BY DESIGN (REQ-SEC-037):
+          # two integers from the same permitAll catalogue block as /locations and /job-types. What
+          # must stay shut is the PUT on the same path - the admin write that changes them for the
+          # whole organisation - and it is the read-only family, not a carve-out, that holds it.
+          probe GET /api/v1/settings/job_order.age_yellow_days 200
+          probe GET /api/v1/settings/job_order.age_red_days 200
+          probe PUT /api/v1/settings/job_order.age_red_days 405
+          probe GET /api/v1/personal-blueprints/overview 401
+          probe GET /api/v1/personal-blueprints/overview/owners 401
+          probe POST /api/v1/personal-blueprints/batch 401
+          probe POST /api/v1/personal-blueprints/import/preview 401
+          probe POST /api/v1/personal-blueprints/import/apply 401
+          probe POST /api/v1/hangar/import/fleetview 401
+          probe POST /api/v1/hangar/ships/home-location 401
+          # And the admin ship surface under the same prefix stays shut: /hangar is a read-only
+          # family precisely because its prefix also carries this.
+          probe GET "/api/v1/hangar/users/$nil/ships" 404
+          # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
+          # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
+
           # Phase L - the bank-STAFF surface, admitted for the first time (runbook § Phase L).
           # Every one of these must reach the backend and be refused there.
           for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \

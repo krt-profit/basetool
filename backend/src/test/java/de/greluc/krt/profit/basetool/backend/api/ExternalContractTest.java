@@ -179,7 +179,16 @@ class ExternalContractTest {
    * quietly substitutes the wrong shape and reports a gap that is not there.
    */
   private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of("{enabled}", "true", "{roleCode}", "KOMMANDOLEITER");
+      java.util.Map.of(
+          "{enabled}",
+          "true",
+          "{roleCode}",
+          "KOMMANDOLEITER",
+          // Phase X. The two settings keys are named EXACTLY in the allow-list -- the `/settings`
+          // prefix carries every system setting there is and the app reads two of them -- so the
+          // reachability guard has to be told which one to try.
+          "{key}",
+          "job_order.age_yellow_days");
 
   /**
    * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
@@ -221,6 +230,134 @@ class ExternalContractTest {
           "userId",
           "displayName",
           "limitAmount");
+
+  /**
+   * What a {@code JobOrderDto} answer promises, for every operation that returns one.
+   *
+   * <p>Named once because they share a mapper: the detail read, the edit and the priority change
+   * all fold their answer back through the app's single {@code JobOrderDto.toModel()}, so a field
+   * one of them needs is a field all of them need. It was written out three times before phase T
+   * added the third consumer, which is one copy past the point where they drift.
+   *
+   * <p>{@code effectiveName} is the only name an assignee row can show, and {@code version} is what
+   * a note edit echoes -- lose it and every note edit 409s. {@code user} and {@code assignees} are
+   * the containers they arrive in; without them the app cannot tell whose edge it is holding, which
+   * is what decides "assign me" from "unassign me".
+   */
+  private static final Set<String> JOB_ORDER_DETAIL =
+      Set.of(
+          "id",
+          "displayId",
+          "status",
+          "priority",
+          "type",
+          "comment",
+          "createdAt",
+          "materials",
+          "aggregatedMaterials",
+          "assignees",
+          "user",
+          "effectiveName",
+          "note",
+          "version",
+          "handovers",
+          "redacted",
+          "canEdit",
+          "requestingOrgUnit",
+          "responsibleOrgUnit");
+
+  /**
+   * What an {@code InventoryItemDto} answer promises, for all three allocation verbs.
+   *
+   * <p>Named once because they share a mapper: {@code POST}, {@code PATCH} and {@code DELETE} on
+   * {@code …/allocation} all fold their answer through the app's single {@code toEntry()}, so a
+   * field one needs is a field all three need.
+   *
+   * <p>{@code jobOrderRest} and {@code missionRest} are what the sheet caps a new earmark against —
+   * how much of the row is still unspoken for — and losing either turns a bounded control into one
+   * that lets a member allocate stock twice. The nested allocation names are read field by field to
+   * label each existing earmark; a row whose target id is gone is dropped rather than drawn, so it
+   * disappears instead of showing blank.
+   */
+  private static final Set<String> INVENTORY_ROW =
+      Set.of(
+          "id",
+          "material",
+          "name",
+          "quantityType",
+          "location",
+          "user",
+          "effectiveName",
+          "amount",
+          "quality",
+          "personal",
+          "owningSquadron",
+          "canEdit",
+          "note",
+          "version",
+          "jobOrderAllocations",
+          "jobOrderId",
+          "jobOrderDisplayId",
+          "jobOrderRest",
+          "missionAllocations",
+          "missionId",
+          "missionName",
+          "missionPlannedStartTime",
+          "missionRest");
+
+  /**
+   * What a {@code MissionDto} answer promises, for every operation that returns one.
+   *
+   * <p>Named once because they share a mapper: the detail read and the five planning writes that
+   * still answer with the whole Einsatz all fold through the app's single {@code toModel()}.
+   *
+   * <p>Phase 3 widened this set: the app acts on the caller's OWN participant row, and {@code user}
+   * is the only thing that says which row that is. A name cannot decide it — the server sends
+   * {@code displayName} when a member set one and {@code username} otherwise — and {@code
+   * startTime} is what "checked in" means on the wire.
+   */
+  /**
+   * What a step row promises, for all five writes that answer with the Ablauf.
+   *
+   * <p>{@code meta} is the line under the title and {@code done} is the tick; a row without an
+   * {@code id} is dropped, because the id is what the next write addresses.
+   */
+  private static final Set<String> STEP_ROW = Set.of("id", "title", "meta", "done");
+
+  /**
+   * What an objective row promises, for all four writes that answer with the Ziele.
+   *
+   * <p>{@code kind} is what separates a Primärziel from a Nicht-Ziel, which is the whole structure
+   * of that section rather than a label on it.
+   */
+  private static final Set<String> OBJECTIVE_ROW = Set.of("id", "title", "kind");
+
+  private static final Set<String> MISSION_DETAIL =
+      Set.of(
+          "id",
+          "name",
+          "description",
+          "status",
+          "meetingTime",
+          "plannedStartTime",
+          "actualStartTime",
+          "plannedEndTime",
+          "isInternal",
+          "meetingPoint",
+          "operation",
+          "owningSquadron",
+          "partyLeadUser",
+          "partyLeadGuestName",
+          "registeredParticipants",
+          "checkedInParticipants",
+          "participants",
+          "user",
+          "startTime",
+          "payoutPreference",
+          "assignedUnits",
+          "steps",
+          "objectives",
+          "frequencies");
 
   private static final List<ContractOperation> CONTRACT =
       List.of(
@@ -310,38 +447,7 @@ class ExternalContractTest {
           // the app reads for its seven tabs -- the counters and the four planning collections
           // among them, since a tab whose collection vanished would render as an empty screen with
           // no error anywhere.
-          new ContractOperation(
-              "/api/v1/missions/{id}",
-              "get",
-              Set.of(
-                  "id",
-                  "name",
-                  "description",
-                  "status",
-                  "meetingTime",
-                  "plannedStartTime",
-                  "actualStartTime",
-                  "plannedEndTime",
-                  "isInternal",
-                  "meetingPoint",
-                  "operation",
-                  "owningSquadron",
-                  "partyLeadUser",
-                  "partyLeadGuestName",
-                  "registeredParticipants",
-                  "checkedInParticipants",
-                  "participants",
-                  // Phase 3 widened this: the app now acts on the caller's OWN participant row,
-                  // and `user` is the only thing that says which row that is. A name cannot decide
-                  // it — the server sends `displayName` when a member set one and `username`
-                  // otherwise — and `startTime` is what "checked in" means on the wire.
-                  "user",
-                  "startTime",
-                  "payoutPreference",
-                  "assignedUnits",
-                  "steps",
-                  "objectives",
-                  "frequencies")),
+          new ContractOperation("/api/v1/missions/{id}", "get", MISSION_DETAIL),
           // Phase 3, the four things a member does to their own participation. `join` answers with
           // the whole Einsatz because it creates the row; the three slim ones answer with the row
           // alone, which is the point of them — the detail is large and a check-in changes one
@@ -490,29 +596,7 @@ class ExternalContractTest {
           // 409 every note edit -- and `effectiveName` is the only name a row can show. `user` and
           // `assignees` are the containers they arrive in; without them the app cannot tell whose
           // edge it is holding, which is what decides "assign me" from "unassign me".
-          new ContractOperation(
-              "/api/v1/orders/{id}",
-              "get",
-              Set.of(
-                  "id",
-                  "displayId",
-                  "status",
-                  "priority",
-                  "type",
-                  "comment",
-                  "createdAt",
-                  "materials",
-                  "aggregatedMaterials",
-                  "assignees",
-                  "user",
-                  "effectiveName",
-                  "note",
-                  "version",
-                  "handovers",
-                  "redacted",
-                  "canEdit",
-                  "requestingOrgUnit",
-                  "responsibleOrgUnit")),
+          new ContractOperation("/api/v1/orders/{id}", "get", JOB_ORDER_DETAIL),
           // Phase 3, the two writes any member may make on an order they can see: putting their
           // own name on it and taking it off again. Self-assignment is open to everyone;
           // assigning someone else needs LOGISTICIAN, which the app never attempts.
@@ -1967,7 +2051,471 @@ class ExternalContractTest {
           new ContractOperation(
               "/api/v1/org-units/bank/accounts/{id}/approval-limit/user/{userId}",
               "delete",
-              BANK_ACCOUNT_SETTINGS));
+              BANK_ACCOUNT_SETTINGS),
+          // ---- Phase Q: the member's own settings, and the Aushang's read marker --------------
+          //
+          // Reported from a device: both Einstellungen rows greyed out on every account since the
+          // first release. They are drawn `enabled` only once their value has arrived, and the GET
+          // that would deliver it was admitted by no rule -- so it answered 404 and the rows sat in
+          // exactly the state a never-set value produces. The quietest shape this class has: not a
+          // failure a member can report, just two settings that appear to have none.
+          //
+          // GET and PUT are frozen TOGETHER for both, and that is not tidiness. The two rows are
+          // columns of one User row sharing one optimistic-lock version, which the app echoes from
+          // whatever its read returned; a client that could write but not read would send `0` and
+          // be refused -- or succeed by accident against a row still at 0.
+          new ContractOperation(
+              "/api/v1/users/me/payout-preference",
+              "get",
+              Set.of("defaultPayoutPreference", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/payout-preference",
+              "put",
+              Set.of("defaultPayoutPreference", "version"),
+              Set.of("preference", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/blueprint-sharing",
+              "get",
+              Set.of("shareBlueprintsGlobally", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/blueprint-sharing",
+              "put",
+              Set.of("shareBlueprintsGlobally", "version"),
+              Set.of("shareBlueprintsGlobally", "version")),
+          // The marker answers the whole UserDto and the app reads exactly one name out of it --
+          // the id it just wrote -- to confirm the band may stay down. Losing that field would put
+          // the „UNGELESEN" band back on every dashboard load with the write having succeeded.
+          new ContractOperation(
+              "/api/v1/users/me/read-announcement/{announcementId}",
+              "put",
+              Set.of("lastReadAnnouncementId")),
+          // ---- Phase R: the two edits that were 405, not 404 ---------------------------------
+          //
+          // Both paths were already admitted; only the read-only guard refused the verb. The
+          // carve-out that opens them is METHOD-SCOPED, because the backend serves DELETE on both
+          // and the app sends neither -- see the runbook's phase R.
+          //
+          // The order edit answers the whole order and the app folds it back through the SAME
+          // mapper as the detail read, so its frozen set is that one. `materials` is the only
+          // required request field: an order without lines is not an order.
+          new ContractOperation(
+              "/api/v1/orders/{id}", "put", JOB_ORDER_DETAIL, Set.of("materials")),
+          // The Operation edit DISCARDS its answer -- `updateOperation` maps the result to
+          // `ApiResult.Success(Unit)` -- so there is no response field to freeze and recording one
+          // would promise a shape nothing reads. The request is what matters, and its `status` is
+          // a required enum: a shipped build sends the literal string.
+          new ContractOperation(
+              "/api/v1/operations/{id}", "put", Set.of(), Set.of("name", "status", "version")),
+          // ---- Phase S: the four pickers that answered „there are none" ----------------------
+          //
+          // Each of these is swallowed on failure by design -- a picker is one field on a form
+          // about something else -- so a refused read renders as an EMPTY list, and an empty
+          // picker reads as an answer. That is what made this class unreportable, and it is why
+          // the frozen sets below are derived from what each mapper reads rather than from the
+          // DTO: a name that disappears here empties a control rather than failing anything.
+          new ContractOperation(
+              "/api/v1/orders/lookup",
+              "get",
+              Set.of("id", "displayId", "handle", "requiredMaterialIds", "requiredGameItemIds")),
+          new ContractOperation("/api/v1/missions/lookup", "get", Set.of("id", "name", "status")),
+          new ContractOperation("/api/v1/operations/lookup", "get", Set.of("id", "name")),
+          // `active` is read as a FILTER (`it.active != false`), which is the easiest kind of
+          // field to lose: drop it and every retired Funktion returns to both pickers, with
+          // nothing failing. `content` is the envelope the app reads whole -- it walks no pages
+          // here, it asks for 200 and takes them.
+          new ContractOperation(
+                  "/api/v1/job-types", "get", Set.of("content", "id", "name", "active"))
+              .addressedBy(Set.of("archetype:string", "page:integer", "size:integer")),
+          // ---- Phase T: the Auftrags-Familie, reads and the writes they arm -------------------
+          //
+          // The audit's own block of ten, minus `PUT /orders/<uuid>` which phase R opened. Four
+          // reads and five writes, admitted together because the pairs do not work apart: the
+          // Zusagen list carries its own upsert and withdrawal, and the Bestandszeilen read is
+          // what makes a Material-Uebergabe submittable at all -- without it no `inventoryItemId`
+          // can be picked, and an Uebergabe is what closes an Auftrag.
+          //
+          // `material-demand` nests THREE deep (overview -> group -> row -> per-order share) and
+          // this guard descends two, so the share's `jobOrderId`, `displayId` and `status` are out
+          // of its reach and are deliberately not recorded. Recording them would fail the guard
+          // rather than protect them; the two levels it does see carry the whole planning table.
+          new ContractOperation(
+              "/api/v1/orders/material-demand",
+              "get",
+              Set.of(
+                  "groups",
+                  "orgUnit",
+                  "id",
+                  "name",
+                  "shorthand",
+                  "materials",
+                  "material",
+                  "qualityRequirement",
+                  "requiredAmount",
+                  "bookedAmount",
+                  "claimedAmount",
+                  "outstandingAmount",
+                  "orders")),
+          // The Verfuegbarkeits-Chip on a sub-assembly. It reads five names and drops a group
+          // without a `gameItem.id`, so the id is load-bearing rather than decorative: lose it and
+          // the chip does not go blank, the row disappears.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/item-stock",
+              "get",
+              Set.of(
+                  "gameItem",
+                  "id",
+                  "name",
+                  "orderedAmount",
+                  "manufacturedAmount",
+                  "allocatedTotal")),
+          // The Zusagen tab, and its two writes. `openRemaining` is what the tab is FOR -- how much
+          // of a material nobody has pledged yet -- and `material.id` keys the upsert, so a bucket
+          // without one is dropped.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/claims",
+              "get",
+              Set.of(
+                  "material",
+                  "id",
+                  "name",
+                  "quantityType",
+                  "qualityRequirement",
+                  "requiredAmount",
+                  "claimedAmount",
+                  "openRemaining",
+                  "claims",
+                  "claimingOrgUnit",
+                  "shorthand",
+                  "amount")),
+          // Both claim writes DISCARD their answer -- the tab is re-read instead, because the
+          // server decides the bucket order -- so there is no response field to freeze and
+          // recording one would promise a shape nothing reads. `qualityRequirement` is a required
+          // enum the app sends as a literal string; it is frozen below.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/claims",
+              "post",
+              Set.of(),
+              Set.of("amount", "claimingOrgUnitId", "materialId", "qualityRequirement")),
+          new ContractOperation("/api/v1/orders/{jobOrderId}/claims/{claimId}", "delete", Set.of()),
+          // The Bestandszeilen the Uebergabe-Sheet picks from. `jobOrderAllocations` carries the
+          // slice already earmarked for THIS Auftrag, which is the number the sheet caps against;
+          // without it every row would offer its whole stack.
+          new ContractOperation(
+              "/api/v1/orders/{id}/materials/{matId}/inventory",
+              "get",
+              Set.of(
+                  "id",
+                  "user",
+                  "effectiveName",
+                  "displayName",
+                  "location",
+                  "name",
+                  "quality",
+                  "amount",
+                  "jobOrderAllocations",
+                  "jobOrderId",
+                  "version")),
+          // The three Logistiker writes that answer with something the app does not read: the
+          // material handover, the item handover and the production booking. Each maps its result
+          // to success-or-failure and re-reads the Auftrag, so only the request is frozen.
+          //
+          // `items` and `entries` are the two list names, and they differ: the item handover's
+          // wire name is `entries` while the app's generated property is `propertyEntries`. The
+          // wire name is what is frozen, which is the whole point of reading the document rather
+          // than the client.
+          new ContractOperation(
+              "/api/v1/orders/{id}/handovers",
+              "post",
+              Set.of(),
+              Set.of("handoverTime", "items", "recipientHandle")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/item-handovers",
+              "post",
+              Set.of(),
+              Set.of("entries", "handoverTime", "recipientHandle")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/items/{itemId}/production",
+              "post",
+              Set.of(),
+              Set.of("amount", "bookIn", "consumption", "version")),
+          // The Gegenstands-Edit replaces the ordered lines whole, so `items` is its one required
+          // field: an edit that omits it is not an edit, it is an emptying.
+          new ContractOperation("/api/v1/orders/{id}/items", "put", Set.of(), Set.of("items")),
+          // „Nach vorn/hinten" -- and it takes the position as a QUERY parameter with no body at
+          // all, which is why its required-request set is empty rather than forgotten. The answer
+          // is the whole Auftrag through the same mapper as the detail read, because every other
+          // row's priority has changed too.
+          new ContractOperation("/api/v1/orders/{id}/priority", "put", JOB_ORDER_DETAIL)
+              .addressedBy(Set.of("priority:integer")),
+          // ---- Phase U: the three Lager writes -----------------------------------------------
+          //
+          // Sammel-Ausbuchen discards its answer -- the list is re-read -- so only its request is
+          // frozen. Sammel-Umbuchen reads two counters and nothing else: the screen reports „so
+          // many moved, so many skipped", and a lost counter makes a bulk move that worked look
+          // like one that did nothing.
+          new ContractOperation(
+              "/api/v1/inventory/bulk-checkout", "post", Set.of(), Set.of("itemIds")),
+          new ContractOperation(
+              "/api/v1/inventory/bulk-rebook",
+              "post",
+              Set.of("rebooked", "skipped"),
+              Set.of("itemIds", "mode")),
+          // The earmark, and the worst of the three: the save loop is sequential and
+          // version-chained, so the first refused row leaves `partial` at zero and NOTHING is ever
+          // written. All three verbs answer the whole row through one mapper.
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "post",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "patch",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "delete",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")),
+          // ---- Phase V: the Einsatz planning set ---------------------------------------------
+          //
+          // The audit's largest block, and the one where most entries freeze NOTHING on the
+          // response. Every `/slim` write answers with the part it touched, and since
+          // basetool-android#140 the app discards that and re-reads the Einsatz -- so recording a
+          // response field would promise a shape nothing reads. What is left to guard is the
+          // request, and there the `version` fields are the whole game: each section carries its
+          // own counter, and a counter that disappears turns a concurrent edit into a silent
+          // overwrite instead of the 409 it exists to raise.
+          //
+          // The five that still answer with the whole Einsatz do so because their endpoints have
+          // no slim twin.
+          new ContractOperation(
+              "/api/v1/missions/{id}/core", "patch", MISSION_DETAIL, Set.of("name", "version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/schedule", "patch", MISSION_DETAIL, Set.of("version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/flags",
+              "patch",
+              MISSION_DETAIL,
+              Set.of("isInternal", "version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants", "post", MISSION_DETAIL, Set.of("userId")),
+          // The only read in the phase, and the only one that is not 401: `GET /missions/**` is
+          // permitAll, so it is dispatched and refused at the method seam with a 403. A ship
+          // without an id is dropped, and the type is what tells two Carracks apart.
+          new ContractOperation(
+              "/api/v1/missions/{id}/unit-ship-options", "get", Set.of("id", "name", "shipType")),
+          // Einheiten, crew, Frequenz and Verwalter. All answers discarded except the custom
+          // frequency's, which is spliced onto the Einsatz as last read -- it is the one endpoint
+          // in this group with no plain twin, so it never went through the re-read.
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/slim", "post", Set.of(), Set.of("name")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{unitId}/slim", "put", Set.of(), Set.of("name")),
+          new ContractOperation("/api/v1/missions/{id}/units/{unitId}/slim", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim",
+              "post",
+              Set.of(),
+              Set.of("participantId")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "put", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim", "delete", Set.of()),
+          new ContractOperation(
+              "/api/v1/missions/{id}/frequencies/custom/slim",
+              "post",
+              Set.of("id", "frequencyType", "name", "value"),
+              Set.of("name", "value")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/frequencies/{frequencyId}/slim", "delete", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "post", Set.of()),
+          new ContractOperation("/api/v1/missions/{id}/managers/{userId}/slim", "delete", Set.of()),
+          // Ablauf and Ziele, which exist ONLY as /slim and whose answers ARE read: the section is
+          // spliced onto the Einsatz as last read rather than re-fetched, because the server
+          // decides the order. `stepsVersion` and `objectivesVersion` are the section counters --
+          // the two most load-bearing request fields in this phase.
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/slim",
+              "post",
+              STEP_ROW,
+              Set.of("stepsVersion", "title")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/{stepId}/slim",
+              "put",
+              STEP_ROW,
+              Set.of("stepsVersion", "title")),
+          // The two deletes carry their section counter as a QUERY parameter rather than a
+          // body, which is the one place in this phase where the version is not in the payload --
+          // and losing it there would not fail the write, it would make it unconditional.
+          new ContractOperation("/api/v1/missions/{id}/steps/{stepId}/slim", "delete", STEP_ROW)
+              .addressedBy(Set.of("stepsVersion:integer")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/{stepId}/done/slim",
+              "patch",
+              STEP_ROW,
+              Set.of("done", "stepsVersion")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/steps/reorder/slim",
+              "put",
+              STEP_ROW,
+              Set.of("stepIds", "stepsVersion")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/slim",
+              "post",
+              OBJECTIVE_ROW,
+              Set.of("kind", "objectivesVersion", "title")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/{objectiveId}/slim",
+              "put",
+              OBJECTIVE_ROW,
+              Set.of("kind", "objectivesVersion", "title")),
+          new ContractOperation(
+                  "/api/v1/missions/{id}/objectives/{objectiveId}/slim", "delete", OBJECTIVE_ROW)
+              .addressedBy(Set.of("objectivesVersion:integer")),
+          new ContractOperation(
+              "/api/v1/missions/{id}/objectives/reorder/slim",
+              "put",
+              OBJECTIVE_ROW,
+              Set.of("objectiveIds", "objectivesVersion")),
+          // ---- Phase W: the Handel family -----------------------------------------------------
+          //
+          // The price screens and the Materialboerse. Three of the four price reads were ANONYMOUS
+          // when this phase was written -- `prices-overview` and `*/prices` answered 200 and
+          // `profit-calculation` answered 500, dispatched and crashing rather than refusing -- and
+          // they carry the same UEX trade data REQ-SEC-032 keeps off the public vhost through
+          // `matrix`. They were closed in SecurityConfig BEFORE the edge admitted them; admitting
+          // them as they stood would have published trade prices to the internet.
+          new ContractOperation(
+                  "/api/v1/materials/prices-overview",
+                  "get",
+                  Set.of(
+                      "content",
+                      "id",
+                      "name",
+                      "category",
+                      "minPriceBuy",
+                      "maxPriceSell",
+                      "isIllegal"))
+              .addressedBy(Set.of("name:string", "page:integer", "size:integer", "sort:string")),
+          // `GET /materials/{id}` stays anonymous by decision (REQ-SEC-037): MaterialDto is
+          // catalogue only -- no price -- and `/materials/search` has published the same fields
+          // anonymously since phase 2.
+          new ContractOperation(
+              "/api/v1/materials/{id}",
+              "get",
+              Set.of("id", "name", "type", "quantityType", "category", "isIllegal")),
+          new ContractOperation(
+                  "/api/v1/materials/{id}/prices",
+                  "get",
+                  Set.of("content", "id", "terminalName", "priceBuy", "priceSell"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          // The route arithmetic. `starSystemNames` is a REPEATED parameter, one per system, and an
+          // absent list means „every system" -- which is why it is recorded rather than left blank:
+          // a rename would narrow the answer instead of failing it.
+          new ContractOperation(
+                  "/api/v1/materials/profit-calculation",
+                  "get",
+                  Set.of(
+                      "materialName",
+                      "minBuyPrice",
+                      "maxSellPrice",
+                      "profitPerScu",
+                      "fullLoadCost",
+                      "maxProfitFullLoad",
+                      "marginPercent"))
+              .addressedBy(Set.of("shipId:string", "starSystemNames:array")),
+          // The app page-walks this for ONE field: the set of star-system names its filter offers.
+          new ContractOperation(
+                  "/api/v1/terminals", "get", Set.of("content", "starSystemName", "totalPages"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          // A list of ids in and a list of ids out. Nothing to freeze on the response but its
+          // shape, and the query parameter is the whole request.
+          new ContractOperation("/api/v1/material-exchange/released-item-ids", "get", Set.of())
+              .addressedBy(Set.of("ids:array")),
+          // The three Materialboerse writes the audit counted. Each answers with the row it wrote,
+          // and `version` is the optimistic lock the two edits echo.
+          new ContractOperation(
+              "/api/v1/material-exchange/item-offers",
+              "post",
+              Set.of(),
+              Set.of("productKey", "quantity")),
+          new ContractOperation(
+              "/api/v1/material-requests/item", "post", Set.of(), Set.of("productKey", "quantity")),
+          new ContractOperation(
+              "/api/v1/material-exchange/offers/{id}/remark",
+              "put",
+              Set.of(),
+              Set.of("offeredAmount", "version")),
+          new ContractOperation(
+              "/api/v1/material-requests/{id}",
+              "put",
+              Set.of(),
+              Set.of("desiredAmount", "version")),
+          // ---- Phase X: the last seven ---------------------------------------------------------
+          //
+          // Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age.
+          //
+          // The import PAIR is the shape to read: `/import/preview` is a multipart upload whose
+          // answer the member then edits, and `/import/apply` sends those edits back. The audit
+          // filed the apply as „latent -- and then work-destroying": unreachable without the
+          // preview, and the thing that discards a member's resolutions once it is reachable. They
+          // are frozen together for the same reason they are admitted together.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/import/preview",
+              "post",
+              Set.of(
+                  "entries",
+                  "externalName",
+                  "status",
+                  "productKey",
+                  "productName",
+                  "suggestedAcquiredAt"),
+              Set.of("file")),
+          new ContractOperation(
+              "/api/v1/personal-blueprints/import/apply",
+              "post",
+              Set.of("added", "skipped", "alreadyOwned"),
+              Set.of("resolutions")),
+          new ContractOperation(
+              "/api/v1/personal-blueprints/batch",
+              "post",
+              Set.of("added", "skippedAlreadyOwned", "skippedUnresolved"),
+              Set.of("productKeys")),
+          new ContractOperation(
+                  "/api/v1/personal-blueprints/overview",
+                  "get",
+                  Set.of(
+                      "content",
+                      "productKey",
+                      "productName",
+                      "ownerCount",
+                      "page",
+                      "totalPages",
+                      "totalElements"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string", "search:string")),
+          new ContractOperation(
+                  "/api/v1/personal-blueprints/overview/owners",
+                  "get",
+                  Set.of("ownerName", "orgUnitMember"))
+              .addressedBy(Set.of("productKey:string")),
+          // The Fleetview import reads three counters and nothing else -- the screen reports what
+          // happened, and a lost counter makes a successful import read as one that did nothing.
+          new ContractOperation(
+              "/api/v1/hangar/import/fleetview",
+              "post",
+              Set.of("importedCount", "skippedCount", "duplicateCount"),
+              Set.of("file")),
+          new ContractOperation(
+              "/api/v1/hangar/ships/home-location", "post", Set.of(), Set.of("locationId")),
+          // Anonymous BY DESIGN (REQ-SEC-037): two integers from the same permitAll catalogue block
+          // as /locations and /job-types. `value` is the whole answer the app reads -- it parses it
+          // as a number and falls back to a built-in default when the read fails, which is exactly
+          // why the failure was silent for so long.
+          new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -1992,7 +2540,46 @@ class ExternalContractTest {
           // dozen methods, they change on a game patch rather than on a member's action, and a
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
-          "get /api/v1/refining-methods");
+          "get /api/v1/refining-methods",
+          // Phase X. The two imports are addressed by path and their multipart part; the
+          // home-location write and the two blueprint writes take no parameter at all.
+          "post /api/v1/personal-blueprints/import/preview",
+          "post /api/v1/personal-blueprints/import/apply",
+          "post /api/v1/personal-blueprints/batch",
+          "post /api/v1/hangar/import/fleetview",
+          "post /api/v1/hangar/ships/home-location",
+          // Phase W. The four writes are addressed by path alone; every read in the phase
+          // takes parameters and records them above.
+          "post /api/v1/material-exchange/item-offers",
+          "post /api/v1/material-requests/item",
+          "put /api/v1/material-exchange/offers/{id}/remark",
+          "put /api/v1/material-requests/{id}",
+          "get /api/v1/materials/{id}",
+          // Phase U. All three are addressed by path alone.
+          "post /api/v1/inventory/bulk-checkout",
+          "post /api/v1/inventory/bulk-rebook",
+          "post /api/v1/inventory/{id}/allocation",
+          "patch /api/v1/inventory/{id}/allocation",
+          "delete /api/v1/inventory/{id}/allocation",
+          // Phase T. Six of its nine take no parameter at all, and the four reads are
+          // addressed by path alone. Recorded rather than left blank, because a blank slot cannot
+          // be told apart from a forgotten one.
+          "get /api/v1/orders/material-demand",
+          "get /api/v1/orders/{jobOrderId}/item-stock",
+          "get /api/v1/orders/{jobOrderId}/claims",
+          "post /api/v1/orders/{jobOrderId}/claims",
+          "delete /api/v1/orders/{jobOrderId}/claims/{claimId}",
+          "get /api/v1/orders/{id}/materials/{matId}/inventory",
+          "post /api/v1/orders/{id}/handovers",
+          "post /api/v1/orders/{id}/item-handovers",
+          "post /api/v1/orders/{id}/items/{itemId}/production",
+          "put /api/v1/orders/{id}/items",
+          // Phase S. `/orders/lookup` offers `withNeeds`, which decides whether each row carries
+          // its required material and item ids. The app sends none of it and reads both id lists
+          // anyway -- the endpoint's default already includes them -- so the parameter is a
+          // narrowing the app has no use for. Recorded rather than left blank, because a blank
+          // slot cannot be told apart from a forgotten one.
+          "get /api/v1/orders/lookup");
 
   @Test
   @DisplayName("the query parameters a shipped client asks with still exist, with their types")
@@ -2111,29 +2698,32 @@ class ExternalContractTest {
    * the new constant first.
    */
   private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
-      Map.of(
-          "JobTypeDto.archetype",
-          Set.of("CREW", "MISSION"),
+      // `Map.ofEntries`, not `Map.of`: the latter caps at ten key/value pairs, and phase R's
+      // Operation edit is the eleventh. The overload resolves silently up to that point and
+      // then stops compiling — a good failure, but an opaque one if you have not met it.
+      Map.ofEntries(
+          Map.entry("JobTypeDto.archetype", Set.of("CREW", "MISSION")),
           // Both halves of the personal-inventory editor send this one, and it was invisible until
           // the guard started walking requests: a renamed constant would have turned every save on
           // an installed build into a 400 while the screen kept loading.
-          "PersonalInventoryItemCreateRequest.locationType",
-          Set.of("CITY", "SPACE_STATION"),
-          "PersonalInventoryItemUpdateRequest.locationType",
-          Set.of("CITY", "SPACE_STATION"),
-          "UpdateJobOrderStatusDto.status",
-          Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED"),
-          "UpdatePayoutPreferenceRequest.preference",
-          Set.of("PAYOUT", "DONATE"),
-          "MissionFinanceEntryCreateDto.type",
-          Set.of("INCOME", "EXPENSE"),
-          "MissionFinanceEntryUpdateDto.type",
-          Set.of("INCOME", "EXPENSE"),
+          Map.entry(
+              "PersonalInventoryItemCreateRequest.locationType", Set.of("CITY", "SPACE_STATION")),
+          Map.entry(
+              "PersonalInventoryItemUpdateRequest.locationType", Set.of("CITY", "SPACE_STATION")),
+          Map.entry(
+              "UpdateJobOrderStatusDto.status",
+              Set.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED")),
+          Map.entry("UpdatePayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
+          // The me-scoped twin of the line above, frozen with phase Q. Different schema, same two
+          // constants and the same failure: a shipped build sends the literal string, so a rename
+          // turns every save of the Einstellungen row into a 400 while the screen keeps loading.
+          Map.entry("MyPayoutPreferenceRequest.preference", Set.of("PAYOUT", "DONATE")),
+          Map.entry("MissionFinanceEntryCreateDto.type", Set.of("INCOME", "EXPENSE")),
+          Map.entry("MissionFinanceEntryUpdateDto.type", Set.of("INCOME", "EXPENSE")),
           // The three movements the app's request sheet sends as literals. Renaming one would
           // turn every booking request an installed build raises into a 400 while the sheet still
           // opens and still looks fine.
-          "CreateBankBookingRequest.type",
-          Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER"),
+          Map.entry("CreateBankBookingRequest.type", Set.of("DEPOSIT", "WITHDRAWAL", "TRANSFER")),
           // Reachable since POST /orders/items joined the set. A material line on an item order is
           // raw or refined, and the app sends the constant as a literal: renaming one turns every
           // item order an installed build raises into a 400 while the form still opens.
@@ -2141,8 +2731,27 @@ class ExternalContractTest {
           // Unlike the response enums above, a NEW constant here is harmless to an old build - it
           // simply never sends it. The direction that hurts is removal, which this guard catches
           // the same way.
-          "CreateJobOrderItemMaterialDto.quality",
-          Set.of("GOOD", "NONE"));
+          Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
+          // Phase V. The Ziel's kind decides which of the three lists it lands in, and the app
+          // sends the literal on every create and every edit.
+          Map.entry("AddMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
+          Map.entry(
+              "UpdateMissionObjectiveRequest.kind", Set.of("PRIMARY", "SECONDARY", "NON_GOAL")),
+          // Phase U. Two more literals a shipped build sends. `mode` is the sharper of them:
+          // the app only ever sends `LOCATION`, so renaming either of the other two constants
+          // would look harmless in the document and still be a rename of the one it uses if the
+          // list is reordered rather than extended.
+          Map.entry("BulkRebookRequest.mode", Set.of("LOCATION", "PERSONALIZE", "DEPERSONALIZE")),
+          Map.entry("InventoryAllocationWriteDto.field", Set.of("JOB_ORDER", "MISSION")),
+          // Phase T. The Zusage the app files carries its quality as a literal string, and a
+          // rename turns every pledge into a 400 while the tab keeps loading -- the bucket list is
+          // a separate read that would go on working.
+          Map.entry("CreateClaimDto.qualityRequirement", Set.of("GOOD", "NONE")),
+          // Phase R. The Operation edit the app sends is the eleventh frozen request enum, which
+          // is what forced this map off `Map.of` — that factory caps at ten pairs and then simply
+          // stops resolving.
+          Map.entry(
+              "OperationUpdateDto.status", Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELED")));
 
   @Test
   @DisplayName("no enum a shipped client must parse has gained or lost a constant")

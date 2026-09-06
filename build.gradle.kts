@@ -532,6 +532,32 @@ dependencyCheck {
   // every invocation, which on github-hosted runners (shared IP pool with
   // every other CI job on github.com refreshing on Monday morning) led to
   // 429s mid-transaction and a corrupt H2 DB — see run 25933803540.
+  // Bound every outbound HTTP call the engine makes. WITHOUT these the scan stalls indefinitely:
+  // dependency-check queries NVD, the NPM Audit API, Maven Central, OSS Index and RetireJS, and a
+  // socket that stops responding is simply waited on forever - then retried, up to the
+  // `nvd.maxRetryCount` below. The task prints "Checking for updates and analyzing dependencies for
+  // vulnerabilities" and NOTHING after it, so the run looks busy rather than stuck and only ends
+  // when the CI job timeout kills it.
+  //
+  // That is what 24 runs between 2026-08-19 and 2026-09-04 were doing: 14 on `main`, 10 on feature
+  // branches, all cancelled at the job ceiling with zero output. It is not a cold-cache cost - a
+  // COLD run finishes in 8-14 minutes (run 31309086034 on `main`, 8m29s; run 33845554721 on a PR,
+  // 13m48s) and a warm one in under a minute. Exactly one of the stalled runs died with a message
+  // instead of hanging, and it names the mechanism: run 33847146815,
+  // `DownloadFailedException: ... 'https://registry.npmjs.org/-/npm/v1/security/audits';
+  // Read timed out` -> `SocketTimeoutException`. That one connection happened to carry a timeout;
+  // the rest do not.
+  //
+  // With a read timeout the same stall surfaces as an error in minutes, the engine disables the
+  // affected analyzer and continues, and the scan still reaches its SARIF upload - which is what
+  // actually keeps the Security tab honest. 120s is deliberately generous: the NVD paging calls are
+  // slow but they do respond, so this must not fire on a healthy sync.
+  //
+  // Kotlin DSL note: `connectionTimeout = ...` does NOT compile. Both setters are overloaded
+  // (Object / Number / Duration) and Kotlin cannot resolve the `=` assignment against them, failing
+  // with "No applicable 'assign' function found for '=' overload". Call the setter explicitly.
+  setConnectionTimeout(java.time.Duration.ofSeconds(30))
+  setReadTimeout(java.time.Duration.ofSeconds(120))
   nvd.validForHours = 168
   // Bump retries above the default of 10 so a transient 429 burst does not
   // abort the in-progress H2 update; the corruption-on-abort failure mode

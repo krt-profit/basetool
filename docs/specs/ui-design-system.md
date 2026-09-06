@@ -501,6 +501,18 @@ Clause 2(g) asks for its notice "in a reasonably prominent location, on your fan
 work wherever materials, trademarks, or properties owned by CIG are located" — which is where the
 band already is. The band therefore shows **three** coupled elements, not two.
 
+> Checked, 04.09.2026 — why the marks are named twice: the owner asked whether the §2b line is
+> redundant next to the 2(g) notice. It is not, by the letter of both documents. The 2(g) sentence
+> carries the *meaning* of the §2b line — it attributes the same marks, plus Squadron 42® — but not
+> its *string*: 2(g) adds Squadron 42® and an Oxford comma and has no space before any ®, where §2b
+> has one before its third. §2 requires the §2b notice whenever the logo is shown, and the logo is
+> not optional: §2a's text alternative ("This is an unofficial Star Citizen Fan Site") needs prior
+> approval by CIG's legal department. Neither document mentions the other's notice or offers itself
+> as a substitute, so the overlap is CIG's. Dropping the §2b line would satisfy the Agreement and
+> the Guidelines only in substance — a low-risk deviation, but a deviation, and this requirement is
+> amended first if it is ever taken. The Android app records the same finding in its
+> `REQ-APP-SET-007`.
+
 Section 2b accepts three placements on a website — the home page, an always-visible navigation
 area, or both. The Basetool uses the **home page**: the band renders at the end of `index.html`'s
 `<main>`.
@@ -542,6 +554,14 @@ Binding details:
   > that addition. **Neither key exists** in any bundle, and no migration seeds equivalent text, so
   > the addition was documented but never shipped. The compliance-critical placement is the band,
   > which is where both notices now are.
+  >
+  > Correction of that correction, 04.09.2026: the 27.08. check grepped the **frontend** bundles
+  > only. The keys do exist — `terms.p_9_4` and `terms.p_9_5`, with the rest of § 9 — in the
+  > **backend** bundles, because #1594 (2026-08-19) made the terms wording a backend resource
+  > served by `TermsDocumentController` (`GET /api/v1/terms/document`) so both clients read one
+  > source; #1531 had shipped them in the frontend bundles first. § 9 of the Nutzungsbedingungen
+  > therefore does name the fan-project status. It remains an *addition*, never a substitute; the
+  > band is unchanged.
 
 **Acceptance**
 

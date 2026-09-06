@@ -531,7 +531,14 @@
                     }
                 });
                 listbox.appendChild(li);
-                rendered.push({ value: it.value, label: it.label, el: li });
+                // Keep the WHOLE option model, not a value/label copy. commit() mirrors
+                // `item.data` onto the hidden input, so a row that carried only value+label made
+                // every KEYBOARD pick (Enter on the active row, Enter on a sole match) commit an
+                // option with no metadata — the refinery create form's output material fell back
+                // to "-" and the amount-unit mirror kept the previous option's unit, while the
+                // mouse path (which commits the model itself) worked. It also became the
+                // committedItem, so the later blur/Escape restore re-cleared the metadata.
+                rendered.push({ item: it, el: li });
             });
 
             if (rendered.length === 0) {
@@ -543,7 +550,7 @@
 
         function highlightCommitted() {
             const selIdx = rendered.findIndex(function (r) {
-                return r.value === hidden.value;
+                return r.item.value === hidden.value;
             });
             if (selIdx >= 0) {
                 setActive(selIdx);
@@ -769,10 +776,10 @@
                 case 'Enter':
                     if (isOpen() && activeIndex >= 0 && rendered[activeIndex]) {
                         event.preventDefault();
-                        commit(rendered[activeIndex]);
+                        commit(rendered[activeIndex].item);
                     } else if (isOpen() && rendered.length === 1) {
                         event.preventDefault();
-                        commit(rendered[0]);
+                        commit(rendered[0].item);
                     } else if (isOpen()) {
                         close();
                     }
