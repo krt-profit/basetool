@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Sammel-Ausbuchen, Sammel-Umbuchen und die Zuordnung im Lager waren tot.** Alle drei waren am API-Zugang nicht freigegeben; beim Umbuchen füllte sich der Standort-Picker sogar, nur das Absenden starb. Die Zuordnung war die schlimmste: die Speicherschleife ist versionsverkettet, die erste Zeile scheitert — und damit wurde nie etwas geschrieben, auch nichts halb (Runbook-Phase U).
+
 - **Die Auftrags-Familie war in der App größtenteils tot.** Materialbedarf, Zusagen-Tab, Verfügbarkeits-Chip und die Lagerzeilen im Übergabe-Sheet waren am API-Zugang nicht freigegeben — und mit ihnen die Schreibvorgänge, die daran hängen: Zusage geben und zurückziehen, Material- und Gegenstands-Übergabe, Herstellung erfassen, Gegenstände bearbeiten, Priorität ändern. Lesen und Schreiben mussten zusammen freigegeben werden: ohne Lagerzeile gibt es nichts abzusenden, und eine Zusagenliste ohne ihre beiden Knöpfe ist eine Liste mit toten Knöpfen (Runbook-Phase T).
 
 - **Vier Auswahllisten in der App waren leer, ohne dass etwas nach einem Fehler aussah.** Auftrags- und Einsatz-Picker im Buchungsblatt, der Operations-Picker im Einsatz und der Funktionen-Katalog werden bei einem Fehler bewusst stillschweigend geschluckt; am API-Zugang abgewiesen hieß das leere Liste, und eine leere Liste liest sich als Antwort. Der Funktionen-Katalog behauptete sogar, die Organisation habe keine CREW-Funktionen (Runbook-Phase S).

@@ -257,6 +257,45 @@ class ExternalContractTest {
           "requestingOrgUnit",
           "responsibleOrgUnit");
 
+  /**
+   * What an {@code InventoryItemDto} answer promises, for all three allocation verbs.
+   *
+   * <p>Named once because they share a mapper: {@code POST}, {@code PATCH} and {@code DELETE} on
+   * {@code …/allocation} all fold their answer through the app's single {@code toEntry()}, so a
+   * field one needs is a field all three need.
+   *
+   * <p>{@code jobOrderRest} and {@code missionRest} are what the sheet caps a new earmark against —
+   * how much of the row is still unspoken for — and losing either turns a bounded control into one
+   * that lets a member allocate stock twice. The nested allocation names are read field by field to
+   * label each existing earmark; a row whose target id is gone is dropped rather than drawn, so it
+   * disappears instead of showing blank.
+   */
+  private static final Set<String> INVENTORY_ROW =
+      Set.of(
+          "id",
+          "material",
+          "name",
+          "quantityType",
+          "location",
+          "user",
+          "effectiveName",
+          "amount",
+          "quality",
+          "personal",
+          "owningSquadron",
+          "canEdit",
+          "note",
+          "version",
+          "jobOrderAllocations",
+          "jobOrderId",
+          "jobOrderDisplayId",
+          "jobOrderRest",
+          "missionAllocations",
+          "missionId",
+          "missionName",
+          "missionPlannedStartTime",
+          "missionRest");
+
   private static final List<ContractOperation> CONTRACT =
       List.of(
           new ContractOperation(
@@ -2175,7 +2214,38 @@ class ExternalContractTest {
           // is the whole Auftrag through the same mapper as the detail read, because every other
           // row's priority has changed too.
           new ContractOperation("/api/v1/orders/{id}/priority", "put", JOB_ORDER_DETAIL)
-              .addressedBy(Set.of("priority:integer")));
+              .addressedBy(Set.of("priority:integer")),
+          // ---- Phase U: the three Lager writes -----------------------------------------------
+          //
+          // Sammel-Ausbuchen discards its answer -- the list is re-read -- so only its request is
+          // frozen. Sammel-Umbuchen reads two counters and nothing else: the screen reports „so
+          // many moved, so many skipped", and a lost counter makes a bulk move that worked look
+          // like one that did nothing.
+          new ContractOperation(
+              "/api/v1/inventory/bulk-checkout", "post", Set.of(), Set.of("itemIds")),
+          new ContractOperation(
+              "/api/v1/inventory/bulk-rebook",
+              "post",
+              Set.of("rebooked", "skipped"),
+              Set.of("itemIds", "mode")),
+          // The earmark, and the worst of the three: the save loop is sequential and
+          // version-chained, so the first refused row leaves `partial` at zero and NOTHING is ever
+          // written. All three verbs answer the whole row through one mapper.
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "post",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "patch",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/allocation",
+              "delete",
+              INVENTORY_ROW,
+              Set.of("field", "targetId")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2201,6 +2271,12 @@ class ExternalContractTest {
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
           "get /api/v1/refining-methods",
+          // Phase U. All three are addressed by path alone.
+          "post /api/v1/inventory/bulk-checkout",
+          "post /api/v1/inventory/bulk-rebook",
+          "post /api/v1/inventory/{id}/allocation",
+          "patch /api/v1/inventory/{id}/allocation",
+          "delete /api/v1/inventory/{id}/allocation",
           // Phase T. Six of its nine take no parameter at all, and the four reads are
           // addressed by path alone. Recorded rather than left blank, because a blank slot cannot
           // be told apart from a forgotten one.
@@ -2372,6 +2448,12 @@ class ExternalContractTest {
           // simply never sends it. The direction that hurts is removal, which this guard catches
           // the same way.
           Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
+          // Phase U. Two more literals a shipped build sends. `mode` is the sharper of them:
+          // the app only ever sends `LOCATION`, so renaming either of the other two constants
+          // would look harmless in the document and still be a rename of the one it uses if the
+          // list is reordered rather than extended.
+          Map.entry("BulkRebookRequest.mode", Set.of("LOCATION", "PERSONALIZE", "DEPERSONALIZE")),
+          Map.entry("InventoryAllocationWriteDto.field", Set.of("JOB_ORDER", "MISSION")),
           // Phase T. The Zusage the app files carries its quality as a literal string, and a
           // rename turns every pledge into a 400 while the tab keeps loading -- the bucket list is
           // a separate read that would go on working.
