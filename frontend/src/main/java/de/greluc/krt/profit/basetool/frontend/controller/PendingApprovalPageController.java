@@ -57,18 +57,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @PreAuthorize("isAuthenticated()")
 public class PendingApprovalPageController {
 
-  /**
-   * Reads the session's cached gate verdict without creating a session.
-   *
-   * @param session the current session, or {@code null} when there is none
-   * @return the cached verdict, or {@code null}
-   */
-  private static String sessionApprovalState(jakarta.servlet.http.HttpSession session) {
-    return session == null
-        ? null
-        : (String) session.getAttribute(BackendRoleSyncFilter.APPROVAL_STATE_FLAG);
-  }
-
   /** Backend endpoint returning the caller's own approval status. */
   private static final String REGISTRATION_STATUS_URI = "/api/v1/users/me/registration-status";
 
@@ -135,9 +123,7 @@ public class PendingApprovalPageController {
     // (REQ-SEC-053). It is derived from the 403 the role sync met, and BackendRoleSyncFilter caches
     // it in the same session attribute the approval verdict uses, which is what routed the caller
     // here in the first place.
-    boolean noRole =
-        BackendRoleSyncFilter.STATE_NO_ROLE.equals(
-            sessionApprovalState(request.getSession(false)));
+    boolean noRole = BackendRoleSyncFilter.isRoleLess(request.getSession(false));
     model.addAttribute(MODEL_REJECTED, STATE_REJECTED.equals(approvalStatus));
     model.addAttribute(MODEL_NO_ROLE, noRole && !STATE_REJECTED.equals(approvalStatus));
     return "pending-approval";

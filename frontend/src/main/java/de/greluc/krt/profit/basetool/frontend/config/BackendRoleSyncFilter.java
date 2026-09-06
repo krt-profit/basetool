@@ -129,6 +129,21 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   /** The stable problem code the backend answers a role-less caller with (REQ-SEC-053). */
   private static final String NO_ROLE_CODE = "NO_ROLE";
 
+  /**
+   * Whether this session's cached gate verdict is "approved, but holding no role" (REQ-SEC-053).
+   *
+   * <p>Exposed for {@code PendingApprovalPageController}, which has to choose between three sets of
+   * words on one page. It reads the verdict rather than the registration status on purpose: the
+   * backend never sends {@code NO_ROLE} in {@code approvalStatus}, because it is derived from a
+   * refusal — and the refusal is what routed the caller to that page.
+   *
+   * @param session the current session, or {@code null} when there is none
+   * @return {@code true} iff the cached verdict is the role-less one
+   */
+  public static boolean isRoleLess(@Nullable HttpSession session) {
+    return session != null && STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG));
+  }
+
   /** Path of the waiting page a non-approved registration is routed to. */
   private static final String PENDING_APPROVAL_PATH = "/pending-approval";
 
