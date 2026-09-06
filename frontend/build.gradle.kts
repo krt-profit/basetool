@@ -226,6 +226,42 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
   skipConfigs.set(listOf("^e2e.*"))
 }
 
+// Third instance of the cross-module input defect the backend build already fixes twice
+// (`crossModuleParitySources`, `apiVhostRunbook`). `DtoMirrorConsistencyTest` lives in this module
+// but reads the BACKEND DTO records as source text — there is no compile-time dependency from
+// frontend to backend, so none of those files reaches this task's classpath and nothing told
+// Gradle that a backend DTO change must re-run the one guard standing between a forgotten frontend
+// mirror and a Thymeleaf template that 500s at render time (three red CI runs on
+// `feat(mission): registeredCount`, 2026-08-25).
+//
+// The hole was masked, not harmless — and the distinction is the whole reason to declare it.
+// `bootBuildInfo` stamps a fresh `build.time` into `META-INF/build-info.properties` on EVERY
+// invocation; that file sits on the test runtime classpath, so the classpath hash changed every
+// run and this task was never UP-TO-DATE at all. Measured 2026-09-06: the guard had been executing
+// by accident, and the documented `--rerun-tasks` workaround bought nothing. Pin the timestamp with
+// one `time.set(…)` — exactly what a reproducible-build change would add — and the defect appears
+// in full: task UP-TO-DATE, BUILD SUCCESSFUL, mirror silently out of sync. Verified both ways,
+// before and after this declaration.
+//
+// Declared as the directory rather than file by file, unlike `crossModuleParitySources`: that test
+// reads three fixed, named files, while this one derives its read set at RUNTIME — it lists the
+// frontend DTO directory and resolves each name against the backend one. A static enumeration
+// would go stale the moment a frontend mirror is added, silently re-opening the hole for that
+// pair, and a backend DTO with no twin today is read the day one appears. It has to be an input
+// before that.
+//
+// `*.java`, not `**/*.java`: the test uses `Files.list`, so `dto/request/` is never read and must
+// not invalidate this task. The frontend half needs no declaration — those sources compile into
+// this module's classes, which are already on the test runtime classpath.
+val backendDtoMirrorDir = "backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto"
+
+tasks.named<Test>("test") {
+  inputs
+    .files(rootProject.fileTree(backendDtoMirrorDir) { include("*.java") })
+    .withPropertyName("backendDtoMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 // L-2 from the performance audit: minify CSS files inside the built jar so the
 // shipped payload is smaller than the readable sources under
 // `src/main/resources/static/css/`. The source files stay untouched (so editing
