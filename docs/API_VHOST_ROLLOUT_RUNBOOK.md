@@ -1403,7 +1403,7 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
 | `POST /api/v1/bank/deposits`                 | **404** at the time of phase I; **401** since phase O admitted it                 |
 | `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
-| `POST /api/v1/hangar/import/fleetview`       | **404** — phase 4, on no allow-list line; refused before the verb is judged       |
+| `POST /api/v1/hangar/import/fleetview`       | **404** at the time of phase 4; **401** since phase X admitted it                 |
 
 A **405** on any row listed **401** would be the read-only guard swallowing a write the phase is
 supposed to open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family
@@ -1414,9 +1414,9 @@ queue — and only the verb is refused.
 
 A **404** where a **401** is listed means the path did not match the allow-list — a typo in the
 regex, most likely a `<uuid>` group that lost a brace. Anything other than **404** on
-`/inventory/all`, `/bank/admin/wipe-reset` or `/hangar/import/fleetview` means the opposite:
-something was admitted that should not have been — a **405** included, because reaching the
-read-only guard at all means the path got past the deny. That one is worth stopping for.
+`/inventory/all` or `/bank/admin/wipe-reset` means the opposite: something was admitted that should
+not have been — a **405** included, because reaching the read-only guard at all means the path got
+past the deny. That one is worth stopping for.
 
 > [!note] `/bank/deposits` used to be the canary named here, and is one no longer
 > Phase O admitted it (2026-09-03). The exclusion it stood for was reasoned from a claim that no
@@ -1451,12 +1451,13 @@ nothing in this repo reaches that host.
 5. **Check that what should still be refused, is:**
 
    ```powershell
-   foreach ($p in '/api/v1/bank/admin/wipe-reset','/api/v1/inventory/all','/api/v1/hangar/import/fleetview') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/bank/admin/wipe-reset','/api/v1/inventory/all') { '{0,-46} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' -X POST "https://api.profit-base.online$p") }
    ```
 
-   Expected: `404` for all three — none of them is on the allow-list, and the deny answers before
-   the read-only guard can. A `401` or a `405` here would mean a path was admitted that should not
-   have been.
+   Expected: `404` for both — neither is on the allow-list, and the deny answers before the
+   read-only guard can. A `401` or a `405` here would mean a path was admitted that should not have
+   been. `/hangar/import/fleetview` was the third path in this list until phase X admitted it; it
+   answers `401` now and is checked by the admitted table above.
 
 6. **Run the probe once by hand** rather than waiting for the night:
    *Actions → Edge deny probe → Run workflow*. It must come back green; it now carries every path of
