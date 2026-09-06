@@ -357,21 +357,23 @@ class MissionServiceTest {
     List<String> status =
         List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
 
-    // M-1: searchMissions now forces {@code isInternal=false} for anonymous callers. This
-    // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
-    // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
+    // The M-1 override is gone with ADR-0159: searchMissions used to rewrite a null isInternal to
+    // FALSE for an unauthenticated caller, as defence-in-depth against a controller forgetting to
+    // pass it. There is no unauthenticated caller on this path any more, and
+    // currentScopePredicate() throws for one rather than building an empty predicate — so the
+    // filter is passed through untouched and the scope decides.
     Pageable pageable = PageRequest.of(0, 10);
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable))
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable);
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test

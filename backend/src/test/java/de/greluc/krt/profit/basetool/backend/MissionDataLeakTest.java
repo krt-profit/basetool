@@ -44,6 +44,11 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+// REQ-SEC-052: these cases used to issue their requests with no principal at all, because
+// the mission surface answered one. It does not, so the class carries a member — which is
+// also the caller each case was really about: what a MEMBER sees, not what the internet did.
+// The PII assertions are unchanged and are now REQ-SEC-007's peer tier.
+@org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
 public class MissionDataLeakTest {
 
   @Autowired private WebApplicationContext context;
@@ -81,9 +86,9 @@ public class MissionDataLeakTest {
   }
 
   @Test
-  void testMissionDetail_Anonymous_SeesRosterWithoutPii() throws Exception {
-    // Outsiders DO see the participant roster on a non-internal mission now, but PII (email / real
-    // name) is always stripped — only the public callsign tuple survives.
+  void testMissionDetail_Peer_SeesRosterWithoutPii() throws Exception {
+    // A member below Logistician sees the participant roster, with PII (e-mail / real name)
+    // stripped — only the public callsign tuple survives (REQ-SEC-007).
     String body =
         mockMvc
             .perform(get("/api/v1/missions/" + publicMission.getId()))
@@ -106,7 +111,7 @@ public class MissionDataLeakTest {
   // finance gate over the full security wiring.
 
   @Test
-  void testMissionDetail_Anonymous_HidesDescriptionAndInternalEconomy() throws Exception {
+  void testMissionDetail_Peer_HidesDescriptionAndInternalEconomy() throws Exception {
     // On top of the PII stripping, an outsider sees neither the free-text description nor the
     // internal economy (inventory / refinery) nor the owner; the mission name stays visible.
     String body =

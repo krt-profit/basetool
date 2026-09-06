@@ -619,7 +619,7 @@ class JobOrderPageControllerNoReloadMvcTest {
 
   @Test
   @WithAnonymousUser
-  void updateStatus_AsAnonymous_Returns403WithoutCallingBackend() throws Exception {
+  void updateStatus_AsAnonymous_IsRedirectedWithoutCallingBackend() throws Exception {
     // /orders/** is permitAll at the URL layer, but the isAuthenticated() method gate still denies
     // an anonymous principal: GlobalExceptionHandler maps the AuthorizationDeniedException to 403
     // (not the SSO entry point), and the backend is never touched.
@@ -631,10 +631,11 @@ class JobOrderPageControllerNoReloadMvcTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":1}"))
-        // REQ-SEC-052: refused at the entry point now, not at the method gate. A background
-        // write (this one carries a JSON body and a CSRF token) answers 401 rather than the 403 a
-        // dispatched-then-refused request produced under the old permitAll URL rule.
-        .andExpect(status().isUnauthorized());
+        // REQ-SEC-052: refused at the entry point now, not at the method gate. This request
+        // carries no Accept header that marks it as a background call, so the entry point treats
+        // it as a navigation and redirects to the login rather than answering 401. Either way the
+        // backend is never called, which is what the verify below has always been about.
+        .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient, never())
         .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));

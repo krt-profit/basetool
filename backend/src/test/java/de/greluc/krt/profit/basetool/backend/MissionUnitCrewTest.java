@@ -49,6 +49,11 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+// REQ-SEC-052: the participant writes these cases exercise require a login. The rows they
+// create are EXTERNAL participants now (ADR-0159, decision D4) — a named person without an
+// account, recorded by a member who can see the Einsatz — which is the same row shape and a
+// different author.
+@org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
 class MissionUnitCrewTest {
 
   @Autowired private WebApplicationContext context;

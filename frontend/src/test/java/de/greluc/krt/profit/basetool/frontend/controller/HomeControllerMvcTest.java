@@ -69,9 +69,10 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 // REQ-SEC-052: these cases exist to render the WHOLE index template through Thymeleaf — the
 // sidebar, the toast fragment, the SpEL in both. That template is the member's dashboard now, so
-// the class carries a principal. The anonymous half of GET / has its own case at the bottom, and
-// it asserts the opposite of rendering: no data, no backend call, no session.
-@org.springframework.security.test.context.support.WithMockUser
+// every request carries an OIDC principal (`oidcLogin()`, not `@WithMockUser`: the handler binds
+// `@AuthenticationPrincipal OidcUser`, and a username/password principal arrives as null and routes
+// to the landing page). The anonymous half of GET / has its own case at the bottom, and it asserts
+// the opposite of rendering: no data, no backend call, no session.
 class HomeControllerMvcTest {
 
   private static final String ERROR_TOAST_ID = "errorNotificationParam";
@@ -105,7 +106,7 @@ class HomeControllerMvcTest {
     // Then: index renders normally; the toast fragment's param-gated branches stay
     //       inactive, but the rest of fragments/toast (script + style block) still
     //       runs through Thymeleaf and SpEL.
-    mockMvc.perform(get("/")).andExpect(status().isOk()).andExpect(view().name("index"));
+    mockMvc.perform(get("/").with(oidcLogin())).andExpect(status().isOk()).andExpect(view().name("index"));
   }
 
   /**
@@ -120,7 +121,7 @@ class HomeControllerMvcTest {
     // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is in the HTML.
     mockMvc
-        .perform(get("/").param("error", "notification.error.title"))
+        .perform(get("/").with(oidcLogin()).param("error", "notification.error.title"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(containsString(ERROR_TOAST_ID)));
@@ -134,7 +135,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WhenSuccessParamMatchesKeyPattern() throws Exception {
     mockMvc
-        .perform(get("/").param("success", "notification.success.title"))
+        .perform(get("/").with(oidcLogin()).param("success", "notification.success.title"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(containsString(SUCCESS_TOAST_ID)));
@@ -153,7 +154,7 @@ class HomeControllerMvcTest {
     // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is absent.
     mockMvc
-        .perform(get("/").param("error", "9 invalid value with spaces"))
+        .perform(get("/").with(oidcLogin()).param("error", "9 invalid value with spaces"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(not(containsString(ERROR_TOAST_ID))));
@@ -167,7 +168,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WithoutParamSuccessToast_WhenSuccessParamIsEmpty() throws Exception {
     mockMvc
-        .perform(get("/").param("success", ""))
+        .perform(get("/").with(oidcLogin()).param("success", ""))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(not(containsString(SUCCESS_TOAST_ID))));
@@ -203,7 +204,7 @@ class HomeControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
-        .perform(get("/"))
+        .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Alpha Staffel")));
   }
@@ -237,7 +238,7 @@ class HomeControllerMvcTest {
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
-        .perform(get("/"))
+        .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Keine")));
   }

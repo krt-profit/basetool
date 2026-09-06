@@ -174,7 +174,10 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  void missionDetail_asAnonymous_skipsFinanceLedger() throws Exception {
+  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
+  // The ledger is skipped for a caller who may not read it. That used to be an anonymous
+  // visitor; it is now a member without the finance permission (REQ-SEC-037).
+  void missionDetail_withoutFinanceAccess_skipsFinanceLedger() throws Exception {
     UUID missionId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(minimalMission(missionId));
@@ -906,7 +909,10 @@ class MissionPageControllerMvcTest {
   }
 
   @Test
-  void missionDetail_AsGuest_ShouldHideParticipationColumn() throws Exception {
+  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
+  // REQ-SEC-007: the column is hidden from a member below Logistician, not from a guest —
+  // there is no guest, and the page needs a login to render at all (REQ-SEC-052).
+  void missionDetail_AsPeer_ShouldHideParticipationColumn() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
@@ -1472,93 +1478,15 @@ class MissionPageControllerMvcTest {
         .andExpect(content().string(containsString("Guest-X")));
   }
 
-  /**
-   * Reproducer for the "anonymous guest cannot sign up to a mission" bug (see live-log/log.txt:
-   * repeated `AccessDeniedException` on POST /missions/{id}/participants/ajax for `[anonymous]`).
-   *
-   * <p>Given an anonymous caller (no `@WithMockUser`), when the AJAX add-participant endpoint is
-   * invoked with a guestName payload, then the request must be routed through the public WebClient
-   * (`isPublic=true`) and return HTTP 200 with the slim response - it must NOT be blocked by Spring
-   * Security with 403.
-   */
-  @Test
-  void addParticipantAjax_AsAnonymousGuest_ShouldRouteThroughPublicWebClientAndReturn200()
-      throws Exception {
-    UUID missionId = UUID.randomUUID();
-    java.util.List<Map<String, Object>> slimResponse = new java.util.ArrayList<>();
-    Map<String, Object> p = new java.util.HashMap<>();
-    p.put("id", UUID.randomUUID().toString());
-    p.put("guestName", "Anon-Guest");
-    p.put("version", 0);
-    slimResponse.add(p);
+  // Three cases stood here: an anonymous guest adding, updating and deleting their own
+  // participant row, each asserting that the write was relayed through the public WebClient.
+  // Both halves of that are gone (ADR-0159): there is no anonymous caller and no public
+  // client. The row itself survives as an EXTERNAL participant, which the mission
+  // leadership records and maintains — covered by MissionSecurityServiceTest on the backend
+  // and by the D4 gating in mission-detail.html.
 
-    // The fix flips isPublic to true when no OidcUser principal is present, so
-    // the stub MUST match isPublic=true for an anonymous caller.
-    when(backendApiClient.post(
-            eq("/api/v1/missions/" + missionId + "/participants/slim"), any(), eq(Object.class)))
-        .thenReturn(slimResponse);
 
-    String body = "{\"guestName\":\"Anon-Guest\"}";
-    mockMvc
-        .perform(
-            post("/missions/" + missionId + "/participants/ajax")
-                .with(csrf())
-                .contentType("application/json")
-                .content(body))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Anon-Guest")));
-  }
 
-  /**
-   * Reproducer for the "anonymous guest cannot edit/delete their own participant entry" bug (see
-   * live-log/log.txt: repeated 403 on PUT and DELETE /missions/{id}/participants/{pid}/ajax for
-   * `[anonymous]`).
-   *
-   * <p>Given an anonymous caller, the AJAX update/delete endpoints must route through the public
-   * WebClient (`isPublic=true`) and not be blocked by Spring Security.
-   */
-  @Test
-  void updateParticipantAjax_AsAnonymousGuest_ShouldRouteThroughPublicWebClientAndReturn200()
-      throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID participantId = UUID.randomUUID();
-    Map<String, Object> slimResponse = new java.util.HashMap<>();
-    slimResponse.put("id", participantId.toString());
-    slimResponse.put("guestName", "Anon-Guest");
-    slimResponse.put("version", 1);
-    when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
-            any(),
-            eq(Object.class)))
-        .thenReturn(slimResponse);
-
-    String body = "{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}";
-    mockMvc
-        .perform(
-            put("/missions/" + missionId + "/participants/" + participantId + "/ajax")
-                .with(csrf())
-                .contentType("application/json")
-                .content(body))
-        .andExpect(status().isOk())
-        .andExpect(content().string(containsString("Anon-Guest")));
-  }
-
-  @Test
-  void deleteParticipantAjax_AsAnonymousGuest_ShouldRouteThroughPublicWebClientAndReturn204()
-      throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID participantId = UUID.randomUUID();
-    when(backendApiClient.delete(
-            eq("/api/v1/missions/" + missionId + "/participants/" + participantId + "/slim"),
-            eq(Void.class)))
-        .thenReturn(null);
-
-    mockMvc
-        .perform(
-            delete("/missions/" + missionId + "/participants/" + participantId + "/ajax")
-                .with(csrf()))
-        .andExpect(status().isNoContent());
-  }
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -2691,6 +2619,8 @@ class MissionPageControllerMvcTest {
    * populates one unit with one crew member holding one function and asserts the board markup.
    */
   @Test
+  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
+  // REQ-SEC-052: the detail page needs a login to render.
   void missionDetail_UnitWithCrew_RendersBoardRowWithChipSelect() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();

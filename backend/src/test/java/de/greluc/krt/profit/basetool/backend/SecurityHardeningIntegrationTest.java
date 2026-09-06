@@ -75,7 +75,7 @@ public class SecurityHardeningIntegrationTest {
             get("/api/v1/users/search")
                 .param("query", "test")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -94,7 +94,7 @@ public class SecurityHardeningIntegrationTest {
         .perform(
             get("/api/v1/inventory/aggregated")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -124,22 +124,23 @@ public class SecurityHardeningIntegrationTest {
   }
 
   @Test
-  void testMissionGet_Anonymous_Ok() throws Exception {
-    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isOk());
+  void testMissionGet_Anonymous_Refused() throws Exception {
+    // Answered 200 until REQ-SEC-052. The mission list was the widest anonymous read the tool had.
+    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isUnauthorized());
   }
 
   @Test
-  void testFinanceEntries_Anonymous_Forbidden() throws Exception {
+  void testFinanceEntries_Anonymous_Unauthorized() throws Exception {
     mockMvc
         .perform(get("/api/v1/missions/" + UUID.randomUUID() + "/finance-entries"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void testFinanceEntriesSum_Anonymous_Forbidden() throws Exception {
+  void testFinanceEntriesSum_Anonymous_Unauthorized() throws Exception {
     mockMvc
         .perform(get("/api/v1/missions/" + UUID.randomUUID() + "/finance-entries/sum"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

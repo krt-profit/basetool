@@ -81,8 +81,12 @@ class SecurityTest {
 
   @Test
   void testSecurityHeaders() throws Exception {
+    // Rides /v3/api-docs because it is a plain GET with a body; the path is admin-gated since
+    // REQ-SEC-052, and the headers under test are set by the filter chain for every response.
     mockMvc
-        .perform(get("/v3/api-docs"))
+        .perform(
+            get("/v3/api-docs")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().exists("Content-Security-Policy"));
@@ -100,7 +104,9 @@ class SecurityTest {
   @Test
   void contentSecurityPolicyIsLockedDownForJsonOnlyBackend() throws Exception {
     mockMvc
-        .perform(get("/v3/api-docs"))
+        .perform(
+            get("/v3/api-docs")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(
             header()
@@ -256,8 +262,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("NO_ROLE"));
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -279,8 +289,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("NO_ROLE"));
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -302,8 +316,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isForbidden())
-        .andExpect(jsonPath("$.code").value("NO_ROLE"));
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   /**

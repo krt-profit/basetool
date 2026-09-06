@@ -586,6 +586,17 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+    // ADR-0159: the anonymous branch of handleAccessDenied is gone, and so is its cause. An
+    // anonymous caller could reach this handler because a permitAll() route still ran
+    // @PreAuthorize on the controller method, and that raised AuthorizationDeniedException
+    // for the anonymous principal instead of triggering SsoReAuthenticationEntryPoint. There
+    // is no permitAll() route with a method gate behind it any more, so the request meets the
+    // entry point and never arrives here.
+    //
+    // The case is kept rather than deleted: it now pins that the handler answers the GENERIC
+    // 403 for a caller it cannot classify, which is the safe direction. The `unauthenticated`
+    // flag still exists and is still set — by the backend's own UNAUTHENTICATED problem code
+    // (handleBackendServiceException), for a session that expired mid-request.
   void accessDenied_anonymousUser_htmlRequest_usesUnauthenticatedMessageAndFlag() {
     // Issue #108: an anonymous caller hitting a @PreAuthorize gate behind a permitAll() route
     // must see "please sign in and try again" rather than the generic "you lack permission",
@@ -599,12 +610,23 @@ class GlobalExceptionHandlerTest {
 
     assertEquals("error/error", result);
     assertEquals("error.403.title", model.getAttribute("error"));
-    assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
+    assertEquals("error.forbidden", model.getAttribute("message"));
     assertEquals("403", model.getAttribute("status"));
-    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+    assertEquals(Boolean.FALSE, model.getAttribute("unauthenticated"));
   }
 
   @Test
+    // ADR-0159: the anonymous branch of handleAccessDenied is gone, and so is its cause. An
+    // anonymous caller could reach this handler because a permitAll() route still ran
+    // @PreAuthorize on the controller method, and that raised AuthorizationDeniedException
+    // for the anonymous principal instead of triggering SsoReAuthenticationEntryPoint. There
+    // is no permitAll() route with a method gate behind it any more, so the request meets the
+    // entry point and never arrives here.
+    //
+    // The case is kept rather than deleted: it now pins that the handler answers the GENERIC
+    // 403 for a caller it cannot classify, which is the safe direction. The `unauthenticated`
+    // flag still exists and is still set — by the backend's own UNAUTHENTICATED problem code
+    // (handleBackendServiceException), for a session that expired mid-request.
   void accessDenied_noAuthentication_htmlRequest_usesUnauthenticatedMessageAndFlag() {
     // Belt-and-suspenders for the AnonymousAuthenticationToken case: when no Authentication
     // is present at all (e.g. AnonymousAuthenticationFilter disabled, programmatic clearContext),
@@ -617,11 +639,22 @@ class GlobalExceptionHandlerTest {
     Object result = handler.handleAccessDenied(ex, htmlRequest(), model);
 
     assertEquals("error/error", result);
-    assertEquals("error.forbidden.unauthenticated", model.getAttribute("message"));
-    assertEquals(Boolean.TRUE, model.getAttribute("unauthenticated"));
+    assertEquals("error.forbidden", model.getAttribute("message"));
+    assertEquals(Boolean.FALSE, model.getAttribute("unauthenticated"));
   }
 
   @Test
+    // ADR-0159: the anonymous branch of handleAccessDenied is gone, and so is its cause. An
+    // anonymous caller could reach this handler because a permitAll() route still ran
+    // @PreAuthorize on the controller method, and that raised AuthorizationDeniedException
+    // for the anonymous principal instead of triggering SsoReAuthenticationEntryPoint. There
+    // is no permitAll() route with a method gate behind it any more, so the request meets the
+    // entry point and never arrives here.
+    //
+    // The case is kept rather than deleted: it now pins that the handler answers the GENERIC
+    // 403 for a caller it cannot classify, which is the safe direction. The `unauthenticated`
+    // flag still exists and is still set — by the backend's own UNAUTHENTICATED problem code
+    // (handleBackendServiceException), for a session that expired mid-request.
   void accessDenied_anonymousUser_jsonRequest_setsUnauthenticatedFlagInBody() {
     // The JSON branch is consumed by the toast renderer — it relies on `body.unauthenticated`
     // to surface a sign-in hint instead of the default "no permission" copy.
@@ -638,7 +671,7 @@ class GlobalExceptionHandlerTest {
     Map<String, Object> body = (Map<String, Object>) response.getBody();
     assertNotNull(body);
     assertEquals("error.forbidden.unauthenticated", body.get("message"));
-    assertEquals(Boolean.TRUE, body.get("unauthenticated"));
+    assertEquals(Boolean.FALSE, body.get("unauthenticated"));
   }
 
   @Test

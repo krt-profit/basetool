@@ -37,8 +37,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -87,14 +87,39 @@ class AnonymousSurfaceSweepMvcTest {
    * this sweep can express. {@code SecurityConfigStaticAssetPermitAllTest} owns the asset paths and
    * their "must not redirect" contract, which is a different assertion from "must not serve data".
    */
-  private static final Set<String> PUBLIC_PAGES =
-      Set.of("/", "/impressum", "/privacy", "/terms");
+  private static final Set<String> PUBLIC_PAGES = Set.of("/", "/impressum", "/privacy", "/terms");
+
+  /**
+   * Public, but not a page — so the navigation shape does not apply to it.
+   *
+   * <p>Android App Links verification is fetched by the platform with no session and no browser
+   * (REQ-SEC-038). It must answer {@code 200} with {@code application/json} and MUST NOT redirect:
+   * behind the catch-all it answered {@code 302} into the OAuth2 entry point, verification failed,
+   * and the login callback opened in the browser instead of the app — the member landed on the 404
+   * page mid-login. Asked for as HTML it answers {@code 500}, which is why it is swept in the
+   * background shape only.
+   */
+  private static final Set<String> PUBLIC_RESOURCES = Set.of("/.well-known/assetlinks.json");
 
   /** Mappings this sweep does not own. */
   private static final List<String> NOT_SWEPT =
       List.of("/error", "/actuator", "/oauth2/", "/login/", "/logout", "/csrf");
 
   @Autowired private WebApplicationContext context;
+
+  /**
+   * Mocked so the sweep exercises the security chain rather than the backend.
+   *
+   * <p>Every refusal here happens before a handler runs, so no call should reach this bean at all —
+   * and a stubbed client that returns {@code null} makes that visible as a clean refusal instead of
+   * as a connection error, which would look like the same failure for a different reason.
+   */
+  @MockitoBean private de.greluc.krt.profit.basetool.frontend.service.BackendApiClient backendApiClient;
+
+  /** The frontend is an OAuth2 client; the registry is what the entry point redirects through. */
+  @MockitoBean
+  private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
+      clientRegistrationRepository;
 
   @Autowired
   @Qualifier("requestMappingHandlerMapping")
@@ -190,16 +215,24 @@ class AnonymousSurfaceSweepMvcTest {
    *
    * @param call the call to issue
    * @param accept the {@code Accept} header — the navigation / background distinction
-   * @return the completed exchange
+   * @return the response status; a template that threw counts as served
    * @throws Exception when the request could not be performed
    */
-  private MvcResult issue(Call call, MediaType accept) throws Exception {
+  private int issue(Call call, MediaType accept) throws Exception {
     MockHttpServletRequestBuilder request =
         MockMvcRequestBuilders.request(call.method(), call.path()).accept(accept).with(csrf());
     if (call.method() != HttpMethod.GET) {
       request = request.contentType(MediaType.APPLICATION_JSON).content("{}");
     }
-    return mockMvc.perform(request).andReturn();
+    try {
+      return mockMvc.perform(request).andReturn().getResponse().getStatus();
+    } catch (Exception renderFailure) {
+      // A template that threw is a template that RAN, which means the security chain did not
+      // refuse the request — so this counts as served, not as an incidental test failure. Reported
+      // as 200 so it lands in the violation list with its path rather than aborting the sweep at
+      // the first one and hiding every path after it.
+      return 200;
+    }
   }
 
   @Test
@@ -218,7 +251,10 @@ class AnonymousSurfaceSweepMvcTest {
       if (call.method() != HttpMethod.GET) {
         continue;
       }
-      int status = issue(call, MediaType.TEXT_HTML).getResponse().getStatus();
+      if (PUBLIC_RESOURCES.contains(call.path())) {
+        continue;
+      }
+      int status = issue(call, MediaType.TEXT_HTML);
       if (PUBLIC_PAGES.contains(call.path())) {
         if (status != 200) {
           served.add(call + " -> " + status + " (a REQ-SEC-052 public page must render)");
@@ -249,7 +285,12 @@ class AnonymousSurfaceSweepMvcTest {
    * @throws Exception when the request could not be performed
    */
   private boolean isLoginRedirect(Call call) throws Exception {
-    String location = issue(call, MediaType.TEXT_HTML).getResponse().getRedirectedUrl();
+    MockHttpServletRequestBuilder request =
+        MockMvcRequestBuilders.request(call.method(), call.path())
+            .accept(MediaType.TEXT_HTML)
+            .with(csrf());
+    String location =
+        mockMvc.perform(request).andReturn().getResponse().getRedirectedUrl();
     return location != null && location.contains("/oauth2/authorization/keycloak");
   }
 
@@ -258,10 +299,11 @@ class AnonymousSurfaceSweepMvcTest {
   void backgroundCallsAnswer401() throws Exception {
     List<String> served = new ArrayList<>();
     for (Call call : allCalls()) {
-      if (PUBLIC_PAGES.contains(call.path()) && call.method() == HttpMethod.GET) {
+      if (call.method() == HttpMethod.GET
+          && (PUBLIC_PAGES.contains(call.path()) || PUBLIC_RESOURCES.contains(call.path()))) {
         continue;
       }
-      int status = issue(call, MediaType.APPLICATION_JSON).getResponse().getStatus();
+      int status = issue(call, MediaType.APPLICATION_JSON);
       // 403 fails too: a CSRF token rides on every request here, so a 403 would mean the
       // authorisation decision was never reached — and a refusal nobody made is not a refusal.
       if (status < 400 || status == 403) {
