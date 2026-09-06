@@ -135,7 +135,6 @@ public class MissionFinancePageController {
    * @return inline {@code mission-detail} view on validation failure, otherwise redirect
    */
   @PostMapping("/{entryId}/update")
-  @PreAuthorize("isAuthenticated()")
   public String updateFinanceEntry(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
@@ -179,7 +178,6 @@ public class MissionFinancePageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{entryId}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteFinanceEntry(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
@@ -241,7 +239,6 @@ public class MissionFinancePageController {
    */
   @PutMapping(value = "/{entryId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> updateFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
@@ -270,7 +267,6 @@ public class MissionFinancePageController {
    */
   @DeleteMapping(value = "/{entryId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> deleteFinanceEntryAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID entryId) {
     try {

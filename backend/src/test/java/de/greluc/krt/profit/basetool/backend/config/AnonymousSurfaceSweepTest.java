@@ -109,6 +109,15 @@ class AnonymousSurfaceSweepTest {
           "GET /error");
 
   /**
+   * <b>The enumeration below is duplicated in the sibling sweep of the other module</b> ({@code
+   * AnonymousSurfaceSweepMvcTest}). Deliberately, for now: the two live in different Gradle modules
+   * and sharing would need a test-support module, while their assertions must stay separate — this
+   * one asks what a caller who is not a member may reach, the other what a navigation and a
+   * background call get. Tracked as <a
+   * href="https://github.com/krt-profit/basetool/issues/1804">#1804</a> rather than left as a thing
+   * somebody notices twice.
+   */
+  /**
    * Mappings excluded from the sweep because they are not a caller-facing surface.
    *
    * <p>Two entries, and both of them are things this sweep cannot express rather than things it
@@ -390,6 +399,58 @@ class AnonymousSurfaceSweepTest {
           .as("%s must still be readable by an admin — the matcher gates it, not disables it", path)
           .isLessThan(400);
     }
+  }
+
+  /**
+   * The three exempt paths are not refused BY THE GATE — the other half of passes 2 and 3.
+   *
+   * <p>Those passes SKIP this set, so the set can only ever make them weaker: a path listed here
+   * that the filters do not actually exempt is a path nobody checks, and the list would go on
+   * describing an exemption that stopped existing. The reverse direction is already covered — a
+   * filter exempting something not listed here shows up as a served path in the passes themselves.
+   *
+   * <p><b>Asserted on the refusal CODE, not the status.</b> Two of the three answer outright; the
+   * registration status reads the caller out of the database, and the sweep's synthetic token
+   * carries a subject no seeded user has, so it answers {@code 401 UNAUTHENTICATED} here for a
+   * reason that has nothing to do with either gate. What matters is that the refusal is not {@code
+   * PENDING_APPROVAL} or {@code NO_ROLE}: those two codes are written only by the filter, so their
+   * absence is the exemption. That a real pending member reaches their own status is pinned end to
+   * end by the E2E suite, where the token belongs to an account that exists.
+   *
+   * <p>This is also what makes the "same two public reads, six places" arrangement safe. {@code
+   * SecurityConfig}'s {@code permitAll} is {@code GET}-scoped and the filters' skip-lists are
+   * verb-agnostic, deliberately (REQ-SEC-032: a method-scoped tightening above an all-verb rule
+   * grants every verb it does not claim), and the two filters exempt different sets for different
+   * reasons — the consent gate has to let {@code /api/v1/terms/**} through or nobody could ever
+   * record consent. Collapsing them into one constant would erase distinctions that are
+   * load-bearing; asserting the behaviour they are supposed to produce does not.
+   *
+   * @throws Exception when a request could not be performed
+   */
+  @Test
+  @DisplayName("no exempt path is refused by the pending or the role-less gate")
+  void theExemptPathsAreActuallyExempt() throws Exception {
+    List<String> refused = new ArrayList<>();
+    for (String path : new TreeSet<>(REACHABLE_WHILE_REFUSED)) {
+      for (String marker : List.of("ROLE_PENDING_APPROVAL", "ROLE_NO_ROLE")) {
+        String body =
+            issue(
+                    new Call(HttpMethod.GET, path),
+                    jwt().authorities(new SimpleGrantedAuthority(marker)))
+                .getResponse()
+                .getContentAsString();
+        if (body.contains("\"code\":\"PENDING_APPROVAL\"")
+            || body.contains("\"code\":\"NO_ROLE\"")) {
+          refused.add(path + " as " + marker);
+        }
+      }
+    }
+
+    Assertions.assertThat(refused)
+        .as(
+            "REACHABLE_WHILE_REFUSED is what passes 2 and 3 skip — a path listed here that the gate"
+                + " still refuses is a path this sweep silently stopped covering")
+        .isEmpty();
   }
 
   /** Pass 2: a bearer whose only authority is the pending marker. */

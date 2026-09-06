@@ -102,6 +102,15 @@ class AnonymousSurfaceSweepMvcTest {
   private static final Set<String> PUBLIC_RESOURCES = Set.of("/.well-known/assetlinks.json");
 
   /**
+   * <b>The enumeration below is duplicated in the sibling sweep of the other module</b> ({@code
+   * AnonymousSurfaceSweepTest}). Deliberately, for now: the two live in different Gradle modules
+   * and sharing would need a test-support module, while their assertions must stay separate — this
+   * one asks what a caller who is not a member may reach, the other what a navigation and a
+   * background call get. Tracked as <a
+   * href="https://github.com/krt-profit/basetool/issues/1804">#1804</a> rather than left as a thing
+   * somebody notices twice.
+   */
+  /**
    * Mappings this sweep does not own, matched as whole path segments rather than as string
    * prefixes.
    *

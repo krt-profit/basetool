@@ -676,7 +676,6 @@ public class MissionPageController {
    * @return the {@code mission-create} view name
    */
   @GetMapping("/new")
-  @PreAuthorize("isAuthenticated()")
   public String createMissionForm(
       Model model,
       @AuthenticationPrincipal OidcUser principal,
@@ -797,7 +796,6 @@ public class MissionPageController {
       value = "/{id}/participants/unassigned/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
       @PathVariable @NotNull UUID id) {
     try {

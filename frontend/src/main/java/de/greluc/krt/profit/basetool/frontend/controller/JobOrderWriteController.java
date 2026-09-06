@@ -506,7 +506,6 @@ public class JobOrderWriteController {
    * @return redirect to {@code /orders}
    */
   @PostMapping("/{id}/priority")
-  @PreAuthorize("isAuthenticated()")
   public String updatePriority(
       @PathVariable UUID id,
       @RequestParam Integer priority,
@@ -562,7 +561,6 @@ public class JobOrderWriteController {
    * @return updated order on success, propagated backend status code on failure
    */
   @PostMapping("/{id}/status")
-  @PreAuthorize("isAuthenticated()")
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
@@ -776,7 +774,6 @@ public class JobOrderWriteController {
    * @return redirect back to the order detail
    */
   @PostMapping("/{id}/requested-update")
-  @PreAuthorize("isAuthenticated()")
   public String updateOrderAsRequester(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -823,7 +820,6 @@ public class JobOrderWriteController {
   @PostMapping(
       value = "/{id}/requested-update",
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @RequestBody JobOrderForm form) {
@@ -858,7 +854,6 @@ public class JobOrderWriteController {
    * @return redirect to {@code /orders}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     return mutationResponseHelper.mutate(
         redirectAttributes,
@@ -879,7 +874,6 @@ public class JobOrderWriteController {
    * @return 204 on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     return relay(
@@ -902,7 +896,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @PostMapping("/{id}/assignees")
-  @PreAuthorize("isAuthenticated()")
   public String addAssignee(
       @PathVariable UUID id,
       @RequestParam UUID userId,
@@ -1382,7 +1375,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @DeleteMapping("/{id}/assignees/{userId}")
-  @PreAuthorize("isAuthenticated()")
   public String removeAssignee(
       @PathVariable UUID id,
       @PathVariable UUID userId,
@@ -1412,7 +1404,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @PutMapping("/{id}/assignees/{userId}/note")
-  @PreAuthorize("isAuthenticated()")
   public String setAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,
@@ -1443,7 +1434,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @DeleteMapping("/{id}/assignees/{userId}/note")
-  @PreAuthorize("isAuthenticated()")
   public String deleteAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,

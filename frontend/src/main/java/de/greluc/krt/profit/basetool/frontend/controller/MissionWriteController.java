@@ -92,6 +92,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
  * package carried no gate of their own at all — protected by a matcher two folders away rather than
  * by anything next to the code. A method-level gate still wins where one is present.
+ *
+ * <p><b>Which is why the method-level {@code isAuthenticated()} annotations were removed and the
+ * template {@code sec:authorize} guards were not.</b> Redundancy with a gate in the same file is
+ * noise: twenty-eight of them stood here restating the line above, and a reader scanning for the
+ * handlers that are gated more strictly than the floor had to read every one to find out that most
+ * were not. Redundancy with a URL matcher two folders away is defence in depth — the arrangement
+ * this change set out to end — and that is the kind the floor itself is. The two look alike and are
+ * opposites.
  */
 @Controller
 @RequestMapping("/missions")
@@ -249,7 +257,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/party-lead")
-  @PreAuthorize("isAuthenticated()")
   public String setPartyLead(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) UUID userId,
@@ -300,7 +307,6 @@ public class MissionWriteController {
       value = "/{id}/party-lead/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> setPartyLeadAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
@@ -431,7 +437,6 @@ public class MissionWriteController {
    */
   @PostMapping("/{id}/actual-time")
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<MissionDto> updateActualTime(
       @PathVariable @NotNull UUID id,
       @Valid @RequestBody
@@ -576,7 +581,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units")
-  @PreAuthorize("isAuthenticated()")
   public String addUnit(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) String name,
@@ -614,7 +618,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units/{unitId}/update")
-  @PreAuthorize("isAuthenticated()")
   public String updateUnit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -654,7 +657,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units/{unitId}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteUnit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -675,7 +677,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units/{unitId}/crew")
-  @PreAuthorize("isAuthenticated()")
   public String addCrew(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -712,7 +713,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units/{unitId}/crew/{crewId}/update")
-  @PreAuthorize("isAuthenticated()")
   public String updateCrew(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -753,7 +753,6 @@ public class MissionWriteController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{id}/units/{unitId}/crew/{crewId}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteCrew(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -778,7 +777,6 @@ public class MissionWriteController {
    * @return inline create view on failure, otherwise redirect to {@code /missions/{newId}}
    */
   @PostMapping
-  @PreAuthorize("isAuthenticated()")
   public String createMission(
       @Valid @ModelAttribute("missionForm") MissionForm form,
       BindingResult bindingResult,
@@ -890,7 +888,6 @@ public class MissionWriteController {
    * @return redirect to the mission detail page
    */
   @PostMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public String updateMission(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("missionForm") MissionForm form,
@@ -1023,7 +1020,6 @@ public class MissionWriteController {
    */
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> updateMissionAjax(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("missionForm") MissionForm form,
@@ -1288,7 +1284,6 @@ public class MissionWriteController {
       value = "/{id}/owning-org-unit/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> setMissionOwningOrgUnit(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
@@ -1504,7 +1499,6 @@ public class MissionWriteController {
       value = "/{id}/units/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> addUnitAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -1529,7 +1523,6 @@ public class MissionWriteController {
       value = "/{id}/units/{unitId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> updateUnitAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -1553,7 +1546,6 @@ public class MissionWriteController {
       value = "/{id}/units/{unitId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> deleteUnitAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     try {
@@ -1583,7 +1575,6 @@ public class MissionWriteController {
       value = "/{id}/steps/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> addStepAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -1612,7 +1603,6 @@ public class MissionWriteController {
       value = "/{id}/steps/{stepId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> updateStepAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
@@ -1644,7 +1634,6 @@ public class MissionWriteController {
       value = "/{id}/steps/{stepId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> deleteStepAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
@@ -1675,7 +1664,6 @@ public class MissionWriteController {
       value = "/{id}/steps/reorder/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> reorderStepsAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -1708,7 +1696,6 @@ public class MissionWriteController {
       value = "/{id}/steps/{stepId}/done/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> toggleStepDoneAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
@@ -1742,7 +1729,6 @@ public class MissionWriteController {
       value = "/{id}/objectives/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> addObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -1772,7 +1758,6 @@ public class MissionWriteController {
       value = "/{id}/objectives/{objectiveId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> updateObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
@@ -1811,7 +1796,6 @@ public class MissionWriteController {
       value = "/{id}/objectives/{objectiveId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> deleteObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
@@ -1852,7 +1836,6 @@ public class MissionWriteController {
       value = "/{id}/objectives/reorder/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> reorderObjectivesAjax(
       @PathVariable @NotNull UUID id,
       @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
@@ -2050,7 +2033,6 @@ public class MissionWriteController {
       value = "/{id}/units/{unitId}/crew/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> addCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -2077,7 +2059,6 @@ public class MissionWriteController {
       value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> updateCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
@@ -2112,7 +2093,6 @@ public class MissionWriteController {
       value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> deleteCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,

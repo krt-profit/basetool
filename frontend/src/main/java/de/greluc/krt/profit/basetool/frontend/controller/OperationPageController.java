@@ -134,7 +134,6 @@ public class OperationPageController {
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @GetMapping
-  @PreAuthorize("isAuthenticated()")
   public String listOperations(
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String start,
@@ -239,7 +238,6 @@ public class OperationPageController {
    *     or a redirect on backend failure of the full-page load
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public String operationDetails(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false, defaultValue = "0") Integer page,
@@ -501,7 +499,6 @@ public class OperationPageController {
    * @return the {@code operation-detail :: financeDetail} fragment view
    */
   @GetMapping("/{id}/finance/{missionId}")
-  @PreAuthorize("isAuthenticated()")
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
     try {
@@ -678,7 +675,6 @@ public class OperationPageController {
   @PostMapping(
       value = "/markdown-preview",
       produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public ResponseEntity<String> markdownPreview(
       @RequestBody java.util.Map<String, String> request) {

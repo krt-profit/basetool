@@ -36,7 +36,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -136,15 +135,7 @@ public class HomeController {
       // must not re-log at ERROR on every load and trip LogbackErrorSpike.
       log.debug("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
-      // A 403 here is an ANSWER, not a failure: the mission list is gated on
-      // isMemberOrAbove(), and an account holding only a bank role passes every other gate on
-      // this page while failing that one. Telling such a member "the missions could not be
-      // loaded" on every single dashboard load describes a fault that is not happening. The
-      // banner stays for everything else, which is what it was written for - a backend restart,
-      // a timeout, an open circuit.
-      if (e.getStatusCode() != HttpStatus.FORBIDDEN.value()) {
-        model.addAttribute("error", "error.mission.fetch");
-      }
+      model.addAttribute("error", "error.mission.fetch");
     } catch (Exception e) {
       log.error("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());

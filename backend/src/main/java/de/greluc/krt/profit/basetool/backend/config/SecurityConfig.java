@@ -314,17 +314,16 @@ public class SecurityConfig {
   }
 
   /**
-   * The sliding window of distinct subjects the consent gate refused, published as the {@code
-   * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
+   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
    *
-   * <p>15 minutes is chosen against the alert that reads it: long enough that a member who is
-   * refused, reads the terms and takes a while to decide stays counted throughout, short enough
-   * that the series falls back to zero within one scrape window of a rollout completing. The 5 000
-   * cap is roughly two orders of magnitude above the membership — it exists so an
-   * internet-reachable refusal path cannot grow the map without bound, not as a functional limit.
+   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
+   * separate instance on purpose: the two answer different questions and one member can be in both
+   * (a role-less account that has also not accepted the terms), so sharing a window would report
+   * them as one population.
    *
    * @param meterRegistry the registry the gauge is published to
-   * @return the window the consent filter records refusals into
+   * @return the window the role gate records refusals into
    */
   @Bean
   public RefusedSubjectWindow noRoleRefusedSubjectWindow(MeterRegistry meterRegistry) {
@@ -336,16 +335,17 @@ public class SecurityConfig {
   }
 
   /**
-   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
-   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
+   * The sliding window of distinct subjects the consent gate refused, published as the {@code
+   * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
    *
-   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
-   * separate instance on purpose: the two answer different questions and one member can be in both
-   * (a role-less account that has also not accepted the terms), so sharing a window would report
-   * them as one population.
+   * <p>15 minutes is chosen against the alert that reads it: long enough that a member who is
+   * refused, reads the terms and takes a while to decide stays counted throughout, short enough
+   * that the series falls back to zero within one scrape window of a rollout completing. The 5 000
+   * cap is roughly two orders of magnitude above the membership — it exists so an
+   * internet-reachable refusal path cannot grow the map without bound, not as a functional limit.
    *
    * @param meterRegistry the registry the gauge is published to
-   * @return the window the role gate records refusals into
+   * @return the window the consent filter records refusals into
    */
   @Bean
   public RefusedSubjectWindow refusedSubjectWindow(MeterRegistry meterRegistry) {

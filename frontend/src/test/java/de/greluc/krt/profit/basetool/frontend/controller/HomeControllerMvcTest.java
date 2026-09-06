@@ -455,4 +455,45 @@ class HomeControllerMvcTest {
         .noneMatch(header -> header.startsWith("SESSION="));
     org.mockito.Mockito.verifyNoInteractions(backendApiClient);
   }
+
+  /**
+   * The landing page shows a logged-out visitor no navigation.
+   *
+   * <p>Pinned because of what it depends on: {@code landing.html} includes {@code
+   * fragments/sidebar}, and that fragment carries the tool's whole navigation, the notification
+   * bell and the org-unit switcher behind {@code sec:authorize="isAuthenticated()"}. Those three
+   * guards look exactly like the twenty-five on the pages behind the login — which are redundant
+   * with the URL matrix, because those pages answer nobody without a session. These are not: this
+   * page is one of the four surfaces REQ-SEC-052 serves without one, so the guards are the only
+   * thing between a visitor and the navigation. Somebody tidying "always-true" template guards
+   * would delete all twenty-eight, and only this case would notice.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void anonymousLandingPageShowsNoNavigation() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("the notification bell is behind sec:authorize and must not render")
+        .doesNotContain("id=\"notification-bell\"");
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("nor any of the tool's own destinations")
+        .doesNotContain("/missions")
+        .doesNotContain("/inventory")
+        .doesNotContain("/orders")
+        .doesNotContain("/hangar");
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("what it DOES carry: the two login entry points and the legal pages")
+        .contains("/oauth2/authorization/keycloak")
+        .contains("/impressum")
+        .contains("/privacy");
+  }
 }

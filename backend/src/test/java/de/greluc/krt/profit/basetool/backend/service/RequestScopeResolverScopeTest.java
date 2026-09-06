@@ -111,11 +111,12 @@ class RequestScopeResolverScopeTest {
       // message, so a lost gate would have answered the caller "reaching this means an endpoint
       // lost its gate" under a status blaming their request. A Spring Security exception lands on
       // the 401 UNAUTHENTICATED path: generic body, DEBUG log, no stack trace, no 5xx alert.
+      // (That it IS an AuthenticationException is the type hierarchy's job, not this test's -
+      // asserting it here is a tautology CodeQL rightly flags.)
       AuthenticationCredentialsNotFoundException thrown =
           assertThrows(
               AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
 
-      assertTrue(thrown instanceof org.springframework.security.core.AuthenticationException);
       assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
     }
 

@@ -2998,8 +2998,13 @@ gateway's acting-member path (ADR-0129), which installs an authentication withou
 `PendingApprovalAccessFilter` is the only reader.
 
 **`default-roles-iri` carries `KRT Member`**, so every account Keycloak creates is a member at the
-IdP. That is the structural half of this requirement, and it is why the roster sync had to be fixed
-in the same change:
+IdP. **There is therefore no account holding only a bank role, or only any other role** (confirmed
+by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a gate on
+the member surface. The E2E realm contradicted this until then: `test-bank-employee` and
+`test-bank-management` carried their bank role alone, so those two accounts, and no real one, met a
+refusal on the mission list. A fixture that models an impossible account shape produces findings
+about a cohort that does not exist. That is the structural half of this requirement, and it is why
+the roster sync had to be fixed in the same change:
 
 > [!warning] The composite-blind sync was the precondition, not a detail
 > `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member

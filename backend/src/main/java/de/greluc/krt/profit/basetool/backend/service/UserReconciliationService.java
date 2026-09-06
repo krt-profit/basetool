@@ -96,12 +96,6 @@ public class UserReconciliationService {
   private final AtomicInteger roleLessAccounts = new AtomicInteger();
 
   /**
-   * The role catalogue for the run in progress, or {@code null} before the first mapping of a run.
-   * Filled by {@link #roleCatalogue()} and dropped by {@link #logRoleSyncSummary()}.
-   */
-  @Nullable private volatile Map<String, Role> roleCatalogue;
-
-  /**
    * Keycloak role names seen in the current run that matched no local role and were dropped
    * (counted across accounts, so a renamed role contributes one per holder).
    */
@@ -528,7 +522,6 @@ public class UserReconciliationService {
     int changed = roleChangedAccounts.getAndSet(0);
     int roleLess = roleLessAccounts.getAndSet(0);
     int dropped = droppedRoleNames.getAndSet(0);
-    roleCatalogue = null;
     if (roleLess > ROLE_LESS_WARN_THRESHOLD) {
       log.warn(
           "User sync role mapping: {} accounts changed roles; {} accounts resolve to NO role at all"
@@ -561,35 +554,31 @@ public class UserReconciliationService {
   }
 
   /**
-   * The role catalogue, lower-cased by name, read once per sync run instead of once per role name
-   * per member.
+   * The role catalogue, lower-cased by name, read <b>once per account</b> instead of once per role
+   * name.
    *
    * <p>The catalogue is a handful of rows and every member carries several names, so the previous
    * {@code findByNameIgnoreCase} per name was one query per name per account - and the REQ-SEC-053
    * composite fold-in adds a name to essentially every member, roughly doubling that count against
-   * the largest loop in the nightly run. One read serves the whole run; the reference is dropped in
-   * {@link #logRoleSyncSummary()}, which the sync calls when it finishes, so a role added between
-   * runs is picked up on the next one.
+   * the largest loop in the nightly run.
    *
-   * <p>{@code volatile} and immutable rather than synchronised: two overlapping runs would at worst
-   * build the same map twice, and neither can observe a half-filled one.
+   * <p><b>Deliberately not cached across calls, and this is the whole point of the method.</b> The
+   * first version of this fix held the map in a {@code volatile} field for the length of a sync
+   * run. That handed out {@link Role} entities loaded in an earlier transaction and assigned them
+   * to a managed {@code User}, which is a detached instance in a live persistence context:
+   * Hibernate refused the flush and every login answered {@code 500} - found by the E2E suite on
+   * 2026-09-06, where it took the whole stack's bring-up with it. One query per account is the N+1
+   * fix; sharing entities across transactions is not an optimisation but a defect.
    *
-   * @return role by lower-cased name; never {@code null}
+   * @return role by lower-cased name, managed by the caller's persistence context; never {@code
+   *     null}
    */
   @NotNull
   private Map<String, Role> roleCatalogue() {
-    Map<String, Role> cached = roleCatalogue;
-    if (cached == null) {
-      cached =
-          roleRepository.findAll().stream()
-              .collect(
-                  java.util.stream.Collectors.toUnmodifiableMap(
-                      role -> role.getName().toLowerCase(Locale.ROOT),
-                      role -> role,
-                      (first, second) -> first));
-      roleCatalogue = cached;
-    }
-    return cached;
+    return roleRepository.findAll().stream()
+        .collect(
+            java.util.stream.Collectors.toUnmodifiableMap(
+                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));
   }
 
   /**

@@ -2,6 +2,13 @@
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <body>
 <th:block th:fragment="sidebar">
+    <!-- The sec:authorize="isAuthenticated()" guards in this fragment are NOT redundant with the
+         URL matrix, unlike the ones on the pages behind it: landing.html includes this fragment,
+         and the landing page is one of the four surfaces REQ-SEC-052 serves without a session. For
+         a logged-out visitor the span below is the only thing between them and the whole
+         navigation, and the other two hide the notification bell and the org-unit switcher. Do not
+         remove them as "always true" — HomeControllerMvcTest#anonymousLandingPageShowsNoNavigation
+         fails if you do. -->
     <!-- The active org-unit context is surfaced solely via the application title (see
          LayoutMiscAdvice#appTitle and REQ-ORG-010) — the brand logo text in the header
          and the browser <title>. The previously-rendered top-right context chip was removed

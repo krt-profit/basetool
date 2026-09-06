@@ -205,7 +205,6 @@ public class JobOrderPageController {
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @GetMapping
-  @PreAuthorize("isAuthenticated()")
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) List<UUID> squadronId,
@@ -365,7 +364,6 @@ public class JobOrderPageController {
    * @return the {@code order-detail} view name
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
       @PathVariable UUID id,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
@@ -878,7 +876,6 @@ public class JobOrderPageController {
    */
   @GetMapping("/{id}/materials/{matId}/inventory")
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public List<InventoryItemDto> getInventoryItemsForMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
