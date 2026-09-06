@@ -185,7 +185,7 @@ public class MissionPageController {
     }
     try {
       List<OperationReferenceDto> operations =
-          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST, false);
+          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST);
       model.addAttribute("operationsList", operations);
     } catch (Exception e) {
       log.warn("Could not load operations", e);
@@ -367,7 +367,7 @@ public class MissionPageController {
       @RequestParam(required = false) String fragment) {
     try {
       MissionDto mission =
-          backendApiClient.get("/api/v1/missions/" + id, MISSION, authHelperService.isAnonymous());
+          backendApiClient.get("/api/v1/missions/" + id, MISSION);
 
       // Fragment-gated reads (mission-scale hardening, ADR-0078): an in-place section refetch
       // (GET /missions/{id}?fragment=X) must issue ONLY the backend reads its own fragment renders,
@@ -472,7 +472,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
             backendApiClient.getCached(
-                CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE, true);
+                CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception e) {
         // Ignore if job types fail
@@ -481,7 +481,7 @@ public class MissionPageController {
       // Fetch Crew JobTypes
       try {
         PageResponse<Map<String, Object>> crewJobTypesPage =
-            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -491,7 +491,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> squadronsPage =
             backendApiClient.getCached(
-                CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE, true);
+                CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception e) {
         // Ignore
@@ -518,7 +518,7 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> freqTypesPage =
             backendApiClient.getCached(
-                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE, true);
+                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("frequencyTypes", freqTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -537,7 +537,7 @@ public class MissionPageController {
           try {
             List<ShipDto> unitShipOptions =
                 backendApiClient.get(
-                    "/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST, false);
+                    "/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
             model.addAttribute("unitShipOptions", unitShipOptions);
           } catch (Exception e) {
             // Ignore, e.g. if the caller cannot manage the mission
@@ -571,8 +571,7 @@ public class MissionPageController {
                   () ->
                       backendApiClient.get(
                           "/api/v1/missions/" + id + "/finance-entries/summary",
-                          MissionFinanceTotalsDto.class,
-                          false));
+                          MissionFinanceTotalsDto.class));
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
               parallelPageLoader.loadAsync(
                   () ->
@@ -581,13 +580,12 @@ public class MissionPageController {
                               + id
                               + "/finance-entries?size="
                               + FINANCE_TABLE_PAGE_SIZE,
-                          MISSION_FINANCE_ENTRY_PAGE,
-                          false));
+                          MISSION_FINANCE_ENTRY_PAGE));
           CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST, false));
+                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST));
           // #1138: the mission inventory list moved off the embedded MissionDto field onto its own
           // dedicated read; fetch it in parallel with the finance/refinery reads for the Wirtschaft
           // "Lagereinträge" table.
@@ -595,7 +593,7 @@ public class MissionPageController {
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST, false));
+                          "/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
@@ -815,7 +813,7 @@ public class MissionPageController {
     try {
       Object result =
           backendApiClient.get(
-              "/api/v1/missions/" + id + "/participants/unassigned", OBJECT, false);
+              "/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(

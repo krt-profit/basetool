@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.service;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -75,7 +76,35 @@ import tools.jackson.databind.json.JsonMapper;
 public class BackendApiClient {
 
   private final WebClient webClient;
-  private final WebClient publicWebClient;
+  /**
+   * The bearer-less client for the Terms-of-Use wording, and nothing else (REQ-SEC-052).
+   *
+   * <p>Injected by name so the narrowing is enforced by the object graph rather than by a comment:
+   * a second caller would have to ask for this bean explicitly, which
+   * {@code TermsDocumentClientUsageTest} refuses.
+   */
+  private final WebClient termsDocumentClient;
+
+  /** The path the wording lives at; the one URI {@link #termsDocumentClient} ever sees. */
+  private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
+
+  /**
+   * Reads the Terms-of-Use wording in force, without a bearer token.
+   *
+   * <p>The one anonymous backend call the frontend makes (ADR-0138 / REQ-SEC-028, REQ-SEC-052). It
+   * has to be anonymous because the public {@code /terms} page renders it for a visitor who has no
+   * session, and it can be anonymous because the document is the same text that page publishes.
+   *
+   * <p>A named method rather than a boolean flag. Its predecessor was {@code get(uri, type, true)},
+   * and the flag was passed at roughly forty call sites — every one of them a decision to send a
+   * request with no identity, taken by typing {@code true}. Now there is one method, one client and
+   * one URI, and {@code TermsDocumentClientUsageTest} asserts nothing else injects the bean.
+   *
+   * @return the wording in force, or {@code null} when the backend returned no body
+   */
+  public TermsDocumentDto getTermsDocumentAnonymously() {
+    return executeGet(termsDocumentClient, TERMS_DOCUMENT_URI, TermsDocumentDto.class);
+  }
   private final MeterRegistry meterRegistry;
   private final CacheManager cacheManager;
 
@@ -125,12 +154,7 @@ public class BackendApiClient {
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
-    return get(uri, responseType, false);
-  }
-
-  /** GET overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T> T get(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
+    return executeGet(webClient, uri, responseType);
   }
 
   /**
@@ -154,34 +178,7 @@ public class BackendApiClient {
 
   /** GET overload for simple (non-generic) return types. */
   public <T> T get(String uri, Class<T> responseType) {
-    return get(uri, responseType, false);
-  }
-
-  /**
-   * Class-typed GET overload that targets the anonymous public WebClient when {@code isPublic} is
-   * true.
-   */
-  public <T> T get(String uri, Class<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
-  }
-
-  /**
-   * Public (anonymous) GET that expands {@code uriVariables} into {@code uriTemplate} so the
-   * WebClient encodes them per RFC 3986, targeting the anonymous {@code publicWebClient}. The
-   * {@code isPublic} counterpart of {@link #get(String, ParameterizedTypeReference, Object...)}:
-   * use it when a free-text value (e.g. an item-search term carrying spaces or quotes) must reach a
-   * {@code permitAll()} backend endpoint from an unauthenticated page, where hand-encoding the
-   * value into the URI string would be re-mangled across the frontend&rarr;backend hop.
-   *
-   * @param uriTemplate the URI template containing {@code {name}} placeholders
-   * @param responseType the decoded response type
-   * @param uriVariables the values expanded into the template, encoded by the WebClient
-   * @param <T> the response body type
-   * @return the decoded response body
-   */
-  public <T> T getPublic(
-      String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
-    return executeGet(publicWebClient, uriTemplate, responseType, uriVariables);
+    return executeGet(webClient, uri, responseType);
   }
 
   /**
@@ -198,30 +195,7 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
-    return getCached(catalog, responseType, false);
-  }
-
-  /**
-   * Cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient when {@code
-   * isPublic} is true (a {@code permitAll} catalogue reachable from an unauthenticated page). For a
-   * {@link CachedCatalog.Fetch#PAGE_WALK} catalogue this walks and merges every backend page before
-   * caching (REQ-ADMIN-003); a mid-walk failure propagates unchanged, so callers keep their
-   * established degradation contract and no partial catalogue is ever cached.
-   *
-   * @param catalog the allowlisted catalogue to fetch and cache
-   * @param responseType the decoded response type
-   * @param isPublic true to use the anonymous {@code publicWebClient}
-   * @param <T> the response body type
-   * @return the decoded (possibly cached) response body
-   */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
-  public <T> T getCached(
-      CachedCatalog catalog, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    WebClient client = isPublic ? publicWebClient : webClient;
-    if (catalog.isPageWalked()) {
-      return fetchCompleteCatalog(client, catalog, responseType);
-    }
-    return executeGet(client, catalog.getUri(), responseType);
+    return executeGet(webClient, catalog.getUri(), responseType);
   }
 
   /**
@@ -238,33 +212,7 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
-    return getCached(catalog, responseType, false);
-  }
-
-  /**
-   * Class-typed cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient
-   * when {@code isPublic} is true.
-   *
-   * @param catalog the allowlisted catalogue to fetch and cache; must not be a {@link
-   *     CachedCatalog.Fetch#PAGE_WALK} catalogue
-   * @param responseType the decoded response type
-   * @param isPublic true to use the anonymous {@code publicWebClient}
-   * @param <T> the response body type
-   * @return the decoded (possibly cached) response body
-   * @throws IllegalArgumentException when {@code catalog} is page-walked — a {@code Class} token
-   *     cannot decode the generic {@code PageResponse} the walk requires, and a plain single-page
-   *     GET of such a catalogue would silently truncate it (REQ-ADMIN-003)
-   */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
-  public <T> T getCached(CachedCatalog catalog, Class<T> responseType, boolean isPublic) {
-    if (catalog.isPageWalked()) {
-      throw new IllegalArgumentException(
-          "Catalogue "
-              + catalog.name()
-              + " is page-walked and must be read through the ParameterizedTypeReference overload"
-              + " of getCached — a single bounded GET would silently truncate it (REQ-ADMIN-003)");
-    }
-    return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
+    return executeGet(webClient, catalog.getUri(), responseType);
   }
 
   /**
@@ -394,12 +342,7 @@ public class BackendApiClient {
    * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R post(String uri, T body, Class<R> responseType) {
-    return post(uri, body, responseType, false);
-  }
-
-  /** POST overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R post(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePost(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePost(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePost(WebClient client, String uri, T body, Class<R> responseType) {
@@ -416,12 +359,7 @@ public class BackendApiClient {
 
   /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
   public <T, R> R put(String uri, T body, Class<R> responseType) {
-    return put(uri, body, responseType, false);
-  }
-
-  /** PUT overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R put(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePut(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePut(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePut(WebClient client, String uri, T body, Class<R> responseType) {
@@ -438,12 +376,7 @@ public class BackendApiClient {
 
   /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
   public <R> R delete(String uri, Class<R> responseType) {
-    return delete(uri, responseType, false);
-  }
-
-  /** DELETE overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <R> R delete(String uri, Class<R> responseType, boolean isPublic) {
-    return executeDelete(isPublic ? publicWebClient : webClient, uri, responseType);
+    return executeDelete(webClient, uri, responseType);
   }
 
   /**
@@ -490,12 +423,7 @@ public class BackendApiClient {
    * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
-    return patch(uri, body, responseType, false);
-  }
-
-  /** PATCH overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R patch(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePatch(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePatch(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePatch(WebClient client, String uri, T body, Class<R> responseType) {

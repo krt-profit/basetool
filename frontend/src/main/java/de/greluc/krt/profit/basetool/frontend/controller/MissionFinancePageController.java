@@ -104,7 +104,7 @@ public class MissionFinancePageController {
       body.put("type", form.getType());
       body.put("amount", form.getAmount());
 
-      backendApiClient.post("/api/v1/finance-entries", body, Void.class, authHelper.isAnonymous());
+      backendApiClient.post("/api/v1/finance-entries", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
@@ -152,7 +152,7 @@ public class MissionFinancePageController {
       body.put("amount", form.getAmount());
       body.put("version", form.getVersion());
 
-      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class, false);
+      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
@@ -181,7 +181,7 @@ public class MissionFinancePageController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class, false);
+      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -216,7 +216,7 @@ public class MissionFinancePageController {
       body.put("missionId", id);
       Object result =
           backendApiClient.post(
-              "/api/v1/finance-entries", body, Object.class, authHelper.isAnonymous());
+              "/api/v1/finance-entries", body, Object.class);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());
@@ -245,7 +245,7 @@ public class MissionFinancePageController {
       @RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class, false);
+          backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Update finance entry (AJAX) failed: status={}", e.getStatusCode());
@@ -271,7 +271,7 @@ public class MissionFinancePageController {
   public ResponseEntity<Object> deleteFinanceEntryAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID entryId) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class, false);
+      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
       log.debug("Delete finance entry (AJAX) failed: status={}", e.getStatusCode());

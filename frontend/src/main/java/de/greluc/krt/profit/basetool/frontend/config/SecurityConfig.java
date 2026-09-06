@@ -221,46 +221,27 @@ public class SecurityConfig {
                         "/sm/**",
                         "/**/*.map")
                     .permitAll()
-                    .requestMatchers("/missions", "/missions/")
-                    .permitAll()
-                    .requestMatchers("/missions/**")
-                    .permitAll() // Still permitAll for general access, @PreAuthorize or logic
-                    // inside handles details
-                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one socket
-                    // per tab carrying every peer-sync topic. Authenticated only — anonymous guests
-                    // get no socket (their order creates are relayed server-side instead), and both
-                    // publish and subscribe require an authenticated principal; only opaque section
-                    // keys cross it and each fragment re-pull re-authorizes per viewer.
+                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one
+                    // socket per tab carrying every peer-sync topic. Both publish and subscribe
+                    // require an authenticated principal; only opaque section keys cross it and
+                    // each fragment re-pull re-authorizes per viewer. Listed explicitly rather than
+                    // left to the catch-all because the handshake interceptor itself always returns
+                    // true — this rule is the whole gate.
                     .requestMatchers("/ws/sync")
                     .authenticated()
-                    .requestMatchers("/operations", "/operations/")
-                    .permitAll()
-                    .requestMatchers("/operations/**")
-                    .permitAll()
-                    // The order queue stays readable without a login, as it always was. Creating
-                    // one does not: the public request form is gone (ADR-0149), so /orders/create
-                    // — and the POST behind it — need a principal. Listed before the wildcard so
-                    // the wildcard cannot re-open it.
-                    .requestMatchers(
-                        "/orders/create",
-                        "/orders/create/**",
-                        "/orders/items",
-                        "/orders/item-search",
-                        "/orders/item-blueprints/**",
-                        "/orders/item-derivation/**")
-                    .authenticated()
-                    .requestMatchers("/orders", "/orders/")
-                    .permitAll()
-                    .requestMatchers("/orders/**")
-                    .permitAll()
-                    // Catalog picker live-search relays (REQ-FE-016). They proxy permitAll backend
-                    // catalog endpoints and expose only public catalog names (materials /
-                    // locations). Their original reason was the anonymous order form's material
-                    // picker (gone, ADR-0149), but they now serve authenticated pickers across
-                    // several forms and the payload was never caller-specific, so they stay public
-                    // rather than being closed as a side effect of an unrelated change.
-                    .requestMatchers("/catalog/**")
-                    .permitAll()
+                    // REQ-SEC-052 / ADR-0159: everything else requires a login. The five families
+                    // that used to sit here — /missions, /missions/**, /operations(/**),
+                    // /orders(/**) and /catalog/** — are gone, and with them the last surface an
+                    // unauthenticated visitor could read data from. They fall through to
+                    // anyRequest().authenticated() below, so a navigation is sent into the OAuth2
+                    // entry point and a background fetch answers 401 REAUTH_REQUIRED.
+                    //
+                    // The /orders/create block that preceded them is gone too: it carved the
+                    // creation paths back OUT of the /orders/** permitAll after ADR-0149 took the
+                    // public request form away, and with the wildcard removed it restates the
+                    // catch-all. Its history is in ADR-0149; its behaviour is pinned by
+                    // AnonymousSurfaceSweepMvcTest, which asserts the status of every mapping
+                    // rather than trusting this list to be complete.
                     .anyRequest()
                     .authenticated())
         .oauth2Login(

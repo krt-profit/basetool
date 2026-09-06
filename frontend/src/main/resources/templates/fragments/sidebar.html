@@ -164,9 +164,11 @@
                     <button type="submit" class="sidebar-logout-btn" data-testid="nav-logout" th:text="#{nav.logout}">Logout</button>
                 </form>
             </span>
+                <!-- REQ-SEC-052: an anonymous visitor has nowhere to go but the login. The two
+                     links that stood here (the mission list and the public order form) both led to
+                     pages that now redirect straight back to it, so they were an invitation to a
+                     round trip. -->
                 <span sec:authorize="isAnonymous()">
-                <a th:href="@{/missions}" data-testid="nav-missions" th:text="#{nav.missions}">Missions</a>
-                <a th:href="@{/orders/create}" th:text="#{orders.create.link}">Auftrag anlegen</a>
                 <a th:href="@{/oauth2/authorization/keycloak}" data-testid="nav-login" th:text="#{nav.login}">Login</a>
                 <a th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
                    data-testid="nav-login-discord" class="sidebar-discord-login">

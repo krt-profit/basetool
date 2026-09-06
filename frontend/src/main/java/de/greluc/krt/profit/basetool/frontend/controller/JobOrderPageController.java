@@ -891,7 +891,7 @@ public class JobOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       List<MaterialDto> list =
-          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL, true);
+          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL);
       if (list != null) {
         return new ArrayList<>(list);
       }
@@ -1145,7 +1145,7 @@ public class JobOrderPageController {
   private List<SquadronDto> fetchSquadrons() {
     try {
       PageResponse<SquadronDto> p =
-          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON, true);
+          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1188,7 +1188,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.getCached(
-              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
+              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);

@@ -84,7 +84,7 @@ public class CatalogSearchController {
       @RequestParam(required = false, defaultValue = "false") boolean raw) {
     try {
       PageResponse<MaterialDto> page =
-          backendApiClient.getPublic(
+          backendApiClient.get(
               "/api/v1/materials/search?search={q}&jobOrderOnly={jobOrder}&rawOnly={raw}"
                   + "&size="
                   + PickerSearch.PAGE_SIZE
@@ -119,7 +119,7 @@ public class CatalogSearchController {
   public List<LocationReferenceDto> locationSearch(@RequestParam(required = false) String q) {
     try {
       PageResponse<LocationReferenceDto> page =
-          backendApiClient.getPublic(
+          backendApiClient.get(
               "/api/v1/locations/search?search={q}&size="
                   + PickerSearch.LOCATION_PAGE_SIZE
                   + "&sort=name,asc",

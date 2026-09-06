@@ -77,24 +77,46 @@ public class HomeController {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Renders the home page. Pulls the upcoming missions (planned start within the next seven days)
-   * for everyone; for authenticated users also fetches the {@code /me} user record and the public
-   * announcement, computes the unread flag by comparing the announcement id to {@code
-   * lastReadAnnouncementId}, and arms the once-per-session welcome toast.
+   * Renders {@code /} — the landing page for a visitor with no session, the dashboard for a
+   * member.
+   *
+   * <p><strong>The anonymous branch returns before anything happens.</strong> No backend call, no
+   * model attribute, no session. Both matter and both used to be violated on every single hit:
+   *
+   * <ul>
+   *   <li>The seven-day mission grid was fetched and rendered for anyone who asked — name, unit,
+   *       status, meeting point, times. That was the largest anonymous read the tool had, and
+   *       REQ-SEC-052 closes it.
+   *   <li>A session was minted <em>twice over</em>. This method declared an {@link HttpSession}
+   *       parameter, which Spring resolves with {@code getSession(true)} whether or not the body
+   *       uses it; and {@code SafeCsrfAdvice} forced the deferred CSRF token on every render, which
+   *       the default {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any
+   *       template runs. Every crawler hit cost two sessions in Redis. The parameter is gone — the
+   *       session is now taken explicitly, inside the authenticated branch — and the advice returns
+   *       null for an unauthenticated request.
+   * </ul>
+   *
+   * <p>For a member it is unchanged: the upcoming missions, the {@code /me} record, the
+   * announcement with its unread flag, and the once-per-session welcome toast.
    *
    * @param model Thymeleaf model populated with mission, announcement, username and toast flags
-   * @param principal authenticated OIDC user, or {@code null} for guests
-   * @param session HTTP session used to gate the welcome toast to the first render after login
-   * @return the {@code index} view name
+   * @param principal authenticated OIDC user, or {@code null} for an anonymous visitor
+   * @param request the current request; the session is taken from it only for a member
+   * @return {@code landing} for an anonymous visitor, {@code index} for a member
    */
   @GetMapping("/")
   public String home(
-      Model model, @AuthenticationPrincipal OidcUser principal, HttpSession session) {
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      jakarta.servlet.http.HttpServletRequest request) {
+    if (principal == null) {
+      return "landing";
+    }
+    HttpSession session = request.getSession(true);
     // Fetch the missions starting within the next seven days, nearest planned start first
     // (REQ-MISSION-012). Replaces the former single "next mission" banner with a tile grid. Uses
-    // the broad mission-list scope (the viewer's own org units PLUS every unit's public missions)
-    // via /api/v1/missions/search, which also applies the guest redaction — outsiders only ever see
-    // PLANNED/ACTIVE non-internal missions. The first tile is the soonest upcoming mission.
+    // the broad mission-list scope (the viewer's own org units PLUS every unit's organisation-wide
+    // missions) via /api/v1/missions/search. The first tile is the soonest upcoming mission.
     try {
       Instant now = Instant.now();
       Instant horizon = now.plus(7, ChronoUnit.DAYS);
@@ -104,8 +126,7 @@ public class HomeController {
               + "&end="
               + horizon
               + "&sort=plannedStartTime,asc&status=PLANNED&status=ACTIVE&size=50";
-      PageResponse<MissionListDto> upcomingPage =
-          backendApiClient.get(searchUri, MISSION_PAGE_TYPE, authHelper.isAnonymous());
+      PageResponse<MissionListDto> upcomingPage = backendApiClient.get(searchUri, MISSION_PAGE_TYPE);
       List<MissionListDto> upcomingMissions =
           (upcomingPage != null && upcomingPage.content() != null)
               ? upcomingPage.content()
@@ -113,8 +134,8 @@ public class HomeController {
       model.addAttribute("upcomingMissions", upcomingMissions);
     } catch (BackendServiceException e) {
       // REQ-OBS-001: the BackendApiClient boundary already logged this (4xx WARN / 5xx ERROR /
-      // circuit-open DEBUG). This is the anonymous landing page, so a routine backend restart must
-      // not re-log at ERROR on every load and trip LogbackErrorSpike.
+      // circuit-open DEBUG). This is the first page after a login, so a routine backend restart
+      // must not re-log at ERROR on every load and trip LogbackErrorSpike.
       log.debug("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
       model.addAttribute("error", "error.mission.fetch");
@@ -128,8 +149,8 @@ public class HomeController {
     // "Meine Einheit" chip (REQ-MISSION-012); populated below for authenticated users.
     model.addAttribute("myOrgUnitIds", Set.of());
 
-    if (principal != null) {
-      model.addAttribute("username", principal.getPreferredUsername());
+    model.addAttribute("username", principal.getPreferredUsername());
+    {
 
       if (session.getAttribute("welcomeMessageShown") == null) {
         model.addAttribute("showLoginNotification", true);

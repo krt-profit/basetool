@@ -215,9 +215,8 @@ public class MissionWriteController {
       }
       body.put("comment", form.comment());
 
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
-          "/api/v1/missions/" + id + "/participants/add", body, Void.class, isPublic);
+          "/api/v1/missions/" + id + "/participants/add", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -269,7 +268,7 @@ public class MissionWriteController {
         body.put("guestName", guestName);
       }
       body.put("version", version != null ? version : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class, false);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
@@ -318,8 +317,8 @@ public class MissionWriteController {
         out.put("guestName", guestName);
       }
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class, false);
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION, false);
+      backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
@@ -342,12 +341,10 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in",
           null,
-          Void.class,
-          isPublic);
+          Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "checkInParticipant", participantId, e);
@@ -371,12 +368,10 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.post(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out",
           null,
-          Void.class,
-          isPublic);
+          Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "checkOutParticipant", participantId, e);
@@ -402,13 +397,11 @@ public class MissionWriteController {
       @RequestBody UpdatePayoutPreferenceRequest request,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       MissionDto updatedMission =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/payout-preference",
               request,
-              MissionDto.class,
-              isPublic);
+              MissionDto.class);
       return org.springframework.http.ResponseEntity.ok(updatedMission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -506,9 +499,8 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/participants/" + participantId, Void.class, isPublic);
+          "/api/v1/missions/" + id + "/participants/" + participantId, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteParticipant", participantId, e);
@@ -571,9 +563,8 @@ public class MissionWriteController {
         body.put("version", form.version());
       }
 
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.put(
-          "/api/v1/missions/" + id + "/participants/" + participantId, body, Void.class, isPublic);
+          "/api/v1/missions/" + id + "/participants/" + participantId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
       log.error("Update participant failed", e);
@@ -1063,7 +1054,7 @@ public class MissionWriteController {
       // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       MissionDto refreshed =
-          backendApiClient.get("/api/v1/missions/" + id, MissionDto.class, false);
+          backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       Map<String, Object> versions = new java.util.LinkedHashMap<>();
       versions.put("version", refreshed.version());
       versions.put("coreVersion", refreshed.coreVersion());
@@ -1139,8 +1130,7 @@ public class MissionWriteController {
         backendApiClient.post(
             "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
             null,
-            String.class,
-            false);
+            String.class);
         log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
         return org.springframework.http.ResponseEntity.ok().build();
       } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
@@ -1203,8 +1193,7 @@ public class MissionWriteController {
       log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
       backendApiClient.delete(
           "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim",
-          Object.class,
-          false);
+          Object.class);
       log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
       return org.springframework.http.ResponseEntity.ok().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
@@ -1265,7 +1254,7 @@ public class MissionWriteController {
       log.debug("CALLING BACKEND PUT - Mission: {}, User: {}", missionUuid, userUuid);
       try {
         backendApiClient.put(
-            "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class, false);
+            "/api/v1/missions/" + missionUuid + "/owner/" + userUuid, null, Void.class);
         log.debug("SUCCESS - Owner of mission {} changed to user {}", missionUuid, userUuid);
         return org.springframework.http.ResponseEntity.ok().build();
       } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
@@ -1317,8 +1306,8 @@ public class MissionWriteController {
               ? owningOrgUnitId
               : null);
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
-      backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class, false);
-      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION, false);
+      backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class);
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
       return org.springframework.http.ResponseEntity.ok(mission);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
@@ -1395,7 +1384,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1424,8 +1413,7 @@ public class MissionWriteController {
       Object result =
           backendApiClient.delete(
               "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim",
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1458,7 +1446,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1496,8 +1484,7 @@ public class MissionWriteController {
           backendApiClient.put(
               "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
               body,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1531,7 +1518,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/units/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/units/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1558,7 +1545,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.put(
-              "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1579,7 +1566,7 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     try {
       backendApiClient.delete(
-          "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class, false);
+          "/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1612,7 +1599,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/steps/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/steps/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1643,7 +1630,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.put(
-              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1676,8 +1663,7 @@ public class MissionWriteController {
       Object result =
           backendApiClient.delete(
               "/api/v1/missions/" + id + "/steps/" + stepId + "/slim?stepsVersion=" + stepsVersion,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -1706,7 +1692,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.put(
-              "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1773,7 +1759,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/objectives/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1807,8 +1793,7 @@ public class MissionWriteController {
           backendApiClient.put(
               "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
               body,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1851,8 +1836,7 @@ public class MissionWriteController {
                   + objectiveId
                   + "/slim?objectivesVersion="
                   + objectivesVersion,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1886,7 +1870,7 @@ public class MissionWriteController {
     try {
       Object result =
           backendApiClient.put(
-              "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class, false);
+              "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1919,10 +1903,9 @@ public class MissionWriteController {
       // Previously this method was annotated with @PreAuthorize("isAuthenticated()")
       // and always passed isPublic=false, which produced the AccessDeniedException
       // observed in live-log/log.txt for anonymous mission signups.
-      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
-              "/api/v1/missions/" + id + "/participants/slim", body, Object.class, isPublic);
+              "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1952,13 +1935,11 @@ public class MissionWriteController {
       // (see backend MissionSecurityService#canAccessParticipant: guest entries
       // with user == null are editable). Route via the public WebClient when no
       // OIDC principal is present, mirroring addParticipantAjax.
-      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
               body,
-              Object.class,
-              isPublic);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -1987,11 +1968,9 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
-          Void.class,
-          isPublic);
+          Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -2020,13 +1999,11 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
               null,
-              Object.class,
-              isPublic);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -2057,13 +2034,11 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
-      boolean isPublic = authHelper.isAnonymous();
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
               null,
-              Object.class,
-              isPublic);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -2099,8 +2074,7 @@ public class MissionWriteController {
           backendApiClient.post(
               "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim",
               body,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -2130,8 +2104,7 @@ public class MissionWriteController {
           backendApiClient.put(
               "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
               body,
-              Object.class,
-              false);
+              Object.class);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
@@ -2163,8 +2136,7 @@ public class MissionWriteController {
     try {
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
-          Void.class,
-          false);
+          Void.class);
       return org.springframework.http.ResponseEntity.noContent().build();
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());

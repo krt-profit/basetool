@@ -280,6 +280,7 @@ public class MissionController {
    */
   @GetMapping("/next")
   @Operation(summary = "Get next upcoming mission")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Transactional(readOnly = true)
   public ResponseEntity<MissionDto> getNextMission() {
     return missionService
@@ -499,15 +500,25 @@ public class MissionController {
       @RequestBody(required = false) @jakarta.validation.Valid JoinMissionRequest request) {
     // Self-enrolment only: the user comes from the token, never from the body. Everything the
     // body can say is about the caller's own row, which is why it needs no self-vs-manager check.
-    return missionMapper.toDto(
-        missionService.addParticipant(
-            id,
-            userService.getUserIdFromJwt(jwt),
-            null,
-            request == null ? null : request.desiredJobTypeId(),
-            null,
-            null,
-            request == null ? null : request.payoutPreference()));
+    MissionDto dto =
+        missionMapper.toDto(
+            missionService.addParticipant(
+                id,
+                userService.getUserIdFromJwt(jwt),
+                null,
+                request == null ? null : request.desiredJobTypeId(),
+                null,
+                null,
+                request == null ? null : request.payoutPreference()));
+    // REQ-SEC-007. Found by the rewritten peerReadableMissionEndpointsMustRedactPii rule, and it
+    // was a real leak rather than a rule artefact: joining returns the WHOLE Einsatz, roster
+    // included, and the caller here is by definition an ordinary member — the one person on the
+    // mission surface most likely to be below Logistician. The old rule could not see it, because
+    // it selected only gates that lacked isAuthenticated() and this one has always had it.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
+    }
+    return dto;
   }
 
   /**
