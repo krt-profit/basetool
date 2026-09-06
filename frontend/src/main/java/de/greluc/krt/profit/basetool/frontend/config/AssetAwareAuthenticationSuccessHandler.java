@@ -84,12 +84,22 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
   private final AuthenticationSuccessHandler delegate;
 
   /**
-   * Builds a handler that uses a fresh {@link HttpSessionRequestCache} and a fresh {@link
-   * SavedRequestAwareAuthenticationSuccessHandler} whose default target URL is {@code /}. This is
-   * the constructor used by {@link SecurityConfig} in production.
+   * Builds a handler around the caller's request cache and a fresh {@link
+   * SavedRequestAwareAuthenticationSuccessHandler} whose default target URL is {@code /} and which
+   * reads that <em>same</em> cache. This is the constructor used by {@link SecurityConfig} in
+   * production, and the cache it is given is the one the filter chain saves into.
+   *
+   * <p>It used to take no argument and build a private {@code new HttpSessionRequestCache()}, with
+   * the delegate quietly building a third. All three agreed only because they used the same default
+   * session attribute — so the moment one of them grew a {@link
+   * org.springframework.security.web.util.matcher.RequestMatcher} (WP-F 11: save only real
+   * navigations, so a logged-out browser's background calls mint no session), the others would have
+   * gone on saving and replaying everything.
+   *
+   * @param requestCache the shared cache the chain saves into; never {@code null}
    */
-  public AssetAwareAuthenticationSuccessHandler() {
-    this(new HttpSessionRequestCache(), defaultDelegate());
+  public AssetAwareAuthenticationSuccessHandler(@NotNull RequestCache requestCache) {
+    this(requestCache, defaultDelegate(requestCache));
   }
 
   /**
@@ -107,9 +117,18 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
     this.delegate = delegate;
   }
 
-  private static SavedRequestAwareAuthenticationSuccessHandler defaultDelegate() {
+  /**
+   * Builds the wrapped default handler, pointed at the same request cache so the replay reads what
+   * the chain saved.
+   *
+   * @param requestCache the shared cache; never {@code null}
+   * @return the delegate whose default target URL is {@code /}
+   */
+  private static SavedRequestAwareAuthenticationSuccessHandler defaultDelegate(
+      @NotNull RequestCache requestCache) {
     SavedRequestAwareAuthenticationSuccessHandler handler =
         new SavedRequestAwareAuthenticationSuccessHandler();
+    handler.setRequestCache(requestCache);
     handler.setDefaultTargetUrl("/");
     handler.setAlwaysUseDefaultTargetUrl(false);
     return handler;

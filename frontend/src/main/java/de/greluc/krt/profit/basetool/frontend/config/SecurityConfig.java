@@ -52,6 +52,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 import org.springframework.security.web.session.SessionInformationExpiredStrategy;
 
@@ -108,12 +110,30 @@ public class SecurityConfig {
         """);
   }
 
+  /** The browser's own word for "this is a page navigation" (Fetch Metadata). */
+  private static final String SEC_FETCH_MODE_HEADER = "Sec-Fetch-Mode";
+
+  /** The {@code Sec-Fetch-Mode} value a top-level navigation carries. */
+  private static final String NAVIGATE_FETCH_MODE = "navigate";
+
   /**
    * Main security filter chain. Wires CSP-nonce, bot-protection, session-debug, request-logging and
    * backend-role-sync filters; configures OAuth2 login against Keycloak with smart OIDC logout; and
    * declares the path-by-path permitAll / authenticated matrix. The injected Keycloak issuer URI
    * feeds the CSP {@code form-action} allow-list so the POST-logout redirect to Keycloak's
    * end-session endpoint is not blocked by the browser.
+   *
+   * @param http the builder to configure
+   * @param clientRegistrationRepository the OAuth2 client registry the entry point redirects
+   *     through
+   * @param keycloakIssuerUri the issuer URI fed into the CSP {@code form-action} allow-list
+   * @param sessionRegistryProvider the Redis-backed session registry, absent in the {@code test}
+   *     profile
+   * @param oauth2LoginSuccessHandler the post-login handler chain
+   * @param navigationRequestCache the one request cache, shared with that handler and its delegate
+   * @param oauthAuthorizationCodeTokenResponseClient the pool-hardened token client (ADR-0115)
+   * @return the configured filter chain
+   * @throws Exception if the builder rejects the configuration
    */
   @Bean
   public SecurityFilterChain filterChain(
@@ -125,6 +145,7 @@ public class SecurityConfig {
               org.springframework.security.core.session.SessionRegistry>
           sessionRegistryProvider,
       AuthenticationSuccessHandler oauth2LoginSuccessHandler,
+      RequestCache navigationRequestCache,
       org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient<
               org.springframework.security.oauth2.client.endpoint
                   .OAuth2AuthorizationCodeGrantRequest>
@@ -166,6 +187,7 @@ public class SecurityConfig {
         // `th:action` auto-include the `_csrf` hidden field through Spring Security's view
         // integration. The default Spring Security CSRF setup is therefore left intact, no
         // ignoringRequestMatchers needed.
+        .requestCache(cache -> cache.requestCache(navigationRequestCache))
         .csrf(org.springframework.security.config.Customizer.withDefaults())
         .headers(SecurityHeaders.frontend(keycloakIssuerUri))
         .authorizeHttpRequests(
@@ -356,6 +378,59 @@ public class SecurityConfig {
   }
 
   /**
+   * The one request cache in the frontend, and the only place a pre-login request may create a
+   * session.
+   *
+   * <p>Spring Security's default {@link HttpSessionRequestCache} saves <em>every</em> refused
+   * request so the caller can be sent back after login. That was tolerable while most of the tool
+   * answered anonymously; with REQ-SEC-052 every path refuses, so each background call a logged-out
+   * browser makes — a poll, a prefetch, an {@code Accept: application/json} fetch, an SSE reconnect
+   * — would mint a session in Redis to hold a URL nobody will ever be redirected to.
+   *
+   * <p>The matcher therefore admits only what a redirect-after-login can sensibly replay: a {@code
+   * GET} the browser itself calls a navigation. {@code Sec-Fetch-Mode: navigate} is the browser's
+   * own word for it and is sent by every engine the tool supports; the {@code Accept: text/html}
+   * fallback covers a client that does not send Fetch Metadata. Everything else is refused without
+   * a saved request and therefore without a session.
+   *
+   * <p><strong>One instance, injected in both directions.</strong> {@link
+   * AssetAwareAuthenticationSuccessHandler} used to construct a private {@code new
+   * HttpSessionRequestCache()} and its {@code SavedRequestAwareAuthenticationSuccessHandler}
+   * delegate a third — three caches over the same session attribute, which happened to agree only
+   * because they all used the default attribute name. A matcher on one of them would have been read
+   * by none of the others.
+   *
+   * @return the shared request cache; never {@code null}
+   */
+  @Bean
+  public RequestCache navigationRequestCache() {
+    HttpSessionRequestCache cache = new HttpSessionRequestCache();
+    cache.setRequestMatcher(
+        request ->
+            org.springframework.http.HttpMethod.GET.matches(request.getMethod())
+                && (NAVIGATE_FETCH_MODE.equalsIgnoreCase(request.getHeader(SEC_FETCH_MODE_HEADER))
+                    || acceptsHtml(request)));
+    return cache;
+  }
+
+  /**
+   * Whether the request asks for HTML, used as the fallback when a client sends no {@code
+   * Sec-Fetch-Mode}. Deliberately a substring test on the raw header: a browser navigation sends a
+   * long {@code Accept} list beginning with {@code text/html}, and a background fetch does not name
+   * it at all.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} when the {@code Accept} header names {@code text/html}
+   */
+  private static boolean acceptsHtml(@NotNull jakarta.servlet.http.HttpServletRequest request) {
+    String accept = request.getHeader(org.springframework.http.HttpHeaders.ACCEPT);
+    return accept != null
+        && accept
+            .toLowerCase(java.util.Locale.ROOT)
+            .contains(org.springframework.http.MediaType.TEXT_HTML_VALUE);
+  }
+
+  /**
    * Builds the post-OAuth2-login success handler chain. Innermost is the {@link
    * AssetAwareAuthenticationSuccessHandler}, which wraps the default {@link
    * org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler}
@@ -373,7 +448,8 @@ public class SecurityConfig {
    */
   @Bean
   public AuthenticationSuccessHandler oauth2LoginSuccessHandler(
-      @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout) {
+      @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout,
+      RequestCache navigationRequestCache) {
     // #1041 item 18: the outer metrics handler counts a success into
     // basetool_login_total{outcome="success"} — the denominator FrontendLoginBroken checks against.
     // REQ-SEC-025: the middle handler upgrades the just-authenticated session's idle window from
@@ -383,7 +459,10 @@ public class SecurityConfig {
     return new LoginSuccessMetricsHandler(
         meterRegistry,
         new SessionLifetimeUpgradeSuccessHandler(
-            authenticatedSessionTimeout, new AssetAwareAuthenticationSuccessHandler()));
+            authenticatedSessionTimeout,
+            // WP-F 11: the SAME cache the chain saves into. A second instance here would read the
+            // same session attribute by luck and ignore the matcher above.
+            new AssetAwareAuthenticationSuccessHandler(navigationRequestCache)));
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
