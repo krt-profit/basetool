@@ -1148,7 +1148,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         // The read-only group's hidden default is the krtm-display-none-5790 class
                         // (ADR-0093), which a `style.display = ''` reveal cannot override — toggle the
                         // class so registered members actually see the org-units read-out.
-                        eOrgUnitsReadonlyGroup.classList.toggle('krtm-display-none-5790', isExternal);
+                        eOrgUnitsReadonlyGroup.classList.toggle(
+                            'krtm-display-none-5790',
+                            isExternal,
+                        );
                         if (!isExternal && eOrgUnitsReadonly) {
                             eOrgUnitsReadonly.textContent = '';
                             const unitNames = (this.getAttribute('data-org-unit-names') || '')

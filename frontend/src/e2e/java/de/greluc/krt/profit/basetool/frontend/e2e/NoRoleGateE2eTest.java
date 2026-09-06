@@ -43,11 +43,15 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * worse: a principal that passes every {@code isAuthenticated()} gate and fails only the ones that
  * name a role, which is a per-endpoint accident rather than a decision.
  *
- * <p>The realm fixture {@code test-norole} is the shape that produces it: an enabled account in
- * {@code default-roles-iri} with no application role at all. What must happen is a page that says
- * what is wrong and who fixes it — not a 403 body, not the dashboard with everything missing, and
- * not the "Freigabe ausstehend" copy, which would send the member to wait for an approval they
- * already have.
+ * <p>The realm fixture {@code test-norole} is the shape that produces it: an enabled account that
+ * carries <b>no realm role at all</b> — verified against the imported realm, where its direct and
+ * its effective (composite-expanded) mappings are both empty, unlike every other fixture user. That
+ * is the account production's {@code default-roles-iri} composite would have made a member and did
+ * not: someone whose grant was removed, or who predates the composite.
+ *
+ * <p>What must happen is a page that says what is wrong and who fixes it — not a 403 body, not the
+ * dashboard with everything missing, and not the "Freigabe ausstehend" copy, which would send the
+ * member to wait for an approval they already have.
  */
 @Tag("e2e")
 class NoRoleGateE2eTest {

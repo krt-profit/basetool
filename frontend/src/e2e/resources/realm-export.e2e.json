@@ -56,6 +56,20 @@
         "description": "E2E test role"
       },
       {
+        "name": "offline_access",
+        "description": "${role_offline-access}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "iri"
+      },
+      {
+        "name": "uma_authorization",
+        "description": "${role_uma_authorization}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "iri"
+      },
+      {
         "name": "default-roles-iri",
         "description": "${role_default-roles}",
         "composite": true,

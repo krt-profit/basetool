@@ -333,7 +333,6 @@ interface KrtLiveSyncApi {
     subscribedTopics(): string[];
 }
 
-
 /** Re-authentication helpers installed by `krt-fetch.js` (REQ-SEC-012). */
 interface KrtReauthApi {
     /** Redirects the window to a same-origin re-authentication path. */
