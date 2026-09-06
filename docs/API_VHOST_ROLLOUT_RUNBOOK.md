@@ -714,6 +714,29 @@ if ($uri = "/api/v1/material-exchange/item-offers") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/material-requests/item") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/material-exchange/offers/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/remark$") { set $krt_api_allowed 1; }
 if ($uri ~ "^/api/v1/material-requests/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+# Phase X - the last seven, and the two families that had no rule at all.
+#
+# Blaupausen: a WRITE family (see the note below on which shape a family gets), so naming a
+# path opens every verb the backend serves on it - which is what `/personal-blueprints`
+# already relies on for its bulk delete. `/import/apply` is admitted with `/import/preview`
+# because the apply is unreachable without the preview and destructive with it: the audit
+# called that pair „latent - and then work-destroying".
+if ($uri = "/api/v1/personal-blueprints/batch") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/personal-blueprints/import/preview") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/personal-blueprints/import/apply") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/personal-blueprints/overview") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/personal-blueprints/overview/owners") { set $krt_api_allowed 1; }
+#
+# Hangar: a READ-ONLY family, because its prefix also carries the admin ship surface
+# (`/hangar/users/<uuid>/ships`) and the P4K-adjacent imports. Both of these need their own
+# exception below.
+if ($uri = "/api/v1/hangar/import/fleetview") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/hangar/ships/home-location") { set $krt_api_allowed 1; }
+#
+# The two thresholds that colour an Auftrag by age. Named exactly, one per key: the
+# `/settings` prefix carries every system setting there is, and the app reads two of them.
+if ($uri = "/api/v1/settings/job_order.age_yellow_days") { set $krt_api_allowed 1; }
+if ($uri = "/api/v1/settings/job_order.age_red_days") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -728,7 +751,10 @@ if ($krt_api_allowed = 0) { return 404; }
 # the harder half: this guard is verb-blind by design, so opening one write means naming it
 # explicitly rather than widening the family.
 set $krt_readonly_family "";
-if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations|materials|users|refining-methods)") { set $krt_readonly_family "R"; }
+# `settings` joined this list in phase X. `/api/v1/settings/<key>` serves a GET and a PUT, and
+# the PUT is the admin write that changes a value for the whole organisation. The app reads two
+# keys and writes none, so the family - not a carve-out - is what keeps the PUT at 405.
+if ($uri ~ "^/api/v1/(missions|operations|notifications|announcement|hangar|inventory|orders|org-units|uex|blueprints|ship-types|locations|materials|users|refining-methods|settings)") { set $krt_readonly_family "R"; }
 if ($request_method !~ "^(GET|HEAD)$") { set $krt_readonly_family "${krt_readonly_family}W"; }
 # Named exceptions: the writes phase 3 opens INSIDE a read-only family. Each one clears the verdict
 # before it is judged, which is the only shape nginx allows - it cannot nest `if`, so an exception
@@ -861,6 +887,11 @@ if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(steps|objectives)/reorder/slim$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/steps/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(done/)?slim$") { set $krt_readonly_family ""; }
 if ($uri ~ "^/api/v1/missions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/objectives/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/slim$") { set $krt_readonly_family ""; }
+# Phase X - the two hangar writes. Both are POST-only on the backend, so a path-wide exception
+# opens exactly the verb the app sends. Nothing is carved out for Blaupausen (a write family,
+# never in the read-only list) or for the two settings keys (a read family, on purpose).
+if ($uri = "/api/v1/hangar/import/fleetview") { set $krt_readonly_family ""; }
+if ($uri = "/api/v1/hangar/ships/home-location") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -893,9 +924,26 @@ proxy_set_header X-Forwarded-Port  443;
 proxy_set_header Forwarded         "";
 
 # --- Body size ---------------------------------------------------------------
-# No upload path is on the allow-list yet. Raise it per location when the hangar/refinery import
-# families are opened, never globally.
-client_max_body_size 256k;
+# Raised from 256k in phase X, when the first two upload paths were admitted: the Fleetview import
+# and the Blaupausen import preview, both `multipart/form-data`.
+#
+# THE NOTE THAT STOOD HERE SAID „per location, never globally", AND THAT IS NOT AVAILABLE HERE.
+# `client_max_body_size` is settable in `server` and `location`, and NPM supplies the `proxy_pass`
+# and its whole directive set from its own template - this Advanced block only ADDS to the server.
+# A `location` written here would therefore have to repeat NPM's proxy configuration to keep
+# proxying at all; `location /actuator` gets away with it only because it returns 404 and proxies
+# nothing. Guessing at that duplication on a production host is worse than a stated ceiling.
+#
+# 4m, and the number is measured rather than round: the backend's own multipart comment records the
+# Fleetview JSON topping out „under ~500 KB for a 100-ship hangar", and a blueprint export is the
+# same order. 4m leaves an eightfold margin and is two orders below the backend's own 64 MB cap -
+# which exists for the admin P4K catalog import, a path this allow-list deliberately never admits.
+#
+# What the ceiling actually exposes is bounded by the list above it: this vhost is default-deny,
+# only two admitted paths accept a body of any size, and every write path behind it is
+# authenticated. A larger ceiling therefore costs an authenticated member's bandwidth, not an
+# anonymous one's.
+client_max_body_size 4m;
 ```
 
 ### D.3a Growing the allow-list after the vhost is live
@@ -1059,6 +1107,13 @@ The safe order, and the reason for it:
    | `/api/v1/material-requests/item` with `POST`                    | **401**                                                             | phase W                                                                                                  |
    | `/api/v1/material-exchange/offers/<uuid>/remark` with `PUT`     | **401**                                                             | phase W                                                                                                  |
    | `/api/v1/material-requests/<uuid>` with `PUT`                   | **401**                                                             | phase W                                                                                                  |
+   | `/api/v1/personal-blueprints/overview` (+ `/owners`)            | **401**                                                             | phase X; the Blaupausen-Übersicht and its owner list                                                     |
+   | `/api/v1/personal-blueprints/batch` with `POST`                 | **401**                                                             | phase X                                                                                                  |
+   | `/api/v1/personal-blueprints/import/preview` with `POST`        | **401**                                                             | phase X; `multipart/form-data`, and the reason the body ceiling moved                                    |
+   | `/api/v1/personal-blueprints/import/apply` with `POST`          | **401**                                                             | phase X; admitted WITH the preview — the pair the audit called latent and then work-destroying           |
+   | `/api/v1/hangar/import/fleetview` with `POST`                   | **401**                                                             | phase X; `multipart/form-data`                                                                           |
+   | `/api/v1/hangar/ships/home-location` with `POST`                | **401**                                                             | phase X                                                                                                  |
+   | `/api/v1/settings/job_order.age_yellow_days` (and `…red_days`)  | **200**                                                             | phase X; anonymous **by design** — two integers, same `permitAll` block as `/locations`                  |
    | anything not on the list                                        | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -2311,6 +2366,75 @@ sends. **No `DELETE` is opened anywhere in this phase**, and no carve-out is wri
 
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written — and here that order was
 not a formality: the pins are what found the three open doors.
+
+---
+
+## Phase X — the last seven, and the first upload
+
+The end of the audit's list: Blaupausen, the Fleetview import, and the two thresholds that colour an
+Auftrag by age.
+
+|                 Screen                 |                         Path                          |
+|----------------------------------------|-------------------------------------------------------|
+| Blaupausen-Übersicht (+ Besitzerliste) | `…/personal-blueprints/overview`, `…/overview/owners` |
+| Blaupausen anlegen (Mehrfachauswahl)   | `…/personal-blueprints/batch`                         |
+| Blaupausen-Import                      | `…/import/preview` **and** `…/import/apply`           |
+| Fleetview-Import                       | `/api/v1/hangar/import/fleetview`                     |
+| Heimatort für alle Schiffe             | `/api/v1/hangar/ships/home-location`                  |
+| Auftrags-Alter (gelb / rot)            | `/api/v1/settings/job_order.age_*_days`               |
+
+### The import pair goes in together, and that is the point
+
+`…/import/preview` is a multipart upload whose answer the member then edits — which name maps to
+which product, and when it was acquired — and `…/import/apply` sends those edits back. The audit
+filed the apply as *„latent — and then work-destroying"*: unreachable while the preview was refused,
+and the thing that discards a member's whole resolution pass the moment it becomes reachable.
+Admitting the preview alone would have created exactly that.
+
+### `settings` joins the read-only family rather than getting a carve-out
+
+`GET /api/v1/settings/<key>` serves a value; `PUT` on the same path is the admin write that changes
+it **for the whole organisation**. The app reads two keys and writes none. Adding `settings` to the
+read-only family is what keeps that `PUT` at `405` — one word in an alternation, rather than a
+carve-out that would have had to be written and then not written.
+
+> [!note] The two keys are named exactly, one rule each
+> `/api/v1/settings` carries every system setting there is. The app reads two, and the guard names
+> those two. They answer **200** anonymously, and that is by design: they sit in the same
+> `permitAll` catalogue block as `/locations` and `/job-types`, and they carry two integers — how
+> many days before an Auftrag turns yellow, and before it turns red. Pinned as a decision
+> (REQ-SEC-037).
+
+### The body ceiling moves, and the old note here was not achievable
+
+The note that stood at `client_max_body_size` said *„raise it per location … never globally"*. That
+is not available in this file. `client_max_body_size` is settable in `server` and `location`; NPM
+supplies `proxy_pass` and its whole directive set from its own template, and this Advanced block
+only **adds** to the server. A `location` written here would have to repeat NPM's proxy
+configuration to keep proxying at all — `location /actuator` gets away with it only because it
+returns `404` and proxies nothing. Guessing at that duplication on a production host is worse than a
+stated ceiling.
+
+**4m, and the number is measured rather than round.** The backend's own multipart comment records the
+Fleetview JSON topping out *„under ~500 KB for a 100-ship hangar"*, and a blueprint export is the
+same order; 4m leaves an eightfold margin. It is two orders below the backend's own 64 MB cap, which
+exists for the admin P4K catalog import — a path this allow-list deliberately never admits.
+
+What the ceiling exposes is bounded by the list above it: this vhost is default-deny, only two
+admitted paths accept a body of any size, and every write path behind it is authenticated. A larger
+ceiling costs an authenticated member's bandwidth, not an anonymous one's.
+
+### What to expect afterwards
+
+|                      Path                       | Anonymous status |
+|-------------------------------------------------|------------------|
+| the two settings keys                           | **200**          |
+| everything else in the phase                    | **401**          |
+| `PUT` on a settings key                         | **405**          |
+| `/api/v1/hangar/users/<uuid>/ships` (unchanged) | **404**          |
+
+The last two rows are the assertions that matter: they prove `settings` went in as a *family* and
+that `/hangar` stayed one. Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
 ---
 

@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Die letzten sieben Pfade der App waren am API-Zugang abgewiesen.** Die Blaupausen-Übersicht, das Anlegen mehrerer Blaupausen, der Blaupausen- und der Fleetview-Import, „Heimatort für alle Schiffe" und die beiden Schwellen, ab denen ein Auftrag gelb oder rot wird. Damit ist die Liste aus dem App-Audit abgearbeitet (Runbook-Phase X).
+
+- **Der Upload am API-Zugang war auf 256 KB begrenzt.** Die beiden Importe hätten dort abgebrochen, bevor sie das Backend erreichen. Die Grenze liegt jetzt bei 4 MB — gemessen am Fleetview-Export, der bei rund 500 KB für 100 Schiffe liegt.
+
 - **Handelspreise waren ohne Anmeldung abrufbar.** Die Preisübersicht und die Preise je Material antworteten anonym mit Daten, die Profitberechnung mit einem Fehler statt einer Abweisung — dieselben UEX-Handelsdaten, die REQ-SEC-032 über die Preismatrix bereits vom öffentlichen API-Zugang fernhält, nur durch drei andere Türen. Alle drei verlangen jetzt eine Anmeldung. Der Materialkatalog selbst (`/materials/{id}`) bleibt bewusst offen: er trägt keine Preise und veröffentlicht nichts, was die Suche nicht schon zeigt.
 
 - **Handel und Materialbörse waren in der App größtenteils tot.** Preisübersicht, Preismatrix, Profitberechnung, Materialdetails, der Standort-Filter und das Freigeben von Gegenständen an die Börse waren am API-Zugang abgewiesen (Runbook-Phase W).

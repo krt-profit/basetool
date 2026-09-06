@@ -179,7 +179,16 @@ class ExternalContractTest {
    * quietly substitutes the wrong shape and reports a gap that is not there.
    */
   private static final java.util.Map<String, String> PLACEHOLDERS =
-      java.util.Map.of("{enabled}", "true", "{roleCode}", "KOMMANDOLEITER");
+      java.util.Map.of(
+          "{enabled}",
+          "true",
+          "{roleCode}",
+          "KOMMANDOLEITER",
+          // Phase X. The two settings keys are named EXACTLY in the allow-list -- the `/settings`
+          // prefix carries every system setting there is and the app reads two of them -- so the
+          // reachability guard has to be told which one to try.
+          "{key}",
+          "job_order.age_yellow_days");
 
   /**
    * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
@@ -2445,7 +2454,68 @@ class ExternalContractTest {
               "/api/v1/material-requests/{id}",
               "put",
               Set.of(),
-              Set.of("desiredAmount", "version")));
+              Set.of("desiredAmount", "version")),
+          // ---- Phase X: the last seven ---------------------------------------------------------
+          //
+          // Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age.
+          //
+          // The import PAIR is the shape to read: `/import/preview` is a multipart upload whose
+          // answer the member then edits, and `/import/apply` sends those edits back. The audit
+          // filed the apply as „latent -- and then work-destroying": unreachable without the
+          // preview, and the thing that discards a member's resolutions once it is reachable. They
+          // are frozen together for the same reason they are admitted together.
+          new ContractOperation(
+              "/api/v1/personal-blueprints/import/preview",
+              "post",
+              Set.of(
+                  "entries",
+                  "externalName",
+                  "status",
+                  "productKey",
+                  "productName",
+                  "suggestedAcquiredAt"),
+              Set.of("file")),
+          new ContractOperation(
+              "/api/v1/personal-blueprints/import/apply",
+              "post",
+              Set.of("added", "skipped", "alreadyOwned"),
+              Set.of("resolutions")),
+          new ContractOperation(
+              "/api/v1/personal-blueprints/batch",
+              "post",
+              Set.of("added", "skippedAlreadyOwned", "skippedUnresolved"),
+              Set.of("productKeys")),
+          new ContractOperation(
+                  "/api/v1/personal-blueprints/overview",
+                  "get",
+                  Set.of(
+                      "content",
+                      "productKey",
+                      "productName",
+                      "ownerCount",
+                      "page",
+                      "totalPages",
+                      "totalElements"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string", "search:string")),
+          new ContractOperation(
+                  "/api/v1/personal-blueprints/overview/owners",
+                  "get",
+                  Set.of("ownerName", "orgUnitMember"))
+              .addressedBy(Set.of("productKey:string")),
+          // The Fleetview import reads three counters and nothing else -- the screen reports what
+          // happened, and a lost counter makes a successful import read as one that did nothing.
+          new ContractOperation(
+              "/api/v1/hangar/import/fleetview",
+              "post",
+              Set.of("importedCount", "skippedCount", "duplicateCount"),
+              Set.of("file")),
+          new ContractOperation(
+              "/api/v1/hangar/ships/home-location", "post", Set.of(), Set.of("locationId")),
+          // Anonymous BY DESIGN (REQ-SEC-037): two integers from the same permitAll catalogue block
+          // as /locations and /job-types. `value` is the whole answer the app reads -- it parses it
+          // as a number and falls back to a built-in default when the read fails, which is exactly
+          // why the failure was silent for so long.
+          new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2471,6 +2541,13 @@ class ExternalContractTest {
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
           "get /api/v1/refining-methods",
+          // Phase X. The two imports are addressed by path and their multipart part; the
+          // home-location write and the two blueprint writes take no parameter at all.
+          "post /api/v1/personal-blueprints/import/preview",
+          "post /api/v1/personal-blueprints/import/apply",
+          "post /api/v1/personal-blueprints/batch",
+          "post /api/v1/hangar/import/fleetview",
+          "post /api/v1/hangar/ships/home-location",
           // Phase W. The four writes are addressed by path alone; every read in the phase
           // takes parameters and records them above.
           "post /api/v1/material-exchange/item-offers",

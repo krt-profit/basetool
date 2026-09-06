@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -36,6 +37,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -750,6 +752,67 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"x\",\"status\":\"PLANNED\",\"version\":0}"))
         .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The last seven paths phase X opens, and the one that is anonymous by design.
+   *
+   * <p>Blaupausen, the Fleetview import and the two thresholds that colour an Auftrag by age. The
+   * settings pair is the interesting one: {@code /api/v1/settings} sits in the {@code permitAll}
+   * catalogue block beside {@code /locations} and {@code /job-types}, so these reads are dispatched
+   * and answer with a value. They carry two integers — how many days before an Auftrag turns
+   * yellow, and before it turns red — and nothing else. What must NOT be open is the {@code PUT} on
+   * the same path, which is the admin write that changes them for the whole organisation; that is
+   * held shut by the read-only family rather than by a carve-out.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousBlueprintAndFleetImports() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/personal-blueprints/overview"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/personal-blueprints/overview/owners"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/personal-blueprints/batch")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/personal-blueprints/import/apply")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            multipart("/api/v1/personal-blueprints/import/preview")
+                .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            multipart("/api/v1/hangar/import/fleetview")
+                .file(new MockMultipartFile("file", "x.json", "application/json", new byte[] {123}))
+                .with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/hangar/ships/home-location")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    // Anonymous BY DESIGN, and pinned so it stays a decision: two integers in the same permitAll
+    // catalogue block as /locations and /job-types.
+    mockMvc.perform(get("/api/v1/settings/job_order.age_yellow_days")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/settings/job_order.age_red_days")).andExpect(status().isOk());
   }
 
   /**

@@ -312,6 +312,24 @@ jobs:
           probe POST /api/v1/material-requests/item 401
           probe PUT "/api/v1/material-exchange/offers/$nil/remark" 401
           probe PUT "/api/v1/material-requests/$nil" 401
+
+          # Phase X - the last seven. The two settings keys are anonymous BY DESIGN (REQ-SEC-037):
+          # two integers from the same permitAll catalogue block as /locations and /job-types. What
+          # must stay shut is the PUT on the same path - the admin write that changes them for the
+          # whole organisation - and it is the read-only family, not a carve-out, that holds it.
+          probe GET /api/v1/settings/job_order.age_yellow_days 200
+          probe GET /api/v1/settings/job_order.age_red_days 200
+          probe PUT /api/v1/settings/job_order.age_red_days 405
+          probe GET /api/v1/personal-blueprints/overview 401
+          probe GET /api/v1/personal-blueprints/overview/owners 401
+          probe POST /api/v1/personal-blueprints/batch 401
+          probe POST /api/v1/personal-blueprints/import/preview 401
+          probe POST /api/v1/personal-blueprints/import/apply 401
+          probe POST /api/v1/hangar/import/fleetview 401
+          probe POST /api/v1/hangar/ships/home-location 401
+          # And the admin ship surface under the same prefix stays shut: /hangar is a read-only
+          # family precisely because its prefix also carries this.
+          probe GET "/api/v1/hangar/users/$nil/ships" 404
           # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
           # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
 
