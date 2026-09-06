@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Handelspreise waren ohne Anmeldung abrufbar.** Die Preisübersicht und die Preise je Material antworteten anonym mit Daten, die Profitberechnung mit einem Fehler statt einer Abweisung — dieselben UEX-Handelsdaten, die REQ-SEC-032 über die Preismatrix bereits vom öffentlichen API-Zugang fernhält, nur durch drei andere Türen. Alle drei verlangen jetzt eine Anmeldung. Der Materialkatalog selbst (`/materials/{id}`) bleibt bewusst offen: er trägt keine Preise und veröffentlicht nichts, was die Suche nicht schon zeigt.
+
+- **Handel und Materialbörse waren in der App größtenteils tot.** Preisübersicht, Preismatrix, Profitberechnung, Materialdetails, der Standort-Filter und das Freigeben von Gegenständen an die Börse waren am API-Zugang abgewiesen (Runbook-Phase W).
+
 - **Einen Einsatz zu planen ging in der App fast nirgends.** Kern, Zeitplan und Flags, Party-Lead, Teilnehmer hinzufügen, Einheiten und ihre Besatzung, Frequenzen, Verwalter, Ablauf und Ziele — alle Schreibwege waren am API-Zugang abgewiesen. Freigegeben sind die schlanken Endpunkte, nicht die veralteten: deren Abschaltung ist für den 20.10.2026 angekündigt (Runbook-Phase V).
 
 - **Sammel-Ausbuchen, Sammel-Umbuchen und die Zuordnung im Lager waren tot.** Alle drei waren am API-Zugang nicht freigegeben; beim Umbuchen füllte sich der Standort-Picker sogar, nur das Absenden starb. Die Zuordnung war die schlimmste: die Speicherschleife ist versionsverkettet, die erste Zeile scheitert — und damit wurde nie etwas geschrieben, auch nichts halb (Runbook-Phase U).

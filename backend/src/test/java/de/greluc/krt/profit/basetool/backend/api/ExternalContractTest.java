@@ -2371,7 +2371,81 @@ class ExternalContractTest {
               "/api/v1/missions/{id}/objectives/reorder/slim",
               "put",
               OBJECTIVE_ROW,
-              Set.of("objectiveIds", "objectivesVersion")));
+              Set.of("objectiveIds", "objectivesVersion")),
+          // ---- Phase W: the Handel family -----------------------------------------------------
+          //
+          // The price screens and the Materialboerse. Three of the four price reads were ANONYMOUS
+          // when this phase was written -- `prices-overview` and `*/prices` answered 200 and
+          // `profit-calculation` answered 500, dispatched and crashing rather than refusing -- and
+          // they carry the same UEX trade data REQ-SEC-032 keeps off the public vhost through
+          // `matrix`. They were closed in SecurityConfig BEFORE the edge admitted them; admitting
+          // them as they stood would have published trade prices to the internet.
+          new ContractOperation(
+                  "/api/v1/materials/prices-overview",
+                  "get",
+                  Set.of(
+                      "content",
+                      "id",
+                      "name",
+                      "category",
+                      "minPriceBuy",
+                      "maxPriceSell",
+                      "isIllegal"))
+              .addressedBy(Set.of("name:string", "page:integer", "size:integer", "sort:string")),
+          // `GET /materials/{id}` stays anonymous by decision (REQ-SEC-037): MaterialDto is
+          // catalogue only -- no price -- and `/materials/search` has published the same fields
+          // anonymously since phase 2.
+          new ContractOperation(
+              "/api/v1/materials/{id}",
+              "get",
+              Set.of("id", "name", "type", "quantityType", "category", "isIllegal")),
+          new ContractOperation(
+                  "/api/v1/materials/{id}/prices",
+                  "get",
+                  Set.of("content", "id", "terminalName", "priceBuy", "priceSell"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          // The route arithmetic. `starSystemNames` is a REPEATED parameter, one per system, and an
+          // absent list means „every system" -- which is why it is recorded rather than left blank:
+          // a rename would narrow the answer instead of failing it.
+          new ContractOperation(
+                  "/api/v1/materials/profit-calculation",
+                  "get",
+                  Set.of(
+                      "materialName",
+                      "minBuyPrice",
+                      "maxSellPrice",
+                      "profitPerScu",
+                      "fullLoadCost",
+                      "maxProfitFullLoad",
+                      "marginPercent"))
+              .addressedBy(Set.of("shipId:string", "starSystemNames:array")),
+          // The app page-walks this for ONE field: the set of star-system names its filter offers.
+          new ContractOperation(
+                  "/api/v1/terminals", "get", Set.of("content", "starSystemName", "totalPages"))
+              .addressedBy(Set.of("page:integer", "size:integer", "sort:string")),
+          // A list of ids in and a list of ids out. Nothing to freeze on the response but its
+          // shape, and the query parameter is the whole request.
+          new ContractOperation("/api/v1/material-exchange/released-item-ids", "get", Set.of())
+              .addressedBy(Set.of("ids:array")),
+          // The three Materialboerse writes the audit counted. Each answers with the row it wrote,
+          // and `version` is the optimistic lock the two edits echo.
+          new ContractOperation(
+              "/api/v1/material-exchange/item-offers",
+              "post",
+              Set.of(),
+              Set.of("productKey", "quantity")),
+          new ContractOperation(
+              "/api/v1/material-requests/item", "post", Set.of(), Set.of("productKey", "quantity")),
+          new ContractOperation(
+              "/api/v1/material-exchange/offers/{id}/remark",
+              "put",
+              Set.of(),
+              Set.of("offeredAmount", "version")),
+          new ContractOperation(
+              "/api/v1/material-requests/{id}",
+              "put",
+              Set.of(),
+              Set.of("desiredAmount", "version")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2397,6 +2471,13 @@ class ExternalContractTest {
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
           "get /api/v1/refining-methods",
+          // Phase W. The four writes are addressed by path alone; every read in the phase
+          // takes parameters and records them above.
+          "post /api/v1/material-exchange/item-offers",
+          "post /api/v1/material-requests/item",
+          "put /api/v1/material-exchange/offers/{id}/remark",
+          "put /api/v1/material-requests/{id}",
+          "get /api/v1/materials/{id}",
           // Phase U. All three are addressed by path alone.
           "post /api/v1/inventory/bulk-checkout",
           "post /api/v1/inventory/bulk-rebook",

@@ -1600,6 +1600,26 @@ day the phase-3 paste landed and got `200` every night: the expectation was righ
 was simply absent. Size is not the argument for this one — one material's terminal list is small —
 which is why it has to be stated rather than inferred from the amplification rule above.
 
+**The same data had three more doors, found on 2026-09-06.** `GET /api/v1/materials/prices-overview`
+answered `200` anonymously, `GET /api/v1/materials/{id}/prices` answered `200`, and `GET
+/api/v1/materials/profit-calculation` answered `500` — dispatched anonymously and crashing, which
+is not a gate either. `MaterialPriceOverviewDto` carries `minPriceBuy` and `maxPriceSell`,
+`MaterialPriceDto` carries `priceBuy`, `priceSell`, `scu*` and `terminalName`, and the profit
+calculation is the route arithmetic over both. **All three MUST require authentication**, for the
+identical reason as `matrix` and `{id}/terminals`: this is UEX trade data, not guest content, and
+every consumer of it is an authenticated screen.
+
+They were found while the Android app's Handel screens were being admitted at the API vhost
+(`API_VHOST_ROLLOUT_RUNBOOK.md`, phase W). That ordering is the lesson worth keeping: **a path is
+measured anonymously before it is admitted, and what the measurement says is acted on first.**
+Admitting these as they stood would have published trade prices to the internet — the vhost would
+have let them through and the backend would not have stopped them.
+
+`GET /api/v1/materials/{id}` deliberately stays anonymous. `MaterialDto` is catalogue only — name,
+quantity type, category, flags, **no price** — and `/api/v1/materials/search` has published those
+same fields anonymously since the vhost's phase 2. Closing it is a different change with a different
+reason, and it is pinned in `ApiVhostAnonymousSurfaceTest` so it stays a decision.
+
 **An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
 be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
 ADR-0104 forbids: the caller gets fewer rows than it asked for, cannot tell, and any surface built on
@@ -1616,6 +1636,11 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 - [x] `GET /api/v1/materials/matrix` answers 401 without a token; the rest of the material catalogue
   stays anonymously readable.
 - [x] `GET /api/v1/materials/{id}/terminals` answers 401 without a token (`SecurityTest`).
+- [x] `GET /api/v1/materials/prices-overview`, `GET /api/v1/materials/{id}/prices` and `GET
+  /api/v1/materials/profit-calculation` answer 401 without a token
+  (`ApiVhostAnonymousSurfaceTest`), and the nightly `edge-deny-probe` asserts it.
+- [x] `GET /api/v1/materials/{id}` stays anonymous — catalogue only, no price — and is pinned as a
+  decision rather than left to drift.
 - [x] An anonymous request with `size=50000` is refused with `400` and the stable code
   `PAGE_SIZE_TOO_LARGE`.
 - [x] An anonymous request with `size=1000` still succeeds.
