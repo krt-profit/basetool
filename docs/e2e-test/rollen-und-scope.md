@@ -12,26 +12,26 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager`               | Einsatz-Verwaltung; gleiche Beförderungslogik.                                                                                                                                                   |
 | **SK Lead**                                                                  | Kontextuell: `org_unit_membership.is_lead` (nur auf einer SK-Zeile) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts.                                                                                                                                   |
 | **KRT Member**                                                               | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
-| **Guest**                                                                    | Unauthentifiziert                                                   | Nur lesend auf öffentliche Aggregate.                                                                                                                                                            |
+| **Kein Rollenträger** (`ROLE_NO_ROLE`)                                       | Konto ohne Anwendungsrolle                                          | Erreicht nichts — `403 NO_ROLE` vor jedem Handler (`REQ-SEC-053`). Der Vorgänger hieß `Guest` und war unauthentifiziert; ohne Anmeldung gibt es seit ADR-0159 nur Startseite und Rechtsseiten.   |
 
 **Hierarchie:** `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`.
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
-|                   Flow                   |         Guest         |       KRT Member        |      Logistician       |  Einsatzleiter  | Officer | Admin |
-|------------------------------------------|-----------------------|-------------------------|------------------------|-----------------|---------|-------|
-| Einsatz anlegen (UC-02)                  | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
-| Job Order anlegen (UC-03)                | ✓ (öffentl. Formular) | ✓                       | ✓                      | ✓               | ✓       | ✓     |
-| Job Order bearbeiten (UC-15)             | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
-| Job-Order-Status ändern (UC-16)          | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
-| Refinery Order anlegen (UC-04)           | ✗                     | ✓ (Owner = self)        | ✓ (Owner frei wählbar) | ✓               | ✓       | ✓     |
-| Schiff in Hangar (UC-05)                 | ✗                     | ✓                       | ✓                      | ✓               | ✓       | ✓     |
-| Eigenes Inventar an Job Order verknüpfen | ✗                     | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
-| Job-Order-Handover (UC-06)               | ✗                     | ✗                       | ✓                      | ✗               | ✓       | ✓     |
-| Job Order / Item-Order löschen           | ✗                     | ✗                       | ✗                      | ✗               | ✗       | ✓     |
-| Einsatz/Operation anlegen                | ✗                     | ✗                       | ✗                      | ✓               | ✓       | ✓     |
-| SK anlegen / umbenennen / löschen        | ✗                     | ✗                       | ✗                      | ✗               | ✗       | ✓     |
-| SK-Mitglieder verwalten                  | ✗                     | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
+|                   Flow                   |       KRT Member        |      Logistician       |  Einsatzleiter  | Officer | Admin |
+|------------------------------------------|-------------------------|------------------------|-----------------|---------|-------|
+| Einsatz anlegen (UC-02)                  | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Job Order anlegen (UC-03)                | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Job Order bearbeiten (UC-15)             | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job-Order-Status ändern (UC-16)          | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Refinery Order anlegen (UC-04)           | ✓ (Owner = self)        | ✓ (Owner frei wählbar) | ✓               | ✓       | ✓     |
+| Schiff in Hangar (UC-05)                 | ✓                       | ✓                      | ✓               | ✓       | ✓     |
+| Eigenes Inventar an Job Order verknüpfen | ✓ (nur eigenes)         | ✓ (fremder Owner)      | ✓ (nur eigenes) | ✓       | ✓     |
+| Job-Order-Handover (UC-06)               | ✗                       | ✓                      | ✗               | ✓       | ✓     |
+| Job Order / Item-Order löschen           | ✗                       | ✗                      | ✗               | ✗       | ✓     |
+| Einsatz/Operation anlegen                | ✗                       | ✗                      | ✓               | ✓       | ✓     |
+| SK anlegen / umbenennen / löschen        | ✗                       | ✗                      | ✗               | ✗       | ✓     |
+| SK-Mitglieder verwalten                  | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
 
 Die Gates verbatim: Einsatz `isAuthenticated()`, Job Order `permitAll()`, Refinery Order + Inventar `isAuthenticated()` (fremder Owner nur `isLogisticianOrAbove`), Handover `hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')`, Job Order bearbeiten/Status `hasRole('LOGISTICIAN')` (+ `canEditJobOrder`), Job Order löschen `hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@SpecialCommandSecurityService.canManageMembers(...)`.
 

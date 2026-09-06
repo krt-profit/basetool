@@ -29,7 +29,8 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
   and continues to win over the profile default; that editing flow is unchanged.
 - Changing the profile default is **forward-only** — it never rewrites `payoutPreference` on
   existing participations.
-- **Guests** have no profile and always sign up as `PAYOUT`.
+- **External participants** have no profile to read a default from, so their row is recorded as
+  `PAYOUT`.
 - A user edits **only their own** default (the value is read for the signing-up user and written for
   the JWT subject), under the user row's optimistic-lock `version` — a stale write surfaces as a
   409, not a silent overwrite.
@@ -39,7 +40,7 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 - [ ] A signed-in user can set their default payout preference (`PAYOUT` / `DONATE`) in their profile and it persists across sessions.
 - [ ] A newly created participant for that user is initialised with the user's default; a user with no explicit choice (`null`) is initialised `PAYOUT`.
 - [ ] Changing the profile default does not alter existing participations; the per-mission preference remains editable and overrides the default.
-- [ ] Guests are unaffected (remain `PAYOUT`).
+- [ ] An external participant's row is unaffected (remains `PAYOUT`).
 - [ ] A concurrent profile edit surfaces as a 409 (optimistic lock), not a silent overwrite.
 
 **Enforced by:** `MissionServiceTest` (sign-up pre-fill), `UserServiceSyncTest`

@@ -314,7 +314,7 @@ an org unit is irrelevant (REQ-BANK-008).
 
 |                                         Actor                                          |                                                                                             Sees                                                                                             |                                          May change                                           |
 |----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| Everyone without a bank role (anonymous, `GUEST`, members)                             | **nothing** (no bank surface at all)                                                                                                                                                         | nothing                                                                                       |
+| Everyone without a bank role (members, and any account below one)                      | **nothing** (no bank surface at all)                                                                                                                                                         | nothing                                                                                       |
 | Officer / lead of an org unit (no bank role; via the org-unit seam, REQ-BANK-021/-022) | **balance only** of their overseen org unit's account (active only; Bereich/OL also see the cartel-wide special accounts view-only, REQ-BANK-028) + status of their **own** booking requests | raise / cancel own **booking requests** (off-ledger; book nothing)                            |
 | Bank employee (role + grants; org-unit membership irrelevant, REQ-BANK-008)            | accounts they hold a grant on                                                                                                                                                                | bookings per their capability flags; confirm/reject requests on those accounts per capability |
 | Bank management (role; org-unit membership irrelevant)                                 | **all** accounts, holders, grants                                                                                                                                                            | all bookings, account lifecycle, holders, grants                                              |
@@ -327,8 +327,9 @@ an org unit is irrelevant (REQ-BANK-008).
 > holders. These widen the employee's "may change" cell only; the audit-log/admin rows below are
 > unchanged.
 
-The audit log is **admin-only** — bank management does **not** see it. The bank area
-contributes nothing to the anonymous/guest surface (consistent with REQ-SEC-009). Bank
+The audit log is **admin-only** — bank management does **not** see it. The bank area is on no
+public surface at all: since REQ-SEC-052 there is none to be on, and it contributed nothing to the
+one that existed (consistent with REQ-SEC-009). Bank
 endpoints follow the two-gate model (URL matrix outer, `@PreAuthorize` inner):
 `/api/v1/bank/admin/**` additionally gets a `hasRole('ADMIN')` URL gate.
 
@@ -1183,8 +1184,7 @@ in the unified activity audit (REQ-AUDIT-001).
   `−transfer_fee`); a reversal negates all three legs and the sweep stays sound.
 - [x] It works to/from a deactivated holder and may drive the source holder negative (no
   holder overdraft); same source/destination holder is rejected.
-- [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a member/anonymous caller is
-  403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
+- [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a plain member is 403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
 **Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankHolderControllerTest`/`BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `service/BankLedgerIntegrityService` + `repository/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 

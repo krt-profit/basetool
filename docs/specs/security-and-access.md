@@ -238,11 +238,12 @@ questions that ask about membership — the mission description (REQ-SEC-041), t
 should keep asking it rather than depending on a refusal happening earlier in the chain.
 
 > **Rewritten 2026-09-06 (ADR-0159).** This requirement used to describe a "deliberately public
-> surface" shared by two cohorts — anonymous callers and the `GUEST` role — under the name *mission
-> outsider*, and enumerated what they could do: create a job order, browse non-internal missions,
-> sign up as a named guest, check in and out, set a payout preference. None of it is true any more.
-> The term *outsider* is retired; what replaced it is REQ-SEC-052 (the public surface as a list) and
-> REQ-SEC-053 (nothing below member).
+>
+>> surface" shared by two cohorts — anonymous callers and the `GUEST` role — under the name *mission
+>> outsider*, and enumerated what they could do: create a job order, browse non-internal missions,
+>> sign up as a named guest, check in and out, set a payout preference. None of it is true any more.
+>> The term *outsider* is retired; what replaced it is REQ-SEC-052 (the public surface as a list) and
+>> REQ-SEC-053 (nothing below member).
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 
@@ -781,12 +782,14 @@ matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 > participant. A credential that needs a second gate to be safe is one nobody is holding correctly.
 > `canManageMission` carries that scope check inherently, so nothing was lost by the removal.
 
+*(Everything from here to the end of this requirement is in the past tense on purpose: it describes
+the state until 2026-09-06.)*
 
 Mission participant write endpoints (`PUT`/`DELETE`/check-in/out/payout on
-`/api/v1/missions/*/participants/*` and the `…/slim` twins) are `permitAll` so the public mission
-sign-up flow works without an account. A **guest** (unlinked) participant row MUST NOT be mutable by a
-caller who merely knows its id — the anonymous-readable roster exposes participant ids, so a bare id is
-not an authorization secret.
+`/api/v1/missions/*/participants/*` and the `…/slim` twins) **were** `permitAll` so the public
+mission sign-up flow worked without an account. A **guest** (unlinked) participant row MUST NOT be
+mutable by a caller who merely knows its id — the anonymous-readable roster exposed participant ids,
+so a bare id was not an authorization secret.
 
 - On creation of a guest sign-up the backend mints an unguessable 256-bit **capability token**,
   persists only its SHA-256 hash on `mission_participant.guest_edit_token_hash`, and returns the
@@ -890,7 +893,6 @@ no Staffel the caller can edit.
 > gets a redacted mission detail (REQ-SEC-007), but payout preference and the free-text comment stay
 > visible to them: a member is part of the organisation, and the two fields were withheld from
 > people who were not.
-
 
 The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
 **operational-coordination surface**: by deliberate product decision (ADR-0034) it exposes the
@@ -2102,15 +2104,19 @@ is why the requirement names it: **a path admitted without its pin is admitted w
 stated**, whatever the runbook says next to it. The rule the two misses share is that a status is
 read off the layer that refuses the caller, never off the form the field belongs to.
 
-**And one family on the list is reachable anonymously by design, without being *anonymous*.** The
-four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
-`payout-preference` siblings — are guarded by `canAccessParticipant`, which **resolves the row
-before it judges the caller**: a *guest* sign-up is editable by the anonymous creator presenting
-the per-row capability token minted at sign-up (REQ-SEC-018, header `X-Guest-Edit-Token`). So an
-anonymous caller is a legitimate one on these paths, the refusal for a row they may not touch is
-`403` rather than `401`, and an unknown row answers `404` to everybody. They are not in the
-anonymous-surface table above because nothing is *served* anonymously: the capability token is a
-credential, and without it every one of them refuses. Pinned in `ApiVhostAnonymousSurfaceTest`.
+**One family on the list used to be reachable anonymously by design, without being *anonymous*.**
+The four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
+`payout-preference` siblings — are guarded by `canAccessParticipant`, which **resolved the row
+before it judged the caller**: a guest sign-up was editable by its anonymous creator presenting the
+per-row capability token minted at sign-up (REQ-SEC-018, header `X-Guest-Edit-Token`). An anonymous
+caller was therefore a legitimate one on these paths, and an unknown row answered `404` to
+everybody.
+
+Both halves are gone. `V239` dropped the column that stored the token's hash and REQ-SEC-052 the
+anonymous caller, so the request no longer reaches the lookup: it is turned away at the entry point
+with `401`, and the row's existence is not part of the answer. This was the one entry on the list
+that was not authenticated-only; there is no longer one. Pinned in
+`ApiVhostAnonymousSurfaceTest.shouldRefuseAnonymousParticipationWritesOnAnAbsentRow`.
 
 **The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
 paths are `authenticated()` in the filter chain, so they never reach a controller and the entry

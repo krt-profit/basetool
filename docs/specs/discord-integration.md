@@ -75,7 +75,7 @@ boolean `UserDto.discordLinked` — `true` iff the user has a non-blank `discord
 (REQ-DATA-006) — computed in `UserMapper.toDto`. The **raw Discord id (snowflake) is never carried
 in any DTO**; only the boolean fact of the link leaves the backend, consistent with the
 never-log/never-expose-Discord-id posture of REQ-SEC-016. The page is already `@PreAuthorize(ADMIN)`
-(frontend) so the indicator is admin-only; every peer/guest redaction shape that strips PII leaves
+(frontend) so the indicator is admin-only; every peer redaction shape that strips PII leaves
 `discordLinked` `null`. **Corrected 2026-08-30:** this sentence used to claim the link status
 "never reaches non-admins through any shared-`UserDto` path (mission participants, pickers, etc.)",
 and that was false for its own example. Only surfaces that apply the peer projection strip it — `GET
@@ -94,8 +94,8 @@ design-system convention: linked → the Discord brand mark in the inherited lin
 - [x] `/members` renders a Discord column between "Missions-Manager" and "Status": a linked account
   shows the `krt-icon-discord` brand mark (neutral `currentColor`, with a localized title/aria-label),
   a non-linked account shows a muted em-dash.
-- [x] The peer/guest redaction shapes (`UserController.redactToPeerShape` and the shared
-  `MissionGuestRedactor.cleanupUserForGuest`, used by both the mission and finance-ledger views) set
+- [x] The peer redaction shapes (`UserController.redactToPeerShape` and the shared
+  `MissionPeerRedactor.cleanupUserForPeer`, used by both the mission and finance-ledger views) set
   `discordLinked = null`, so it is not exposed to non-admin viewers.
 - [x] The three message bundles (default/de/en) carry `members.discord`, `members.discord.linked`,
   `members.discord.not_linked` (umlauts `\uXXXX`-escaped in the `.properties`).
@@ -121,7 +121,7 @@ from a clean `404` (not in guild). Tokens, payloads and Discord ids are **never 
 - [x] Role is matched by numeric id; renaming the Discord role does not change the outcome.
 - [ ] No token, payload or Discord id appears in any log line. _(by design — only the coarse decision is logged; proven by the T1.4 PII grep.)_
 - [ ] Credential (non-Discord) login is unaffected by the gate. _(T1.4 e2e.)_
-- [x] The anonymous sidebar exposes a **localized** Discord login entry point (`nav.login.discord`, all three message bundles) that brokers the login this gate guards. It carries the Discord brand mark, which inherits the link colour (`currentColor`) like the footer GitHub mark — no hard-coded blurple, per the monochrome-icon design-system convention.
+- [x] The landing page and the logged-out sidebar expose a **localized** Discord login entry point (`nav.login.discord`, all three message bundles) that brokers the login this gate guards. It carries the Discord brand mark, which inherits the link colour (`currentColor`) like the footer GitHub mark — no hard-coded blurple, per the monochrome-icon design-system convention.
 - [x] The Keycloak login page itself renders configured (non-hidden) IdPs as social buttons via the
   krt-theme `login.ftl` social block, so the Discord entry point is reachable from the credential
   form, the extractor's device-grant verification page, and any direct login — not only the app
@@ -272,8 +272,10 @@ PENDING decision is deliberately **decoupled from Discord detection**: it must n
 optional `discord_user_id` claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol
 mapper absent) would let a federated login inherit the `ACTIVE` default and silently skip approval.
 For a PENDING (or `REJECTED`) account the entire authority assembly (realm roles + permissions +
-org-unit membership + cascade) is short-circuited to a single `ROLE_PENDING_APPROVAL`, and
-`ROLE_GUEST` is **not** carried. Approval moves the user to `ACTIVE`; rejection keeps them denied.
+org-unit membership + cascade) is short-circuited to a single `ROLE_PENDING_APPROVAL`. Neither the
+deleted `ROLE_GUEST` nor the `ROLE_NO_ROLE` marker that replaced it (V239, REQ-SEC-053) is carried:
+the order matters, because a pending registration must be told it is pending rather than that it
+holds no role. Approval moves the user to `ACTIVE`; rejection keeps them denied.
 Keycloak `ADMIN`-realm-role holders are auto-`ACTIVE` (bootstrap safety — the first admin can never be
 locked out). Both creation paths apply the rule — the interactive login (`syncUser(Jwt)`) and the
 scheduled Keycloak reconciliation (`syncUser(KeycloakUserDto)`) — so the scheduler can never
@@ -298,7 +300,7 @@ new PENDING registration (REQ-NOTIF-012), keyed off the PENDING transition itsel
 **Acceptance**
 
 - [x] PENDING/REJECTED ⇒ only `ROLE_PENDING_APPROVAL`, even if the JWT carries realm roles; membership
-  is never consulted and `ROLE_GUEST` is not carried.
+  is never consulted, and neither `ROLE_GUEST` nor the `ROLE_NO_ROLE` marker is carried.
 - [x] Every brand-new non-admin registration ⇒ `PENDING`, whether via Discord **or** credentials, and
   regardless of whether the `discord_user_id` claim is present (mapper-independent fail-safe).
 - [x] The scheduled sync (`syncUser(KeycloakUserDto)`) creates a brand-new non-admin user `PENDING`

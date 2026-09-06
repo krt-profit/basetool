@@ -90,9 +90,9 @@
                     <!-- Own-unit chip pinned to the bottom-right of the tile (REQ-MISSION-012):
                          kept out of the top of the flow (right of the CTA via margin-left:auto) so a
                          chip never adds a row above the body and every tile's body text starts at the
-                         same height, with or without the chip. myOrgUnitIds is empty for guests, so
-                         the chip never shows; the chip implies an authenticated viewer, so it is safe
-                         inside this isAuthenticated() block. -->
+                         same height, with or without the chip. myOrgUnitIds is empty for a member
+                         with no membership, so the chip never shows for them; it implies an
+                         authenticated viewer either way, which this isAuthenticated() block is. -->
                     <span th:if="${mission.owningSquadron != null and myOrgUnitIds.contains(mission.owningSquadron.id)}" class="chip chip--primary mission-tile__badge" th:text="#{home.upcoming.my_unit}">Meine Einheit</span>
                 </div>
             </div>

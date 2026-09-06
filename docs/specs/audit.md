@@ -82,7 +82,8 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   org-unit `kind:id` refs only); party-lead change; manager add / remove; finance
   entry create / edit / delete; Ablauf step add / edit / remove / reorder / done-toggle; goal (Ziel)
   add / edit / remove / reorder (the goal's non-personal `kind` enum may appear in the details). Free-text
-  (mission/guest names beyond the snapshot label, notes, **step titles and time/place hints, goal
+  (mission/external participant names beyond the snapshot label, notes, **step titles and
+  time/place hints, goal
   titles, and custom-frequency labels**) is never written to the details payload — only ids, counts,
   the goal kind enum and the non-personal mission name snapshot.
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not

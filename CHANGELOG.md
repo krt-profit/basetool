@@ -10,6 +10,8 @@
 
 - **Drei Preis-Abfragen und die Startseite gaben ohne Anmeldung Daten heraus.** Die Handelspreise waren bereits vorher geschlossen (Runbook-Phase W); die Startseite zeigte bis jetzt die Einsätze der nächsten sieben Tage und legte für jeden Besuch zwei Sitzungen an. Beides ist behoben.
 
+- **Ein abgemeldeter Tab legt keine Sitzungen mehr an.** Da jetzt jeder Pfad eine Anmeldung verlangt, hätte jede Hintergrundabfrage eines offenen Tabs eine Sitzung in Redis erzeugt. Gemerkt wird nur noch das Ziel echter Seitenaufrufe — Deep-Links führen nach der Anmeldung weiterhin genau dorthin.
+
 ### Changed
 
 - **„Gast" heißt jetzt „Extern".** Wer keinen Account hat, kann weiterhin an einem Einsatz teilnehmen — die Einsatzleitung trägt die Person ein und pflegt ihre Zeile. Die Selbstanmeldung ohne Konto entfällt.

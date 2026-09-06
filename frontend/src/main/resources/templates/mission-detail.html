@@ -495,7 +495,7 @@
                                 <dt th:text="#{mission.party_lead}">Partyleiter</dt>
                                 <dd id="overview-party-lead">
                                     <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead</span>
-                                    <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                    <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Externer Lead</span>
                                     <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                 </dd>
                             </dl>
@@ -1251,7 +1251,7 @@
                                 <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
                                     <div id="party-lead-display" class="data-value krtm-background-var-color-surface-input-padding-0-fd20" th:data-none-label="#{general.none}">
                                         <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
-                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Externer Lead</span>
                                         <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                     </div>
                                     <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
@@ -1548,7 +1548,7 @@
                     <select name="orgUnitIds" id="participant-org-units" multiple>
                         <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">IRIDIUM</option>
                     </select>
-                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
 
                 <div class="form-row">
@@ -1619,7 +1619,7 @@
                     <select name="orgUnitIds" id="edit-org-units" multiple>
                         <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">Alpha</option>
                     </select>
-                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
                 <!-- Registered members get their org units from their account (never selected). JS
                      shows this read-only list (populated from the row's data-org-unit-names) and hides

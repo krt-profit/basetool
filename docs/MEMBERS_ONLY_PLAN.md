@@ -1,8 +1,18 @@
-> **Doc type:** Living plan — **proposed; the thirteen decisions were taken by the owner on
-> 2026-09-05 (§3). Implementation awaits a separate go and has not started.** Drafted 2026-09-04 from a full inventory of the repository, the three sibling
-> repositories and the knowledge base; revised 2026-09-05 after an adversarial review of the draft
-> against the code (§11). Once approved it becomes the working plan; once shipped it is frozen and
-> points at ADR-0159 and REQ-SEC-052/053 as the living truth.
+> **Doc type:** Historical plan — **shipped 2026-09-06 and frozen.** The living truth is
+> [ADR-0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md), `REQ-SEC-052` /
+> `REQ-SEC-053` in [`docs/specs/security-and-access.md`](specs/security-and-access.md), and
+> [`ROLES_AND_PERMISSIONS.md`](../ROLES_AND_PERMISSIONS.md) §1. Read those first; this document
+> records how the change was scoped and why, not what the system does now.
+>
+> Drafted 2026-09-04 from a full inventory of the repository, the three sibling repositories and the
+> knowledge base; revised 2026-09-05 after an adversarial review of the draft against the code
+> (§11); the thirteen decisions were taken by the owner on 2026-09-05 (§3). Two things were decided
+> during implementation rather than in §3 and are recorded here because the plan does not say them:
+> the roster sync reads the `default-roles-iri` composite and aborts only on a **total** match
+> failure (a single role-less account is written through, so a leaver loses access — the owner chose
+> this over the plan's literal "never write an empty set"), and `MissionPeerRedactor` forwards the
+> caller's own `canEdit` / `canManageManagers` flags, which the widened peer tier would otherwise
+> have taken away from a MISSION_MANAGER.
 > **Epic:** tbd · **Spec:** [`docs/specs/security-and-access.md`](specs/security-and-access.md)
 > (REQ-SEC-052/053, new) · **ADR:** 0159 (new; supersedes ADR-0034)
 

@@ -1660,6 +1660,19 @@ instead of trusting the one-time rollout verification:
 - **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
   public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
   followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.
+- **Members-only redirect** — the `blackbox-members-only` job probes `/missions`, `/operations` and
+  `/orders` on `profit-base.online` with `http_members_only_redirect`, sending the request as a
+  **browser navigation** (`Sec-Fetch-Mode: navigate`, HTML `Accept`) and requiring exactly `302`
+  with a `Location` naming `/oauth2/authorization/keycloak`; `EdgeMembersOnlyRedirectBroken`
+  (**critical**, 5 min) fires on drift. These three pages answered anonymously until the
+  members-only cut-over (REQ-SEC-052, ADR-0159), and this is the only signal that says otherwise
+  from where a member's browser stands: `AnonymousSurfaceSweepMvcTest` runs in-process against
+  MockMvc and stays green while a cache rule, a stale upstream or a mis-ordered NPM `location`
+  serves the old public page. It is `critical` rather than `warning` — unlike its posture siblings,
+  a drift here means member data is served to the internet, not that a working transport got
+  weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
+  design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
+  contract.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
   `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their

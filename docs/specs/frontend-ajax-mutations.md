@@ -83,7 +83,7 @@ Mutations use `krtFetch.write(...)`; no page may hand-roll a `fetch` write or a 
 `FormData` body rather than a JSON payload — goes through `krtFetch.submitForm({form, ...})`, the
 multipart twin of `write`. Both entry points share **one** request orchestration (`send`): the
 CSRF header, the bare-403 refresh-and-retry-once (REQ-FE-004), the `X-Reauthenticate` redirect
-(REQ-SEC-012), the guest-edit-token replay (REQ-SEC-018), `syncVersion` (REQ-FE-003), the
+(REQ-SEC-012), `syncVersion` (REQ-FE-003), the
 success toast, and the RFC 7807 `handleProblem` conflict UX. `submitForm` **must not** set a
 `Content-Type` header on a `FormData` body — the browser sets `multipart/form-data` together with
 its boundary itself; the CSRF token rides in the header, never in the form body. A page may
@@ -631,8 +631,9 @@ Each peer turns the frame into a `krtRefreshMissionSection(keys, {broadcast: fal
 
 **Only opaque section keys travel over the socket — never mission data.** Every peer re-pulls the
 affected fragment through its own authenticated, authorization-checked
-`GET /missions/{id}?fragment=…`, so guest field-redaction and the member-only finance gate still
-apply per viewer; a guest never receives privileged data via the push. The relay sanitises the
+`GET /missions/{id}?fragment=…`, so the REQ-SEC-007 peer redaction and the member-only finance
+gate still apply per viewer; a member below Logistician never receives privileged data via the
+push. The relay sanitises the
 inbound `sections` array (keys outside the whitelist
 {`crew`,`finance`,`mgmt`,`overview`,`steps`,`objectives`,`frequencies`,`organisation`} dropped,
 count capped) so
@@ -698,8 +699,8 @@ notification SSE registry carries the same two fixes (#1157 / #1156, see REQ-NOT
   Ziele-objective or frequency/custom-frequency edit) appears on user B's view within a short delay
   without a manual reload — including the Verwaltung steps/objectives/frequencies editors, not only
   their Übersicht mirrors.
-- [ ] No mission data crosses the socket — a guest viewer's auto-refresh still renders the
-  guest-redacted fragment and the member-only finance section stays gated per viewer.
+- [ ] No mission data crosses the socket — a peer viewer's auto-refresh still renders the
+  PII-redacted fragment and the member-only finance section stays gated per viewer.
 - [ ] An incoming change while user B has a modal open (or is editing the affected section) does not
   destroy their in-progress edit; it is deferred behind the "updates available" pill.
 - [ ] Applying a pushed change does not re-broadcast it (no echo loop), and the originating session
@@ -715,7 +716,7 @@ participant add propagating to a second viewer in place (no reload), and a Ziele
 reaching a passive viewer's backgrounded editor (pinning a section key beyond the original four
 across broadcast → relay whitelist → receiver); the remaining mutation kinds in the first bullet all
 route through the same `krtRefreshMissionSection` / `krtNotifyMissionChanged` chokepoint, so they
-inherit the same behaviour, and the per-viewer guest-redaction guarantee rests on the existing
+inherit the same behaviour, and the per-viewer peer-redaction guarantee rests on the existing
 authenticated fragment GET (covered by the mission fragment/redaction tests) rather than a dedicated
 live-sync case.
 
@@ -808,8 +809,9 @@ the symmetric event dependent loaders keep the cleared state. Guarded by
 `ComboboxBlurRestoresValueE2eTest`, which asserts the cleared intermediate state as well so a
 regression that stops clearing (re-opening the "submits unresolved free text" hole) cannot pass.
 
-**Carve-outs.** (1) Fields that must also accept a free-text **guest** name — the mission
-participant-add and party-lead pickers — keep using the `/users/search`-backed autocomplete, which
+**Carve-outs.** (1) Fields that must also accept a free-text **external** name — the mission
+participant-add and party-lead pickers, which record a named person with no account (ADR-0159
+decision D4) — keep using the `/users/search`-backed autocomplete, which
 already live-searches both username and display name and must keep accepting non-user names; the
 strict combobox (which forces a pick from the list) does not fit them. (2) **Holder** pickers (bank
 deposit / withdrawal / transfer / booking-confirm) select a bank holder by handle — holders may be
@@ -845,8 +847,8 @@ the old value on delete) is the "can't remove the responsible person" defect and
   notification-rule selector rows) is searchable and pre-selects its value correctly.
 - [ ] A converted picker submits the same value as the former `<select>` (the hidden input inherits
   `name`); code that pre-selects a value after enhancement shows the matching label, not a blank box.
-- [ ] Guest-capable mission fields still accept a free-text non-user name; holder pickers filter by
-  handle.
+- [ ] External-capable mission fields still accept a free-text non-user name; holder pickers filter
+  by handle.
 - [ ] An optional picker (non-required `<select>` with an empty option) can be cleared back to none
   by **both** paths: emptying the textbox (delete-to-clear — the box stays empty, not snapping back to
   the removed entry on blur) and, when the empty option has descriptive text, picking its "clear" row.
@@ -1025,14 +1027,14 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `mission:{id}`           | crew, finance, mgmt, overview, steps, objectives, frequencies, organisation                                                   | yes           | `GET /api/v1/missions/{id}`                                                                           |
 | `operation:{id}`         | overview, missions, payout, finance                                                                                           | no            | `GET /api/v1/operations/{id}`                                                                         |
 | `order:{id}`             | header, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
-| `orders` (global queue)  | queue                                                                                                                         | no            | capabilities `canViewJobOrders` (guests and requesters are refused)                                   |
+| `orders` (global queue)  | queue                                                                                                                         | no            | capabilities `canViewJobOrders` (requesters are refused)                                              |
 | `refinery-order:{id}`    | order, store                                                                                                                  | no            | `GET /api/v1/refinery-orders/{id}`                                                                    |
 | `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board, requests                                                                                                               | no            | authenticated                                                                                         |
 | `inventory` (global)     | stock                                                                                                                         | no            | authenticated (every viewer re-fetches its own owner/org-unit-scoped view)                            |
-| `missions` (global list) | list                                                                                                                          | no            | authenticated (the `/missions` list gate; each viewer re-pulls its own scoped, guest-redacted page)   |
+| `missions` (global list) | list                                                                                                                          | no            | authenticated (the `/missions` list gate; each viewer re-pulls its own scoped, peer-redacted page)    |
 | `refinery` (global)      | queue                                                                                                                         | no            | authenticated (the `/refinery-orders` list gate; the `onlyMine` filter is applied per viewer)         |
 | `members` (global)       | roster                                                                                                                        | no            | `ROLE_ADMIN` (local check — the `/members` class-level page gate)                                     |
 | `org-structure` (global) | units, forms, chart                                                                                                           | no            | authenticated (the Organigramm is member-visible; the admin sections stay protected per fragment)     |
@@ -1157,7 +1159,7 @@ the registry whitelist and the receiving page's apply map must change together i
 `LiveSyncSectionMapParityTest` enforces seam-map ↔ registry set-equality at build time, so a key
 added on one side without the other **fails the build** instead of silently stranding peers stale.
 Receivers derive their container maps from the same seam-map object the write side uses; a section
-key whose container does not exist on the receiving page (guest redaction, requester view, MATERIAL
+key whose container does not exist on the receiving page (peer redaction, requester view, MATERIAL
 vs ITEM orders, staff vs org-unit bank pages) is silently skipped — that asymmetry is the
 authorization model, not an error.
 
@@ -1244,7 +1246,7 @@ the same `presence` frame — so no client change was needed.
 - [ ] On every covered surface, a mutation by user A appears on user B's view in place — including
   across pages (an order status change updates both a peer's order detail and a peer's queue; a
   bank confirm updates the staff queue, the account views and the org-unit tabs).
-- [ ] A requester/guest cannot subscribe to the `orders` queue or the bank rooms, yet their
+- [ ] A requester cannot subscribe to the `orders` queue or the bank rooms, yet their
   (server-published) order create still refreshes staff viewers' queues.
 - [ ] No entity data crosses the socket on any topic; every peer re-render is the peer's own
   authorized, redaction-applied fragment GET with fresh `data-version` attributes.
