@@ -753,6 +753,56 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The three Lager writes phase U opens, refused without a token.
+   *
+   * <p>Sammel-Ausbuchen, Sammel-Umbuchen, and the earmark a Logistiker sets on a stock row. The
+   * allocation is three verbs on one path and all three were refused, which is what made it the
+   * worst of them: the save loop is sequential and version-chained, so the first row fails, {@code
+   * partial} stays at zero and <em>nothing</em> is ever written.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousInventoryBulkAndAllocationWithUnauthorized() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/bulk-checkout")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"itemIds\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/bulk-rebook")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"itemIds\":[],\"mode\":\"LOCATION\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            patch("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"field\":\"JOB_ORDER\",\"targetId\":\"" + ABSENT_MISSION + "\"}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The Auftrags-Familie phase T opens, refused without a token.
    *
    * <p>Nine paths, and the audit's own block: four reads that made a working screen look empty or

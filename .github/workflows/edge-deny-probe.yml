@@ -255,6 +255,15 @@ jobs:
           probe PUT "/api/v1/orders/$nil/items" 401
           probe POST "/api/v1/orders/$nil/items/$nil/production" 401
           probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
+
+          # Phase U - the three Lager writes. The allocation is three verbs on one path, and all
+          # three are probed: the app sends every one of them, and the carve-out that opens them
+          # rides the leaf group that already carried book-out and delivered.
+          probe POST /api/v1/inventory/bulk-checkout 401
+          probe POST /api/v1/inventory/bulk-rebook 401
+          probe POST "/api/v1/inventory/$nil/allocation" 401
+          probe PATCH "/api/v1/inventory/$nil/allocation" 401
+          probe DELETE "/api/v1/inventory/$nil/allocation" 401
           # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
           # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
 
