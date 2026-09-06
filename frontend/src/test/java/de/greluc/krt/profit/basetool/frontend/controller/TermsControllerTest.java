@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,6 +43,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 class TermsControllerTest {
 
   @Autowired private WebApplicationContext context;
@@ -60,9 +61,7 @@ class TermsControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(
-            eq("/api/v1/terms/document"), eq(TermsDocumentDto.class), anyBoolean()))
-        .thenReturn(document());
+    when(backendApiClient.getTermsDocumentAnonymously()).thenReturn(document());
   }
 
   /**

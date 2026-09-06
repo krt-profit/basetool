@@ -74,8 +74,10 @@ class MissionSecurityRenderingTest {
   }
 
   @Test
-  void missionDetail_AsAnonymous_ShouldDisableRegisteredParticipantPayoutDropdown()
-      throws Exception {
+  @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
+  // REQ-SEC-052: the detail page needs a login to render. What the case asserts — a member
+  // may not change a registered participant's payout dropdown — is unchanged.
+  void missionDetail_AsPeer_ShouldDisableRegisteredParticipantPayoutDropdown() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
@@ -112,8 +114,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -156,14 +157,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Anonymously access the mission detail page: a registered participant's payout select must be
@@ -219,8 +218,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -263,14 +261,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as Admin
@@ -319,8 +315,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -363,14 +358,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as another user. The OIDC subject (the Keycloak sub, which equals app_user.id)
@@ -429,8 +422,7 @@ class MissionSecurityRenderingTest {
             null,
             null,
             PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
 
     MissionDto mission =
         new MissionDto(
@@ -473,14 +465,12 @@ class MissionSecurityRenderingTest {
     when(backendApiClient.get(
             eq("/api/v1/missions/" + missionId),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(mission);
     when(backendApiClient.getCached(
             any(CachedCatalog.class),
             org.mockito.ArgumentMatchers
-                .<org.springframework.core.ParameterizedTypeReference<Object>>any(),
-            anyBoolean()))
+                .<org.springframework.core.ParameterizedTypeReference<Object>>any()))
         .thenReturn(Collections.emptyList());
 
     // Authenticated as the participant themselves via an OIDC login whose subject (sub) equals the

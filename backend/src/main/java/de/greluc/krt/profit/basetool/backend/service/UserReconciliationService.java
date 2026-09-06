@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -71,29 +72,28 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserReconciliationService {
 
   /**
-   * Display name of the local fallback role every account lands on when not a single Keycloak role
-   * name matched the local catalog. Matched case-insensitively, like every other role lookup here.
+   * How many accounts may end a single sync run holding NO local role before the run summary
+   * escalates from INFO to WARN. A handful is ordinary (a leaver whose realm roles were stripped);
+   * more than this in one run is the fingerprint of a realm-side role rename, which silently strips
+   * every holder of the renamed role at once — the failure this aggregate exists to make visible.
+   * Deliberately low: the run summary is emitted once per sync, so a WARN here is not a flood
+   * vector.
+   *
+   * <p>The stakes rose with ADR-0159. Such an account used to land on the authority-less {@code
+   * Guest} role and keep the anonymous read surface; now it is refused with {@code 403 NO_ROLE}
+   * (REQ-SEC-053) until an administrator acts, so this line is the difference between a rename
+   * being noticed and a silent overnight lockout.
    */
-  private static final String GUEST_FALLBACK_ROLE_NAME = "Guest";
-
-  /**
-   * How many accounts may be re-mapped ONTO the {@code Guest} fallback in a single sync run before
-   * the run summary escalates from INFO to WARN. A handful is ordinary (a leaver whose realm roles
-   * were stripped); more than this in one run is the fingerprint of a realm-side role rename, which
-   * silently demotes every holder of the renamed role at once — the failure this aggregate exists
-   * to make visible. Deliberately low: the run summary is emitted once per sync, so a WARN here is
-   * not a flood vector.
-   */
-  private static final int GUEST_FALLBACK_WARN_THRESHOLD = 3;
+  private static final int ROLE_LESS_WARN_THRESHOLD = 3;
 
   /** Accounts whose persisted role set actually changed in the current Admin-API sync run. */
   private final AtomicInteger roleChangedAccounts = new AtomicInteger();
 
   /**
-   * Accounts whose role change in the current run was a demotion onto the {@code Guest} fallback —
-   * i.e. NONE of their Keycloak role names resolved to a local role.
+   * Accounts whose role change in the current run left them with NO local role — i.e. none of their
+   * Keycloak role names resolved.
    */
-  private final AtomicInteger guestFallbackAccounts = new AtomicInteger();
+  private final AtomicInteger roleLessAccounts = new AtomicInteger();
 
   /**
    * Keycloak role names seen in the current run that matched no local role and were dropped
@@ -121,8 +121,9 @@ public class UserReconciliationService {
    * an existing account found by name (ADR-0142 point 5) — a Keycloak username is neither immutable
    * nor unique after a deletion, so matching on it let a callsign decide which account a token
    * acted as. A row holding the same username under a different id is logged and counted; the admin
-   * queue shows it as a collision, and merging the two is an explicit admin action. Roles default
-   * to "Guest" when the JWT carries none so an unconfigured Keycloak doesn't lock everyone out.
+   * queue shows it as a collision, and merging the two is an explicit admin action. A JWT that
+   * carries no resolvable role leaves the account role-less, which is refused with {@code 403
+   * NO_ROLE} (REQ-SEC-053) rather than substituted with a catch-all role.
    *
    * <p>Roles are the one field this does not always write. A client whose realm-role claim is
    * deliberately incomplete (REQ-SEC-036) leaves the stored set untouched, and the returned {@link
@@ -377,24 +378,31 @@ public class UserReconciliationService {
     }
 
     // Sync Roles. The mapping is tracked (not just applied) on this path: a realm-side role rename
-    // makes every holder's names stop matching, which silently re-maps them all onto the Guest
-    // fallback overnight — a privilege change with no signal anywhere, because the fetch itself
-    // succeeded and the item count stayed the same. The tallies feed the per-run aggregate written
-    // by logRoleSyncSummary(); the per-account line stays at DEBUG and carries the sub UUID only.
+    // makes every holder's names stop matching, which strips them all overnight — a privilege
+    // change with no signal anywhere, because the fetch itself succeeded and the item count stayed
+    // the same. Since REQ-SEC-053 that is a lockout rather than a demotion, which raises the stakes
+    // on the tally rather than changing how it works. The tallies feed the per-run aggregate
+    // written by logRoleSyncSummary(); the per-account line stays at DEBUG and carries the sub
+    // UUID only.
     RoleMapping mapping = mapRolesTracked(dto.roles());
     droppedRoleNames.addAndGet(mapping.droppedNames());
     Set<Role> localRoles = mapping.roles();
+    // The role-less tally is counted OUTSIDE the delta gate on purpose. Inside it, only an account
+    // that role-less-ness happened TO on this run is counted, and an account that was already
+    // role-less contributes nothing - so the population V239 creates in one stroke (every ex-GUEST
+    // holder) is invisible on the first run and on every run after it, which is precisely the
+    // population the WARN exists to surface. It is a census, not a delta.
+    if (mapping.roleLess()) {
+      roleLessAccounts.incrementAndGet();
+    }
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
       changed = true;
       roleChangedAccounts.incrementAndGet();
-      if (mapping.guestFallback()) {
-        guestFallbackAccounts.incrementAndGet();
-      }
       log.debug(
-          "Role set changed for user {} (guestFallback={}, unmatchedKeycloakRoleNames={})",
+          "Role set changed for user {} (roleLess={}, unmatchedKeycloakRoleNames={})",
           user.getId(),
-          mapping.guestFallback(),
+          mapping.roleLess(),
           mapping.droppedNames());
     }
 
@@ -496,14 +504,14 @@ public class UserReconciliationService {
   /**
    * Writes the per-run role-mapping aggregate and resets the tallies for the next run, so the
    * scheduled reconciliation leaves exactly one line stating how many accounts had their roles
-   * rewritten — the signal that was missing when a realm-side role rename re-mapped every holder
-   * onto {@code Guest} overnight with no trace at all.
+   * rewritten — the signal that was missing when a realm-side role rename stripped every holder of
+   * a role overnight with no trace at all.
    *
    * <p>Counts only, never handles: REQ-OBS-004 forbids the {@code preferred_username} / callsign /
    * e-mail / Discord snowflake, and the affected subs are already available per account at DEBUG.
-   * The level is INFO for an ordinary run and WARN once more than {@link
-   * #GUEST_FALLBACK_WARN_THRESHOLD} accounts were demoted onto the fallback in one run, which is
-   * what a renamed or deleted realm role looks like from here.
+   * The level is INFO for an ordinary run and WARN once more than {@link #ROLE_LESS_WARN_THRESHOLD}
+   * accounts ended the run with no role, which is what a renamed or deleted realm role looks like
+   * from here — and, since REQ-SEC-053, what a lockout looks like.
    *
    * <p>Called by {@link UserSyncService} at the end of a run. The tallies are only fed by the
    * Admin-API path ({@link #syncUser(KeycloakUserDto)}), never by the per-login JWT path, so an
@@ -512,81 +520,114 @@ public class UserReconciliationService {
    */
   public void logRoleSyncSummary() {
     int changed = roleChangedAccounts.getAndSet(0);
-    int fallbacks = guestFallbackAccounts.getAndSet(0);
+    int roleLess = roleLessAccounts.getAndSet(0);
     int dropped = droppedRoleNames.getAndSet(0);
-    if (fallbacks > GUEST_FALLBACK_WARN_THRESHOLD) {
+    if (roleLess > ROLE_LESS_WARN_THRESHOLD) {
       log.warn(
-          "User sync role mapping: {} accounts changed roles, {} of them re-mapped onto the Guest"
-              + " fallback, {} Keycloak role names matched no local role — check for a renamed or"
-              + " deleted realm role.",
+          "User sync role mapping: {} accounts changed roles; {} accounts resolve to NO role at all"
+              + " and are refused with NO_ROLE; {} Keycloak role names matched no local role —"
+              + " check for a renamed or deleted realm role.",
           changed,
-          fallbacks,
+          roleLess,
           dropped);
       return;
     }
     log.info(
-        "User sync role mapping: {} accounts changed roles ({} onto the Guest fallback), {}"
+        "User sync role mapping: {} accounts changed roles; {} accounts resolve to no role; {}"
             + " Keycloak role names matched no local role.",
         changed,
-        fallbacks,
+        roleLess,
         dropped);
   }
 
   /**
    * Maps Keycloak realm-role names to the local {@link Role} catalog, case-insensitively; unmatched
-   * names are dropped. Falls back to the {@code Guest} role when none match (or the input is {@code
-   * null}) so an unconfigured / mismatched Keycloak never leaves a user role-less. Thin wrapper
-   * over {@link #mapRolesTracked(Collection)} for the per-login JWT path, which deliberately does
-   * not feed the sync-run tallies.
+   * names are dropped and nothing is substituted when none match. Thin wrapper over {@link
+   * #mapRolesTracked(Collection)} for the per-login JWT path, which deliberately does not feed the
+   * sync-run tallies.
    *
    * @param roleNames the Keycloak role names to map, possibly {@code null}
-   * @return the matched local roles, or {@code Guest} as a singleton fallback; never {@code null}
+   * @return the matched local roles, possibly empty; never {@code null}
    */
   private Set<Role> mapRoles(Collection<String> roleNames) {
     return mapRolesTracked(roleNames).roles();
   }
 
   /**
+   * The role catalogue, lower-cased by name, read <b>once per account</b> instead of once per role
+   * name.
+   *
+   * <p>The catalogue is a handful of rows and every member carries several names, so the previous
+   * {@code findByNameIgnoreCase} per name was one query per name per account - and the REQ-SEC-053
+   * composite fold-in adds a name to essentially every member, roughly doubling that count against
+   * the largest loop in the nightly run.
+   *
+   * <p><b>The permissions are fetched with the roles</b>, not left lazy. These entities outlive the
+   * transaction that read them - {@code assembleFor} iterates {@code getPermissions()} after {@code
+   * syncUser} has returned - so a lazy collection there is a {@code LazyInitializationException} on
+   * the authentication path, i.e. a {@code 500} on every login.
+   *
+   * <p><b>Deliberately not cached across calls, and this is the whole point of the method.</b> The
+   * first version of this fix held the map in a {@code volatile} field for the length of a sync
+   * run. That handed out {@link Role} entities loaded in an earlier transaction and assigned them
+   * to a managed {@code User}, which is a detached instance in a live persistence context:
+   * Hibernate refused the flush and every login answered {@code 500} - found by the E2E suite on
+   * 2026-09-06, where it took the whole stack's bring-up with it. One query per account is the N+1
+   * fix; sharing entities across transactions is not an optimisation but a defect.
+   *
+   * @return role by lower-cased name, managed by the caller's persistence context; never {@code
+   *     null}
+   */
+  @NotNull
+  private Map<String, Role> roleCatalogue() {
+    return roleRepository.findAllWithPermissions().stream()
+        .collect(
+            java.util.stream.Collectors.toUnmodifiableMap(
+                role -> role.getName().toLowerCase(Locale.ROOT), role -> role, (a, b) -> a));
+  }
+
+  /**
    * Maps Keycloak realm-role names onto the local catalog exactly like {@link #mapRoles} but also
-   * reports HOW the mapping went, so the caller can tell a legitimate role change apart from the
-   * silent catch-all: a name that matches nothing is dropped, and an account for which nothing
-   * matched at all is handed the {@code Guest} fallback rather than being left role-less.
+   * reports HOW the mapping went, so the caller can tell a legitimate role change apart from a
+   * total failure to resolve: a name that matches nothing is dropped, and an account for which
+   * nothing matched at all comes back with an empty set rather than a substitute role.
    *
    * @param roleNames the Keycloak role names to map, possibly {@code null}
-   * @return the mapped roles plus the fallback flag and the number of dropped names
+   * @return the mapped roles plus the role-less flag and the number of dropped names
    */
   @NotNull
   private RoleMapping mapRolesTracked(@Nullable Collection<String> roleNames) {
     Set<Role> localRoles = new HashSet<>();
     int dropped = 0;
     if (roleNames != null) {
+      Map<String, Role> catalogue = roleCatalogue();
       for (String roleName : roleNames) {
-        Optional<Role> match = roleRepository.findByNameIgnoreCase(roleName);
-        if (match.isPresent()) {
-          localRoles.add(match.get());
+        Role match = catalogue.get(roleName.toLowerCase(Locale.ROOT));
+        if (match != null) {
+          localRoles.add(match);
         } else {
           dropped++;
         }
       }
     }
 
-    boolean guestFallback = localRoles.isEmpty();
-    if (guestFallback) {
-      roleRepository.findByNameIgnoreCase(GUEST_FALLBACK_ROLE_NAME).ifPresent(localRoles::add);
-    }
-    return new RoleMapping(localRoles, guestFallback, dropped);
+    // REQ-SEC-053: nothing is substituted for an empty result any more. It used to be handed the
+    // authority-less `Guest` role, which read as "mapped" while meaning "not mapped" — and, with
+    // the anonymous surface still open, quietly granted the guest read surface to an account whose
+    // realm roles the sync had failed to resolve. An empty set is now the honest answer, and
+    // `assembleFor` turns it into a refusal.
+    return new RoleMapping(localRoles, localRoles.isEmpty(), dropped);
   }
 
   /**
    * Outcome of one role-name mapping: the resolved local roles plus the two facts the raw set
-   * cannot express — whether the result is the {@code Guest} catch-all (nothing matched) and how
-   * many supplied names were silently dropped.
+   * cannot express — whether nothing matched at all and how many supplied names were dropped.
    *
-   * @param roles the resolved local roles (the {@code Guest} singleton when {@code guestFallback})
-   * @param guestFallback {@code true} when no supplied name resolved and the fallback was applied
+   * @param roles the resolved local roles, possibly empty
+   * @param roleLess {@code true} when no supplied name resolved to a local role
    * @param droppedNames how many supplied Keycloak role names matched no local role
    */
-  private record RoleMapping(@NotNull Set<Role> roles, boolean guestFallback, int droppedNames) {}
+  private record RoleMapping(@NotNull Set<Role> roles, boolean roleLess, int droppedNames) {}
 
   /**
    * What one authentication reconciled: the managed row, and the roles that authorise <em>this</em>
@@ -600,7 +641,8 @@ public class UserReconciliationService {
    *
    * @param user the created or updated {@code app_user} row; never {@code null}
    * @param effectiveRoles the roles this request is authorised with -- the token's, mapped onto the
-   *     local catalogue, with the {@code Guest} fallback already applied; never {@code null}
+   *     local catalogue; possibly empty, which {@code assembleFor} refuses (REQ-SEC-053); never
+   *     {@code null}
    */
   public record ReconciledUser(@NotNull User user, @NotNull Set<Role> effectiveRoles) {
 

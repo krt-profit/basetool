@@ -41,6 +41,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -62,10 +63,20 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * /api/v1/users/me} payload (used to overwrite the token values with the authoritative DB state,
  * including the optimistic-locking {@code version} needed for subsequent updates). When the backend
  * is unreachable, the token-only view still renders so the user always sees something.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, as on
+ * every sibling in this package. The three {@code authHelper.isAnonymous()} guards that used to
+ * open each handler went with the anonymous caller (ADR-0159), and without a gate of its own this
+ * class would have been protected only by a URL matcher two folders away — the arrangement the
+ * members-only change set out to end. It is defence in depth, not the enforcement: {@code
+ * anyRequest().authenticated()} already refuses at {@code AuthorizationFilter}. Without it, a
+ * regression in that one matcher would reach {@code principal.getPreferredUsername()} on a null
+ * principal.
  */
 @Controller
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class ProfileController {
 
   /** Shared response type for the raw {@code Map<String, Object>} backend payloads on this page. */
@@ -80,22 +91,18 @@ public class ProfileController {
   private String issuerUri;
 
   /**
-   * Renders the profile page. Unauthenticated users are redirected to the home page. For
-   * authenticated users the controller seeds the model from token claims, then overlays the backend
-   * {@code /me} record where available and parses the {@code joinDate} into a {@code LocalDate}
-   * plus the derived months-in-squadron counter. A fresh {@link ProfileDescriptionForm} is added to
-   * the model unless one is already there (preserves user input across a failed submit).
+   * Renders the profile page. The controller seeds the model from token claims, then overlays the
+   * backend {@code /me} record where available and parses the {@code joinDate} into a {@code
+   * LocalDate} plus the derived months-in-squadron counter. A fresh {@link ProfileDescriptionForm}
+   * is added to the model unless one is already there (preserves user input across a failed
+   * submit).
    *
    * @param model Thymeleaf model populated with the layered profile data and the description form
    * @param principal authenticated OIDC user
-   * @return the {@code profile} view name, or {@code redirect:/} for guests
+   * @return the {@code profile} view name
    */
   @GetMapping("/profile")
   public String profile(Model model, @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return "redirect:/";
-    }
-
     model.addAttribute("username", principal.getPreferredUsername());
     model.addAttribute("email", principal.getEmail());
 
@@ -309,10 +316,6 @@ public class ProfileController {
       @Valid @RequestBody ProfileDescriptionForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -428,10 +431,6 @@ public class ProfileController {
       @Valid @RequestBody ProfilePayoutPreferenceForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }
@@ -543,10 +542,6 @@ public class ProfileController {
       @Valid @RequestBody ProfileBlueprintSharingForm form,
       BindingResult bindingResult,
       @AuthenticationPrincipal OidcUser principal) {
-    if (authHelper.isAnonymous()) {
-      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-          .body(Map.of("detail", msg("error.profile.update.failed")));
-    }
     if (bindingResult.hasErrors()) {
       return ResponseEntity.badRequest().body(Map.of("detail", firstFieldError(bindingResult)));
     }

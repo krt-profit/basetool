@@ -56,9 +56,24 @@ public final class Roles {
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
-  public static final String GUEST = "GUEST";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
+
+  // --- Refusal markers (never seeded, never granted; see below) ---------------------------------
+
+  /**
+   * The marker authority an approved account holding no application role carries (REQ-SEC-053).
+   *
+   * <p>Not a role and not in the hierarchy: nothing grants on it, and the only code that reads it
+   * is {@code PendingApprovalAccessFilter}, which turns it into {@code 403 NO_ROLE} before a
+   * handler runs. It exists so such an account is <em>refused</em> rather than left with an empty
+   * authority set — which would pass every {@code isAuthenticated()} gate and fail only the ones
+   * naming a role, making admission a per-endpoint accident instead of a decision.
+   *
+   * <p>Spelled with the {@code ROLE_} prefix already applied, unlike every constant above: it is
+   * never a {@code Role.code} and never a Keycloak realm role, so there is no bare form of it.
+   */
+  public static final String NO_ROLE_MARKER = ROLE_PREFIX + "NO_ROLE";
 
   // --- Hierarchy-derived roles (never seeded; see class Javadoc) ---------------------------------
 

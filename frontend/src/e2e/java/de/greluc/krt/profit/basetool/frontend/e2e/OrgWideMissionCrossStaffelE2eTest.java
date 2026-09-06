@@ -33,18 +33,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel mission visibility (UC-10): Staffel A owns one public mission ({@code
+ * Cross-Staffel mission visibility (UC-10): Staffel A owns one organisation-wide mission ({@code
  * is_internal=false}) and one internal mission. A member of Staffel B must see — and be able to
- * open — A's public mission (the public-escape that enables cross-Staffel collaboration) but must
- * NOT see A's internal mission. This is the only cross-Staffel visibility path for missions ({@code
- * searchMissions}: {@code owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false}).
+ * open — A's organisation-wide mission (the escape that enables cross-Staffel collaboration) but
+ * must NOT see A's internal mission. This is the only cross-Staffel visibility path for missions
+ * ({@code searchMissions}: {@code owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal =
+ * false}).
+ *
+ * <p><b>Renamed from {@code PublicMissionCrossStaffelE2eTest} with ADR-0159.</b> "Public" meant two
+ * different things in that name and only one of them survived: {@code is_internal = false} still
+ * opens a mission to the whole organisation, and it no longer opens it to the internet. The escape
+ * itself is untouched, which is exactly why this test is the regression guard the members-only
+ * change needed — a gate written one notch too tight would close it, and every member outside the
+ * owning Staffel would quietly stop seeing the mission.
  *
  * <p>The join (participant add) is the documented next step; it is not automated here because it
  * depends on seeded job types, but the visibility + cross-Staffel detail access it builds on are
  * fully covered.
  */
 @Tag("e2e")
-class PublicMissionCrossStaffelE2eTest {
+class OrgWideMissionCrossStaffelE2eTest {
 
   /** Provisions (or, in staging mode, targets) the shared stack for the whole run. */
   @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
@@ -56,12 +64,12 @@ class PublicMissionCrossStaffelE2eTest {
   private static final String MEMBER_USER = "test-member";
   private static final String MEMBER_PASSWORD = "test-member-pw";
   private static final String IRIDIUM_ID = "00000000-0000-0000-0000-000000000001";
-  private static final String PUBLIC_MISSION = "E2E Public Mission AB";
+  private static final String ORG_WIDE_MISSION = "E2E Org-wide Mission AB";
   private static final String INTERNAL_MISSION = "E2E Internal Mission AB";
 
   private static Playwright playwright;
   private static Browser browser;
-  private static String publicMissionId;
+  private static String orgWideMissionId;
 
   /**
    * Seeds an Officer homed in Staffel A (IRIDIUM) who owns one public and one internal mission, and
@@ -91,7 +99,8 @@ class PublicMissionCrossStaffelE2eTest {
           false,
           false);
       // Both missions are owned by Staffel A (test-officer auto-stamps its home Staffel).
-      publicMissionId = seeder.createMission(OFFICER_USER, OFFICER_PASSWORD, PUBLIC_MISSION, false);
+      orgWideMissionId =
+          seeder.createMission(OFFICER_USER, OFFICER_PASSWORD, ORG_WIDE_MISSION, false);
       seeder.createMission(OFFICER_USER, OFFICER_PASSWORD, INTERNAL_MISSION, true);
     }
   }
@@ -108,11 +117,11 @@ class PublicMissionCrossStaffelE2eTest {
   }
 
   /**
-   * A member of Staffel B sees A's public mission in the list and can open its detail page, but
-   * does not see A's internal mission at all.
+   * A member of Staffel B sees A's organisation-wide mission in the list and can open its detail
+   * page, but does not see A's internal mission at all.
    */
   @Test
-  void staffelBMemberSeesPublicMissionButNotInternal() {
+  void staffelBMemberSeesOrgWideMissionButNotInternal() {
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
         browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
@@ -124,17 +133,17 @@ class PublicMissionCrossStaffelE2eTest {
 
         assertThat(
                 page.getByTestId("mission-row")
-                    .filter(new Locator.FilterOptions().setHasText(PUBLIC_MISSION)))
+                    .filter(new Locator.FilterOptions().setHasText(ORG_WIDE_MISSION)))
             .isVisible();
         assertThat(
                 page.getByTestId("mission-row")
                     .filter(new Locator.FilterOptions().setHasText(INTERNAL_MISSION)))
             .hasCount(0);
 
-        // B can open A's public mission detail cross-Staffel.
-        E2eSupport.navigate(page, baseUrl + "/missions/" + publicMissionId);
+        // B can open A's organisation-wide mission detail cross-Staffel.
+        E2eSupport.navigate(page, baseUrl + "/missions/" + orgWideMissionId);
         page.waitForLoadState();
-        assertThat(page.getByText(PUBLIC_MISSION).first()).isVisible();
+        assertThat(page.getByText(ORG_WIDE_MISSION).first()).isVisible();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "public-mission-crossstaffel");
         throw failure;

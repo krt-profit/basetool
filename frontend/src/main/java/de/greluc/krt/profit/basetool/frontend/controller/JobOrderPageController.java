@@ -40,7 +40,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
@@ -87,17 +86,22 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * and fragment renders plus the read-only JSON proxies; every state-mutating {@code /orders}
  * endpoint (create/update/delete, priority, status, claims, assignees, handovers, unlinks) lives
  * unchanged in {@link JobOrderWriteController}.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class JobOrderPageController {
 
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
-  private final FrontendAuthHelperService authHelper;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
@@ -201,7 +205,6 @@ public class JobOrderPageController {
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
   @GetMapping
-  @PreAuthorize("isAuthenticated()")
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false) List<UUID> squadronId,
@@ -361,7 +364,6 @@ public class JobOrderPageController {
    * @return the {@code order-detail} view name
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
       @PathVariable UUID id,
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
@@ -874,7 +876,6 @@ public class JobOrderPageController {
    */
   @GetMapping("/{id}/materials/{matId}/inventory")
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public List<InventoryItemDto> getInventoryItemsForMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
     try {
@@ -891,7 +892,7 @@ public class JobOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       List<MaterialDto> list =
-          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL, true);
+          backendApiClient.getCached(CachedCatalog.MATERIALS_JOB_ORDER, LIST_OF_MATERIAL);
       if (list != null) {
         return new ArrayList<>(list);
       }
@@ -1145,7 +1146,7 @@ public class JobOrderPageController {
   private List<SquadronDto> fetchSquadrons() {
     try {
       PageResponse<SquadronDto> p =
-          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON, true);
+          backendApiClient.getCached(CachedCatalog.SQUADRONS, PAGE_OF_SQUADRON);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -1176,11 +1177,11 @@ public class JobOrderPageController {
    * offers every active Staffel + Spezialkommando, not just the caller's memberships; each option
    * carries its {@code isProfitEligible} flag so {@link #addOwnerPickerOptions} can derive the
    * responsible picker from the requesting one without a second, authenticated SK-catalog call.
-   * Read through the public client ({@code isPublic = true}) because the endpoint is {@code
-   * permitAll} and the catalogue carries no PII. Since ADR-0149 this is the degradation path rather
-   * than the guest path: {@link #fetchRequestingOrgUnitOptions} prefers the all-kinds catalogue and
-   * falls back here when that read fails, which costs the Bereich/OL tiers but keeps the form
-   * renderable.
+   * Read with the caller's token like every other backend call. It went through the anonymous
+   * client while the endpoint was {@code permitAll} and the form had an anonymous caller; both are
+   * gone (ADR-0149, ADR-0159). This is the degradation path: {@link #fetchRequestingOrgUnitOptions}
+   * prefers the all-kinds catalogue and falls back here when that read fails, which costs the
+   * Bereich/OL tiers but keeps the form renderable.
    *
    * @return picker options or empty list; never {@code null}.
    */
@@ -1188,7 +1189,7 @@ public class JobOrderPageController {
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.getCached(
-              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, true);
+              CachedCatalog.ORG_UNITS_ACTIVE, LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION);
       return options != null ? options : List.of();
     } catch (Exception e) {
       log.warn("Failed to fetch active org units for Job Order owner-picker", e);

@@ -70,6 +70,16 @@ public class BackendServiceException extends RuntimeException {
    */
   public static final String CODE_TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED";
 
+  /**
+   * Problem code the backend answers every {@code /api} call with once the caller's token maps to
+   * no application role (REQ-SEC-053). The third member of the same family as {@link
+   * #CODE_PENDING_APPROVAL} and {@link #CODE_TERMS_NOT_ACCEPTED}: an expected 403 that says the
+   * gate is working, arriving once per fragment of every page such a member loads until an
+   * administrator assigns a role. Counting it as a backend-call failure would let one waiting
+   * account push {@code basetool_backend_client_errors_total} on its own.
+   */
+  public static final String CODE_NO_ROLE = "NO_ROLE";
+
   private final int statusCode;
   private final @NotNull String problemCode;
   private final @Nullable String correlationId;

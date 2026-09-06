@@ -42,10 +42,14 @@ import org.jetbrains.annotations.Nullable;
  *       union of every OrgUnit they belong to (Staffel + every SK membership). This is the case
  *       where today's "single Staffel id" view silently dropped SK data — the new predicate fixes
  *       that by passing the full membership set into the {@code IN} clause.
- *   <li><b>Anonymous</b> (all fields empty / null / false): the caller sees nothing through the
- *       scoped clause; only the cross-staffel public escape (Mission's {@code isInternal=false})
- *       lets data through. Matches today's behaviour for guest read paths.
  * </ul>
+ *
+ * <p>There used to be a fourth case here: an anonymous caller, all fields empty, seeing nothing
+ * through the scoped clause and reaching data only through Mission's organisation-wide escape. That
+ * case is gone with the anonymous surface (ADR-0159), and {@code
+ * RequestScopeResolver#currentScopePredicate()} now throws rather than building it — an all-empty
+ * predicate is indistinguishable from a legitimate one and would answer a question nobody was
+ * entitled to ask.
  *
  * <p>Used in repository queries by the standard JPQL fragment
  *
@@ -55,16 +59,18 @@ import org.jetbrains.annotations.Nullable;
  *   OR (:scopeOrgUnitId IS NULL AND x.owningOrgUnit.id IN :memberOrgUnitIds)
  * }</pre>
  *
- * <p>Mission (cross-staffel aggregate) adds {@code OR x.isInternal = false} as the public-escape
- * clause. The empty-collection case for {@link #memberOrgUnitIds()} returns no rows from the {@code
- * IN} clause (Hibernate 6 handles {@code IN ()} as a constant {@code false}).
+ * <p>Mission (cross-staffel aggregate) adds {@code OR x.isInternal = false} as the
+ * organisation-wide escape clause — {@code isInternal = false} means "every member of the
+ * organisation", never "everyone" (REQ-ORG-009, D8). The empty-collection case for {@link
+ * #memberOrgUnitIds()} returns no rows from the {@code IN} clause (Hibernate 6 handles {@code IN
+ * ()} as a constant {@code false}).
  *
  * @param adminAllScope {@code true} iff the caller is an admin with no active selection — the
  *     filter clauses are short-circuited to "all rows visible".
  * @param activeOrgUnitId the single OrgUnit id the caller pinned via the switcher; {@code null}
  *     when no pinning is active.
  * @param memberOrgUnitIds the union of OrgUnit ids the caller is a member of (Staffel + SK
- *     memberships); empty for admins and anonymous callers.
+ *     memberships); empty for admins and for a member who belongs to no unit.
  */
 public record ScopePredicate(
     boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds) {

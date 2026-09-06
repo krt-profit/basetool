@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -1154,6 +1155,15 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ProblemDetail> handleAllExceptions(
       Exception ex, HttpServletRequest request) {
+    // A security refusal raised inside a @PreAuthorize SpEL expression does not arrive as itself:
+    // SpEL wraps whatever a bean method threw, so RequestScopeResolver's "no identity" refusal
+    // (REQ-SEC-052) would land here and be answered 500 with a stack trace in the log and a 5xx on
+    // the alerting - for a request whose only problem is that it carried no login. Unwrap before
+    // giving up, so the shape of the answer follows the cause rather than the wrapper.
+    AuthenticationException wrapped = rootAuthenticationCause(ex);
+    if (wrapped != null) {
+      return handleAuthentication(wrapped, request);
+    }
     String cid = correlationId();
     // Make sure the correlation id is the same for both the log line and the response.
     MDC.put(MDC_CORRELATION_ID, cid);
@@ -1171,6 +1181,25 @@ public class GlobalExceptionHandler {
     pd.setProperty("code", CODE_INTERNAL_ERROR);
     pd.setProperty("correlationId", cid);
     return toEntity(pd);
+  }
+
+  /**
+   * Digs an {@link AuthenticationException} out of a wrapper chain.
+   *
+   * @param ex the exception that reached the catch-all
+   * @return the first {@link AuthenticationException} in its cause chain, or {@code null} when
+   *     there is none. The walk is depth-bounded so a self-referencing cause cannot spin.
+   */
+  @Nullable
+  private static AuthenticationException rootAuthenticationCause(Throwable ex) {
+    Throwable current = ex;
+    for (int depth = 0; current != null && depth < 10; depth++) {
+      if (current instanceof AuthenticationException authentication) {
+        return authentication;
+      }
+      current = current.getCause() == current ? null : current.getCause();
+    }
+    return null;
   }
 
   /**

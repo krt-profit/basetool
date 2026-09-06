@@ -26,6 +26,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 public class MaterialControllerTempTest {
 
   @Autowired private MaterialController controller;

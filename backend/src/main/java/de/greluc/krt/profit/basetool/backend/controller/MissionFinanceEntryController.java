@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor;
+import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -53,12 +53,13 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface over mission finance entries. Reads are mission-scoped (via {@code
  * /missions/{missionId}/finance-entries}); writes are entry-scoped (via {@code
  * /finance-entries/{entryId}}). The whole finance ledger is restricted to registered members and
- * above ({@code @authHelperService.isMemberOrAbove()}): anonymous callers AND authenticated but
- * role-less {@code GUEST} accounts are blocked from reading and creating entries, mirroring the
- * "treat guest like anonymous on the mission surface" rule (the finance ledger is the mission's
- * payout view). Every member-facing response still strips the nested participant PII via {@link
- * #redactParticipantPii} (a peer's email is profile-only; audit finding H-1). Update/delete are
- * gated on {@link
+ * above ({@code @authHelperService.isMemberOrAbove()}). The two cohorts that gate used to exclude —
+ * anonymous callers and the role-less {@code GUEST} — no longer exist: nothing anonymous reaches an
+ * {@code /api} path and a role-less token is refused {@code 403 NO_ROLE} before any handler runs
+ * (REQ-SEC-052, REQ-SEC-053). The gate is kept because it still answers a question of its own — the
+ * finance ledger is the mission's payout view, and membership is what it asks for. Every
+ * member-facing response still strips the nested participant PII via {@link #redactParticipantPii}
+ * (a peer's email is profile-only; audit finding H-1). Update/delete are gated on {@link
  * de.greluc.krt.profit.basetool.backend.service.MissionSecurityService#canEditFinanceEntry}.
  */
 @Slf4j
@@ -87,7 +88,7 @@ public class MissionFinanceEntryController {
   private static final int MAX_FINANCE_PAGE_SIZE = 500;
 
   private final MissionFinanceEntryService financeEntryService;
-  private final MissionGuestRedactor missionGuestRedactor;
+  private final MissionPeerRedactor missionPeerRedactor;
 
   /**
    * Paged finance entries for a mission. Sort is whitelisted; unknown fields → 400.
@@ -117,7 +118,7 @@ public class MissionFinanceEntryController {
     // that the nested participant PII is stripped for EVERY caller — including Logistician/Officer.
     // A participant's email may only ever be shown to that user themselves in their own profile, so
     // it must never travel to a peer through the finance ledger (there is no business need for a
-    // peer's contact data here). The shared MissionGuestRedactor keeps only the public name tuple.
+    // peer's contact data here). The shared MissionPeerRedactor keeps only the public name tuple.
     entries = entries.map(this::redactParticipantPii);
     return PageResponse.of(entries);
   }
@@ -155,10 +156,10 @@ public class MissionFinanceEntryController {
 
   /**
    * Creates a finance entry. Restricted to registered members and above ({@code
-   * isMemberOrAbove()}): anonymous callers AND authenticated role-less {@code GUEST} accounts are
-   * rejected with 401/403, because the finance ledger is the mission's payout view and a guest is
-   * treated like an anonymous visitor there. The response strips the nested participant PII via
-   * {@link #redactParticipantPii} so the create cannot echo a peer's email back to the creator
+   * isMemberOrAbove()}), because the finance ledger is the mission's payout view. The cohorts that
+   * used to make that gate load-bearing on their own — anonymous and role-less callers — are
+   * refused earlier now (REQ-SEC-052, REQ-SEC-053). The response strips the nested participant PII
+   * via {@link #redactParticipantPii} so the create cannot echo a peer's email back to the creator
    * (email is a profile-only field, H-1).
    *
    * <p>REQ-SEC-042: the write gate is {@code @missionSecurityService.canCreateFinanceEntry}, not
@@ -220,11 +221,11 @@ public class MissionFinanceEntryController {
    * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
    * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
    * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the nested user is stripped via {@link MissionGuestRedactor#cleanupUserForGuest}
-   * while the participant's non-sensitive fields (org units, job types, comment, times, payout
-   * preference) are kept. Mirrors {@link MissionGuestRedactor#cleanupParticipantForGuest} (which
-   * additionally forwards the guest edit token; a finance read never mints one, so it is nulled
-   * here).
+   * otherwise the nested user is stripped via {@link MissionPeerRedactor#cleanupUserForPeer} while
+   * the participant's non-sensitive fields (org units, job types, comment, times, payout
+   * preference) are kept. Mirrors {@link MissionPeerRedactor#cleanupParticipantForPeer}, which is
+   * now field-for-field the same pass: the one field that used to differ was the guest edit token,
+   * and V239 deleted the column behind it (ADR-0159).
    *
    * @param dto the finance-entry DTO straight from the service
    * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
@@ -238,7 +239,7 @@ public class MissionFinanceEntryController {
     MissionParticipantDto redacted =
         new MissionParticipantDto(
             participant.id(),
-            missionGuestRedactor.cleanupUserForGuest(participant.user()),
+            missionPeerRedactor.cleanupUserForPeer(participant.user()),
             participant.guestName(),
             participant.orgUnits(),
             participant.desiredMissionJobType(),
@@ -247,10 +248,7 @@ public class MissionFinanceEntryController {
             participant.startTime(),
             participant.endTime(),
             participant.payoutPreference(),
-            participant.version(),
-            // Finance-entry responses are reads, never a guest sign-up create — no edit token is
-            // ever minted or surfaced here (M1).
-            null);
+            participant.version());
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
   }

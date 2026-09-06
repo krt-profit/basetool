@@ -189,19 +189,19 @@ public class HangarPageController {
         parallelPageLoader.loadAsync(
             () ->
                 catalogListLoader.loadPageContent(
-                    CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, false, "ship types"));
+                    CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE_TYPE, "ship types"));
 
     CompletableFuture<List<LocationDto>> locationsFuture =
         parallelPageLoader.loadAsync(
             () ->
                 catalogListLoader.loadPageContent(
-                    CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, false, "locations"));
+                    CachedCatalog.LOCATIONS, LOCATION_PAGE_TYPE, "locations"));
 
     CompletableFuture<List<ManufacturerDto>> manufacturersFuture =
         parallelPageLoader.loadAsync(
             () ->
                 catalogListLoader.loadPageContent(
-                    CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, false, "manufacturers"));
+                    CachedCatalog.MANUFACTURERS, MANUFACTURER_PAGE_TYPE, "manufacturers"));
 
     CompletableFuture<List<LocationDto>> homeLocationsFuture =
         parallelPageLoader

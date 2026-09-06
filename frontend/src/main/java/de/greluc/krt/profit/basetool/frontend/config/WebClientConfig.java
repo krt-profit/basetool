@@ -129,8 +129,6 @@ public class WebClientConfig {
   private final UserLocaleRelayFilter userLocaleRelayFilter;
   private final de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter
       clientIpRelayFilter;
-  private final de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter
-      guestEditTokenRelayFilter;
   private final org.springframework.core.env.Environment environment;
   private final SslBundles sslBundles;
 
@@ -577,7 +575,6 @@ public class WebClientConfig {
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
-        .filter(guestEditTokenRelayFilter.relayGuestEditToken())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(
@@ -588,11 +585,26 @@ public class WebClientConfig {
   }
 
   /**
-   * Anonymous WebClient against the backend's public endpoints. Same resilience and logging chain
-   * as {@link #webClient} but without OAuth2 bearer relay.
+   * The one anonymous WebClient left, and it reaches exactly one endpoint.
+   *
+   * <p>{@code GET /api/v1/terms/document} is the Terms-of-Use wording, which the public {@code
+   * /terms} page renders (ADR-0138 / REQ-SEC-028, REQ-SEC-052). A document everyone must be able to
+   * read before agreeing to anything cannot be fetched with a token the reader does not have yet,
+   * so this call has no bearer to relay.
+   *
+   * <p><strong>Named for its one caller on purpose.</strong> Its predecessor was called {@code
+   * publicWebClient} and was handed to roughly forty call sites through an {@code isPublic} boolean
+   * — the mission list, the order queue, the catalogue pickers, the home page. Each of those was a
+   * decision to send a request without an identity, taken by passing {@code true}, and none of them
+   * needed to be. A boolean parameter is the wrong shape for "this request has no caller": {@code
+   * TermsDocumentClientUsageTest} asserts that {@code BackendApiClient} is the only class holding
+   * this bean and {@code getTermsDocumentAnonymously()} the only method reading it — which a
+   * boolean could never do.
+   *
+   * <p>Same resilience and logging chain as {@link #webClient}, without the OAuth2 bearer relay.
    */
   @Bean
-  public WebClient publicWebClient(
+  public WebClient termsDocumentClient(
       CircuitBreakerRegistry cbRegistry,
       RetryRegistry retryRegistry,
       TimeLimiterRegistry timeLimiterRegistry,
@@ -609,9 +621,6 @@ public class WebClientConfig {
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
-        // Anonymous guest path: relay the per-row guest edit token so a guest can edit/withdraw
-        // their own sign-up (security audit M1 / REQ-SEC-018).
-        .filter(guestEditTokenRelayFilter.relayGuestEditToken())
         .filter(webClientLoggingFilter.callLogging())
         .filter(
             resilienceFilter(

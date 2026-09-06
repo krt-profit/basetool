@@ -27,14 +27,60 @@
   ],
   "roles": {
     "realm": [
-      { "name": "Admin", "description": "E2E test role" },
-      { "name": "Officer", "description": "E2E test role" },
-      { "name": "Logistician", "description": "E2E test role" },
-      { "name": "Mission Manager", "description": "E2E test role" },
-      { "name": "KRT Member", "description": "E2E test role" },
-      { "name": "Guest", "description": "E2E test role" },
-      { "name": "Bank Employee", "description": "E2E test role" },
-      { "name": "Bank Management", "description": "E2E test role" }
+      {
+        "name": "Admin",
+        "description": "E2E test role"
+      },
+      {
+        "name": "Officer",
+        "description": "E2E test role"
+      },
+      {
+        "name": "Logistician",
+        "description": "E2E test role"
+      },
+      {
+        "name": "Mission Manager",
+        "description": "E2E test role"
+      },
+      {
+        "name": "KRT Member",
+        "description": "E2E test role"
+      },
+      {
+        "name": "Bank Employee",
+        "description": "E2E test role"
+      },
+      {
+        "name": "Bank Management",
+        "description": "E2E test role"
+      },
+      {
+        "name": "offline_access",
+        "description": "${role_offline-access}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "iri"
+      },
+      {
+        "name": "uma_authorization",
+        "description": "${role_uma_authorization}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "iri"
+      },
+      {
+        "name": "default-roles-iri",
+        "description": "${role_default-roles}",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "KRT Member",
+            "offline_access",
+            "uma_authorization"
+          ]
+        }
+      }
     ]
   },
   "clients": [
@@ -55,7 +101,9 @@
         "http://frontend:18081/*",
         "http://host.docker.internal:18081/*"
       ],
-      "webOrigins": ["+"],
+      "webOrigins": [
+        "+"
+      ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "+"
@@ -121,9 +169,17 @@
       "emailVerified": true,
       "email": "test-admin@example.test",
       "credentials": [
-        { "type": "password", "value": "test-admin-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-admin-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["Admin", "Officer", "KRT Member"]
+      "realmRoles": [
+        "Admin",
+        "Officer",
+        "KRT Member"
+      ]
     },
     {
       "username": "test-officer",
@@ -131,9 +187,16 @@
       "emailVerified": true,
       "email": "test-officer@example.test",
       "credentials": [
-        { "type": "password", "value": "test-officer-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-officer-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["Officer", "KRT Member"]
+      "realmRoles": [
+        "Officer",
+        "KRT Member"
+      ]
     },
     {
       "username": "test-member",
@@ -141,9 +204,15 @@
       "emailVerified": true,
       "email": "test-member@example.test",
       "credentials": [
-        { "type": "password", "value": "test-member-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-member-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-sk",
@@ -151,9 +220,15 @@
       "emailVerified": true,
       "email": "test-sk@example.test",
       "credentials": [
-        { "type": "password", "value": "test-sk-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-sk-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-none",
@@ -161,9 +236,15 @@
       "emailVerified": true,
       "email": "test-none@example.test",
       "credentials": [
-        { "type": "password", "value": "test-none-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-none-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-both",
@@ -171,9 +252,15 @@
       "emailVerified": true,
       "email": "test-both@example.test",
       "credentials": [
-        { "type": "password", "value": "test-both-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-both-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-bereich",
@@ -181,9 +268,15 @@
       "emailVerified": true,
       "email": "test-bereich@example.test",
       "credentials": [
-        { "type": "password", "value": "test-bereich-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-bereich-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-bank-employee",
@@ -191,9 +284,16 @@
       "emailVerified": true,
       "email": "test-bank-employee@example.test",
       "credentials": [
-        { "type": "password", "value": "test-bank-employee-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-bank-employee-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["Bank Employee"]
+      "realmRoles": [
+        "Bank Employee",
+        "KRT Member"
+      ]
     },
     {
       "username": "test-bank-management",
@@ -201,9 +301,16 @@
       "emailVerified": true,
       "email": "test-bank-management@example.test",
       "credentials": [
-        { "type": "password", "value": "test-bank-management-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-bank-management-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["Bank Management"]
+      "realmRoles": [
+        "Bank Management",
+        "KRT Member"
+      ]
     },
     {
       "username": "test-bank-member",
@@ -211,9 +318,16 @@
       "emailVerified": true,
       "email": "test-bank-member@example.test",
       "credentials": [
-        { "type": "password", "value": "test-bank-member-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-bank-member-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["Bank Employee", "KRT Member"]
+      "realmRoles": [
+        "Bank Employee",
+        "KRT Member"
+      ]
     },
     {
       "username": "test-appoint-bl",
@@ -221,9 +335,15 @@
       "emailVerified": true,
       "email": "test-appoint-bl@example.test",
       "credentials": [
-        { "type": "password", "value": "test-appoint-bl-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-appoint-bl-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
     },
     {
       "username": "test-appoint-tgt",
@@ -231,9 +351,37 @@
       "emailVerified": true,
       "email": "test-appoint-tgt@example.test",
       "credentials": [
-        { "type": "password", "value": "test-appoint-tgt-pw", "temporary": false }
+        {
+          "type": "password",
+          "value": "test-appoint-tgt-pw",
+          "temporary": false
+        }
       ],
-      "realmRoles": ["KRT Member"]
+      "realmRoles": [
+        "KRT Member"
+      ]
+    },
+    {
+      "username": "test-norole",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "test-norole@example.invalid",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test-norole-pw",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "clientRoles": {}
     }
-  ]
+  ],
+  "defaultRole": {
+    "name": "default-roles-iri",
+    "description": "${role_default-roles}",
+    "composite": true,
+    "clientRole": false,
+    "containerId": "iri"
+  }
 }

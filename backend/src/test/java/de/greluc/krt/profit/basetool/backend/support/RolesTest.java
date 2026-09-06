@@ -34,7 +34,6 @@ class RolesTest {
     assertEquals("ADMIN", Roles.ADMIN);
     assertEquals("OFFICER", Roles.OFFICER);
     assertEquals("KRT_MEMBER", Roles.KRT_MEMBER);
-    assertEquals("GUEST", Roles.GUEST);
     assertEquals("BANK_EMPLOYEE", Roles.BANK_EMPLOYEE);
     assertEquals("BANK_MANAGEMENT", Roles.BANK_MANAGEMENT);
     assertEquals("LOGISTICIAN", Roles.LOGISTICIAN);

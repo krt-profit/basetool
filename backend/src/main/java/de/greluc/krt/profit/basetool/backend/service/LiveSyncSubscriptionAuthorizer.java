@@ -99,7 +99,7 @@ public class LiveSyncSubscriptionAuthorizer {
   @NotNull
   private Verdict evaluate(@NotNull LiveSyncTopic topic) {
     if (!authHelperService.isMemberOrAbove()) {
-      // Every room in this registry is member-facing; a roleless guest has no business in any of
+      // Every room in this registry is member-facing; a role-less account has no business in any of
       // them, and checking it once here keeps each branch below to its own resource question.
       return Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     }

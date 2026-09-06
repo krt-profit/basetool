@@ -130,15 +130,22 @@ class MissionServiceTest {
     verify(missionRepository).findById(id);
   }
 
-  // covers REQ-MISSION-008 — an anonymous/membershipless caller keeps the unscoped public fallback
+  // covers REQ-MISSION-008 — the allowInternal=false branch of the unscoped fallback.
+  //
+  // Its caller was the anonymous/role-less tier, which ADR-0159 removed: MissionController passes
+  // `true` unconditionally now. The parameter and this repository variant are kept for API
+  // consumers that ask for the organisation-wide-only view, so the branch is pinned rather than
+  // deleted — an untested branch that nothing calls is how a wrong query survives until the day
+  // something calls it again.
   @Test
-  void getNextMission_guest_usesInternalFalseVariantThenRefetches() {
+  void getNextMission_allowInternalFalse_usesTheIsInternalFalseVariantThenRefetches() {
     UUID id = UUID.randomUUID();
     Mission head = new Mission();
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
-    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false → public.
+    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false narrows
+    // it to organisation-wide missions.
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository
@@ -357,21 +364,23 @@ class MissionServiceTest {
     List<String> status =
         List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
 
-    // M-1: searchMissions now forces {@code isInternal=false} for anonymous callers. This
-    // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
-    // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
+    // The M-1 override is gone with ADR-0159: searchMissions used to rewrite a null isInternal to
+    // FALSE for an unauthenticated caller, as defence-in-depth against a controller forgetting to
+    // pass it. There is no unauthenticated caller on this path any more, and
+    // currentScopePredicate() throws for one rather than building an empty predicate — so the
+    // filter is passed through untouched and the scope decides.
     Pageable pageable = PageRequest.of(0, 10);
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable))
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable);
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test

@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipReposit
 import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -346,8 +347,10 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void pendingRegistration_getsOnlyPendingApprovalAndNeverConsultsMembership() {
     // REQ-SEC-017: a PENDING registration is granted NO authorities except ROLE_PENDING_APPROVAL —
-    // the entire assembly is short-circuited, so membership/cascade are never consulted and
-    // ROLE_GUEST is not carried.
+    // the entire assembly is short-circuited, so membership/cascade are never consulted, and
+    // neither the deleted ROLE_GUEST nor the ROLE_NO_ROLE marker that replaced it is carried. The
+    // order matters: PENDING is answered before the role check, so a pending registration is told
+    // it is pending rather than that it holds no role.
     User pending = userWithNoRoles();
     pending.setApprovalStatus(ApprovalStatus.PENDING);
     when(userReconciliationService.syncUser(jwt)).thenReturn(ReconciledUser.of(pending));
@@ -357,6 +360,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     assertEquals(
         List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")), List.copyOf(authorities));
     assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_GUEST")));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority(Roles.NO_ROLE_MARKER)));
     verifyNoInteractions(orgUnitMembershipRepository, orgUnitCascadeService);
   }
 

@@ -85,7 +85,7 @@ don't use "tests pass" as a stand-in.
 ### Security & Data Isolation (if affected)
 
 - [ ] Read/write operations filter by JWT `sub` in the service layer, unless the caller has an elevated role (`ADMIN`, `OFFICER`, ...).
-- [ ] For guests: sensitive fields are explicitly removed in the controller layer (`cleanupForGuest`-style).
+- [ ] For a member below Logistician: sensitive fields are explicitly removed in the controller layer (`cleanup…ForPeer`-style, REQ-SEC-007).
 - [ ] No direct `SecurityContextHolder` access outside the auth-helper service (enforced via ArchUnit).
 - [ ] Frontend does not depend on Spring Data JPA and does not access the DB or Keycloak Admin API directly (ArchUnit rule).
 - [ ] No tokens, emails, or real names in logs.

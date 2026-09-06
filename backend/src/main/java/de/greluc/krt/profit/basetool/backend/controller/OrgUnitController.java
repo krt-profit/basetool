@@ -74,7 +74,7 @@ public class OrgUnitController {
    * @return picker options sorted Staffel-first then Spezialkommandos alphabetical.
    */
   @GetMapping("/active")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   @Operation(
       summary = "List every active org unit",
@@ -82,8 +82,8 @@ public class OrgUnitController {
           "Returns the full active Staffel + Spezialkommando catalog as picker options, each with"
               + " its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job"
               + " Orders are cross-staffel workspaces and the picker must offer the full active"
-              + " list, not the caller's memberships. Open to anonymous callers because the request"
-              + " form is public; the payload carries no PII.")
+              + " list, not the caller's memberships. Members only since REQ-SEC-052; it was open"
+              + " to anonymous callers while the request form was.")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Active org-unit options")})
   public List<OrgUnitMembershipOptionDto> listActiveOrgUnits() {
@@ -94,10 +94,10 @@ public class OrgUnitController {
    * Lists every active org unit of <em>all four</em> kinds (Staffel + Spezialkommando + Bereich +
    * Organisationsleitung) as picker options (epic #692 Phase 6, REQ-ORG-019). Drives the
    * bank-management account-create form, which links an {@code AREA} account to its Bereich and the
-   * {@code CARTEL} account to the Organisationsleitung. {@code isAuthenticated}: unlike the public
-   * {@link #listActiveOrgUnits()} (whose Staffel/SK-only list backs the anonymous Job-Order form),
-   * this surfaces the Bereich/OL tiers and is gated to authenticated callers — the consumer is the
-   * BANK_MANAGEMENT create form; the payload carries no PII.
+   * {@code CARTEL} account to the Organisationsleitung. Both this and {@link #listActiveOrgUnits()}
+   * are {@code isAuthenticated} now (REQ-SEC-052); what still separates them is the tier they
+   * surface — the Staffel/SK-only list backs the Job-Order form, this one adds Bereich/OL for the
+   * BANK_MANAGEMENT create form. Neither payload carries PII.
    *
    * @return active org-unit options across all four kinds, grouped by tier.
    */

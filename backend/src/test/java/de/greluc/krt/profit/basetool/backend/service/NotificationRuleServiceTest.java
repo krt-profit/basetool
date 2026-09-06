@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -33,11 +34,13 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.OrgRelativeRole;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.SelectorKind;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,6 +50,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -66,6 +70,12 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 class NotificationRuleServiceTest {
 
   @Mock private NotificationRuleRepository notificationRuleRepository;
+
+  // REQ-SEC-053: a ROLE selector's code is validated against the catalogue now, so the service
+  // reads the role table. The admin screen used to offer GUEST, and a rule pointed at a role that
+  // does not exist addresses nobody for ever without ever saying so.
+  @Mock private RoleRepository roleRepository;
+
   @Mock private NotificationRuleMapper notificationRuleMapper;
   @InjectMocks private NotificationRuleService notificationRuleService;
 
@@ -83,6 +93,13 @@ class NotificationRuleServiceTest {
 
   private static NotificationRuleSelectorWriteRequest roleSelector(String roleCode) {
     return new NotificationRuleSelectorWriteRequest(SelectorKind.ROLE, null, roleCode, null, null);
+  }
+
+  /** Makes {@code roleCode} resolve to a catalogue row, so the REQ-SEC-053 check passes. */
+  private void catalogueKnows(String roleCode) {
+    Role role = new Role();
+    role.setCode(roleCode);
+    when(roleRepository.findByCodeIgnoreCase(roleCode)).thenReturn(Optional.of(role));
   }
 
   private static NotificationRule ruleWithVersion(UUID id, Long version) {
@@ -124,6 +141,7 @@ class NotificationRuleServiceTest {
     when(notificationRuleRepository.saveAndFlush(persisted)).thenReturn(persisted);
     NotificationRuleDto dto = dtoFor(persisted);
     when(notificationRuleMapper.toDto(persisted)).thenReturn(dto);
+    catalogueKnows("ADMIN");
 
     NotificationRuleDto result =
         notificationRuleService.update(id, writeRequest(2L, roleSelector("ADMIN")));
@@ -148,6 +166,7 @@ class NotificationRuleServiceTest {
     when(notificationRuleRepository.saveAndFlush(persisted)).thenReturn(persisted);
     NotificationRuleDto dto = dtoFor(persisted);
     when(notificationRuleMapper.toDto(persisted)).thenReturn(dto);
+    catalogueKnows("ADMIN");
 
     // A non-null client version must NOT trip a 409 when the persisted version is absent.
     NotificationRuleDto result =
@@ -217,12 +236,50 @@ class NotificationRuleServiceTest {
     when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
     NotificationRuleDto dto = dtoFor(saved);
     when(notificationRuleMapper.toDto(saved)).thenReturn(dto);
+    catalogueKnows("ADMIN");
 
     NotificationRuleDto result =
         notificationRuleService.create(writeRequest(null, roleSelector("ADMIN")));
 
     assertThat(result).isSameAs(dto);
     verify(notificationRuleRepository).saveAndFlush(any(NotificationRule.class));
+  }
+
+  @Test
+  void aDifferentlyCasedRoleCodeIsAcceptedAndStoredCanonically() {
+    // The recipient query is the case-sensitive `r.code = :roleCode`, so the two sides have to
+    // agree: refusing `admin` rejects a role that exists, and storing `admin` produces a rule that
+    // validates, saves, displays - and matches nobody, for ever, without saying so.
+    Role role = new Role();
+    role.setCode("ADMIN");
+    when(roleRepository.findByCodeIgnoreCase("admin")).thenReturn(Optional.of(role));
+    NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
+    when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
+    when(notificationRuleMapper.toDto(saved)).thenReturn(dtoFor(saved));
+
+    notificationRuleService.create(writeRequest(null, roleSelector("admin")));
+
+    ArgumentCaptor<NotificationRule> persisted = ArgumentCaptor.forClass(NotificationRule.class);
+    verify(notificationRuleRepository).saveAndFlush(persisted.capture());
+    assertThat(persisted.getValue().getSelectors())
+        .as("stored in the catalogue's casing, not the caller's")
+        .allSatisfy(selector -> assertThat(selector.getRoleCode()).isEqualTo("ADMIN"));
+  }
+
+  @Test
+  void createWithUnknownRoleCodeIsRejected() {
+    // REQ-SEC-053: the admin screen offered GUEST until V239 deleted it. A rule addressed at a
+    // role the catalogue does not have would have been saved happily and then matched nobody, for
+    // ever — a notification silently not sent is the hardest kind of defect to notice.
+    when(roleRepository.findByCodeIgnoreCase("GUEST")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> notificationRuleService.create(writeRequest(null, roleSelector("GUEST"))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("unknown roleCode")
+        .hasMessageContaining("GUEST");
+
+    verify(notificationRuleRepository, never()).saveAndFlush(any(NotificationRule.class));
   }
 
   /**

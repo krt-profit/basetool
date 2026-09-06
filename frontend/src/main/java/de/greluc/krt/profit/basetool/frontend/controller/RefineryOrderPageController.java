@@ -837,7 +837,7 @@ public class RefineryOrderPageController {
   private List<MaterialDto> fetchMaterials() {
     try {
       PageResponse<MaterialDto> p =
-          backendApiClient.getCached(CachedCatalog.MATERIALS, MATERIAL_PAGE, true);
+          backendApiClient.getCached(CachedCatalog.MATERIALS, MATERIAL_PAGE);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }
@@ -850,7 +850,7 @@ public class RefineryOrderPageController {
   private List<RefiningMethodDto> fetchMethods() {
     try {
       PageResponse<RefiningMethodDto> p =
-          backendApiClient.getCached(CachedCatalog.REFINING_METHODS, REFINING_METHOD_PAGE, true);
+          backendApiClient.getCached(CachedCatalog.REFINING_METHODS, REFINING_METHOD_PAGE);
       if (p != null && p.content() != null) {
         return new ArrayList<>(p.content());
       }

@@ -67,7 +67,7 @@ class JobTypeTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
   private User adminUser;
 
   @BeforeEach
@@ -79,10 +79,10 @@ class JobTypeTest {
     officerUser.setUsername("officerJob");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestJob");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestJob");
+    userRepository.save(roleLessUser);
 
     adminUser = new User();
     adminUser.setId(UUID.randomUUID());
@@ -116,7 +116,7 @@ class JobTypeTest {
   }
 
   @Test
-  void testCreateJobType_Guest_Forbidden() throws Exception {
+  void testCreateJobType_RoleLess_Forbidden() throws Exception {
     JobTypeDto jobType =
         new JobTypeDto(
             null, "Hacker", null, JobTypeArchetype.MISSION, null, true, false, false, null);
@@ -126,8 +126,8 @@ class JobTypeTest {
             post("/api/v1/job-types")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(jobType)))
         .andExpect(status().isForbidden());

@@ -565,8 +565,8 @@ Binding details:
 
 **Acceptance**
 
-- [x] An anonymous `GET /` renders the Made-By-The-Community artwork, the §2b trademark notice and
-  the clause-2(g) notice.
+- [x] An anonymous `GET /` — the landing page, the one page REQ-SEC-052 leaves public — renders the
+  Made-By-The-Community artwork, the §2b trademark notice and the clause-2(g) notice.
 - [x] `fankit.trademark` and `fankit.disclaimer` are byte-identical in the DE, EN and default
   bundles.
 - [x] The two notices keep their **differing** ® spacing, and 2(g) keeps `Ltd..`.

@@ -438,6 +438,35 @@ groups:
           summary: "Pending-approval 403 spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is 403-blocking pending-approval users at an elevated rate — likely an authorities-converter or approval-sync regression leaving legitimate users with only ROLE_PENDING_APPROVAL, not just the occasional genuinely-pending account."
 
+      # (REQ-SEC-053) The sibling of the alert above, on the state ADR-0159 introduced: an approved
+      # account whose realm roles map to no application role is refused 403 NO_ROLE by the same
+      # filter, and the same counter records it.
+      #
+      # This one carries more weight than its twin. A pending account is a person waiting; a
+      # role-less one is a person who has ALREADY been approved and is being turned away — and the
+      # way that happens at scale is the roster sync, which reads the realm's roles nightly. A run
+      # that resolved nothing used to demote everyone onto the authority-less GUEST role, silently;
+      # now it locks them out, loudly, and this is the line that says so. The sync itself refuses to
+      # write such a run, so a spike here means something else: a realm role renamed, a member
+      # stripped by hand, or an integration sending tokens from the wrong realm.
+      # baseline-tune: same 0.2/s as its twin — a genuinely role-less account is rare, and a real
+      # one produces a handful of 403s while its owner reads the page and gives up.
+      # Counted in SUBJECTS, not requests. The request rate this used to read
+      # (rate(basetool_http_error_total{code="NO_ROLE"})) answers a distinct-subject question and
+      # fails in both directions: one member's tab polling in the background sustains it on its
+      # own, while a realm-side role rename at 03:00 -- the event this alert exists for -- locks
+      # the whole membership out at a moment when nobody is making requests, so the rate stays
+      # near zero until morning. max(), never sum(): the gauge is per process, and a subject
+      # refused on two instances would otherwise count twice.
+      - alert: NoRoleBlockSpike
+        expr: max by (application) (basetool_norole_refused_subjects) > 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Several accounts hold no role ({{ $labels.application }})"
+          description: "{{ $labels.application }} refused {{ $value }} distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a realm-side role rename, a hand-edit, or tokens arriving from the wrong realm; check the Keycloak role index line in the sync summary."
+
       - alert: RateLimitRejectionSpike
         expr: sum by (application) (rate(basetool_ratelimit_rejections_total[5m])) > 1
         for: 10m

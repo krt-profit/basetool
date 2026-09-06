@@ -57,6 +57,9 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
       "management.opentelemetry.enabled=true",
       "management.tracing.export.otlp.enabled=false"
     })
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 class MonitoringTracingEnabledTest {
 
   /** Registers the in-memory exporter Boot wires into the tracer provider instead of OTLP. */

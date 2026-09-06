@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter;
-import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.UserLocaleRelayFilter;
 import de.greluc.krt.profit.basetool.frontend.logging.WebClientLoggingFilter;
 import io.micrometer.observation.ObservationRegistry;
@@ -96,7 +95,6 @@ class WebClientConfigSseRelayTest {
             squadron,
             locale,
             new ClientIpRelayFilter(),
-            mock(GuestEditTokenRelayFilter.class),
             environment,
             mock(SslBundles.class),
             ObservationRegistry.NOOP);

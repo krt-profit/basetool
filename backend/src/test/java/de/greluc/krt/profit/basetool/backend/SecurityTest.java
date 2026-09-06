@@ -81,8 +81,11 @@ class SecurityTest {
 
   @Test
   void testSecurityHeaders() throws Exception {
+    // Rides /v3/api-docs because it is a plain GET with a body; the path is admin-gated since
+    // REQ-SEC-052, and the headers under test are set by the filter chain for every response.
     mockMvc
-        .perform(get("/v3/api-docs"))
+        .perform(
+            get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().exists("Content-Security-Policy"));
@@ -100,7 +103,8 @@ class SecurityTest {
   @Test
   void contentSecurityPolicyIsLockedDownForJsonOnlyBackend() throws Exception {
     mockMvc
-        .perform(get("/v3/api-docs"))
+        .perform(
+            get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
         .andExpect(
             header()
@@ -112,13 +116,28 @@ class SecurityTest {
 
   @Test
   void testRateLimiting() throws Exception {
-    // First request should pass
-    mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+    // First request should pass. Admin-gated since REQ-SEC-052: the document enumerates every
+    // path, parameter and DTO field the API has, which is the most efficient description of the
+    // attack surface the project can produce.
+    mockMvc
+        .perform(
+            get("/v3/api-docs")
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.jwt()
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  /** The OpenAPI document is not part of the public surface (REQ-SEC-052). */
+  @Test
+  void openApiDocumentIsNotAnonymouslyReachable() throws Exception {
+    mockMvc.perform(get("/v3/api-docs")).andExpect(status().isUnauthorized());
   }
 
   @Test
   void testAnonymousAccessToMissions() throws Exception {
-    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -136,7 +155,8 @@ class SecurityTest {
                 .with(
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
-                        .jwt(jwt)))
+                        .jwt(jwt)
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk());
   }
 
@@ -145,9 +165,11 @@ class SecurityTest {
    * used to fall into the catalog {@code permitAll} through {@code /api/v1/materials/**} — the
    * cheapest amplification lever an unauthenticated caller had. Its only consumer is an
    * {@code @PreAuthorize("isAuthenticated()")} page controller, so requiring a token costs nothing
-   * (A6, REQ-SEC-032). Ordering is what makes this work, and what a future edit could quietly undo:
-   * Spring Security takes the first matching rule, so moving this below the catalog block would
-   * re-open the surface with no other symptom.
+   * (A6, REQ-SEC-032).
+   *
+   * <p>Kept after REQ-SEC-052 closed the whole catalogue, which makes the explicit carve-out
+   * redundant — and that is exactly why the assertion stays: the rule it pinned is gone from {@code
+   * SecurityConfig}, so nothing but this test now says the path must not answer anonymously.
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachable() throws Exception {
@@ -173,12 +195,13 @@ class SecurityTest {
   /**
    * The same two paths, asked for with {@code HEAD}.
    *
-   * <p>The carve-out above used to be registered with {@code HttpMethod.GET}, and Spring Security
-   * compares the verb with {@code String.equals} - so a {@code HEAD} missed it and fell through to
-   * the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers {@code HEAD} from
-   * the {@code @GetMapping} handler, so the query ran anonymously and the {@code Content-Length}
-   * came back. The rule is now verb-agnostic; these two pin that, because a method-scoped rewrite
-   * would look like a harmless tightening and re-open exactly this.
+   * <p>The carve-out that used to sit above was registered with {@code HttpMethod.GET}, and Spring
+   * Security compares the verb with {@code String.equals} - so a {@code HEAD} missed it and fell
+   * through to the all-verb catalogue {@code permitAll} underneath. Spring MVC then answers {@code
+   * HEAD} from the {@code @GetMapping} handler, so the query ran anonymously and the {@code
+   * Content-Length} came back. The lesson outlived the rule: the two remaining anonymous reads are
+   * {@code GET}-scoped on purpose, and {@code AnonymousSurfaceSweepTest} asks {@code HEAD} of every
+   * {@code GET} mapping for exactly this reason.
    */
   @Test
   void materialsMatrixIsNotAnonymouslyReachableWithHead() throws Exception {
@@ -192,82 +215,33 @@ class SecurityTest {
         .andExpect(status().isUnauthorized());
   }
 
-  @Test
-  void theRestOfTheMaterialCatalogStaysAnonymous() throws Exception {
-    // The carve-out must be surgical: the anonymous order form's material picker still needs the
-    // ordinary catalog list, so a too-broad matcher would break the guest flow instead.
-    mockMvc.perform(get("/api/v1/materials")).andExpect(status().isOk());
-  }
-
   /**
-   * The anonymous page-size ceiling (A6, REQ-SEC-032).
+   * The rest of the material catalogue is not anonymous either (REQ-SEC-052).
    *
-   * <p>{@code PaginationUtil} clamps at 100 000, which is right for the authenticated consumers
-   * that page-walk large catalogues and far too generous for a surface anyone can reach. The
-   * refusal is deliberate rather than a silent clamp: reducing the size quietly is the defect
-   * ADR-0104 forbids, because a caller built on "one big page" would then present an incomplete
-   * list as complete.
+   * <p>This test used to assert the opposite, and its comment gave the reason: "the anonymous order
+   * form's material picker still needs the ordinary catalog list". That form went with ADR-0149 and
+   * the picker now rides a member's bearer, so the carve-out no longer has to be surgical — the
+   * whole family requires a login.
    */
   @Test
-  void anonymousPageSizeAboveTheCeilingIsRefusedRatherThanTruncated() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/materials").param("size", "50000"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("PAGE_SIZE_TOO_LARGE"));
+  void theRestOfTheMaterialCatalogIsNotAnonymousEither() throws Exception {
+    mockMvc.perform(get("/api/v1/materials")).andExpect(status().isUnauthorized());
   }
 
-  /**
-   * The ceiling must be bypass-proof in every spelling Spring's binder accepts, not just the
-   * decimal one.
-   *
-   * <p>The filter used to parse with {@code Integer.parseInt} and treat "unparseable" as "allowed".
-   * Spring binds through {@code NumberUtils#parseNumber}, which strips all whitespace and honours
-   * {@code 0x} / {@code 0X} / {@code #} - so each of these threw in the filter, was waved through,
-   * and bound to a number two orders of magnitude above the ceiling.
-   */
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(
-      strings = {"0x186A0", "0X186A0", "#186A0", "100 000", " 50000 "})
-  void anonymousPageSizeCeilingCannotBeBypassedByAlternativeSpellings(String size)
-      throws Exception {
-    mockMvc
-        .perform(get("/api/v1/materials").param("size", size))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("PAGE_SIZE_TOO_LARGE"));
-  }
-
-  /** An empty {@code size=} binds to null and must stay a legal way to ask for the default page. */
-  @Test
-  void anonymousEmptyPageSizeIsNotRefused() throws Exception {
-    mockMvc.perform(get("/api/v1/materials").param("size", "")).andExpect(status().isOk());
-  }
-
-  @Test
-  void anonymousPageSizeAtTheCeilingStillWorks() throws Exception {
-    // 1000 is what every anonymous caller in the codebase already asks for — the guest order form's
-    // pickers and the catalogue page-walks — so the ceiling must not start rejecting them.
-    mockMvc.perform(get("/api/v1/materials").param("size", "1000")).andExpect(status().isOk());
-  }
-
-  @Test
-  void anAuthenticatedCallerIsNotSubjectToTheAnonymousCeiling() throws Exception {
-    // The large page-walks are authenticated and must keep their 100 000 clamp.
-    mockMvc
-        .perform(
-            get("/api/v1/materials")
-                .param("size", "50000")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-        .andExpect(status().isOk());
-  }
+  // The anonymous page-size ceiling (A6, REQ-SEC-032) and its six cases stood here. The filter
+  // and the ceiling are gone with ADR-0159: it bounded what an unauthenticated caller could ask a
+  // paginated endpoint for, and no paginated endpoint answers one any more. The two reads that do
+  // are unpaginated. The per-subject limiter that used to be anchored behind the filter now hangs
+  // off TermsAcceptanceAccessFilter, pinned by SecurityFilterChainOrderTest.
 
   @Test
   void testAnonymousAccessToLocations() throws Exception {
-    mockMvc.perform(get("/api/v1/locations")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/locations")).andExpect(status().isUnauthorized());
   }
 
   @Test
   void testAnonymousAccessToJobTypes() throws Exception {
-    mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -286,7 +260,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isOk());
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -298,7 +277,9 @@ class SecurityTest {
             .claim("preferred_username", "testuser")
             .build();
 
-    // This should now succeed and not log ERROR (only log WARN)
+    // Reaches a handler no longer: a token that resolves to no application role is refused with
+    // 403 NO_ROLE (REQ-SEC-053) before dispatch. It used to answer 200 because /api/v1/missions was
+    // permitAll and the odd sub only produced a WARN.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -306,7 +287,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isOk());
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -319,7 +305,8 @@ class SecurityTest {
             .claim("foo", "bar")
             .build();
 
-    // This should log ERROR but still return 200 for permitAll
+    // Logs ERROR as before, and is then refused with 403 NO_ROLE (REQ-SEC-053) — it used to
+    // answer 200 because /api/v1/missions was permitAll.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -327,7 +314,12 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        .andExpect(status().isOk());
+        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
+        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
+        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
+        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
+        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
+        .andExpect(status().isForbidden());
   }
 
   /**

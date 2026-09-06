@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 /**
  * Mockito unit tests for the org-tenancy scope-resolution behaviour of {@link RequestScopeResolver}
@@ -87,6 +89,46 @@ class RequestScopeResolverScopeTest {
     m.setId(new OrgUnitMembershipId(userId, orgUnitId));
     m.setKind(kind);
     return m;
+  }
+
+  /**
+   * REQ-SEC-052 / ADR-0159: a scope question asked by a caller with no identity has no honest
+   * answer, so {@code currentScopePredicate()} refuses it instead of inventing one.
+   */
+  @Nested
+  class UnauthenticatedCallerTests {
+
+    @Test
+    void currentScopePredicate_unauthenticatedCaller_throwsRatherThanScopingToNothing() {
+      // It used to return the all-empty predicate, which the repository fragments read as "no rows
+      // except the organisation-wide escape" — a plausible answer, and the reason an endpoint that
+      // lost its gate would have looked like it was working. Since ADR-0159 nothing anonymous
+      // reaches a scoped read, so an empty predicate could only come from a forgotten gate.
+      when(authHelper.isAuthenticated()).thenReturn(false);
+
+      // The TYPE is part of the contract, not an implementation detail. An IllegalStateException
+      // — which this used to throw — is mapped by GlobalExceptionHandler to a 400 that echoes the
+      // message, so a lost gate would have answered the caller "reaching this means an endpoint
+      // lost its gate" under a status blaming their request. A Spring Security exception lands on
+      // the 401 UNAUTHENTICATED path: generic body, DEBUG log, no stack trace, no 5xx alert.
+      // (That it IS an AuthenticationException is the type hierarchy's job, not this test's -
+      // asserting it here is a tautology CodeQL rightly flags.)
+      AuthenticationCredentialsNotFoundException thrown =
+          assertThrows(
+              AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
+
+      assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
+    }
+
+    @Test
+    void currentScopePredicate_authenticatedCaller_stillAnswers() {
+      // The counterpart, so the case above cannot pass because the method throws for everyone.
+      when(authHelper.isAuthenticated()).thenReturn(true);
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
+
+      assertTrue(resolver.currentScopePredicate().adminAllScope());
+    }
   }
 
   @Nested

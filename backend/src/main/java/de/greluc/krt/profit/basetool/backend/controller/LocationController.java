@@ -53,11 +53,16 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface for the location reference table. Public endpoint set; mutations are OFFICER/ADMIN.
  * Provides a lightweight {@code /lookup} projection for typeaheads and a dedicated {@code
  * /refineries} list used by the refinery-order create form.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/locations")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class LocationController {
 
   private final LocationService locationService;

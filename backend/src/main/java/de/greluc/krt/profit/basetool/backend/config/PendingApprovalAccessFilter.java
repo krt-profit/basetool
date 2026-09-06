@@ -22,12 +22,15 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +43,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.server.PathContainer;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.pattern.PathPattern;
@@ -47,16 +51,26 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Backend enforcement of "a PENDING/REJECTED registration has no access" (REQ-SEC-017).
+ * Backend enforcement of the two states that authenticate but do not admit: a PENDING/REJECTED
+ * registration (REQ-SEC-017) and an approved account holding no application role (REQ-SEC-053).
  *
- * <p>{@link CustomJwtGrantedAuthoritiesConverter} already short-circuits a non-approved user to the
- * single authority {@code ROLE_PENDING_APPROVAL}, but such a user is still <em>authenticated</em> —
- * so the many writes gated only on {@code @PreAuthorize("isAuthenticated()")} (e.g. personal-
- * inventory create/delete) would otherwise be reachable by a pending user calling the API directly,
- * bypassing the frontend's waiting-page redirect (which is UX, not the access boundary). This
- * filter closes that gap: any authenticated caller whose sole authority is the pending marker is
- * refused with {@code 403} on every {@code /api/**} endpoint, with one deliberate exception — the
- * registration-status endpoint the frontend reads to route them to the waiting page.
+ * <p>{@link CustomJwtGrantedAuthoritiesConverter} already short-circuits both to a single marker
+ * authority — {@code ROLE_PENDING_APPROVAL} or {@code ROLE_NO_ROLE} — but such a caller is still
+ * <em>authenticated</em>, so the many writes gated only on
+ * {@code @PreAuthorize("isAuthenticated()")} (e.g. personal-inventory create/delete) would
+ * otherwise be reachable by calling the API directly, bypassing the frontend's waiting-page
+ * redirect (which is UX, not the access boundary). This filter closes that gap: an authenticated
+ * caller carrying either marker is refused with {@code 403} on every {@code /api/**} endpoint, with
+ * three deliberate exceptions — the registration-status endpoint the frontend reads to route them
+ * to the waiting page, and the two reads REQ-SEC-052 serves without any token at all.
+ *
+ * <p><strong>The two refusals carry different codes and different words, on purpose.</strong> Until
+ * ADR-0159 a role-less account was mapped onto the authority-less {@code GUEST} role and simply
+ * used the anonymous surface; with that surface gone it needed a state of its own rather than an
+ * empty authority set that passes every {@code isAuthenticated()} gate and fails only the ones
+ * naming a role. Answering it with {@code PENDING_APPROVAL} would have been worse than generic: it
+ * tells a member who has already been approved to wait for an approval, which is a wait with no
+ * end.
  *
  * <p>Runs after {@link ActingMemberFilter}, which itself sits after the bearer-token authentication
  * filter — so the authorities are already assembled, and an ingest-gateway request has already had
@@ -92,8 +106,30 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   /** The synthetic authority a PENDING/REJECTED user carries (and nothing else). */
   static final String PENDING_AUTHORITY = "ROLE_PENDING_APPROVAL";
 
+  /**
+   * The synthetic authority an approved account with no application role carries (REQ-SEC-053).
+   *
+   * <p>Assembled in {@code CustomJwtGrantedAuthoritiesConverter#assembleFor}, so it reaches this
+   * filter from the JWT path and from the ingest gateway's acting-member path alike. A marker, not
+   * a permission: nothing grants on it, and this filter is the only thing that reads it.
+   */
+  static final String NO_ROLE_AUTHORITY = Roles.NO_ROLE_MARKER;
+
   /** The only {@code /api} endpoint a pending user may reach (drives the waiting-page routing). */
   static final String SELF_STATUS_PATH = "/api/v1/users/me/registration-status";
+
+  /**
+   * The two reads that answer without any token at all (REQ-SEC-052).
+   *
+   * <p>They are exempt here for the same reason they are {@code permitAll} in the matrix: an app
+   * too old to log in must still learn that it is too old, and a document everyone must be able to
+   * read before agreeing to anything cannot require having agreed. The Android app attaches its
+   * bearer to <em>every</em> call once a session exists (D2/D3 of ADR-0159), so without this
+   * exemption a pending or role-less member would be refused the version policy and the terms text
+   * purely because they happened to be signed in — the one caller group most likely to need both.
+   */
+  static final List<String> ANONYMOUS_READ_PATHS =
+      List.of("/api/v1/app/version-policy", "/api/v1/terms/document");
 
   /** Parses the two patterns below once; matching is per request and allocation-light. */
   private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;
@@ -129,8 +165,15 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    */
   private static final PathPattern SELF_STATUS_PATTERN = PATH_PARSER.parse(SELF_STATUS_PATH);
 
+  /** {@link #ANONYMOUS_READ_PATHS} parsed once, matched on the same decoded path as the scope. */
+  private static final List<PathPattern> ANONYMOUS_READ_PATTERNS =
+      ANONYMOUS_READ_PATHS.stream().map(PATH_PARSER::parse).toList();
+
   /** Stable machine-readable code the frontend maps to the waiting-page routing. */
   static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
+
+  /** Stable machine-readable code for the role-less refusal (REQ-SEC-053). */
+  static final String CODE_NO_ROLE = "NO_ROLE";
 
   /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
@@ -149,43 +192,126 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
 
+  /**
+   * Distinct subjects refused with {@code NO_ROLE} in a rolling window, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}. The refusal rate cannot answer the question the alert
+   * asks - see that constant.
+   */
+  private final RefusedSubjectWindow noRoleRefusedSubjects;
+
   @Override
   protected void doFilterInternal(
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    if (isBlockedPendingApiCall(request)) {
-      writeForbidden(request, response);
+    Refusal refusal = refusalFor(request);
+    if (refusal != null) {
+      if (NO_ROLE_REFUSAL.equals(refusal)) {
+        // As a SUBJECT, not as a request: one member's background polling and a realm-wide lockout
+        // produce very different subject counts and indistinguishable request rates.
+        AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
+            .map(PendingApprovalAccessFilter::toUuidOrNull)
+            .ifPresent(noRoleRefusedSubjects::record);
+      }
+      writeForbidden(request, response, refusal);
       return;
     }
     filterChain.doFilter(request, response);
   }
 
   /**
-   * Decides whether this request must be refused: an {@code /api} call — other than the self-status
-   * exemption — made by an authenticated caller carrying the pending marker.
+   * One of the two states this filter refuses, with the wording and the code that belong to it.
+   *
+   * <p>Named rather than expressed as a boolean pair because the two are answered on the same
+   * status with different instructions: a pending member is waiting for a decision that has been
+   * asked for, a role-less one has already been approved and is waiting for a role nobody has been
+   * asked to grant. Telling the second to wait for approval points them at an administrator who has
+   * already acted.
+   *
+   * @param code the stable machine-readable code on the problem body
+   * @param titleKey message key for the localized title
+   * @param detailKey message key for the localized detail
+   * @param defaultDetail fallback detail when no bundle carries the key
+   * @param type the problem type suffix
+   * @param logSubject how the DEBUG line names the refused caller
+   */
+  private record Refusal(
+      String code,
+      String titleKey,
+      String detailKey,
+      String defaultDetail,
+      String type,
+      String logSubject) {}
+
+  /** The pending/rejected refusal (REQ-SEC-017). */
+  private static final Refusal PENDING_REFUSAL =
+      new Refusal(
+          CODE_PENDING_APPROVAL,
+          "problem.pending_approval.title",
+          "problem.pending_approval.detail",
+          "Account is pending admin approval.",
+          "pending-approval",
+          "Pending-approval user");
+
+  /** The role-less refusal (REQ-SEC-053). */
+  private static final Refusal NO_ROLE_REFUSAL =
+      new Refusal(
+          CODE_NO_ROLE,
+          "problem.no_role.title",
+          "problem.no_role.detail",
+          "Account holds no role. An administrator has to assign one.",
+          "no-role",
+          "Role-less user");
+
+  /**
+   * Decides whether this request must be refused, and on which of the two grounds.
+   *
+   * <p>An {@code /api} call — other than the self-status exemption and the two anonymous reads —
+   * made by an authenticated caller carrying one of the two markers. The pending marker wins when
+   * both are somehow present: it is the state the member can act on.
    *
    * <p>The path is parsed into a {@link PathContainer} and matched against {@link #API_SCOPE} /
    * {@link #SELF_STATUS_PATTERN} rather than string-compared, so the gate sees the same decoded
    * path the dispatcher will route on (see {@link #API_SCOPE}).
    *
    * @param request the current request
-   * @return {@code true} when the request must be answered with the 403, {@code false} when it may
-   *     proceed down the chain
+   * @return the refusal to write, or {@code null} when the request may proceed down the chain
    */
-  private boolean isBlockedPendingApiCall(HttpServletRequest request) {
+  private Refusal refusalFor(HttpServletRequest request) {
     PathContainer path =
         PathContainer.parsePath(
             request.getRequestURI().substring(request.getContextPath().length()));
-    if (!API_SCOPE.matches(path) || SELF_STATUS_PATTERN.matches(path)) {
-      return false;
+    if (!API_SCOPE.matches(path)
+        || SELF_STATUS_PATTERN.matches(path)
+        || ANONYMOUS_READ_PATTERNS.stream().anyMatch(pattern -> pattern.matches(path))) {
+      return null;
     }
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    return auth != null
-        && auth.isAuthenticated()
-        && auth.getAuthorities().stream()
-            .anyMatch(authority -> PENDING_AUTHORITY.equals(authority.getAuthority()));
+    if (auth == null || !auth.isAuthenticated()) {
+      return null;
+    }
+    // Two short-circuiting scans rather than materialising the whole authority collection into a
+    // HashSet on every authenticated /api request: both markers are exclusive and neither is
+    // common, so the set was allocated in full to answer two questions that stop at the first hit.
+    if (hasAuthority(auth, PENDING_AUTHORITY)) {
+      return PENDING_REFUSAL;
+    }
+    return hasAuthority(auth, NO_ROLE_AUTHORITY) ? NO_ROLE_REFUSAL : null;
+  }
+
+  /**
+   * Whether the caller carries a given authority, without building an intermediate collection.
+   *
+   * @param authentication the current authentication; never {@code null}
+   * @param authority the authority name to look for
+   * @return {@code true} as soon as one of the caller's authorities matches
+   */
+  private static boolean hasAuthority(
+      @NotNull Authentication authentication, @NotNull String authority) {
+    return authentication.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .anyMatch(authority::equals);
   }
 
   /**
@@ -204,15 +330,32 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @param response the response to write the problem body into
    * @throws IOException if serialization or writing the body fails
    */
-  private void writeForbidden(HttpServletRequest request, HttpServletResponse response)
+  private void writeForbidden(
+      HttpServletRequest request, HttpServletResponse response, Refusal refusal)
       throws IOException {
     boolean userIdOwned = stampAuthenticatedSub();
     try {
-      writeForbiddenBody(request, response);
+      writeForbiddenBody(request, response, refusal);
     } finally {
       if (userIdOwned) {
         MDC.remove(MDC_USER_ID);
       }
+    }
+  }
+
+  /**
+   * Parses a subject string into a {@link UUID}, or {@code null} when it is not one.
+   *
+   * @param subject the authenticated subject, as {@code AuthenticatedSubject} reports it
+   * @return the parsed id, or {@code null} for a subject that is not a UUID (a service account, or
+   *     a realm that does not mint UUID subjects) - such a caller simply does not enter the window
+   */
+  @org.jetbrains.annotations.Nullable
+  private static UUID toUuidOrNull(String subject) {
+    try {
+      return UUID.fromString(subject);
+    } catch (IllegalArgumentException notAnId) {
+      return null;
     }
   }
 
@@ -260,22 +403,22 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @param response the response to write the problem body into
    * @throws IOException if serialization or writing the body fails
    */
-  private void writeForbiddenBody(HttpServletRequest request, HttpServletResponse response)
+  private void writeForbiddenBody(
+      HttpServletRequest request, HttpServletResponse response, Refusal refusal)
       throws IOException {
     String correlationId = UUID.randomUUID().toString();
     Locale locale = request.getLocale();
-    final String title =
-        messageSource.getMessage("problem.pending_approval.title", null, "Forbidden", locale);
+    final String title = messageSource.getMessage(refusal.titleKey(), null, "Forbidden", locale);
     final String detail =
-        messageSource.getMessage(
-            "problem.pending_approval.detail", null, "Account is pending admin approval.", locale);
+        messageSource.getMessage(refusal.detailKey(), null, refusal.defaultDetail(), locale);
 
     // Logged at DEBUG, not WARN: a pending user's shell polls several endpoints on every page load,
     // so an approved-status-pending session emits a steady stream of these 403s — an expected,
     // self-inflicted condition, not an operational warning. The metric below (not this line) is the
     // monitoring signal, so dropping to DEBUG does not blind the mass-403 detector.
     log.debug(
-        "Pending-approval user blocked on {} {} [correlationId={}]",
+        "{} blocked on {} {} [correlationId={}]",
+        refusal.logSubject(),
         request.getMethod(),
         request.getRequestURI(),
         correlationId);
@@ -286,9 +429,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     // here (mirroring IdentityProviderUnavailableFilter) so a converter / approval-sync regression
     // that mass-403s legitimate users surfaces on PendingApprovalBlockSpike, not in the log (which
     // is now DEBUG for this expected condition).
-    meterRegistry
-        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_PENDING_APPROVAL)
-        .increment();
+    meterRegistry.counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, refusal.code()).increment();
 
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
@@ -301,8 +442,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
             title,
             detail,
             request.getRequestURI(),
-            "pending-approval",
-            CODE_PENDING_APPROVAL,
+            refusal.type(),
+            refusal.code(),
             correlationId);
     response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }

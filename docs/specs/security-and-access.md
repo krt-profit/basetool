@@ -129,10 +129,13 @@ The following must always hold and are enforced as ArchUnit rules in
 
 ### REQ-SEC-004 — Roles & hierarchy
 
-Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`, `GUEST`.
+Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,
+which the matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159): there is no role
+below member, and a token that maps to none of these is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`,
-`OFFICER > MISSION_MANAGER`. The full matrix is authoritative in
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
+`OFFICER > MISSION_MANAGER` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
+why a mission manager is inside the peer-redaction tier (REQ-SEC-007). The full matrix is
+authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 
 ### REQ-SEC-005 — Contextual LOGISTICIAN / MISSION_MANAGER grants
 
@@ -201,103 +204,71 @@ recomputed.
 Every read/write filters by JWT `sub` unless the caller has an elevated role (`ADMIN`,
 `OFFICER`, …). **Enforce this in the service layer, not the controller.**
 
-### REQ-SEC-007 — Guest minimisation & field redaction
+### REQ-SEC-007 — Peer minimisation & field redaction
 
-For unauthenticated guests, return only the minimum required data. Sensitive fields
-(email, real name, internal orders/items) MUST be explicitly cleared in the controller via
-a `cleanup…ForGuest`-style helper to prevent information disclosure. (E-mail is shown only in
-a user's own profile — never elsewhere.) Mission reads have **two** redaction tiers: a
-member-peer tier (`cleanupMissionForGuest`, strips owner/managers/PII but keeps the roster
-for a fellow member) and the **outsider** tier (`cleanupOutsiderMissionForGuest` = the
-member-peer redaction plus the free-text description hidden) used for anonymous and GUEST
-callers — see REQ-SEC-009. The naming convention
-(`cleanup…ForGuest`) is enforced structurally by the ArchUnit rule
-`anonymousReadableMissionEndpointsMustRedactGuestPii`.
+For a **member below Logistician**, return only the minimum required data. Sensitive fields
+(e-mail, real name, internal orders/items) MUST be explicitly cleared in the controller via a
+`cleanup…ForPeer`-style helper to prevent information disclosure. (E-mail is shown only in a user's
+own profile — never elsewhere.) The naming convention is enforced structurally by the ArchUnit rule
+`peerReadableMissionEndpointsMustRedactPii`.
 
-### REQ-SEC-009 — Anonymous & guest-role access surface
+> **Amended 2026-09-06 (ADR-0159).** This requirement had **two** tiers: the member-peer one above,
+> and a stricter *outsider* tier (`cleanupOutsiderMissionForGuest`) that additionally hid the
+> free-text description and each participant's payout preference and comment, for anonymous and
+> role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
+> with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
 
-The application has a deliberately public surface so requesters and visitors can interact
-without a login. That surface is **minimal and identical for two cohorts** — *anonymous*
-callers (no JWT) and the *GUEST role* (an authenticated Keycloak user with no member or
-elevated authority). The discriminator is `AuthHelperService.isMemberOrAbove()` (true for
-`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`KRT_MEMBER`/`MEMBER`); its negation
-is the **"mission outsider"** predicate. A GUEST is treated exactly like an anonymous
-visitor on the mission surface — *behandle guest wie anonym bei den Einsätzen*.
+**The mission's owner and managers are withheld from a peer who is only reading, and kept for one
+who may manage the mission** (`canEdit` or `canManageManagers`). The exemption exists because the
+pass now runs for callers who hold those rights: a bare `MISSION_MANAGER` is below Logistician — the
+hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN — so the
+response asserted `canManageManagers: true` and handed over an empty manager list in the same
+breath, and the Verwaltung panel offered add/remove controls over a list nobody could see. It
+discloses nothing: `UserReferenceDto` is id, username, display name, effective name and rank, the
+same public callsign tuple every participant on that mission already carries, and it travels only to
+a caller who may rewrite the list it names.
 
-What a mission outsider (anonymous OR GUEST) **may** do — and nothing more:
+> The rule that selects the endpoints was rewritten rather than renamed, and that is the part worth
+> reading. It used to select gates carrying **no** `isAuthenticated()` clause — the shape that made
+> an endpoint anonymously reachable. Every such gate now has one, so the old predicate would select
+> *nothing* and the rule would pass by checking an empty set. It now keys on *which* gate. The
+> rewrite immediately found a real leak the old rule could not see —
+> `MissionController.joinMission` returned the whole Einsatz, roster included, to the member who had
+> just joined.
+>
+> [!bug] Corrected 2026-09-06 — `canManageMission` **does** admit an ordinary member
+> The rewrite above first exempted `canManageMission`, `canManageManagers` and `canChangeOwner`,
+> on the premise that a gate requiring leadership returns the unredacted aggregate on purpose. That
+> premise is false. All three fall through to `isOwnerOrManager`, which grants on
+> `mission.getOwner()` or membership of `getManagers()` **without consulting a role**, and the
+> hierarchy declares no `MISSION_MANAGER > LOGISTICIAN` edge either — so creating a mission (which
+> only needs `isAuthenticated()`, and makes you its owner) is enough to pass them. The exemption
+> covered exactly the audience the peer tier exists for, which is why the guard stayed green over
+> twenty-three write handlers that returned the unredacted aggregate to a member below Logistician
+> and over the slim unit endpoints and ship picker, where `ShipDto.owner` re-opened REQ-SEC-040 one
+> tier up. Only a gate naming a **role or authority** is genuinely out of a peer's reach; those are
+> the exemptions the rule keeps.
 
-- **Orders:** create a job order only (`POST /api/v1/orders`, `/api/v1/orders/items`, plus
-  the supporting `permitAll` catalog reads). They may **not** list, view, edit or delete
-  orders. (This holds for GUEST too: a memberless account fails the profit-eligibility gate
-  `canViewJobOrders`, exactly like an anonymous caller — see `org-unit-tenancy.md`.) A non-profit
-  **member** (not a memberless guest) is the exception: they may view and limitedly edit the orders
-  their own org unit requested — the requesting-owner escape (REQ-ORDERS-023, ADR-0091) — but still
-  cannot browse the general queue or see other units' orders.
-- **Missions (non-internal only):** see the mission detail in its **redacted** form, sign up
-  as a participant, and edit / check-in / check-out / delete / change-payout-preference on
-  **unlinked guest participants** (`participant.user == null`, which includes their own
-  guest entry) via `MissionSecurityService.canAccessParticipant`. Internal and past
-  (`COMPLETED`/`CANCELLED`) missions are not visible to outsiders.
+### REQ-SEC-009 — The member surface
 
-The outsider mission detail (`MissionGuestRedactor.cleanupOutsiderMissionForGuest`) applies the
-member-peer redaction (participant PII stripped to the public callsign tuple
-username/displayName/rank; owner and managers cleared) and **additionally hides only the free-text
-`description`**. The mission **economy** (inventory entries / refinery orders) is no longer part of
-the `MissionDto` at all (#1138) — it is served member-gated at its own endpoints
-(`/api/v1/inventory/mission/{id}`, `/api/v1/refinery-orders/mission/{id}`, both behind the member-role
-filter) — so there is nothing economy-related on the outsider surface to redact. By explicit product decision an
-outsider **does** see, on a non-internal mission, the owning **organisation**
-(`owningSquadron`), the **participant roster** (PII-stripped) with each participant's
-**payout preference**, the assigned **units** and the mission **frequencies**. PII (email,
-real name) is never included — that is a non-negotiable invariant regardless of which fields
-are shown.
+Every caller of the tool is a **member**. There is no cohort below that: an anonymous caller reaches
+only the paths REQ-SEC-052 enumerates, and an authenticated token that maps to no application role is
+refused with `403 NO_ROLE` (REQ-SEC-053).
 
-The mission **finance ledger** (`GET`/`POST /api/v1/.../finance-entries`) is a separate
-surface — the per-participant payout *preference* above is not the ledger — and stays
-restricted to **registered members and above**: anonymous AND GUEST are blocked (create +
-read). Finance-entry creation is therefore no longer anonymous.
+`AuthHelperService.isMemberOrAbove()` remains the membership predicate (true for
+`ADMIN`/`OFFICER`/`MISSION_MANAGER`/`LOGISTICIAN`/`KRT_MEMBER`/`MEMBER`). It is deliberately still a
+different question from `isAuthenticated()`: the gap between the two has shrunk to the
+PENDING/REJECTED registration and to whatever authority set a future integration introduces, and the
+questions that ask about membership — the mission description (REQ-SEC-041), the live-sync rooms —
+should keep asking it rather than depending on a refusal happening earlier in the chain.
 
-**Acceptance**
-
-- [ ] Anonymous and GUEST callers can `POST /api/v1/orders` (+`/items`) but receive empty
-  list / 403 on every order read/edit/delete path.
-- [ ] A mission outsider's `GET /api/v1/missions/{id}` on a non-internal mission returns a DTO
-  with `description`, `owner`, `managers` null and no `inventoryEntries`/`refineryOrders` fields at
-  all (#1138), but WITH the participant roster (PII stripped — no email/roles), `owningSquadron`,
-  `assignedUnits` and `frequencies` present; internal/past → 403.
-- [ ] An outsider can add and edit an unlinked guest participant; editing a *linked*
-  participant they do not own → 403.
-- [ ] Anonymous create on `POST /api/v1/finance-entries` → 401; GUEST → 403; member → 201.
-  GUEST `GET /api/v1/missions/{id}/finance-entries` → 403.
-- [ ] `AuthHelperService.isMemberOrAbove()` is false for anonymous and GUEST, true for every
-  member/elevated role.
-
-**Enforced by:** `MissionControllerLifecycleTest`, `MissionDataLeakTest`,
-`MissionGuestAccessTest`, `MissionFinanceEntryControllerSecurityTest`, `AuthHelperServiceTest`,
-`ArchitectureTest#anonymousReadableMissionEndpointsMustRedactGuestPii` · **Code:**
-`MissionController`, `MissionFinanceEntryController`, `AuthHelperService`,
-`SecurityConfig` · **Role matrix:** [`ROLES_AND_PERMISSIONS.md` §1](../../ROLES_AND_PERMISSIONS.md)
-
-**Live-sync WebSocket (`/ws/sync`; REQ-FE-015 / [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md)).**
-The tool-wide peer-sync transport is one multiplexed `/ws/sync` socket per tab (the one-release
-legacy aliases `/ws/missions/{id}/presence` and `/ws/materialboerse/board` were removed in #1236).
-`SecurityConfig` gates `/ws/sync` to an **authenticated** principal, and every handshake is pinned
-to the explicit `app.websocket.allowed-origin-patterns` allowlist (never `*`) to prevent Cross-Site
-WebSocket Hijacking. **No new role or gate is introduced** (this spec's role matrix is unchanged): a
-`subscribe` to a topic is authorized per topic with the *same* check the page itself performs — the
-per-resource backend read (mission / operation / order / bank-account, including the requester-escape
-redaction of REQ-ORDERS-023), a capability probe (`canViewJobOrders` for the global `orders` queue),
-or a local role match against the handshake-captured authorities (the bank-staff, org-unit-bank and
-member-or-above global rooms). Publishing a `changed` frame needs **no** subscription (the cross-topic
-case — a requester poking the staff queue it may not read), only an authenticated socket, a known
-topic class, the class's section whitelist and a per-session rate limit. Only opaque section keys ever
-cross the socket; every fragment a peer then re-pulls is independently authorized per viewer through
-the servlet path, so a transient subscribe fail-open (a backend blip during the probe) leaks at most
-"some section of resource X changed", never its contents. The one exception is the presence-enabled
-`mission` class: an allowed subscribe there immediately returns an editor-presence snapshot
-(pseudonymous ids + callsigns), which is cross-user identity data rather than an opaque key, so that
-class **fails closed** on any indeterminate verdict (lapsed token / transient error / executor
-saturation) — an unverified presence subscribe is refused, not admitted.
+> **Rewritten 2026-09-06 (ADR-0159).** This requirement used to describe a "deliberately public
+>
+>> surface" shared by two cohorts — anonymous callers and the `GUEST` role — under the name *mission
+>> outsider*, and enumerated what they could do: create a job order, browse non-internal missions,
+>> sign up as a named guest, check in and out, set a payout preference. None of it is true any more.
+>> The term *outsider* is retired; what replaced it is REQ-SEC-052 (the public surface as a list) and
+>> REQ-SEC-053 (nothing below member).
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 
@@ -315,7 +286,10 @@ The frontend's session/meta CSRF setup is unchanged (`HttpSessionCsrfTokenReposi
 [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)) can self-heal a bare-403 write with a
 single transparent token refresh + retry. The endpoint sits under the `authenticated()` catch-all —
 an anonymous caller is redirected to the OIDC entry point, never handed a token — so it widens no
-trust boundary and is not a change to the CSRF repository/handler (ADR-0012).
+trust boundary and is not a change to the CSRF repository/handler (ADR-0012). Since 2026-09-06 it
+also carries a class-level `@PreAuthorize("isAuthenticated()")`: the catch-all is still what
+refuses, but REQ-SEC-052's rule is that no controller's only protection is a matcher two folders
+away, and `ArchitectureTest.everyControllerCarriesAGateOfItsOwn` now holds every controller to it.
 
 **Acceptance**
 
@@ -650,9 +624,9 @@ its own 30 s memoisation; anything that must revoke instantly needs the session 
 **Acceptance**
 
 - [ ] `FrontendAuthHelperService.isMemberOrAbove()` is true for any member/elevated `ROLE_*` on the
-  Authentication token and false for anonymous, missing-context and role-less GUEST callers.
-- [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch; an anonymous
-  visitor's does not.
+  Authentication token and false for a missing context. The anonymous and role-less-`GUEST` cohorts
+  it also excluded no longer reach it: neither can hold a session (REQ-SEC-052, REQ-SEC-053).
+- [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch.
 - [x] `BackendRoleSyncFilter` does not stamp `BACKEND_ROLES_SYNCED_AT` when `/api/v1/users/me`
   returns `null` or throws; it does stamp it when the read succeeds.
 - [x] A cached `ACTIVE` verdict is never re-read; a cached `PENDING` verdict is re-read once its
@@ -821,13 +795,29 @@ whitelist (incl. the new `OrgUnitBankAccessService`) and `staffelScopedWriteEndp
 matrix on the ephemeral stack (Phase 7, `e2e`-label-gated) · **ADR:**
 [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · **Issues:** #692, #696, #700.
 
-### REQ-SEC-018 — Anonymous guest sign-up edits require a per-row capability token
+### REQ-SEC-018 — Anonymous guest sign-up edits require a per-row capability token *(superseded)*
+
+> [!warning] Superseded 2026-09-06 by ADR-0159 / REQ-SEC-052 — kept for the reasoning
+> There is no anonymous sign-up left to mint a token for, and `V239` dropped the column that stored
+> its hash. An **external** participant row — a named person without an account — is the mission
+> leadership's to edit, because it carries no creator to bind a self-edit to (decision D4).
+>
+> The text below is kept because its second half is the part that generalises: the token proved
+> *which row*, never *whether the mission was still open*, and without a `canSeeMission` re-check
+> beside it the capability outlived the surface that granted it — a guest who signed up while a
+> mission was public kept `PUT`/`DELETE`/check-in after it was flipped to internal or reached
+> `COMPLETED`, and back-dating a settled operation moved real money away from every other
+> participant. A credential that needs a second gate to be safe is one nobody is holding correctly.
+> `canManageMission` carries that scope check inherently, so nothing was lost by the removal.
+
+*(Everything from here to the end of this requirement is in the past tense on purpose: it describes
+the state until 2026-09-06.)*
 
 Mission participant write endpoints (`PUT`/`DELETE`/check-in/out/payout on
-`/api/v1/missions/*/participants/*` and the `…/slim` twins) are `permitAll` so the public mission
-sign-up flow works without an account. A **guest** (unlinked) participant row MUST NOT be mutable by a
-caller who merely knows its id — the anonymous-readable roster exposes participant ids, so a bare id is
-not an authorization secret.
+`/api/v1/missions/*/participants/*` and the `…/slim` twins) **were** `permitAll` so the public
+mission sign-up flow worked without an account. A **guest** (unlinked) participant row MUST NOT be
+mutable by a caller who merely knows its id — the anonymous-readable roster exposed participant ids,
+so a bare id was not an authorization secret.
 
 - On creation of a guest sign-up the backend mints an unguessable 256-bit **capability token**,
   persists only its SHA-256 hash on `mission_participant.guest_edit_token_hash`, and returns the
@@ -924,34 +914,38 @@ no Staffel the caller can edit.
 `upsert_shouldAllowOfficer_evaluatingOwnSquadronMember`). **Security audit:** gap-fill finding
 (member-evaluation cross-tenant write).
 
-### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments
+### REQ-SEC-021 — Anonymous outsider mission view withholds payout intent and free-text comments *(superseded)*
 
-The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
-**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposes the
+> [!warning] Superseded 2026-09-06 by ADR-0159 / REQ-SEC-052 — kept for the reasoning
+> The audience this requirement was written for does not exist. A member below Logistician still
+> gets a redacted mission detail (REQ-SEC-007), but payout preference and the free-text comment stay
+> visible to them: a member is part of the organisation, and the two fields were withheld from
+> people who were not.
+
+The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission **was** an
+**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposed the
 participant roster's public callsign tuple (`username`/`displayName`/`rank`), org-unit affiliation,
 job type, assigned ship/unit, mission frequencies, owning organisation and schedule/status, so a
-prospective sign-up can decide whether and how to join. It MUST continue to withhold PII (email /
-real name — enforced by the C-1 ArchUnit rule `anonymousReadableMissionEndpointsMustRedactGuestPii`)
-and, additionally, the two per-participant fields with low public-coordination value and higher
+prospective sign-up could decide whether and how to join. It withheld PII (email / real name) and,
+additionally, the two per-participant fields with low public-coordination value and higher
 sensitivity:
 
 - **`payoutPreference`** — a participant's financial intent.
 - the free-text **`comment`** — uncontrolled text that may carry incidental PII.
 
-Both fields stay on the authenticated member-peer view; only the outsider paths strip them, via
-`MissionGuestRedactor.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
-pass every outsider full-mission response routes through — `getMissionById` and the participant write
-endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
-deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in
-ADR-0034.
+Both fields stayed on the authenticated member-peer view; only the outsider paths stripped them, via
+`MissionGuestRedactor.stripOutsiderParticipantFields`. **All of that is gone** — the tier, the
+methods and the audience — and `MissionPeerRedactor` has one level left. The reasoning is kept
+because it is the argument for what a peer *does* see: a member is part of the organisation, so the
+two fields are not withheld from them.
 
-**Acceptance**
+**Acceptance** — retired with the tier (ADR-0159); listed so the record shows what was asserted.
 
-- [x] An anonymous / role-less-`GUEST` read of a public mission (`GET /api/v1/missions/{id}`, the
-  participant endpoints, `addParticipantSlim`) returns every participant with `payoutPreference` and
-  `comment` `null`.
-- [x] An authenticated member (peer view and above) still sees both fields.
-- [x] PII (email / real name) remains redacted for outsiders (C-1 unchanged).
+- [x] ~~An anonymous / role-less-`GUEST` read of a public mission returns every participant with
+  `payoutPreference` and `comment` `null`.~~ No such reader exists; both are visible to a peer.
+- [x] An authenticated member (peer view and above) still sees both fields — the one that survives,
+  pinned by `MissionPeerRedactorTest`.
+- [x] PII (email / real name) remains redacted below Logistician (REQ-SEC-007).
 
 **Enforced by:** `MissionControllerLifecycleTest`
 (`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
@@ -1562,6 +1556,21 @@ rather than configuration: which data is sensitive is a property of the domain, 
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 
+> [!note] Amended 2026-09-06 (ADR-0159) — the lesson outlived the surface
+> There is no anonymous surface left to bound: `AnonymousPageSizeFilter` and its page-size ceiling
+> are gone, and no paginated endpoint answers an unauthenticated caller. The two that do
+> (REQ-SEC-052) are unpaginated, and the per-IP limiter bounds them.
+>
+> **The verb-agnostic lesson below is the part that stays load-bearing.** A tightening placed above
+> an all-verb `permitAll` must itself be all-verb, or the rule underneath grants every verb the
+> tightening does not claim — that is how a `HEAD` once ran the material price matrix query
+> anonymously and returned its `Content-Length`. The two remaining anonymous reads are `GET`-scoped
+> on purpose, and `AnonymousSurfaceSweepTest` issues a `HEAD` against every `GET` mapping for
+> exactly this reason.
+>
+> The `basetool_http_error_total{code="PAGE_SIZE_TOO_LARGE"}` label value disappears with the
+> filter (REQ-OBS-011's bounded-label review).
+
 `PaginationUtil` clamps `size` at 100 000. That is correct for the authenticated consumers that
 page-walk large catalogues and far too generous for endpoints anyone on the internet can reach once
 the API vhost is live: one request would return an entire catalogue, and repeating it is the cheapest
@@ -1584,12 +1593,14 @@ through to the all-verb catalog `permitAll` underneath, and Spring MVC answers `
 back. The general rule: **a method-scoped tightening placed above an all-verb `permitAll` grants
 every verb it does not claim.**
 
-The anonymous page-size ceiling MUST be evaluated with **the same parser Spring's binder uses**
-(`NumberUtils#parseNumber`), and a value that parser rejects MUST be refused rather than allowed.
-`Integer.parseInt` is stricter: it throws on `0x186A0`, `#186A0` and on embedded whitespace, all of
-which the binder accepts (it strips whitespace and honours the hex spellings). Treating
-"unparseable" as "within the limit" therefore made the ceiling bypassable with three characters. An
-**empty** `size=` stays exempt — it binds to `null` and is a legal request for the default page.
+The anonymous page-size ceiling used to be evaluated with **the same parser Spring's binder uses**
+(`NumberUtils#parseNumber`), refusing what that parser rejects rather than letting it through:
+`Integer.parseInt` is stricter and throws on `0x186A0`, `#186A0` and embedded whitespace, all of
+which the binder accepts, so treating "unparseable" as "within the limit" made the ceiling
+bypassable with three characters. **Retained as the lesson, not as a rule** — the ceiling and its
+filter are gone with the anonymous surface (see the amendment above). The general form still holds
+anywhere a guard and a binder read the same string: *parse it the way the thing you are guarding
+will parse it.*
 
 `GET /api/v1/materials/{id}/terminals` — the per-material slice of that same matrix, which the
 inventory page uses to suggest where to sell — is covered by the identical reasoning and was
@@ -1615,10 +1626,12 @@ measured anonymously before it is admitted, and what the measurement says is act
 Admitting these as they stood would have published trade prices to the internet — the vhost would
 have let them through and the backend would not have stopped them.
 
-`GET /api/v1/materials/{id}` deliberately stays anonymous. `MaterialDto` is catalogue only — name,
-quantity type, category, flags, **no price** — and `/api/v1/materials/search` has published those
-same fields anonymously since the vhost's phase 2. Closing it is a different change with a different
-reason, and it is pinned in `ApiVhostAnonymousSurfaceTest` so it stays a decision.
+`GET /api/v1/materials/{id}` used to stay anonymous deliberately — `MaterialDto` is catalogue only
+(name, quantity type, category, flags, **no price**), and `/api/v1/materials/search` had published
+those same fields anonymously since the vhost's phase 2. **REQ-SEC-052 closed it with everything
+else**: the public surface is now an enumerated list of four backend paths and this is not one of
+them. The paragraph is kept because the reasoning is still the reason it was the *last* catalogue
+read to go, not because the exemption survives.
 
 **An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
 be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
@@ -1639,14 +1652,17 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 - [x] `GET /api/v1/materials/prices-overview`, `GET /api/v1/materials/{id}/prices` and `GET
   /api/v1/materials/profit-calculation` answer 401 without a token
   (`ApiVhostAnonymousSurfaceTest`), and the nightly `edge-deny-probe` asserts it.
-- [x] `GET /api/v1/materials/{id}` stays anonymous — catalogue only, no price — and is pinned as a
-  decision rather than left to drift.
-- [x] An anonymous request with `size=50000` is refused with `400` and the stable code
-  `PAGE_SIZE_TOO_LARGE`.
-- [x] An anonymous request with `size=1000` still succeeds.
-- [x] An authenticated caller with `size=50000` is unaffected.
+- [x] `GET /api/v1/materials/{id}` answers `401` without a token like every other catalogue read
+  (REQ-SEC-052); it was the last one to close and is swept rather than pinned as an exemption.
+- [x] ~~An anonymous request with `size=50000` is refused with `400` and the stable code
+  `PAGE_SIZE_TOO_LARGE`.~~ Retired with `AnonymousPageSizeFilter` (ADR-0159): no paginated endpoint
+  answers an unauthenticated caller, so there is no anonymous page to bound.
+- [x] ~~An anonymous request with `size=1000` still succeeds.~~ Same.
+- [x] An authenticated caller with `size=50000` is unaffected — the 100 000 `PaginationUtil` clamp
+  is unchanged.
 
-**Enforced by:** `SecurityTest` · **Code:** `AnonymousPageSizeFilter`, `SecurityConfig`
+**Enforced by:** `SecurityTest`, `AnonymousSurfaceSweepTest` (the `HEAD`-per-`GET` pass that carries
+the verb-agnostic lesson forward) · **Code:** `SecurityConfig`
 
 ### REQ-SEC-033 — An authenticated account MUST have a budget of its own
 
@@ -2045,6 +2061,22 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 
 ### REQ-SEC-037 — The public API vhost's anonymous surface is enumerated, not incidental
 
+> [!note] Amended 2026-09-06 (ADR-0159) — the enumeration stands, the statuses changed
+> The allow-list is unchanged: no rule was added, removed or reordered, and every path the app sends
+> is still admitted. What changed is the **backend**, which now refuses the caller behind them. The
+> expected-status table in `API_VHOST_ROLLOUT_RUNBOOK.md` § D.3a therefore reads `401` almost
+> throughout, with two `200` rows — `/api/v1/terms/document` and `/api/v1/app/version-policy` — and
+> the `404`/`405` rows untouched.
+>
+> The `403` rows are worth a second look rather than a search-and-replace. They said `403` because
+> their path sat under a `permitAll` stem: the request was dispatched and refused at the method
+> seam, and the MVC advice rendered that. With the stem gone they are turned away at the entry point,
+> which writes `401`. Same closure, different number — and the number is what the rollout check
+> reads, which is why this requirement is about numbers at all.
+>
+> The requirement's discipline is unchanged and was followed here: **no pin, no stated status.**
+> Every row is pinned in `ApiVhostAnonymousSurfaceTest` before the runbook says it.
+
 The vhost is a default-deny allow-list (ADR-0135), and every path on it **inherits whatever
 authentication the backend requires of that path**. That is deliberately not uniform: most of the
 API is `authenticated()`, and a few operations are `permitAll` because something already public
@@ -2105,15 +2137,19 @@ is why the requirement names it: **a path admitted without its pin is admitted w
 stated**, whatever the runbook says next to it. The rule the two misses share is that a status is
 read off the layer that refuses the caller, never off the form the field belongs to.
 
-**And one family on the list is reachable anonymously by design, without being *anonymous*.** The
-four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
-`payout-preference` siblings — are guarded by `canAccessParticipant`, which **resolves the row
-before it judges the caller**: a *guest* sign-up is editable by the anonymous creator presenting
-the per-row capability token minted at sign-up (REQ-SEC-018, header `X-Guest-Edit-Token`). So an
-anonymous caller is a legitimate one on these paths, the refusal for a row they may not touch is
-`403` rather than `401`, and an unknown row answers `404` to everybody. They are not in the
-anonymous-surface table above because nothing is *served* anonymously: the capability token is a
-credential, and without it every one of them refuses. Pinned in `ApiVhostAnonymousSurfaceTest`.
+**One family on the list used to be reachable anonymously by design, without being *anonymous*.**
+The four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
+`payout-preference` siblings — are guarded by `canAccessParticipant`, which **resolved the row
+before it judged the caller**: a guest sign-up was editable by its anonymous creator presenting the
+per-row capability token minted at sign-up (REQ-SEC-018, header `X-Guest-Edit-Token`). An anonymous
+caller was therefore a legitimate one on these paths, and an unknown row answered `404` to
+everybody.
+
+Both halves are gone. `V239` dropped the column that stored the token's hash and REQ-SEC-052 the
+anonymous caller, so the request no longer reaches the lookup: it is turned away at the entry point
+with `401`, and the row's existence is not part of the answer. This was the one entry on the list
+that was not authenticated-only; there is no longer one. Pinned in
+`ApiVhostAnonymousSurfaceTest.shouldRefuseAnonymousParticipationWritesOnAnAbsentRow`.
 
 **The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
 paths are `authenticated()` in the filter chain, so they never reach a controller and the entry
@@ -2374,15 +2410,22 @@ Note what did **not** catch this, because the same blind spots apply to the next
 - [x] The strict outsider level inherits the pass from the member-peer level.
 - [x] A unit with no assigned ship redacts without error.
 
-**Enforced by:** `MissionGuestRedactorTest` · **Code:** `MissionGuestRedactor#cleanupUnitForGuest`,
-`#cleanupShipForGuest` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0034
+**Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
+`#cleanupShipForPeer` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0159 (supersedes ADR-0034)
 
 ### REQ-SEC-041 — The mission description is gated on membership, not on authentication
 
 `MissionMapper#resolveDescription` MUST return the free-text mission description only to a caller
 who is a member or above (`AuthHelperService#isMemberOrAbove`), never merely to an authenticated
-one. A role-less `GUEST` is authenticated yet is a **mission outsider** by REQ-SEC-009, and ADR-0034
-withholds the description from that tier.
+one.
+
+> [!note] Amended 2026-09-06 (ADR-0159) — the cohort is gone, the rule is kept
+> The gap this closed was a role-less `GUEST`: authenticated, yet a mission outsider by
+> REQ-SEC-009. There is no such caller left — a token that maps to no application role is refused
+> `403 NO_ROLE` before any handler runs (REQ-SEC-053). The requirement stands anyway, and
+> deliberately: `isMemberOrAbove()` and `isAuthenticated()` are still different questions
+> (REQ-SEC-009), and a gate that asks the narrower one must not be relaxed to the wider one because
+> the difference happens to be empty today.
 
 The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
 the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
@@ -2395,12 +2438,13 @@ invisible from the anonymous surface.
 
 **Acceptance**
 
-- [x] A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
-  the mission detail alike.
+- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+  the mission detail alike.~~ Such a token is refused before the mapper runs (REQ-SEC-053); the
+  gate itself is unchanged and still pinned.
 - [x] A member still receives the description on both.
 
 **Enforced by:** `MissionViewerAccessServiceTest` · **Code:** `MissionMapper#resolveDescription`,
-`MissionViewerAccess#isMemberOrAbove` · **Related:** REQ-SEC-009, ADR-0034
+`MissionViewerAccess#isMemberOrAbove` · **Related:** REQ-SEC-009, ADR-0159
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
@@ -2429,7 +2473,9 @@ participant" rule.
 - [x] A member naming another participant's row gets `403`.
 - [x] A member booking against their own row succeeds.
 - [x] A mission manager in scope may book for any participant.
-- [x] An anonymous caller still gets `401` and a role-less `GUEST` still `403`, unchanged.
+- [x] An anonymous caller still gets `401`, and a token that maps to no application role still
+  `403` — the marker behind that refusal is `ROLE_NO_ROLE` since `V239`, not `GUEST`
+  (REQ-SEC-053).
 
 **Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest` ·
 **Code:** `MissionSecurityService#canCreateFinanceEntry`,
@@ -2860,6 +2906,170 @@ allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system na
 `AdminPersonalBlueprintsPageController`, `AdminSyncReportsPageController`,
 `MaterialboersePageController` · **ADR:**
 [ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
+
+### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
+
+The public surface is a **list**, not a policy. Everything on it is here because somebody argued for
+it and the argument is written down; everything else requires authentication at the URL layer **and**
+a method gate.
+
+**Frontend** — the only `permitAll()` matchers:
+
+|                                      Path                                       |                                                                Why it stays public                                                                 |
+|---------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/`                                                                             | The landing page. Product name, one paragraph, the two login entries, the legal links, the Fan Kit band. **No backend call, no data, no session.** |
+| `/impressum`, `/privacy`, `/terms`                                              | Legal obligation: Impressumspflicht, DSGVO information duties, terms readable before agreeing.                                                     |
+| `/error`, `/error/**`                                                           | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.                                          |
+| the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                       |
+| `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                           |
+| `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                           |
+| `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                    |
+
+**Backend** — the only `permitAll()` matchers on the main chain:
+
+|                   Path                    |                                                                                                                             Why it stays                                                                                                                              |
+|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/app/version-policy`          | The forced-update gate (REQ-API-010). A version gate that only answers after a login is silent in exactly the case it exists for: an app too old to log in must still learn that it is too old. Three integers and a public release URL.                              |
+| `GET /api/v1/terms/document`              | The Terms-of-Use wording (ADR-0138 / REQ-SEC-028). A document everyone must read before agreeing to anything cannot require having agreed, and the same text is already on the public `/terms` page.                                                                  |
+| `/internal/**`                            | The Keycloak SPI's account-existence precheck (REQ-SEC-022) — machine-to-machine behind a constant-time shared-secret header, `401` without it. Keycloak sits outside the resource server's trust boundary and carries no JWT to gate on. Not an anonymous data path. |
+| `/actuator/health`, `/actuator/health/**` | Docker `HEALTHCHECK`.                                                                                                                                                                                                                                                 |
+| `/error`                                  | Spring's error dispatch.                                                                                                                                                                                                                                              |
+
+**Both anonymous reads are `GET`-scoped**, so a `HEAD` on either falls to the authenticated
+catch-all and answers `401`. That is deliberate and it is the REQ-SEC-032 lesson: Spring Security
+compares the verb with `String.equals`, so a method-scoped tightening placed above an all-verb
+`permitAll` grants every verb it does not claim — which is how a `HEAD` once ran the material price
+query anonymously and returned its `Content-Length`.
+
+The OpenAPI document is **not** on either list. It enumerates every path, parameter and DTO field
+the API has — the most efficient description of the attack surface the project can produce — and
+being a 404 in prod is a deployment property, not an access rule. It requires `ROLE_ADMIN` under
+**both** spellings springdoc registers: `/v3/api-docs*` and `/v3/api-docs/**`. The second pattern
+alone, which is what stood here, does not cover `/v3/api-docs.yaml` — `**` spans whole segments — so
+that spelling fell through to the catch-all and was merely authenticated, on a path that carries the
+whole surface. Corrected 2026-09-06; the sweep excluded it too, by prefix, and now excludes nothing
+of the kind.
+
+The prod-only **management-port chain** (`ManagementPortSecurityConfig`,
+`@ConditionalOnProperty("management.server.port")`, port `11271`) is `permitAll` on
+`/actuator/health(/**)`, `/actuator/prometheus` and `/actuator/info` **on the internal connector
+only** (ADR-0134), with basic auth added on `/actuator/prometheus` by
+`MonitoringScrapeSecurityConfig`. It is listed here so this requirement is exhaustive, not because
+it is anonymous access in the brief's sense.
+
+**Acceptance**
+
+- [x] Every mapping the dispatcher knows refuses a caller with no token, except the four paths above
+  — asserted by enumerating `RequestMappingHandlerMapping`, not by listing paths somebody thought of.
+- [x] Every `GET` is additionally issued as `HEAD`, and the two `GET`-scoped reads answer `401` to it.
+- [x] Exactly three methods declare `@PreAuthorize("permitAll()")`; a fourth fails the build.
+- [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
+  scheme the document does not define.
+- [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
+  `SESSION` cookie, `verifyNoInteractions(backendApiClient)`.
+- [x] A read endpoint without a method- or class-level `@PreAuthorize` fails the build, like a write.
+
+**Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
+`AnonymousSurfaceSweepMvcTest` (the frontend, navigation and background shapes) ·
+`ArchitectureTest#permitAllIsDeclaredOnlyOnTheThreePublicEndpoints`,
+`#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
+`HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
+`SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
+`ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
+the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/config/SecurityConfig`,
+`frontend/…/controller/HomeController`, `frontend/…/config/SafeCsrfAdvice`,
+`templates/landing.html` · **ADR:**
+[ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
+
+---
+
+### REQ-SEC-053 — Every account is at least a member; a role-less token is refused
+
+There is no role below member. The seeded `GUEST` role is gone (`V239`), and with it the state it
+represented — an authenticated caller with an **empty authority set**.
+
+**The rule:** an authenticated token whose realm roles map to no application role is refused with
+`403 NO_ROLE` on every `/api/**` path, before a handler runs. Three paths are exempt, for the same
+reasons they are exempt from the pending gate: `/api/v1/users/me/registration-status` (or the
+refusal has no way to explain itself), and the two REQ-SEC-052 reads (the Android app attaches its
+bearer to every call once a session exists, so gating them would refuse the version policy and the
+terms text to exactly the callers most likely to need both).
+
+**Why a refusal and not an empty set.** An empty authority set passes every `isAuthenticated()`
+gate and fails only the ones that name a role, so whether such a caller is admitted depends on which
+endpoint they happen to hit — a per-endpoint accident rather than a decision. Until ADR-0159 the
+empty set was worse than that: it was mapped onto `GUEST`, which the URL matrix's anonymous families
+let through, so "we could not resolve this account's roles" silently meant "give them the guest
+surface".
+
+**The refusal lives in `assembleFor(User, Collection<Role>)`**, not on the JWT path, so both callers
+inherit it: the resource-server conversion and `DatabaseActingMemberAuthorities` on the ingest
+gateway's acting-member path (ADR-0129), which installs an authentication without inspecting it.
+`Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
+`PendingApprovalAccessFilter` is the only reader.
+
+**`default-roles-iri` carries `KRT Member`**, so every account Keycloak creates is a member at the
+IdP. **There is therefore no account holding only a bank role, or only any other role** (confirmed
+by the repository owner, 2026-09-06) — which is what makes `isMemberOrAbove()` safe as a gate on
+the member surface. The E2E realm contradicted this until then: `test-bank-employee` and
+`test-bank-management` carried their bank role alone, so those two accounts, and no real one, met a
+refusal on the mission list. A fixture that models an impossible account shape produces findings
+about a cohort that does not exist. That is the structural half of this requirement, and it is why
+the roster sync had to be fixed in the same change:
+
+> [!warning] The composite-blind sync was the precondition, not a detail
+> `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
+> holding `KRT Member` only through the composite came back with an empty set on every nightly run.
+> While that mapped to the authority-less `GUEST` it was invisible and healed at the next web login;
+> with this requirement live it would be an overnight lockout of everyone who never had the role
+> assigned directly. The sync now folds in what the realm's default-role composite grants.
+>
+> A run in which the realm matches **none** of the app's roles aborts rather than writing, because
+> that is a rename or a broken query and never a legitimate state. A **single** account resolving to
+> no role is still written through — removing someone's roles in Keycloak still removes their access.
+
+**Acceptance**
+
+- [x] A token carrying no known realm role is refused `403 NO_ROLE` on `/api/v1/users/me`, on the
+  JWT path and through `ActingMemberFilter`.
+- [x] The three exempt paths still answer such a token.
+- [x] A member holding `KRT Member` only through `default-roles-iri` keeps the role after a sync run.
+- [x] A sync run that resolves no app role at all writes nothing and logs it.
+- [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
+  before deleting — identifiers, not identities.
+- [x] A `ROLE` notification selector naming a code the catalogue does not know is rejected, so a
+  rule cannot address a role that no longer exists.
+- [x] The frontend routes the state to the account-status page with its own words, not the waiting
+  copy: a role-less member has already been approved, so "wait for an administrator to approve you"
+  describes a wait with no end.
+  **The lockout signal counts subjects, never requests.** `basetool_norole_refused_subjects` is a
+  gauge of the distinct subjects `PendingApprovalAccessFilter` refused with `NO_ROLE` in a rolling
+  15-minute window, and `NoRoleBlockSpike` alerts on it with `max()` (per process). The refusal
+  *rate* answers a different question and fails in both directions: one member's open tab polling in
+  the background sustains it on its own, while the event the alert exists for — a realm-side role
+  rename — locks the whole membership out at 03:00, when nobody is making requests, so the rate stays
+  near zero until morning. This is the same lesson `basetool_terms_refused_subjects` was built on
+  after `TermsConsentRolloutStalled` fired twice overnight on a single looping tab (2026-08-03), and
+  the two windows are separate instances because one member can be in both populations.
+- [x] That routing takes effect on the request that **discovers** the state, not the one after it.
+  The role read is where the frontend first meets a role-less account, and it runs *after* the
+  approval gate — so a filter that only caches the verdict serves the discovering request, which
+  renders the dashboard with every fragment on it refused `403 NO_ROLE` and defers the copy
+  explaining why to the next click.
+
+**Enforced by:** `AnonymousSurfaceSweepTest` (the role-less pass over every mapping) ·
+`CustomJwtGrantedAuthoritiesConverterTest` · `PendingApprovalAccessFilterTest` ·
+`UserReconciliationServiceTest` · `KeycloakServiceTest` (the composite fold-in and the aborted run) ·
+`V239MigrationTest` · `BackendRoleSyncFilterTest` · `NotificationRuleServiceTest` ·
+`PendingApprovalPageControllerTest` (the account-status routing and its redirect loop) ·
+`BackendApiClientProblemJsonTest` (the refusal is not a backend-call failure) ·
+`norole_block_subjects_test.yml` (the alert counts subjects) ·
+**Code:** `CustomJwtGrantedAuthoritiesConverter#assembleFor`, `Roles.NO_ROLE_MARKER`,
+`PendingApprovalAccessFilter`, `MetricNames.NO_ROLE_REFUSED_SUBJECTS`, `UserReconciliationService`,
+`KeycloakService#fetchDefaultRoleGrants`,
+`NotificationRuleService#validateSelector`, `frontend/…/config/BackendRoleSyncFilter`,
+`V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**
+[ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
 ## Out of scope
 

@@ -51,8 +51,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig}.
  *
  * <p>{@code HttpClient.compress(true)} is applied only on the regular request/response connector
- * ({@code connector(false)}), which backs both {@code webClient} and {@code publicWebClient}. Two
- * properties must hold:
+ * ({@code connector(false)}), which backs both {@code webClient} and {@code termsDocumentClient}.
+ * Two properties must hold:
  *
  * <ul>
  *   <li>the non-streaming client advertises {@code Accept-Encoding: gzip} and transparently
@@ -83,7 +83,7 @@ class WebClientCompressionTest {
   private static MockWebServer server;
   private static byte[] gzippedPayload;
 
-  @Autowired private WebClient publicWebClient;
+  @Autowired private WebClient termsDocumentClient;
 
   @Autowired private WebClient sseWebClient;
 
@@ -137,7 +137,8 @@ class WebClientCompressionTest {
 
   @Test
   void nonStreamingClient_AdvertisesGzip_AndDecompressesTransparently() {
-    String body = publicWebClient.get().uri(GZIP_PATH).retrieve().bodyToMono(String.class).block();
+    String body =
+        termsDocumentClient.get().uri(GZIP_PATH).retrieve().bodyToMono(String.class).block();
 
     assertThat(body)
         .as("gzipped response body must be transparently decompressed back to the original payload")

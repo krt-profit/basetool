@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -57,7 +56,7 @@ class MissionFrontendSecurityTest {
 
   @MockitoBean private WebClient webClient;
 
-  @MockitoBean private WebClient publicWebClient;
+  @MockitoBean private WebClient termsDocumentClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -77,8 +76,8 @@ class MissionFrontendSecurityTest {
     requestHeadersSpec = mock(WebClient.RequestHeadersSpec.class);
     responseSpec = mock(WebClient.ResponseSpec.class);
 
-    // Standard mocking for publicWebClient used in listMissions
-    when(publicWebClient.get()).thenReturn(requestHeadersUriSpec);
+    // Standard mocking for termsDocumentClient used in listMissions
+    when(termsDocumentClient.get()).thenReturn(requestHeadersUriSpec);
     when(webClient.get()).thenReturn(requestHeadersUriSpec);
     when(requestHeadersUriSpec.uri(any(String.class))).thenReturn(requestHeadersSpec);
     when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
@@ -89,15 +88,25 @@ class MissionFrontendSecurityTest {
                     Collections.emptyList(), 0, 20, 0, 0, Collections.emptyList())));
   }
 
+  /**
+   * The mission list does not render for an anonymous visitor at all any more (REQ-SEC-052).
+   *
+   * <p>This case used to assert something weaker and stranger: that the page rendered, but without
+   * the create button. That was the right assertion while the list was {@code permitAll} — the leak
+   * to guard against was the control, not the page. Now the page itself is the leak, and the answer
+   * is a redirect into the OAuth2 entry point rather than a roster with one button missing.
+   */
   @Test
   @WithAnonymousUser
-  void testMissionsList_Anonymous_ShouldNotSeeCreateButton() throws Exception {
+  void testMissionsList_Anonymous_IsSentToTheLogin() throws Exception {
     mockMvc
         .perform(get("/missions"))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("/missions/new"))))
-        .andExpect(content().string(not(containsString("Create New"))))
-        .andExpect(content().string(not(containsString("Neue Mission"))));
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            result ->
+                org.assertj.core.api.Assertions.assertThat(result.getResponse().getRedirectedUrl())
+                    .as("an anonymous navigation is sent into the OAuth2 entry point")
+                    .contains("/oauth2/authorization/keycloak"));
   }
 
   @Test

@@ -317,13 +317,18 @@ public class GlobalExceptionHandler {
       @NotNull Exception ex, @NotNull HttpServletRequest request, @NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
     String title = resolve("error.403.title", locale, "Forbidden");
-    // Distinguish "authenticated but lacks role" (generic forbidden) from "not signed in at all"
-    // (suggest sign-in + retry) — issue #108. An anonymous user can reach handleAccessDenied
-    // because permitAll() routes still run @PreAuthorize on controller methods, and the latter
-    // raises AuthorizationDeniedException for the anonymous principal instead of triggering
-    // SsoReAuthenticationEntryPoint.
-    boolean anonymous = isAnonymous();
-    String messageKey = anonymous ? FORBIDDEN_UNAUTHENTICATED_KEY : "error.forbidden";
+    // The "not signed in at all" branch of issue #108 is gone with its cause: an anonymous caller
+    // could reach handleAccessDenied because a permitAll() route still ran @PreAuthorize on the
+    // controller method, and that raised AuthorizationDeniedException for the anonymous principal
+    // instead of triggering SsoReAuthenticationEntryPoint. There is no permitAll() route with a
+    // method gate behind it any more (ADR-0159), so an unauthenticated request meets the entry
+    // point and never arrives here.
+    //
+    // The `unauthenticated` model attribute stays: the backend's own UNAUTHENTICATED problem code
+    // still sets it (see handleBackendServiceException), and the error view renders the sign-in CTA
+    // off that — a session that expired mid-request is a real case and a different one.
+    String messageKey = "error.forbidden";
+    boolean anonymous = false;
     String message = resolve(messageKey, locale, "Access denied.");
     log.warn(
         "Access denied for {} {} [exception={}, anonymous={}]: {}",
@@ -502,8 +507,12 @@ public class GlobalExceptionHandler {
    * caller — either no {@link Authentication} at all or an {@link AnonymousAuthenticationToken}
    * supplied by the {@code AnonymousAuthenticationFilter}. Used to decide whether a 403 message
    * should explain "you don't have permission" (authenticated user, insufficient role) versus
-   * "please sign in and try again" (anonymous caller hitting a {@code @PreAuthorize} gate behind a
-   * {@code permitAll()} route).
+   * "please sign in and try again".
+   *
+   * <p>The second branch was for an anonymous caller reaching a {@code @PreAuthorize} gate behind a
+   * {@code permitAll()} route. REQ-SEC-052 left four public routes and none of them carries a
+   * method gate, so nothing should reach it any more — it stays because a wrong message on a route
+   * that grows one is worse than a branch nobody takes.
    */
   private static boolean isAnonymous() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();

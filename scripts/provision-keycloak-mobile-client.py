@@ -88,14 +88,15 @@ ACCESS_TOKEN_LIFESPAN_SECONDS = 300
 # `fullScopeAllowed` below is false, so this list is the whole of it: a realm role that is not
 # named here never reaches the app. That matters more than it looks, because the backend does not
 # read the token's roles directly — `UserReconciliationService` REPLACES the local role set from
-# `realm_access.roles` on every login, and falls back to `Guest` when the claim carries none. A
-# client with `fullScopeAllowed: false` and no scope mappings therefore does not merely narrow the
-# app's rights; it demotes every member who logs in through it to Guest, in the database, for the
-# web app too. Measured on the test stack before this list existed: a fresh app login as an account
-# holding Admin + Officer + KRT Member left it holding `Guest` alone.
+# `realm_access.roles` on every login. A client with `fullScopeAllowed: false` and no scope
+# mappings therefore does not merely narrow the app's rights; it strips every member who logs in
+# through it, in the database, for the web app too. Measured on the test stack before this list
+# existed: a fresh app login as an account holding Admin + Officer + KRT Member left it holding the
+# authority-less `Guest` role of the time.
 #
-# `Guest` itself is deliberately absent: it is what the backend assigns when the claim is empty, so
-# listing it would buy nothing.
+# Since ADR-0159 that outcome is louder rather than quieter: `Guest` is gone, an account that maps
+# to no role is refused with `403 NO_ROLE` (REQ-SEC-053), and the same misconfiguration locks the
+# member out instead of silently demoting them. The list below is what stands between the two.
 #
 # `Admin` WAS absent, and was asserted absent, until 2026-09-01 (owner decision reversing the
 # original one, REQ-SEC-035). It is granted now because withholding it did not narrow the app so
@@ -417,7 +418,7 @@ def upsert_realm_role_scope(kc: Kcadm, client_uuid: str) -> None:
         if unknown:
             raise KcadmError(
                 f"the realm has no role(s) {unknown}. The app's token would carry nothing for them "
-                f"and every holder would be reconciled onto the Guest fallback. Check the realm's "
+                f"and every holder would be left with no role, i.e. refused with NO_ROLE. Check the realm's "
                 f"role names before re-running."
             )
         kc.write("create", f"clients/{client_uuid}/scope-mappings/realm",
@@ -501,7 +502,7 @@ def verify(kc: Kcadm, profile: str = "prod") -> list[str]:
             problems.append(
                 f"realm role '{name}' is not on the client scope — with fullScopeAllowed off the "
                 f"token carries no roles, and every member who signs in through the app is "
-                f"reconciled onto the Guest fallback in the database"
+                f"left with no role in the database, i.e. refused with NO_ROLE"
             )
     for name in FORBIDDEN_REALM_ROLES:
         if name in scope:

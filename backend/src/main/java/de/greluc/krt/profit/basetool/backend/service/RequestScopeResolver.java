@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -192,9 +193,14 @@ public class RequestScopeResolver {
    *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
    *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
    *       the same X-Active-Org-Unit-Id header that admins use today.
-   *   <li>Anonymous → all empty / false / null. The repository predicate falls through to "no rows
-   *       except cross-staffel public escape".
    * </ul>
+   *
+   * <p><strong>An unauthenticated caller is a defect, not a case.</strong> It used to resolve to an
+   * all-empty predicate, which the repository fragment read as "no rows except the
+   * organisation-wide escape" — a silent, plausible answer for a request that should never have
+   * reached a scoped query. Since ADR-0159 nothing anonymous gets past the security matrix, so an
+   * empty predicate built here could only come from a gate that was forgotten; it throws instead,
+   * because a scope question asked by a caller with no identity has no honest answer.
    *
    * <p>The membership union read is hybrid pre-D3: {@link
    * de.greluc.krt.profit.basetool.backend.model.User#getSquadron()} for the Staffel link (still
@@ -203,10 +209,25 @@ public class RequestScopeResolver {
    * app_user.squadron_id} and migrates the legacy Staffel membership onto {@code
    * org_unit_membership}, this method switches to a single {@code findAllByIdUserId} read.
    *
+   * <p><b>The refusal is an {@link AuthenticationCredentialsNotFoundException}, not an {@code
+   * IllegalStateException}.</b> Both fail closed; only one of them fails closed in a shape the API
+   * can answer with. {@code GlobalExceptionHandler} maps the latter to a {@code 400} and echoes its
+   * message, so a lost gate would have told the caller “reaching this means an endpoint lost its
+   * gate” under a status that says they sent something wrong. As a Spring Security exception it
+   * lands on the {@code 401 UNAUTHENTICATED} path instead — generic body, DEBUG log, no stack
+   * trace, no 5xx alert — which is what a request with no identity actually is.
+   *
    * @return a never-null scope vector describing what the current request should see.
+   * @throws AuthenticationCredentialsNotFoundException when the current request carries no
+   *     authenticated caller.
    */
   @NotNull
   public ScopePredicate currentScopePredicate() {
+    if (!authHelper.isAuthenticated()) {
+      throw new AuthenticationCredentialsNotFoundException(
+          "No scope for an unauthenticated caller — every scoped read requires a login"
+              + " (REQ-SEC-052). Reaching this means an endpoint lost its gate.");
+    }
     if (authHelper.isAdmin()) {
       Optional<UUID> active = readActiveSquadronFromHeader();
       return active

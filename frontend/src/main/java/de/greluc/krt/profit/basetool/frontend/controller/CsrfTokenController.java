@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,8 +44,15 @@ import org.springframework.web.bind.annotation.RestController;
  * XorCsrfTokenRequestAttributeHandler}-based repository unchanged; {@link CsrfToken#getToken()}
  * returns the same BREACH-masked value the {@code _csrf} meta tag is rendered from, so the token
  * this returns is valid for the very next submit.
+ *
+ * <p>REQ-SEC-010 has always said an anonymous caller is never handed a token, and the {@code
+ * anyRequest().authenticated()} catch-all is what enforced it — a matcher two folders away, which
+ * is the arrangement REQ-SEC-052 set out to end. The class-level {@code isAuthenticated()} says the
+ * same thing next to the code. It changes no response: the URL layer still refuses first, with the
+ * OIDC redirect rather than a 403.
  */
 @RestController
+@PreAuthorize("isAuthenticated()")
 public class CsrfTokenController {
 
   /**

@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -67,11 +66,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void listMissions_AsMissionManager_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -83,11 +82,11 @@ class MissionManagerButtonVisibilityTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void listMissions_AsMember_ShouldShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
     mockMvc
@@ -98,16 +97,15 @@ class MissionManagerButtonVisibilityTest {
 
   @Test
   void listMissions_AsAnonymous_ShouldNotShowCreateButton() throws Exception {
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(Collections.emptyList(), 0, 10, 0, 0, Collections.emptyList()));
 
-    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
-    mockMvc
-        .perform(get("/missions"))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("href=\"/missions/new\""))));
+    // REQ-SEC-052: there is no anonymous render to inspect for a missing button — the request
+    // is sent into the OAuth2 entry point before a template runs.
+    mockMvc.perform(get("/missions")).andExpect(status().is3xxRedirection());
   }
 }

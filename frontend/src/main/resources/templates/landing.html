@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<!--
+  The only page an unauthenticated visitor sees (REQ-SEC-052 / REQ-UI-018, ADR-0159, decision D7).
+
+  It renders NO DATA and MINTS NO SESSION. Both halves are the requirement, not a nicety:
+
+  * No data — the seven-day mission grid used to render here for anyone who
+    asked, with unit, status, meeting point and times. That is internal
+    planning, and it was the largest anonymous read surface the tool had.
+  * No session — `HomeController.home` no longer declares an `HttpSession`
+    parameter (Spring resolves one with `getSession(true)`), and
+    `SafeCsrfAdvice` returns null for an unauthenticated request instead of
+    forcing the deferred CSRF token, which the default
+    `HttpSessionCsrfTokenRepository` would save into a fresh session before any
+    template ran. Every crawler hit used to cost two.
+
+  The page therefore carries no form and no fragment that needs a token. What it
+  does carry is what D7 named: the product's name, one paragraph, the two login
+  entries, the legal links, and the Fan Kit band — which must appear on the
+  home-page analogue (Fan Kit Guidelines section 2b), and this is now it.
+-->
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
+    <title th:text="${appTitle}">Profit Basetool</title>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{landing.title}">Profit Basetool</h1>
+        <p th:text="#{landing.lead}">Das Werkzeug der Organisation f&uuml;r Eins&auml;tze, Auftr&auml;ge, Lager und Raffinerie.</p>
+
+        <!-- The notice REQ-UI-018 requires on the landing page: this is a fan project, not a CIG
+             product. It stays here, unchanged in substance, now that the page carries nothing
+             else. -->
+        <p class="krt-landing-notice" th:text="#{landing.notice}">Ein inoffizielles Fan-Projekt zu Star Citizen.</p>
+
+        <div class="krt-landing-actions mt-1-5">
+            <a class="btn btn-primary" th:href="@{/oauth2/authorization/keycloak}"
+               data-testid="landing-login" th:text="#{nav.login}">Anmelden</a>
+            <a class="btn btn-ghost sidebar-discord-login"
+               th:href="@{/oauth2/authorization/keycloak(idp='discord')}"
+               data-testid="landing-login-discord">
+                <span th:text="#{nav.login.discord}">Mit Discord anmelden</span>
+                <svg class="krt-icon" aria-hidden="true" focusable="false"><use href="#krt-icon-discord"/></svg>
+            </a>
+        </div>
+
+        <!-- Stated rather than left for the visitor to discover by clicking: every other page
+             sends them to the login and back, and a member arriving from a Discord deep link
+             should know that is what will happen. -->
+        <p class="krt-landing-hint mt-1" th:text="#{landing.members_only}">Alles Weitere ist Mitgliedern vorbehalten.</p>
+
+        <nav class="krt-landing-legal mt-1-5" th:aria-label="#{nav.legal}">
+            <a th:href="@{/terms}" th:text="#{nav.terms}">Nutzungsbedingungen</a>
+            <a th:href="@{/privacy}" th:text="#{nav.privacy}">Datenschutz</a>
+            <a th:href="@{/impressum}" th:text="#{nav.impressum}">Impressum</a>
+        </nav>
+    </div>
+
+    <th:block th:replace="~{fragments/fankit :: band}" />
+</main>
+<!-- No footer include here: the sidebar fragment this page opens with already ends with
+     ~{fragments/footer :: footer} (fragments/sidebar.html), so a second one rendered the
+     legal band twice on the one page a logged-out visitor sees. -->
+</body>
+</html>

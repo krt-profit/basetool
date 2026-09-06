@@ -434,28 +434,10 @@ class InventoryTenancyE2eTest {
     }
   }
 
-  /** UI boundary: an unauthenticated guest is redirected to the login form, not into the Lager. */
-  @Test
-  void guestIsRedirectedToLoginFromLager() {
-    String baseUrl = STACK.baseUrl();
-    try (BrowserContext context =
-        browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
-      Page page = context.newPage();
-      try {
-        E2eSupport.navigate(page, baseUrl + "/inventory/all");
-        page.waitForLoadState();
-        // An anonymous request to a protected Lager page lands on the public landing page carrying
-        // the OIDC login affordance (not the Keycloak form directly), and the protected Lager table
-        // is never rendered for the guest.
-        assertThat(page.locator("a[href='/oauth2/authorization/keycloak']").first())
-            .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        assertThat(page.locator("#inventoryTable")).hasCount(0);
-      } catch (RuntimeException | AssertionError failure) {
-        E2eSupport.dump(page, "inventory-tenancy-guest");
-        throw failure;
-      }
-    }
-  }
+  // The anonymous-visitor case that stood here — /inventory/all lands on the landing page and never
+  // renders the Lager table — moved to AnonymousSurfaceE2eTest, which sweeps that same shape across
+  // every page rather than one. This class is about what a MEMBER sees; who may reach the page at
+  // all is REQ-SEC-052's question, and answering it in one place is what stops the two drifting.
 
   // --------------------------------------------------------------------------------------------
   // Helpers

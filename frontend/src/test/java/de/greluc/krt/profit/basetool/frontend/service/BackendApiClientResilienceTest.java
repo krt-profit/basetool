@@ -67,19 +67,19 @@ import reactor.core.publisher.Mono;
 class BackendApiClientResilienceTest {
 
   private WebClient webClient;
-  private WebClient publicWebClient;
+  private WebClient termsDocumentClient;
   private SimpleMeterRegistry meterRegistry;
   private BackendApiClient client;
 
   @BeforeEach
   void setUp() {
     webClient = mock(WebClient.class);
-    publicWebClient = mock(WebClient.class);
+    termsDocumentClient = mock(WebClient.class);
     meterRegistry = new SimpleMeterRegistry();
     client =
         new BackendApiClient(
             webClient,
-            publicWebClient,
+            termsDocumentClient,
             meterRegistry,
             new org.springframework.cache.support.NoOpCacheManager());
   }
@@ -240,21 +240,34 @@ class BackendApiClientResilienceTest {
     }
 
     @Test
-    void publicWebClient_isUsedWhenIsPublicTrue() {
+    void theTermsDocumentIsTheOneReadThatGoesOutOnTheAnonymousClient() {
+      // The case used to prove that `isPublic = true` selected this client. The flag is gone
+      // (ADR-0159) and one named method took its place, so what is left to pin is that the method
+      // routes there — and, below, that an ordinary GET does not.
       stubGet(
-          publicWebClient,
-          "/api/v1/public-data",
-          new RuntimeException("wrap", new TimeoutException("public-3s")));
+          termsDocumentClient,
+          "/api/v1/terms/document",
+          de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto.class,
+          new RuntimeException("wrap", new TimeoutException("terms-3s")));
 
       BackendServiceException ex =
-          assertThrows(
-              BackendServiceException.class,
-              () -> client.get("/api/v1/public-data", String.class, /* isPublic= */ true));
+          assertThrows(BackendServiceException.class, () -> client.getTermsDocumentAnonymously());
       assertEquals(
           504,
           ex.getStatusCode(),
-          "stubbing publicWebClient (not webClient) must surface the same exception "
-              + "as if isPublic=true routed through it");
+          "getTermsDocumentAnonymously must go out on the anonymous client");
+    }
+
+    @Test
+    void anOrdinaryGetNeverTouchesTheAnonymousClient() {
+      // The half that would fail silently: a call routed to the wrong client still answers, it
+      // just answers without the caller's token. Stubbing only the authenticated one and letting
+      // the anonymous mock stay untouched makes the mistake a failure rather than a 401 in a log.
+      stubGet(
+          webClient, "/api/v1/x", new RuntimeException("wrap", new TimeoutException("auth-3s")));
+
+      assertThrows(BackendServiceException.class, () -> client.get("/api/v1/x", String.class));
+      org.mockito.Mockito.verifyNoInteractions(termsDocumentClient);
     }
   }
 
@@ -360,15 +373,31 @@ class BackendApiClientResilienceTest {
    */
   @SuppressWarnings("unchecked")
   private static void stubGet(WebClient targetClient, String uri, Throwable toThrow) {
+    stubGet(targetClient, uri, String.class, toThrow);
+  }
+
+  /**
+   * Same as {@link #stubGet(WebClient, String, Throwable)} for a call that decodes something other
+   * than {@code String} — {@code getTermsDocumentAnonymously} decodes a {@code TermsDocumentDto},
+   * and a stub on the wrong body type simply never matches, which reads as "the client was not
+   * used" rather than as a wrong stub.
+   *
+   * @param targetClient the WebClient mock to stub
+   * @param uri the URI the call is expected to request
+   * @param bodyType the type the call decodes
+   * @param toThrow what {@code block()} should raise
+   */
+  private static void stubGet(
+      WebClient targetClient, String uri, Class<?> bodyType, Throwable toThrow) {
     WebClient.RequestHeadersUriSpec<?> uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
     WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
     WebClient.ResponseSpec respSpec = mock(WebClient.ResponseSpec.class);
-    Mono<String> body = (Mono<String>) mock(Mono.class);
+    Mono<?> body = mock(Mono.class);
 
     when(targetClient.get()).thenAnswer(inv -> uriSpec);
     when(uriSpec.uri(uri)).thenAnswer(inv -> headersSpec);
     when(headersSpec.retrieve()).thenReturn(respSpec);
-    when(respSpec.bodyToMono(String.class)).thenReturn(body);
+    when(respSpec.bodyToMono(bodyType)).thenAnswer(inv -> body);
 
     // Mockito refuses to "throw checked exception" on a method that doesn't
     // declare it. Mono.block() only throws RuntimeException — so wrap any

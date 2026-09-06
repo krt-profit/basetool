@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -60,31 +59,38 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * the Redis-FlashMap self-reference crash) and preserves the modal-open flag so the user sees the
  * form with errors instead of an empty page. The injected {@link MissionPageController} is a Spring
  * proxy, so its method-level {@code @PreAuthorize} still fires when called via this delegation.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present, which is why
+ * the two {@code @PreAuthorize("permitAll()")} the guest era left on the create handlers were
+ * deleted rather than left to be harmless: Spring resolves method-first and does not AND the class
+ * annotation into it, so they read as a live exemption from the floor above them.
  */
 @Slf4j
 @Controller
 @RequestMapping("/missions/{id}/finance-entries")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class MissionFinancePageController {
 
   private final BackendApiClient backendApiClient;
   private final MissionPageController missionPageController;
-  private final FrontendAuthHelperService authHelper;
 
   /**
-   * Creates a finance entry on a mission. {@code permitAll()} reflects the project's guest-mode for
-   * mission finances — the backend still gates write access at the JWT layer when needed.
+   * Creates a finance entry on a mission. Covered by the class-level {@code isAuthenticated()}
+   * floor; the backend re-evaluates the write permission on {@code /api/v1/finance-entries}.
    *
    * @param id mission id
    * @param form finance-entry form
    * @param bindingResult validation errors carrier
    * @param model Thymeleaf model used for inline re-rendering (modal stays open)
    * @param redirectAttributes flash attributes carrier
-   * @param principal OIDC user, may be {@code null} for guests
+   * @param principal OIDC user; never {@code null} below the class-level floor
    * @return inline {@code mission-detail} view on validation failure, otherwise redirect
    */
   @PostMapping
-  @PreAuthorize("permitAll()")
   public String addFinanceEntry(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("financeForm") MissionFinanceEntryForm form,
@@ -104,7 +110,7 @@ public class MissionFinancePageController {
       body.put("type", form.getType());
       body.put("amount", form.getAmount());
 
-      backendApiClient.post("/api/v1/finance-entries", body, Void.class, authHelper.isAnonymous());
+      backendApiClient.post("/api/v1/finance-entries", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
@@ -117,8 +123,7 @@ public class MissionFinancePageController {
   }
 
   /**
-   * Updates a finance entry. The form carries the optimistic-lock version. Authenticated-only —
-   * guest write is restricted to {@code POST} (create) above.
+   * Updates a finance entry. The form carries the optimistic-lock version.
    *
    * @param id mission id (path)
    * @param entryId finance entry id (path)
@@ -130,7 +135,6 @@ public class MissionFinancePageController {
    * @return inline {@code mission-detail} view on validation failure, otherwise redirect
    */
   @PostMapping("/{entryId}/update")
-  @PreAuthorize("isAuthenticated()")
   public String updateFinanceEntry(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
@@ -152,7 +156,7 @@ public class MissionFinancePageController {
       body.put("amount", form.getAmount());
       body.put("version", form.getVersion());
 
-      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class, false);
+      backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
@@ -174,14 +178,13 @@ public class MissionFinancePageController {
    * @return redirect to {@code /missions/{id}}
    */
   @PostMapping("/{entryId}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteFinanceEntry(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class, false);
+      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
@@ -201,22 +204,20 @@ public class MissionFinancePageController {
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
    *     amount}); {@code missionId} is stamped from the path
-   * @param principal OIDC user bound from the security context; guest vs. authenticated routing now
-   *     goes through {@code authHelper.isAnonymous()}
+   * @param principal OIDC user bound from the security context; never {@code null} below the
+   *     class-level floor. The guest-vs-authenticated routing it used to steer is gone with the
+   *     guest (ADR-0159)
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("permitAll()")
   public ResponseEntity<Object> addFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
       @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
     try {
       body.put("missionId", id);
-      Object result =
-          backendApiClient.post(
-              "/api/v1/finance-entries", body, Object.class, authHelper.isAnonymous());
+      Object result = backendApiClient.post("/api/v1/finance-entries", body, Object.class);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Add finance entry (AJAX) failed: status={}", e.getStatusCode());
@@ -238,14 +239,13 @@ public class MissionFinancePageController {
    */
   @PutMapping(value = "/{entryId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> updateFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID entryId,
       @RequestBody Map<String, Object> body) {
     try {
       Object result =
-          backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class, false);
+          backendApiClient.put("/api/v1/finance-entries/" + entryId, body, Object.class);
       return ResponseEntity.ok(result);
     } catch (BackendServiceException e) {
       log.debug("Update finance entry (AJAX) failed: status={}", e.getStatusCode());
@@ -267,11 +267,10 @@ public class MissionFinancePageController {
    */
   @DeleteMapping(value = "/{entryId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public ResponseEntity<Object> deleteFinanceEntryAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID entryId) {
     try {
-      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class, false);
+      backendApiClient.delete("/api/v1/finance-entries/" + entryId, Void.class);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
       log.debug("Delete finance entry (AJAX) failed: status={}", e.getStatusCode());

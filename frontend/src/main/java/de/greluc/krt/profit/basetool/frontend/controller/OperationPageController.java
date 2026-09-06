@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -79,16 +78,21 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} so the template can disable inputs for users
  * who would just bounce off a 403 on submit — without leaking any role logic into the service
  * layer.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/operations")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
   private final MarkdownRenderer markdown;
-  private final FrontendAuthHelperService authHelper;
   private final ParallelPageLoader parallelPageLoader;
 
   /** Response type for one paginated page of the operations search endpoint. */
@@ -125,12 +129,11 @@ public class OperationPageController {
    * @param size page size (default 20)
    * @param fragment when equal to {@code "results"}, render only the results fragment
    * @param model Thymeleaf model populated with the page content and metadata
-   * @param principal current OIDC user, bound from the security context; the {@code showPast}
-   *     honouring now consults {@code authHelper.isAnonymous()} rather than this parameter directly
+   * @param principal current OIDC user, bound from the security context. {@code showPast} used to
+   *     be honoured only for an authenticated caller; every caller is one now (ADR-0159)
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
   @GetMapping
-  @PreAuthorize("isAuthenticated()")
   public String listOperations(
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String start,
@@ -160,7 +163,9 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    boolean effectiveShowPast = showPast && !authHelper.isAnonymous();
+    // The "and not anonymous" half is gone with the caller (ADR-0159): every caller here holds
+    // a session, so the archive toggle means what it says.
+    boolean effectiveShowPast = showPast;
     if (effectiveShowPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
@@ -171,7 +176,7 @@ public class OperationPageController {
       PageResponse<OperationDto> operationsPage =
           hasSearch
               ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, search)
-              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, false);
+              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE);
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);
@@ -199,9 +204,6 @@ public class OperationPageController {
    * @return picker options or empty list; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
-    if (authHelper.isAnonymous()) {
-      return List.of();
-    }
     try {
       // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
       // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
@@ -236,7 +238,6 @@ public class OperationPageController {
    *     or a redirect on backend failure of the full-page load
    */
   @GetMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   public String operationDetails(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false, defaultValue = "0") Integer page,
@@ -331,7 +332,7 @@ public class OperationPageController {
     // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
     CompletableFuture<OperationDto> operationF =
         parallelPageLoader.loadAsync(
-            () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+            () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
     CompletableFuture<PageResponse<MissionListDto>> missionsF =
         parallelPageLoader.loadAsync(() -> fetchMissionsPage(id, page, size));
     CompletableFuture<OperationFinanceSummaryDto> financeF =
@@ -339,15 +340,12 @@ public class OperationPageController {
             () ->
                 backendApiClient.get(
                     "/api/v1/operations/" + id + "/finance-summary",
-                    OperationFinanceSummaryDto.class,
-                    false));
+                    OperationFinanceSummaryDto.class));
     CompletableFuture<OperationPayoutSummaryDto> payoutsF =
         parallelPageLoader.loadAsync(
             () ->
                 backendApiClient.get(
-                    "/api/v1/operations/" + id + "/payouts",
-                    OperationPayoutSummaryDto.class,
-                    false));
+                    "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class));
     CompletableFuture.allOf(operationF, missionsF, financeF, payoutsF).join();
 
     model.addAttribute("operation", operationF.join());
@@ -403,10 +401,10 @@ public class OperationPageController {
    */
   private void loadPayoutModel(UUID id, Authentication authentication, Model model) {
     model.addAttribute(
-        "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+        "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
     OperationPayoutSummaryDto payoutSummary =
         backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
@@ -427,12 +425,10 @@ public class OperationPageController {
     model.addAttribute(
         "operationFinance",
         backendApiClient.get(
-            "/api/v1/operations/" + id + "/finance-summary",
-            OperationFinanceSummaryDto.class,
-            false));
+            "/api/v1/operations/" + id + "/finance-summary", OperationFinanceSummaryDto.class));
     OperationPayoutSummaryDto payoutSummary =
         backendApiClient.get(
-            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class, false);
+            "/api/v1/operations/" + id + "/payouts", OperationPayoutSummaryDto.class);
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
     model.addAttribute("missionsPage", fetchMissionsPage(id, page, size));
   }
@@ -454,7 +450,7 @@ public class OperationPageController {
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
     try {
       model.addAttribute(
-          "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class, false));
+          "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
       PageResponse<MissionListDto> missionsPage = fetchMissionsPage(id, page, size);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
@@ -484,8 +480,7 @@ public class OperationPageController {
             + "&size="
             + size
             + "&sort=plannedStartTime,asc",
-        MISSION_PAGE_TYPE,
-        false);
+        MISSION_PAGE_TYPE);
   }
 
   /**
@@ -504,15 +499,13 @@ public class OperationPageController {
    * @return the {@code operation-detail :: financeDetail} fragment view
    */
   @GetMapping("/{id}/finance/{missionId}")
-  @PreAuthorize("isAuthenticated()")
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
     try {
       MissionFinanceSummaryDto detail =
           backendApiClient.get(
               "/api/v1/operations/" + id + "/finances/" + missionId,
-              MissionFinanceSummaryDto.class,
-              false);
+              MissionFinanceSummaryDto.class);
       model.addAttribute("financeDetail", detail);
     } catch (Exception e) {
       log.error("Error loading finance detail for operation {} mission {}", id, missionId, e);
@@ -641,8 +634,7 @@ public class OperationPageController {
           backendApiClient.put(
               "/api/v1/operations/" + id + "/payouts/paid-out",
               request,
-              OperationPayoutStatusDto.class,
-              false);
+              OperationPayoutStatusDto.class);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
       log.debug(
@@ -683,7 +675,6 @@ public class OperationPageController {
   @PostMapping(
       value = "/markdown-preview",
       produces = org.springframework.http.MediaType.TEXT_HTML_VALUE)
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public ResponseEntity<String> markdownPreview(
       @RequestBody java.util.Map<String, String> request) {

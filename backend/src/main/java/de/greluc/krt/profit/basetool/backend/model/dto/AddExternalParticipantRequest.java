@@ -25,13 +25,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the Add Participant Public operation. {@code @Size} caps cap the
- * anonymous attack surface — without them an unauthenticated caller could spam multi-megabyte
- * {@code guestName} / {@code comment} payloads through the public participant-add endpoint until
- * the {@code mission_participant} table is full (audit finding H-2).
+ * Inbound request payload for the add-participant operations — by {@code userId} for a registered
+ * member, or by free-text {@code guestName} for an <b>external</b> participant, a named person
+ * without an account (ADR-0159, decision D4).
  *
- * <p>{@code orgUnitIds} is honoured only for GUEST entries (and only when the authenticated caller
- * may label those org units — see {@code MissionService.resolveGuestSubmittedOrgUnits}); for a
+ * <p>Named {@code AddParticipantPublicRequest} until ADR-0159, after the endpoint that was {@code
+ * permitAll}. The {@code @Size} caps were written for that audience: without them an
+ * unauthenticated caller could spam multi-megabyte {@code guestName} / {@code comment} payloads
+ * until the {@code mission_participant} table was full (audit finding H-2). They stay — a member
+ * can fill a table too, and a bound on a free-text column is cheap.
+ *
+ * <p>{@code orgUnitIds} is honoured only for an external entry (and only when the caller may label
+ * those org units — see {@code MissionParticipantService.resolveSubmittedOrgUnits}); for a
  * registered participant the affiliations are auto-derived server-side from the user's memberships
  * and any submitted list is ignored.
  *
@@ -39,7 +44,7 @@ import java.util.UUID;
  * "Auszahlungsart" select in the sign-up modal). When {@code null}, the registered user's profile
  * default (REQ-MISSION-002) respectively the entity default ({@code PAYOUT}) applies.
  */
-public record AddParticipantPublicRequest(
+public record AddExternalParticipantRequest(
     UUID userId,
     @Size(max = 100) String guestName,
     UUID desiredJobTypeId,

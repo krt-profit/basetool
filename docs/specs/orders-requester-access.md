@@ -11,13 +11,15 @@ that was gated behind the profit-eligibility viewer gate `canViewJobOrders`
 ([`security-and-access.md`](security-and-access.md), REQ-SEC-009;
 [`org-unit-tenancy.md`](org-unit-tenancy.md), REQ-ORG-003). A member of a purely non-profit ordering
 unit could therefore **create** an order but could neither see nor track it afterwards — the same
-"submit but don't track" posture as an anonymous guest (#1186).
+"submit but don't track" posture the public request form gave an anonymous visitor before ADR-0149
+removed it (#1186).
 
 This spec adds a **requester escape**: a member of an order's requesting org unit may view that order
 and, while it is still fully undelivered, edit it within limits — independent of the profit gate and
 independent of the LOGISTICIAN full-edit path used by the processing side. Ownership is defined at the
 **org-unit level** (membership in the requesting org unit), because a job order carries no per-user
-creator column and may be created anonymously; there is no schema change (ADR-0091).
+creator column — a legacy of the anonymous request form it once had; there is no schema change
+(ADR-0091).
 
 ## Requirements
 

@@ -37,6 +37,7 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -94,6 +95,8 @@ class ArchitectureTest {
 
   private static final String TRANSACTIONAL =
       "org.springframework.transaction.annotation.Transactional";
+
+  private static final String GET_MAPPING = "org.springframework.web.bind.annotation.GetMapping";
 
   private static final String POST_MAPPING = "org.springframework.web.bind.annotation.PostMapping";
   private static final String PUT_MAPPING = "org.springframework.web.bind.annotation.PutMapping";
@@ -392,11 +395,11 @@ class ArchitectureTest {
     // catch the worst regression case: a controller that ships with zero auth
     // annotations and silently falls through to SecurityConfig's catch-all.
     //
-    // We deliberately do NOT require every handler method to be annotated, because
-    // the current codebase mixes the two patterns ("controller-level @PreAuthorize
-    // covers everything" vs. "method-level @PreAuthorize per endpoint") and many
-    // public endpoints are gated by SecurityConfig's `requestMatchers(...).permitAll()`
-    // instead. Tightening to per-method is a separate, larger follow-up.
+    // We deliberately do NOT require every handler method to be annotated: the codebase mixes
+    // the two patterns ("controller-level @PreAuthorize covers everything" vs. "method-level
+    // @PreAuthorize per endpoint"), and a class-level gate genuinely covers its methods. What is
+    // no longer accepted is a controller with no gate at all relying on a permitAll matcher two
+    // folders away — readEndpointsMustDeclareAnAuthorisationAnnotation below closes that.
     classes()
         .that()
         .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
@@ -404,7 +407,94 @@ class ArchitectureTest {
         .because(
             "Every REST controller class must declare at least one @PreAuthorize annotation (either"
                 + " on the class or on any method) so it cannot silently bypass authorisation."
-                + " Public endpoints should use @PreAuthorize(\"permitAll()\").")
+                + " Public endpoints must use @PreAuthorize(\"permitAll()\") and are limited to"
+                + " the three REQ-SEC-052 names.")
+        .check(CLASSES);
+  }
+
+  /**
+   * The three methods that may declare {@code @PreAuthorize("permitAll()")} — and no others.
+   *
+   * <p>REQ-SEC-052 states the public surface as a list, and a list is only a requirement if
+   * something refuses to grow it. Two are the anonymous reads (D2 / D3 of ADR-0159): an app too old
+   * to log in must still learn that it is too old, and a document everyone must be able to read
+   * before agreeing to anything cannot require having agreed. The third is the Keycloak SPI's
+   * account-existence precheck, which is machine-to-machine behind a constant-time shared-secret
+   * header — not an anonymous data path, and it carries no JWT because Keycloak sits outside the
+   * resource server's trust boundary.
+   */
+  private static final Set<String> PERMIT_ALL_ALLOWED_METHODS =
+      Set.of(
+          "de.greluc.krt.profit.basetool.backend.controller.AppVersionPolicyController"
+              + ".versionPolicy()",
+          "de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController.document"
+              + "(java.util.Locale)",
+          "de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController");
+
+  @Test
+  void permitAllIsDeclaredOnlyOnTheThreePublicEndpoints() {
+    List<String> offenders = new java.util.ArrayList<>();
+    for (JavaClass clazz : CLASSES) {
+      if (!clazz.getPackageName().contains(".backend.controller")) {
+        continue;
+      }
+      for (JavaMethod method : clazz.getMethods()) {
+        if (!method.isAnnotatedWith(PRE_AUTHORIZE)) {
+          continue;
+        }
+        String value =
+            method
+                .getAnnotationOfType(PRE_AUTHORIZE)
+                .tryGetExplicitlyDeclaredProperty("value")
+                .map(Object::toString)
+                .orElse("");
+        if (!value.contains("permitAll")) {
+          continue;
+        }
+        boolean allowed =
+            PERMIT_ALL_ALLOWED_METHODS.stream()
+                .anyMatch(
+                    allowedName ->
+                        method.getFullName().startsWith(allowedName)
+                            || clazz.getFullName().equals(allowedName));
+        if (!allowed) {
+          offenders.add(method.getFullName());
+        }
+      }
+    }
+    org.assertj.core.api.Assertions.assertThat(offenders)
+        .as(
+            "REQ-SEC-052: only the two anonymous reads and the Keycloak SPI precheck may declare"
+                + " permitAll(). A new one is a widening of the public surface and needs the"
+                + " requirement amended first.")
+        .isEmpty();
+  }
+
+  /**
+   * Every read endpoint carries an authorisation decision of its own, class-level or method-level.
+   *
+   * <p>The write sibling of this rule has existed since the 2026-05-20 audit. Reads were left out
+   * because the URL matrix answered for them — and that is exactly what REQ-SEC-052 removed. Before
+   * ADR-0159 twelve {@code InventoryItemController} reads, both {@code MaterialCategoryController}
+   * reads, {@code AnnouncementController}, {@code TerminalController} and the two {@code
+   * HangarController} reads carried no gate at all; they were safe only because a matcher two
+   * folders away said {@code authenticated()}. A read is where data leaves, so it gets the same
+   * treatment as a write.
+   */
+  @Test
+  void readEndpointsMustDeclareAnAuthorisationAnnotation() {
+    methods()
+        .that()
+        .areDeclaredInClassesThat()
+        .resideInAPackage("..backend.controller..")
+        .and()
+        .arePublic()
+        .and(isAnnotatedWithAnyOf(GET_MAPPING))
+        .should(haveMethodOrClassLevelPreAuthorize())
+        .because(
+            "Every read endpoint must carry an explicit @PreAuthorize (method- or class-level)."
+                + " REQ-SEC-052 leaves the URL matrix naming only the public surface, so a read"
+                + " without a gate of its own is protected by nothing that lives next to it.")
         .check(CLASSES);
   }
 
@@ -1177,54 +1267,75 @@ class ArchitectureTest {
   }
 
   /**
-   * Audit finding C-1 guard (2026-05-20 security audit): mission endpoints gated only by
-   * {@code @PreAuthorize("@ownerScopeService.canSeeMission(#id)")} (without an additional {@code
-   * isAuthenticated()} / {@code hasRole(...)} / {@code hasAuthority(...)} clause) are reachable by
-   * anonymous callers for non-internal missions — {@link
-   * de.greluc.krt.profit.basetool.backend.config.SecurityConfig} declares the matching paths as
-   * {@code permitAll}. Any such endpoint that returns a {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.MissionDto}, a {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} or a generic collection
-   * of either MUST invoke one of the guest-redaction helpers ({@code cleanupMissionForGuest} /
-   * {@code cleanupParticipantForGuest}) somewhere in its body; otherwise full participant PII
-   * (email, real name, roles, permissions) is shipped to guests.
+   * Audit finding C-1 guard, re-keyed by ADR-0159: a mission endpoint whose gate admits a member
+   * <b>below Logistician</b> and which returns a PII-carrying mission DTO MUST call one of the
+   * {@code cleanup…ForPeer} helpers, or it ships participant e-mail and real name to a peer
+   * (REQ-SEC-007).
    *
-   * <p>The rule fired on the original C-1 regression in {@code
-   * MissionController.addParticipantPublic} and {@code MissionController.addParticipantSlim}, both
-   * of which had the {@code canSeeMission} gate but skipped the redaction pass that {@code
-   * getMissionById} / {@code getNextMission} already applied. Without this guard a future endpoint
-   * added with the same gate would silently re-introduce the same leak.
+   * <p><b>What changed, and why the rule had to be rewritten rather than renamed.</b> It used to
+   * select endpoints whose {@code @PreAuthorize} carried <em>no</em> {@code isAuthenticated()} /
+   * {@code hasRole(...)} clause — the shape that made an endpoint anonymously reachable under the
+   * old {@code permitAll} matrix. Every one of those gates now carries {@code isAuthenticated()},
+   * so the old predicate would select <b>nothing</b> and the rule would pass by matching no
+   * members: a guard that is green because it checks an empty set is worse than no guard, which is
+   * why the non-empty assertion below is part of the test rather than a nicety.
+   *
+   * <p>The replacement keys on <em>which</em> gate rather than on the absence of one. {@code
+   * canSeeMission} and {@code canAccessParticipant} both admit an ordinary member; {@code
+   * canManageMission}, {@code canManageManagers}, {@code canChangeOwner} and any {@code hasRole}
+   * gate do not, and those endpoints legitimately return the unredacted aggregate to the
+   * leadership.
    *
    * <p>The check is structural: it asserts the helper is referenced in the bytecode, NOT that the
-   * call is conditional on {@code jwt == null}. The conditional branching is verified by the
-   * per-endpoint unit tests. The intent of the ArchUnit rule is to catch the "I forgot the
-   * redaction entirely" regression, which is the actual C-1 root cause.
+   * call is conditional. The conditional branching is verified by the per-endpoint unit tests. The
+   * intent is to catch the "I forgot the redaction entirely" regression, which was the actual C-1
+   * root cause in {@code addParticipantPublic} / {@code addParticipantSlim}.
    */
   @Test
-  void anonymousReadableMissionEndpointsMustRedactGuestPii() {
+  void peerReadableMissionEndpointsMustRedactPii() {
+    // failOnEmptyShould is on (ArchUnit 1.5.0), but a rule that silently narrows to zero members
+    // reads as a pass in every report format that matters. Assert the selection explicitly, with
+    // the number stated, so shrinking it is a decision somebody has to write down.
+    long selected =
+        CLASSES.stream()
+            .filter(c -> c.getPackageName().contains(".backend.controller"))
+            .flatMap(c -> c.getMethods().stream())
+            .filter(
+                m ->
+                    m.getModifiers().contains(com.tngtech.archunit.core.domain.JavaModifier.PUBLIC))
+            .filter(m -> hasPeerReachableMissionGate().test(m))
+            .filter(m -> returnsMissionDtoOrMissionParticipantDtoOrCollection().test(m))
+            .count();
+    org.assertj.core.api.Assertions.assertThat(selected)
+        .as(
+            "peer-reachable mission endpoints returning a PII-carrying DTO — if this is 0 the rule"
+                + " below checks nothing and passes for the wrong reason")
+        .isGreaterThanOrEqualTo(10);
+
     methods()
         .that()
         .areDeclaredInClassesThat()
         .resideInAPackage("..backend.controller..")
         .and()
         .arePublic()
-        .and(hasGuestVisibleCanSeeMissionPreAuthorize())
+        .and(hasPeerReachableMissionGate())
         .and(returnsMissionDtoOrMissionParticipantDtoOrCollection())
         .should(callOneOfTheGuestRedactionHelpers())
         .because(
-            "Mission endpoints reachable by anonymous callers must apply cleanupMissionForGuest "
-                + "or cleanupParticipantForGuest before returning — audit finding C-1: "
-                + "addParticipantPublic / addParticipantSlim previously leaked full participant "
-                + "emails and real names to anonymous callers because the redaction pass that "
-                + "getMissionById / getNextMission already used was skipped on the write paths.")
+            "Mission endpoints reachable by a member below Logistician must apply "
+                + "cleanupMissionForPeer or cleanupParticipantForPeer before returning "
+                + "(REQ-SEC-007) — audit finding C-1: addParticipantPublic / addParticipantSlim "
+                + "previously leaked full participant emails and real names because the redaction "
+                + "pass that getMissionById / getNextMission already used was skipped on the "
+                + "write paths.")
         .check(CLASSES);
   }
 
   /**
    * Mission DTOs whose participant nesting carries PII (email, first/last name, roles). Used by
-   * {@link #anonymousReadableMissionEndpointsMustRedactGuestPii} to recognise return shapes that
-   * must go through guest-redaction before reaching an anonymous caller. {@code
-   * MissionFinanceEntryDto} is included because it embeds {@link
+   * {@link #peerReadableMissionEndpointsMustRedactPii} to recognise return shapes that must go
+   * through guest-redaction before reaching an anonymous caller. {@code MissionFinanceEntryDto} is
+   * included because it embeds {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} directly — the audit
    * found this transitive leak (C-2) in {@code MissionFinanceEntryController.createFinanceEntry}.
    */
@@ -1235,26 +1346,24 @@ class ArchitectureTest {
           "de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto");
 
   /**
-   * Naming convention for helper methods that strip participant PII for anonymous / guest callers:
-   * {@code cleanup<EntityName>ForGuest}. Examples in the codebase (the redaction helpers now live
-   * in {@code MissionGuestRedactor}, called by the controllers): {@code
-   * MissionGuestRedactor#cleanupMissionForGuest} (member-peer level), {@code
-   * MissionGuestRedactor#cleanupOutsiderMissionForGuest} (strict outsider level), {@code
-   * …#cleanupParticipantForGuest}. The ArchUnit rule recognises any call to a method matching this
-   * pattern as a valid redaction call — so adding a new guest-reachable controller with its own
-   * entity-specific redactor (named accordingly) does not require updating this test.
+   * Naming convention for helper methods that strip participant PII for a peer: {@code
+   * cleanup<EntityName>ForPeer}. The helpers live in {@code MissionPeerRedactor} and are called by
+   * the controllers: {@code cleanupMissionForPeer}, {@code cleanupParticipantForPeer}, {@code
+   * cleanupUserForPeer}, {@code cleanupUnitForPeer}, {@code cleanupShipForPeer}. The rule
+   * recognises any call to a method matching this pattern as a valid redaction call — so adding a
+   * new peer-reachable controller with its own entity-specific redactor (named accordingly) does
+   * not require updating this test.
    *
    * @param name candidate method name
-   * @return {@code true} iff {@code name} matches the {@code cleanup…ForGuest} convention
+   * @return {@code true} iff {@code name} matches the {@code cleanup…ForPeer} convention
    */
   private static boolean isGuestRedactionHelperName(String name) {
-    return name.startsWith("cleanup") && name.endsWith("ForGuest");
+    return name.startsWith("cleanup") && name.endsWith("ForPeer");
   }
 
-  private static DescribedPredicate<JavaMethod> hasGuestVisibleCanSeeMissionPreAuthorize() {
+  private static DescribedPredicate<JavaMethod> hasPeerReachableMissionGate() {
     return new DescribedPredicate<JavaMethod>(
-        "annotated with @PreAuthorize that gates on canSeeMission or canAccessParticipant"
-            + " without an isAuthenticated/hasRole/hasAuthority clause") {
+        "annotated with @PreAuthorize whose gate admits a member below Logistician") {
       @Override
       public boolean test(JavaMethod method) {
         if (!method.isAnnotatedWith(PRE_AUTHORIZE)) {
@@ -1263,18 +1372,29 @@ class ArchitectureTest {
         JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
         String value =
             ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-        // {@code canAccessParticipant} returns true for any guest participant ({@code
-        // p.getUser() == null}) — so an anonymous caller can reach the endpoint when the target
-        // is a guest. The legacy participant endpoints (PUT /participants/{id}, check-in / -out,
-        // payout-preference, DELETE /participants/{id}) all carry this gate and have shipped the
-        // full MissionDto without redaction before the 2026-05-20 audit fix.
-        if (!value.contains("canSeeMission") && !value.contains("canAccessParticipant")) {
+        // Every gate below admits an ordinary member, which is the audience the peer redaction
+        // exists for. canSeeMission admits any member who may see the Einsatz; canAccessParticipant
+        // admits the participant themselves.
+        //
+        // canManageMission, canManageManagers and canChangeOwner used to be listed here as
+        // EXEMPTIONS, on the premise that "a gate that already requires leadership returns the
+        // unredacted aggregate on purpose". That premise is false, and the 2026-09-06 review is
+        // what established it: all three fall through to isOwnerOrManager, which grants on
+        // mission.getOwner() or membership of getManagers() without consulting a role at all — and
+        // the role hierarchy declares no MISSION_MANAGER > LOGISTICIAN edge either. Creating a
+        // mission makes you its owner, so a plain KRT_MEMBER passes them. The exemptions therefore
+        // covered exactly the audience the peer tier was created for, and the rule could not fail
+        // on twenty-three write handlers that returned the unredacted aggregate.
+        if (!value.contains("canSeeMission")
+            && !value.contains("canAccessParticipant")
+            && !value.contains("canManageMission")
+            && !value.contains("canManageManagers")
+            && !value.contains("canChangeOwner")) {
           return false;
         }
-        // Any of the following would force the caller to be authenticated, making jwt non-null
-        // at runtime and the guest-redaction pass moot.
-        return !value.contains("isAuthenticated()")
-            && !value.contains("hasRole(")
+        // A gate that names a role or authority genuinely cannot admit a member below Logistician:
+        // the hierarchy is what decides those, and it puts nobody below LOGISTICIAN above it.
+        return !value.contains("hasRole(")
             && !value.contains("hasAnyRole(")
             && !value.contains("hasAuthority(")
             && !value.contains("hasAnyAuthority(");
@@ -1399,7 +1519,7 @@ class ArchitectureTest {
 
   private static ArchCondition<JavaMethod> callOneOfTheGuestRedactionHelpers() {
     return new ArchCondition<JavaMethod>(
-        "call a cleanup…ForGuest redaction helper from its own body") {
+        "call a cleanup…ForPeer redaction helper from its own body") {
       @Override
       public void check(JavaMethod method, ConditionEvents events) {
         boolean callsHelper =
@@ -1409,7 +1529,7 @@ class ArchitectureTest {
         if (callsHelper) {
           return;
         }
-        // Method references (e.g. `stream.map(this::cleanupParticipantForGuest)`) are compiled
+        // Method references (e.g. `stream.map(this::cleanupParticipantForPeer)`) are compiled
         // into a synthetic invokedynamic call site whose target is reachable via the bootstrap.
         // ArchUnit exposes that as a separate access kind — fall back to the broader call set so
         // the rule does not false-positive on the slim endpoint's stream pattern.
@@ -1420,15 +1540,34 @@ class ArchitectureTest {
         if (referencesHelper) {
           return;
         }
+        // One level of same-class indirection counts. Twenty-three handlers route their return
+        // through MissionController#redactForPeer rather than repeating the same four-line
+        // isLogisticianOrAbove block, and a rule that forced the copy would be arguing for worse
+        // code than it protects. The hop is bounded on purpose: only a private helper of the very
+        // same controller, so the redaction stays visible in the file the reviewer is reading.
+        boolean callsALocalHelperThatRedacts =
+            method.getMethodCallsFromSelf().stream()
+                .filter(
+                    call ->
+                        call.getTargetOwner().getFullName().equals(method.getOwner().getFullName()))
+                .flatMap(call -> call.getTarget().resolveMember().stream())
+                .anyMatch(
+                    target ->
+                        target.getAccessesFromSelf().stream()
+                            .map(access -> access.getTarget().getName())
+                            .anyMatch(ArchitectureTest::isGuestRedactionHelperName));
+        if (callsALocalHelperThatRedacts) {
+          return;
+        }
         events.add(
             SimpleConditionEvent.violated(
                 method,
                 method.getFullName()
-                    + " — anonymous callers reach this endpoint (PreAuthorize gates on"
-                    + " canSeeMission without forcing authentication) and the return type carries"
-                    + " participant PII, but the method body does not invoke any cleanup…ForGuest"
-                    + " redaction helper. Full participant emails / real names / roles will leak to"
-                    + " guests — see audit findings C-1 / C-2."));
+                    + " — a member below Logistician reaches this endpoint (its @PreAuthorize"
+                    + " gate admits one) and the return type carries participant PII, but the"
+                    + " method body does not invoke any cleanup…ForPeer redaction helper."
+                    + " Participant e-mail addresses and real names will leak to a peer"
+                    + " (REQ-SEC-007) — see audit findings C-1 / C-2."));
       }
     };
   }

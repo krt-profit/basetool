@@ -148,13 +148,13 @@ public class AuthHelperService {
    * role ({@code KRT_MEMBER}/{@code MEMBER}/{@code LOGISTICIAN}/{@code MISSION_MANAGER}/{@code
    * OFFICER}/{@code ADMIN}), evaluated through the configured {@link RoleHierarchy}.
    *
-   * <p>Its negation is the project's "mission outsider" predicate: it returns {@code false} for an
-   * anonymous request (only {@code ROLE_ANONYMOUS}) AND for an authenticated but role-less {@code
-   * GUEST} account (empty authorities / only {@code ROLE_GUEST}). Mission read and write paths use
-   * this to apply the same minimised, redacted view to anonymous and guest callers alike — a guest
-   * is deliberately treated like an anonymous visitor on the mission surface (no description,
-   * organisation, participant roster, units, payout, or finance ledger), while still being allowed
-   * to sign up and edit their own guest participant.
+   * <p>Kept as a distinct question from {@code isAuthenticated()} even though the two now agree on
+   * nearly every caller. Since ADR-0159 an account that maps to no application role is refused with
+   * {@code 403 NO_ROLE} before a handler runs, so the gap between "authenticated" and "member" has
+   * shrunk to the PENDING/REJECTED registration and to whatever authority set a future integration
+   * introduces. Membership is the honest predicate for the questions that ask it — the mission
+   * description (REQ-SEC-041), the live-sync rooms — and collapsing it into authentication would
+   * make each of those depend on a refusal happening earlier in the chain.
    *
    * @return {@code true} iff the caller reaches one of {@link #MEMBER_OR_ABOVE_ROLES}
    */

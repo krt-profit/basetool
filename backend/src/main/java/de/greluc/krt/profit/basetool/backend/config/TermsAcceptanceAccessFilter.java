@@ -64,10 +64,13 @@ import tools.jackson.databind.ObjectMapper;
  * minted correlation id, {@code basetool_http_error_total} increment, and the JWT {@code sub}
  * stamped into the MDC only for the duration of the rejection write.
  *
- * <p>Two exemptions and no more. The consent endpoints themselves, or there is no way through the
- * gate — refusing those would make the block permanent for everyone. And the registration-status
+ * <p>Three exemptions and no more. The consent endpoints themselves, or there is no way through the
+ * gate — refusing those would make the block permanent for everyone. The registration-status
  * endpoint, so a user who is <em>also</em> pending approval still gets routed to the waiting page
- * rather than to a consent page for a tool they cannot enter yet.
+ * rather than to a consent page for a tool they cannot enter yet. And the served-version floor
+ * ({@code /api/v1/app/version-policy}, REQ-SEC-052): it answers without a token at all, and the app
+ * sends its bearer on every call once a session exists, so gating it here would refuse the
+ * forced-update check to exactly the callers who cannot complete the consent flow.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -110,7 +113,14 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
           PATH_PARSER.parse("/api/v1/terms"),
           PATH_PARSER.parse("/api/v1/terms/**"),
           // Lets a caller who is ALSO pending approval be routed to the waiting page instead.
-          PATH_PARSER.parse("/api/v1/users/me/registration-status"));
+          PATH_PARSER.parse("/api/v1/users/me/registration-status"),
+          // REQ-SEC-052: the second of the two reads that answer without any token. The terms
+          // wording above is already exempt via /api/v1/terms/**; this one is not covered by any
+          // pattern here and needs naming. The Android app attaches its bearer to every call once
+          // a session exists, so an unconsented member asking whether their build is still served
+          // would otherwise be refused — and the forced-update gate exists precisely for the case
+          // where the member cannot get through the flow that would let them consent.
+          PATH_PARSER.parse("/api/v1/app/version-policy"));
 
   /** App-wide correlation-id response header. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";

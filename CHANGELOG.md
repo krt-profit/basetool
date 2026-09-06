@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Das Basetool ist ab jetzt nur noch für Mitglieder.** Ohne Anmeldung siehst du die Startseite und die Rechtsseiten — sonst nichts. Einsätze, Operationen, die Auftragswarteschlange und die Spieldaten-Kataloge brauchen einen Login; jeder Link dorthin führt zur Anmeldung und danach zurück auf die gewünschte Seite.
+
+- **Jedes Konto hat mindestens Mitgliedsrechte.** Die Rolle „Gast" gibt es nicht mehr. Ein Konto, dem keine Rolle zugeordnet werden kann, wird abgewiesen und bekommt einen eigenen Hinweis, statt wie bisher stillschweigend die Gast-Ansicht zu erhalten.
+
+- **Drei Preis-Abfragen und die Startseite gaben ohne Anmeldung Daten heraus.** Die Handelspreise waren bereits vorher geschlossen (Runbook-Phase W); die Startseite zeigte bis jetzt die Einsätze der nächsten sieben Tage und legte für jeden Besuch zwei Sitzungen an. Beides ist behoben.
+
+- **Wer einen Einsatz verwalten darf, sieht die Verwaltungsdaten auch.** Bisher zeigte die Verwaltungs-Ansicht einem Einsatz-Manager den Besitzer als „-“ und keine Co-Manager, während die Knöpfe zum Hinzufügen und Entfernen aktiv waren. Zusätzlich geben die Schreib-Endpunkte eines Einsatzes ihre Antwort jetzt genauso gefiltert zurück wie das Lesen: unterhalb der Logistik ohne E-Mail, Rollen und Beitrittsdatum der anderen Teilnehmer.
+
+- **Die API-Dokumentation ist unter beiden Adressen der Administration vorbehalten.** Bisher war nur `/v3/api-docs` geschützt; die identische YAML-Variante war für jedes angemeldete Mitglied lesbar.
+
+- **Die Nutzungsbedingungen zeigen einen Hinweis statt eines Fehlers, wenn sie gerade nicht geladen werden können.** Zuvor endete die Seite in diesem Fall mit einem Serverfehler — auf genau der Seite, die man vor der Zustimmung lesen können muss.
+
+- **Ein abgemeldeter Tab legt keine Sitzungen mehr an.** Da jetzt jeder Pfad eine Anmeldung verlangt, hätte jede Hintergrundabfrage eines offenen Tabs eine Sitzung in Redis erzeugt. Gemerkt wird nur noch das Ziel echter Seitenaufrufe — Deep-Links führen nach der Anmeldung weiterhin genau dorthin.
+
+### Changed
+
+- **„Gast" heißt jetzt „Extern".** Wer keinen Account hat, kann weiterhin an einem Einsatz teilnehmen — die Einsatzleitung trägt die Person ein und pflegt ihre Zeile. Die Selbstanmeldung ohne Konto entfällt.
+
+- **Bei Einsätzen heißt „öffentlich" jetzt „organisationsweit".** Gemeint war immer „jedes Mitglied der Organisation", nie „jeder".
+
 ## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
 
 ### Fixed

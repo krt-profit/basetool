@@ -1088,7 +1088,16 @@ transaction per pass) rather than per-scrape.
   authorities converter / approval sync regressed and is 403ing legitimate users, backing
   `PendingApprovalBlockSpike`). "One non-double-counted increment site" therefore holds per code, not
   per handler. The ingest gateway emits the same metric name with the `SERVICE_UNAVAILABLE` code from
-  its own filter; the `application` common tag distinguishes the module.
+  its own filter; the `application` common tag distinguishes the module. `NO_ROLE` (REQ-SEC-053) is
+  incremented at the same filter, but is **not** what its alert reads — see the subject gauge below.
+  `PAGE_SIZE_TOO_LARGE` left the bounded `code` set with `AnonymousPageSizeFilter` (ADR-0159).
+- `basetool_norole_refused_subjects` gauge — the distinct subjects `PendingApprovalAccessFilter`
+  refused with `403 NO_ROLE` in a rolling 15-minute window (REQ-SEC-053), and the series
+  `NoRoleBlockSpike` alerts on. Untagged, so it stays one bounded number; per process, so it is read
+  with `max()` and never `sum()`, or a subject refused on two instances counts twice. **Subjects and
+  not the refusal rate**, for the reason `basetool_terms_refused_subjects` was built the same way: a
+  rate cannot separate one member's polling tab from a locked-out membership, and the event this one
+  exists for — a realm-side role rename — happens at 03:00 when the request rate is near zero.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
@@ -1660,6 +1669,19 @@ instead of trusting the one-time rollout verification:
 - **Force-SSL redirect** — the `blackbox-force-ssl` job probes plain-HTTP port 80 of all four
   public vhosts with `http_force_ssl_redirect` (301/308 + `Location: https://…`, redirects not
   followed); `EdgeForceSslRedirectBroken` (warning) fires on drift.
+- **Members-only redirect** — the `blackbox-members-only` job probes `/missions`, `/operations` and
+  `/orders` on `profit-base.online` with `http_members_only_redirect`, sending the request as a
+  **browser navigation** (`Sec-Fetch-Mode: navigate`, HTML `Accept`) and requiring exactly `302`
+  with a `Location` naming `/oauth2/authorization/keycloak`; `EdgeMembersOnlyRedirectBroken`
+  (**critical**, 5 min) fires on drift. These three pages answered anonymously until the
+  members-only cut-over (REQ-SEC-052, ADR-0159), and this is the only signal that says otherwise
+  from where a member's browser stands: `AnonymousSurfaceSweepMvcTest` runs in-process against
+  MockMvc and stays green while a cache rule, a stale upstream or a mis-ordered NPM `location`
+  serves the old public page. It is `critical` rather than `warning` — unlike its posture siblings,
+  a drift here means member data is served to the internet, not that a working transport got
+  weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
+  design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
+  contract.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
   `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their

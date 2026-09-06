@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -65,7 +67,17 @@ class OpenApiGeneratorTest {
 
   @Test
   void generateOpenApiDocs() throws Exception {
-    MvcResult result = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk()).andReturn();
+    // REQ-SEC-052: the document is admin-gated now — it enumerates every path, parameter and DTO
+    // field the API has, which is the most efficient description of the attack surface the project
+    // can produce, and it was readable without a token on every profile that serves it. Being a 404
+    // in prod is a deployment property, not an access rule.
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/v3/api-docs")
+                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn();
 
     String json = result.getResponse().getContentAsString();
     Object jsonObject = objectMapper.readValue(json, Object.class);

@@ -103,7 +103,7 @@ class RefineryImportAjaxControllerTest {
             2,
             1,
             Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef()))
         .thenReturn(materials);
   }
 

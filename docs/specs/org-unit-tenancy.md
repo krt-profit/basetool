@@ -62,8 +62,8 @@ non-admins see the union of their memberships unless they pin one.
   by `owning_org_unit_id` like the strict aggregates, but visible beyond the owning scope in two
   cases (view only; editing stays role+scope via `canEditOperation`): (1) an **ownerless** operation
   (`owning_org_unit_id IS NULL`, V145) is a leadership/"Bereichsleitung" operation visible to
-  organisation members-or-above (`viewerIsMemberOrAbove`; no public escape — operations are never
-  anonymous-visible); (2) any authenticated user who **participated** in one of the operation's
+  organisation members-or-above (`viewerIsMemberOrAbove`; no organisation-wide escape — operations
+  carry no `is_internal` flag); (2) any member who **participated** in one of the operation's
   linked missions may see it (`viewerUserId` matches a `mission_participant.user_id` of a mission
   whose `operation_id` is this operation), so participants can view the operation and their payout
   regardless of owning Staffel. Both escapes are gated in the service layer and mirrored across the
@@ -206,10 +206,11 @@ able to plan org-wide missions. A mission created by such a membershipless user 
 `owning_org_unit IS NULL` state, mirroring the Staffel-internal rule with the whole organisation
 as the owning scope:
 
-- **Public** (`is_internal = false`) → visible to everyone, anonymous visitors included (the
-  create-time default).
+- **Organisation-wide** (`is_internal = false`) → visible to every member, whichever unit they
+  belong to (the create-time default). It meant "and to the internet" until REQ-SEC-052; the escape
+  itself is unchanged, its audience is now the organisation (ADR-0159).
 - **Internal** (`is_internal = true`) → visible to organisation members-or-above
-  (`AuthHelperService.isMemberOrAbove()`), hidden from guests/anonymous.
+  (`AuthHelperService.isMemberOrAbove()`), so not to an account below member.
 
 Editing follows the normal mission-management gate: `OwnerScopeService.canEditMission` is a no-op
 (returns `true`) for an ownerless mission, so `MissionSecurityService.canManageMission` decides via
@@ -224,16 +225,17 @@ creator column and no `is_internal` flag:
 
 - **Attribution.** An ownerless operation has no `owner_id` to point at; it is attributable only as
   an organisation-wide leadership operation (audited via `created_at`/`updated_at`).
-- **Visibility.** Operations have no public escape, so there is no public-vs-internal split: an
-  ownerless operation is the org-wide analogue of a Staffel-internal operation — visible to
-  organisation members-or-above (`AuthHelperService.isMemberOrAbove()`), hidden from guests/anonymous.
+- **Visibility.** Operations have no `is_internal` flag, so there is no organisation-wide-vs-internal
+  split: an ownerless operation is the org-wide analogue of a Staffel-internal operation — visible to
+  organisation members-or-above (`AuthHelperService.isMemberOrAbove()`), so not to an account below
+  member.
   `canSeeOperation` defers to `isMemberOrAbove()` on the null-owner branch, and the three scoped
   operation queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) carry a
   `viewerIsMemberOrAbove` flag so the list and the per-row detail gate stay consistent. Editing
   follows the role gate: `canEditOperation` is a no-op for an ownerless operation, so an org-wide
   operation is editable by any mission manager and deletable by any admin.
-- **Participation — all operations (#500).** Independently of ownership, any *authenticated* user
-  (member or guest, but never anonymous) who participated in one of an operation's linked missions
+- **Participation — all operations (#500).** Independently of ownership, any member who
+  participated in one of an operation's linked missions
   may see that operation — so participants can view the operation and their payout even when it is
   owned by another Staffel or is ownerless. Implemented as a `viewerUserId` EXISTS branch on the
   three scoped queries plus a `canSeeOperation` participant check
@@ -260,7 +262,7 @@ which renders in both the browser `<title>` tag and the sidebar brand logo text.
   kind — `SQUADRON` *or* `SPECIAL_COMMAND`. `appTitle` reads the merged `activeOrgUnit` catalogue,
   not the Squadron-only `activeSquadron`, so an SK pin shows in the title;
 - the localised "Alle Staffeln" label for an admin in all-OrgUnits mode (no pin);
-- nothing (plain "Profit Basetool") when no context applies (squadron-less non-admin, anonymous).
+- nothing (plain "Profit Basetool") when no context applies (a member with no org unit).
 
 There is **no separate context chip**. An always-on top-right context chip used to render the same
 information (and was the only surface that distinguished/showed an SK pin); it was removed as
@@ -470,8 +472,8 @@ extended:
   Inventory **owning** picker (cascade-scoped via `/api/v1/users/me/pickable-org-units`, Phase 5) and
   the Job Order **requesting** (Auftraggeber) picker (every active unit via
   `/api/v1/org-units/active-all-kinds`; since ADR-0149 the order form has no anonymous caller, so
-  the Staffel/SK-only `/api/v1/org-units/active` catalogue is its degradation path rather than its
-  guest path). The Job Order **responsible** picker
+  the Staffel/SK-only `/api/v1/org-units/active` catalogue is its degradation path rather than a
+  second audience's). The Job Order **responsible** picker
   stays profit-eligible Staffel/SK only — Bereiche/OL are never profit-eligible, so they can be the
   customer but never the processor.
 
@@ -480,8 +482,7 @@ resolved as owners, create-on-behalf of a descendant **Staffel and SK** via `can
 caller ≠ target divergence keyed on the caller's scope, foreign-to-both pick still 400, strict-silo
 read/edit lock); existing picker-resolver + per-aggregate stamping/visibility tests stay green
 (self-service stamping unchanged); the Job Order requesting-picker surfacing by
-`JobOrderPageControllerMvcTest` (authenticated picker offers Bereich/OL, guest does not, responsible
-excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
+`JobOrderPageControllerMvcTest` (the picker offers Bereich/OL, responsible excludes them); visibility-matrix e2e (`OrgHierarchyVisibilityMatrixE2eTest`, Phase 7) · **ADR:**
 [ADR-0027](../adr/0027-bereich-ol-aggregate-ownership.md) · **Issues:** #692, #697.
 
 ### REQ-ORG-017 — Membership cardinality & exclusivity rules

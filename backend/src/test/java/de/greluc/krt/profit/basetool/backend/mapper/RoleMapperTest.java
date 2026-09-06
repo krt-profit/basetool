@@ -77,7 +77,7 @@ class RoleMapperTest {
     // Given
     Role role = new Role();
     role.setId(1L);
-    role.setName("GUEST");
+    role.setName("KRT Member");
     role.setPermissions(new HashSet<>());
 
     // When

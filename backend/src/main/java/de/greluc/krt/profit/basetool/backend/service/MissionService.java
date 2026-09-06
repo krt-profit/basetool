@@ -199,13 +199,13 @@ public class MissionService {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
-    // M-1: defence-in-depth. Anonymous callers may never see internal missions, even if a future
-    // controller forgets to pass {@code isInternal=false}. Force the filter here so the data
-    // layer is the authoritative gate — a regression in the controller cannot widen the leak.
+    // The M-1 override that stood here forced isInternal=false for an unauthenticated caller, as
+    // defence-in-depth against a controller forgetting to pass it. Removed with its audience
+    // (ADR-0159): there is no unauthenticated caller on this path, and `currentScopePredicate()`
+    // now throws for one rather than building an empty predicate — so the guard could only ever be
+    // reached by a request that has already failed. Internal-mission visibility among members is
+    // decided by the scope predicate below, which is where it always belonged.
     Boolean effectiveIsInternal = isInternal;
-    if (!authHelperService.isAuthenticated()) {
-      effectiveIsInternal = Boolean.FALSE;
-    }
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return missionRepository.searchMissions(
         LikePatterns.escapeNullable(query),
@@ -244,16 +244,15 @@ public class MissionService {
   /**
    * Returns the next upcoming mission by planned-start time. Drives the home-page "next mission"
    * banner. Only missions in status {@code PLANNED} or {@code ACTIVE} are considered. {@code
-   * allowInternal=true} (for authenticated callers) includes internal missions; guests see only
-   * public missions.
+   * allowInternal=true} includes internal missions in the caller's scope.
    *
    * <p>Org-unit scoping (REQ-MISSION-008): when the caller has an effective org-unit scope — a
    * plain member's own unit(s), or the cascade-expanded reach of a Bereich/OL leader (REQ-ORG-015)
    * — the banner is restricted to missions owned by those org units; foreign missions, including
-   * other units' public ones, are excluded so the banner answers "what is <em>my</em> unit heading
-   * towards". When the caller has <em>no</em> org-unit scope — an admin in "all squadrons" mode, an
-   * anonymous guest, or an authenticated user who belongs to no org unit — the banner falls back to
-   * the unchanged organisation-wide next mission. The scope vector is the same {@link
+   * other units' organisation-wide ones, are excluded so the banner answers "what is <em>my</em>
+   * unit heading towards". When the caller has <em>no</em> org-unit scope — an admin in "all
+   * squadrons" mode, or a member who belongs to no org unit — the banner falls back to the
+   * unchanged organisation-wide next mission. The scope vector is the same {@link
    * OwnerScopeService#currentScopePredicate()} the scoped mission lists use.
    *
    * @param allowInternal whether internal missions should be included
@@ -265,9 +264,8 @@ public class MissionService {
     Optional<Mission> next;
     if (scope.adminAllScope()
         || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty())) {
-      // No org-unit scope: admin all-scope, anonymous guest, or an authenticated user with no
-      // membership. Unchanged behaviour — the soonest PLANNED/ACTIVE mission across the whole
-      // organisation (internal ones only for members). REQ-MISSION-008.
+      // No org-unit scope: admin all-scope, or a member with no membership. Unchanged behaviour —
+      // the soonest PLANNED/ACTIVE mission across the whole organisation. REQ-MISSION-008.
       next = findNextMissionHead(now, allowInternal);
     } else {
       // The caller has an org-unit scope: restrict the banner to missions owned by those org units.
@@ -280,7 +278,7 @@ public class MissionService {
     // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
     // through the graphed findById so participants / assignedUnits are eagerly loaded for the
     // mapper
-    // (and the home-page guest redaction) without paginating the whole upcoming-mission set.
+    // (and the home-page peer redaction) without paginating the whole upcoming-mission set.
     return next.map(Mission::getId).flatMap(missionRepository::findById);
   }
 
@@ -822,7 +820,7 @@ public class MissionService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@code MissionParticipantService.resolveGuestSubmittedOrgUnits}
+   *       authorization filter in {@code MissionParticipantService.resolveSubmittedOrgUnits}
    *       (anonymous callers cannot label a guest at all; authenticated callers may label only org
    *       units they can edit).
    * </ul>

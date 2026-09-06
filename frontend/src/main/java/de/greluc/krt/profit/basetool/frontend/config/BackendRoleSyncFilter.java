@@ -115,6 +115,35 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   /** Registration declined by an admin. */
   private static final String STATE_REJECTED = "REJECTED";
 
+  /**
+   * The account is approved but holds no application role (REQ-SEC-053, ADR-0159).
+   *
+   * <p>Not a registration status: the backend never sends it in {@code approvalStatus}. It is
+   * derived from the refusal — a role-less caller is answered {@code 403 NO_ROLE} on every {@code
+   * /api} path except the three exempt ones, so the role sync's own read of {@code
+   * /api/v1/users/me} is where the frontend meets it. Kept in the same session attribute as the
+   * approval verdict because it routes to the same page and expires the same way.
+   */
+  static final String STATE_NO_ROLE = "NO_ROLE";
+
+  /** The stable problem code the backend answers a role-less caller with (REQ-SEC-053). */
+  private static final String NO_ROLE_CODE = "NO_ROLE";
+
+  /**
+   * Whether this session's cached gate verdict is "approved, but holding no role" (REQ-SEC-053).
+   *
+   * <p>Exposed for {@code PendingApprovalPageController}, which has to choose between three sets of
+   * words on one page. It reads the verdict rather than the registration status on purpose: the
+   * backend never sends {@code NO_ROLE} in {@code approvalStatus}, because it is derived from a
+   * refusal — and the refusal is what routed the caller to that page.
+   *
+   * @param session the current session, or {@code null} when there is none
+   * @return {@code true} iff the cached verdict is the role-less one
+   */
+  public static boolean isRoleLess(@Nullable HttpSession session) {
+    return session != null && STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG));
+  }
+
   /** Path of the waiting page a non-approved registration is routed to. */
   private static final String PENDING_APPROVAL_PATH = "/pending-approval";
 
@@ -165,16 +194,16 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       HttpSession session = request.getSession(false);
       if (session != null) {
         // Epic #720, Track 1: a PENDING/REJECTED Discord registration is routed to the
-        // waiting-for-approval page instead of the (role-less) guest surface — never a 403 storm.
-        // The backend is the source of truth (it also withholds every authority from a pending
-        // account, so this redirect is UX, not the access control).
+        // account-status page rather than left to collect 403s. REQ-SEC-053 adds a third state to
+        // the same routing: an approved account holding no role, which reaches the identical dead
+        // end for a different reason and needs different words for it. The backend is the source of
+        // truth for all three (it withholds every authority in each case), so this redirect is UX,
+        // not the access control.
         String approval = resolveApprovalState(session);
-        if (STATE_PENDING.equals(approval) || STATE_REJECTED.equals(approval)) {
-          if (isApprovalExempt(request)) {
-            filterChain.doFilter(request, response);
-          } else {
-            response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
-          }
+        if (STATE_PENDING.equals(approval)
+            || STATE_REJECTED.equals(approval)
+            || STATE_NO_ROLE.equals(approval)) {
+          routeToAccountStatus(request, response, filterChain);
           return;
         }
 
@@ -198,6 +227,15 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           // re-sync interval instead of retrying on the very next request (REQ-SEC-013).
           if (syncRoles(token, session, request, response)) {
             session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
+          } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
+            // The role read is where a role-less account is first recognised, and it runs after the
+            // approval routing above rather than before it. Without this the request that made the
+            // discovery would still be served: the dashboard renders, every backend call on it is
+            // refused with 403 NO_ROLE, and only the NEXT navigation reaches the account-status
+            // page. REQ-SEC-053 wants the dead end at the first request, so route the one that
+            // found it.
+            routeToAccountStatus(request, response, filterChain);
+            return;
           }
         }
       }
@@ -343,6 +381,29 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         || path.startsWith("/error")
         || path.startsWith("/actuator")
         || isStaticAsset(request);
+  }
+
+  /**
+   * Sends the caller to the account-status page, unless the request targets one of the paths that
+   * must stay reachable from it (the page itself, its status poll, logout, the OAuth2 endpoints,
+   * the error page, actuator and static assets - see {@link #isApprovalExempt}), which is passed
+   * down the chain instead.
+   *
+   * @param request the current request
+   * @param response the response the redirect is written to
+   * @param filterChain the chain an exempt request continues down
+   * @throws ServletException propagated from an exempt request's downstream chain
+   * @throws IOException propagated from writing the redirect, or from an exempt request's
+   *     downstream chain
+   */
+  private static void routeToAccountStatus(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
+    if (isApprovalExempt(request)) {
+      filterChain.doFilter(request, response);
+    } else {
+      response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
+    }
   }
 
   /**
@@ -509,6 +570,18 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
       return true;
     } catch (BackendServiceException | ReauthenticationRequiredException e) {
+      // REQ-SEC-053: the role read is the frontend's first meeting with a role-less account — the
+      // backend refuses it with 403 NO_ROLE like every other /api call. Cached as the session's
+      // verdict so the next request routes to the account-status page instead of repeating the
+      // same refusal on every navigation, and expiring on the same interval as the approval verdict
+      // so an administrator granting a role reaches the member without a re-login.
+      if (e instanceof BackendServiceException backendFailure
+          && NO_ROLE_CODE.equals(backendFailure.getProblemCode())) {
+        session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
+        session.setAttribute(APPROVAL_CHECKED_AT_FLAG, System.currentTimeMillis());
+        log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
+        return false;
+      }
       // REQ-OBS-001: the BackendApiClient boundary already logged this once (5xx=ERROR, 4xx=WARN,
       // circuit-open=DEBUG). syncRoles re-runs on EVERY request until it succeeds
       // (SYNC_COMPLETE_FLAG

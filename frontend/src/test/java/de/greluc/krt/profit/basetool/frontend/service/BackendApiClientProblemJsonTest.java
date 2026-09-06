@@ -30,6 +30,8 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Set;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -37,12 +39,19 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -78,6 +87,45 @@ class BackendApiClientProblemJsonTest {
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   @MockitoBean private OAuth2AuthorizedClientRepository authorizedClientRepository;
+
+  /**
+   * Gives the authenticated WebClient a resolvable {@code keycloak} registration and a live token.
+   *
+   * <p>These cases used to pass {@code isPublic = true} and go out on the anonymous WebClient,
+   * which carries no OAuth2 exchange filter — a way of reaching the Problem+JSON mapping without a
+   * Keycloak registration. That client is gone (ADR-0159), and routing around the authenticated
+   * chain was never the point of this class anyway: what it asserts is the mapping, and it now
+   * asserts it on the client the application actually uses.
+   */
+  @BeforeEach
+  void bearAToken() {
+    ClientRegistration registration =
+        ClientRegistration.withRegistrationId("keycloak")
+            .clientId("basetool-frontend")
+            .clientSecret("test-secret")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+            .authorizationUri("https://keycloak.invalid/auth")
+            .tokenUri("https://keycloak.invalid/token")
+            .userInfoUri("https://keycloak.invalid/userinfo")
+            .userNameAttributeName("sub")
+            .build();
+    Mockito.when(clientRegistrationRepository.findByRegistrationId("keycloak"))
+        .thenReturn(registration);
+    OAuth2AccessToken token =
+        new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "test-token",
+            Instant.now(),
+            Instant.now().plusSeconds(300),
+            Set.of());
+    Mockito.when(
+            authorizedClientRepository.loadAuthorizedClient(
+                ArgumentMatchers.eq("keycloak"),
+                ArgumentMatchers.any(),
+                ArgumentMatchers.<jakarta.servlet.http.HttpServletRequest>any()))
+        .thenReturn(new OAuth2AuthorizedClient(registration, "test-principal", token));
+  }
 
   @BeforeAll
   static void startServer() throws IOException {
@@ -118,6 +166,12 @@ class BackendApiClientProblemJsonTest {
                       "{\"type\":\"urn:problem:terms-not-accepted\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Accept"
                           + " the terms\","
                           + "\"code\":\"TERMS_NOT_ACCEPTED\",\"correlationId\":\"corr-terms\"}");
+              case "/api/v1/role-gated" ->
+                  problemJson(
+                      403,
+                      "{\"type\":\"urn:problem:no-role\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Your"
+                          + " account holds no role.\","
+                          + "\"code\":\"NO_ROLE\",\"correlationId\":\"corr-no-role\"}");
               case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
               default -> new MockResponse().setResponseCode(404);
             };
@@ -149,7 +203,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/optimistic-lock", String.class, true));
+            () -> backendApiClient.get("/api/v1/optimistic-lock", String.class));
     assertEquals(409, ex.getStatusCode());
     assertEquals("OPTIMISTIC_LOCK", ex.getProblemCode());
     assertEquals("corr-123", ex.getCorrelationId());
@@ -161,7 +215,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+            () -> backendApiClient.get("/api/v1/forbidden", String.class));
     assertEquals(403, ex.getStatusCode());
     assertEquals("ACCESS_DENIED", ex.getProblemCode());
     assertEquals("corr-403", ex.getCorrelationId());
@@ -172,7 +226,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/validation", String.class, true));
+            () -> backendApiClient.get("/api/v1/validation", String.class));
     assertEquals(400, ex.getStatusCode());
     assertEquals("VALIDATION_FAILED", ex.getProblemCode());
     assertEquals(2, ex.getFieldErrors().size());
@@ -205,7 +259,7 @@ class BackendApiClientProblemJsonTest {
       BackendServiceException ex =
           assertThrows(
               BackendServiceException.class,
-              () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+              () -> backendApiClient.get("/api/v1/terms-gated", String.class));
       assertEquals("TERMS_NOT_ACCEPTED", ex.getProblemCode());
 
       assertTrue(
@@ -235,9 +289,57 @@ class BackendApiClientProblemJsonTest {
 
     assertThrows(
         BackendServiceException.class,
-        () -> backendApiClient.get("/api/v1/terms-gated", String.class, true));
+        () -> backendApiClient.get("/api/v1/terms-gated", String.class));
 
     assertEquals(before, backendErrorCount(), "a consent-gate refusal is not a call failure");
+  }
+
+  /**
+   * A {@code NO_ROLE} 403 is the third member of the same family, and is treated like the other
+   * two.
+   *
+   * <p>It was missed when REQ-SEC-053 shipped, and its arrival rate is the reason that matters: one
+   * role-less member loading one page produces a refusal per fragment on it — {@code /users/me},
+   * terms status, capabilities, notification count, active org unit, org units, mission search — so
+   * a single account waiting for an administrator raises the same alert the consent gate raised at
+   * 3.2/s. The counter measures backend health; a working gate is not ill health.
+   */
+  @Test
+  void get_ShouldNotCountNoRole403AsABackendCallFailure() {
+    double before = backendErrorCount();
+
+    assertThrows(
+        BackendServiceException.class,
+        () -> backendApiClient.get("/api/v1/role-gated", String.class));
+
+    assertEquals(before, backendErrorCount(), "a role-gate refusal is not a call failure");
+  }
+
+  /** And it is logged at DEBUG, for the same reason and at the same rate. */
+  @Test
+  void get_ShouldLogNoRole403AtDebug_NotWarn() {
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(BackendApiClient.class);
+    Level original = logger.getLevel();
+    logger.setLevel(Level.DEBUG);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      assertThrows(
+          BackendServiceException.class,
+          () -> backendApiClient.get("/api/v1/role-gated", String.class));
+
+      assertTrue(
+          appender.list.stream().noneMatch(event -> event.getLevel() == Level.WARN),
+          "a role-gate 403 must not reach WARN");
+      assertTrue(
+          appender.list.stream().anyMatch(event -> event.getLevel() == Level.DEBUG),
+          "the refusal is still recorded, at DEBUG");
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(original);
+    }
   }
 
   /** A genuine 4xx still counts, so the alert keeps its sensitivity to real problems. */
@@ -247,7 +349,7 @@ class BackendApiClientProblemJsonTest {
 
     assertThrows(
         BackendServiceException.class,
-        () -> backendApiClient.get("/api/v1/forbidden", String.class, true));
+        () -> backendApiClient.get("/api/v1/forbidden", String.class));
 
     assertEquals(before + 1.0, backendErrorCount(), "a real 4xx must still be counted");
   }
@@ -268,7 +370,7 @@ class BackendApiClientProblemJsonTest {
     BackendServiceException ex =
         assertThrows(
             BackendServiceException.class,
-            () -> backendApiClient.get("/api/v1/no-body", String.class, true));
+            () -> backendApiClient.get("/api/v1/no-body", String.class));
     assertEquals(500, ex.getStatusCode());
     assertNotNull(ex.getProblemCode());
     assertFalse(ex.getProblemCode().isBlank());

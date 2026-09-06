@@ -5,7 +5,7 @@
 | **ID**         | UC-17                                                                                                                                    |
 | **Tag**        | `e2e`                                                                                                                                    |
 | **Testklasse** | [`JobOrderItemHandoverE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/JobOrderItemHandoverE2eTest.java) |
-| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md) · Item-Anlegen analog [UC-12](UC-12-anonymer-auftrag.md)                                             |
+| **Basis-Flow** | [UC-03](UC-03-job-order-anlegen.md) · Item-Anlegen analog [UC-03](UC-03-job-order-anlegen.md)                                            |
 
 ## Akteur
 

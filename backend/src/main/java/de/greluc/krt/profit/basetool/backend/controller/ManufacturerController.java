@@ -45,11 +45,16 @@ import org.springframework.web.bind.annotation.RestController;
  * Read-mostly REST surface over the manufacturer catalog plus the admin-only visibility toggle. The
  * catalog itself is owned by {@code UexManufacturerService}; this controller only reads and flips
  * the {@code hidden} flag.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/manufacturers")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class ManufacturerController {
 
   private final ManufacturerService manufacturerService;

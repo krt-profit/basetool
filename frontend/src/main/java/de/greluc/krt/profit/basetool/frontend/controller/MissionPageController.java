@@ -78,15 +78,21 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * <p>Since the #924 L5 read/write split this class keeps only that read-side surface. Every
  * state-mutating {@code /missions} endpoint — participants, units, crew, managers, frequencies and
- * their AJAX variants, including the deliberately public guest-join paths ({@code
- * addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}) — moved verbatim
- * to {@link MissionWriteController}, which delegates its validation-failure re-renders back to this
- * class.
+ * their AJAX variants, including the sign-up paths that used to be reachable without a login
+ * ({@code addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}, members
+ * only since ADR-0159) — moved verbatim to {@link MissionWriteController}, which delegates its
+ * validation-failure re-renders back to this class.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/missions")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class MissionPageController {
 
   /** Response type for the {@code /api/v1/operations/lookup} reference-list read. */
@@ -178,14 +184,10 @@ public class MissionPageController {
    */
   private final ParallelPageLoader parallelPageLoader;
 
-  private void addOperationsToModel(Model model, boolean isPublic) {
-    if (isPublic) {
-      model.addAttribute("operationsList", List.of());
-      return;
-    }
+  private void addOperationsToModel(Model model) {
     try {
       List<OperationReferenceDto> operations =
-          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST, false);
+          backendApiClient.get("/api/v1/operations/lookup", OPERATION_REFERENCE_LIST);
       model.addAttribute("operationsList", operations);
     } catch (Exception e) {
       log.warn("Could not load operations", e);
@@ -304,8 +306,9 @@ public class MissionPageController {
     uri.append("sort=plannedStartTime,desc&");
 
     if ((status == null || status.isEmpty())) {
-      if (showPast && !authHelperService.isAnonymous()) {
-        // Explicitly request all statuses ONLY if authenticated
+      if (showPast) {
+        // The "only if authenticated" half of this condition is gone with the anonymous caller
+        // (ADR-0159): every caller here holds a session, so the archive toggle means what it says.
         uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
       } else {
         uri.append("status=PLANNED&status=ACTIVE&");
@@ -317,16 +320,14 @@ public class MissionPageController {
     }
 
     try {
-      boolean isPublic = authHelperService.isAnonymous();
-
       PageResponse<MissionListDto> missionsPage =
-          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, isPublic);
+          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE);
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", showPast && !authHelperService.isAnonymous());
+      model.addAttribute("showPast", showPast);
     } catch (Exception e) {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");
@@ -366,8 +367,7 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) String fragment) {
     try {
-      MissionDto mission =
-          backendApiClient.get("/api/v1/missions/" + id, MISSION, authHelperService.isAnonymous());
+      MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
 
       // Fragment-gated reads (mission-scale hardening, ADR-0078): an in-place section refetch
       // (GET /missions/{id}?fragment=X) must issue ONLY the backend reads its own fragment renders,
@@ -411,7 +411,7 @@ public class MissionPageController {
       // list when skipped so a stray reference never NPEs. The owner/manager USER pickers are now
       // server-side searchable comboboxes (remote-users, #1193) that fetch matches from
       // /users/search on demand, so the full roster is no longer preloaded here.
-      if (!authHelperService.isAnonymous() && needMgmt) {
+      if (needMgmt) {
         // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
         // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
         model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
@@ -460,19 +460,17 @@ public class MissionPageController {
       // never inside a swapped fragment). Skip the uncapped /operations/lookup read on fragment
       // refetches that never repaint the picker (#1124, mirrors the #1142 users/me gate above).
       if (fullRender) {
-        addOperationsToModel(model, authHelperService.isAnonymous());
+        addOperationsToModel(model);
       }
 
       // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
       // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
-      model.addAttribute(
-          "roundingMode", needFinance ? fetchRoundingMode(authHelperService.isAnonymous()) : "UP");
+      model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
       // Fetch Mission JobTypes
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
-            backendApiClient.getCached(
-                CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("jobTypes", jobTypesPage.content());
       } catch (Exception e) {
         // Ignore if job types fail
@@ -481,7 +479,7 @@ public class MissionPageController {
       // Fetch Crew JobTypes
       try {
         PageResponse<Map<String, Object>> crewJobTypesPage =
-            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
       } catch (Exception e) {
         // Ignore
@@ -490,27 +488,21 @@ public class MissionPageController {
       // Fetch Squadrons
       try {
         PageResponse<Map<String, Object>> squadronsPage =
-            backendApiClient.getCached(
-                CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE, true);
+            backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("squadrons", squadronsPage.content());
       } catch (Exception e) {
         // Ignore
       }
 
-      // Fetch all active org units (Staffel + Spezialkommandos) for the guest org-unit picker in
-      // the participant add/edit modals. The backend endpoint requires a role, and an anonymous
-      // guest's submitted org units are dropped server-side (H-3) anyway, so the picker is only
-      // populated for authenticated callers labeling a guest.
-      if (!authHelperService.isAnonymous()) {
-        try {
-          List<OrgUnitMembershipOptionDto> orgUnits =
-              backendApiClient.getCached(
-                  CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
-          model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
-        } catch (Exception e) {
-          model.addAttribute("orgUnits", List.of());
-        }
-      } else {
+      // Active org units (Staffel + Spezialkommandos) for the org-unit picker in the
+      // participant add/edit modals — the control a member uses when recording an external
+      // participant (ADR-0159, decision D4).
+      try {
+        List<OrgUnitMembershipOptionDto> orgUnits =
+            backendApiClient.getCached(
+                CachedCatalog.ORG_UNITS_ACTIVE, ORG_UNIT_MEMBERSHIP_OPTION_LIST);
+        model.addAttribute("orgUnits", orgUnits != null ? orgUnits : List.of());
+      } catch (Exception e) {
         model.addAttribute("orgUnits", List.of());
       }
 
@@ -518,14 +510,14 @@ public class MissionPageController {
       try {
         PageResponse<Map<String, Object>> freqTypesPage =
             backendApiClient.getCached(
-                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE, true);
+                CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("frequencyTypes", freqTypesPage.content());
       } catch (Exception e) {
         // Ignore
       }
 
-      // Fetch Ships (Only if authenticated)
-      if (!authHelperService.isAnonymous()) {
+      // Fetch Ships
+      {
         // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
         // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
         // ships already assigned to a unit. Only fetched when the caller may edit the mission —
@@ -536,8 +528,7 @@ public class MissionPageController {
         if (canEdit != null && canEdit && needCrewBoard) {
           try {
             List<ShipDto> unitShipOptions =
-                backendApiClient.get(
-                    "/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST, false);
+                backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
             model.addAttribute("unitShipOptions", unitShipOptions);
           } catch (Exception e) {
             // Ignore, e.g. if the caller cannot manage the mission
@@ -571,8 +562,7 @@ public class MissionPageController {
                   () ->
                       backendApiClient.get(
                           "/api/v1/missions/" + id + "/finance-entries/summary",
-                          MissionFinanceTotalsDto.class,
-                          false));
+                          MissionFinanceTotalsDto.class));
           CompletableFuture<PageResponse<MissionFinanceEntryDto>> entriesFuture =
               parallelPageLoader.loadAsync(
                   () ->
@@ -581,21 +571,19 @@ public class MissionPageController {
                               + id
                               + "/finance-entries?size="
                               + FINANCE_TABLE_PAGE_SIZE,
-                          MISSION_FINANCE_ENTRY_PAGE,
-                          false));
+                          MISSION_FINANCE_ENTRY_PAGE));
           CompletableFuture<List<RefineryOrderListDto>> refineryFuture =
               parallelPageLoader.loadAsync(
                   () ->
                       backendApiClient.get(
-                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST, false));
+                          "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST));
           // #1138: the mission inventory list moved off the embedded MissionDto field onto its own
           // dedicated read; fetch it in parallel with the finance/refinery reads for the Wirtschaft
           // "Lagereinträge" table.
           CompletableFuture<List<InventoryItemDto>> inventoryFuture =
               parallelPageLoader.loadAsync(
                   () ->
-                      backendApiClient.get(
-                          "/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST, false));
+                      backendApiClient.get("/api/v1/inventory/mission/" + id, INVENTORY_ITEM_LIST));
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
@@ -688,7 +676,6 @@ public class MissionPageController {
    * @return the {@code mission-create} view name
    */
   @GetMapping("/new")
-  @PreAuthorize("isAuthenticated()")
   public String createMissionForm(
       Model model,
       @AuthenticationPrincipal OidcUser principal,
@@ -767,7 +754,7 @@ public class MissionPageController {
             null));
     // Create page: always a full-page render, so prefill the "join as me" participant form.
     addFormsToModel(model, principal, true);
-    addOperationsToModel(model, false);
+    addOperationsToModel(model);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "mission-detail";
   }
@@ -809,13 +796,11 @@ public class MissionPageController {
       value = "/{id}/participants/unassigned/ajax",
       produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("isAuthenticated()")
   public org.springframework.http.ResponseEntity<Object> getUnassignedParticipantsAjax(
       @PathVariable @NotNull UUID id) {
     try {
       Object result =
-          backendApiClient.get(
-              "/api/v1/missions/" + id + "/participants/unassigned", OBJECT, false);
+          backendApiClient.get("/api/v1/missions/" + id + "/participants/unassigned", OBJECT);
       return org.springframework.http.ResponseEntity.ok(result);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
       log.debug(
@@ -829,11 +814,10 @@ public class MissionPageController {
     }
   }
 
-  private String fetchRoundingMode(boolean isPublic) {
+  private String fetchRoundingMode() {
     try {
       Map<String, Object> setting =
-          backendApiClient.get(
-              "/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP, isPublic);
+          backendApiClient.get("/api/v1/settings/refinery.rounding.mode", STRING_OBJECT_MAP);
       if (setting != null && setting.get("value") != null) {
         return String.valueOf(setting.get("value"));
       }

@@ -244,18 +244,18 @@ self-descriptively in OpenAPI.
 
 New `GET /api/v1/inventory/item-catalog?q=&page=…` on `InventoryItemController`,
 delegating to the blueprint-output query (§5.4). A dedicated endpoint is **required, not
-just cleaner**: the existing `GET /api/v1/orders/item-catalog` is deliberately
-`permitAll()` at every layer (it feeds the anonymous item-order request form), so reusing
-it for the Lager picker would hang Member-facing UI on an anonymous endpoint and invite
-accidental coupling. The new endpoint needs no method-level annotation — it inherits
+just cleaner**: the existing `GET /api/v1/orders/item-catalog` was deliberately
+`permitAll()` at every layer while it fed the anonymous item-order request form, so reusing
+it for the Lager picker would have hung Member-facing UI on an anonymous endpoint and invited
+accidental coupling. (The form went with ADR-0149 and the `permitAll` with ADR-0159; the two
+endpoints stayed separate, which is why nothing had to move when it did.) The new endpoint needs no method-level annotation — it inherits
 `hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)` from the `/api/v1/inventory/**` URL
 umbrella in `SecurityConfig`, matching the controller's read-handler style.
 
 The frontend proxy `GET /inventory/item-search` falls under the frontend catch-all
 `anyRequest().authenticated()` and **must relay with the token-carrying
-`backendApiClient.get(...)`** — not `getPublic(...)` (which the orders item search uses
-for anonymous parity); the token-less client would be rejected by the role-gated
-inventory umbrella.
+`backendApiClient.get(...)`** — which since ADR-0159 is the only way there is: `getPublic(...)`,
+which the orders item search used for anonymous parity, no longer exists.
 
 ### 5.4 Catalog predicate — "items with blueprints"
 

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.service;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.support.CatalogPages;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -75,7 +76,37 @@ import tools.jackson.databind.json.JsonMapper;
 public class BackendApiClient {
 
   private final WebClient webClient;
-  private final WebClient publicWebClient;
+
+  /**
+   * The bearer-less client for the Terms-of-Use wording, and nothing else (REQ-SEC-052).
+   *
+   * <p>Injected by name so the narrowing is enforced by the object graph rather than by a comment:
+   * a second caller would have to ask for this bean explicitly, which {@code
+   * TermsDocumentClientUsageTest} refuses.
+   */
+  private final WebClient termsDocumentClient;
+
+  /** The path the wording lives at; the one URI {@link #termsDocumentClient} ever sees. */
+  private static final String TERMS_DOCUMENT_URI = "/api/v1/terms/document";
+
+  /**
+   * Reads the Terms-of-Use wording in force, without a bearer token.
+   *
+   * <p>The one anonymous backend call the frontend makes (ADR-0138 / REQ-SEC-028, REQ-SEC-052). It
+   * has to be anonymous because the public {@code /terms} page renders it for a visitor who has no
+   * session, and it can be anonymous because the document is the same text that page publishes.
+   *
+   * <p>A named method rather than a boolean flag. Its predecessor was {@code get(uri, type, true)},
+   * and the flag was passed at roughly forty call sites — every one of them a decision to send a
+   * request with no identity, taken by typing {@code true}. Now there is one method, one client and
+   * one URI, and {@code TermsDocumentClientUsageTest} asserts nothing else injects the bean.
+   *
+   * @return the wording in force, or {@code null} when the backend returned no body
+   */
+  public TermsDocumentDto getTermsDocumentAnonymously() {
+    return executeGet(termsDocumentClient, TERMS_DOCUMENT_URI, TermsDocumentDto.class);
+  }
+
   private final MeterRegistry meterRegistry;
   private final CacheManager cacheManager;
 
@@ -110,27 +141,30 @@ public class BackendApiClient {
    * Whether a problem code is one of the access gates refusing an authenticated user, rather than a
    * backend-call failure.
    *
-   * <p>Both are expected, high-frequency and self-clearing: a pending registration polls until an
-   * admin approves it, and an unconsented session hits the Terms-of-Use gate on every request until
-   * it accepts (REQ-SEC-017, REQ-SEC-028). Neither says anything about backend health, which is
-   * what {@code basetool_backend_client_errors_total} is read as.
+   * <p>All three are expected, high-frequency and self-clearing: a pending registration polls until
+   * an admin approves it, an unconsented session hits the Terms-of-Use gate on every request until
+   * it accepts, and a role-less account is refused on every call until an administrator assigns one
+   * (REQ-SEC-017, REQ-SEC-028, REQ-SEC-053). None of them says anything about backend health, which
+   * is what {@code basetool_backend_client_errors_total} is read as.
+   *
+   * <p>{@code NO_ROLE} joined the list on 2026-09-06, having been missed when it shipped: one
+   * waiting account loading one page produced a WARN and an error-counter increment per fragment on
+   * it — {@code /users/me}, terms status, capabilities, notifications, active org unit, org units,
+   * mission search — which is the shape that made {@code BackendCallFailureSustained} fire on the
+   * consent rollout and is exactly what excluding the other two exists to prevent.
    *
    * @param problemCode the RFC 7807 {@code code} the backend returned, may be {@code null}
    * @return {@code true} when the refusal is an expected access gate
    */
   private static boolean isExpectedAccessGateRefusal(String problemCode) {
     return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode);
+        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode)
+        || BackendServiceException.CODE_NO_ROLE.equals(problemCode);
   }
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
   public <T> T get(String uri, ParameterizedTypeReference<T> responseType) {
-    return get(uri, responseType, false);
-  }
-
-  /** GET overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T> T get(String uri, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
+    return executeGet(webClient, uri, responseType);
   }
 
   /**
@@ -154,34 +188,7 @@ public class BackendApiClient {
 
   /** GET overload for simple (non-generic) return types. */
   public <T> T get(String uri, Class<T> responseType) {
-    return get(uri, responseType, false);
-  }
-
-  /**
-   * Class-typed GET overload that targets the anonymous public WebClient when {@code isPublic} is
-   * true.
-   */
-  public <T> T get(String uri, Class<T> responseType, boolean isPublic) {
-    return executeGet(isPublic ? publicWebClient : webClient, uri, responseType);
-  }
-
-  /**
-   * Public (anonymous) GET that expands {@code uriVariables} into {@code uriTemplate} so the
-   * WebClient encodes them per RFC 3986, targeting the anonymous {@code publicWebClient}. The
-   * {@code isPublic} counterpart of {@link #get(String, ParameterizedTypeReference, Object...)}:
-   * use it when a free-text value (e.g. an item-search term carrying spaces or quotes) must reach a
-   * {@code permitAll()} backend endpoint from an unauthenticated page, where hand-encoding the
-   * value into the URI string would be re-mangled across the frontend&rarr;backend hop.
-   *
-   * @param uriTemplate the URI template containing {@code {name}} placeholders
-   * @param responseType the decoded response type
-   * @param uriVariables the values expanded into the template, encoded by the WebClient
-   * @param <T> the response body type
-   * @return the decoded response body
-   */
-  public <T> T getPublic(
-      String uriTemplate, ParameterizedTypeReference<T> responseType, Object... uriVariables) {
-    return executeGet(publicWebClient, uriTemplate, responseType, uriVariables);
+    return executeGet(webClient, uri, responseType);
   }
 
   /**
@@ -198,30 +205,13 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
-    return getCached(catalog, responseType, false);
-  }
-
-  /**
-   * Cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient when {@code
-   * isPublic} is true (a {@code permitAll} catalogue reachable from an unauthenticated page). For a
-   * {@link CachedCatalog.Fetch#PAGE_WALK} catalogue this walks and merges every backend page before
-   * caching (REQ-ADMIN-003); a mid-walk failure propagates unchanged, so callers keep their
-   * established degradation contract and no partial catalogue is ever cached.
-   *
-   * @param catalog the allowlisted catalogue to fetch and cache
-   * @param responseType the decoded response type
-   * @param isPublic true to use the anonymous {@code publicWebClient}
-   * @param <T> the response body type
-   * @return the decoded (possibly cached) response body
-   */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
-  public <T> T getCached(
-      CachedCatalog catalog, ParameterizedTypeReference<T> responseType, boolean isPublic) {
-    WebClient client = isPublic ? publicWebClient : webClient;
+    // The page walk is not an optimisation: a bounded single GET of a PAGE_WALK catalogue returns
+    // its first chunk, and the cache then holds that truncated answer for the whole TTL
+    // (REQ-ADMIN-003). A mid-walk failure propagates unchanged, so no partial catalogue is cached.
     if (catalog.isPageWalked()) {
-      return fetchCompleteCatalog(client, catalog, responseType);
+      return fetchCompleteCatalog(catalog, responseType);
     }
-    return executeGet(client, catalog.getUri(), responseType);
+    return executeGet(webClient, catalog.getUri(), responseType);
   }
 
   /**
@@ -238,25 +228,6 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, Class<T> responseType) {
-    return getCached(catalog, responseType, false);
-  }
-
-  /**
-   * Class-typed cached GET of a {@link CachedCatalog} that targets the anonymous public WebClient
-   * when {@code isPublic} is true.
-   *
-   * @param catalog the allowlisted catalogue to fetch and cache; must not be a {@link
-   *     CachedCatalog.Fetch#PAGE_WALK} catalogue
-   * @param responseType the decoded response type
-   * @param isPublic true to use the anonymous {@code publicWebClient}
-   * @param <T> the response body type
-   * @return the decoded (possibly cached) response body
-   * @throws IllegalArgumentException when {@code catalog} is page-walked — a {@code Class} token
-   *     cannot decode the generic {@code PageResponse} the walk requires, and a plain single-page
-   *     GET of such a catalogue would silently truncate it (REQ-ADMIN-003)
-   */
-  @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
-  public <T> T getCached(CachedCatalog catalog, Class<T> responseType, boolean isPublic) {
     if (catalog.isPageWalked()) {
       throw new IllegalArgumentException(
           "Catalogue "
@@ -264,7 +235,7 @@ public class BackendApiClient {
               + " is page-walked and must be read through the ParameterizedTypeReference overload"
               + " of getCached — a single bounded GET would silently truncate it (REQ-ADMIN-003)");
     }
-    return executeGet(isPublic ? publicWebClient : webClient, catalog.getUri(), responseType);
+    return executeGet(webClient, catalog.getUri(), responseType);
   }
 
   /**
@@ -276,7 +247,6 @@ public class BackendApiClient {
    * runaway cap logs a warning instead of a banner: these catalogues feed pickers and sidebar
    * fragments with no page-level truncation surface (REQ-ADMIN-003).
    *
-   * @param client the WebClient to fetch through (authenticated or public)
    * @param catalog the page-walked catalogue to assemble
    * @param responseType the caller's declared response type — always {@code PageResponse<E>} for a
    *     page-walked catalogue
@@ -288,12 +258,12 @@ public class BackendApiClient {
   // T <-> PageResponse casts below are the unavoidable Object->generic case.
   @SuppressWarnings("unchecked")
   private <T> T fetchCompleteCatalog(
-      WebClient client, CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
+      CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
     CatalogPages.CompleteCatalog<Object> walked =
         CatalogPages.fetchAll(
             page ->
                 (PageResponse<Object>)
-                    executeGet(client, catalog.getUri() + "&page=" + page, responseType));
+                    executeGet(webClient, catalog.getUri() + "&page=" + page, responseType));
     if (walked.truncated()) {
       log.warn(
           "Cached catalogue {} hit the page-walk safety cap of {} pages — the cached list is"
@@ -394,12 +364,7 @@ public class BackendApiClient {
    * POST against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R post(String uri, T body, Class<R> responseType) {
-    return post(uri, body, responseType, false);
-  }
-
-  /** POST overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R post(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePost(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePost(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePost(WebClient client, String uri, T body, Class<R> responseType) {
@@ -416,12 +381,7 @@ public class BackendApiClient {
 
   /** PUT against the authenticated backend; {@code body} may be {@code null} for empty payloads. */
   public <T, R> R put(String uri, T body, Class<R> responseType) {
-    return put(uri, body, responseType, false);
-  }
-
-  /** PUT overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R put(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePut(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePut(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePut(WebClient client, String uri, T body, Class<R> responseType) {
@@ -438,12 +398,7 @@ public class BackendApiClient {
 
   /** DELETE against the authenticated backend; pass {@code Void.class} for 204 responses. */
   public <R> R delete(String uri, Class<R> responseType) {
-    return delete(uri, responseType, false);
-  }
-
-  /** DELETE overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <R> R delete(String uri, Class<R> responseType, boolean isPublic) {
-    return executeDelete(isPublic ? publicWebClient : webClient, uri, responseType);
+    return executeDelete(webClient, uri, responseType);
   }
 
   /**
@@ -490,12 +445,7 @@ public class BackendApiClient {
    * PATCH against the authenticated backend; {@code body} may be {@code null} for empty payloads.
    */
   public <T, R> R patch(String uri, T body, Class<R> responseType) {
-    return patch(uri, body, responseType, false);
-  }
-
-  /** PATCH overload that targets the anonymous public WebClient when {@code isPublic} is true. */
-  public <T, R> R patch(String uri, T body, Class<R> responseType, boolean isPublic) {
-    return executePatch(isPublic ? publicWebClient : webClient, uri, body, responseType);
+    return executePatch(webClient, uri, body, responseType);
   }
 
   private <T, R> R executePatch(WebClient client, String uri, T body, Class<R> responseType) {
@@ -526,16 +476,21 @@ public class BackendApiClient {
           parsed.getCorrelationId(),
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
-    } else if (BackendServiceException.CODE_PENDING_APPROVAL.equals(parsed.getProblemCode())
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(parsed.getProblemCode())) {
+    } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
       // Expected, high-frequency 403s, not faults. A pending-approval session polls several
       // endpoints on every page load; an unconsented session 403s on every request, because
       // BackendRoleSyncFilter's GET /api/v1/users/me is not exempt from the consent gate and its
       // failure path deliberately leaves the sync stamp unset so the next request retries. After a
-      // terms change that is the whole squadron times every request. Log at DEBUG so neither floods
-      // the client-error log (mirrors the backend PendingApprovalAccessFilter and
-      // TermsAcceptanceAccessFilter, both of which log their own refusal at DEBUG for the same
-      // reason). The backend-4xx metric below is unaffected, so the monitoring signal stays.
+      // terms change that is the whole squadron times every request. A role-less account is the
+      // same shape at a smaller scale: every fragment of every page it loads, until an
+      // administrator assigns a role. Log at DEBUG so none of them floods the client-error log
+      // (mirrors the backend PendingApprovalAccessFilter and TermsAcceptanceAccessFilter, both of
+      // which log their own refusal at DEBUG for the same reason). The backend-4xx metric below is
+      // unaffected, so the monitoring signal stays.
+      //
+      // Reading the same predicate as the metric exclusion below is deliberate: the two lists were
+      // written out separately and NO_ROLE was added to neither, so a third gate could diverge
+      // from a fourth. One list, two readers.
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,
