@@ -68,6 +68,11 @@ import org.springframework.web.context.WebApplicationContext;
  * regression cases here intentionally supply a matching query parameter.
  */
 @SpringBootTest
+// REQ-SEC-052: these cases exist to render the WHOLE index template through Thymeleaf — the
+// sidebar, the toast fragment, the SpEL in both. That template is the member's dashboard now, so
+// the class carries a principal. The anonymous half of GET / has its own case at the bottom, and
+// it asserts the opposite of rendering: no data, no backend call, no session.
+@org.springframework.security.test.context.support.WithMockUser
 class HomeControllerMvcTest {
 
   private static final String ERROR_TOAST_ID = "errorNotificationParam";
@@ -87,7 +92,7 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // Anonymous home() path: backendApiClient.get(searchUri, typeRef, isPublic=true) for the
+    // The member's home() path: backendApiClient.get(searchUri, typeRef) for the
     // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
     // response and keeps the template's empty-state branch simple.
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
@@ -97,7 +102,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WithoutQueryParams() throws Exception {
     // Given: no toast-controlling query parameters
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: index renders normally; the toast fragment's param-gated branches stay
     //       inactive, but the rest of fragments/toast (script + style block) still
     //       runs through Thymeleaf and SpEL.
@@ -113,7 +118,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WhenErrorParamMatchesKeyPattern() throws Exception {
     // Given: ?error= with a value that matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is in the HTML.
     mockMvc
         .perform(get("/").param("error", "notification.error.title"))
@@ -146,7 +151,7 @@ class HomeControllerMvcTest {
   void home_ShouldRenderIndex_WithoutParamErrorToast_WhenErrorParamFailsKeyPattern()
       throws Exception {
     // Given: a value that violates the key pattern (contains spaces, starts with digit)
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is absent.
     mockMvc
         .perform(get("/").param("error", "9 invalid value with spaces"))
@@ -416,4 +421,36 @@ class HomeControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Meine Einheit")));
   }
+
+  /**
+   * The landing page renders no data, calls no backend and mints no session (REQ-SEC-052, D7).
+   *
+   * <p>All three used to be violated on every hit. The seven-day mission grid was fetched and
+   * rendered for anyone who asked; and a session was created twice over — once by the {@code
+   * HttpSession} parameter Spring resolves with {@code getSession(true)} whether the body uses it
+   * or not, and once by {@code SafeCsrfAdvice} forcing the deferred CSRF token, which the default
+   * {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any template runs.
+   * Every crawler hit cost two sessions in Redis for a page that carries no form.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void anonymousRootRendersTheLandingPageWithoutDataOrSession() throws Exception {
+    org.springframework.test.web.servlet.MvcResult result =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("landing"))
+            .andReturn();
+
+    org.assertj.core.api.Assertions.assertThat(result.getRequest().getSession(false))
+        .as("the landing page must not mint a session — REQ-SEC-025 counts every one of these")
+        .isNull();
+    org.assertj.core.api.Assertions.assertThat(result.getResponse().getHeaders("Set-Cookie"))
+        .as("nor set a session cookie")
+        .noneMatch(header -> header.startsWith("SESSION="));
+    org.mockito.Mockito.verifyNoInteractions(backendApiClient);
+  }
+
 }

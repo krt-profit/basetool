@@ -105,9 +105,8 @@ class MissionManagerButtonVisibilityTest {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
-    mockMvc
-        .perform(get("/missions"))
-        .andExpect(status().isOk())
-        .andExpect(content().string(not(containsString("href=\"/missions/new\""))));
+    // REQ-SEC-052: there is no anonymous render to inspect for a missing button — the request
+    // is sent into the OAuth2 entry point before a template runs.
+    mockMvc.perform(get("/missions")).andExpect(status().is3xxRedirection());
   }
 }

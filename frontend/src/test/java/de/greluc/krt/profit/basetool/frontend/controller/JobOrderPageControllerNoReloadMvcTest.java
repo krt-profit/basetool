@@ -631,7 +631,10 @@ class JobOrderPageControllerNoReloadMvcTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":1}"))
-        .andExpect(status().isForbidden());
+        // REQ-SEC-052: refused at the entry point now, not at the method gate. A background
+        // write (this one carries a JSON body and a CSRF token) answers 401 rather than the 403 a
+        // dispatched-then-refused request produced under the old permitAll URL rule.
+        .andExpect(status().isUnauthorized());
 
     verify(backendApiClient, never())
         .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));

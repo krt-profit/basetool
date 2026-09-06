@@ -59,6 +59,10 @@ import org.springframework.web.context.WebApplicationContext;
  * the anonymous reachability the guest order form relies on.
  */
 @SpringBootTest
+// REQ-SEC-052 / ADR-0159: /catalog/** requires a login. The relays were public because the
+// anonymous order form's material picker needed them; that form went with ADR-0149 and the pickers
+// ride a member's bearer, so the class-wide principal replaces the per-test anonymity.
+@org.springframework.security.test.context.support.WithMockUser
 class CatalogSearchControllerMvcTest {
 
   @Autowired private WebApplicationContext context;
@@ -105,7 +109,7 @@ class CatalogSearchControllerMvcTest {
         id, name, "RAW", "SCU", null, refined, null, null, null, null, true, null, null, true, 1L);
   }
 
-  // Anonymous on purpose (no @WithMockUser): the guest order form carries a material picker, so
+  // Authenticated on purpose (REQ-SEC-052): the picker rides the member's own bearer now, so
   // /catalog/** must stay reachable without authentication.
   @Test
   void materialSearch_anonymous_mapsBackendPageIncludingRefinedMetadata() throws Exception {

@@ -2861,6 +2861,143 @@ allowlist, `MARKET` included) · `MaterialProxyControllerTest` (a star-system na
 `MaterialboersePageController` · **ADR:**
 [ADR-0158](../adr/0158-a-relayed-request-parameter-is-bound-to-the-backends-own-type.md)
 
+### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
+
+The public surface is a **list**, not a policy. Everything on it is here because somebody argued for
+it and the argument is written down; everything else requires authentication at the URL layer **and**
+a method gate.
+
+**Frontend** — the only `permitAll()` matchers:
+
+|                                    Path                                     |                                                  Why it stays public                                                  |
+|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| `/`                                                                         | The landing page. Product name, one paragraph, the two login entries, the legal links, the Fan Kit band. **No backend call, no data, no session.** |
+| `/impressum`, `/privacy`, `/terms`                                          | Legal obligation: Impressumspflicht, DSGVO information duties, terms readable before agreeing.                       |
+| `/error`, `/error/**`                                                       | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.            |
+| the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`       | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).         |
+| `/.well-known/assetlinks.json`                                              | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                             |
+| `/actuator/health`, `/actuator/health/**`                                   | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                              |
+| `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                   |
+
+**Backend** — the only `permitAll()` matchers on the main chain:
+
+|                   Path                    |                                                          Why it stays                                                          |
+|-------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------|
+| `GET /api/v1/app/version-policy`          | The forced-update gate (REQ-API-010). A version gate that only answers after a login is silent in exactly the case it exists for: an app too old to log in must still learn that it is too old. Three integers and a public release URL. |
+| `GET /api/v1/terms/document`              | The Terms-of-Use wording (ADR-0138 / REQ-SEC-028). A document everyone must read before agreeing to anything cannot require having agreed, and the same text is already on the public `/terms` page. |
+| `/internal/**`                            | The Keycloak SPI's account-existence precheck (REQ-SEC-022) — machine-to-machine behind a constant-time shared-secret header, `401` without it. Keycloak sits outside the resource server's trust boundary and carries no JWT to gate on. Not an anonymous data path. |
+| `/actuator/health`, `/actuator/health/**` | Docker `HEALTHCHECK`.                                                                                                          |
+| `/error`                                  | Spring's error dispatch.                                                                                                       |
+
+**Both anonymous reads are `GET`-scoped**, so a `HEAD` on either falls to the authenticated
+catch-all and answers `401`. That is deliberate and it is the REQ-SEC-032 lesson: Spring Security
+compares the verb with `String.equals`, so a method-scoped tightening placed above an all-verb
+`permitAll` grants every verb it does not claim — which is how a `HEAD` once ran the material price
+query anonymously and returned its `Content-Length`.
+
+`/v3/api-docs/**` is **not** on either list. The document enumerates every path, parameter and DTO
+field the API has — the most efficient description of the attack surface the project can produce —
+and being a 404 in prod is a deployment property, not an access rule. It requires `ROLE_ADMIN`.
+
+The prod-only **management-port chain** (`ManagementPortSecurityConfig`,
+`@ConditionalOnProperty("management.server.port")`, port `11271`) is `permitAll` on
+`/actuator/health(/**)`, `/actuator/prometheus` and `/actuator/info` **on the internal connector
+only** (ADR-0134), with basic auth added on `/actuator/prometheus` by
+`MonitoringScrapeSecurityConfig`. It is listed here so this requirement is exhaustive, not because
+it is anonymous access in the brief's sense.
+
+**Acceptance**
+
+- [x] Every mapping the dispatcher knows refuses a caller with no token, except the four paths above
+  — asserted by enumerating `RequestMappingHandlerMapping`, not by listing paths somebody thought of.
+- [x] Every `GET` is additionally issued as `HEAD`, and the two `GET`-scoped reads answer `401` to it.
+- [x] Exactly three methods declare `@PreAuthorize("permitAll()")`; a fourth fails the build.
+- [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
+  scheme the document does not define.
+- [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
+  `SESSION` cookie, `verifyNoInteractions(backendApiClient)`.
+- [x] A read endpoint without a method- or class-level `@PreAuthorize` fails the build, like a write.
+
+**Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
+`AnonymousSurfaceSweepMvcTest` (the frontend, navigation and background shapes) ·
+`ArchitectureTest#permitAllIsDeclaredOnlyOnTheThreePublicEndpoints`,
+`#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
+`HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
+`SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
+`ApiVhostAnonymousSurfaceTest` and the nightly `edge-deny-probe.yml` (the same statuses from outside
+the host) · **Code:** `backend/…/config/SecurityConfig`, `frontend/…/config/SecurityConfig`,
+`frontend/…/controller/HomeController`, `frontend/…/config/SafeCsrfAdvice`,
+`templates/landing.html` · **ADR:**
+[ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
+
+---
+
+### REQ-SEC-053 — Every account is at least a member; a role-less token is refused
+
+There is no role below member. The seeded `GUEST` role is gone (`V239`), and with it the state it
+represented — an authenticated caller with an **empty authority set**.
+
+**The rule:** an authenticated token whose realm roles map to no application role is refused with
+`403 NO_ROLE` on every `/api/**` path, before a handler runs. Three paths are exempt, for the same
+reasons they are exempt from the pending gate: `/api/v1/users/me/registration-status` (or the
+refusal has no way to explain itself), and the two REQ-SEC-052 reads (the Android app attaches its
+bearer to every call once a session exists, so gating them would refuse the version policy and the
+terms text to exactly the callers most likely to need both).
+
+**Why a refusal and not an empty set.** An empty authority set passes every `isAuthenticated()`
+gate and fails only the ones that name a role, so whether such a caller is admitted depends on which
+endpoint they happen to hit — a per-endpoint accident rather than a decision. Until ADR-0159 the
+empty set was worse than that: it was mapped onto `GUEST`, which the URL matrix's anonymous families
+let through, so "we could not resolve this account's roles" silently meant "give them the guest
+surface".
+
+**The refusal lives in `assembleFor(User, Collection<Role>)`**, not on the JWT path, so both callers
+inherit it: the resource-server conversion and `DatabaseActingMemberAuthorities` on the ingest
+gateway's acting-member path (ADR-0129), which installs an authentication without inspecting it.
+`Roles.NO_ROLE_MARKER` is a marker, never a permission — nothing grants on it, and
+`PendingApprovalAccessFilter` is the only reader.
+
+**`default-roles-iri` carries `KRT Member`**, so every account Keycloak creates is a member at the
+IdP. That is the structural half of this requirement, and it is why the roster sync had to be fixed
+in the same change:
+
+> [!warning] The composite-blind sync was the precondition, not a detail
+> `KeycloakService` indexes **directly-assigned** realm roles (`GET /roles/{name}/users`). A member
+> holding `KRT Member` only through the composite came back with an empty set on every nightly run.
+> While that mapped to the authority-less `GUEST` it was invisible and healed at the next web login;
+> with this requirement live it would be an overnight lockout of everyone who never had the role
+> assigned directly. The sync now folds in what the realm's default-role composite grants.
+>
+> A run in which the realm matches **none** of the app's roles aborts rather than writing, because
+> that is a rename or a broken query and never a legitimate state. A **single** account resolving to
+> no role is still written through — removing someone's roles in Keycloak still removes their access.
+
+**Acceptance**
+
+- [x] A token carrying no known realm role is refused `403 NO_ROLE` on `/api/v1/users/me`, on the
+  JWT path and through `ActingMemberFilter`.
+- [x] The three exempt paths still answer such a token.
+- [x] A member holding `KRT Member` only through `default-roles-iri` keeps the role after a sync run.
+- [x] A sync run that resolves no app role at all writes nothing and logs it.
+- [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
+  before deleting — identifiers, not identities.
+- [x] A `ROLE` notification selector naming a code the catalogue does not know is rejected, so a
+  rule cannot address a role that no longer exists.
+- [x] The frontend routes the state to the account-status page with its own words, not the waiting
+  copy: a role-less member has already been approved, so "wait for an administrator to approve you"
+  describes a wait with no end.
+
+**Enforced by:** `AnonymousSurfaceSweepTest` (the role-less pass over every mapping) ·
+`CustomJwtGrantedAuthoritiesConverterTest` · `PendingApprovalAccessFilterTest` ·
+`UserReconciliationServiceTest` · `KeycloakServiceTest` (the composite fold-in and the aborted run) ·
+`V239MigrationTest` · `BackendRoleSyncFilterTest` · `NotificationRuleServiceTest` ·
+**Code:** `CustomJwtGrantedAuthoritiesConverter#assembleFor`, `Roles.NO_ROLE_MARKER`,
+`PendingApprovalAccessFilter`, `UserReconciliationService`, `KeycloakService#fetchDefaultRoleGrants`,
+`NotificationRuleService#validateSelector`, `frontend/…/config/BackendRoleSyncFilter`,
+`V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**
+[ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
+
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the

@@ -93,12 +93,15 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     // renders. A redirect, not a 403 — the frontend sends a browser to the OAuth2 login.
     mockMvc.perform(get("/orders/create")).andExpect(status().is3xxRedirection());
 
+    // Nothing is fetched at all: the redirect happens before the handler runs, so the catalogue
+    // read never starts. This used to assert "never through the public client", which was the
+    // weaker half of the same statement.
     verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef());
   }
 
   @Test
   @WithMockUser
-  void viewCreateForm_ShouldFetchMaterialsThroughPublicWebClient() throws Exception {
+  void viewCreateForm_ShouldFetchMaterialsThroughTheMembersBearer() throws Exception {
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
 
@@ -107,10 +110,10 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"));
 
-    verify(backendApiClient)
-        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
-    verify(backendApiClient, never())
-        .getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
+    // One client, carrying the member's bearer (REQ-SEC-052). The pair of assertions that stood
+    // here — fetched through the public client, never through the authenticated one — described a
+    // choice that no longer exists.
+    verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
   }
 
   // The Material <-> Item order-kind radios must keep the global 1.2rem KRT circle styling: the
