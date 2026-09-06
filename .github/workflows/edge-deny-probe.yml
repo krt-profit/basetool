@@ -80,7 +80,19 @@ jobs:
           # this table says a refusal is an unauthenticated read of member data.
           base=https://api.profit-base.online
           fail=0
+          # Two expectations for one verb+path is a bug in THIS table, not a finding about the
+          # vhost, and it has happened twice: a phase admits a path, adds its new row above and
+          # leaves the old refusal row standing further down. The run then demands both answers of
+          # one path and reports whichever it reaches second as edge drift -- which sends the
+          # reader to the nginx config for a mistake that is here. Catch it as what it is.
+          declare -A seen=()
           probe() { # verb path expected
+            key="$1 $2"
+            if [ -n "${seen[$key]:-}" ] && [ "${seen[$key]}" != "$3" ]; then
+              echo "::error::probe table conflict: '$key' is expected to answer both ${seen[$key]} and $3. A path admitted by a phase must have its old refusal row DELETED, not just a new row added."
+              fail=1
+            fi
+            seen[$key]="$3"
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X "$1" "$base$2" || true)
             echo "$1 $2 -> HTTP ${code:-000} (expected $3)"
             if [ "$code" != "$3" ]; then
@@ -390,22 +402,24 @@ jobs:
           # therefore 404 to everybody, and a 401 here would mean that rule changed.
           probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 404
 
-          # Still refused, and that is the point: the every-member inventory list and the two
-          # Hangar imports (phase 4) are on no allow-list line at all.
+          # Still refused, and that is the point: the every-member inventory list is on no
+          # allow-list line at all.
           #
-          # Both answer 404 rather than 405, and the ORDER of the two guards is why: the
+          # It answers 404 rather than 405, and the ORDER of the two guards is why: the
           # allow-list's `if ($krt_api_allowed = 0) { return 404; }` fires before the read-only
           # family guard, so a path that was never admitted is refused without its verb ever being
-          # judged. /hangar being a read-only family therefore says nothing about the imports yet --
-          # that only becomes visible on the day phase 4 admits them, at which point 405 is what
-          # this line must expect and the guard is what keeps the writes shut.
+          # judged. A family membership in the read-only guard therefore says nothing about a path
+          # the deny already swallowed -- it only starts to matter on the day the path is admitted.
           #
-          # `POST /api/v1/bank/deposits` used to head this group as its third member. It is
-          # admitted since phase O and now sits with the other bank writes above; the bank canary
-          # this group lost is `POST /api/v1/bank/admin/wipe-reset`, which guards a decision that
-          # is still a decision.
+          # This group has now lost two members to that day, and both left the same lesson: an
+          # admission has to delete the row here, not only add one above. `POST
+          # /api/v1/bank/deposits` went first (phase O) and sits with the other bank writes; the
+          # bank canary it left behind is `POST /api/v1/bank/admin/wipe-reset`, which guards a
+          # decision that is still a decision. `POST /api/v1/hangar/import/fleetview` went with
+          # phase X, which added its 401 above and left this line asserting 404 -- so the probe
+          # demanded both answers of one path and went red on the first scheduled run after the
+          # merge (2026-09-06). The vhost was right throughout; only this table was not.
           probe POST /api/v1/inventory/all 404
-          probe POST /api/v1/hangar/import/fleetview 404
 
           # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
