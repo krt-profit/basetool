@@ -309,7 +309,7 @@ public class MissionController {
   public MissionDto createMission(
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest request) {
-    return missionMapper.toDto(missionService.createMission(request));
+    return redactForPeer(missionMapper.toDto(missionService.createMission(request)));
   }
 
   /**
@@ -330,7 +330,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest request) {
-    return missionMapper.toDto(missionService.addSubMission(id, request));
+    return redactForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
   }
 
   /**
@@ -357,7 +357,7 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest request) {
-    return missionMapper.toDto(missionService.updateMission(id, request));
+    return redactForPeer(missionMapper.toDto(missionService.updateMission(id, request)));
   }
 
   /**
@@ -380,16 +380,17 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionCoreRequest request) {
-    return missionMapper.toDto(
-        missionService.updateCoreSection(
-            id,
-            request.name(),
-            request.description(),
-            request.calendarLink(),
-            request.status(),
-            request.operationId(),
-            request.meetingPoint(),
-            request.version()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.updateCoreSection(
+                id,
+                request.name(),
+                request.description(),
+                request.calendarLink(),
+                request.status(),
+                request.operationId(),
+                request.meetingPoint(),
+                request.version())));
   }
 
   /**
@@ -413,15 +414,16 @@ public class MissionController {
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionScheduleRequest
               request) {
-    return missionMapper.toDto(
-        missionService.updateScheduleSection(
-            id,
-            request.meetingTime(),
-            request.plannedStartTime(),
-            request.plannedEndTime(),
-            request.actualStartTime(),
-            request.actualEndTime(),
-            request.version()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.updateScheduleSection(
+                id,
+                request.meetingTime(),
+                request.plannedStartTime(),
+                request.plannedEndTime(),
+                request.actualStartTime(),
+                request.actualEndTime(),
+                request.version())));
   }
 
   /**
@@ -441,8 +443,9 @@ public class MissionController {
       @RequestBody @jakarta.validation.Valid @NotNull
           de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionFlagsRequest
               request) {
-    return missionMapper.toDto(
-        missionService.updateFlagsSection(id, request.isInternal(), request.version()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.updateFlagsSection(id, request.isInternal(), request.version())));
   }
 
   /**
@@ -544,16 +547,17 @@ public class MissionController {
   public MissionDto addUnit(
       @PathVariable @NotNull UUID id,
       @jakarta.validation.Valid @RequestBody @NotNull AddUnitRequest request) {
-    return missionMapper.toDto(
-        missionService.addUnitToMission(
-            id,
-            request.name(),
-            request.shipTypeId(),
-            request.shipId(),
-            request.isHighValueUnit(),
-            request.frequency(),
-            request.responsibleUserId(),
-            request.note()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.addUnitToMission(
+                id,
+                request.name(),
+                request.shipTypeId(),
+                request.shipId(),
+                request.isHighValueUnit(),
+                request.frequency(),
+                request.responsibleUserId(),
+                request.note())));
   }
 
   /**
@@ -581,18 +585,19 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @jakarta.validation.Valid @RequestBody @NotNull UpdateUnitRequest request) {
-    return missionMapper.toDto(
-        missionService.updateMissionUnit(
-            id,
-            unitId,
-            request.version(),
-            request.name(),
-            request.shipTypeId(),
-            request.shipId(),
-            request.isHighValueUnit(),
-            request.frequency(),
-            request.responsibleUserId(),
-            request.note()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.updateMissionUnit(
+                id,
+                unitId,
+                request.version(),
+                request.name(),
+                request.shipTypeId(),
+                request.shipId(),
+                request.isHighValueUnit(),
+                request.frequency(),
+                request.responsibleUserId(),
+                request.note())));
   }
 
   /**
@@ -616,7 +621,7 @@ public class MissionController {
               + " which returns 204 No Content.",
       deprecated = true)
   public MissionDto deleteUnit(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
-    return missionMapper.toDto(missionService.removeMissionUnit(id, unitId));
+    return redactForPeer(missionMapper.toDto(missionService.removeMissionUnit(id, unitId)));
   }
 
   /**
@@ -647,8 +652,9 @@ public class MissionController {
       @RequestBody @jakarta.validation.Valid @NotNull AddCrewRequest request) {
     java.util.Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
-    return missionMapper.toDto(
-        missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds)));
   }
 
   /**
@@ -681,8 +687,10 @@ public class MissionController {
       @RequestBody @jakarta.validation.Valid @NotNull UpdateCrewRequest request) {
     java.util.Set<UUID> jobTypeIds =
         request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
-    return missionMapper.toDto(
-        missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.updateCrewInShip(
+                id, missionUnitId, crewId, request.version(), jobTypeIds)));
   }
 
   /**
@@ -711,7 +719,8 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID missionUnitId,
       @PathVariable @NotNull UUID crewId) {
-    return missionMapper.toDto(missionService.removeCrewFromShip(id, missionUnitId, crewId));
+    return redactForPeer(
+        missionMapper.toDto(missionService.removeCrewFromShip(id, missionUnitId, crewId)));
   }
 
   /**
@@ -908,7 +917,7 @@ public class MissionController {
   public MissionDto addParticipant(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantRequest request) {
-    return missionMapper.toDto(missionService.addParticipant(id, request.userId()));
+    return redactForPeer(missionMapper.toDto(missionService.addParticipant(id, request.userId())));
   }
 
   /**
@@ -1091,8 +1100,10 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid
           de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest request) {
-    return missionMapper.toDto(
-        missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.addOrUpdateMissionFrequency(
+                id, request.frequencyTypeId(), request.value())));
   }
 
   /**
@@ -1118,7 +1129,8 @@ public class MissionController {
       deprecated = true)
   public MissionDto removeFrequency(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
-    return missionMapper.toDto(missionService.removeMissionFrequency(id, frequencyId));
+    return redactForPeer(
+        missionMapper.toDto(missionService.removeMissionFrequency(id, frequencyId)));
   }
 
   /**
@@ -1148,7 +1160,7 @@ public class MissionController {
     try {
       var mission = missionService.addManager(id, userId);
       log.debug("MissionController.addManager SUCCESS - id: {}, userId: {}", id, userId);
-      return missionMapper.toDto(mission);
+      return redactForPeer(missionMapper.toDto(mission));
     } catch (Exception e) {
       log.debug(
           "MissionController.addManager ERROR - id: {}, userId: {}, error: {}",
@@ -1186,7 +1198,7 @@ public class MissionController {
     try {
       var mission = missionService.removeManager(id, userId);
       log.info("Manager {} removed from mission {} successfully", userId, id);
-      return missionMapper.toDto(mission);
+      return redactForPeer(missionMapper.toDto(mission));
     } catch (Exception e) {
       log.debug("Failed to remove manager {} from mission {}: {}", userId, id, e.getMessage(), e);
       throw e;
@@ -1223,7 +1235,7 @@ public class MissionController {
     try {
       var mission = missionService.setMissionOwner(id, userId);
       log.debug("MissionController.setMissionOwnerLegacy SUCCESS - id: {}, userId: {}", id, userId);
-      return missionMapper.toDto(mission);
+      return redactForPeer(missionMapper.toDto(mission));
     } catch (Exception e) {
       log.debug(
           "MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error: {}",
@@ -1277,7 +1289,7 @@ public class MissionController {
           de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwnerRequest
               request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
-    return missionMapper.toDto(mission);
+    return redactForPeer(missionMapper.toDto(mission));
   }
 
   /**
@@ -1330,7 +1342,7 @@ public class MissionController {
               request) {
     var mission =
         missionService.updateOwningOrgUnit(id, request.owningOrgUnitId(), request.version());
-    return missionMapper.toDto(mission);
+    return redactForPeer(missionMapper.toDto(mission));
   }
 
   /**
@@ -1407,8 +1419,9 @@ public class MissionController {
       }
     }
 
-    return missionMapper.toDto(
-        missionService.setPartyLead(id, finalUserId, finalGuestName, request.version()));
+    return redactForPeer(
+        missionMapper.toDto(
+            missionService.setPartyLead(id, finalUserId, finalGuestName, request.version())));
   }
 
   // -------------------------------------------------------------------------------------
@@ -1502,7 +1515,8 @@ public class MissionController {
             request.frequency(),
             request.responsibleUserId(),
             request.note());
-    return mission.getAssignedUnits().stream().map(missionMapper::toDto).toList();
+    return redactUnitsForPeer(
+        mission.getAssignedUnits().stream().map(missionMapper::toDto).toList());
   }
 
   /**
@@ -1534,7 +1548,7 @@ public class MissionController {
             request.frequency(),
             request.responsibleUserId(),
             request.note());
-    return missionMapper.toDto(findUnit(mission, unitId));
+    return redactForPeer(missionMapper.toDto(findUnit(mission, unitId)));
   }
 
   /**
@@ -1811,7 +1825,8 @@ public class MissionController {
               + "participants (regardless of OrgUnit) plus ships already assigned to a unit of the "
               + "mission. Restricted to callers who may manage the mission.")
   public List<ShipDto> getUnitShipOptions(@PathVariable @NotNull UUID id) {
-    return missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList();
+    return redactShipsForPeer(
+        missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList());
   }
 
   // --- Crew ---
@@ -1864,6 +1879,8 @@ public class MissionController {
         request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
     var mission =
         missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds);
+    // MissionCrewDto carries no nested user — id, participantId, participantName, version and
+    // the job types — so there is nothing for the peer pass to strip from it.
     return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
   }
 
@@ -2150,7 +2167,8 @@ public class MissionController {
       description =
           "Returns all participants of a mission that are not yet assigned to any unit crew.")
   public List<MissionParticipantDto> getUnassignedParticipants(@PathVariable @NotNull UUID id) {
-    return missionService.getUnassignedParticipants(id).stream().map(missionMapper::toDto).toList();
+    return redactParticipantsForPeer(
+        missionService.getUnassignedParticipants(id).stream().map(missionMapper::toDto).toList());
   }
 
   // --- Frequencies ---
@@ -2305,5 +2323,85 @@ public class MissionController {
             missions.getContent().stream().map(Mission::getId).toList());
     return missions.map(
         mission -> missionMapper.toListDto(mission, counts.getOrDefault(mission.getId(), 0L)));
+  }
+
+  /**
+   * Applies the REQ-SEC-007 peer pass to a mission DTO on its way out, for a caller below
+   * Logistician.
+   *
+   * <p><b>Why this is one helper and not the same four lines twenty-three times.</b> Until the
+   * 2026-09-06 review the redaction sat only on the read handlers, and every write returned the
+   * unredacted aggregate to the same caller: creating a mission makes you its owner, and {@code
+   * canManageMission} admits an owner regardless of role, so a plain {@code KRT_MEMBER} could read
+   * back every participant's roles, permissions, description, join date and Discord-link status
+   * through {@code PATCH .../core}. That was true before the members-only change as well — what the
+   * change added was the asymmetry that made it visible. The pass is a no-op for
+   * Logistician-and-above, so routing every return through it costs nothing and cannot widen
+   * anything.
+   *
+   * @param dto the freshly mapped DTO
+   * @return the same DTO for Logistician-and-above, the peer-redacted copy for everyone else
+   */
+  private MissionDto redactForPeer(MissionDto dto) {
+    return authHelperService.isLogisticianOrAbove()
+        ? dto
+        : missionPeerRedactor.cleanupMissionForPeer(dto);
+  }
+
+  /**
+   * Peer pass for a single unit DTO (the slim unit endpoints).
+   *
+   * @param dto the freshly mapped unit
+   * @return the same DTO for Logistician-and-above, otherwise one whose nested ship owner is
+   *     reduced to the public callsign tuple (REQ-SEC-040)
+   */
+  private MissionUnitDto redactForPeer(MissionUnitDto dto) {
+    return authHelperService.isLogisticianOrAbove()
+        ? dto
+        : missionPeerRedactor.cleanupUnitForPeer(dto);
+  }
+
+  /**
+   * Peer pass for a participant list.
+   *
+   * @param participants the freshly mapped roster rows
+   * @return the same list for Logistician-and-above, otherwise one whose nested users are reduced
+   *     to the public callsign tuple
+   */
+  private List<MissionParticipantDto> redactParticipantsForPeer(
+      List<MissionParticipantDto> participants) {
+    return authHelperService.isLogisticianOrAbove()
+        ? participants
+        : participants.stream().map(missionPeerRedactor::cleanupParticipantForPeer).toList();
+  }
+
+  /**
+   * Peer pass for a unit list.
+   *
+   * @param units the freshly mapped units
+   * @return the same list for Logistician-and-above, otherwise a redacted copy
+   */
+  private List<MissionUnitDto> redactUnitsForPeer(List<MissionUnitDto> units) {
+    return authHelperService.isLogisticianOrAbove()
+        ? units
+        : units.stream().map(missionPeerRedactor::cleanupUnitForPeer).toList();
+  }
+
+  /**
+   * Peer pass for the unit ship picker.
+   *
+   * <p>{@code Ship.owner} is {@code nullable = false} and {@code UserMapper} nulls only the email,
+   * so an unredacted ship option hands over its owner's roles, permissions, description, org-unit
+   * memberships, join date and Discord-link status — the REQ-SEC-040 hole the mission read path
+   * closed, reachable here because the picker is fetched whenever {@code canEdit} is true, which
+   * for a member who owns the Einsatz it is.
+   *
+   * @param ships the selectable ships
+   * @return the same list for Logistician-and-above, otherwise a redacted copy
+   */
+  private List<ShipDto> redactShipsForPeer(List<ShipDto> ships) {
+    return authHelperService.isLogisticianOrAbove()
+        ? ships
+        : ships.stream().map(missionPeerRedactor::cleanupShipForPeer).toList();
   }
 }

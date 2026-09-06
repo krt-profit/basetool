@@ -28,7 +28,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncTopicClass;
 import java.util.List;
@@ -70,7 +69,6 @@ class MissionListLiveSyncPublishTest {
             backendApiClient,
             mock(MessageSource.class),
             mock(MissionPageController.class),
-            mock(FrontendAuthHelperService.class),
             liveSyncLocalBus);
     redirectAttributes = new RedirectAttributesModelMap();
   }

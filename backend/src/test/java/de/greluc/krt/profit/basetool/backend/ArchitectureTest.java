@@ -1372,17 +1372,29 @@ class ArchitectureTest {
         JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
         String value =
             ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-        // canSeeMission admits any member who may see the Einsatz; canAccessParticipant admits the
-        // participant themselves. Both let an ordinary member through, which is the audience the
-        // peer redaction exists for.
-        if (!value.contains("canSeeMission") && !value.contains("canAccessParticipant")) {
+        // Every gate below admits an ordinary member, which is the audience the peer redaction
+        // exists for. canSeeMission admits any member who may see the Einsatz; canAccessParticipant
+        // admits the participant themselves.
+        //
+        // canManageMission, canManageManagers and canChangeOwner used to be listed here as
+        // EXEMPTIONS, on the premise that "a gate that already requires leadership returns the
+        // unredacted aggregate on purpose". That premise is false, and the 2026-09-06 review is
+        // what established it: all three fall through to isOwnerOrManager, which grants on
+        // mission.getOwner() or membership of getManagers() without consulting a role at all — and
+        // the role hierarchy declares no MISSION_MANAGER > LOGISTICIAN edge either. Creating a
+        // mission makes you its owner, so a plain KRT_MEMBER passes them. The exemptions therefore
+        // covered exactly the audience the peer tier was created for, and the rule could not fail
+        // on twenty-three write handlers that returned the unredacted aggregate.
+        if (!value.contains("canSeeMission")
+            && !value.contains("canAccessParticipant")
+            && !value.contains("canManageMission")
+            && !value.contains("canManageManagers")
+            && !value.contains("canChangeOwner")) {
           return false;
         }
-        // A gate that already requires leadership returns the unredacted aggregate on purpose.
-        return !value.contains("canManageMission")
-            && !value.contains("canManageManagers")
-            && !value.contains("canChangeOwner")
-            && !value.contains("hasRole(")
+        // A gate that names a role or authority genuinely cannot admit a member below Logistician:
+        // the hierarchy is what decides those, and it puts nobody below LOGISTICIAN above it.
+        return !value.contains("hasRole(")
             && !value.contains("hasAnyRole(")
             && !value.contains("hasAuthority(")
             && !value.contains("hasAnyAuthority(");
@@ -1526,6 +1538,25 @@ class ArchitectureTest {
                 .map(access -> access.getTarget().getName())
                 .anyMatch(ArchitectureTest::isGuestRedactionHelperName);
         if (referencesHelper) {
+          return;
+        }
+        // One level of same-class indirection counts. Twenty-three handlers route their return
+        // through MissionController#redactForPeer rather than repeating the same four-line
+        // isLogisticianOrAbove block, and a rule that forced the copy would be arguing for worse
+        // code than it protects. The hop is bounded on purpose: only a private helper of the very
+        // same controller, so the redaction stays visible in the file the reviewer is reading.
+        boolean callsALocalHelperThatRedacts =
+            method.getMethodCallsFromSelf().stream()
+                .filter(
+                    call ->
+                        call.getTargetOwner().getFullName().equals(method.getOwner().getFullName()))
+                .flatMap(call -> call.getTarget().resolveMember().stream())
+                .anyMatch(
+                    target ->
+                        target.getAccessesFromSelf().stream()
+                            .map(access -> access.getTarget().getName())
+                            .anyMatch(ArchitectureTest::isGuestRedactionHelperName));
+        if (callsALocalHelperThatRedacts) {
           return;
         }
         events.add(

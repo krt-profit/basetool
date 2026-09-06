@@ -1500,7 +1500,6 @@
                         th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
                         th:data-org-unit-names="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![name], ',') : ''}"
                         th:data-external="${p?.user == null and p?.guestName != null}"
-                        th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('KRT_MEMBER') or p.user.roles.contains('ROLE_KRT_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
                         th:data-payout-preference="${p?.payoutPreference?.name()}"
                         th:data-comment="${p?.comment}"
                         th:data-version="${p?.version}"

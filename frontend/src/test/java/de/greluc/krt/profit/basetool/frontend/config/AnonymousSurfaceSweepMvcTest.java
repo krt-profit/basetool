@@ -101,9 +101,17 @@ class AnonymousSurfaceSweepMvcTest {
    */
   private static final Set<String> PUBLIC_RESOURCES = Set.of("/.well-known/assetlinks.json");
 
-  /** Mappings this sweep does not own. */
+  /**
+   * Mappings this sweep does not own, matched as whole path segments rather than as string
+   * prefixes.
+   *
+   * <p>The distinction is the backend sweep's lesson (2026-09-06): compared with {@code
+   * startsWith}, an entry silently claims every sibling that happens to share its opening
+   * characters, and an exclusion that over-reaches inside a sweep whose whole value is
+   * exhaustiveness removes exactly the coverage nobody will notice missing.
+   */
   private static final List<String> NOT_SWEPT =
-      List.of("/error", "/actuator", "/oauth2/", "/login/", "/logout", "/csrf");
+      List.of("/error", "/actuator", "/oauth2", "/login", "/logout", "/csrf");
 
   @Autowired private WebApplicationContext context;
 
@@ -168,7 +176,7 @@ class AnonymousSurfaceSweepMvcTest {
       }
       for (String pattern : patterns) {
         String path = substituteVariables(pattern);
-        if (path == null || NOT_SWEPT.stream().anyMatch(path::startsWith)) {
+        if (path == null || NOT_SWEPT.stream().anyMatch(p -> isUnder(path, p))) {
           continue;
         }
         for (HttpMethod verb : verbs) {
@@ -255,13 +263,35 @@ class AnonymousSurfaceSweepMvcTest {
       if (PUBLIC_RESOURCES.contains(call.path())) {
         continue;
       }
-      int status = issue(call, MediaType.TEXT_HTML);
       if (PUBLIC_PAGES.contains(call.path())) {
-        if (status != 200) {
-          served.add(call + " -> " + status + " (a REQ-SEC-052 public page must render)");
+        // NOT through issue(): that reports a render failure as 200 so a template which threw
+        // still counts as "served" for the refusal check below. Applied to a public page it turns
+        // the assertion inside out - the page that could not render passes as the page that must.
+        // Four of them did, because BackendApiClient is a @MockitoBean and terms.html evaluated
+        // ${terms.title} on the null it returned. Here the exception is the failure.
+        try {
+          int rendered =
+              mockMvc
+                  .perform(
+                      MockMvcRequestBuilders.request(call.method(), call.path())
+                          .accept(MediaType.TEXT_HTML)
+                          .with(csrf()))
+                  .andReturn()
+                  .getResponse()
+                  .getStatus();
+          if (rendered != 200) {
+            served.add(call + " -> " + rendered + " (a REQ-SEC-052 public page must render)");
+          }
+        } catch (Exception renderFailure) {
+          served.add(
+              call
+                  + " -> threw during rendering ("
+                  + renderFailure.getClass().getSimpleName()
+                  + ") — a REQ-SEC-052 public page must render");
         }
         continue;
       }
+      int status = issue(call, MediaType.TEXT_HTML);
       // 3xx is the redirect into the OAuth2 entry point; 4xx is any refusal. A 2xx is a page
       // rendered for somebody with no session, which is what this whole change removes.
       if (status < 300 || (status >= 300 && status < 400 && !isLoginRedirect(call))) {
@@ -316,5 +346,17 @@ class AnonymousSurfaceSweepMvcTest {
                 + " so the page can re-authenticate in place. A 2xx is data served without a"
                 + " session; a 403 means the CSRF filter answered before the gate did.")
         .isEmpty();
+  }
+
+  /**
+   * Whether a mapping path lies at or under an excluded root, comparing whole path segments.
+   *
+   * @param path the substituted mapping path
+   * @param root an entry of {@link #NOT_SWEPT}, without a trailing slash
+   * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
+   *     that merely shares its opening characters
+   */
+  private static boolean isUnder(String path, String root) {
+    return path.equals(root) || path.startsWith(root + "/");
   }
 }

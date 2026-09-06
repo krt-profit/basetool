@@ -90,13 +90,20 @@ public class PendingApprovalPageController {
   /**
    * Renders the account-status page, choosing its copy from the caller's live approval status.
    *
-   * <p>{@code ACTIVE} never belongs here: the redirect that owns this path fires only for a
-   * non-approved registration, so an approved caller can only have arrived via a stale bookmark or
-   * a tab left open across the approval — and is sent to the dashboard rather than shown a waiting
-   * page for an approval they already hold. {@code REJECTED} renders the rejection copy and
-   * suppresses the poll script. Every other outcome — {@code PENDING}, and an unreadable backend —
-   * renders the waiting copy, so a backend outage can never tell a still-pending member they were
-   * declined.
+   * <p>{@code ACTIVE} alone does not belong here: the approval redirect fires only for a
+   * non-approved registration, so such a caller normally arrived via a stale bookmark or a tab left
+   * open across the approval — and is sent to the dashboard rather than shown a waiting page for an
+   * approval they already hold. {@code REJECTED} renders the rejection copy and suppresses the poll
+   * script. Every other outcome — {@code PENDING}, and an unreadable backend — renders the waiting
+   * copy, so a backend outage can never tell a still-pending member they were declined.
+   *
+   * <p><b>A role-less caller is the exception, and it is not a corner case — it is this page's
+   * other reason to exist.</b> Such an account IS approved, so the registration endpoint answers
+   * {@code ACTIVE} for it; sending it to the dashboard on that alone hands it straight back to
+   * {@link BackendRoleSyncFilter}, which meets the same {@code 403 NO_ROLE} and returns it here.
+   * Because the redirect also clears the cached verdict, neither side ever settles: the browser
+   * gives up with a redirect-cap error, which is how the E2E suite found it. The role-less verdict
+   * is therefore read <em>before</em> the redirect and suppresses it.
    *
    * <p>The {@code ACTIVE} redirect MUST invalidate the session's cached approval verdict first.
    * This page is reached because {@link BackendRoleSyncFilter} believes the caller is not approved,
@@ -115,15 +122,18 @@ public class PendingApprovalPageController {
   @NotNull
   public String pendingApproval(@NotNull Model model, @NotNull HttpServletRequest request) {
     String approvalStatus = readApprovalStatus();
-    if (STATE_ACTIVE.equals(approvalStatus)) {
-      BackendRoleSyncFilter.forgetApprovalVerdict(request.getSession(false));
-      return "redirect:/";
-    }
     // The role-less verdict never comes from approvalStatus — the backend does not send it there
     // (REQ-SEC-053). It is derived from the 403 the role sync met, and BackendRoleSyncFilter caches
     // it in the same session attribute the approval verdict uses, which is what routed the caller
     // here in the first place.
     boolean noRole = BackendRoleSyncFilter.isRoleLess(request.getSession(false));
+    // ...and it must be read BEFORE the ACTIVE redirect, because a role-less account IS approved:
+    // the registration endpoint answers ACTIVE for it, so redirecting on that alone sends the one
+    // caller this page exists for straight back to a dashboard the filter will bounce here again.
+    if (STATE_ACTIVE.equals(approvalStatus) && !noRole) {
+      BackendRoleSyncFilter.forgetApprovalVerdict(request.getSession(false));
+      return "redirect:/";
+    }
     model.addAttribute(MODEL_REJECTED, STATE_REJECTED.equals(approvalStatus));
     model.addAttribute(MODEL_NO_ROLE, noRole && !STATE_REJECTED.equals(approvalStatus));
     return "pending-approval";

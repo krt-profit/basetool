@@ -141,17 +141,25 @@ public class BackendApiClient {
    * Whether a problem code is one of the access gates refusing an authenticated user, rather than a
    * backend-call failure.
    *
-   * <p>Both are expected, high-frequency and self-clearing: a pending registration polls until an
-   * admin approves it, and an unconsented session hits the Terms-of-Use gate on every request until
-   * it accepts (REQ-SEC-017, REQ-SEC-028). Neither says anything about backend health, which is
-   * what {@code basetool_backend_client_errors_total} is read as.
+   * <p>All three are expected, high-frequency and self-clearing: a pending registration polls until
+   * an admin approves it, an unconsented session hits the Terms-of-Use gate on every request until
+   * it accepts, and a role-less account is refused on every call until an administrator assigns one
+   * (REQ-SEC-017, REQ-SEC-028, REQ-SEC-053). None of them says anything about backend health, which
+   * is what {@code basetool_backend_client_errors_total} is read as.
+   *
+   * <p>{@code NO_ROLE} joined the list on 2026-09-06, having been missed when it shipped: one
+   * waiting account loading one page produced a WARN and an error-counter increment per fragment on
+   * it — {@code /users/me}, terms status, capabilities, notifications, active org unit, org units,
+   * mission search — which is the shape that made {@code BackendCallFailureSustained} fire on the
+   * consent rollout and is exactly what excluding the other two exists to prevent.
    *
    * @param problemCode the RFC 7807 {@code code} the backend returned, may be {@code null}
    * @return {@code true} when the refusal is an expected access gate
    */
   private static boolean isExpectedAccessGateRefusal(String problemCode) {
     return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode);
+        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode)
+        || BackendServiceException.CODE_NO_ROLE.equals(problemCode);
   }
 
   /** GET against the authenticated backend, decoded via a {@link ParameterizedTypeReference}. */
@@ -468,16 +476,21 @@ public class BackendApiClient {
           parsed.getCorrelationId(),
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
-    } else if (BackendServiceException.CODE_PENDING_APPROVAL.equals(parsed.getProblemCode())
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(parsed.getProblemCode())) {
+    } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
       // Expected, high-frequency 403s, not faults. A pending-approval session polls several
       // endpoints on every page load; an unconsented session 403s on every request, because
       // BackendRoleSyncFilter's GET /api/v1/users/me is not exempt from the consent gate and its
       // failure path deliberately leaves the sync stamp unset so the next request retries. After a
-      // terms change that is the whole squadron times every request. Log at DEBUG so neither floods
-      // the client-error log (mirrors the backend PendingApprovalAccessFilter and
-      // TermsAcceptanceAccessFilter, both of which log their own refusal at DEBUG for the same
-      // reason). The backend-4xx metric below is unaffected, so the monitoring signal stays.
+      // terms change that is the whole squadron times every request. A role-less account is the
+      // same shape at a smaller scale: every fragment of every page it loads, until an
+      // administrator assigns a role. Log at DEBUG so none of them floods the client-error log
+      // (mirrors the backend PendingApprovalAccessFilter and TermsAcceptanceAccessFilter, both of
+      // which log their own refusal at DEBUG for the same reason). The backend-4xx metric below is
+      // unaffected, so the monitoring signal stays.
+      //
+      // Reading the same predicate as the metric exclusion below is deliberate: the two lists were
+      // written out separately and NO_ROLE was added to neither, so a third gate could diverge
+      // from a fourth. One list, two readers.
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,

@@ -408,9 +408,34 @@ public class SecurityConfig {
     cache.setRequestMatcher(
         request ->
             org.springframework.http.HttpMethod.GET.matches(request.getMethod())
-                && (NAVIGATE_FETCH_MODE.equalsIgnoreCase(request.getHeader(SEC_FETCH_MODE_HEADER))
-                    || acceptsHtml(request)));
+                && isNavigation(request));
     return cache;
+  }
+
+  /**
+   * Whether this request is a browser navigation, and therefore worth remembering for the redirect
+   * after the login.
+   *
+   * <p><b>The Fetch Metadata header wins where it is present; the {@code Accept} test is the
+   * fallback, not a second chance.</b> The two were ORed at first, which meant a background call
+   * that says {@code Sec-Fetch-Mode: cors} and also asks for HTML — a fragment refetch, an
+   * htmx-style partial, a prefetch — saved a request and minted a Redis session anyway. That is the
+   * churn WP-F 11 exists to remove, and it lands hardest on exactly the five page families this
+   * change moved out of {@code permitAll}; it can also overwrite a genuine deep link with a
+   * fragment URL, so the member returns from the login to half a page. A browser that sends the
+   * header has already answered the question, and {@code
+   * SsoReAuthenticationEntryPoint.isBackgroundRequest} treats it the same way.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} for a declared navigation, or for an HTML {@code Accept} when the client
+   *     sends no Fetch Metadata at all
+   */
+  private static boolean isNavigation(@NotNull jakarta.servlet.http.HttpServletRequest request) {
+    String fetchMode = request.getHeader(SEC_FETCH_MODE_HEADER);
+    if (fetchMode != null) {
+      return NAVIGATE_FETCH_MODE.equalsIgnoreCase(fetchMode);
+    }
+    return acceptsHtml(request);
   }
 
   /**

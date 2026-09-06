@@ -78,10 +78,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
  *
  * <p>Since the #924 L5 read/write split this class keeps only that read-side surface. Every
  * state-mutating {@code /missions} endpoint — participants, units, crew, managers, frequencies and
- * their AJAX variants, including the deliberately public guest-join paths ({@code
- * addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}) — moved verbatim
- * to {@link MissionWriteController}, which delegates its validation-failure re-renders back to this
- * class.
+ * their AJAX variants, including the sign-up paths that used to be reachable without a login
+ * ({@code addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}, members
+ * only since ADR-0159) — moved verbatim to {@link MissionWriteController}, which delegates its
+ * validation-failure re-renders back to this class.
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this

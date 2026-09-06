@@ -55,6 +55,20 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
   Optional<Role> findByCode(String code);
 
   /**
+   * Finds a role by its stable code, ignoring case.
+   *
+   * <p>The codes are canonical and upper-case, and every match at read time is the case-sensitive
+   * {@code r.code = :roleCode}. This exists for the write side: a client that sends {@code admin}
+   * names a role that exists, and refusing it (or, worse, storing it) produces a rule that either
+   * cannot be saved or matches nobody. Callers resolve through this and then store the catalogue's
+   * own casing, so the two sides cannot drift.
+   *
+   * @param code the role code in any casing
+   * @return the role, or empty when the catalogue knows no such code
+   */
+  Optional<Role> findByCodeIgnoreCase(String code);
+
+  /**
    * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */

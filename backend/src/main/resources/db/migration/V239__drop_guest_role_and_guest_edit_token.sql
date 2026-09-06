@@ -38,11 +38,15 @@ DO $$
 DECLARE
     affected TEXT;
 BEGIN
+    -- Both spellings, because the DELETEs below match both: a deployment that
+    -- ran under a renamed role carries `name = 'Guest'` with some other code,
+    -- and logging only the `code` match would leave exactly those assignments
+    -- unrecorded -- defeating the rollback path this block exists for.
     SELECT string_agg(ur.user_id::TEXT, ', ' ORDER BY ur.user_id::TEXT)
       INTO affected
       FROM user_roles ur
       JOIN role r ON r.id = ur.role_id
-     WHERE r.code = 'GUEST';
+     WHERE r.code = 'GUEST' OR r.name = 'Guest';
 
     IF affected IS NOT NULL THEN
         RAISE INFO 'V239: dropping GUEST assignments for user ids: %', affected;
@@ -69,6 +73,32 @@ DELETE FROM role_permissions
  WHERE role_id IN (SELECT id FROM role WHERE name = 'Guest');
 
 DELETE FROM role WHERE name = 'Guest';
+
+-- Notification rules could address a role by code, and `role_code` is a bare
+-- VARCHAR with no FK to `role` (V156) -- so deleting the role leaves any GUEST
+-- ROLE selector behind as a row pointing at nothing. It would match no
+-- recipient, which is harmless; what is not harmless is that the rule becomes
+-- PERMANENTLY UNSAVEABLE. `NotificationRuleService.update` clears the selectors
+-- and re-applies them, re-validating every one, and `findByCode('GUEST')` is now
+-- empty -- so any edit to that rule, including one that never touches its
+-- recipients, is refused with a 400. The UI cannot repair it either: the GUEST
+-- option is gone from the picker, so the browser submits an empty role code and
+-- the save fails on the other branch instead.
+DO $$
+DECLARE
+    orphaned INT;
+BEGIN
+    SELECT count(*) INTO orphaned
+      FROM notification_rule_selector
+     WHERE kind = 'ROLE' AND role_code = 'GUEST';
+
+    IF orphaned > 0 THEN
+        RAISE INFO 'V239: dropping % orphaned GUEST notification-rule selector(s)', orphaned;
+    END IF;
+END $$;
+
+DELETE FROM notification_rule_selector
+ WHERE kind = 'ROLE' AND role_code = 'GUEST';
 
 -- The capability token (V177). Dropped in the same unit of work as the
 -- role, by owner decision D10 of the members-only plan -- deliberately

@@ -99,23 +99,22 @@ class MissionPeerRedactorTest {
   }
 
   @Test
-  void cleanupMissionForPeer_clearsOwnerAndManagersButKeepsTheCallersOwnCapabilities() {
+  void cleanupMissionForPeer_forAReadingPeer_clearsOwnerAndManagers() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
-    MissionDto full = mission("secret plan", squadron, participant, steps);
+    MissionDto full = mission("secret plan", squadron, participant, steps, List.of(), false);
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    // Owner / managers stripped.
+    // Owner / managers stripped: this caller may not change either, so the response does not name
+    // them.
     assertThat(redacted.owner()).isNull();
     assertThat(redacted.managers()).isNull();
-    // canEdit / canManageManagers survive. They were forced off while this pass only ran for
-    // outsiders — for whom the answer was false anyway — and a MISSION_MANAGER is below
-    // Logistician, so since ADR-0159 forcing them would hide the management controls from the
-    // person who owns the Einsatz. They describe the caller, not the mission's other members.
-    assertThat(redacted.canEdit()).isTrue();
-    assertThat(redacted.canManageManagers()).isTrue();
+    // The flags are forwarded, not forced — here they happen to be false, which is the whole
+    // reason the pair above is withheld.
+    assertThat(redacted.canEdit()).isFalse();
+    assertThat(redacted.canManageManagers()).isFalse();
     // Member-peer view keeps the free-text description, the organisation and the planning data.
     assertThat(redacted.description()).isEqualTo("secret plan");
     assertThat(redacted.owningSquadron()).isEqualTo(squadron);
@@ -125,6 +124,34 @@ class MissionPeerRedactorTest {
     assertThat(cleaned.user().email()).isNull();
     assertThat(cleaned.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(cleaned.comment()).isEqualTo("comment");
+  }
+
+  /**
+   * A peer who may manage the mission is shown the list the same response says they may edit.
+   *
+   * <p>The case exists because the combination is reachable and was self-contradictory: a bare
+   * {@code MISSION_MANAGER} is below Logistician — the hierarchy puts ADMIN/OFFICER above both
+   * roles but never MISSION_MANAGER above LOGISTICIAN — so they read through this pass, and it
+   * answered {@code canManageManagers: true} with {@code managers: null}. The detail view rendered
+   * the Verwaltung panel with the owner as {@code -}, no co-manager chips, and add/remove controls
+   * operating on a list nobody could see. {@code UserReferenceDto} carries no PII to begin with:
+   * id, username, display name, effective name, rank — the same tuple every participant on the same
+   * mission already carries.
+   */
+  @Test
+  void cleanupMissionForPeer_forAManagingPeer_keepsTheListItSaysTheyMayEdit() {
+    SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
+    MissionParticipantDto participant = participant(fullUser(), PayoutPreference.PAYOUT, "comment");
+    MissionDto full = mission("secret plan", squadron, participant, List.of(), List.of(), true);
+
+    MissionDto redacted = redactor.cleanupMissionForPeer(full);
+
+    assertThat(redacted.canManageManagers()).isTrue();
+    assertThat(redacted.owner()).isEqualTo(full.owner());
+    assertThat(redacted.managers()).isEqualTo(full.managers());
+    // Everything else this pass does is unchanged by the caller's capability — the exemption is
+    // the management pair, not the redaction.
+    assertThat(redacted.participants().iterator().next().user().email()).isNull();
   }
 
   /**
@@ -231,7 +258,7 @@ class MissionPeerRedactorTest {
       SquadronReferenceDto squadron,
       MissionParticipantDto participant,
       List<MissionStepDto> steps) {
-    return mission(description, squadron, participant, steps, List.of());
+    return mission(description, squadron, participant, steps, List.of(), true);
   }
 
   private static MissionDto mission(
@@ -240,6 +267,29 @@ class MissionPeerRedactorTest {
       MissionParticipantDto participant,
       List<MissionStepDto> steps,
       List<MissionUnitDto> assignedUnits) {
+    return mission(description, squadron, participant, steps, assignedUnits, true);
+  }
+
+  /**
+   * Builds the unredacted mission the pass is run against.
+   *
+   * @param description the free-text description a peer is allowed to keep
+   * @param squadron the owning org unit shorthand
+   * @param participant the single roster row, carrying the nested user whose PII is stripped
+   * @param steps the mission steps, forwarded by identity so a test can assert on sameness
+   * @param assignedUnits the assigned units, whose nested ship owner is redacted separately
+   * @param managing what {@code MissionMapper} resolved for THIS caller — both {@code canEdit} and
+   *     {@code canManageManagers}, which travel together in every case this class needs to tell
+   *     apart: a peer who may change the mission, and one who may only read it
+   * @return a fully populated {@link MissionDto}
+   */
+  private static MissionDto mission(
+      String description,
+      SquadronReferenceDto squadron,
+      MissionParticipantDto participant,
+      List<MissionStepDto> steps,
+      List<MissionUnitDto> assignedUnits,
+      boolean managing) {
     UserReferenceDto owner = new UserReferenceDto(UUID.randomUUID(), "owner", "Owner", "Owner", 9);
     return new MissionDto(
         UUID.randomUUID(),
@@ -259,8 +309,8 @@ class MissionPeerRedactorTest {
         null,
         owner,
         Set.of(new UserReferenceDto(UUID.randomUUID(), "mgr", "Mgr", "Mgr", 8)),
-        true,
-        true,
+        managing,
+        managing,
         1L,
         2L,
         3L,

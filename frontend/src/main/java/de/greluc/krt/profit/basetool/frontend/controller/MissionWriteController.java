@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
@@ -82,10 +81,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * body moved over verbatim - routes, security annotations and behaviour are unchanged; validation
  * failures of the classic form posts re-render the mission-detail or create view by delegating to
  * the injected read controller, and AJAX failures re-emit the upstream RFC 7807 problem through
- * {@link MissionPageController#propagateBackendError}. Several participant endpoints (add,
- * check-in/check-out, payout preference and the participant slim-AJAX family) deliberately carry no
- * {@code @PreAuthorize} so anonymous guests can join missions and manage their own entries; adding
- * security there is a known live-bug regression.
+ * {@link MissionPageController#propagateBackendError}. The participant endpoints (add,
+ * check-in/check-out, payout preference and the participant slim-AJAX family) used to carry no
+ * {@code @PreAuthorize} of their own, deliberately, so that a caller with no login could sign
+ * themselves up for an Einsatz. That audience is gone (ADR-0159) and the class-level floor below
+ * covers them; the sentence that used to stand here told the next reader that adding security to
+ * them was a known regression, which would now be advice to re-open the surface.
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
@@ -134,15 +135,6 @@ public class MissionWriteController {
    * delegation.
    */
   private final MissionPageController missionPageController;
-
-  /**
-   * Centralised anonymous-principal predicate. The guest-flow endpoints route to the public
-   * WebClient when no OIDC principal is present; this helper replaces the inlined
-   * {@code @AuthenticationPrincipal OidcUser principal == null} guard with a single, mock-friendly
-   * seam (Q10) — on this frontend the only authenticated principal type is the Keycloak {@code
-   * OidcUser}, so a null principal and an anonymous security context are the same condition.
-   */
-  private final FrontendAuthHelperService authHelper;
 
   /**
    * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). A mission create, core update

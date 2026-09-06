@@ -74,8 +74,7 @@ class MissionFinancePageControllerTest {
     backendApiClient = mock(BackendApiClient.class);
     missionPageController = mock(MissionPageController.class);
     authHelper = mock(FrontendAuthHelperService.class);
-    controller =
-        new MissionFinancePageController(backendApiClient, missionPageController, authHelper);
+    controller = new MissionFinancePageController(backendApiClient, missionPageController);
     redirectAttributes = new RedirectAttributesModelMap();
     principal = mock(OidcUser.class);
   }

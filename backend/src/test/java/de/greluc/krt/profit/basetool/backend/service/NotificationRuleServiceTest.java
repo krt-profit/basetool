@@ -50,6 +50,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -98,7 +99,7 @@ class NotificationRuleServiceTest {
   private void catalogueKnows(String roleCode) {
     Role role = new Role();
     role.setCode(roleCode);
-    when(roleRepository.findByCode(roleCode)).thenReturn(Optional.of(role));
+    when(roleRepository.findByCodeIgnoreCase(roleCode)).thenReturn(Optional.of(role));
   }
 
   private static NotificationRule ruleWithVersion(UUID id, Long version) {
@@ -245,11 +246,32 @@ class NotificationRuleServiceTest {
   }
 
   @Test
+  void aDifferentlyCasedRoleCodeIsAcceptedAndStoredCanonically() {
+    // The recipient query is the case-sensitive `r.code = :roleCode`, so the two sides have to
+    // agree: refusing `admin` rejects a role that exists, and storing `admin` produces a rule that
+    // validates, saves, displays - and matches nobody, for ever, without saying so.
+    Role role = new Role();
+    role.setCode("ADMIN");
+    when(roleRepository.findByCodeIgnoreCase("admin")).thenReturn(Optional.of(role));
+    NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
+    when(notificationRuleRepository.saveAndFlush(any(NotificationRule.class))).thenReturn(saved);
+    when(notificationRuleMapper.toDto(saved)).thenReturn(dtoFor(saved));
+
+    notificationRuleService.create(writeRequest(null, roleSelector("admin")));
+
+    ArgumentCaptor<NotificationRule> persisted = ArgumentCaptor.forClass(NotificationRule.class);
+    verify(notificationRuleRepository).saveAndFlush(persisted.capture());
+    assertThat(persisted.getValue().getSelectors())
+        .as("stored in the catalogue's casing, not the caller's")
+        .allSatisfy(selector -> assertThat(selector.getRoleCode()).isEqualTo("ADMIN"));
+  }
+
+  @Test
   void createWithUnknownRoleCodeIsRejected() {
     // REQ-SEC-053: the admin screen offered GUEST until V239 deleted it. A rule addressed at a
     // role the catalogue does not have would have been saved happily and then matched nobody, for
     // ever — a notification silently not sent is the hardest kind of defect to notice.
-    when(roleRepository.findByCode("GUEST")).thenReturn(Optional.empty());
+    when(roleRepository.findByCodeIgnoreCase("GUEST")).thenReturn(Optional.empty());
 
     assertThatThrownBy(
             () -> notificationRuleService.create(writeRequest(null, roleSelector("GUEST"))))

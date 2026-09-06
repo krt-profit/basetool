@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.ShipDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,15 +37,17 @@ import org.springframework.stereotype.Component;
  * instead of buried in the 2500-line controller, and so the later mission read/write controller
  * split can share the exact same pass.
  *
- * <p><b>One redaction level, since ADR-0159.</b> Owner and managers are cleared, edit/manage flags
- * forced off, and every nested user — each participant's, and each assigned unit's <b>ship
- * owner</b> (REQ-SEC-040) — stripped to the public callsign tuple. Payout preference and the
- * free-text comment are kept, because a peer is a member of the organisation.
+ * <p><b>One redaction level, since ADR-0159.</b> Owner and managers are cleared for a peer who is
+ * only reading, and every nested user — each participant's, and each assigned unit's <b>ship
+ * owner</b> (REQ-SEC-040) — stripped to the public callsign tuple. The caller's own edit/manage
+ * flags are forwarded rather than forced off, and the management pair travels with them; see {@link
+ * #cleanupMissionForPeer}. Payout preference and the free-text comment are kept, because a peer is
+ * a member of the organisation.
  *
  * <p>There used to be a second, stricter <b>outsider</b> tier for anonymous and role-less callers
  * (ADR-0034, superseded), which additionally hid the description and each participant's payout
  * preference and comment. Both audiences are gone: there is no anonymous mission read, and no role
- * below member. The class was named {@code MissionPeerRedactor} and its methods {@code
+ * below member. The class was named {@code MissionGuestRedactor} and its methods {@code
  * cleanup…ForGuest} for that audience; keeping those names would have described a caller the system
  * can no longer produce.
  *
@@ -74,17 +77,32 @@ import org.springframework.stereotype.Component;
 public class MissionPeerRedactor {
 
   /**
-   * Redacts a mission DTO for a peer: strips owner/managers, clears edit/manage flags, and
-   * recursively cleans each participant. The mission economy (inventory / refinery orders) is no
-   * longer part of this DTO (#1138) — it is member-gated at its own endpoints — so there is nothing
-   * to strip here for it. This is the only path that controls what leaves the API to a member below
-   * Logistician — never lift data into the controller layer without thinking about this method
-   * first.
+   * Redacts a mission DTO for a peer: hides owner and managers from a reader, keeps the caller's
+   * own capability flags, and recursively cleans each participant. The mission economy (inventory /
+   * refinery orders) is no longer part of this DTO (#1138) — it is member-gated at its own
+   * endpoints — so there is nothing to strip here for it. This is the only path that controls what
+   * leaves the API to a member below Logistician — never lift data into the controller layer
+   * without thinking about this method first.
+   *
+   * <p><b>The management pair is kept for a caller who may manage the mission.</b> Since ADR-0159
+   * this pass runs for every caller below Logistician, and a bare {@code MISSION_MANAGER} is one —
+   * so the response used to assert {@code canManageManagers: true} and hand over an empty manager
+   * list in the same breath. The detail view then rendered the Verwaltung panel with the owner as
+   * {@code -} and no co-manager chips, and its add/remove controls operated on a list the manager
+   * could not see. Nothing is disclosed by closing that: {@link UserReferenceDto} is id, username,
+   * display name, effective name and rank — the same public callsign tuple every participant on the
+   * same mission already carries through {@link #cleanupUserForPeer}, and it goes only to a caller
+   * who may rewrite the very list it names. A peer who is only reading still sees neither.
    *
    * @param dto the full mission DTO
    * @return a redacted copy safe for a member below Logistician
    */
   public MissionDto cleanupMissionForPeer(MissionDto dto) {
+    // Both flags, not just canManageManagers: the Verwaltung tab opens on either
+    // (mission-detail.html), and the owner field it shows is the one canEdit lets a caller change.
+    boolean managing =
+        Boolean.TRUE.equals(dto.canEdit()) || Boolean.TRUE.equals(dto.canManageManagers());
+
     Set<MissionParticipantDto> cleanedParticipants =
         dto.participants() == null
             ? null
@@ -113,8 +131,10 @@ public class MissionPeerRedactor {
         cleanedUnits,
         dto.frequencies(),
         dto.operation(),
-        null, // owner
-        null, // managers
+        // Owner and managers stay hidden from a peer who is only reading — but not from one the
+        // very same response tells it may CHANGE them. See managesThisMission below.
+        managing ? dto.owner() : null,
+        managing ? dto.managers() : null,
         // canEdit / canManageManagers are answers ABOUT THE CALLER, computed per request by
         // MissionMapper from their own authorities — not somebody else's data, and telling a
         // caller what they may do cannot disclose anything they do not already have. They were
@@ -240,6 +260,14 @@ public class MissionPeerRedactor {
    * public callsign tuple. Shared verbatim with the finance ledger's peer-PII pass ({@code
    * MissionFinanceEntryController} delegates its participant-user redaction here, audit H-1) so the
    * redacted user shape is identical across the mission and finance views.
+   *
+   * <p><b>It is NOT identical to {@code UserDtoRedaction.toPeerShape}</b>, the job-order surface's
+   * peer projection of the same record: that one forwards {@code squadron} and {@code squadrons}
+   * where this one nulls them. Noticed in the 2026-09-06 review and left as it stands rather than
+   * reconciled by guess — changing either direction is a visibility decision, not a cleanup, and
+   * the mission surface already shows a participant's affiliations through {@code
+   * MissionParticipantDto.orgUnits} anyway. Recorded here so the next reader meets the difference
+   * as a known one instead of assuming the two are interchangeable.
    *
    * @param dto the user DTO
    * @return a redacted copy safe for a member below Logistician

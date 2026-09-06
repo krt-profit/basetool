@@ -93,12 +93,13 @@ class AnonymousSurfaceSweepTest {
   /**
    * The mappings REQ-SEC-052 serves without a token, with the status each must answer.
    *
-   * <p>Four entries and no more. {@code /error} is Spring's own dispatch and carries no data;
-   * {@code /actuator/health} is the Docker {@code HEALTHCHECK} (in production it lives on the
-   * internal management port instead, pinned by {@code ManagementPortIsolationTest}); the two
-   * {@code /api/v1} reads are D2 and D3 of ADR-0159 — an app too old to log in must still learn
-   * that it is too old, and a document everyone must be able to read before agreeing to anything
-   * cannot require having agreed.
+   * <p>Four entries and no more. {@code /error} is Spring's own dispatch and carries no data — it
+   * is listed for completeness but excluded from the sweep, because a direct {@code GET} of it
+   * answers {@code 500} by design (see {@link #NOT_SWEPT}); {@code /actuator/health} is the Docker
+   * {@code HEALTHCHECK} (in production it lives on the internal management port instead, pinned by
+   * {@code ManagementPortIsolationTest}); the two {@code /api/v1} reads are D2 and D3 of ADR-0159 —
+   * an app too old to log in must still learn that it is too old, and a document everyone must be
+   * able to read before agreeing to anything cannot require having agreed.
    */
   private static final Set<String> ANONYMOUS_OK =
       Set.of(
@@ -110,14 +111,29 @@ class AnonymousSurfaceSweepTest {
   /**
    * Mappings excluded from the sweep because they are not a caller-facing surface.
    *
-   * <p>{@code /internal/**} is machine-to-machine behind a constant-time shared-secret header and
-   * is {@code permitAll} at the URL layer on purpose (REQ-SEC-022) — the controller does its own
-   * refusing, which is a different assertion belonging to a different test. The actuator tree
-   * beyond {@code health} is gated by the management-port configuration in production, which this
-   * application-connector context does not model.
+   * <p>Two entries, and both of them are things this sweep cannot express rather than things it
+   * chooses not to look at. {@code /internal/**} is machine-to-machine behind a constant-time
+   * shared-secret header and is {@code permitAll} at the URL layer on purpose (REQ-SEC-022) — the
+   * controller does its own refusing, which is a different assertion belonging to a different test.
+   * A direct {@code GET /error} with no error attribute resolves to a {@code 500}, which is its
+   * correct contract and not something a "must answer / must refuse" sweep has a verdict for.
+   *
+   * <p><b>{@code /actuator} used to stand here too, and that was one exclusion too many.</b> Two of
+   * the four {@code ANONYMOUS_OK} entries were {@code /actuator/health} and {@code /error} — both
+   * excluded, so the list of paths that must answer anonymously was half a list nothing checked.
+   * The actuator tree is swept now: {@code health} answers, everything else refuses, and the
+   * production management-port isolation that the Javadoc used to cite as the reason for skipping
+   * it is a different property, pinned by {@code ManagementPortIsolationTest}.
+   *
+   * <p><b>Matched as a path segment, not as a string prefix.</b> An exclusion inside a sweep whose
+   * whole value is exhaustiveness must not be able to swallow a neighbour it was never meant to
+   * name. {@code /v3/api-docs} used to stand here and, compared with {@code startsWith}, took
+   * springdoc's second spelling {@code /v3/api-docs.yaml} with it — which was the one the {@code
+   * ROLE_ADMIN} matcher's {@code **} did not cover either, so the only path on the whole surface
+   * that was silently weaker than its own comment was also the only one this sweep could not see.
+   * The document is swept under both spellings now; the entry is gone rather than made exact.
    */
-  private static final List<String> NOT_SWEPT =
-      List.of("/internal", "/actuator", "/v3/api-docs", "/error");
+  private static final List<String> NOT_SWEPT = List.of("/internal", "/error");
 
   /**
    * The three {@code /api} paths a refused-but-authenticated caller may still reach.
@@ -193,7 +209,7 @@ class AnonymousSurfaceSweepTest {
       }
       for (String pattern : patterns) {
         String path = substituteVariables(pattern);
-        if (path == null || NOT_SWEPT.stream().anyMatch(path::startsWith)) {
+        if (path == null || NOT_SWEPT.stream().anyMatch(p -> isUnder(path, p))) {
           continue;
         }
         for (HttpMethod verb : verbs) {
@@ -338,6 +354,44 @@ class AnonymousSurfaceSweepTest {
         .isEmpty();
   }
 
+  /**
+   * The OpenAPI document requires {@code ROLE_ADMIN} under <b>both</b> spellings springdoc
+   * registers for it.
+   *
+   * <p>Its own test because the three passes above cannot see this one. They ask what a caller who
+   * is <em>not a member</em> may reach, and the document was already behind {@code
+   * anyRequest().authenticated()} for such a caller under either spelling — so an anonymous sweep
+   * stays green whether the {@code ROLE_ADMIN} matcher covers {@code /v3/api-docs.yaml} or not, and
+   * passes 2 and 3 skip it outright because it is not an {@code /api} path. The question this asks
+   * is the one that was actually wrong: whether an ordinary <em>member</em> can read the most
+   * efficient description of the attack surface the project can produce. Until 2026-09-06 they
+   * could, through the YAML spelling, because {@code **} spans whole segments.
+   *
+   * @throws Exception when a request could not be performed
+   */
+  @Test
+  @DisplayName("the OpenAPI document is ADMIN-only under both of springdoc's spellings")
+  void theOpenApiDocumentIsAdminOnlyUnderBothSpellings() throws Exception {
+    for (String path : List.of("/v3/api-docs", "/v3/api-docs.yaml")) {
+      Call call = new Call(HttpMethod.GET, path);
+      int asMember =
+          issue(call, jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
+              .getResponse()
+              .getStatus();
+      Assertions.assertThat(asMember)
+          .as("%s must not answer an ordinary member — it enumerates the whole API", path)
+          .isGreaterThanOrEqualTo(400);
+
+      int asAdmin =
+          issue(call, jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+              .getResponse()
+              .getStatus();
+      Assertions.assertThat(asAdmin)
+          .as("%s must still be readable by an admin — the matcher gates it, not disables it", path)
+          .isLessThan(400);
+    }
+  }
+
   /** Pass 2: a bearer whose only authority is the pending marker. */
   @Test
   @DisplayName("a pending registration reaches nothing but its own status")
@@ -382,5 +436,18 @@ class AnonymousSurfaceSweepTest {
       }
     }
     Assertions.assertThat(served).as(because).isEmpty();
+  }
+
+  /**
+   * Whether a mapping path lies at or under an excluded root, comparing whole path segments.
+   *
+   * @param path the substituted mapping path, e.g. {@code /actuator/health} or {@code
+   *     /v3/api-docs.yaml}
+   * @param root an entry of {@link #NOT_SWEPT}, without a trailing slash
+   * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
+   *     that merely shares its opening characters
+   */
+  private static boolean isUnder(String path, String root) {
+    return path.equals(root) || path.startsWith(root + "/");
   }
 }

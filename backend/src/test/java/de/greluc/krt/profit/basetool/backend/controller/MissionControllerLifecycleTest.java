@@ -57,6 +57,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -76,21 +77,17 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * sub-resource endpoints + RSVP branches) do NOT touch:
  *
  * <ul>
- *   <li><b>Outsider redaction</b> in {@code getMissionById} / {@code getNextMission} — {@code
- *       MissionController#cleanupOutsiderMissionForPeer} is the only path that controls what leaves
- *       the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected via
- *       {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the free-text
- *       description hidden, participant PII stripped to the public callsign tuple, owner / managers
- *       / internal inventory+refinery cleared, and — per ADR-0034 — each participant's
- *       payoutPreference + free-text comment stripped, while organisation, the participant roster,
- *       units and frequencies stay visible) protects the multi-user-data-isolation guarantee in
- *       CLAUDE.md.
- *   <li><b>Outsider access blocks</b>: internal missions → 403, completed/cancelled missions → 403
- *       (a past mission must not leak its participant list to a public viewer).
- *   <li><b>Outsider list/search filtering</b> — {@code getAllMissions} / {@code searchMissions}
- *       silently restrict outsiders to {@code PLANNED}+{@code ACTIVE} non-internal missions. The
- *       "outsider passes a forbidden status" path returns an empty page (not 403) so the UI
- *       degrades silently.
+ *   <li><b>Peer redaction</b> — {@code MissionPeerRedactor#cleanupMissionForPeer} is the only path
+ *       that controls what leaves the API to a member below Logistician (detected via {@code
+ *       AuthHelperService#isLogisticianOrAbove()}). Pinning it (participant PII stripped to the
+ *       public callsign tuple, owner and managers withheld from a caller who may not manage the
+ *       mission) protects the multi-user-data-isolation guarantee in CLAUDE.md. Since 2026-09-06
+ *       every mission return runs through it, not only the reads — which is why the {@code
+ *       BeforeEach} below assumes a Logistician unless a case says otherwise.
+ *       <p>There used to be a stricter <b>outsider</b> tier here for anonymous and role-less
+ *       callers (ADR-0034), with its own access blocks (internal and terminal missions refused
+ *       outright) and its own list filtering (silently restricted to {@code PLANNED}/{@code ACTIVE}
+ *       non-internal). Its whole audience is gone (ADR-0159) and so are its cases.
  *   <li><b>Section patches</b> ({@code patchMissionCore}, {@code patchMissionSchedule}, {@code
  *       patchMissionFlags}) unpack each request record into the service's positional argument list.
  *       The argument order is the spot where a copy-paste during refactor would silently swap
@@ -110,13 +107,25 @@ class MissionControllerLifecycleTest {
   @Mock private MissionSecurityService missionSecurityService;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
-  // Real redactor (not a mock) so the outsider-redaction assertions exercise the actual
+  // Real redactor (not a mock) so the peer-redaction assertions exercise the actual
   // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
   @org.mockito.Spy
   private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
       new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
   @InjectMocks private MissionController controller;
+
+  /**
+   * Every mission response now runs through the peer pass on its way out (REQ-SEC-007), so a test
+   * that does not say which tier its caller is in gets the redacted shape by Mockito's default
+   * {@code false}. Most cases here are about ARGUMENT FORWARDING and assert the mapper's own
+   * result, so the default is Logistician-and-above, for whom the pass is a no-op. The three cases
+   * that are about the redaction override it, and are the reason this is {@code lenient()}.
+   */
+  @BeforeEach
+  void assumeALogisticianUnlessACaseSaysOtherwise() {
+    org.mockito.Mockito.lenient().when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
+  }
 
   private static Jwt jwt(String sub) {
     return Jwt.withTokenValue("token")
@@ -127,12 +136,26 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * Build a representative MissionDto that exercises every field {@link
-   * MissionController#cleanupMissionForPeer} touches. This is the canary input for the redaction
+   * Build a representative MissionDto that exercises every field {@code
+   * MissionPeerRedactor#cleanupMissionForPeer} touches. This is the canary input for the redaction
    * assertions further down: every "internal" or "leaks-PII" field is intentionally populated so
    * the cleanup pass has something to strip.
    */
   private static MissionDto fullMissionDto(UUID id) {
+    return fullMissionDto(id, true);
+  }
+
+  /**
+   * The unredacted mission the controller's mapper is stubbed to return.
+   *
+   * @param id the mission id
+   * @param managing what {@code MissionMapper} resolved for THIS caller — {@code canEdit} and
+   *     {@code canManageManagers}, which since 2026-09-06 also decide whether the peer pass keeps
+   *     the mission's owner and manager list: a caller the response tells may change that list is
+   *     shown it, a peer who is only reading is not (REQ-SEC-007)
+   * @return a fully populated {@link MissionDto}
+   */
+  private static MissionDto fullMissionDto(UUID id, boolean managing) {
     UserReferenceDto owner =
         new UserReferenceDto(
             UUID.randomUUID(), "owner.handle", "Owner Display", "Owner Effective", 12);
@@ -190,8 +213,8 @@ class MissionControllerLifecycleTest {
         null,
         owner,
         Set.of(manager),
-        true,
-        true,
+        managing,
+        managing,
         9L,
         4L, // coreVersion
         5L, // scheduleVersion
@@ -397,7 +420,7 @@ class MissionControllerLifecycleTest {
     Mission planned = new Mission();
     planned.setIsInternal(false);
     planned.setStatus("PLANNED");
-    MissionDto full = fullMissionDto(id);
+    MissionDto full = fullMissionDto(id, false);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
     // A member below Logistician — the only redacted tier left (REQ-SEC-007).
@@ -417,11 +440,14 @@ class MissionControllerLifecycleTest {
     // Stripped: owner / managers.
     assertThat(result.owner()).isNull();
     assertThat(result.managers()).isNull();
-    // NOT stripped: what the CALLER may do. A MISSION_MANAGER sits below Logistician (the
-    // hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN),
-    // so forcing these off would hide the management controls from the Einsatz's own manager.
-    assertThat(result.canEdit()).isTrue();
-    assertThat(result.canManageManagers()).isTrue();
+    // NOT forced off: the flags are what the CALLER may do, forwarded rather than overwritten. A
+    // MISSION_MANAGER sits below Logistician (the hierarchy puts ADMIN/OFFICER above both roles
+    // but never MISSION_MANAGER above LOGISTICIAN), so forcing them would hide the management
+    // controls from the Einsatz's own manager. Here they are false because this caller is only
+    // READING, which is also why owner and managers are stripped above — the two travel together
+    // since 2026-09-06. MissionPeerRedactorTest owns both directions of that rule.
+    assertThat(result.canEdit()).isFalse();
+    assertThat(result.canManageManagers()).isFalse();
     // #1138: the mission economy (inventory / refinery orders) is no longer part of MissionDto —
     // there is nothing to assert empty here; it is served member-gated at its own endpoints.
     // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
@@ -454,7 +480,7 @@ class MissionControllerLifecycleTest {
   void getNextMission_peer_allowInternalIsTrue_andResponseRedacted() {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
-    MissionDto full = fullMissionDto(id);
+    MissionDto full = fullMissionDto(id, false);
     // A member below Logistician.
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
     when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
@@ -583,7 +609,7 @@ class MissionControllerLifecycleTest {
     UUID callerId = UUID.randomUUID();
     UUID missionId = UUID.randomUUID();
     Mission persisted = new Mission();
-    MissionDto full = fullMissionDto(missionId);
+    MissionDto full = fullMissionDto(missionId, false);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
     when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);

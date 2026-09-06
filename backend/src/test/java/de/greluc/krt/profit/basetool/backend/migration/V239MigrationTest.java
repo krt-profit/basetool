@@ -96,6 +96,33 @@ class V239MigrationTest {
   }
 
   @Test
+  void v239LeavesNoNotificationRuleAddressingTheDeletedRole() {
+    // `notification_rule_selector.role_code` is a bare VARCHAR with no FK to `role` (V156), so
+    // deleting the role cannot cascade here. A surviving GUEST selector matches no recipient, which
+    // is harmless — but it also makes its rule permanently unsaveable: NotificationRuleService
+    // re-validates every selector on update and findByCode('GUEST') is now empty, so any edit to
+    // that rule is refused with a 400, and the UI cannot repair it because the option is gone from
+    // the picker. Asserted against the live catalogue rather than a fixture: this is a statement
+    // about what the migration left behind in the database it ran on.
+    assertThat(count("SELECT count(*) FROM notification_rule_selector WHERE role_code = 'GUEST'"))
+        .as("no notification rule may still address the deleted role")
+        .isZero();
+  }
+
+  @Test
+  void noNotificationRuleSelectorPointsAtARoleThatDoesNotExist() {
+    // The general form of the case above, so the next role deletion is covered on the day it
+    // happens: any ROLE selector naming a code with no row in `role` is the same trap.
+    assertThat(
+            count(
+                "SELECT count(*) FROM notification_rule_selector s WHERE s.kind = 'ROLE'"
+                    + " AND s.role_code IS NOT NULL"
+                    + " AND NOT EXISTS (SELECT 1 FROM role r WHERE r.code = s.role_code)"))
+        .as("a ROLE selector naming a code the catalogue does not know cannot be saved again")
+        .isZero();
+  }
+
+  @Test
   void v239DropsTheGuestEditTokenColumn() {
     assertThat(
             count(

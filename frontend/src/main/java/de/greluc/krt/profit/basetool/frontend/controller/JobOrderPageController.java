@@ -40,7 +40,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.PickerSearch;
@@ -103,7 +102,6 @@ public class JobOrderPageController {
   private final BackendApiClient backendApiClient;
   private final RoleHierarchy roleHierarchy;
   private final ParallelPageLoader parallelPageLoader;
-  private final FrontendAuthHelperService authHelper;
 
   private static final List<String> VALID_STATUSES =
       List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");

@@ -214,15 +214,37 @@ own profile — never elsewhere.) The naming convention is enforced structurally
 > free-text description and each participant's payout preference and comment, for anonymous and
 > role-less `GUEST` callers. Both audiences are gone (REQ-SEC-052, REQ-SEC-053), so the tier went
 > with them and `MissionGuestRedactor` became `MissionPeerRedactor`.
->
+
+**The mission's owner and managers are withheld from a peer who is only reading, and kept for one
+who may manage the mission** (`canEdit` or `canManageManagers`). The exemption exists because the
+pass now runs for callers who hold those rights: a bare `MISSION_MANAGER` is below Logistician — the
+hierarchy puts ADMIN/OFFICER above both roles but never MISSION_MANAGER above LOGISTICIAN — so the
+response asserted `canManageManagers: true` and handed over an empty manager list in the same
+breath, and the Verwaltung panel offered add/remove controls over a list nobody could see. It
+discloses nothing: `UserReferenceDto` is id, username, display name, effective name and rank, the
+same public callsign tuple every participant on that mission already carries, and it travels only to
+a caller who may rewrite the list it names.
+
 > The rule that selects the endpoints was rewritten rather than renamed, and that is the part worth
 > reading. It used to select gates carrying **no** `isAuthenticated()` clause — the shape that made
 > an endpoint anonymously reachable. Every such gate now has one, so the old predicate would select
-> *nothing* and the rule would pass by checking an empty set. It now keys on *which* gate:
-> `canSeeMission` and `canAccessParticipant` admit an ordinary member, `canManageMission` and its
-> siblings do not. The rewrite immediately found a real leak the old rule could not see —
+> *nothing* and the rule would pass by checking an empty set. It now keys on *which* gate. The
+> rewrite immediately found a real leak the old rule could not see —
 > `MissionController.joinMission` returned the whole Einsatz, roster included, to the member who had
 > just joined.
+>
+> [!bug] Corrected 2026-09-06 — `canManageMission` **does** admit an ordinary member
+> The rewrite above first exempted `canManageMission`, `canManageManagers` and `canChangeOwner`,
+> on the premise that a gate requiring leadership returns the unredacted aggregate on purpose. That
+> premise is false. All three fall through to `isOwnerOrManager`, which grants on
+> `mission.getOwner()` or membership of `getManagers()` **without consulting a role**, and the
+> hierarchy declares no `MISSION_MANAGER > LOGISTICIAN` edge either — so creating a mission (which
+> only needs `isAuthenticated()`, and makes you its owner) is enough to pass them. The exemption
+> covered exactly the audience the peer tier exists for, which is why the guard stayed green over
+> twenty-three write handlers that returned the unredacted aggregate to a member below Logistician
+> and over the slim unit endpoints and ship picker, where `ShipDto.owner` re-opened REQ-SEC-040 one
+> tier up. Only a gate naming a **role or authority** is genuinely out of a peer's reach; those are
+> the exemptions the rule keeps.
 
 ### REQ-SEC-009 — The member surface
 
@@ -261,7 +283,10 @@ The frontend's session/meta CSRF setup is unchanged (`HttpSessionCsrfTokenReposi
 [`frontend-ajax-mutations.md`](frontend-ajax-mutations.md)) can self-heal a bare-403 write with a
 single transparent token refresh + retry. The endpoint sits under the `authenticated()` catch-all —
 an anonymous caller is redirected to the OIDC entry point, never handed a token — so it widens no
-trust boundary and is not a change to the CSRF repository/handler (ADR-0012).
+trust boundary and is not a change to the CSRF repository/handler (ADR-0012). Since 2026-09-06 it
+also carries a class-level `@PreAuthorize("isAuthenticated()")`: the catch-all is still what
+refuses, but REQ-SEC-052's rule is that no controller's only protection is a matcher two folders
+away, and `ArchitectureTest.everyControllerCarriesAGateOfItsOwn` now holds every controller to it.
 
 **Acceptance**
 
@@ -1567,12 +1592,14 @@ through to the all-verb catalog `permitAll` underneath, and Spring MVC answers `
 back. The general rule: **a method-scoped tightening placed above an all-verb `permitAll` grants
 every verb it does not claim.**
 
-The anonymous page-size ceiling MUST be evaluated with **the same parser Spring's binder uses**
-(`NumberUtils#parseNumber`), and a value that parser rejects MUST be refused rather than allowed.
-`Integer.parseInt` is stricter: it throws on `0x186A0`, `#186A0` and on embedded whitespace, all of
-which the binder accepts (it strips whitespace and honours the hex spellings). Treating
-"unparseable" as "within the limit" therefore made the ceiling bypassable with three characters. An
-**empty** `size=` stays exempt — it binds to `null` and is a legal request for the default page.
+The anonymous page-size ceiling used to be evaluated with **the same parser Spring's binder uses**
+(`NumberUtils#parseNumber`), refusing what that parser rejects rather than letting it through:
+`Integer.parseInt` is stricter and throws on `0x186A0`, `#186A0` and embedded whitespace, all of
+which the binder accepts, so treating "unparseable" as "within the limit" made the ceiling
+bypassable with three characters. **Retained as the lesson, not as a rule** — the ceiling and its
+filter are gone with the anonymous surface (see the amendment above). The general form still holds
+anywhere a guard and a binder read the same string: *parse it the way the thing you are guarding
+will parse it.*
 
 `GET /api/v1/materials/{id}/terminals` — the per-material slice of that same matrix, which the
 inventory page uses to suggest where to sell — is covered by the identical reasoning and was
@@ -1598,10 +1625,12 @@ measured anonymously before it is admitted, and what the measurement says is act
 Admitting these as they stood would have published trade prices to the internet — the vhost would
 have let them through and the backend would not have stopped them.
 
-`GET /api/v1/materials/{id}` deliberately stays anonymous. `MaterialDto` is catalogue only — name,
-quantity type, category, flags, **no price** — and `/api/v1/materials/search` has published those
-same fields anonymously since the vhost's phase 2. Closing it is a different change with a different
-reason, and it is pinned in `ApiVhostAnonymousSurfaceTest` so it stays a decision.
+`GET /api/v1/materials/{id}` used to stay anonymous deliberately — `MaterialDto` is catalogue only
+(name, quantity type, category, flags, **no price**), and `/api/v1/materials/search` had published
+those same fields anonymously since the vhost's phase 2. **REQ-SEC-052 closed it with everything
+else**: the public surface is now an enumerated list of four backend paths and this is not one of
+them. The paragraph is kept because the reasoning is still the reason it was the *last* catalogue
+read to go, not because the exemption survives.
 
 **An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
 be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
@@ -1622,14 +1651,17 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 - [x] `GET /api/v1/materials/prices-overview`, `GET /api/v1/materials/{id}/prices` and `GET
   /api/v1/materials/profit-calculation` answer 401 without a token
   (`ApiVhostAnonymousSurfaceTest`), and the nightly `edge-deny-probe` asserts it.
-- [x] `GET /api/v1/materials/{id}` stays anonymous — catalogue only, no price — and is pinned as a
-  decision rather than left to drift.
-- [x] An anonymous request with `size=50000` is refused with `400` and the stable code
-  `PAGE_SIZE_TOO_LARGE`.
-- [x] An anonymous request with `size=1000` still succeeds.
-- [x] An authenticated caller with `size=50000` is unaffected.
+- [x] `GET /api/v1/materials/{id}` answers `401` without a token like every other catalogue read
+  (REQ-SEC-052); it was the last one to close and is swept rather than pinned as an exemption.
+- [x] ~~An anonymous request with `size=50000` is refused with `400` and the stable code
+  `PAGE_SIZE_TOO_LARGE`.~~ Retired with `AnonymousPageSizeFilter` (ADR-0159): no paginated endpoint
+  answers an unauthenticated caller, so there is no anonymous page to bound.
+- [x] ~~An anonymous request with `size=1000` still succeeds.~~ Same.
+- [x] An authenticated caller with `size=50000` is unaffected — the 100 000 `PaginationUtil` clamp
+  is unchanged.
 
-**Enforced by:** `SecurityTest` · **Code:** `AnonymousPageSizeFilter`, `SecurityConfig`
+**Enforced by:** `SecurityTest`, `AnonymousSurfaceSweepTest` (the `HEAD`-per-`GET` pass that carries
+the verb-agnostic lesson forward) · **Code:** `SecurityConfig`
 
 ### REQ-SEC-033 — An authenticated account MUST have a budget of its own
 
@@ -2898,9 +2930,14 @@ compares the verb with `String.equals`, so a method-scoped tightening placed abo
 `permitAll` grants every verb it does not claim — which is how a `HEAD` once ran the material price
 query anonymously and returned its `Content-Length`.
 
-`/v3/api-docs/**` is **not** on either list. The document enumerates every path, parameter and DTO
-field the API has — the most efficient description of the attack surface the project can produce —
-and being a 404 in prod is a deployment property, not an access rule. It requires `ROLE_ADMIN`.
+The OpenAPI document is **not** on either list. It enumerates every path, parameter and DTO field
+the API has — the most efficient description of the attack surface the project can produce — and
+being a 404 in prod is a deployment property, not an access rule. It requires `ROLE_ADMIN` under
+**both** spellings springdoc registers: `/v3/api-docs*` and `/v3/api-docs/**`. The second pattern
+alone, which is what stood here, does not cover `/v3/api-docs.yaml` — `**` spans whole segments — so
+that spelling fell through to the catch-all and was merely authenticated, on a path that carries the
+whole surface. Corrected 2026-09-06; the sweep excluded it too, by prefix, and now excludes nothing
+of the kind.
 
 The prod-only **management-port chain** (`ManagementPortSecurityConfig`,
 `@ConditionalOnProperty("management.server.port")`, port `11271`) is `permitAll` on
@@ -2989,6 +3026,15 @@ in the same change:
 - [x] The frontend routes the state to the account-status page with its own words, not the waiting
   copy: a role-less member has already been approved, so "wait for an administrator to approve you"
   describes a wait with no end.
+  **The lockout signal counts subjects, never requests.** `basetool_norole_refused_subjects` is a
+  gauge of the distinct subjects `PendingApprovalAccessFilter` refused with `NO_ROLE` in a rolling
+  15-minute window, and `NoRoleBlockSpike` alerts on it with `max()` (per process). The refusal
+  *rate* answers a different question and fails in both directions: one member's open tab polling in
+  the background sustains it on its own, while the event the alert exists for — a realm-side role
+  rename — locks the whole membership out at 03:00, when nobody is making requests, so the rate stays
+  near zero until morning. This is the same lesson `basetool_terms_refused_subjects` was built on
+  after `TermsConsentRolloutStalled` fired twice overnight on a single looping tab (2026-08-03), and
+  the two windows are separate instances because one member can be in both populations.
 - [x] That routing takes effect on the request that **discovers** the state, not the one after it.
   The role read is where the frontend first meets a role-less account, and it runs *after* the
   approval gate — so a filter that only caches the verdict serves the discovering request, which
@@ -2999,8 +3045,12 @@ in the same change:
 `CustomJwtGrantedAuthoritiesConverterTest` · `PendingApprovalAccessFilterTest` ·
 `UserReconciliationServiceTest` · `KeycloakServiceTest` (the composite fold-in and the aborted run) ·
 `V239MigrationTest` · `BackendRoleSyncFilterTest` · `NotificationRuleServiceTest` ·
+`PendingApprovalPageControllerTest` (the account-status routing and its redirect loop) ·
+`BackendApiClientProblemJsonTest` (the refusal is not a backend-call failure) ·
+`norole_block_subjects_test.yml` (the alert counts subjects) ·
 **Code:** `CustomJwtGrantedAuthoritiesConverter#assembleFor`, `Roles.NO_ROLE_MARKER`,
-`PendingApprovalAccessFilter`, `UserReconciliationService`, `KeycloakService#fetchDefaultRoleGrants`,
+`PendingApprovalAccessFilter`, `MetricNames.NO_ROLE_REFUSED_SUBJECTS`, `UserReconciliationService`,
+`KeycloakService#fetchDefaultRoleGrants`,
 `NotificationRuleService#validateSelector`, `frontend/…/config/BackendRoleSyncFilter`,
 `V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)

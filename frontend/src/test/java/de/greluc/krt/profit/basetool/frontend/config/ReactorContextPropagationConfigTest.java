@@ -51,11 +51,12 @@ import reactor.core.scheduler.Schedulers;
  * reactor.core.publisher.Hooks#enableAutomaticContextPropagation()} being on. That is activated in
  * {@link ReactorContextPropagationConfig#enableContextPropagation()}; we trigger it once at {@link
  * BeforeAll} time, then run a parallel-scheduler-bound assertion for each registered accessor —
- * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext}, {@link
- * GuestEditTokenContext} and the {@link LocaleContextHolder}-backed user locale. The three
- * later-added accessors (client IP for the backend per-IP rate limiter, guest edit token for
- * anonymous mission sign-up edits, user locale for the {@code Accept-Language} relay) would each
- * silently drop their outbound header if the registration or its null/blank branch regressed.
+ * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext} and the {@link
+ * LocaleContextHolder}-backed user locale. The two later-added accessors (client IP for the backend
+ * per-IP rate limiter, user locale for the {@code Accept-Language} relay) would each silently drop
+ * their outbound header if the registration or its null/blank branch regressed. A fifth accessor
+ * carried the guest edit token for anonymous mission sign-up edits; it went with the token itself
+ * (ADR-0159, V239).
  */
 class ReactorContextPropagationConfigTest {
 

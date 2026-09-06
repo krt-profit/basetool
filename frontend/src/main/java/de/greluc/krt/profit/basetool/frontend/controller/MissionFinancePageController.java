@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.form.MissionFinanceEntryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,7 +63,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
  * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
+ * by anything next to the code. A method-level gate still wins where one is present, which is why
+ * the two {@code @PreAuthorize("permitAll()")} the guest era left on the create handlers were
+ * deleted rather than left to be harmless: Spring resolves method-first and does not AND the class
+ * annotation into it, so they read as a live exemption from the floor above them.
  */
 @Slf4j
 @Controller
@@ -75,22 +77,20 @@ public class MissionFinancePageController {
 
   private final BackendApiClient backendApiClient;
   private final MissionPageController missionPageController;
-  private final FrontendAuthHelperService authHelper;
 
   /**
-   * Creates a finance entry on a mission. {@code permitAll()} reflects the project's guest-mode for
-   * mission finances — the backend still gates write access at the JWT layer when needed.
+   * Creates a finance entry on a mission. Covered by the class-level {@code isAuthenticated()}
+   * floor; the backend re-evaluates the write permission on {@code /api/v1/finance-entries}.
    *
    * @param id mission id
    * @param form finance-entry form
    * @param bindingResult validation errors carrier
    * @param model Thymeleaf model used for inline re-rendering (modal stays open)
    * @param redirectAttributes flash attributes carrier
-   * @param principal OIDC user, may be {@code null} for guests
+   * @param principal OIDC user; never {@code null} below the class-level floor
    * @return inline {@code mission-detail} view on validation failure, otherwise redirect
    */
   @PostMapping
-  @PreAuthorize("permitAll()")
   public String addFinanceEntry(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("financeForm") MissionFinanceEntryForm form,
@@ -123,8 +123,7 @@ public class MissionFinancePageController {
   }
 
   /**
-   * Updates a finance entry. The form carries the optimistic-lock version. Authenticated-only —
-   * guest write is restricted to {@code POST} (create) above.
+   * Updates a finance entry. The form carries the optimistic-lock version.
    *
    * @param id mission id (path)
    * @param entryId finance entry id (path)
@@ -207,13 +206,13 @@ public class MissionFinancePageController {
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
    *     amount}); {@code missionId} is stamped from the path
-   * @param principal OIDC user bound from the security context. The guest-vs-authenticated routing
-   *     it used to steer is gone with the guest (ADR-0159)
+   * @param principal OIDC user bound from the security context; never {@code null} below the
+   *     class-level floor. The guest-vs-authenticated routing it used to steer is gone with the
+   *     guest (ADR-0159)
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  @PreAuthorize("permitAll()")
   public ResponseEntity<Object> addFinanceEntryAjax(
       @PathVariable @NotNull UUID id,
       @RequestBody Map<String, Object> body,

@@ -10,6 +10,12 @@
 
 - **Drei Preis-Abfragen und die Startseite gaben ohne Anmeldung Daten heraus.** Die Handelspreise waren bereits vorher geschlossen (Runbook-Phase W); die Startseite zeigte bis jetzt die Einsätze der nächsten sieben Tage und legte für jeden Besuch zwei Sitzungen an. Beides ist behoben.
 
+- **Wer einen Einsatz verwalten darf, sieht die Verwaltungsdaten auch.** Bisher zeigte die Verwaltungs-Ansicht einem Einsatz-Manager den Besitzer als „-“ und keine Co-Manager, während die Knöpfe zum Hinzufügen und Entfernen aktiv waren. Zusätzlich geben die Schreib-Endpunkte eines Einsatzes ihre Antwort jetzt genauso gefiltert zurück wie das Lesen: unterhalb der Logistik ohne E-Mail, Rollen und Beitrittsdatum der anderen Teilnehmer.
+
+- **Die API-Dokumentation ist unter beiden Adressen der Administration vorbehalten.** Bisher war nur `/v3/api-docs` geschützt; die identische YAML-Variante war für jedes angemeldete Mitglied lesbar.
+
+- **Die Nutzungsbedingungen zeigen einen Hinweis statt eines Fehlers, wenn sie gerade nicht geladen werden können.** Zuvor endete die Seite in diesem Fall mit einem Serverfehler — auf genau der Seite, die man vor der Zustimmung lesen können muss.
+
 - **Ein abgemeldeter Tab legt keine Sitzungen mehr an.** Da jetzt jeder Pfad eine Anmeldung verlangt, hätte jede Hintergrundabfrage eines offenen Tabs eine Sitzung in Redis erzeugt. Gemerkt wird nur noch das Ziel echter Seitenaufrufe — Deep-Links führen nach der Anmeldung weiterhin genau dorthin.
 
 ### Changed

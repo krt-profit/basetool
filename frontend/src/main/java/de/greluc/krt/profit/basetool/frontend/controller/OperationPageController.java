@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.OperationForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -94,7 +93,6 @@ public class OperationPageController {
 
   private final BackendApiClient backendApiClient;
   private final MarkdownRenderer markdown;
-  private final FrontendAuthHelperService authHelper;
   private final ParallelPageLoader parallelPageLoader;
 
   /** Response type for one paginated page of the operations search endpoint. */

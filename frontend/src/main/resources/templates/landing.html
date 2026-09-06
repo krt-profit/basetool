@@ -74,6 +74,8 @@
 
     <th:block th:replace="~{fragments/fankit :: band}" />
 </main>
-<th:block th:replace="~{fragments/footer :: footer}" />
+<!-- No footer include here: the sidebar fragment this page opens with already ends with
+     ~{fragments/footer :: footer} (fragments/sidebar.html), so a second one rendered the
+     legal band twice on the one page a logged-out visitor sees. -->
 </body>
 </html>

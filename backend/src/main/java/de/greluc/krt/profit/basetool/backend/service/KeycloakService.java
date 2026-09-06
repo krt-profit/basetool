@@ -387,10 +387,8 @@ public class KeycloakService {
     // REQ-SEC-053: everything the realm's default-role composite grants, credited to every one of
     // its members. Without this a member who holds KRT Member only through `default-roles-iri`
     // comes back with no roles at all.
-    String defaultRoleName = defaultRoleName();
-    for (String granted : fetchDefaultRoleGrants(token, canonicalByLower)) {
-      accumulateRoleMembers(defaultRoleName, granted, token, byUser);
-    }
+    accumulateRoleMembers(
+        defaultRoleName(), fetchDefaultRoleGrants(token, canonicalByLower), token, byUser);
     // Which of the app's roles the realm actually still knows is the input every downstream role
     // decision rests on, and it used to be invisible: a renamed realm role simply stops matching
     // here, the run still "succeeds", and every holder is quietly left with no role at all.
@@ -575,6 +573,30 @@ public class KeycloakService {
    */
   private void accumulateRoleMembers(
       String queryRoleName, String storedRoleName, String token, Map<UUID, Set<String>> byUser) {
+    accumulateRoleMembers(queryRoleName, java.util.List.of(storedRoleName), token, byUser);
+  }
+
+  /**
+   * Same, crediting <b>several</b> stored role names from one membership walk.
+   *
+   * <p>The default-role composite is why this overload exists. Its membership is, by definition,
+   * every account in the realm, and calling the single-name form once per granted role re-walked
+   * that whole list each time - the largest page walk the sync makes, repeated. One walk credits
+   * them all.
+   *
+   * @param queryRoleName the realm role to read members of, in Keycloak's own casing
+   * @param storedRoleNames the local catalogue names to credit each member with
+   * @param token a valid admin access token
+   * @param byUser the accumulator, keyed by Keycloak user id
+   */
+  private void accumulateRoleMembers(
+      String queryRoleName,
+      java.util.Collection<String> storedRoleNames,
+      String token,
+      Map<UUID, Set<String>> byUser) {
+    if (storedRoleNames.isEmpty()) {
+      return;
+    }
     int pageSize = properties.getPageSize();
     int first = 0;
     while (true) {
@@ -612,7 +634,7 @@ public class KeycloakService {
           try {
             byUser
                 .computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>())
-                .add(storedRoleName);
+                .addAll(storedRoleNames);
           } catch (IllegalArgumentException ignored) {
             // A non-UUID member id is a Keycloak configuration deviation; skip it rather than
             // aborting the whole role page (matches the fail-closed id handling elsewhere).

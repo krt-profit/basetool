@@ -129,16 +129,17 @@ public class MissionParticipantService {
    *       Staffel and Spezialkommando they belong to); the submitted {@code orgUnitIds} are
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
-   *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@link #resolveSubmittedOrgUnits(java.util.List)} (anonymous
-   *       callers cannot label a guest at all; authenticated callers may label only org units they
-   *       can edit).
+   *   <li><b>External participant</b> (a person with no account, entered by the Einsatzleitung) —
+   *       the caller-submitted {@code orgUnitIds} are honoured after the authorization filter in
+   *       {@link #resolveSubmittedOrgUnits(java.util.List)}: the caller may label only org units
+   *       they can edit. There is no anonymous caller to consider any more (ADR-0159).
    * </ul>
    *
    * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
    * the sign-up modal's "Auszahlungsart" select. A non-null value wins over the registered user's
    * profile default (REQ-MISSION-002); {@code null} keeps the existing default chain (profile
-   * default for users, entity default {@code PAYOUT} for guests).
+   * default for registered users, entity default {@code PAYOUT} for external participants, who have
+   * no profile to read one from).
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
    *     id is unknown
@@ -839,13 +840,17 @@ public class MissionParticipantService {
     if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {
       return java.util.List.of();
     }
-    java.util.List<OrgUnit> resolved = new java.util.ArrayList<>();
-    for (UUID orgUnitId : submittedOrgUnitIds) {
-      if (orgUnitId == null) {
-        continue;
-      }
-      orgUnitRepository.findById(orgUnitId).ifPresent(resolved::add);
+    // One findAllById rather than a findById per submitted id: this runs inside the write
+    // transaction, and CLAUDE.md's no-N+1 rule applies to a loop of single reads even when the
+    // list is short. Order is restored from the submitted list afterwards, because findAllById
+    // gives no ordering guarantee and the caller's list is the one the user chose.
+    java.util.List<UUID> ids =
+        submittedOrgUnitIds.stream().filter(java.util.Objects::nonNull).toList();
+    if (ids.isEmpty()) {
+      return java.util.List.of();
     }
-    return resolved;
+    java.util.Map<UUID, OrgUnit> found = new java.util.HashMap<>();
+    orgUnitRepository.findAllById(ids).forEach(unit -> found.put(unit.getId(), unit));
+    return ids.stream().map(found::get).filter(java.util.Objects::nonNull).toList();
   }
 }

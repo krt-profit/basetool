@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -208,13 +209,22 @@ public class RequestScopeResolver {
    * app_user.squadron_id} and migrates the legacy Staffel membership onto {@code
    * org_unit_membership}, this method switches to a single {@code findAllByIdUserId} read.
    *
+   * <p><b>The refusal is an {@link AuthenticationCredentialsNotFoundException}, not an {@code
+   * IllegalStateException}.</b> Both fail closed; only one of them fails closed in a shape the API
+   * can answer with. {@code GlobalExceptionHandler} maps the latter to a {@code 400} and echoes its
+   * message, so a lost gate would have told the caller “reaching this means an endpoint lost its
+   * gate” under a status that says they sent something wrong. As a Spring Security exception it
+   * lands on the {@code 401 UNAUTHENTICATED} path instead — generic body, DEBUG log, no stack
+   * trace, no 5xx alert — which is what a request with no identity actually is.
+   *
    * @return a never-null scope vector describing what the current request should see.
-   * @throws IllegalStateException when the current request carries no authenticated caller.
+   * @throws AuthenticationCredentialsNotFoundException when the current request carries no
+   *     authenticated caller.
    */
   @NotNull
   public ScopePredicate currentScopePredicate() {
     if (!authHelper.isAuthenticated()) {
-      throw new IllegalStateException(
+      throw new AuthenticationCredentialsNotFoundException(
           "No scope for an unauthenticated caller — every scoped read requires a login"
               + " (REQ-SEC-052). Reaching this means an endpoint lost its gate.");
     }

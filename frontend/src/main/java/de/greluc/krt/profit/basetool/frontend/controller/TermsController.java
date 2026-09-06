@@ -43,7 +43,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 @RequiredArgsConstructor
 public class TermsController {
 
-  /** Backend endpoint serving the wording in force; anonymous by design (ADR-0138). */
+  /**
+   * Reads the wording in force through the one bearer-less call the frontend makes: {@code GET
+   * /api/v1/terms/document} is one of the four backend paths REQ-SEC-052 serves without a token,
+   * because a document everyone must be able to read before agreeing to anything cannot require
+   * having agreed (ADR-0138). Every other call this module makes carries the caller's bearer.
+   */
   private final BackendApiClient backendApiClient;
 
   /**

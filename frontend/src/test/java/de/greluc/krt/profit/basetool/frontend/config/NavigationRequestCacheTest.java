@@ -92,7 +92,15 @@ class NavigationRequestCacheTest {
     assertThat(navigationRequestCache.getRequest(result.getRequest(), result.getResponse()))
         .as("and the target is the page the member asked for")
         .isNotNull()
-        .satisfies(saved -> assertThat(saved.getRedirectUrl()).contains(PROTECTED_PATH));
+        // endsWith, not contains: Spring Security appends its own `continue` marker to the
+        // replayed URL, and `contains` would go on passing if the path itself ever changed under
+        // it. The marker is asserted separately below so a Spring upgrade that drops or renames it
+        // is visible here rather than in an E2E failure.
+        .satisfies(
+            saved ->
+                assertThat(saved.getRedirectUrl())
+                    .endsWith(PROTECTED_PATH + "?continue")
+                    .contains(PROTECTED_PATH));
   }
 
   @Test
@@ -111,6 +119,43 @@ class NavigationRequestCacheTest {
     assertThat(result.getRequest().getSession(false))
         .as("and holding nothing needs no session — REQ-SEC-025's leak")
         .isNull();
+  }
+
+  @Test
+  void aBackgroundCallThatAlsoAsksForHtmlIsNotSaved() throws Exception {
+    // The case the matcher used to admit. Sec-Fetch-Mode and the Accept test were ORed, so a
+    // fragment refetch or a prefetch — cors, but asking for HTML because it renders HTML — saved a
+    // request and minted a session anyway, which is the churn WP-F 11 exists to remove and lands
+    // hardest on the five page families this change moved out of permitAll. It could also
+    // overwrite a genuine deep link with a fragment URL, sending the member back from the login to
+    // half a page. A browser that sends the header has already answered the question.
+    MvcResult result =
+        mockMvc
+            .perform(
+                get(PROTECTED_PATH)
+                    .header("Sec-Fetch-Mode", "cors")
+                    .header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE))
+            .andReturn();
+
+    assertThat(navigationRequestCache.getRequest(result.getRequest(), result.getResponse()))
+        .as("a declared background call is a background call, whatever it wants back")
+        .isNull();
+    assertThat(result.getRequest().getSession(false)).as("and it mints no session either").isNull();
+  }
+
+  @Test
+  void aClientWithoutFetchMetadataFallsBackToTheAcceptHeader() throws Exception {
+    // The other half of the same rule: the Accept test is the FALLBACK, so it must still decide
+    // for a client that sends no Sec-Fetch-Mode at all — an older browser, a link opened from an
+    // external app, curl following a redirect.
+    MvcResult result =
+        mockMvc
+            .perform(get(PROTECTED_PATH).header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE))
+            .andReturn();
+
+    assertThat(navigationRequestCache.getRequest(result.getRequest(), result.getResponse()))
+        .as("no Fetch Metadata and an HTML Accept is the best evidence of a navigation there is")
+        .isNotNull();
   }
 
   @Test

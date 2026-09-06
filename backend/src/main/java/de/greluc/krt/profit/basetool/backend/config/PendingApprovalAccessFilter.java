@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
@@ -31,9 +32,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -193,6 +192,13 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
 
+  /**
+   * Distinct subjects refused with {@code NO_ROLE} in a rolling window, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}. The refusal rate cannot answer the question the alert
+   * asks - see that constant.
+   */
+  private final RefusedSubjectWindow noRoleRefusedSubjects;
+
   @Override
   protected void doFilterInternal(
       @NotNull HttpServletRequest request,
@@ -201,6 +207,13 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     Refusal refusal = refusalFor(request);
     if (refusal != null) {
+      if (NO_ROLE_REFUSAL.equals(refusal)) {
+        // As a SUBJECT, not as a request: one member's background polling and a realm-wide lockout
+        // produce very different subject counts and indistinguishable request rates.
+        AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
+            .map(PendingApprovalAccessFilter::toUuidOrNull)
+            .ifPresent(noRoleRefusedSubjects::record);
+      }
       writeForbidden(request, response, refusal);
       return;
     }
@@ -278,14 +291,27 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     if (auth == null || !auth.isAuthenticated()) {
       return null;
     }
-    Set<String> authorities =
-        auth.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .collect(Collectors.toSet());
-    if (authorities.contains(PENDING_AUTHORITY)) {
+    // Two short-circuiting scans rather than materialising the whole authority collection into a
+    // HashSet on every authenticated /api request: both markers are exclusive and neither is
+    // common, so the set was allocated in full to answer two questions that stop at the first hit.
+    if (hasAuthority(auth, PENDING_AUTHORITY)) {
       return PENDING_REFUSAL;
     }
-    return authorities.contains(NO_ROLE_AUTHORITY) ? NO_ROLE_REFUSAL : null;
+    return hasAuthority(auth, NO_ROLE_AUTHORITY) ? NO_ROLE_REFUSAL : null;
+  }
+
+  /**
+   * Whether the caller carries a given authority, without building an intermediate collection.
+   *
+   * @param authentication the current authentication; never {@code null}
+   * @param authority the authority name to look for
+   * @return {@code true} as soon as one of the caller's authorities matches
+   */
+  private static boolean hasAuthority(
+      @NotNull Authentication authentication, @NotNull String authority) {
+    return authentication.getAuthorities().stream()
+        .map(GrantedAuthority::getAuthority)
+        .anyMatch(authority::equals);
   }
 
   /**
@@ -314,6 +340,22 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
       if (userIdOwned) {
         MDC.remove(MDC_USER_ID);
       }
+    }
+  }
+
+  /**
+   * Parses a subject string into a {@link UUID}, or {@code null} when it is not one.
+   *
+   * @param subject the authenticated subject, as {@code AuthenticatedSubject} reports it
+   * @return the parsed id, or {@code null} for a subject that is not a UUID (a service account, or
+   *     a realm that does not mint UUID subjects) - such a caller simply does not enter the window
+   */
+  @org.jetbrains.annotations.Nullable
+  private static UUID toUuidOrNull(String subject) {
+    try {
+      return UUID.fromString(subject);
+    } catch (IllegalArgumentException notAnId) {
+      return null;
     }
   }
 

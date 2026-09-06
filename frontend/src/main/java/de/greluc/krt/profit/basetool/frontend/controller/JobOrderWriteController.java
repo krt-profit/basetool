@@ -47,7 +47,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -121,12 +120,6 @@ public class JobOrderWriteController {
    * mutations.
    */
   private final MutationResponseHelper mutationResponseHelper;
-
-  /**
-   * Auth helper resolving whether the SecurityContext is anonymous, backing the guest-routing
-   * checks on the order-create handlers.
-   */
-  private final FrontendAuthHelperService authHelper;
 
   /**
    * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff

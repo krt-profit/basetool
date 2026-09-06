@@ -35,6 +35,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -152,11 +153,34 @@ public class NotificationRuleService {
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
               .userId(selectorRequest.userId())
-              .roleCode(trimToNull(selectorRequest.roleCode()))
+              // Stored in the catalogue's own casing, not the caller's: the recipient query is
+              // the case-sensitive `r.code = :roleCode`, so a rule saved as `admin` would match
+              // nobody while looking perfectly valid on the admin screen.
+              .roleCode(canonicalRoleCode(selectorRequest.roleCode()))
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
               .build());
     }
+  }
+
+  /**
+   * Resolves a submitted role code to the catalogue's own casing.
+   *
+   * @param submitted the caller's role code, possibly {@code null}, blank or differently cased
+   * @return the catalogue's code, or the trimmed input when it names no role (which {@link
+   *     #validateSelector} has already refused for a {@code ROLE} selector, and which is {@code
+   *     null} for every other kind)
+   */
+  @Nullable
+  private String canonicalRoleCode(@Nullable String submitted) {
+    String trimmed = trimToNull(submitted);
+    if (trimmed == null) {
+      return null;
+    }
+    return roleRepository
+        .findByCodeIgnoreCase(trimmed)
+        .map(de.greluc.krt.profit.basetool.backend.model.Role::getCode)
+        .orElse(trimmed);
   }
 
   private void validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
@@ -175,7 +199,7 @@ public class NotificationRuleService {
         // screen sent, and the screen offered `GUEST` — a role V239 deleted, so the rule would
         // have addressed nobody, for ever, without saying so. A selector nobody can match is a
         // notification silently not sent, which is the hardest kind of defect to notice.
-        if (roleRepository.findByCode(roleCode).isEmpty()) {
+        if (roleRepository.findByCodeIgnoreCase(roleCode).isEmpty()) {
           throw new IllegalArgumentException(
               "ROLE selector names an unknown roleCode: " + roleCode);
         }

@@ -327,6 +327,27 @@ public class SecurityConfig {
    * @return the window the consent filter records refusals into
    */
   @Bean
+  public RefusedSubjectWindow noRoleRefusedSubjectWindow(MeterRegistry meterRegistry) {
+    RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
+    Gauge.builder(MetricNames.NO_ROLE_REFUSED_SUBJECTS, window, RefusedSubjectWindow::size)
+        .description("Distinct subjects the role gate refused with NO_ROLE in the last 15 min.")
+        .register(meterRegistry);
+    return window;
+  }
+
+  /**
+   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
+   *
+   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
+   * separate instance on purpose: the two answer different questions and one member can be in both
+   * (a role-less account that has also not accepted the terms), so sharing a window would report
+   * them as one population.
+   *
+   * @param meterRegistry the registry the gauge is published to
+   * @return the window the role gate records refusals into
+   */
+  @Bean
   public RefusedSubjectWindow refusedSubjectWindow(MeterRegistry meterRegistry) {
     RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
     Gauge.builder(MetricNames.TERMS_REFUSED_SUBJECTS, window, RefusedSubjectWindow::size)
@@ -358,6 +379,9 @@ public class SecurityConfig {
    * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
+   * @param noRoleRefusedSubjectWindow the distinct-subject window {@code
+   *     PendingApprovalAccessFilter} records its {@code NO_ROLE} refusals into; a separate instance
+   *     from the consent one, because a member can be in both populations at once
    * @param clientAttribution bounds the {@code client_id} label of {@code
    *     basetool_api_client_requests_total} (A8, REQ-OBS-018) — the same mapping the audit trail's
    *     client column records (REQ-AUDIT-005)
@@ -376,6 +400,7 @@ public class SecurityConfig {
       MeterRegistry meterRegistry,
       TermsConsentCheck termsConsentCheck,
       RefusedSubjectWindow refusedSubjectWindow,
+      RefusedSubjectWindow noRoleRefusedSubjectWindow,
       IngestGatewayProperties ingestGatewayProperties,
       ActingMemberAuthorities actingMemberAuthorities,
       RateLimitProperties rateLimitProperties,
@@ -504,7 +529,14 @@ public class SecurityConfig {
                     // the attack surface the project can produce — and it was readable without a
                     // token on any profile that serves it. Being a 404 in prod is a deployment
                     // property, not an access rule, and this file is where the access rule belongs.
-                    .requestMatchers("/v3/api-docs/**")
+                    //
+                    // Both spellings, because springdoc registers two handlers for one document:
+                    // /v3/api-docs and /v3/api-docs.yaml. `**` spans whole segments, so the pattern
+                    // that has stood here since the permitAll days never matched the YAML variant —
+                    // it fell through to the catch-all and was merely authenticated, which is not
+                    // what the line next to it claims. `*` matches within the segment and closes
+                    // it.
+                    .requestMatchers("/v3/api-docs*", "/v3/api-docs/**")
                     .hasRole(Roles.ADMIN)
                     // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
                     // docker-compose `depends_on: condition: service_healthy`. Other actuator
@@ -538,16 +570,6 @@ public class SecurityConfig {
                     // the controller enforces its own constant-time shared-secret header instead.
                     .requestMatchers("/internal/**")
                     .permitAll()
-                    // A6 / REQ-SEC-032: carved OUT of the catalog permitAll below, which it would
-                    // otherwise fall into via /api/v1/materials/**. The material x terminal price
-                    // matrix is the largest single response the API can produce — the frontend
-                    // page-walks it at size=100000 — so leaving it anonymous hands an
-                    // unauthenticated
-                    // caller the cheapest amplification lever on the whole surface. It is operating
-                    // data, not guest content: its only consumer is MaterialsPageController, which
-                    // carries @PreAuthorize("isAuthenticated()"), so requiring a token here costs
-                    // nothing. Ordering matters — Spring Security takes the FIRST matching rule, so
-                    // this must stay above the /api/v1/materials/** entry.
                     // ADR-0138 / REQ-SEC-028: the Terms-of-Use WORDING is anonymous, while
                     // /api/v1/terms/status and /acceptance below it stay authenticated. A document
                     // everyone must be able to read before agreeing to anything cannot require
@@ -761,7 +783,11 @@ public class SecurityConfig {
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
-                messageSource, problemResponseFactory, objectMapper, meterRegistry),
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry,
+                noRoleRefusedSubjectWindow),
             ActingMemberFilter.class)
         // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
         // than only in the frontend because the backend is the one place every caller passes

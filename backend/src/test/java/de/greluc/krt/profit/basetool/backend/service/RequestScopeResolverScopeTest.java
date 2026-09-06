@@ -43,6 +43,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 /**
  * Mockito unit tests for the org-tenancy scope-resolution behaviour of {@link RequestScopeResolver}
@@ -105,9 +106,16 @@ class RequestScopeResolverScopeTest {
       // reaches a scoped read, so an empty predicate could only come from a forgotten gate.
       when(authHelper.isAuthenticated()).thenReturn(false);
 
-      IllegalStateException thrown =
-          assertThrows(IllegalStateException.class, resolver::currentScopePredicate);
+      // The TYPE is part of the contract, not an implementation detail. An IllegalStateException
+      // — which this used to throw — is mapped by GlobalExceptionHandler to a 400 that echoes the
+      // message, so a lost gate would have answered the caller "reaching this means an endpoint
+      // lost its gate" under a status blaming their request. A Spring Security exception lands on
+      // the 401 UNAUTHENTICATED path: generic body, DEBUG log, no stack trace, no 5xx alert.
+      AuthenticationCredentialsNotFoundException thrown =
+          assertThrows(
+              AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
 
+      assertTrue(thrown instanceof org.springframework.security.core.AuthenticationException);
       assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
     }
 

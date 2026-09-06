@@ -34,6 +34,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -93,6 +94,12 @@ public class UserReconciliationService {
    * Keycloak role names resolved.
    */
   private final AtomicInteger roleLessAccounts = new AtomicInteger();
+
+  /**
+   * The role catalogue for the run in progress, or {@code null} before the first mapping of a run.
+   * Filled by {@link #roleCatalogue()} and dropped by {@link #logRoleSyncSummary()}.
+   */
+  @Nullable private volatile Map<String, Role> roleCatalogue;
 
   /**
    * Keycloak role names seen in the current run that matched no local role and were dropped
@@ -386,13 +393,18 @@ public class UserReconciliationService {
     RoleMapping mapping = mapRolesTracked(dto.roles());
     droppedRoleNames.addAndGet(mapping.droppedNames());
     Set<Role> localRoles = mapping.roles();
+    // The role-less tally is counted OUTSIDE the delta gate on purpose. Inside it, only an account
+    // that role-less-ness happened TO on this run is counted, and an account that was already
+    // role-less contributes nothing - so the population V239 creates in one stroke (every ex-GUEST
+    // holder) is invisible on the first run and on every run after it, which is precisely the
+    // population the WARN exists to surface. It is a census, not a delta.
+    if (mapping.roleLess()) {
+      roleLessAccounts.incrementAndGet();
+    }
     if (!user.getRoles().equals(localRoles)) {
       user.setRoles(localRoles);
       changed = true;
       roleChangedAccounts.incrementAndGet();
-      if (mapping.roleLess()) {
-        roleLessAccounts.incrementAndGet();
-      }
       log.debug(
           "Role set changed for user {} (roleLess={}, unmatchedKeycloakRoleNames={})",
           user.getId(),
@@ -516,19 +528,20 @@ public class UserReconciliationService {
     int changed = roleChangedAccounts.getAndSet(0);
     int roleLess = roleLessAccounts.getAndSet(0);
     int dropped = droppedRoleNames.getAndSet(0);
+    roleCatalogue = null;
     if (roleLess > ROLE_LESS_WARN_THRESHOLD) {
       log.warn(
-          "User sync role mapping: {} accounts changed roles, {} of them left with NO role and now"
-              + " refused with NO_ROLE, {} Keycloak role names matched no local role — check for a"
-              + " renamed or deleted realm role.",
+          "User sync role mapping: {} accounts changed roles; {} accounts resolve to NO role at all"
+              + " and are refused with NO_ROLE; {} Keycloak role names matched no local role —"
+              + " check for a renamed or deleted realm role.",
           changed,
           roleLess,
           dropped);
       return;
     }
     log.info(
-        "User sync role mapping: {} accounts changed roles ({} left with no role), {} Keycloak role"
-            + " names matched no local role.",
+        "User sync role mapping: {} accounts changed roles; {} accounts resolve to no role; {}"
+            + " Keycloak role names matched no local role.",
         changed,
         roleLess,
         dropped);
@@ -548,6 +561,38 @@ public class UserReconciliationService {
   }
 
   /**
+   * The role catalogue, lower-cased by name, read once per sync run instead of once per role name
+   * per member.
+   *
+   * <p>The catalogue is a handful of rows and every member carries several names, so the previous
+   * {@code findByNameIgnoreCase} per name was one query per name per account - and the REQ-SEC-053
+   * composite fold-in adds a name to essentially every member, roughly doubling that count against
+   * the largest loop in the nightly run. One read serves the whole run; the reference is dropped in
+   * {@link #logRoleSyncSummary()}, which the sync calls when it finishes, so a role added between
+   * runs is picked up on the next one.
+   *
+   * <p>{@code volatile} and immutable rather than synchronised: two overlapping runs would at worst
+   * build the same map twice, and neither can observe a half-filled one.
+   *
+   * @return role by lower-cased name; never {@code null}
+   */
+  @NotNull
+  private Map<String, Role> roleCatalogue() {
+    Map<String, Role> cached = roleCatalogue;
+    if (cached == null) {
+      cached =
+          roleRepository.findAll().stream()
+              .collect(
+                  java.util.stream.Collectors.toUnmodifiableMap(
+                      role -> role.getName().toLowerCase(Locale.ROOT),
+                      role -> role,
+                      (first, second) -> first));
+      roleCatalogue = cached;
+    }
+    return cached;
+  }
+
+  /**
    * Maps Keycloak realm-role names onto the local catalog exactly like {@link #mapRoles} but also
    * reports HOW the mapping went, so the caller can tell a legitimate role change apart from a
    * total failure to resolve: a name that matches nothing is dropped, and an account for which
@@ -561,10 +606,11 @@ public class UserReconciliationService {
     Set<Role> localRoles = new HashSet<>();
     int dropped = 0;
     if (roleNames != null) {
+      Map<String, Role> catalogue = roleCatalogue();
       for (String roleName : roleNames) {
-        Optional<Role> match = roleRepository.findByNameIgnoreCase(roleName);
-        if (match.isPresent()) {
-          localRoles.add(match.get());
+        Role match = catalogue.get(roleName.toLowerCase(Locale.ROOT));
+        if (match != null) {
+          localRoles.add(match);
         } else {
           dropped++;
         }

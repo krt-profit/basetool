@@ -160,6 +160,18 @@ Rules:
     `ShipType.description` in the same change — which is what keeps
     `ddl-auto=validate` green: during the soak both the field and the column existed,
     after V125 neither did, and at no point was there a field without its column.
+  - **Owner-approved single-phase exception: V239** (`drop_guest_role_and_guest_edit_token`,
+    2026-09-06, decision D10 of `MEMBERS_ONLY_PLAN.md`). The `mission_participant`
+    `guest_edit_token_hash` column is dropped in the same unit of work that removes its last
+    reader, deliberately, because the column stored the **hash of a capability token**: leaving it
+    through a soak would leave a credential-shaped artefact in the database with no code able to
+    mint, rotate or check it, and the whole point of the change is that the capability no longer
+    exists. The rule's own reason — room to roll the app back — is what the file's header states
+    is being given up, and it names the forward fix (re-add nullable, let `DataInitializer`
+    re-seed the role, replay the assignments from the migration's INFO line) rather than a
+    backward one. **This is the shape of exception the rule admits: a column whose *content* is
+    the risk, approved by the repository owner in the plan, with the rollback written down.** It
+    is not a precedent for dropping ordinary data a release early.
 * **Drop-then-add in one file is allowed only on tables that did not yet ship
   to production**, i.e. for migrations younger than the most recently
   deployed version. Use sparingly and only during the very first iteration of

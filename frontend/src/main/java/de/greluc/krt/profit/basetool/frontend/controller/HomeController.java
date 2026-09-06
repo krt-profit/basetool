@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import jakarta.servlet.http.HttpSession;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -37,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
@@ -74,7 +74,6 @@ public class HomeController {
   private long notificationDuration;
 
   private final BackendApiClient backendApiClient;
-  private final FrontendAuthHelperService authHelper;
 
   /**
    * Renders {@code /} — the landing page for a visitor with no session, the dashboard for a member.
@@ -111,7 +110,6 @@ public class HomeController {
     if (principal == null) {
       return "landing";
     }
-    HttpSession session = request.getSession(true);
     // Fetch the missions starting within the next seven days, nearest planned start first
     // (REQ-MISSION-012). Replaces the former single "next mission" banner with a tile grid. Uses
     // the broad mission-list scope (the viewer's own org units PLUS every unit's organisation-wide
@@ -138,7 +136,15 @@ public class HomeController {
       // must not re-log at ERROR on every load and trip LogbackErrorSpike.
       log.debug("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
-      model.addAttribute("error", "error.mission.fetch");
+      // A 403 here is an ANSWER, not a failure: the mission list is gated on
+      // isMemberOrAbove(), and an account holding only a bank role passes every other gate on
+      // this page while failing that one. Telling such a member "the missions could not be
+      // loaded" on every single dashboard load describes a fault that is not happening. The
+      // banner stays for everything else, which is what it was written for - a backend restart,
+      // a timeout, an open circuit.
+      if (e.getStatusCode() != HttpStatus.FORBIDDEN.value()) {
+        model.addAttribute("error", "error.mission.fetch");
+      }
     } catch (Exception e) {
       log.error("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
@@ -150,73 +156,73 @@ public class HomeController {
     model.addAttribute("myOrgUnitIds", Set.of());
 
     model.addAttribute("username", principal.getPreferredUsername());
-    {
-      if (session.getAttribute("welcomeMessageShown") == null) {
-        model.addAttribute("showLoginNotification", true);
-        model.addAttribute("notificationDuration", notificationDuration);
-        session.setAttribute("welcomeMessageShown", true);
-      }
 
+    HttpSession session = request.getSession(true);
+    if (session.getAttribute("welcomeMessageShown") == null) {
+      model.addAttribute("showLoginNotification", true);
+      model.addAttribute("notificationDuration", notificationDuration);
+      session.setAttribute("welcomeMessageShown", true);
+    }
+
+    try {
+      de.greluc.krt.profit.basetool.frontend.model.dto.UserDto currentUser =
+          backendApiClient.get(
+              "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
+      model.addAttribute("currentUser", currentUser);
+
+      // Collect the viewer's own org-unit ids so the tile grid can flag own-unit missions with a
+      // "Meine Einheit" chip (REQ-MISSION-012). These are the caller's DIRECT memberships across
+      // every kind (Staffel / SK / Bereich / OL), with no leadership cascade. The
+      // /me/org-unit-ids endpoint is the authoritative kind-agnostic source; the Staffel ids from
+      // the already-fetched /me record are unioned in as a fallback so a transient failure of
+      // that
+      // call still flags own-Staffel missions.
+      Set<UUID> myOrgUnitIds = new HashSet<>();
+      if (currentUser.squadrons() != null) {
+        for (SquadronReferenceDto su : currentUser.squadrons()) {
+          if (su != null && su.id() != null) {
+            myOrgUnitIds.add(su.id());
+          }
+        }
+      }
+      if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
+        myOrgUnitIds.add(currentUser.squadron().id());
+      }
       try {
-        de.greluc.krt.profit.basetool.frontend.model.dto.UserDto currentUser =
-            backendApiClient.get(
-                "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
-        model.addAttribute("currentUser", currentUser);
-
-        // Collect the viewer's own org-unit ids so the tile grid can flag own-unit missions with a
-        // "Meine Einheit" chip (REQ-MISSION-012). These are the caller's DIRECT memberships across
-        // every kind (Staffel / SK / Bereich / OL), with no leadership cascade. The
-        // /me/org-unit-ids endpoint is the authoritative kind-agnostic source; the Staffel ids from
-        // the already-fetched /me record are unioned in as a fallback so a transient failure of
-        // that
-        // call still flags own-Staffel missions.
-        Set<UUID> myOrgUnitIds = new HashSet<>();
-        if (currentUser.squadrons() != null) {
-          for (SquadronReferenceDto su : currentUser.squadrons()) {
-            if (su != null && su.id() != null) {
-              myOrgUnitIds.add(su.id());
+        List<UUID> directOrgUnitIds =
+            backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST_TYPE);
+        if (directOrgUnitIds != null) {
+          for (UUID id : directOrgUnitIds) {
+            if (id != null) {
+              myOrgUnitIds.add(id);
             }
           }
         }
-        if (currentUser.squadron() != null && currentUser.squadron().id() != null) {
-          myOrgUnitIds.add(currentUser.squadron().id());
-        }
-        try {
-          List<UUID> directOrgUnitIds =
-              backendApiClient.get("/api/v1/users/me/org-unit-ids", UUID_LIST_TYPE);
-          if (directOrgUnitIds != null) {
-            for (UUID id : directOrgUnitIds) {
-              if (id != null) {
-                myOrgUnitIds.add(id);
-              }
-            }
-          }
-        } catch (Exception ex) {
-          log.warn("Could not fetch own org-unit memberships for the home highlight", ex);
-        }
-        model.addAttribute("myOrgUnitIds", myOrgUnitIds);
-
-        // Fetch Public Announcement
-        Map<String, Object> announcement =
-            backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
-        model.addAttribute("announcement", announcement);
-
-        boolean unread = false;
-        if (announcement != null && announcement.containsKey("id")) {
-          String announcementId = (String) announcement.get("id");
-          if (currentUser.lastReadAnnouncementId() == null
-              || !currentUser.lastReadAnnouncementId().toString().equals(announcementId)) {
-            unread = true;
-          }
-        }
-        model.addAttribute("unreadAnnouncement", unread);
-      } catch (BackendServiceException e) {
-        // Fail-soft: the tiles/announcement are optional. The boundary already logged the backend
-        // error; keep a DEBUG breadcrumb (correlationId is in the MDC) rather than swallowing it.
-        log.debug("Could not load home user/announcement context", e);
-      } catch (Exception e) {
-        log.warn("Unexpected failure building home context", e);
+      } catch (Exception ex) {
+        log.warn("Could not fetch own org-unit memberships for the home highlight", ex);
       }
+      model.addAttribute("myOrgUnitIds", myOrgUnitIds);
+
+      // Fetch Public Announcement
+      Map<String, Object> announcement =
+          backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
+      model.addAttribute("announcement", announcement);
+
+      boolean unread = false;
+      if (announcement != null && announcement.containsKey("id")) {
+        String announcementId = (String) announcement.get("id");
+        if (currentUser.lastReadAnnouncementId() == null
+            || !currentUser.lastReadAnnouncementId().toString().equals(announcementId)) {
+          unread = true;
+        }
+      }
+      model.addAttribute("unreadAnnouncement", unread);
+    } catch (BackendServiceException e) {
+      // Fail-soft: the tiles/announcement are optional. The boundary already logged the backend
+      // error; keep a DEBUG breadcrumb (correlationId is in the MDC) rather than swallowing it.
+      log.debug("Could not load home user/announcement context", e);
+    } catch (Exception e) {
+      log.warn("Unexpected failure building home context", e);
     }
     return "index";
   }
