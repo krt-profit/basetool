@@ -753,6 +753,120 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The Einsatz planning set phase V opens, refused without a token.
+   *
+   * <p>The audit's largest block: everything a Kommandoleiter builds an Einsatz out of. The writes
+   * are the interesting half here, because {@code GET /api/v1/missions/**} is {@code permitAll} —
+   * the whole Einsatz read surface is, so a guest can see the board — and that seam is what phase S
+   * met with {@code /missions/lookup} answering {@code 403} where its three neighbours answered
+   * {@code 401}. A write is not covered by that {@code permitAll}, so the entry point turns it away
+   * before dispatch and writes {@code 401}; the one read in this phase is the one to watch.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousMissionPlanningWrites() throws Exception {
+    String mission = "/api/v1/missions/" + ABSENT_MISSION;
+    // The three section patches and the party lead. Each carries its own section counter, which is
+    // the reason they are separate endpoints at all.
+    for (String leaf : new String[] {"/core", "/schedule", "/flags"}) {
+      mockMvc
+          .perform(
+              patch(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"version\":0}"))
+          .andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            put(mission + "/party-lead")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post(mission + "/participants")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    // Einheiten, crew, Frequenzen and Verwalter — slim only, because the full-DTO twins are
+    // deprecation-marked with a sunset of 2026-10-20 and the app was moved off them.
+    for (String leaf :
+        new String[] {
+          "/units/slim",
+          "/units/" + ABSENT_OPERATION + "/crew/slim",
+          "/frequencies/custom/slim",
+          "/managers/" + ABSENT_OPERATION + "/slim",
+          "/steps/slim",
+          "/objectives/slim"
+        }) {
+      mockMvc
+          .perform(
+              post(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String leaf :
+        new String[] {
+          "/units/" + ABSENT_OPERATION + "/slim",
+          "/units/" + ABSENT_OPERATION + "/crew/" + ABSENT_OPERATION + "/slim",
+          "/steps/" + ABSENT_OPERATION + "/slim",
+          "/objectives/" + ABSENT_OPERATION + "/slim",
+          "/steps/reorder/slim",
+          "/objectives/reorder/slim"
+        }) {
+      mockMvc
+          .perform(
+              put(mission + leaf)
+                  .with(csrf())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isUnauthorized());
+    }
+    for (String leaf :
+        new String[] {
+          "/units/" + ABSENT_OPERATION + "/slim",
+          "/frequencies/" + ABSENT_OPERATION + "/slim",
+          "/managers/" + ABSENT_OPERATION + "/slim",
+          "/steps/" + ABSENT_OPERATION + "/slim",
+          "/objectives/" + ABSENT_OPERATION + "/slim"
+        }) {
+      mockMvc.perform(delete(mission + leaf).with(csrf())).andExpect(status().isUnauthorized());
+    }
+    mockMvc
+        .perform(
+            patch(mission + "/steps/" + ABSENT_OPERATION + "/done/slim")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"done\":true}"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
+   * The one read in phase V, pinned on its own because it sits behind the {@code permitAll} seam.
+   *
+   * <p>{@code GET /api/v1/missions/**} is {@code permitAll}, so this request is dispatched rather
+   * than turned away at the entry point, and whatever the method guard then decides is what the
+   * runbook's table and the nightly probe have to say. Phase M's lesson, and phase S's: the number
+   * is measured here first and written down afterwards.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousUnitShipOptions() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/missions/" + ABSENT_MISSION + "/unit-ship-options"))
+        .andExpect(status().isForbidden());
+  }
+
+  /**
    * The three Lager writes phase U opens, refused without a token.
    *
    * <p>Sammel-Ausbuchen, Sammel-Umbuchen, and the earmark a Logistiker sets on a stock row. The

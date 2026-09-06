@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Einen Einsatz zu planen ging in der App fast nirgends.** Kern, Zeitplan und Flags, Party-Lead, Teilnehmer hinzufügen, Einheiten und ihre Besatzung, Frequenzen, Verwalter, Ablauf und Ziele — alle Schreibwege waren am API-Zugang abgewiesen. Freigegeben sind die schlanken Endpunkte, nicht die veralteten: deren Abschaltung ist für den 20.10.2026 angekündigt (Runbook-Phase V).
+
 - **Sammel-Ausbuchen, Sammel-Umbuchen und die Zuordnung im Lager waren tot.** Alle drei waren am API-Zugang nicht freigegeben; beim Umbuchen füllte sich der Standort-Picker sogar, nur das Absenden starb. Die Zuordnung war die schlimmste: die Speicherschleife ist versionsverkettet, die erste Zeile scheitert — und damit wurde nie etwas geschrieben, auch nichts halb (Runbook-Phase U).
 
 - **Die Auftrags-Familie war in der App größtenteils tot.** Materialbedarf, Zusagen-Tab, Verfügbarkeits-Chip und die Lagerzeilen im Übergabe-Sheet waren am API-Zugang nicht freigegeben — und mit ihnen die Schreibvorgänge, die daran hängen: Zusage geben und zurückziehen, Material- und Gegenstands-Übergabe, Herstellung erfassen, Gegenstände bearbeiten, Priorität ändern. Lesen und Schreiben mussten zusammen freigegeben werden: ohne Lagerzeile gibt es nichts abzusenden, und eine Zusagenliste ohne ihre beiden Knöpfe ist eine Liste mit toten Knöpfen (Runbook-Phase T).
