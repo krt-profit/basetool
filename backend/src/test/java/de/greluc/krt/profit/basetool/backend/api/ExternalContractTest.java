@@ -222,6 +222,41 @@ class ExternalContractTest {
           "displayName",
           "limitAmount");
 
+  /**
+   * What a {@code JobOrderDto} answer promises, for every operation that returns one.
+   *
+   * <p>Named once because they share a mapper: the detail read, the edit and the priority change
+   * all fold their answer back through the app's single {@code JobOrderDto.toModel()}, so a field
+   * one of them needs is a field all of them need. It was written out three times before phase T
+   * added the third consumer, which is one copy past the point where they drift.
+   *
+   * <p>{@code effectiveName} is the only name an assignee row can show, and {@code version} is what
+   * a note edit echoes -- lose it and every note edit 409s. {@code user} and {@code assignees} are
+   * the containers they arrive in; without them the app cannot tell whose edge it is holding, which
+   * is what decides "assign me" from "unassign me".
+   */
+  private static final Set<String> JOB_ORDER_DETAIL =
+      Set.of(
+          "id",
+          "displayId",
+          "status",
+          "priority",
+          "type",
+          "comment",
+          "createdAt",
+          "materials",
+          "aggregatedMaterials",
+          "assignees",
+          "user",
+          "effectiveName",
+          "note",
+          "version",
+          "handovers",
+          "redacted",
+          "canEdit",
+          "requestingOrgUnit",
+          "responsibleOrgUnit");
+
   private static final List<ContractOperation> CONTRACT =
       List.of(
           new ContractOperation(
@@ -490,29 +525,7 @@ class ExternalContractTest {
           // 409 every note edit -- and `effectiveName` is the only name a row can show. `user` and
           // `assignees` are the containers they arrive in; without them the app cannot tell whose
           // edge it is holding, which is what decides "assign me" from "unassign me".
-          new ContractOperation(
-              "/api/v1/orders/{id}",
-              "get",
-              Set.of(
-                  "id",
-                  "displayId",
-                  "status",
-                  "priority",
-                  "type",
-                  "comment",
-                  "createdAt",
-                  "materials",
-                  "aggregatedMaterials",
-                  "assignees",
-                  "user",
-                  "effectiveName",
-                  "note",
-                  "version",
-                  "handovers",
-                  "redacted",
-                  "canEdit",
-                  "requestingOrgUnit",
-                  "responsibleOrgUnit")),
+          new ContractOperation("/api/v1/orders/{id}", "get", JOB_ORDER_DETAIL),
           // Phase 3, the two writes any member may make on an order they can see: putting their
           // own name on it and taking it off again. Self-assignment is open to everyone;
           // assigning someone else needs LOGISTICIAN, which the app never attempts.
@@ -2015,29 +2028,7 @@ class ExternalContractTest {
           // mapper as the detail read, so its frozen set is that one. `materials` is the only
           // required request field: an order without lines is not an order.
           new ContractOperation(
-              "/api/v1/orders/{id}",
-              "put",
-              Set.of(
-                  "id",
-                  "displayId",
-                  "status",
-                  "priority",
-                  "type",
-                  "comment",
-                  "createdAt",
-                  "materials",
-                  "aggregatedMaterials",
-                  "assignees",
-                  "user",
-                  "effectiveName",
-                  "note",
-                  "version",
-                  "handovers",
-                  "redacted",
-                  "canEdit",
-                  "requestingOrgUnit",
-                  "responsibleOrgUnit"),
-              Set.of("materials")),
+              "/api/v1/orders/{id}", "put", JOB_ORDER_DETAIL, Set.of("materials")),
           // The Operation edit DISCARDS its answer -- `updateOperation` maps the result to
           // `ApiResult.Success(Unit)` -- so there is no response field to freeze and recording one
           // would promise a shape nothing reads. The request is what matters, and its `status` is
@@ -2063,7 +2054,128 @@ class ExternalContractTest {
           // here, it asks for 200 and takes them.
           new ContractOperation(
                   "/api/v1/job-types", "get", Set.of("content", "id", "name", "active"))
-              .addressedBy(Set.of("archetype:string", "page:integer", "size:integer")));
+              .addressedBy(Set.of("archetype:string", "page:integer", "size:integer")),
+          // ---- Phase T: the Auftrags-Familie, reads and the writes they arm -------------------
+          //
+          // The audit's own block of ten, minus `PUT /orders/<uuid>` which phase R opened. Four
+          // reads and five writes, admitted together because the pairs do not work apart: the
+          // Zusagen list carries its own upsert and withdrawal, and the Bestandszeilen read is
+          // what makes a Material-Uebergabe submittable at all -- without it no `inventoryItemId`
+          // can be picked, and an Uebergabe is what closes an Auftrag.
+          //
+          // `material-demand` nests THREE deep (overview -> group -> row -> per-order share) and
+          // this guard descends two, so the share's `jobOrderId`, `displayId` and `status` are out
+          // of its reach and are deliberately not recorded. Recording them would fail the guard
+          // rather than protect them; the two levels it does see carry the whole planning table.
+          new ContractOperation(
+              "/api/v1/orders/material-demand",
+              "get",
+              Set.of(
+                  "groups",
+                  "orgUnit",
+                  "id",
+                  "name",
+                  "shorthand",
+                  "materials",
+                  "material",
+                  "qualityRequirement",
+                  "requiredAmount",
+                  "bookedAmount",
+                  "claimedAmount",
+                  "outstandingAmount",
+                  "orders")),
+          // The Verfuegbarkeits-Chip on a sub-assembly. It reads five names and drops a group
+          // without a `gameItem.id`, so the id is load-bearing rather than decorative: lose it and
+          // the chip does not go blank, the row disappears.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/item-stock",
+              "get",
+              Set.of(
+                  "gameItem",
+                  "id",
+                  "name",
+                  "orderedAmount",
+                  "manufacturedAmount",
+                  "allocatedTotal")),
+          // The Zusagen tab, and its two writes. `openRemaining` is what the tab is FOR -- how much
+          // of a material nobody has pledged yet -- and `material.id` keys the upsert, so a bucket
+          // without one is dropped.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/claims",
+              "get",
+              Set.of(
+                  "material",
+                  "id",
+                  "name",
+                  "quantityType",
+                  "qualityRequirement",
+                  "requiredAmount",
+                  "claimedAmount",
+                  "openRemaining",
+                  "claims",
+                  "claimingOrgUnit",
+                  "shorthand",
+                  "amount")),
+          // Both claim writes DISCARD their answer -- the tab is re-read instead, because the
+          // server decides the bucket order -- so there is no response field to freeze and
+          // recording one would promise a shape nothing reads. `qualityRequirement` is a required
+          // enum the app sends as a literal string; it is frozen below.
+          new ContractOperation(
+              "/api/v1/orders/{jobOrderId}/claims",
+              "post",
+              Set.of(),
+              Set.of("amount", "claimingOrgUnitId", "materialId", "qualityRequirement")),
+          new ContractOperation("/api/v1/orders/{jobOrderId}/claims/{claimId}", "delete", Set.of()),
+          // The Bestandszeilen the Uebergabe-Sheet picks from. `jobOrderAllocations` carries the
+          // slice already earmarked for THIS Auftrag, which is the number the sheet caps against;
+          // without it every row would offer its whole stack.
+          new ContractOperation(
+              "/api/v1/orders/{id}/materials/{matId}/inventory",
+              "get",
+              Set.of(
+                  "id",
+                  "user",
+                  "effectiveName",
+                  "displayName",
+                  "location",
+                  "name",
+                  "quality",
+                  "amount",
+                  "jobOrderAllocations",
+                  "jobOrderId",
+                  "version")),
+          // The three Logistiker writes that answer with something the app does not read: the
+          // material handover, the item handover and the production booking. Each maps its result
+          // to success-or-failure and re-reads the Auftrag, so only the request is frozen.
+          //
+          // `items` and `entries` are the two list names, and they differ: the item handover's
+          // wire name is `entries` while the app's generated property is `propertyEntries`. The
+          // wire name is what is frozen, which is the whole point of reading the document rather
+          // than the client.
+          new ContractOperation(
+              "/api/v1/orders/{id}/handovers",
+              "post",
+              Set.of(),
+              Set.of("handoverTime", "items", "recipientHandle")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/item-handovers",
+              "post",
+              Set.of(),
+              Set.of("entries", "handoverTime", "recipientHandle")),
+          new ContractOperation(
+              "/api/v1/orders/{id}/items/{itemId}/production",
+              "post",
+              Set.of(),
+              Set.of("amount", "bookIn", "consumption", "version")),
+          // The Gegenstands-Edit replaces the ordered lines whole, so `items` is its one required
+          // field: an edit that omits it is not an edit, it is an emptying.
+          new ContractOperation("/api/v1/orders/{id}/items", "put", Set.of(), Set.of("items")),
+          // „Nach vorn/hinten" -- and it takes the position as a QUERY parameter with no body at
+          // all, which is why its required-request set is empty rather than forgotten. The answer
+          // is the whole Auftrag through the same mapper as the detail read, because every other
+          // row's priority has changed too.
+          new ContractOperation("/api/v1/orders/{id}/priority", "put", JOB_ORDER_DETAIL)
+              .addressedBy(Set.of("priority:integer")));
 
   /**
    * Contract operations the app addresses by <strong>no</strong> query parameter, although the
@@ -2089,6 +2201,19 @@ class ExternalContractTest {
           // picker that paged would be a picker somebody has to operate. Recorded rather than left
           // blank, because a blank slot cannot be told apart from a forgotten one.
           "get /api/v1/refining-methods",
+          // Phase T. Six of its nine take no parameter at all, and the four reads are
+          // addressed by path alone. Recorded rather than left blank, because a blank slot cannot
+          // be told apart from a forgotten one.
+          "get /api/v1/orders/material-demand",
+          "get /api/v1/orders/{jobOrderId}/item-stock",
+          "get /api/v1/orders/{jobOrderId}/claims",
+          "post /api/v1/orders/{jobOrderId}/claims",
+          "delete /api/v1/orders/{jobOrderId}/claims/{claimId}",
+          "get /api/v1/orders/{id}/materials/{matId}/inventory",
+          "post /api/v1/orders/{id}/handovers",
+          "post /api/v1/orders/{id}/item-handovers",
+          "post /api/v1/orders/{id}/items/{itemId}/production",
+          "put /api/v1/orders/{id}/items",
           // Phase S. `/orders/lookup` offers `withNeeds`, which decides whether each row carries
           // its required material and item ids. The app sends none of it and reads both id lists
           // anyway -- the endpoint's default already includes them -- so the parameter is a
@@ -2247,6 +2372,10 @@ class ExternalContractTest {
           // simply never sends it. The direction that hurts is removal, which this guard catches
           // the same way.
           Map.entry("CreateJobOrderItemMaterialDto.quality", Set.of("GOOD", "NONE")),
+          // Phase T. The Zusage the app files carries its quality as a literal string, and a
+          // rename turns every pledge into a 400 while the tab keeps loading -- the bucket list is
+          // a separate read that would go on working.
+          Map.entry("CreateClaimDto.qualityRequirement", Set.of("GOOD", "NONE")),
           // Phase R. The Operation edit the app sends is the eleventh frozen request enum, which
           // is what forced this map off `Map.of` — that factory caps at ten pairs and then simply
           // stops resolving.

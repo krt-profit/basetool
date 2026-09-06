@@ -636,6 +636,26 @@ if ($uri = "/api/v1/orders/lookup") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/missions/lookup") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/operations/lookup") { set $krt_api_allowed 1; }
 if ($uri = "/api/v1/job-types") { set $krt_api_allowed 1; }
+# Phase T - the Auftrags-Familie, the audit's own block. Nine rules, one anchored regex per
+# sub-family and no prefix: `/api/v1/orders` also carries the Auftrag itself, the requester's
+# edit and the delete, none of which belongs here.
+#
+# Reads first. `material-demand` is exact - it is a collection path, not a leaf under an id.
+if ($uri = "/api/v1/orders/material-demand") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/item-stock$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/materials/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/inventory$") { set $krt_api_allowed 1; }
+#
+# Then the writes. Each is named because the read beside it is useless alone: the Zusagen tab
+# is a list with an upsert and a withdrawal on the same path, and the Bestandszeilen read is
+# what makes a Material-Uebergabe submittable at all - without it no `inventoryItemId` can be
+# picked, and an Uebergabe is what closes an Auftrag.
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/claims$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/claims/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/handovers$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/item-handovers$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/items$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/items/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/production$") { set $krt_api_allowed 1; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/priority$") { set $krt_api_allowed 1; }
 if ($krt_api_allowed = 0) { return 404; }
 
 # --- The missions and operations families are READ-ONLY on this vhost ---------
@@ -748,6 +768,19 @@ if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-f
 if ($uri ~ "^/api/v1/operations/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_put_only "P"; }
 if ($request_method = PUT) { set $krt_put_only "${krt_put_only}U"; }
 if ($krt_put_only = "PU") { set $krt_readonly_family ""; }
+# Phase T - the Auftrags-Familie's writes. `/api/v1/orders` is in the read-only family, so
+# every one of these needs its own exception. All seven are path-wide rather than
+# method-scoped, and that is safe here for a reason worth stating: on each of these paths the
+# backend serves exactly the verb the app sends. The destructive ones live elsewhere -
+# `DELETE /orders/<uuid>` is kept shut by phase R's method-scoped rule, and
+# `DELETE …/materials/<uuid>` already has its own exception from phase N.
+#
+# `…/claims$` is the exception to the exception: it carries BOTH the GET the tab reads and
+# the POST that upserts a Zusage. Opening it path-wide opens exactly those two.
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/claims$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/claims/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/(handovers|item-handovers|items|priority)$") { set $krt_readonly_family ""; }
+if ($uri ~ "^/api/v1/orders/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/items/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/production$") { set $krt_readonly_family ""; }
 if ($krt_readonly_family = "RW") { return 405; }
 
 # --- Which family gets which shape ---------------------------------------------------------------
@@ -915,6 +948,16 @@ The safe order, and the reason for it:
    | `/api/v1/missions/lookup`                                     | **403**                                                             | phase S; `GET /missions/**` is `permitAll`, so the method guard refuses it at the seam                   |
    | `/api/v1/operations/lookup`                                   | **401**                                                             | phase S; the Operation picker on the Einsatz's Kern section                                              |
    | `/api/v1/job-types`                                           | **200**                                                             | phase S; anonymous **by design** — a role-name catalogue, like `/ship-types` (REQ-SEC-037)               |
+   | `/api/v1/orders/material-demand`                              | **401**                                                             | phase T; the Materialbedarf screen, which showed a retry button that retried the same refusal            |
+   | `/api/v1/orders/<uuid>/item-stock`                            | **401**                                                             | phase T; the Verfügbarkeits-Chip on a sub-assembly                                                       |
+   | `/api/v1/orders/<uuid>/claims` (`GET`, `POST`)                | **401**                                                             | phase T; the Zusagen tab and its upsert, on one path                                                     |
+   | `/api/v1/orders/<uuid>/claims/<uuid>` with `DELETE`           | **401**                                                             | phase T; withdrawing a Zusage. The only destructive verb this phase opens, and it is on the leaf         |
+   | `/api/v1/orders/<uuid>/materials/<uuid>/inventory`            | **401**                                                             | phase T; the Bestandszeilen an Übergabe is picked from                                                   |
+   | `/api/v1/orders/<uuid>/handovers` with `POST`                 | **401**                                                             | phase T; the Material-Übergabe                                                                           |
+   | `/api/v1/orders/<uuid>/item-handovers` with `POST`            | **401**                                                             | phase T; the Gegenstands-Übergabe                                                                        |
+   | `/api/v1/orders/<uuid>/items` with `PUT`                      | **401**                                                             | phase T; editing the ordered lines                                                                       |
+   | `/api/v1/orders/<uuid>/items/<uuid>/production` with `POST`   | **401**                                                             | phase T; recording a Herstellung                                                                         |
+   | `/api/v1/orders/<uuid>/priority` with `PUT`                   | **401**                                                             | phase T; „nach vorn/hinten“, the position as a query parameter                                           |
    | anything not on the list                                      | **404**                                                             | default deny                                                                                             |
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
@@ -1931,6 +1974,72 @@ did.
 > `PUT …/units/<uuid>/crew/<uuid>` was not among the 75: the chips were never drawn, so the call
 > was unreachable. Phase S draws them. It is recorded here because a latent entry that goes live
 > silently is how a ledger stops being trustworthy.
+
+---
+
+## Phase T — the Auftrags-Familie, and the pairs that do not work apart
+
+**The audit's own block of ten, minus the one phase R already opened.** Nine rules: four reads and
+five writes, and they are one phase rather than two because the pairs inside it are useless apart.
+
+|                 Screen                 |                        Path                        |   Verb    |
+|----------------------------------------|----------------------------------------------------|-----------|
+| Materialbedarf (Aufträge-Überlauf)     | `/api/v1/orders/material-demand`                   | GET       |
+| Verfügbarkeits-Chip an Unterbaugruppen | `/api/v1/orders/<uuid>/item-stock`                 | GET       |
+| Zusagen-Tab (SK-Aufträge)              | `/api/v1/orders/<uuid>/claims`                     | GET, POST |
+| Zusage zurückziehen                    | `/api/v1/orders/<uuid>/claims/<uuid>`              | DELETE    |
+| Lagerzeilen im Übergabe-Sheet          | `/api/v1/orders/<uuid>/materials/<uuid>/inventory` | GET       |
+| Material-Übergabe erfassen             | `/api/v1/orders/<uuid>/handovers`                  | POST      |
+| Gegenstands-Übergabe erfassen          | `/api/v1/orders/<uuid>/item-handovers`             | POST      |
+| Auftrag bearbeiten (Gegenstände)       | `/api/v1/orders/<uuid>/items`                      | PUT       |
+| Herstellung erfassen                   | `/api/v1/orders/<uuid>/items/<uuid>/production`    | POST      |
+| Auftrags-Priorität ändern              | `/api/v1/orders/<uuid>/priority`                   | PUT       |
+
+### Why the reads and the writes ship together
+
+Two of these pairs are the reason. **The Zusagen list carries its own upsert and withdrawal**: the
+tab, the pledge button and the withdrawal all hang on `…/claims`, so admitting the read alone gives
+a member a populated list with two dead buttons. And **the Bestandszeilen read is what makes an
+Übergabe submittable at all** — without a row there is no `inventoryItemId` to send, so the submit
+button stays disabled; the audit filed `POST …/handovers` as *latent* for exactly that reason, and
+this phase is what arms it.
+
+`material-demand` is the one that was loudest and still unfixable: its screen shows a hard error
+branch with *„Erneut versuchen"*, and every retry repeated the same blocked request.
+
+### The carve-outs are path-wide, and here that is safe
+
+Unlike phase R, none of these needs method scoping — **on each of these paths the backend serves
+exactly the verb the app sends.** That was checked against the controller mappings rather than
+assumed:
+
+- `…/items` serves `PUT` only (`…/items/requested` is a different path, and the collection-level
+  `/api/v1/orders/items` is a different path again).
+- `…/priority`, `…/handovers`, `…/item-handovers` and `…/items/<uuid>/production` each serve one
+  verb.
+- `…/claims` serves `GET` and `POST`, which are the two this phase wants.
+- `…/claims/<uuid>` serves `DELETE` only.
+
+**The destructive verbs stay where they were.** `DELETE /api/v1/orders/<uuid>` — deleting the whole
+Auftrag — is kept shut by phase R's method-scoped rule, and every carve-out here is on a leaf
+*under* the id, never on the id itself. The nightly probe keeps asserting that `405`.
+
+> [!note] `…/priority` takes its position as a query parameter and sends no body
+> `PUT …/priority?priority=1`, and no `version` either: the service reorders the whole queue under
+> a pessimistic write lock, so an optimistic version would suggest a conflict check that does not
+> happen. The vhost guard matches on `$uri`, which stops at the `?`, so the rule is unaffected; the
+> parameter is frozen in the contract instead, where a rename would be caught.
+
+### What to expect afterwards
+
+|                    Path                    | Anonymous status |
+|--------------------------------------------|------------------|
+| all nine, every verb                       | **401**          |
+| `DELETE /api/v1/orders/<uuid>` (unchanged) | **405**          |
+
+Nothing under `/api/v1/orders` is `permitAll` except the item catalogue and the two creates, and
+those are `authenticated` explicitly — so unlike phase S's pickers there is no seam to fall through
+and no `403` among them. Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
 ---
 

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Die Auftrags-Familie war in der App größtenteils tot.** Materialbedarf, Zusagen-Tab, Verfügbarkeits-Chip und die Lagerzeilen im Übergabe-Sheet waren am API-Zugang nicht freigegeben — und mit ihnen die Schreibvorgänge, die daran hängen: Zusage geben und zurückziehen, Material- und Gegenstands-Übergabe, Herstellung erfassen, Gegenstände bearbeiten, Priorität ändern. Lesen und Schreiben mussten zusammen freigegeben werden: ohne Lagerzeile gibt es nichts abzusenden, und eine Zusagenliste ohne ihre beiden Knöpfe ist eine Liste mit toten Knöpfen (Runbook-Phase T).
+
 - **Vier Auswahllisten in der App waren leer, ohne dass etwas nach einem Fehler aussah.** Auftrags- und Einsatz-Picker im Buchungsblatt, der Operations-Picker im Einsatz und der Funktionen-Katalog werden bei einem Fehler bewusst stillschweigend geschluckt; am API-Zugang abgewiesen hieß das leere Liste, und eine leere Liste liest sich als Antwort. Der Funktionen-Katalog behauptete sogar, die Organisation habe keine CREW-Funktionen (Runbook-Phase S).
 
 - **Auftrag und Operation liessen sich in der App nicht bearbeiten.** Beide Pfade waren am API-Zugang längst freigegeben — nur das Verb wurde abgewiesen (405 statt 404). Die Ausnahme ist **methoden-genau** geschrieben: der Server bietet auf beiden Pfaden auch ein Löschen an, die App ruft es nie auf, und es bleibt weiterhin gesperrt (Runbook-Phase R).

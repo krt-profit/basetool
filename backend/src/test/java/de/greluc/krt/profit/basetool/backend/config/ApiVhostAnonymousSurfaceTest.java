@@ -753,6 +753,94 @@ class ApiVhostAnonymousSurfaceTest {
   }
 
   /**
+   * The Auftrags-Familie phase T opens, refused without a token.
+   *
+   * <p>Nine paths, and the audit's own block: four reads that made a working screen look empty or
+   * absent, and five writes that discarded what a Logistiker had typed. They are pinned together
+   * because they were admitted together — the Zusagen list carries its own upsert and withdrawal on
+   * the same path, and the Bestandszeilen read is what makes a Material-Übergabe submittable at
+   * all, an Übergabe being what closes an Auftrag.
+   *
+   * <p>All nine answer {@code 401}: nothing under {@code /api/v1/orders} is {@code permitAll}
+   * except the item catalogue and the two creates, and those are {@code authenticated} explicitly.
+   * Unlike phase S's pickers there is no seam to fall through — the entry point turns every one of
+   * these away before dispatch. Asserted rather than assumed, in the order this runbook fixed after
+   * phase M.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @WithAnonymousUser
+  void shouldRefuseAnonymousJobOrderFamilyWithUnauthorized() throws Exception {
+    // The four reads.
+    mockMvc.perform(get("/api/v1/orders/material-demand")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/item-stock"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/claims"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            get(
+                "/api/v1/orders/"
+                    + ABSENT_OPERATION
+                    + "/materials/"
+                    + ABSENT_MISSION
+                    + "/inventory"))
+        .andExpect(status().isUnauthorized());
+    // The five writes. Bodies are shaped enough to reach the security gate and no further — an
+    // anonymous request never gets as far as validation.
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/claims")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"materialId\":\""
+                        + ABSENT_MISSION
+                        + "\",\"qualityRequirement\":\"NONE\",\"amount\":1}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            delete("/api/v1/orders/" + ABSENT_OPERATION + "/claims/" + ABSENT_MISSION).with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientHandle\":\"x\",\"items\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/item-handovers")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"recipientHandle\":\"x\",\"propertyEntries\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/orders/" + ABSENT_OPERATION + "/items/" + ABSENT_MISSION + "/production")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":1,\"version\":0}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/orders/" + ABSENT_OPERATION + "/items")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"items\":[]}"))
+        .andExpect(status().isUnauthorized());
+    // A query parameter, not a body, and no version: the service reorders the whole queue under a
+    // pessimistic write lock, so there is nothing for an optimistic version to guard.
+    mockMvc
+        .perform(put("/api/v1/orders/" + ABSENT_OPERATION + "/priority?priority=1").with(csrf()))
+        .andExpect(status().isUnauthorized());
+  }
+
+  /**
    * The member's own two settings and the Aushang's read marker, refused without a token.
    *
    * <p>Phase Q, and the quietest gap this allow-list has produced. Both settings rows are drawn

@@ -240,6 +240,24 @@ jobs:
           probe GET /api/v1/missions/lookup 403
           probe GET /api/v1/job-types 200
 
+          # Phase T - the Auftrags-Familie. All nine answer 401: nothing under /api/v1/orders is
+          # permitAll except the item catalogue, so there is no seam to fall through. The DELETE is
+          # the one to watch - it is the only destructive verb this phase opens, and it is opened
+          # on the claims LEAF, not on the Auftrag.
+          probe GET /api/v1/orders/material-demand 401
+          probe GET "/api/v1/orders/$nil/item-stock" 401
+          probe GET "/api/v1/orders/$nil/claims" 401
+          probe GET "/api/v1/orders/$nil/materials/$nil/inventory" 401
+          probe POST "/api/v1/orders/$nil/claims" 401
+          probe DELETE "/api/v1/orders/$nil/claims/$nil" 401
+          probe POST "/api/v1/orders/$nil/handovers" 401
+          probe POST "/api/v1/orders/$nil/item-handovers" 401
+          probe PUT "/api/v1/orders/$nil/items" 401
+          probe POST "/api/v1/orders/$nil/items/$nil/production" 401
+          probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
+          # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
+          # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
+
           # Phase L - the bank-STAFF surface, admitted for the first time (runbook § Phase L).
           # Every one of these must reach the backend and be refused there.
           for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \
