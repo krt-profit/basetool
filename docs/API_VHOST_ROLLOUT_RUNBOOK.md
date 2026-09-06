@@ -978,11 +978,12 @@ The safe order, and the reason for it:
    |                              Path                               |                           Without a token                           |                                                   Why                                                    |
    |-----------------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
    | `/api/v1/terms/document`                                        | **200**                                                             | anonymous by design (ADR-0138): wording that must be read *before* agreeing cannot require having agreed |
-   | `/api/v1/missions/search`                                       | **200**                                                             | anonymous by design: the public home page already renders its guest-redacted rows                        |
-   | `/api/v1/missions/<uuid>`                                       | **200** for a non-internal, non-terminal Einsatz, **403** otherwise | anonymous by design, redacted per ADR-0034                                                               |
+   | `/api/v1/app/version-policy`                                    | **200**                                                             | REQ-API-010 / D2: an app too old to log in must still learn that it is too old                           |
+   | `/api/v1/missions/search`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/missions/<uuid>` with `PUT`/`DELETE`                   | **405**                                                             | the family is read-only on this vhost                                                                    |
-   | `/api/v1/missions/<uuid>/finance-entries`                       | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
-   | `/api/v1/missions/<uuid>/finance-entries/summary`               | **403**                                                             | member-or-above **and** `canSeeMission`, refused at the method seam — see below                          |
+   | `/api/v1/missions/<uuid>/finance-entries`                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/missions/<uuid>/finance-entries/summary`               | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/operations/search`                                     | **401**                                                             | `isAuthenticated()`, and no chain matcher makes it public                                                |
    | `/api/v1/operations/<uuid>`                                     | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
    | `/api/v1/operations/<uuid>/finance-summary`                     | **401**                                                             | `isAuthenticated()` + `canSeeOperation`                                                                  |
@@ -1001,7 +1002,7 @@ The safe order, and the reason for it:
    | `/api/v1/orders/<uuid>`                                         | **401**                                                             | `isAuthenticated()` + scope                                                                              |
    | `/api/v1/orders/<uuid>/assignees/<uuid>`                        | **401**                                                             | `isAuthenticated()` + scope; self-assignment is open to every member, anyone else needs LOGISTICIAN      |
    | `/api/v1/orders/<uuid>/assignees/<uuid>/note`                   | **401**                                                             | same, and locked on the assignee edge's own version                                                      |
-   | `/api/v1/orders/<uuid>/status`                                  | **401**                                                             | `hasRole(LOGISTICIAN)` + per-order scope; a member without the role gets **403** once authenticated      |
+   | `/api/v1/orders/<uuid>/status`                                  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/missions/<uuid>/join`                                  | **401**                                                             | `isAuthenticated()` + `canSeeMission`                                                                    |
    | `/api/v1/missions/<uuid>/participants/<uuid>/slim`              | **401**                                                             | `canAccessParticipant` — the caller's own row, or a mission manager's                                    |
    | `…/participants/<uuid>/check-in/slim`                           | **401**                                                             | same                                                                                                     |
@@ -1024,16 +1025,16 @@ The safe order, and the reason for it:
    | `/api/v1/blueprints/products/search`                            | **401**                                                             | `isAuthenticated()`                                                                                      |
    | `/api/v1/hangar/ships`                                          | **401**                                                             | me-scoped; POST likewise                                                                                 |
    | `/api/v1/hangar/ships/<uuid>`                                   | **401**                                                             | me-scoped; PUT and DELETE likewise                                                                       |
-   | `/api/v1/ship-types`                                            | **200**                                                             | anonymous by design: `permitAll` game data the public web frontend already renders (REQ-SEC-037)         |
-   | `/api/v1/locations/home-locations`                              | **403**                                                             | `permitAll` chain + method guard — refused at the method seam, like the Finanzen paths                   |
+   | `/api/v1/ship-types`                                            | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/locations/home-locations`                              | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/inventory` (POST)                                      | **401**                                                             | chain requires a member role                                                                             |
    | `/api/v1/inventory/all/stack/entries`                           | **401**                                                             | chain requires a member role                                                                             |
    | `/api/v1/inventory/material/<uuid>`                             | **401**                                                             | same; one material's entries, for the app's tablet pane                                                  |
    | `/api/v1/inventory/<uuid>/book-out`                             | **401**                                                             | same, plus `canEditInventoryItem`                                                                        |
    | `/api/v1/inventory/<uuid>/personal-rebook`                      | **401**                                                             | same                                                                                                     |
    | `/api/v1/inventory/<uuid>/note`                                 | **401**                                                             | same                                                                                                     |
-   | `/api/v1/materials/search`                                      | **200**                                                             | anonymous by design: `permitAll` catalogue, like `/ship-types` (REQ-SEC-037)                             |
-   | `/api/v1/locations/search`                                      | **200**                                                             | same catalogue family                                                                                    |
+   | `/api/v1/materials/search`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/locations/search`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/users/search`                                          | **401**                                                             | member records; `isAuthenticated()` and role-gated                                                       |
    | `/api/v1/materials/<uuid>/terminals`                            | **401**                                                             | carved back **out** of the catalogue family with `/materials/matrix` (REQ-SEC-032) — UEX trade prices    |
    | `/api/v1/org-units/bank/accounts/<uuid>/transactions`           | **401**                                                             | same                                                                                                     |
@@ -1052,8 +1053,8 @@ The safe order, and the reason for it:
    | `/api/v1/users/me/registration-status`                          | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/users/me/memberships`                                  | **401**                                                             | me-scoped                                                                                                |
    | `/api/v1/refinery-orders` (POST)                                | **401**                                                             | phase M; `hasRole(KRT_MEMBER)` — the create form's write                                                 |
-   | `/api/v1/locations/refineries`                                  | **403**                                                             | phase M; `permitAll` chain + method guard, refused at the method seam like `/locations/home-locations`   |
-   | `/api/v1/refining-methods`                                      | **200**                                                             | phase M; anonymous master-data catalogue with no method gate, like `/ship-types` (REQ-SEC-037)           |
+   | `/api/v1/locations/refineries`                                  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
+   | `/api/v1/refining-methods`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/orders/<uuid>/material-collection`                     | **401**                                                             | phase N; `isAuthenticated()` + `canSeeJobOrder`                                                          |
    | `/api/v1/orders/<uuid>/inventory/<uuid>/unlink`                 | **401**                                                             | phase N; LOGISTICIAN / OFFICER / ADMIN + `canEditJobOrder`                                               |
    | `/api/v1/orders/<uuid>/materials/<uuid>`                        | **401**                                                             | phase N; same gate                                                                                       |
@@ -1073,9 +1074,9 @@ The safe order, and the reason for it:
    | `/api/v1/orders/<uuid>` with `PUT`                              | **401**                                                             | phase R; the Logistician's edit. `DELETE` on the same path stays **405**                                 |
    | `/api/v1/operations/<uuid>` with `PUT`                          | **401**                                                             | phase R; a mission manager's edit. `DELETE` likewise stays **405**                                       |
    | `/api/v1/orders/lookup`                                         | **401**                                                             | phase S; the Auftrag picker in the booking sheet                                                         |
-   | `/api/v1/missions/lookup`                                       | **403**                                                             | phase S; `GET /missions/**` is `permitAll`, so the method guard refuses it at the seam                   |
+   | `/api/v1/missions/lookup`                                       | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/operations/lookup`                                     | **401**                                                             | phase S; the Operation picker on the Einsatz's Kern section                                              |
-   | `/api/v1/job-types`                                             | **200**                                                             | phase S; anonymous **by design** — a role-name catalogue, like `/ship-types` (REQ-SEC-037)               |
+   | `/api/v1/job-types`                                             | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/orders/material-demand`                                | **401**                                                             | phase T; the Materialbedarf screen, which showed a retry button that retried the same refusal            |
    | `/api/v1/orders/<uuid>/item-stock`                              | **401**                                                             | phase T; the Verfügbarkeits-Chip on a sub-assembly                                                       |
    | `/api/v1/orders/<uuid>/claims` (`GET`, `POST`)                  | **401**                                                             | phase T; the Zusagen tab and its upsert, on one path                                                     |
@@ -1092,7 +1093,7 @@ The safe order, and the reason for it:
    | `/api/v1/missions/<uuid>/(core\|schedule\|flags)` with `PATCH`  | **401**                                                             | phase V; the three Einsatz sections, each with its own counter                                           |
    | `/api/v1/missions/<uuid>/party-lead` with `PUT`                 | **401**                                                             | phase V                                                                                                  |
    | `/api/v1/missions/<uuid>/participants` with `POST`              | **401**                                                             | phase V; „Teilnehmer hinzufügen“                                                                         |
-   | `/api/v1/missions/<uuid>/unit-ship-options`                     | **403**                                                             | phase V; the only read in it, and `GET /missions/**` is `permitAll` — refused at the method seam         |
+   | `/api/v1/missions/<uuid>/unit-ship-options`                     | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/missions/<uuid>/units/…/slim` (all verbs)              | **401**                                                             | phase V; Einheiten and their crew, slim only                                                             |
    | `/api/v1/missions/<uuid>/frequencies/…/slim`                    | **401**                                                             | phase V                                                                                                  |
    | `/api/v1/missions/<uuid>/managers/<uuid>/slim`                  | **401**                                                             | phase V                                                                                                  |
@@ -1100,7 +1101,7 @@ The safe order, and the reason for it:
    | `/api/v1/materials/prices-overview`                             | **401**                                                             | phase W; **was 200** until this phase closed it (REQ-SEC-032)                                            |
    | `/api/v1/materials/profit-calculation`                          | **401**                                                             | phase W; **was 500** — dispatched anonymously and crashing, which is not a gate either                   |
    | `/api/v1/materials/<uuid>/prices`                               | **401**                                                             | phase W; **was 200**. Same UEX trade data as `matrix`, through another door                              |
-   | `/api/v1/materials/<uuid>`                                      | **200**                                                             | phase W; anonymous **by decision** — catalogue only, no price, same fields as `/materials/search`        |
+   | `/api/v1/materials/<uuid>`                                      | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | `/api/v1/terminals`                                             | **401**                                                             | phase W; the star-system filter page-walks it                                                            |
    | `/api/v1/material-exchange/released-item-ids`                   | **401**                                                             | phase W                                                                                                  |
    | `/api/v1/material-exchange/item-offers` with `POST`             | **401**                                                             | phase W; releasing a Gegenstand to the Börse                                                             |
@@ -1113,8 +1114,25 @@ The safe order, and the reason for it:
    | `/api/v1/personal-blueprints/import/apply` with `POST`          | **401**                                                             | phase X; admitted WITH the preview — the pair the audit called latent and then work-destroying           |
    | `/api/v1/hangar/import/fleetview` with `POST`                   | **401**                                                             | phase X; `multipart/form-data`                                                                           |
    | `/api/v1/hangar/ships/home-location` with `POST`                | **401**                                                             | phase X                                                                                                  |
-   | `/api/v1/settings/job_order.age_yellow_days` (and `…red_days`)  | **200**                                                             | phase X; anonymous **by design** — two integers, same `permitAll` block as `/locations`                  |
+   | `/api/v1/settings/job_order.age_yellow_days` (and `…red_days`)  | **401**                                                             | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path                              |
    | anything not on the list                                        | **404**                                                             | default deny                                                                                             |
+
+> [!important] ADR-0159 needs no paste at this edge, and that is the point
+> The members-only change (REQ-SEC-052 / REQ-SEC-053) does not add, remove or reorder a
+> single allow-list rule. Every path the app sends is still admitted; what changed is that
+> the **backend** now refuses the caller behind them. The status column above is therefore
+> almost entirely `401` where it used to read `200` or `403`, with no nginx work at all.
+>
+> The two exceptions answer as before: `/api/v1/terms/document` and
+> `/api/v1/app/version-policy`. Both are `GET`-scoped in the backend matrix, so a `HEAD` on
+> either answers `401` — the nightly probe asserts that, because a method-scoped rule above
+> an all-verb one is how REQ-SEC-032 leaked a price query to a `HEAD` once.
+>
+> The `403` rows are the ones worth re-reading. They said `403` because their path sat under
+> a `permitAll` stem: the request was dispatched and refused at the method seam, and the MVC
+> advice rendered that as `403`. With the stem gone they are turned away at the entry point
+> instead, which writes `401`. Same closure, different number — and the number is what the
+> rollout check reads.
 
    **Two refusals, two numbers, and the difference is structural rather than a policy gap.** The
    me-scoped paths are `authenticated()` in the filter chain, so Spring Security turns them away
@@ -1386,15 +1404,15 @@ Anonymously, from outside the host — the same shape as Phase H's check:
 | `/api/v1/blueprints/products/search`         | **401**                                                                           |
 | `/api/v1/hangar/ships`                       | **401**                                                                           |
 | `/api/v1/hangar/ships/<uuid>`                | **401**                                                                           |
-| `/api/v1/ship-types`                         | **200** — anonymous by design, see REQ-SEC-037                                    |
-| `/api/v1/locations/home-locations`           | **403** — method-seam refusal, not a `401`                                        |
+| `/api/v1/ship-types`                         | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/locations/home-locations`           | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
 | `/api/v1/inventory/<uuid>/book-out`          | **401**                                                                           |
 | `/api/v1/users/search`                       | **401**                                                                           |
-| `/api/v1/materials/search`                   | **200** — anonymous catalogue, see REQ-SEC-037                                    |
-| `/api/v1/locations/search`                   | **200** — same                                                                    |
+| `/api/v1/materials/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/locations/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
 | `POST /api/v1/inventory/all`                 | **404** — the every-member list is not on the allow-list at all                   |
 | `/api/v1/orders/<uuid>/assignees/<uuid>`     | **401**                                                                           |
-| `/api/v1/orders/<uuid>/status`               | **401** — and **403** for an authenticated member without LOGISTICIAN             |
+| `/api/v1/orders/<uuid>/status`               | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
 | `/api/v1/missions/<uuid>/join`               | **401**                                                                           |
 | `…/participants/<uuid>/check-in/slim`        | **404** — the guard resolves the row before it judges the caller, see REQ-SEC-037 |
 | `/api/v1/finance-entries`                    | **401**                                                                           |
@@ -2100,8 +2118,8 @@ contract instead, where a rename would actually be caught.
 |-----------------------------|------------------|
 | `/api/v1/orders/lookup`     | **401**          |
 | `/api/v1/operations/lookup` | **401**          |
-| `/api/v1/missions/lookup`   | **403**          |
-| `/api/v1/job-types`         | **200**          |
+| `/api/v1/missions/lookup`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
+| `/api/v1/job-types`         | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
 
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
@@ -2362,7 +2380,7 @@ sends. **No `DELETE` is opened anywhere in this phase**, and no carve-out is wri
 |             Path             | Anonymous status |
 |------------------------------|------------------|
 | the four price reads         | **401**          |
-| `/api/v1/materials/<uuid>`   | **200**          |
+| `/api/v1/materials/<uuid>`   | **401**          | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path
 | everything else in the phase | **401**          |
 
 Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written — and here that order was

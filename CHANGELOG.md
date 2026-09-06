@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Das Basetool ist ab jetzt nur noch für Mitglieder.** Ohne Anmeldung siehst du die Startseite und die Rechtsseiten — sonst nichts. Einsätze, Operationen, die Auftragswarteschlange und die Spieldaten-Kataloge brauchen einen Login; jeder Link dorthin führt zur Anmeldung und danach zurück auf die gewünschte Seite.
+
+- **Jedes Konto hat mindestens Mitgliedsrechte.** Die Rolle „Gast" gibt es nicht mehr. Ein Konto, dem keine Rolle zugeordnet werden kann, wird abgewiesen und bekommt einen eigenen Hinweis, statt wie bisher stillschweigend die Gast-Ansicht zu erhalten.
+
+- **Drei Preis-Abfragen und die Startseite gaben ohne Anmeldung Daten heraus.** Die Handelspreise waren bereits vorher geschlossen (Runbook-Phase W); die Startseite zeigte bis jetzt die Einsätze der nächsten sieben Tage und legte für jeden Besuch zwei Sitzungen an. Beides ist behoben.
+
+### Changed
+
+- **„Gast" heißt jetzt „Extern".** Wer keinen Account hat, kann weiterhin an einem Einsatz teilnehmen — die Einsatzleitung trägt die Person ein und pflegt ihre Zeile. Die Selbstanmeldung ohne Konto entfällt.
+
+- **Bei Einsätzen heißt „öffentlich" jetzt „organisationsweit".** Gemeint war immer „jedes Mitglied der Organisation", nie „jeder".
+
 ## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
 
 ### Fixed

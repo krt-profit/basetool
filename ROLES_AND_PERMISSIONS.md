@@ -45,14 +45,30 @@ Whoever judges a permission must therefore read **both** layers.
 
 ---
 
-## 1. Anonymous (unauthenticated) users
+## 1. The public surface
 
-The Basetool has a deliberately public surface so that job-order requesters and
-guests can interact with the organization **without a login**. In the frontend,
-the routes `/`, `/missions/**`, `/operations/**`, `/orders/**`, the legal pages
-(`/impressum`, `/privacy`, `/terms`) and static assets are set to `permitAll()`;
-in the backend, an explicitly enumerated list of `permitAll()` endpoints. Everything
-else requires authentication.
+**There is no anonymous access to the tool** (ADR-0159, REQ-SEC-052). What answers without a login
+is a list, and the list is the requirement:
+
+| Where        | What                                                                                                   |
+|--------------|--------------------------------------------------------------------------------------------------------|
+| **Frontend** | `/` (the landing page — name, one paragraph, the two login entries, the legal links, the Fan Kit band; **no data, no session**), `/impressum`, `/privacy`, `/terms`, `/error(/**)`, the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`, `/.well-known/assetlinks.json`, `/actuator/health(/**)`, and Spring Security's own login/logout endpoints |
+| **Backend**  | `GET /api/v1/app/version-policy`, `GET /api/v1/terms/document`, `/internal/**` (machine-to-machine behind a shared-secret header), `/actuator/health(/**)`, `/error` |
+
+Everything else requires authentication **and** a method gate. Both backend reads are `GET`-scoped,
+so a `HEAD` on either answers `401`.
+
+**And there is nothing below member.** An authenticated token whose realm roles map to no
+application role is refused with `403 NO_ROLE` (REQ-SEC-053); the `GUEST` role was deleted by
+migration `V239`. A person without an account can still take part in an Einsatz — the leadership
+records them as an **external participant** — but they do not hold an account and they cannot sign
+themselves up.
+
+> **This section used to describe the opposite**, and the change is worth stating plainly rather
+> than silently rewriting: until 2026-09-06 the mission board, the operations, the order queue and
+> the whole game-data catalogue answered without a login, and a role-less token was mapped onto the
+> authority-less `GUEST` role — so "we could not resolve this account's roles" and "this person is a
+> guest" were one state.
 
 ### 1.1 What anonymous users may do
 

@@ -102,8 +102,18 @@ jobs:
           }
 
           # Anonymous by design (ADR-0138, ADR-0034).
+          # REQ-SEC-052: exactly two paths on this vhost answer without a token, and both
+          # are GET-scoped. The version policy was never probed before ADR-0159 — the one
+          # read the app makes before it can hold a session, and the one whose silence
+          # looks like a working app rather than a broken one.
           probe GET /api/v1/terms/document 200
-          probe GET /api/v1/missions/search 200
+          probe GET /api/v1/app/version-policy 200
+          # A HEAD on either falls to the authenticated catch-all: the rules name the verb,
+          # and Spring Security compares it with String.equals. This is the REQ-SEC-032
+          # shape that once served a material price query to a HEAD.
+          probe HEAD /api/v1/terms/document 401
+          probe HEAD /api/v1/app/version-policy 401
+          probe GET /api/v1/missions/search 401
 
           # Me-scoped: refused before the dispatch, so the entry point answers 401.
           for p in /api/v1/terms/status /api/v1/me/active-org-unit /api/v1/me/capabilities                    /api/v1/users/me/registration-status /api/v1/users/me/memberships; do
@@ -152,9 +162,9 @@ jobs:
 
           # Anonymous by design, and the reason REQ-SEC-037 exists: these are catalogues the public
           # web frontend already renders. A 401 here is not a security problem but a broken picker.
-          probe GET /api/v1/ship-types 200
-          probe GET /api/v1/materials/search 200
-          probe GET /api/v1/locations/search 200
+          probe GET /api/v1/ship-types 401
+          probe GET /api/v1/materials/search 401
+          probe GET /api/v1/locations/search 401
           # Phase M - the create form's write and its two mandatory pickers. All three must reach
           # the backend; the org-wide list and the extractor import must not.
           #
@@ -171,14 +181,14 @@ jobs:
           #     same family as /ship-types, /materials/search and /locations/search probed above:
           #     method names and their UEX ratings, no member, org unit or order anywhere in it.
           probe POST /api/v1/refinery-orders 401
-          probe GET /api/v1/locations/refineries 403
-          probe GET /api/v1/refining-methods 200
+          probe GET /api/v1/locations/refineries 401
+          probe GET /api/v1/refining-methods 401
           probe GET /api/v1/refinery-orders/all 404
           probe POST /api/v1/refinery-orders/import-extract 404
           probe GET "/api/v1/materials/$nil/terminals" 401
 
           # Refused at the method seam, which renders 403 rather than 401.
-          probe GET /api/v1/locations/home-locations 403
+          probe GET /api/v1/locations/home-locations 401
 
           # The writes themselves. Each must reach the backend and be refused there -- a 405 would
           # mean the read-only guard swallowed a write this phase is supposed to open, and a 404
@@ -249,8 +259,8 @@ jobs:
           # (200, REQ-SEC-037 - a role-name catalogue, like /ship-types).
           probe GET /api/v1/orders/lookup 401
           probe GET /api/v1/operations/lookup 401
-          probe GET /api/v1/missions/lookup 403
-          probe GET /api/v1/job-types 200
+          probe GET /api/v1/missions/lookup 401
+          probe GET /api/v1/job-types 401
 
           # Phase T - the Auftrags-Familie. All nine answer 401: nothing under /api/v1/orders is
           # permitAll except the item catalogue, so there is no seam to fall through. The DELETE is
@@ -280,7 +290,7 @@ jobs:
           # Phase V - the Einsatz planning set. The writes are all 401, and the ONE read is not:
           # GET /api/v1/missions/** is permitAll, so unit-ship-options is dispatched and refused at
           # the method seam with a 403 - the same seam /missions/lookup met in phase S.
-          probe GET "/api/v1/missions/$nil/unit-ship-options" 403
+          probe GET "/api/v1/missions/$nil/unit-ship-options" 401
           for leaf in core schedule flags; do
             probe PATCH "/api/v1/missions/$nil/$leaf" 401
           done
@@ -329,8 +339,8 @@ jobs:
           # two integers from the same permitAll catalogue block as /locations and /job-types. What
           # must stay shut is the PUT on the same path - the admin write that changes them for the
           # whole organisation - and it is the read-only family, not a carve-out, that holds it.
-          probe GET /api/v1/settings/job_order.age_yellow_days 200
-          probe GET /api/v1/settings/job_order.age_red_days 200
+          probe GET /api/v1/settings/job_order.age_yellow_days 401
+          probe GET /api/v1/settings/job_order.age_red_days 401
           probe PUT /api/v1/settings/job_order.age_red_days 405
           probe GET /api/v1/personal-blueprints/overview 401
           probe GET /api/v1/personal-blueprints/overview/owners 401
@@ -424,21 +434,18 @@ jobs:
           # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
 
-          # The id-dependent rows need a real Einsatz. The anonymous search returns only PLANNED
-          # and ACTIVE non-internal rows, so any id it yields is one the detail must answer 200 for
-          # -- no hardcoded UUID to rot, and no assumption about which Einsatz exists today.
-          id=$(curl -s --max-time 20 "$base/api/v1/missions/search?page=0&size=1"                  | jq -r '.content[0].id // empty')
-          if [ -z "$id" ]; then
-            echo "::notice::No anonymous Einsatz row today — the detail, Finanzen and read-only rows were NOT checked. Not a pass; they were skipped."
-          else
-            probe GET "/api/v1/missions/$id" 200
-            # Refused at the method seam, which renders 403 rather than 401 -- the chain is
-            # permitAll under /api/v1/missions/**. See REQ-SEC-037.
-            probe GET "/api/v1/missions/$id/finance-entries" 403
-            probe GET "/api/v1/missions/$id/finance-entries/summary" 403
-            # The family is read-only on this vhost: the guard is verb-blind and returns 405
-            # before the request reaches the backend.
-            probe PUT "/api/v1/missions/$id" 405
-            probe DELETE "/api/v1/missions/$id" 405
-          fi
+          # These rows used to need a real Einsatz id, discovered by reading the anonymous
+          # mission search from this very probe. That discovery WAS the finding: a nightly
+          # job could learn which Einsätze existed, from outside, with no credentials.
+          # REQ-SEC-052 closed the search, so a nil UUID is enough — authorisation is decided
+          # before the row is looked up, and a fixed id cannot rot or depend on which
+          # Einsatz happens to exist tonight.
+          probe GET "/api/v1/missions/$nil" 401
+          probe GET "/api/v1/missions/$nil/finance-entries" 401
+          probe GET "/api/v1/missions/$nil/finance-entries/summary" 401
+          # The family is read-only on this vhost: the guard is verb-blind and returns 405
+          # before the request reaches the backend, so these two are unchanged by ADR-0159
+          # and still say something the 401 rows cannot.
+          probe PUT "/api/v1/missions/$nil" 405
+          probe DELETE "/api/v1/missions/$nil" 405
           exit $fail
