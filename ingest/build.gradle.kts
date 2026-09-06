@@ -145,3 +145,32 @@ tasks {
 tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
   includeConfigs.set(listOf("^runtimeClasspath$"))
 }
+
+// `LogSafeTest` exists once per module and asserts that the marked region of all three
+// `LogSafe.java` implementations, and the expectation table in all three test classes, are
+// byte-identical — so a sanitiser fix in one module cannot leave the other two logging what it
+// strips. It reads those files off the filesystem, resolved from the repository root, which puts
+// four of the six outside this module and on no classpath: nothing told Gradle that a `LogSafe`
+// edit in `backend` or `frontend` must re-run `:ingest:test`, so the task reported UP-TO-DATE and
+// the mirror assertion never executed. Neither `ingest` nor `backend` runs `bootBuildInfo`, whose
+// timestamp churn accidentally covers the same gap in `frontend`, so this was a live false green.
+//
+// The whole set is declared, not only the four that live elsewhere: two are already covered here
+// by `classes`/`testClasses`, listing them costs nothing, and the three build files then carry the
+// identical list instead of three different subsets a reader has to reason about.
+val logSafeMirrorSources =
+  listOf(
+    "backend/src/main/java/de/greluc/krt/profit/basetool/backend/support/LogSafe.java",
+    "frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafe.java",
+    "ingest/src/main/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafe.java",
+    "backend/src/test/java/de/greluc/krt/profit/basetool/backend/support/LogSafeTest.java",
+    "frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/logging/LogSafeTest.java",
+    "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
+  )
+
+tasks.named<Test>("test") {
+  inputs
+    .files(logSafeMirrorSources.map { rootProject.file(it) })
+    .withPropertyName("logSafeMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}
