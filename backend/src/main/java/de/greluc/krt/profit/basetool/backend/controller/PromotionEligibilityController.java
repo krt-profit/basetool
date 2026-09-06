@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Promotion Eligibility",
     description = "Evaluate whether a member meets the promotion requirements.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class PromotionEligibilityController {
 

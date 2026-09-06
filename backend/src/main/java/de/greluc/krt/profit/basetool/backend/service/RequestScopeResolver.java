@@ -192,9 +192,14 @@ public class RequestScopeResolver {
    *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
    *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
    *       the same X-Active-Org-Unit-Id header that admins use today.
-   *   <li>Anonymous → all empty / false / null. The repository predicate falls through to "no rows
-   *       except cross-staffel public escape".
-   * </ul>
+ * </ul>
+   *
+   * <p><strong>An unauthenticated caller is a defect, not a case.</strong> It used to resolve to an
+   * all-empty predicate, which the repository fragment read as "no rows except the organisation-wide
+   * escape" — a silent, plausible answer for a request that should never have reached a scoped
+   * query. Since ADR-0159 nothing anonymous gets past the security matrix, so an empty predicate
+   * built here could only come from a gate that was forgotten; it throws instead, because a scope
+   * question asked by a caller with no identity has no honest answer.
    *
    * <p>The membership union read is hybrid pre-D3: {@link
    * de.greluc.krt.profit.basetool.backend.model.User#getSquadron()} for the Staffel link (still
@@ -204,9 +209,15 @@ public class RequestScopeResolver {
    * org_unit_membership}, this method switches to a single {@code findAllByIdUserId} read.
    *
    * @return a never-null scope vector describing what the current request should see.
+   * @throws IllegalStateException when the current request carries no authenticated caller.
    */
   @NotNull
   public ScopePredicate currentScopePredicate() {
+    if (!authHelper.isAuthenticated()) {
+      throw new IllegalStateException(
+          "No scope for an unauthenticated caller — every scoped read requires a login"
+              + " (REQ-SEC-052). Reaching this means an endpoint lost its gate.");
+    }
     if (authHelper.isAdmin()) {
       Optional<UUID> active = readActiveSquadronFromHeader();
       return active

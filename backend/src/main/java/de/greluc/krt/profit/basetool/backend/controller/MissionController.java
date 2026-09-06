@@ -51,7 +51,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor;
+import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -105,7 +105,7 @@ import org.springframework.web.bind.annotation.RestController;
  * </ul>
  *
  * <p>Guest reads are heavily redacted: internal and past missions are hidden, and {@link
- * MissionGuestRedactor#cleanupMissionForGuest} strips names, emails, internal inventory and
+ * MissionPeerRedactor#cleanupMissionForPeer} strips names, emails, internal inventory and
  * refinery orders before the DTO leaves the controller. {@code addParticipantPublic} additionally
  * resolves free-text guest names against registered users to prevent impersonation.
  *
@@ -129,20 +129,24 @@ public class MissionController {
   private final ShipMapper shipMapper;
   private final MissionSecurityService missionSecurityService;
   private final AuthHelperService authHelperService;
-  private final MissionGuestRedactor missionGuestRedactor;
+  private final MissionPeerRedactor missionPeerRedactor;
 
   /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
   private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
 
   /**
-   * Paged mission list. Mission outsiders (anonymous callers AND authenticated but role-less {@code
-   * GUEST} accounts) are silently restricted to {@code PLANNED}+{@code ACTIVE} non-internal
-   * missions; registered members and above see everything in their scope.
+   * Paged mission list, scoped to the calling member.
+   *
+   * <p>There used to be a second branch here for mission outsiders — anonymous callers and
+   * role-less {@code GUEST} accounts — silently restricted to {@code PLANNED}+{@code ACTIVE}
+   * non-internal missions. Neither caller can reach this endpoint any more (ADR-0159), so the
+   * restriction has no audience and the branch is gone.
    *
    * @return paged mission list DTOs
    */
   @GetMapping
   @Operation(summary = "List all missions (paginated)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Transactional(readOnly = true)
   public PageResponse<MissionListDto> getAllMissions(
       @RequestParam(required = false) Integer page,
@@ -156,15 +160,11 @@ public class MissionController {
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
     Page<Mission> pageResult;
-    if (!authHelperService.isMemberOrAbove()) {
-      pageResult =
-          missionService.searchMissions(
-              null, null, null, List.of("PLANNED", "ACTIVE"), false, null, pageable);
-    } else {
-      // Authenticated callers MUST go through searchMissions so the squadron scope (own
-      // squadron OR is_internal=false cross-staffel public) is applied — getAllMissions
-      // would call missionRepository.findAll() unfiltered and leak internal missions of
-      // other squadrons to every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
+    {
+      // Every caller MUST go through searchMissions so the org-unit scope (own Staffel OR
+      // is_internal=false organisation-wide) is applied — getAllMissions would call
+      // missionRepository.findAll() unfiltered and leak internal missions of other squadrons to
+      // every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
       pageResult =
           missionService.searchMissions(
               null,
@@ -201,10 +201,10 @@ public class MissionController {
   }
 
   /**
-   * Filtered + paged mission search. Mission outsiders (anonymous callers AND authenticated but
-   * role-less {@code GUEST} accounts) are restricted to {@code PLANNED}+{@code ACTIVE} non-internal
-   * missions; an unsupported status filter from an outsider returns an empty page (rather than 403)
-   * so the UI degrades silently.
+   * Filtered + paged mission search, scoped to the calling member.
+   *
+   * <p>The outsider branch that restricted anonymous and role-less callers to {@code PLANNED}+
+   * {@code ACTIVE} non-internal missions is gone with its audience (ADR-0159).
    *
    * @param query free-text name fragment
    * @param start lower bound on planned start time
@@ -215,6 +215,7 @@ public class MissionController {
    */
   @GetMapping("/search")
   @Operation(summary = "Search missions (paginated)")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Transactional(readOnly = true)
   public PageResponse<MissionListDto> searchMissions(
       @RequestParam(required = false) String query,
@@ -234,32 +235,17 @@ public class MissionController {
             sort,
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
-    if (!authHelperService.isMemberOrAbove()) {
-      List<String> allowed = List.of("PLANNED", "ACTIVE");
-      if (status == null || status.isEmpty()) {
-        status = allowed;
-      } else {
-        status = status.stream().filter(allowed::contains).toList();
-        if (status.isEmpty()) {
-          return new PageResponse<>(
-              Collections.emptyList(), 0, pageable.getPageSize(), 0, 0, List.of());
-        }
-      }
-      Page<Mission> pageResult =
-          missionService.searchMissions(query, start, end, status, false, operationId, pageable);
-      return PageResponse.of(withRegisteredCounts(pageResult));
-    }
     Page<Mission> pageResult =
         missionService.searchMissions(query, start, end, status, null, operationId, pageable);
     return PageResponse.of(withRegisteredCounts(pageResult));
   }
 
   /**
-   * Single-mission read. Mission "outsiders" — anonymous callers and authenticated but role-less
+   * Single-mission read. A member below Logistician
    * {@code GUEST} accounts (see {@link
    * de.greluc.krt.profit.basetool.backend.service.AuthHelperService#isMemberOrAbove()}) — are
    * blocked from internal and past missions (403) and get the strict redaction via {@link
-   * MissionGuestRedactor#cleanupOutsiderMissionForGuest}. Registered members and above see the full
+   * MissionPeerRedactor#cleanupOutsiderMissionForPeer}. Registered members and above see the full
    * DTO.
    *
    * @param id mission id
@@ -267,22 +253,18 @@ public class MissionController {
    */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
-  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
     var mission = missionService.getMissionById(id);
-    boolean outsider = !authHelperService.isMemberOrAbove();
-    if (outsider) {
-      if (mission.getIsInternal() != null && mission.getIsInternal()) {
-        throw new AccessDeniedException("Guests cannot view internal missions.");
-      }
-      if ("COMPLETED".equals(mission.getStatus()) || "CANCELLED".equals(mission.getStatus())) {
-        throw new AccessDeniedException("Guests cannot view past missions.");
-      }
-    }
     var dto = missionMapper.toDto(mission);
-    if (outsider) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII. The two throws that
+    // stood here — internal missions and terminal ones refused outright — belonged to the outsider
+    // tier, whose whole audience (anonymous and role-less callers) no longer exists (ADR-0159).
+    // Visibility itself is unchanged and is decided by canSeeMission above, which is where the
+    // internal-mission rule always lived for members.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -291,8 +273,8 @@ public class MissionController {
    * Returns the next upcoming mission (or 204 when none). Only {@code PLANNED} / {@code ACTIVE}
    * missions are eligible — a terminal ({@code COMPLETED} / {@code CANCELLED}) mission with a
    * future planned start is never the next mission (REQ-MISSION-003). Internal missions are
-   * included only for registered members and above; mission outsiders (anonymous + role-less {@code
-   * GUEST}) get the same strict redaction pass as {@link #getMissionById}.
+   * included for every member in scope; a member below Logistician gets the same peer redaction
+   * pass as {@link #getMissionById}.
    *
    * @return mission DTO or 204 No Content
    */
@@ -300,14 +282,13 @@ public class MissionController {
   @Operation(summary = "Get next upcoming mission")
   @Transactional(readOnly = true)
   public ResponseEntity<MissionDto> getNextMission() {
-    boolean outsider = !authHelperService.isMemberOrAbove();
     return missionService
-        .getNextMission(!outsider)
+        .getNextMission(true)
         .map(
             m -> {
               var dto = missionMapper.toDto(m);
-              if (outsider) {
-                dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+              if (!authHelperService.isLogisticianOrAbove()) {
+                dto = missionPeerRedactor.cleanupMissionForPeer(dto);
               }
               return ResponseEntity.ok(dto);
             })
@@ -732,13 +713,14 @@ public class MissionController {
    * @param request participant payload (carries the expected participant version)
    * @param jwt caller's JWT (null for anonymous)
    * @return the persisted parent DTO (redacted via {@link
-   *     MissionGuestRedactor#cleanupMissionForGuest} for anonymous callers, who reach this endpoint
+   *     MissionPeerRedactor#cleanupMissionForPeer} for anonymous callers, who reach this endpoint
    *     when editing a guest participant per {@code MissionSecurityService#canAccessParticipant})
    * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -770,11 +752,9 @@ public class MissionController {
                 request.guestName(),
                 request.version(),
                 authentication));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
-    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
-    // catches guest accounts (treat guest like anonymous on the mission surface).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -790,7 +770,8 @@ public class MissionController {
    */
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-in")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-in/slim")
@@ -806,11 +787,9 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
-    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
-    // catches guest accounts (treat guest like anonymous on the mission surface).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -826,7 +805,8 @@ public class MissionController {
    */
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-out")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/check-out/slim")
@@ -842,11 +822,9 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
-    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
-    // catches guest accounts (treat guest like anonymous on the mission surface).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -866,7 +844,8 @@ public class MissionController {
    */
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}/payout-preference")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim")
@@ -885,11 +864,9 @@ public class MissionController {
     MissionDto dto =
         missionMapper.toDto(
             missionService.updatePayoutPreference(id, participantId, request.preference()));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
-    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
-    // catches guest accounts (treat guest like anonymous on the mission surface).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -932,7 +909,8 @@ public class MissionController {
    */
   @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/participants/{participantId}")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
       replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
@@ -948,11 +926,9 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal Jwt jwt) {
     MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the strict mission redaction; the
-    // jwt == null fast-path keeps the common anonymous case cheap, the role check additionally
-    // catches guest accounts (treat guest like anonymous on the mission surface).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
+    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -1004,7 +980,7 @@ public class MissionController {
   // `canSeeMission` returns true for own-squadron, admin, and non-internal-anywhere — exactly
   // the matrix we need. Without this gate, an anonymous user could create a guest participant
   // on an internal mission of any squadron (the URL is `permitAll` in SecurityConfig).
-  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
@@ -1071,19 +1047,11 @@ public class MissionController {
                 request.comment(),
                 request.orgUnitIds(),
                 request.payoutPreference()));
-    // C-1 + H-2: every caller below Officer+ gets a redacted shape — anonymous / guest callers
-    // would otherwise see participant emails / real names; authenticated non-Logistician members
-    // got the same leak on the legacy public endpoint until H-2. Two tiers:
-    //   * Outsiders (anonymous OR authenticated role-less GUEST) get the STRICT redaction — no
-    //     roster, units, description, organisation or payout (treat guest like anonymous).
-    //   * Authenticated members below Logistician keep the peer view (roster visible, PII
-    // stripped).
-    // The ArchUnit rule {@code anonymousReadableMissionEndpointsMustRedactGuestPii} keeps the
-    // outsider redaction from regressing (this method calls a cleanup…ForGuest helper).
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupOutsiderMissionForGuest(dto);
-    } else if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionGuestRedactor.cleanupMissionForGuest(dto);
+    // H-2 / REQ-SEC-007: a member below Logistician gets the peer view — roster visible, PII
+    // stripped. There used to be a stricter tier above this one for anonymous and role-less
+    // callers; ADR-0159 removed that audience, so one tier is all that is left.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
     }
     return dto;
   }
@@ -1920,7 +1888,8 @@ public class MissionController {
    * @return the updated participant DTO
    */
   @PutMapping("/{id}/participants/{participantId}/slim")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
       summary = "Update a participant (slim response)",
       description = "Updates a participant and returns only the updated participant as a slim DTO.")
@@ -1945,15 +1914,15 @@ public class MissionController {
             request.version(),
             authentication);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    // The {@code cleanupParticipantForGuest} call here satisfies the ArchUnit rule {@code
-    // anonymousReadableMissionEndpointsMustRedactGuestPii} (audit finding C-1): the participant
+    // The {@code cleanupParticipantForPeer} call here satisfies the ArchUnit rule {@code
+    // peerReadableMissionEndpointsMustRedactPii} (audit finding C-1): the participant
     // {@code canAccessParticipant} lets anonymous reach this endpoint reaches only guest entries
     // anyway ({@code participant.user == null}), so the redaction is a no-op for the data — but
     // calling it directly is the structural guarantee that a future mapping change which surfaces
     // a non-null {@code UserDto} on a guest participant cannot leak through. The role check
     // additionally treats an authenticated role-less GUEST like an anonymous caller here.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
     }
     return dto;
   }
@@ -1967,7 +1936,8 @@ public class MissionController {
    * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
       summary = "Check in a participant (slim response)",
       description =
@@ -1978,9 +1948,9 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkIn(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
+    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
     }
     return dto;
   }
@@ -1994,7 +1964,8 @@ public class MissionController {
    * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
       summary = "Check out a participant (slim response)",
       description =
@@ -2005,9 +1976,9 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.checkOut(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
+    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
     }
     return dto;
   }
@@ -2022,7 +1993,8 @@ public class MissionController {
    * @return the updated participant DTO (redacted for anonymous callers)
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
       summary = "Update payout preference for a participant (slim response)",
       description =
@@ -2034,9 +2006,9 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
-    // Outsiders (anonymous OR authenticated role-less GUEST) get the participant PII redaction.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      dto = missionGuestRedactor.cleanupParticipantForGuest(dto);
+    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      dto = missionPeerRedactor.cleanupParticipantForPeer(dto);
     }
     return dto;
   }
@@ -2065,7 +2037,7 @@ public class MissionController {
   // MULTI_SQUADRON_PLAN.md §1: same gate as the legacy `/participants/add` endpoint — only
   // non-internal missions accept cross-staffel / anonymous sign-ups. Internal missions are
   // gated even though the URL is `permitAll` in SecurityConfig.
-  @PreAuthorize("@ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddParticipantPublicRequest request,
@@ -2126,21 +2098,12 @@ public class MissionController {
             request.payoutPreference());
     java.util.stream.Stream<MissionParticipantDto> participants =
         mission.getParticipants().stream().map(missionMapper::toDto);
-    // C-1 (anonymous + guest) + H-5 (authenticated non-Officer): every caller below Logistician+
-    // gets the peer-redacted user shape — outsiders (anonymous / role-less GUEST) and
-    // non-privileged
-    // members alike see the full roster but only the public callsign tuple (username, displayName,
-    // rank), never email / real name. The ArchUnit rule
-    // {@code anonymousReadableMissionEndpointsMustRedactGuestPii} statically enforces this for any
-    // future endpoint added with the same {@code @ownerScopeService.canSeeMission(#id)} gate.
-    if (jwt == null || !authHelperService.isLogisticianOrAbove()) {
-      participants = participants.map(missionGuestRedactor::cleanupParticipantForGuest);
-    }
-    // ADR-0034: outsiders (anonymous / role-less GUEST) additionally lose each participant's
-    // payoutPreference + comment in the returned roster; the member-peer tier (a member below
-    // logistician) keeps them. The freshly created guest's own guestEditToken is preserved.
-    if (jwt == null || !authHelperService.isMemberOrAbove()) {
-      participants = participants.map(missionGuestRedactor::stripOutsiderParticipantFields);
+    // H-5 / REQ-SEC-007: every caller below Logistician gets the peer-redacted user shape — the
+    // full roster, but only the public callsign tuple (username, displayName, rank), never email or
+    // real name. The ArchUnit rule {@code peerReadableMissionEndpointsMustRedactPii} statically
+    // enforces this for any future endpoint returning a PII-carrying mission DTO.
+    if (!authHelperService.isLogisticianOrAbove()) {
+      participants = participants.map(missionPeerRedactor::cleanupParticipantForPeer);
     }
     return participants.toList();
   }
@@ -2154,7 +2117,8 @@ public class MissionController {
    * @return 204 No Content
    */
   @DeleteMapping("/{id}/participants/{participantId}/slim")
-  @PreAuthorize("@missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
+  @PreAuthorize(
+      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId, authentication)")
   @Operation(
       summary = "Remove a participant (slim response)",
       description = "Removes a participant and returns 204 No Content.")

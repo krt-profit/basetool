@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.List;
@@ -52,6 +53,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationRuleService {
 
   private final NotificationRuleRepository notificationRuleRepository;
+
+  /** Resolves a {@code ROLE} selector's {@code roleCode} against the catalogue (REQ-SEC-053). */
+  private final RoleRepository roleRepository;
   private final NotificationRuleMapper notificationRuleMapper;
 
   /**
@@ -162,8 +166,16 @@ public class NotificationRuleService {
         }
       }
       case ROLE -> {
-        if (trimToNull(selector.roleCode()) == null) {
+        String roleCode = trimToNull(selector.roleCode());
+        if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
+        }
+        // REQ-SEC-053: the code has to name a role that exists. It used to be any string the admin
+        // screen sent, and the screen offered `GUEST` — a role V239 deleted, so the rule would
+        // have addressed nobody, for ever, without saying so. A selector nobody can match is a
+        // notification silently not sent, which is the hardest kind of defect to notice.
+        if (roleRepository.findByCode(roleCode).isEmpty()) {
+          throw new IllegalArgumentException("ROLE selector names an unknown roleCode: " + roleCode);
         }
       }
       case ORG_RELATIVE_ROLE -> {

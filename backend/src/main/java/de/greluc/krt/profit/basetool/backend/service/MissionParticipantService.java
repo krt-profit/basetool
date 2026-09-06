@@ -81,9 +81,6 @@ public class MissionParticipantService {
   /** Repository used to resolve the desired/planned mission job type references. */
   private final JobTypeRepository jobTypeRepository;
 
-  /** Mints and hashes the per-row guest-edit capability token (REQ-SEC-018). */
-  private final GuestParticipantTokenService guestParticipantTokenService;
-
   /** Resolves a registered user's org-unit memberships to stamp on the participant row. */
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
@@ -237,18 +234,13 @@ public class MissionParticipantService {
         participant.setPayoutPreference(user.getDefaultPayoutPreference());
       }
     } else {
+      // An EXTERNAL participant: a named person without an account, recorded by a member who
+      // can see the mission (ADR-0159, decision D4). The row used to be bound to its anonymous
+      // creator by a per-row capability token (REQ-SEC-018) so they could edit it without a login;
+      // there is no anonymous sign-up left to mint one for, and every later write on a row with no
+      // user is the mission leadership's (MissionSecurityService.canAccessParticipant).
       participant.setGuestName(effectiveGuestName);
       participant.setOrgUnits(resolveGuestSubmittedOrgUnits(orgUnitIds));
-      // Security audit M1 / REQ-SEC-018: bind this anonymous guest sign-up to its creator with a
-      // per-row capability token. Only the hash is persisted; the plaintext rides back on the
-      // transient field so the create response can hand it to the caller exactly once. A later
-      // guest
-      // mutate/delete must present the token (or hold a mission-management role) — enforced by
-      // MissionSecurityService.canAccessParticipant.
-      String mintedGuestEditToken = guestParticipantTokenService.generateToken();
-      participant.setGuestEditTokenHash(
-          guestParticipantTokenService.hashToken(mintedGuestEditToken));
-      participant.setGuestEditToken(mintedGuestEditToken);
     }
 
     if (desiredJobTypeId != null) {

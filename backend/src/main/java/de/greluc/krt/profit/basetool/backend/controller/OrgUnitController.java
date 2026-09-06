@@ -74,7 +74,7 @@ public class OrgUnitController {
    * @return picker options sorted Staffel-first then Spezialkommandos alphabetical.
    */
   @GetMapping("/active")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   @Operation(
       summary = "List every active org unit",

@@ -78,7 +78,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
  *
  * <ul>
  *   <li><b>Outsider redaction</b> in {@code getMissionById} / {@code getNextMission} — {@code
- *       MissionController#cleanupOutsiderMissionForGuest} is the only path that controls what
+ *       MissionController#cleanupOutsiderMissionForPeer} is the only path that controls what
  *       leaves the API for a mission outsider (anonymous OR authenticated role-less GUEST, detected
  *       via {@code AuthHelperService#isMemberOrAbove()}). Pinning the outsider redaction (the
  *       free-text description hidden, participant PII stripped to the public callsign tuple, owner
@@ -112,10 +112,10 @@ class MissionControllerLifecycleTest {
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
   // Real redactor (not a mock) so the outsider-redaction assertions exercise the actual
-  // MissionGuestRedactor logic; @Spy makes @InjectMocks wire it into the controller.
+  // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
   @org.mockito.Spy
-  private de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor missionGuestRedactor =
-      new de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor();
+  private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
+      new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
   @InjectMocks private MissionController controller;
 
@@ -129,7 +129,7 @@ class MissionControllerLifecycleTest {
 
   /**
    * Build a representative MissionDto that exercises every field {@link
-   * MissionController#cleanupMissionForGuest} touches. This is the canary input for the redaction
+   * MissionController#cleanupMissionForPeer} touches. This is the canary input for the redaction
    * assertions further down: every "internal" or "leaks-PII" field is intentionally populated so
    * the cleanup pass has something to strip.
    */
@@ -172,8 +172,7 @@ class MissionControllerLifecycleTest {
             null,
             null,
             de.greluc.krt.profit.basetool.backend.model.PayoutPreference.PAYOUT,
-            1L,
-            null);
+            1L);
     return new MissionDto(
         id,
         "Op Foxglove",
@@ -574,7 +573,7 @@ class MissionControllerLifecycleTest {
 
     MissionDto result = controller.getMissionById(id);
 
-    // Outsider redaction (cleanupOutsiderMissionForGuest): on top of the member-peer redaction the
+    // Outsider redaction (cleanupOutsiderMissionForPeer): on top of the member-peer redaction the
     // free-text description is hidden and — per ADR-0034 / REQ-SEC-021 — each participant's
     // payoutPreference and free-text comment are stripped. Organisation, the participant roster
     // (public callsign tuple), units and frequencies stay visible (explicit product decision);
@@ -863,7 +862,7 @@ class MissionControllerLifecycleTest {
     MissionParticipant raw = new MissionParticipant();
     MissionParticipantDto dto =
         new MissionParticipantDto(
-            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L, null);
+            UUID.randomUUID(), null, null, null, null, null, null, null, null, null, 1L);
     when(missionService.getUnassignedParticipants(id)).thenReturn(List.of(raw));
     when(missionMapper.toDto(raw)).thenReturn(dto);
 

@@ -199,9 +199,8 @@ public class KeycloakService {
    * @param appRoleNames the realm role names the app maps locally (from the local role catalog);
    *     these are matched case-insensitively against the realm's actual role names and only the
    *     matches are indexed against Keycloak, so default/technical realm roles never trigger a
-   *     wasteful full-membership page. A role that exists locally but not in Keycloak (e.g. the
-   *     local-only {@code Guest} fallback) is absent from the realm listing and simply contributes
-   *     no memberships. Never {@code null}.
+   *     wasteful full-membership page. A role that exists locally but not in Keycloak is absent
+   *     from the realm listing and simply contributes no memberships. Never {@code null}.
    * @param knownDiscordLinkedIds ids of users who already carry a local Discord link and therefore
    *     do NOT need their federated identity re-read this run; every other roster user (including
    *     brand-new ones absent locally) gets the read. Never {@code null}.
@@ -328,9 +327,18 @@ public class KeycloakService {
    *
    * <p>This is the role-indexed inverse of the old per-user {@code GET
    * /users/{id}/role-mappings/realm} fan-out (which cost one Admin-API call per user). Both views
-   * report <em>directly-assigned</em> realm roles, so the reconstructed sets are equivalent to what
-   * the per-user path returned — only far cheaper: the call count is bounded by the number of
-   * mappable roles (a handful) times their page count, not by the user count.
+   * report <em>directly-assigned</em> realm roles — only far cheaper: the call count is bounded by
+   * the number of mappable roles (a handful) times their page count, not by the user count.
+   *
+   * <p><strong>Directly-assigned is not the whole truth, and REQ-SEC-053 made the gap
+   * load-bearing.</strong> The realm's default-role composite ({@code default-roles-iri}) grants
+   * {@code KRT Member} to every account created in it, and a role held only through a composite
+   * appears in <em>neither</em> view above. Until ADR-0159 that cost nothing visible: such an
+   * account came back with an empty set, was mapped onto the authority-less {@code Guest} fallback,
+   * and healed at its owner's next web login. With a role-less account now refused outright, the
+   * same run would lock every composite-only member out overnight. {@link
+   * #fetchDefaultRoleGrants(String)} therefore resolves what the default role grants and folds it
+   * into every one of its members.
    *
    * <p>The mappable role names come from the local catalog ({@link
    * UserService#getMappableRoleNames()}); they are matched <em>case-insensitively</em> against the
@@ -341,17 +349,18 @@ public class KeycloakService {
    * differently-cased local name straight through would silently miss the role. Ubiquitous
    * default/technical realm roles ({@code default-roles-*}, {@code offline_access}, {@code
    * uma_authorization}) are not in the app's mappable set and are therefore never queried (no
-   * wasteful full-membership page walk). The mappable set <em>does</em> contain the app's
-   * local-only roles — the seeded {@code Guest} fallback in particular — because it is simply the
-   * local catalog's names; they find no realm counterpart, which is expected and must not be
-   * reported as an anomaly (see the intersection logging below).
+   * wasteful full-membership page walk). The mappable set may contain local-only roles, because it
+   * is simply the local catalog's names; those find no realm counterpart, which is expected and
+   * must not be reported as an anomaly (see the intersection logging below).
    *
    * @param appRoleNames the realm role names to index; never {@code null}.
    * @param token a valid admin access token.
    * @return a mutable map of user id to the subset of {@code appRoleNames} each user holds (stored
-   *     under the local catalog's casing); users with none simply do not appear (the caller
-   *     defaults them to the empty set, which {@link UserService#syncUser(KeycloakUserDto)} maps to
-   *     the {@code Guest} fallback).
+   *     under the local catalog's casing); users with none simply do not appear and the caller
+   *     defaults them to the empty set, which is now a refusal rather than a fallback role
+   *     (REQ-SEC-053).
+   * @throws IllegalStateException when the realm matches none of the app's roles — the run must be
+   *     skipped rather than write a role-strip for every account (see below).
    */
   private Map<UUID, Set<String>> fetchRoleMemberships(
       Collection<String> appRoleNames, String token) {
@@ -374,9 +383,17 @@ public class KeycloakService {
         accumulateRoleMembers(keycloakRoleName, canonical, token, byUser);
       }
     }
+
+    // REQ-SEC-053: everything the realm's default-role composite grants, credited to every one of
+    // its members. Without this a member who holds KRT Member only through `default-roles-iri`
+    // comes back with no roles at all.
+    String defaultRoleName = defaultRoleName();
+    for (String granted : fetchDefaultRoleGrants(token, canonicalByLower)) {
+      accumulateRoleMembers(defaultRoleName, granted, token, byUser);
+    }
     // Which of the app's roles the realm actually still knows is the input every downstream role
     // decision rests on, and it used to be invisible: a renamed realm role simply stops matching
-    // here, the run still "succeeds", and every holder quietly falls through to the Guest fallback.
+    // here, the run still "succeeds", and every holder is quietly left with no role at all.
     // Counts only (role names are structural, but the numbers are what a dashboard needs).
     log.info(
         "Keycloak role index: {} of {} mappable app roles matched a realm role ({} realm roles"
@@ -385,16 +402,24 @@ public class KeycloakService {
         canonicalByLower.size(),
         realmRoleNames.size(),
         byUser.size());
-    // Not a per-role "missing from the realm" warning: the local catalog deliberately contains
-    // local-only roles (the seeded `Guest` fallback), so an unmatched app role is NOT by itself an
-    // anomaly and warning per role would fire on every single run. Only the degenerate case — the
-    // realm matching NONE of the app's roles, which re-maps the entire user base onto Guest — is
-    // unambiguous enough to warn about.
+    // Not a per-role "missing from the realm" warning: the local catalog may contain local-only
+    // roles, so an unmatched app role is NOT by itself an anomaly and warning per role would fire
+    // on every single run. The degenerate case — the realm matching NONE of the app's roles — is
+    // unambiguous, and since REQ-SEC-053 it is no longer merely worth warning about: writing that
+    // run would strip every account of every role and refuse the entire organisation with NO_ROLE
+    // at once. It is a realm-side rename or a broken query, never a legitimate state, so the run
+    // is ABORTED here and skipped by fetchUsers' top-level catch.
+    //
+    // Deliberately narrow. A single account resolving to no role IS legitimate — a leaver whose
+    // realm roles were stripped — and is written through, so removing someone's roles in Keycloak
+    // still removes their access. Only the whole-index failure is treated as "the realm did not
+    // answer the question", which is what it is.
     if (matched == 0) {
-      log.warn(
-          "Keycloak role index: none of the {} mappable app roles matched a realm role; every"
-              + " account would be re-mapped onto the local Guest fallback.",
-          canonicalByLower.size());
+      throw new IllegalStateException(
+          "Keycloak role index: none of the "
+              + canonicalByLower.size()
+              + " mappable app roles matched a realm role; skipping the run rather than stripping"
+              + " every account (REQ-SEC-053).");
     }
     return byUser;
   }
@@ -451,6 +476,82 @@ public class KeycloakService {
   }
 
   /**
+   * The realm's default-role composite, whose members are every account created in the realm.
+   *
+   * <p>Keycloak names it {@code default-roles-<realm>} and exposes it on the realm representation
+   * as {@code defaultRole.name}. Derived rather than read, because reading it would cost a call to
+   * {@code GET /admin/realms/{realm}} on every run for a value that is a documented naming
+   * convention; a realm whose default role was renamed simply contributes no members here, which
+   * degrades to the pre-ADR-0159 behaviour for composite-only members rather than to a wrong
+   * grant.
+   *
+   * @return the default role's name for the configured realm; never {@code null}.
+   */
+  private String defaultRoleName() {
+    return "default-roles-" + properties.getRealm().toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * Reads which of the app's mappable roles the realm's default-role composite grants.
+   *
+   * <p>{@code GET /roles/{defaultRole}/composites/realm} lists the realm roles the composite
+   * confers. Only the ones the app maps are returned, under the local catalog's casing, so the
+   * caller can credit them exactly like a directly-assigned role.
+   *
+   * <p>Best-effort by design, and it is the one call here that is: a realm without a default-role
+   * composite answers {@code 404}, which is a legitimate configuration rather than a failure, and
+   * neither test realm modelled the composite before WP-K1. Any other failure propagates, so a
+   * broken Admin API still skips the run instead of writing a set that silently lacks every
+   * composite-only grant.
+   *
+   * @param token a valid admin access token.
+   * @param canonicalByLower the app's mappable role names, keyed by their lower-cased form.
+   * @return the granted app role names under the local catalog's casing; never {@code null}.
+   */
+  private Set<String> fetchDefaultRoleGrants(String token, Map<String, String> canonicalByLower) {
+    List<Map<String, Object>> composites;
+    try {
+      composites =
+          adminClient()
+              .get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path("/admin/realms/{realm}/roles/{roleName}/composites/realm")
+                          .build(properties.getRealm(), defaultRoleName()))
+              .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+    } catch (HttpClientErrorException.NotFound notFound) {
+      log.debug("Realm has no default-role composite '{}'; nothing to fold in.", defaultRoleName());
+      return Set.of();
+    }
+    if (composites == null || composites.isEmpty()) {
+      return Set.of();
+    }
+    Set<String> granted = new HashSet<>();
+    for (Map<String, Object> composite : composites) {
+      if (composite.get("name") instanceof String name && !name.isBlank()) {
+        String canonical = canonicalByLower.get(name.toLowerCase(Locale.ROOT));
+        if (canonical != null) {
+          granted.add(canonical);
+        }
+      }
+    }
+    if (!granted.isEmpty()) {
+      // Counts and role names only — both are structural, neither is PII. Worth INFO: this is the
+      // grant that is invisible in every per-user and per-role view, so a reader diagnosing "why
+      // does this member have KRT Member" has nothing else to go on.
+      log.info(
+          "Keycloak role index: the default-role composite '{}' grants {} mappable app role(s): {}",
+          defaultRoleName(),
+          granted.size(),
+          granted);
+    }
+    return granted;
+  }
+
+  /**
    * Pages through {@code GET /roles/{queryRoleName}/users} and records {@code storedRoleName}
    * against every member id in {@code byUser}. The endpoint caps each response at a server-side
    * maximum, so this loops {@code first}/{@code max} (page size from {@link
@@ -464,9 +565,9 @@ public class KeycloakService {
    * propagates to {@link #fetchUsers(Collection, Set)}'s top-level catch, which returns an empty
    * roster so the whole run is <em>skipped</em>. This is a fail-safe: the earlier
    * swallow-every-exception behaviour turned a transient single-role failure into a silent
-   * role-strip of every holder — mapping a brand-new admin to the {@code Guest} fallback and
-   * creating it {@code PENDING} instead of {@code ACTIVE}, and mass-downgrading existing admins —
-   * because the degraded role set was then persisted as a normal successful run.
+   * role-strip of every holder — mapping a brand-new admin onto the {@code Guest} fallback of the
+   * time and creating it {@code PENDING} instead of {@code ACTIVE}, and mass-downgrading existing
+   * admins — because the degraded role set was then persisted as a normal successful run.
    *
    * @param queryRoleName the realm role name as Keycloak spells it (used in the request path).
    * @param storedRoleName the local catalog's canonical name to record for each member.

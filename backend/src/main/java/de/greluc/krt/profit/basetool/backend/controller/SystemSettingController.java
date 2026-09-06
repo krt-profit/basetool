@@ -38,10 +38,15 @@ import org.springframework.web.bind.annotation.RestController;
  * Public/admin REST surface over the {@code system_setting} key-value store. Reads are public (the
  * frontend's home page reads the announcement / aging thresholds without authentication); writes
  * are restricted to ADMIN/OFFICER and carry an optimistic-lock version.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/settings")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class SystemSettingController {
 
   private final SystemSettingService systemSettingService;

@@ -53,7 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Blueprint Availability",
     description = "Org-unit blueprint availability overview (#364).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class PersonalBlueprintOverviewController {
 
   private final PersonalBlueprintOverviewService service;

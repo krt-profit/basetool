@@ -443,7 +443,7 @@ public class JobOrderController {
       description =
           "Returns a paginated list of items that can be ordered (blueprint outputs with at least"
               + " one resolvable material).")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<GameItemReferenceDto> getOrderableItems(
       @RequestParam(required = false) String search,
@@ -466,7 +466,7 @@ public class JobOrderController {
   @Operation(
       summary = "List blueprints for an orderable item",
       description = "Returns the blueprints that produce the given item.")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<BlueprintReferenceDto> getBlueprintsForItem(@PathVariable UUID gameItemId) {
     return jobOrderItemService.blueprintsForItem(gameItemId);
@@ -487,7 +487,7 @@ public class JobOrderController {
       description =
           "Returns the materials, sub-assembly suggestions and unresolved ingredients derived from"
               + " a blueprint at the given amount.")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public ItemDerivationDto getBlueprintDerivation(
       @PathVariable UUID blueprintId,
@@ -504,7 +504,7 @@ public class JobOrderController {
    * ordering squad must not see. The ordered lines the requester may edit ({@code materials} with
    * their quantity + min-quality, and {@code items}), the {@code comment}, the org-unit references,
    * the status and the optimistic-lock {@code version} (the requester CAN edit, so it is kept) are
-   * preserved. The sibling {@code cleanupJobOrderForGuest} this convention was named after is gone
+   * preserved. The sibling {@code cleanupJobOrderForPeer} this convention was named after is gone
    * with the anonymous create (ADR-0149).
    *
    * @param dto the full job-order DTO

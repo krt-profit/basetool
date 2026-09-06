@@ -73,7 +73,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Personal Blueprints", description = "Per-user owned crafting blueprints (#327).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class PersonalBlueprintController {
 
   private final PersonalBlueprintService service;

@@ -63,7 +63,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_KRT_MEMBER)
 @Tag(name = "Material Exchange", description = "The Materialbörse trade board (Flotte & Logistik).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class MaterialExchangeController {
 
   private final MaterialExchangeService service;

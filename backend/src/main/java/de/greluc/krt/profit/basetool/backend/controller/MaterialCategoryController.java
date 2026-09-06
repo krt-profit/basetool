@@ -40,10 +40,15 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST surface for the material-category reference table. Read is public; mutations are
  * ADMIN/OFFICER only.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/material-categories")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class MaterialCategoryController {
 
   private final MaterialCategoryService service;

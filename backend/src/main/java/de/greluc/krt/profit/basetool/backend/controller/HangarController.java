@@ -74,10 +74,15 @@ import org.springframework.web.multipart.MultipartFile;
  * hasRole('ADMIN')}. The {@code /squadron-overview} endpoint shapes its response based on the
  * caller's role: only ADMIN/OFFICER see the per-ship owner details, every other authenticated
  * caller gets just the aggregated counts.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/hangar")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class HangarController {
   private final HangarService hangarService;
   private final HangarImportService hangarImportService;

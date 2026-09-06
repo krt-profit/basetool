@@ -37,20 +37,20 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link MissionGuestRedactor}, pinning exactly which fields each redaction level
+ * Unit tests for {@link MissionPeerRedactor}, pinning exactly which fields each redaction level
  * nulls versus forwards. These are the security contract for what leaves the API to a guest
  * (REQ-SEC-021, ADR-0034); the assertions exist so a future edit to the record shapes or the
  * redactor cannot silently start (or stop) exposing a field to unauthenticated callers.
  */
-class MissionGuestRedactorTest {
+class MissionPeerRedactorTest {
 
-  private final MissionGuestRedactor redactor = new MissionGuestRedactor();
+  private final MissionPeerRedactor redactor = new MissionPeerRedactor();
 
   @Test
-  void cleanupUserForGuest_stripsPiiButKeepsPublicCallsignTuple() {
+  void cleanupUserForPeer_stripsPiiButKeepsPublicCallsignTuple() {
     UserDto full = fullUser();
 
-    UserDto redacted = redactor.cleanupUserForGuest(full);
+    UserDto redacted = redactor.cleanupUserForPeer(full);
 
     // Public callsign tuple + non-sensitive scalars kept.
     assertThat(redacted.id()).isEqualTo(full.id());
@@ -75,54 +75,38 @@ class MissionGuestRedactorTest {
   }
 
   @Test
-  void cleanupParticipantForGuest_redactsUserButKeepsPayoutCommentAndEditToken() {
+  void cleanupParticipantForPeer_redactsUserButKeepsPayoutAndComment() {
     MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "my comment", "edit-token");
+        participant(fullUser(), PayoutPreference.PAYOUT, "my comment");
 
-    MissionParticipantDto redacted = redactor.cleanupParticipantForGuest(participant);
+    MissionParticipantDto redacted = redactor.cleanupParticipantForPeer(participant);
 
     assertThat(redacted.user().email()).isNull();
     assertThat(redacted.user().username()).isEqualTo("bob.callsign");
-    // Member-peer view keeps payout preference + comment + the M1 self-edit token.
+    // A peer is a member of the organisation: payout preference and the free-text comment stay.
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(redacted.comment()).isEqualTo("my comment");
-    assertThat(redacted.guestEditToken()).isEqualTo("edit-token");
   }
 
   @Test
-  void cleanupParticipantForGuest_toleratesNullUser() {
-    MissionParticipantDto participant = participant(null, PayoutPreference.DONATE, "c", "tok");
+  void cleanupParticipantForPeer_toleratesNullUser() {
+    MissionParticipantDto participant = participant(null, PayoutPreference.DONATE, "c");
 
-    MissionParticipantDto redacted = redactor.cleanupParticipantForGuest(participant);
+    MissionParticipantDto redacted = redactor.cleanupParticipantForPeer(participant);
 
     assertThat(redacted.user()).isNull();
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.DONATE);
   }
 
   @Test
-  void stripOutsiderParticipantFields_nullsPayoutAndCommentButKeepsUserAndToken() {
-    UserDto user = fullUser();
-    MissionParticipantDto participant =
-        participant(user, PayoutPreference.PAYOUT, "my comment", "edit-token");
-
-    MissionParticipantDto stripped = redactor.stripOutsiderParticipantFields(participant);
-
-    assertThat(stripped.comment()).isNull();
-    assertThat(stripped.payoutPreference()).isNull();
-    // This pass does not touch the user (the peer pass already redacted it) or the edit token.
-    assertThat(stripped.user()).isSameAs(user);
-    assertThat(stripped.guestEditToken()).isEqualTo("edit-token");
-  }
-
-  @Test
-  void cleanupMissionForGuest_clearsOwnerManagersFlagsButKeepsDescriptionAndOrg() {
+  void cleanupMissionForPeer_clearsOwnerManagersFlagsButKeepsDescriptionAndOrg() {
     List<MissionStepDto> steps = List.of();
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "comment", "tok");
+        participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     MissionDto full = mission("secret plan", squadron, participant, steps);
 
-    MissionDto redacted = redactor.cleanupMissionForGuest(full);
+    MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
     // Owner / managers stripped, edit + manage flags forced off.
     assertThat(redacted.owner()).isNull();
@@ -140,28 +124,6 @@ class MissionGuestRedactorTest {
     assertThat(cleaned.comment()).isEqualTo("comment");
   }
 
-  @Test
-  void cleanupOutsiderMissionForGuest_hidesDescriptionAndStripsParticipantPayoutAndComment() {
-    List<MissionStepDto> steps = List.of();
-    SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
-    MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "comment", "tok");
-    MissionDto full = mission("secret plan", squadron, participant, steps);
-
-    MissionDto redacted = redactor.cleanupOutsiderMissionForGuest(full);
-
-    // Strict outsider level: description hidden on top of the peer redaction.
-    assertThat(redacted.description()).isNull();
-    assertThat(redacted.owner()).isNull();
-    // Organisation + planning data still forwarded to outsiders on a non-internal mission.
-    assertThat(redacted.owningSquadron()).isEqualTo(squadron);
-    assertThat(redacted.steps()).isSameAs(steps);
-    // Each participant's payout preference + comment nulled (ADR-0034); user already PII-stripped.
-    MissionParticipantDto outsider = redacted.participants().iterator().next();
-    assertThat(outsider.user().email()).isNull();
-    assertThat(outsider.payoutPreference()).isNull();
-    assertThat(outsider.comment()).isNull();
-  }
 
   /**
    * REQ-SEC-040: the nested ship owner must be redacted like any other user leaving the API.
@@ -173,11 +135,11 @@ class MissionGuestRedactorTest {
    * free-text description, org-unit memberships, join date and Discord-link status.
    */
   @Test
-  void cleanupMissionForGuest_redactsTheOwnerOfEachAssignedUnitsShip() {
+  void cleanupMissionForPeer_redactsTheOwnerOfEachAssignedUnitsShip() {
     UserDto shipOwner = fullUser();
     MissionDto full = missionWithUnit(unitWithShipOwnedBy(shipOwner));
 
-    MissionDto redacted = redactor.cleanupMissionForGuest(full);
+    MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
     UserDto owner = redacted.assignedUnits().getFirst().ship().owner();
     assertThat(owner.roles()).isNull();
@@ -198,28 +160,15 @@ class MissionGuestRedactorTest {
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");
   }
 
-  /** The strict outsider level inherits the peer pass's ship-owner redaction. */
-  @Test
-  void cleanupOutsiderMissionForGuest_alsoRedactsTheShipOwner() {
-    MissionDto full = missionWithUnit(unitWithShipOwnedBy(fullUser()));
-
-    MissionDto redacted = redactor.cleanupOutsiderMissionForGuest(full);
-
-    UserDto owner = redacted.assignedUnits().getFirst().ship().owner();
-    assertThat(owner.roles()).isNull();
-    assertThat(owner.permissions()).isNull();
-    assertThat(owner.description()).isNull();
-    assertThat(owner.email()).isNull();
-  }
 
   /** A unit without an assigned ship must not blow up the redaction pass. */
   @Test
-  void cleanupUnitForGuest_toleratesAUnitWithoutAShip() {
+  void cleanupUnitForPeer_toleratesAUnitWithoutAShip() {
     MissionUnitDto unit =
         new MissionUnitDto(
             UUID.randomUUID(), "Bravo", null, null, 12.5, false, null, "note", 1L, List.of());
 
-    MissionUnitDto redacted = redactor.cleanupUnitForGuest(unit);
+    MissionUnitDto redacted = redactor.cleanupUnitForPeer(unit);
 
     assertThat(redacted.ship()).isNull();
     assertThat(redacted.name()).isEqualTo("Bravo");
@@ -245,7 +194,7 @@ class MissionGuestRedactorTest {
   private static MissionDto missionWithUnit(MissionUnitDto unit) {
     SquadronReferenceDto squadron = new SquadronReferenceDto(UUID.randomUUID(), "Kartell", "KRT");
     MissionParticipantDto participant =
-        participant(fullUser(), PayoutPreference.PAYOUT, "comment", "tok");
+        participant(fullUser(), PayoutPreference.PAYOUT, "comment");
     return mission("secret plan", squadron, participant, List.of(), List.of(unit));
   }
 
@@ -272,9 +221,9 @@ class MissionGuestRedactorTest {
   }
 
   private static MissionParticipantDto participant(
-      UserDto user, PayoutPreference payout, String comment, String token) {
+      UserDto user, PayoutPreference payout, String comment) {
     return new MissionParticipantDto(
-        UUID.randomUUID(), user, null, null, null, null, comment, null, null, payout, 1L, token);
+        UUID.randomUUID(), user, null, null, null, null, comment, null, null, payout, 1L);
   }
 
   private static MissionDto mission(

@@ -441,7 +441,7 @@ class ExternalContractTest {
                       "size:integer",
                       "sort:string")),
           // Phase 2, the Einsatz detail. Anonymous by design like the search above it, and
-          // redacted for an outsider by MissionGuestRedactor (ADR-0034): no description, no owner,
+          // redacted for an outsider by MissionPeerRedactor (ADR-0034): no description, no owner,
           // no managers, and each participant loses their payout preference and comment. An
           // internal or terminal Einsatz is refused outright with 403. What is frozen here is what
           // the app reads for its seven tabs -- the counters and the four planning collections

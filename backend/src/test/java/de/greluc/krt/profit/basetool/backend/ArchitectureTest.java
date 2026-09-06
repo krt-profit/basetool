@@ -1185,8 +1185,8 @@ class ArchitectureTest {
    * {@code permitAll}. Any such endpoint that returns a {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.MissionDto}, a {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} or a generic collection
-   * of either MUST invoke one of the guest-redaction helpers ({@code cleanupMissionForGuest} /
-   * {@code cleanupParticipantForGuest}) somewhere in its body; otherwise full participant PII
+   * of either MUST invoke one of the guest-redaction helpers ({@code cleanupMissionForPeer} /
+   * {@code cleanupParticipantForPeer}) somewhere in its body; otherwise full participant PII
    * (email, real name, roles, permissions) is shipped to guests.
    *
    * <p>The rule fired on the original C-1 regression in {@code
@@ -1201,7 +1201,7 @@ class ArchitectureTest {
    * redaction entirely" regression, which is the actual C-1 root cause.
    */
   @Test
-  void anonymousReadableMissionEndpointsMustRedactGuestPii() {
+  void peerReadableMissionEndpointsMustRedactPii() {
     methods()
         .that()
         .areDeclaredInClassesThat()
@@ -1212,8 +1212,8 @@ class ArchitectureTest {
         .and(returnsMissionDtoOrMissionParticipantDtoOrCollection())
         .should(callOneOfTheGuestRedactionHelpers())
         .because(
-            "Mission endpoints reachable by anonymous callers must apply cleanupMissionForGuest "
-                + "or cleanupParticipantForGuest before returning — audit finding C-1: "
+            "Mission endpoints reachable by anonymous callers must apply cleanupMissionForPeer "
+                + "or cleanupParticipantForPeer before returning — audit finding C-1: "
                 + "addParticipantPublic / addParticipantSlim previously leaked full participant "
                 + "emails and real names to anonymous callers because the redaction pass that "
                 + "getMissionById / getNextMission already used was skipped on the write paths.")
@@ -1222,7 +1222,7 @@ class ArchitectureTest {
 
   /**
    * Mission DTOs whose participant nesting carries PII (email, first/last name, roles). Used by
-   * {@link #anonymousReadableMissionEndpointsMustRedactGuestPii} to recognise return shapes that
+   * {@link #peerReadableMissionEndpointsMustRedactPii} to recognise return shapes that
    * must go through guest-redaction before reaching an anonymous caller. {@code
    * MissionFinanceEntryDto} is included because it embeds {@link
    * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} directly — the audit
@@ -1237,10 +1237,10 @@ class ArchitectureTest {
   /**
    * Naming convention for helper methods that strip participant PII for anonymous / guest callers:
    * {@code cleanup<EntityName>ForGuest}. Examples in the codebase (the redaction helpers now live
-   * in {@code MissionGuestRedactor}, called by the controllers): {@code
-   * MissionGuestRedactor#cleanupMissionForGuest} (member-peer level), {@code
-   * MissionGuestRedactor#cleanupOutsiderMissionForGuest} (strict outsider level), {@code
-   * …#cleanupParticipantForGuest}. The ArchUnit rule recognises any call to a method matching this
+   * in {@code MissionPeerRedactor}, called by the controllers): {@code
+   * MissionPeerRedactor#cleanupMissionForPeer} (member-peer level), {@code
+   * MissionPeerRedactor#cleanupOutsiderMissionForPeer} (strict outsider level), {@code
+   * …#cleanupParticipantForPeer}. The ArchUnit rule recognises any call to a method matching this
    * pattern as a valid redaction call — so adding a new guest-reachable controller with its own
    * entity-specific redactor (named accordingly) does not require updating this test.
    *
@@ -1409,7 +1409,7 @@ class ArchitectureTest {
         if (callsHelper) {
           return;
         }
-        // Method references (e.g. `stream.map(this::cleanupParticipantForGuest)`) are compiled
+        // Method references (e.g. `stream.map(this::cleanupParticipantForPeer)`) are compiled
         // into a synthetic invokedynamic call site whose target is reachable via the bootstrap.
         // ArchUnit exposes that as a separate access kind — fall back to the broader call set so
         // the rule does not false-positive on the slim endpoint's stream pattern.

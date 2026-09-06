@@ -85,10 +85,15 @@ import org.springframework.web.bind.annotation.RestController;
  * dispatch directly to {@link InventoryAggregationService}'s item siblings. {@code catalog=ITEM}
  * rejects the material-only {@code minQuality} / {@code missionIds} / {@code quality} parameters
  * with 400 (items carry no quality dimension and are never mission-allocated, REQ-INV-031).
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class InventoryItemController {
 
   /** Default page size for a stack-entries drill-down when the caller does not specify one. */

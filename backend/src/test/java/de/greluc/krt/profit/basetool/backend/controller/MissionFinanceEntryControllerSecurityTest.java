@@ -134,7 +134,7 @@ class MissionFinanceEntryControllerSecurityTest {
             false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L, null);
+            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L);
     return new MissionFinanceEntryDto(
         UUID.randomUUID(),
         missionId,

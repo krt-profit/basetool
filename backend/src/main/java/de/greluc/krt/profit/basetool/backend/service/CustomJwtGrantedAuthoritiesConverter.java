@@ -24,6 +24,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
@@ -225,11 +226,8 @@ public class CustomJwtGrantedAuthoritiesConverter
             userReconciliationService.syncUser(jwt);
 
         // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
-        // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived
-        // flat roles, contextual + cascaded authorities — is short-circuited to a single
-        // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed
-        // to
-        // the "waiting for approval" surface, not given the guest read surface.
+        // authorities, and REQ-SEC-053 refuses an approved account that maps to no role at all.
+        // Both short-circuits live in assembleFor so the acting-member path shares them.
         //
         // Authorise with the roles the TOKEN presented, not with the row's. The two are the same
         // set for every client whose claim is complete; they differ for a partial-scope client,
@@ -311,10 +309,25 @@ public class CustomJwtGrantedAuthoritiesConverter
     // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
     // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived flat
     // roles, contextual + cascaded authorities — is short-circuited to a single
-    // ROLE_PENDING_APPROVAL. ROLE_GUEST is deliberately NOT carried: a pending user is routed to
-    // the "waiting for approval" surface, not given the guest read surface.
+    // ROLE_PENDING_APPROVAL: a pending user is routed to the "waiting for approval" surface.
     if (!user.isApproved()) {
       return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
+    }
+
+    // REQ-SEC-053 / ADR-0159: an approved account whose realm roles map to NO application role is
+    // refused, not admitted with an empty authority set. Until V239 it was mapped onto the
+    // authority-less GUEST role, which the URL matrix's anonymous families then let through — so
+    // "no role" quietly meant "the guest surface". With that surface gone the empty set would mean
+    // something worse: an authenticated principal that passes every isAuthenticated() gate and
+    // fails only the ones that name a role, which is a per-endpoint accident rather than a
+    // decision. ROLE_NO_ROLE is a marker, not a permission; PendingApprovalAccessFilter turns it
+    // into 403 NO_ROLE before a handler runs.
+    //
+    // It sits HERE rather than on the JWT path so both callers get it: the resource-server
+    // conversion above, and DatabaseActingMemberAuthorities on the ingest gateway's
+    // acting-member path, which installs an authentication without inspecting it.
+    if (roles.isEmpty()) {
+      return List.of(new SimpleGrantedAuthority(Roles.NO_ROLE_MARKER));
     }
 
     Collection<GrantedAuthority> authorities =

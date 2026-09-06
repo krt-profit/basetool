@@ -46,11 +46,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Methods on this bean are referenced from {@code @PreAuthorize} on controllers and other
  * services (e.g. {@code @missionSecurityService.canEditFinanceEntry(#id, authentication)}). Each
  * method translates a "can the caller do X on resource Y" question into a boolean by combining the
- * caller's authorities with the resource's owner/manager relations. A guest participant (unlinked,
- * no user account) is editable by a mission manager / officer / admin in scope OR by the anonymous
- * creator who presents the per-row capability token minted at sign-up (security audit M1 /
- * REQ-SEC-018, header {@value #GUEST_EDIT_TOKEN_HEADER}); a participant linked to a user is
- * editable only by that user or an elevated role.
+ * caller's authorities with the resource's owner/manager relations. An <em>external</em>
+ * participant (unlinked, no user account) is editable by a mission manager / officer / admin in
+ * scope and by nobody else; a participant linked to a user is editable only by that user or an
+ * elevated role.
  *
  * <p>Missing resources translate to {@code NotFoundException} rather than {@code false} so a stale
  * frontend gets a deterministic 404 instead of an opaque "access denied" for an entity that no
@@ -68,27 +67,15 @@ public class MissionSecurityService {
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
   private final OwnerScopeService ownerScopeService;
-  private final GuestParticipantTokenService guestParticipantTokenService;
-  private final HttpServletRequest request;
-
-  /**
-   * Request header carrying the per-row guest capability token (security audit M1 / REQ-SEC-018).
-   * The frontend relays it from the browser to the backend; {@link #canAccessParticipant} verifies
-   * it against the participant's stored hash so an anonymous guest can edit/withdraw only their OWN
-   * sign-up.
-   */
-  public static final String GUEST_EDIT_TOKEN_HEADER = "X-Guest-Edit-Token";
 
   /**
    * Authorizes access to a single participant of a mission.
    *
    * <p>Access is granted when the caller has elevated privileges (MISSION_MANAGER / OFFICER / ADMIN
    * / mission owner or manager) OR when the participant belongs to the currently authenticated user
-   * (Self-Edit: {@code participant.user.id == jwt.sub}). A guest (unlinked) participant is editable
-   * by an elevated caller OR by the anonymous creator presenting the per-row capability token
-   * (header {@value #GUEST_EDIT_TOKEN_HEADER}) minted at sign-up — security audit M1 / REQ-SEC-018.
-   * Before M1 a guest row was editable by anyone who knew its id, which let an anonymous caller
-   * vandalise foreign guest sign-ups on public missions.
+   * (Self-Edit: {@code participant.user.id == jwt.sub}). An <em>external</em> (unlinked) participant
+   * is editable by an elevated caller only — the row carries no creator to bind a self-edit to
+   * (ADR-0159, decision D4).
    *
    * <p>If the participant does not exist (e.g. the frontend holds a stale row whose entry was
    * concurrently deleted in another tab), this method translates the missing row into a {@code 404
@@ -109,29 +96,21 @@ public class MissionSecurityService {
     }
 
     if (p.getUser() == null) {
-      // Security audit M1 / REQ-SEC-018: a guest (unlinked) row is no longer editable by anyone who
-      // merely knows its id (the public roster exposes participant ids). It may be mutated/deleted
-      // by (a) the anonymous creator presenting the per-row capability token (header
-      // GUEST_EDIT_TOKEN_HEADER) that hashes to the row's stored hash, or (b) a mission manager /
-      // officer / admin within the owning-OrgUnit scope. The token is checked first so the common
-      // anonymous self-edit path never loads the mission aggregate. A guest row with no stored hash
-      // (created before V177) only passes via (b) — the gate fails closed.
-      if (guestParticipantTokenService.matches(
-          request.getHeader(GUEST_EDIT_TOKEN_HEADER), p.getGuestEditTokenHash())) {
-        // The token proves WHICH row, never WHETHER the mission is still open to a guest. Without
-        // the visibility re-check the capability outlived the surface that granted it: a guest who
-        // signed up while the mission was public kept PUT / DELETE / check-in on their row after
-        // the mission was flipped to isInternal, and after it reached COMPLETED / CANCELLED - and
-        // since OperationPayoutService recomputes the time split on every read, back-dating
-        // start/end on a settled operation moved real money away from every other participant.
-        //
-        // canSeeMission is exactly the missing predicate and covers both halves: it denies an
-        // internal mission to a non-member, and (audit hardening M-2) denies a terminal mission to
-        // an unauthenticated caller - which is what a token-only guest is. It is the same gate the
-        // READ path already applied, whose own javadoc gives this as its reason: "so a guest cannot
-        // (re-)write the participant list / finance ledger of an already-archived mission".
-        return ownerScopeService.canSeeMission(missionId);
-      }
+      // An EXTERNAL row — a named person without an account, recorded by somebody else. Editing
+      // and removing it is the mission leadership's (ADR-0159, decision D4), because the row
+      // carries no creator to bind a self-edit to: there is no `user` to compare a subject
+      // against, and the id alone proves nothing (the roster exposes participant ids to every
+      // member who can see the mission).
+      //
+      // This branch used to accept a per-row capability token (REQ-SEC-018, header
+      // `X-Guest-Edit-Token`) so the anonymous creator of a guest sign-up could edit their own
+      // row. There is no anonymous sign-up left to mint one for, and V239 dropped the column that
+      // stored its hash. Note what the token needed alongside it to be safe: a `canSeeMission`
+      // re-check, because the capability otherwise outlived the surface that granted it — a guest
+      // who signed up while the mission was public kept PUT / DELETE / check-in after it was
+      // flipped to internal or reached COMPLETED, and back-dating a settled operation moved real
+      // money away from every other participant. `canManageMission` carries that scope check
+      // inherently, so nothing is lost by the simplification.
       return canManageMission(missionId, authentication);
     }
 
@@ -298,6 +277,16 @@ public class MissionSecurityService {
    */
   public boolean canManageMission(UUID missionId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
+      return false;
+    }
+
+    // An AnonymousAuthenticationToken IS authenticated and carries ROLE_ANONYMOUS, so the check
+    // above does not catch it — every sibling gate in this class spells the principal test out for
+    // that reason (canChangeOwner:422, canAccessParticipant). This one did not, and it is now the
+    // gate an external participant row hangs off (ADR-0159, D4). Nothing reaches it anonymously
+    // today because the URL matrix refuses first, but a gate that depends on a matrix entry
+    // elsewhere being right is one deletion away from being wrong.
+    if ("anonymousUser".equals(authentication.getPrincipal())) {
       return false;
     }
 

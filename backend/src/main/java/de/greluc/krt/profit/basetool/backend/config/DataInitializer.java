@@ -84,7 +84,6 @@ public class DataInitializer {
               Permissions.MISSION_MANAGE,
               Permissions.USER_MANAGE,
               Permissions.ROLE_MANAGE));
-      createRoleIfNotFound(Roles.GUEST, "Guest", Set.of());
       // Kartell bank (epic #556, REQ-BANK-007): two coarse roles; the fine-grained per-account
       // capabilities are app-managed grant rows (bank_account_grant), not permission strings.
       createRoleIfNotFound(Roles.BANK_EMPLOYEE, "Bank Employee", Set.of());

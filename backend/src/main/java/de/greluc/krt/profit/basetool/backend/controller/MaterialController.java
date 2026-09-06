@@ -58,11 +58,16 @@ import org.springframework.web.bind.annotation.RestController;
  * price-overview projection, the full material × terminal matrix, the job-order sub-catalog, and
  * the lightweight reference projection. Mutations are ADMIN/OFFICER and only touch the
  * admin-maintained fields (UEX-imported flags stay untouched).
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/materials")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class MaterialController {
 
   private final MaterialService materialService;

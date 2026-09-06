@@ -26,7 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.service.MissionFinanceEntryService;
-import de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor;
+import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
@@ -87,7 +87,7 @@ public class MissionFinanceEntryController {
   private static final int MAX_FINANCE_PAGE_SIZE = 500;
 
   private final MissionFinanceEntryService financeEntryService;
-  private final MissionGuestRedactor missionGuestRedactor;
+  private final MissionPeerRedactor missionPeerRedactor;
 
   /**
    * Paged finance entries for a mission. Sort is whitelisted; unknown fields → 400.
@@ -117,7 +117,7 @@ public class MissionFinanceEntryController {
     // that the nested participant PII is stripped for EVERY caller — including Logistician/Officer.
     // A participant's email may only ever be shown to that user themselves in their own profile, so
     // it must never travel to a peer through the finance ledger (there is no business need for a
-    // peer's contact data here). The shared MissionGuestRedactor keeps only the public name tuple.
+    // peer's contact data here). The shared MissionPeerRedactor keeps only the public name tuple.
     entries = entries.map(this::redactParticipantPii);
     return PageResponse.of(entries);
   }
@@ -220,9 +220,9 @@ public class MissionFinanceEntryController {
    * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
    * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
    * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the nested user is stripped via {@link MissionGuestRedactor#cleanupUserForGuest}
+   * otherwise the nested user is stripped via {@link MissionPeerRedactor#cleanupUserForPeer}
    * while the participant's non-sensitive fields (org units, job types, comment, times, payout
-   * preference) are kept. Mirrors {@link MissionGuestRedactor#cleanupParticipantForGuest} (which
+   * preference) are kept. Mirrors {@link MissionPeerRedactor#cleanupParticipantForPeer} (which
    * additionally forwards the guest edit token; a finance read never mints one, so it is nulled
    * here).
    *
@@ -238,7 +238,7 @@ public class MissionFinanceEntryController {
     MissionParticipantDto redacted =
         new MissionParticipantDto(
             participant.id(),
-            missionGuestRedactor.cleanupUserForGuest(participant.user()),
+            missionPeerRedactor.cleanupUserForPeer(participant.user()),
             participant.guestName(),
             participant.orgUnits(),
             participant.desiredMissionJobType(),
@@ -247,10 +247,7 @@ public class MissionFinanceEntryController {
             participant.startTime(),
             participant.endTime(),
             participant.payoutPreference(),
-            participant.version(),
-            // Finance-entry responses are reads, never a guest sign-up create — no edit token is
-            // ever minted or surfaced here (M1).
-            null);
+            participant.version());
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
   }

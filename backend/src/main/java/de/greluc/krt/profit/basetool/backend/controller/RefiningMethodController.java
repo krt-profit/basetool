@@ -48,11 +48,16 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface for the refining-method reference table. The data is owned by {@code
  * UexRefinerySyncService}; this controller adds the admin-mutable CRUD subset (name + description),
  * with read open to everyone.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/refining-methods")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class RefiningMethodController {
 
   private final RefiningMethodService refiningMethodService;

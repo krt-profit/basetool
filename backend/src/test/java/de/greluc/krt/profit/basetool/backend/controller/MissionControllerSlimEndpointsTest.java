@@ -864,7 +864,7 @@ class MissionControllerSlimEndpointsTest {
             .getContentAsString();
 
     // The legacy public-add returns the full MissionDto; for an outsider it is redacted via
-    // cleanupOutsiderMissionForGuest, which keeps the roster (PII stripped) and hides only the
+    // cleanupOutsiderMissionForPeer, which keeps the roster (PII stripped) and hides only the
     // description. The username stays visible, the email never leaks (audit finding C-1).
     org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob.callsign"), "username must remain visible to guests");

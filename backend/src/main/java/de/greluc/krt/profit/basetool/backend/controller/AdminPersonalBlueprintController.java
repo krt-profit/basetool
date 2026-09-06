@@ -74,7 +74,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(
     name = "Admin – Personal Blueprints",
     description = "Administrator endpoints for managing any user's acquired blueprints (#327).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class AdminPersonalBlueprintController {
 
