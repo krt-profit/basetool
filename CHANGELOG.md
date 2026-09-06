@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
+
 ### Fixed
 
 - **Die letzten sieben Pfade der App waren am API-Zugang abgewiesen.** Die Blaupausen-Übersicht, das Anlegen mehrerer Blaupausen, der Blaupausen- und der Fleetview-Import, „Heimatort für alle Schiffe" und die beiden Schwellen, ab denen ein Auftrag gelb oder rot wird. Damit ist die Liste aus dem App-Audit abgearbeitet (Runbook-Phase X).
