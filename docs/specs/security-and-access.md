@@ -2989,6 +2989,11 @@ in the same change:
 - [x] The frontend routes the state to the account-status page with its own words, not the waiting
   copy: a role-less member has already been approved, so "wait for an administrator to approve you"
   describes a wait with no end.
+- [x] That routing takes effect on the request that **discovers** the state, not the one after it.
+  The role read is where the frontend first meets a role-less account, and it runs *after* the
+  approval gate — so a filter that only caches the verdict serves the discovering request, which
+  renders the dashboard with every fragment on it refused `403 NO_ROLE` and defers the copy
+  explaining why to the next click.
 
 **Enforced by:** `AnonymousSurfaceSweepTest` (the role-less pass over every mapping) ·
 `CustomJwtGrantedAuthoritiesConverterTest` · `PendingApprovalAccessFilterTest` ·

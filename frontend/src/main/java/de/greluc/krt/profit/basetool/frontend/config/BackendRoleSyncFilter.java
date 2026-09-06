@@ -203,11 +203,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         if (STATE_PENDING.equals(approval)
             || STATE_REJECTED.equals(approval)
             || STATE_NO_ROLE.equals(approval)) {
-          if (isApprovalExempt(request)) {
-            filterChain.doFilter(request, response);
-          } else {
-            response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
-          }
+          routeToAccountStatus(request, response, filterChain);
           return;
         }
 
@@ -231,6 +227,15 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           // re-sync interval instead of retrying on the very next request (REQ-SEC-013).
           if (syncRoles(token, session, request, response)) {
             session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
+          } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
+            // The role read is where a role-less account is first recognised, and it runs after the
+            // approval routing above rather than before it. Without this the request that made the
+            // discovery would still be served: the dashboard renders, every backend call on it is
+            // refused with 403 NO_ROLE, and only the NEXT navigation reaches the account-status
+            // page. REQ-SEC-053 wants the dead end at the first request, so route the one that
+            // found it.
+            routeToAccountStatus(request, response, filterChain);
+            return;
           }
         }
       }
@@ -376,6 +381,29 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         || path.startsWith("/error")
         || path.startsWith("/actuator")
         || isStaticAsset(request);
+  }
+
+  /**
+   * Sends the caller to the account-status page, unless the request targets one of the paths that
+   * must stay reachable from it (the page itself, its status poll, logout, the OAuth2 endpoints,
+   * the error page, actuator and static assets - see {@link #isApprovalExempt}), which is passed
+   * down the chain instead.
+   *
+   * @param request the current request
+   * @param response the response the redirect is written to
+   * @param filterChain the chain an exempt request continues down
+   * @throws ServletException propagated from an exempt request's downstream chain
+   * @throws IOException propagated from writing the redirect, or from an exempt request's
+   *     downstream chain
+   */
+  private static void routeToAccountStatus(
+      HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+      throws ServletException, IOException {
+    if (isApprovalExempt(request)) {
+      filterChain.doFilter(request, response);
+    } else {
+      response.sendRedirect(request.getContextPath() + PENDING_APPROVAL_PATH);
+    }
   }
 
   /**

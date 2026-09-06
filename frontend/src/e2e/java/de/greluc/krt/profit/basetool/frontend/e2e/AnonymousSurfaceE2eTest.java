@@ -119,7 +119,8 @@ class AnonymousSurfaceE2eTest {
    * probe ({@code prompt=none} → {@code login_required}) means the browser can end up back on the
    * landing page at {@code /?error} rather than on a Keycloak form, and which of the two it is
    * depends on the SSO session, not on this rule. What must hold either way is that the protected
-   * markup never appears.
+   * markup never appears — which is also why the "no form" half only applies while the browser is
+   * still on this host: being handed a login form on Keycloak's is the rule working.
    */
   @Test
   void everyFormerPublicPageSendsAnAnonymousVisitorAway() {
@@ -139,10 +140,17 @@ class AnonymousSurfaceE2eTest {
               0,
               page.locator("table tbody tr").count(),
               "no row of " + path + " may reach an anonymous visitor");
-          assertEquals(
-              0,
-              page.locator("form").count(),
-              "and no form of it either — /orders/create was the public request form (ADR-0149)");
+          // Scoped to our own origin on purpose: the page a refused visitor is sent to IS a
+          // login form, and it is Keycloak's, served from Keycloak's host. The landing page —
+          // the other place the visitor can end up — carries no form at all, so the check
+          // still bites wherever it can mean anything.
+          if (page.url().startsWith(baseUrl)) {
+            assertEquals(
+                0,
+                page.locator("form").count(),
+                "and no form of it either — /orders/create was the public request form"
+                    + " (ADR-0149)");
+          }
           assertTrue(
               page.url().contains("/oauth2/authorization/keycloak")
                   || page.url().startsWith(baseUrl + "/?")
@@ -291,9 +299,16 @@ class AnonymousSurfaceE2eTest {
           E2eSupport.navigate(page, baseUrl + deepLink.getKey());
           E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
+          // Spring Security replays the saved request with its own `continue` marker appended:
+          // the request cache only hands the saved request back to a URL carrying it, which is
+          // how it tells a replay apart from a fresh navigation to the same path. That marker is
+          // its bookkeeping, not part of the deep link the member asked for.
+          String url = page.url();
+          int query = url.indexOf('?');
+          String replayed = query < 0 ? url : url.substring(0, query);
           assertEquals(
               baseUrl + deepLink.getKey(),
-              page.url(),
+              replayed,
               "the deep link must be replayed after the login (" + deepLink.getValue() + ")");
         } finally {
           page.close();
