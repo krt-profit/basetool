@@ -327,8 +327,16 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
-   * Role matrix: the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue, and a pure
-   * bank employee (no officer/lead role) cannot reach the officer/lead org-unit page.
+   * Role matrix: the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue, and a bank
+   * employee with no officer/lead role cannot reach the officer/lead org-unit page.
+   *
+   * <p><b>The employee's half asserts the PAGE, not the nav link.</b> It used to assert both, which
+   * worked only while {@code test-bank-employee} held its bank role alone — an account shape
+   * Keycloak cannot produce, because {@code default-roles-iri} grants {@code KRT Member} to every
+   * account it creates (REQ-SEC-053). The fixture was corrected on 2026-09-06, and the link
+   * legitimately appears now: {@code nav-org-unit-bank} is gated on {@code hasAnyRole(ADMIN,
+   * OFFICER, LOGISTICIAN, MISSION_MANAGER, KRT_MEMBER)} and every real member passes that. What the
+   * boundary was ever about is the page, and the page still refuses.
    */
   @Test
   void roleBoundariesAreEnforced() {
@@ -355,8 +363,9 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
+        // The page renders nothing for a bank employee — that is the boundary. The nav LINK is a
+        // different rule (every member sees it) and is no longer asserted here; see the Javadoc.
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
-        assertThat(page.locator("[data-testid='nav-org-unit-bank']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-employee-page-forbidden");
         throw failure;

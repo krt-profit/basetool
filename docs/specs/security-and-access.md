@@ -129,10 +129,13 @@ The following must always hold and are enforced as ArchUnit rules in
 
 ### REQ-SEC-004 — Roles & hierarchy
 
-Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`, `GUEST`.
+Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,
+which the matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159): there is no role
+below member, and a token that maps to none of these is refused with `403 NO_ROLE` (REQ-SEC-053).
 Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`,
-`OFFICER > MISSION_MANAGER`. The full matrix is authoritative in
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
+`OFFICER > MISSION_MANAGER` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
+why a mission manager is inside the peer-redaction tier (REQ-SEC-007). The full matrix is
+authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 
 ### REQ-SEC-005 — Contextual LOGISTICIAN / MISSION_MANAGER grants
 
@@ -621,9 +624,9 @@ its own 30 s memoisation; anything that must revoke instantly needs the session 
 **Acceptance**
 
 - [ ] `FrontendAuthHelperService.isMemberOrAbove()` is true for any member/elevated `ROLE_*` on the
-  Authentication token and false for anonymous, missing-context and role-less GUEST callers.
-- [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch; an anonymous
-  visitor's does not.
+  Authentication token and false for a missing context. The anonymous and role-less-`GUEST` cohorts
+  it also excluded no longer reach it: neither can hold a session (REQ-SEC-052, REQ-SEC-053).
+- [ ] A member's `GET /missions/{id}` triggers the member-only finance-entries fetch.
 - [x] `BackendRoleSyncFilter` does not stamp `BACKEND_ROLES_SYNCED_AT` when `/api/v1/users/me`
   returns `null` or throws; it does stamp it when the read succeeds.
 - [x] A cached `ACTIVE` verdict is never re-read; a cached `PENDING` verdict is re-read once its
@@ -919,32 +922,30 @@ no Staffel the caller can edit.
 > visible to them: a member is part of the organisation, and the two fields were withheld from
 > people who were not.
 
-The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission is an
-**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposes the
+The anonymous / role-less-`GUEST` ("outsider") view of a public (non-internal) mission **was** an
+**operational-coordination surface**: by deliberate product decision (ADR-0034) it exposed the
 participant roster's public callsign tuple (`username`/`displayName`/`rank`), org-unit affiliation,
 job type, assigned ship/unit, mission frequencies, owning organisation and schedule/status, so a
-prospective sign-up can decide whether and how to join. It MUST continue to withhold PII (email /
-real name — enforced by the C-1 ArchUnit rule `anonymousReadableMissionEndpointsMustRedactGuestPii`)
-and, additionally, the two per-participant fields with low public-coordination value and higher
+prospective sign-up could decide whether and how to join. It withheld PII (email / real name) and,
+additionally, the two per-participant fields with low public-coordination value and higher
 sensitivity:
 
 - **`payoutPreference`** — a participant's financial intent.
 - the free-text **`comment`** — uncontrolled text that may carry incidental PII.
 
-Both fields stay on the authenticated member-peer view; only the outsider paths strip them, via
-`MissionGuestRedactor.stripOutsiderParticipantFields` applied in `cleanupOutsiderMissionForGuest` (the
-pass every outsider full-mission response routes through — `getMissionById` and the participant write
-endpoints) and the `addParticipantSlim` outsider branch. The shared `cleanupParticipantForGuest` is
-deliberately unchanged. The full residual decision (and the rejected alternatives) is recorded in
-ADR-0034.
+Both fields stayed on the authenticated member-peer view; only the outsider paths stripped them, via
+`MissionGuestRedactor.stripOutsiderParticipantFields`. **All of that is gone** — the tier, the
+methods and the audience — and `MissionPeerRedactor` has one level left. The reasoning is kept
+because it is the argument for what a peer *does* see: a member is part of the organisation, so the
+two fields are not withheld from them.
 
-**Acceptance**
+**Acceptance** — retired with the tier (ADR-0159); listed so the record shows what was asserted.
 
-- [x] An anonymous / role-less-`GUEST` read of a public mission (`GET /api/v1/missions/{id}`, the
-  participant endpoints, `addParticipantSlim`) returns every participant with `payoutPreference` and
-  `comment` `null`.
-- [x] An authenticated member (peer view and above) still sees both fields.
-- [x] PII (email / real name) remains redacted for outsiders (C-1 unchanged).
+- [x] ~~An anonymous / role-less-`GUEST` read of a public mission returns every participant with
+  `payoutPreference` and `comment` `null`.~~ No such reader exists; both are visible to a peer.
+- [x] An authenticated member (peer view and above) still sees both fields — the one that survives,
+  pinned by `MissionPeerRedactorTest`.
+- [x] PII (email / real name) remains redacted below Logistician (REQ-SEC-007).
 
 **Enforced by:** `MissionControllerLifecycleTest`
 (`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
@@ -2409,15 +2410,22 @@ Note what did **not** catch this, because the same blind spots apply to the next
 - [x] The strict outsider level inherits the pass from the member-peer level.
 - [x] A unit with no assigned ship redacts without error.
 
-**Enforced by:** `MissionGuestRedactorTest` · **Code:** `MissionGuestRedactor#cleanupUnitForGuest`,
-`#cleanupShipForGuest` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0034
+**Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
+`#cleanupShipForPeer` · **Related:** REQ-SEC-007, REQ-SEC-009, ADR-0159 (supersedes ADR-0034)
 
 ### REQ-SEC-041 — The mission description is gated on membership, not on authentication
 
 `MissionMapper#resolveDescription` MUST return the free-text mission description only to a caller
 who is a member or above (`AuthHelperService#isMemberOrAbove`), never merely to an authenticated
-one. A role-less `GUEST` is authenticated yet is a **mission outsider** by REQ-SEC-009, and ADR-0034
-withholds the description from that tier.
+one.
+
+> [!note] Amended 2026-09-06 (ADR-0159) — the cohort is gone, the rule is kept
+> The gap this closed was a role-less `GUEST`: authenticated, yet a mission outsider by
+> REQ-SEC-009. There is no such caller left — a token that maps to no application role is refused
+> `403 NO_ROLE` before any handler runs (REQ-SEC-053). The requirement stands anyway, and
+> deliberately: `isMemberOrAbove()` and `isAuthenticated()` are still different questions
+> (REQ-SEC-009), and a gate that asks the narrower one must not be relaxed to the wider one because
+> the difference happens to be empty today.
 
 The gate had been bare `isAuthenticated()`, which the *detail* endpoint compensated for by nulling
 the description in `cleanupOutsiderMissionForGuest`. The list and search projections run through no
@@ -2430,12 +2438,13 @@ invisible from the anonymous surface.
 
 **Acceptance**
 
-- [x] A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
-  the mission detail alike.
+- [x] ~~A role-less `GUEST` token gets `description == null` from `/api/v1/missions/search` and from
+  the mission detail alike.~~ Such a token is refused before the mapper runs (REQ-SEC-053); the
+  gate itself is unchanged and still pinned.
 - [x] A member still receives the description on both.
 
 **Enforced by:** `MissionViewerAccessServiceTest` · **Code:** `MissionMapper#resolveDescription`,
-`MissionViewerAccess#isMemberOrAbove` · **Related:** REQ-SEC-009, ADR-0034
+`MissionViewerAccess#isMemberOrAbove` · **Related:** REQ-SEC-009, ADR-0159
 
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
@@ -2464,7 +2473,9 @@ participant" rule.
 - [x] A member naming another participant's row gets `403`.
 - [x] A member booking against their own row succeeds.
 - [x] A mission manager in scope may book for any participant.
-- [x] An anonymous caller still gets `401` and a role-less `GUEST` still `403`, unchanged.
+- [x] An anonymous caller still gets `401`, and a token that maps to no application role still
+  `403` — the marker behind that refusal is `ROLE_NO_ROLE` since `V239`, not `GUEST`
+  (REQ-SEC-053).
 
 **Enforced by:** `MissionSecurityServiceTest`, `MissionFinanceEntryControllerSecurityTest` ·
 **Code:** `MissionSecurityService#canCreateFinanceEntry`,
