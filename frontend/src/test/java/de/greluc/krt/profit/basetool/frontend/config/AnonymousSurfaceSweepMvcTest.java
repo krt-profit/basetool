@@ -302,8 +302,10 @@ class AnonymousSurfaceSweepMvcTest {
       }
       int status = issue(call, MediaType.TEXT_HTML);
       // 3xx is the redirect into the OAuth2 entry point; 4xx is any refusal. A 2xx is a page
-      // rendered for somebody with no session, which is what this whole change removes.
-      if (status < 300 || (status >= 300 && status < 400 && !isLoginRedirect(call))) {
+      // rendered for somebody with no session, which is what this whole change removes. The second
+      // clause carries no lower bound: `||` short-circuits, so it is only evaluated once the status
+      // is already >= 300, and spelling that out again reads as a condition doing work it is not.
+      if (status < 300 || (status < 400 && !isLoginRedirect(call))) {
         served.add(call + " -> " + status);
       }
     }
