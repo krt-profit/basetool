@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:1f7dd28d-c145-4772-9e2e-c74b05e5f7be",
+  "serialNumber" : "urn:uuid:09b13732-448c-4b2e-bfa4-f494d428f638",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-09-06T08:00:24Z",
+    "timestamp" : "2026-09-07T15:54:25Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/34020497381"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/34140603386"
         },
         {
           "type" : "vcs",
@@ -4559,43 +4559,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.52?type=jar",
+      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar",
       "group" : "io.swagger.core.v3",
       "name" : "swagger-annotations-jakarta",
-      "version" : "2.2.52",
+      "version" : "2.2.55",
       "description" : "swagger-annotations-jakarta",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "23c007ada7f14134eaa9f972169ac5c4"
+          "content" : "576a29f3692ccc16ec3161faf1af6b47"
         },
         {
           "alg" : "SHA-1",
-          "content" : "03806bb2a46610b20b5841c7f711b2d660ca5848"
+          "content" : "a8af2e7fdca945d8871316e84a9b3154694e26ba"
         },
         {
           "alg" : "SHA-256",
-          "content" : "330742c7666396e96f1b22db00b749774d3ccfb40c35ea9f557a39c6f3c56778"
+          "content" : "d464521aac0e9ae2cfead9d2f56e9e8c110ef4b15ad9c046408a087a4c58952b"
         },
         {
           "alg" : "SHA-512",
-          "content" : "06596745535259085d0f6245b6f4a5a1dec972d7eb50a680e3765efa4009987a0d5a7d27f5ba80891118d14076391493d76cdc0f509c0aa4f7a3bfdf3bef631c"
+          "content" : "bde4be280bc11a982555b907ad3eb94c92eec22352607cea936db7da77eba8b693a2a1b34a560946cb16501012e022295cdaf0225cb873b39b00eaabeaf6e62a"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "37ab2892d536fcd9805004b8b6f74487e86b46d71e8d0f95afc1aa40f195c65f"
+          "content" : "2ca762aefe4eb8a7396f7299116249866ed539b3751c6124246deebe7bee5af9"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "b1c7eb945584888a361ca2b55da0ccaa63ca409bad23ff915fd1f31a34cc87e2d0c443d2b6972e9684e8af5c40a0b3b34663f088aeba67187776c247c14fd665"
+          "content" : "47213a991d5cc9ac3f0e1ed1bf10266238035b5b275f14fcf1b03f0233764ca353fa0a40641d655d9bb48e275e4fd03d4ddf6516aec7eb5c996d4ab88387e6f9"
         },
         {
           "alg" : "SHA-384",
-          "content" : "c97c02fed723ff0efe04d2fb6fe88adf8d0493b9ee0dda07e70dc736de1233b074223d42cf6353af6dc3504e20488de1"
+          "content" : "82e6121fc4c5a51e04b22da5051e296ad7d380ad5362ace077bac0214d2bd13d2fe41708ccd0f6adeb3273e27a6cc8e6"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "4c22a99cb95c0120eff19b83c15419a4f26d0abda9e6c390918555f2d4a04901e9953b15b184ecfebef291e1be54e3a1"
+          "content" : "5b6112434edb044cc0971f905fdecb168d9e6f3f166cfc7d73d062d88c8c0a3e897bf1936217590e0cae286e3dc6a0fd"
         }
       ],
       "licenses" : [
@@ -4606,7 +4606,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.52?type=jar",
+      "purl" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -4617,43 +4617,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.52?type=jar",
+      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar",
       "group" : "io.swagger.core.v3",
       "name" : "swagger-core-jakarta",
-      "version" : "2.2.52",
+      "version" : "2.2.55",
       "description" : "swagger-core-jakarta",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "15cc0fdbbaa806c28aaad368200107ca"
+          "content" : "12f5e4a252cc99db79a3f0af60f7158b"
         },
         {
           "alg" : "SHA-1",
-          "content" : "a0e9e1f3c23867c1db9a811722b927826419bc2f"
+          "content" : "5fab7a2e1df29cfe3ae569f8b96a3534f5ca15a3"
         },
         {
           "alg" : "SHA-256",
-          "content" : "70370a0401852f851414dd51d496201e7490578bfe5a24dd71de032f4ca7ad88"
+          "content" : "3d72786a7133dbf8569dda19549e0ef3e0d68d01d3b4dd221a96eb1b29263d5f"
         },
         {
           "alg" : "SHA-512",
-          "content" : "ae73ebf5315631b731a2fedb5820d558fe49cec6bc36753708c37a55a2c6367655fac343cdec5921ba82eb2c021a7f44343aaddea63921d1a46f614577234247"
+          "content" : "ba931ba95054dd97eedc25217ce818120c674e2c167b688ab272de92a6a8fb7aff457dbcc04760a3cef10f8ac0f8415e7c80b437ea7bcec47629d6c944fa0bff"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "ae6b1d2a99d01961c2d9f9ee5a35fb8911bd5ecdb92f6160cd84528f53609af0"
+          "content" : "f5603fd12a6206f810a60f953acf41e972c62fe3ee9ab1f52213aaf6c295a9cc"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "7c312a61b746ef8542605f976434895f69b82c3bee24b844a3f00084002025be52b373108b89ee18164fa58e7c263e2641eaf72394052a88073b2e595236a325"
+          "content" : "9b406a4898a7859e5b83956b07295fbfc5399e389a4368a5c35ce9532f7b40bf795eef38408ebd80eeb98525c01497bb2bc01a8ae54ce73ea39e48fb066d5da0"
         },
         {
           "alg" : "SHA-384",
-          "content" : "e4d6e1399b0e7becd824f9296b63eab2fd50446e0290689cf6db10d971755be9257d012b5c44e410f5adf17ed02d96bb"
+          "content" : "8bd9d886e58a4f166a60a3335ea29313c822ec2214bc6535946fe377c2d70568b2e69dffbcf6ecfbc13182e00d5b07cb"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "df12a85ddcfa9f0f8c81f06d28d9ed549d352da508d43b6df7abb718659be3e9d37c693ebc8ef4c27aa53b6cfebcc2fc"
+          "content" : "056e24c4c25cd3f0a35a23a61fc21fd5eb2ab15d965c8f47ba1f49bcdfed8f9ad37ea8f5498d8387ce97f8c613bbc122"
         }
       ],
       "licenses" : [
@@ -4664,7 +4664,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.52?type=jar",
+      "purl" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -4675,43 +4675,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.52?type=jar",
+      "bom-ref" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.55?type=jar",
       "group" : "io.swagger.core.v3",
       "name" : "swagger-models-jakarta",
-      "version" : "2.2.52",
+      "version" : "2.2.55",
       "description" : "swagger-models-jakarta",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "f72ea4904c4065d50df1b47322786925"
+          "content" : "505e268edc57c851d9f636e3ab4f91fd"
         },
         {
           "alg" : "SHA-1",
-          "content" : "56506ea5ef31546ae741e06532e63c43ca937c56"
+          "content" : "1c0f2d4ce28c69ad62a5e4de705aa67e1c55e935"
         },
         {
           "alg" : "SHA-256",
-          "content" : "0bbb5b2d24d62b4d565c8fc4809e1517b601e17aa62e1b910b6c19c5b7665f36"
+          "content" : "f83577d4090301a49342dd73708ace743ea46fe382e922a9e892368c45cc6a8d"
         },
         {
           "alg" : "SHA-512",
-          "content" : "6748269e6c9fece70d905966a7f044c8c24d2bf1fb77f30aba4837181aad5c3dcfa40600854f4378a8bc67808fd30bea2f8c9229e2a553ee6d9c5bc83c9c6ade"
+          "content" : "24fe8bc49edc38fc1646daf63acd4c2427fd9a7b87c4d0a0ced4ab5eb50c0c90ac9c3f6768008a525b532d10c2713e46a19c39c3a44e05ed1ec3b93227236e39"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "406d27e016a8549f3d9490dbc4cea82e190703d97720d5379d896dc214aced93"
+          "content" : "a5215f3df1ce9a9d7464cf4978dee4b7b972ec7059e3efc6aa1fa7cec0ae494f"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "a76caede6bb744cf8630b726a9cbb9c9929122fa9faf5e4da4c0a911c97485f6a6c693e346c418d8af28d4144e1731f26a49745bd4e10e2fefc8f8396c0365e0"
+          "content" : "f58176678a0b8cb3f444cf8c4778925c1b46b519c0bc4fff28d5e0a0ef7cfb560a519399875ac585c71b37f60e414702a00c4ae7e17a639aeffedfc57622f747"
         },
         {
           "alg" : "SHA-384",
-          "content" : "2271e6db2081236a3455ca90ed3a7a0148c0c21dc6f7afbe1a3f22f0d48718a5056f6980a48393c75ae9fe390fc74e78"
+          "content" : "d9d44756794ca183126507c9770fda4f6f5ee6dbe6c4b952bd301458ca09180265c119af7e2dec3fd9c58b4771fb28cb"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "e7df43baf312e93268f873123ff1688d96dbc2b704aba5028b07ad11d9ea354291dcada48e092e344cbe0791073f89a1"
+          "content" : "822922b7f69efef39a05d4bdf8fdd28846f175c532e6f15d78f2702ee5067d44176f641ddb2fedc584d4157ba2c0ba57"
         }
       ],
       "licenses" : [
@@ -4722,7 +4722,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.52?type=jar",
+      "purl" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.55?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -6088,42 +6088,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-core",
-      "version" : "13.4.0",
+      "version" : "13.5.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "237f8ddda9b8b3d87de15e19af1c6400"
+          "content" : "3431f05b395afbfa6921048348c58143"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ebf3c1f49583c63e4ec10af5dbd6271e0f1bc48f"
+          "content" : "9f461bca27469797a2e131a5f5b1de033f6b0a73"
         },
         {
           "alg" : "SHA-256",
-          "content" : "e6147827cb883a8bb359231202e8d0d32e0f8e905caf0e20d2890e36dcd12251"
+          "content" : "1adf597e9d4d405b48229c0651f4c7d9dde81e958cac45c2a00afa9b06bc4047"
         },
         {
           "alg" : "SHA-512",
-          "content" : "3cedc4d46a73b0b75f27689605622000af3276dc7a153dfe37fcceca46f2fd7473389cc403df355681c8ab922b6a29ca4352015dcd65822905fe233916b7aff4"
+          "content" : "93d08b1536d88875a54d11227f2f7aa939c05b9537f983137dbd80ab96d0ea3995588eb807c27838ad523d34bcaed5532a77012b8896d0a212c8ae65bfbd387c"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "9a3c0a88f314d58257eb83d9cb6f376f0fd0288093668ee70c441246c5d98664"
+          "content" : "9568297656485a0a7264f0cb646ce3c790254cf9cc5e85a3b0b5eaba1a17903a"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "20fd997349749c11d305c622196395b914f5882f06b03310bb5b20176788399ac701163f6645fa74061dba3c8c76a235a11145896faf1bfa15d53866b9cc2533"
+          "content" : "590cfc5b38fe8eaebdf98cddf09ec3af664c208df980136d6cc2eb97449cb6dd175e346281552b3ca17921a79263f8bd2fa4b301fda3716401eda433eaa02c02"
         },
         {
           "alg" : "SHA-384",
-          "content" : "3cec71b314161005580e3551a4d9b1e1ea939f040b3d727aea75092e8514a2ac13086ca686c660314503052c3f5413bb"
+          "content" : "28feb4219ed67d0a27bbdfecc1bb485f133b3b8dd8d0723f215a1fae3d59589490145052de8171ca4a8a27928cc81516"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "b4e0838754ab0a5ae97965d8b5928a86dfbc9c632deb182ba9d7fc0f022a32a598b0763856ff54fb68d6b43f11c64e8c"
+          "content" : "628ee536508bd481c08821c9ca18b3bbfe630e6d531f772ef46d59bf95a6c6f8c434cb2fa0286cf58854ff3f0da6e9ec"
         }
       ],
       "licenses" : [
@@ -6133,7 +6133,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -6144,42 +6144,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.4.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.5.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-cockroachdb",
-      "version" : "13.4.0",
+      "version" : "13.5.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a0fce0056a1cd09f5e07b41130299b1d"
+          "content" : "aa571d4bed7f07210dad0e9ada5d6198"
         },
         {
           "alg" : "SHA-1",
-          "content" : "799ab50d01d8012488aa551f7a109a199f711476"
+          "content" : "a3ae675e554badf786ecb4d520408c794dd67def"
         },
         {
           "alg" : "SHA-256",
-          "content" : "6a7a9723f581122f194ba033875de11fdba5fca8f30cf9f0c94de8f961f35853"
+          "content" : "1a4466bb8e7caae340e1dfab4661590d276baa49ab0035b222eb2c2b9490450a"
         },
         {
           "alg" : "SHA-512",
-          "content" : "a6f541c538b107f35057a9150290a30a03cf5081b917c2d931c8bc80076b6c1e8e890ade09ce7fe2dd73b206a9502e2f9284e67241aabe4bf2564c8c41992518"
+          "content" : "555b493d347db63a8d7f812ced2eab08d9b3ac1492138b04e7449aaf900e32ae419f3644752c270d4aa7b9371e923f949b600455ae1aa4fefe5871db1aaf7ad0"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "7d93f8b73dab4799f4d1f9c8393238c8ae5966e17a88af4877a06194434e00de"
+          "content" : "4646e3ba8e99393a01efc9db8f6d8668df052d0638689352f9c715e9c974880e"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "7a63617b821a20e5437983485cdabfe4e5c34adae82f6a0f5c611aa56fd594a8506a50d2376ec8afc3f7898001779e66549ae273502ca37c05b4bf20bc70c839"
+          "content" : "5fe2838425ba02ddf422acbf71574c40b5e8827115389ed115ae7e980d8394f9f793183b59457839aa09e4f0eda609e58e51e4f82e1d8f13fb97e135a779706a"
         },
         {
           "alg" : "SHA-384",
-          "content" : "d3dbbada31918eabaf77ac230300fd237aae110b2ab739934b38898a91ec6eb6625e88964ed33ffae2b8e0fbe5934046"
+          "content" : "bfa725c0a4ef4041567523fedd4560f4167756290d5123834d62870fa52b85c67be3520b17b7e6c8763df82390911531"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "97022f38949be5ac08af7b17c69861115197d82c676e7987e9e73eeeb52a8c23ca3b6e25cf9999db763e4a91f5885fc2"
+          "content" : "e8680fb81de74266c9d4bf4430b41f5556195dfabf9c351587c1fa899a4ae0ebe04344e06100a1b4975118d06e0ebdd6"
         }
       ],
       "licenses" : [
@@ -6189,7 +6189,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.4.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.5.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -6200,42 +6200,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.4.0?type=jar",
+      "bom-ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.5.0?type=jar",
       "group" : "org.flywaydb",
       "name" : "flyway-database-postgresql",
-      "version" : "13.4.0",
+      "version" : "13.5.0",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a97868a43b9c5541999a8211afa3298a"
+          "content" : "6123d594c46d2680d697d2f8257930b6"
         },
         {
           "alg" : "SHA-1",
-          "content" : "5a55e25e67688577ac95de3ae443402f618e8db2"
+          "content" : "069037e63d41174448a167bd622e6cd9f12de74c"
         },
         {
           "alg" : "SHA-256",
-          "content" : "1219a89b93fe5dc74ddec8271d810136751820d5bc2a880e51f6ff21e02d66ac"
+          "content" : "d04bd453c3be0264f554c6fd0457d247f004b7023221491d5b6a860ee91275b9"
         },
         {
           "alg" : "SHA-512",
-          "content" : "0b0d769b8f600fba5fa5163aecbd7a45044784e2a5e26923eeb2e538d1f0dd5ffb660da1c6d577cb4373c637d1e51a4f60287a0971ef190e195c65aa7602a718"
+          "content" : "88467439dd66fc15e9af9a546a82107dda494e452aec7b820da2a91248b82be008cd72169c447007d0c2cdbcf1969dfccc5ebf0da84ddec45824f229bdca2588"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "2b510f687d1527b437e0a9ab2bed289c906b8b995251688cd702cfd63ab301a0"
+          "content" : "f265f30193505f0505998444e242ecfa503cf964cebeff6c0a78719934c042fa"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "d0ff546e5a97721d893ac4bcd22586e9d1b082f62c4a2696ef06c5e7baa820c071138a5f962ea2ada324fb80b00b54f0bdeccff295c8c3ce65814038ce1d4574"
+          "content" : "e23d6e1e6c9250bcb5ea0316d495ad98bae3b9a9a638a7ce4bd81a96f6cebb7b3cfd3a1dc66489444a5ba11413aa13165037992578aa27441a7b9ad7af6acc7d"
         },
         {
           "alg" : "SHA-384",
-          "content" : "3af0b0f6ad6f2cfd9cda7ca98f238e86c749a1a059bcdcd0dbf47138d31fbcd7285058802a238bb600600236c42608ae"
+          "content" : "ccde32a9c562c63fa27b953a4d5357ac204ce090b73d32242db37c029c8cf1fd823bd1993dbc07bec9689fb94b53d13f"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "a8d12e28ce3045222934c6e0e1304136ed73d3c6f42213ea4574a6c8181e7f013a88f6e160f899c4ffd404b9b3349f31"
+          "content" : "3cc015946936b66f6f06f9dc73e6684d72721f450eda0bf45f40f545546907b4f0c9e79db48194372f9149284923e577"
         }
       ],
       "licenses" : [
@@ -6245,7 +6245,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.4.0?type=jar",
+      "purl" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.5.0?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7385,42 +7385,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.0?type=jar",
+      "bom-ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.1?type=jar",
       "group" : "org.springdoc",
       "name" : "springdoc-openapi-starter-common",
-      "version" : "3.1.0",
+      "version" : "3.1.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "92be6526ad029c27086d9140f5b3b64b"
+          "content" : "4eea04d6777b6f04b9e11f59c301170f"
         },
         {
           "alg" : "SHA-1",
-          "content" : "47a9cf5e6c2623214b9676c49f9e774b9849dd63"
+          "content" : "2c49a5ccecd3190f307f03a5bf20b724da244796"
         },
         {
           "alg" : "SHA-256",
-          "content" : "9a19f8a8885ef1d3e1c25a5849c541a72eac9f13d345c63dc40472d3522a674f"
+          "content" : "8765460695778bc383f12d9f96d62195ec8ddaef64277854891e9ff0f76e9b97"
         },
         {
           "alg" : "SHA-512",
-          "content" : "a54bbf4842095abaa67105864e1cf2007b935ecd3e3b2a477aca1fdbf62660b9bf8a6b962635f3e7ea085c4697946941f65daf758c255c39d0494ebaae4f4356"
+          "content" : "49d041019a3a9f54576c819e15ee7aa859229ab7b4249fc76812e76bf247b64fbef20d26e86d42a13ecab6ea5a75aa619c4f3e36a1f0220739b16a80a237c602"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "af6740c2450f8c1c6494346d7648be42aa4b7526c9924be1efb183816912a202"
+          "content" : "617aefc53cdddc67cd2277536b00a19278a0ccc0222e708dad069002dccf22a4"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "f354cef467decaa994b3b3a1ac7122a9042a463e10e8f6809e79d0e3141d6ec356babb7cb52279626911144e98598cb3912bb968da24eacbf2f9a53ae2915aaf"
+          "content" : "bfe2b46b7e7693dd03d7efe2ce931e9f58f43df8f91d8ddcab6fcaadfea9127b77ef716d3f3f9c9f2a4851f2b24aa8fbbf530a8a3b56e6045baba0fcc612bfa6"
         },
         {
           "alg" : "SHA-384",
-          "content" : "84ca728a3a5d243233fa6058f2d0c5a7da0f1b071e41e5c05a7a3ec72f957e959a012d163dc2343fa77e621123de96da"
+          "content" : "ee040b6e8bf933a41c94e7c45cfe1711f385a03827587f30cacb183d0940e4a6267c19f9f399f35ca11e2270d355bcb0"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "f7f8e8a3e901e5e035100f4b033911e26e9e379f12f05526c3a8b819e936df7ff3c58b8e5dbb789e46127063b45f007a"
+          "content" : "84bca57fcb361de490a50ff704fea0520949263594150dd44df1e9d7a6e4d7b4743bc5cf198125d7b8989a9a084cf62f"
         }
       ],
       "licenses" : [
@@ -7430,7 +7430,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.0?type=jar",
+      "purl" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -7441,42 +7441,42 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.0?type=jar",
+      "bom-ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.1?type=jar",
       "group" : "org.springdoc",
       "name" : "springdoc-openapi-starter-webmvc-api",
-      "version" : "3.1.0",
+      "version" : "3.1.1",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "8811ada5dddecc6e6b8c4e17dc1b0270"
+          "content" : "c42641cf244536c4922b5addbbad320b"
         },
         {
           "alg" : "SHA-1",
-          "content" : "7d8f1418900b44b7ce0d4a04fa9945f728f6e660"
+          "content" : "bf3d2d80134ef02a3dcbac3af2e0d78873355a61"
         },
         {
           "alg" : "SHA-256",
-          "content" : "3e37f6d0767d16d3ef1caf8617da05dac6f9976077fb63aff63d3d73bb7791e0"
+          "content" : "3b9aa208f93c3e6ff93ae505ea9b8467d00943ca9f6f0041ee0de8008d079a2d"
         },
         {
           "alg" : "SHA-512",
-          "content" : "25f790554346e10e52b6f514a208c466d3a605bc301c2dec5980f53565ffed8eec80415a7fe6b5e9ba0e0ce870265d1963b27e44ad6490aa17127fdd5733962e"
+          "content" : "bd08ab5153b0ae17fd25900f94a13d65af0f0bfb94e64bbf1f7cc326f865bd8082779a1a3ee173bbbca5865f3c9726ef00058e2fefe6c8600fde45f458c57855"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "98d18f607afb365dfea98e23481834f9cf35a088928ec3c43c9848f6e3685bba"
+          "content" : "aea166abc8aedd8f071e442af56bf4b3a5e456cfecadba8412814591c1718d2b"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "fc6ab09e1053af03c33ffe548187d65120e12e0d6a0091ad3339eff643ad2f6b14ea6290a980b4ec5b462f41f26af703f631f84ab1ab84e43973a8c9fa3aff75"
+          "content" : "1587a90228413d4921a901f242d9d5bf591d3f56348cc7dbe495ab11aea9df37c104672c77a41b6b828dd248919a5aa5929b753a0269f1feb11f5f02f7f19ae8"
         },
         {
           "alg" : "SHA-384",
-          "content" : "4305878bd5c35f01210af09316c800c44b5c26a6828630cd212c815aa31dd33d207df9ddc1f8acd738ab72c6f8ec277f"
+          "content" : "5e85b4b20334200e31119d4d9571034dbc0d796bd6bd97f12905a3415330407f2744d744d8b06b754423f55d68761b63"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "279ea7c2576eb6075c9dd0831bdecaeed13c7b2d35d1cfcfb44c990a833ca73a4c12e6dbe5a1ce78923c7da9b4f8cae0"
+          "content" : "49524e990af1499e5e8a90d7882b212bd79eafc8b8ee51cf2cc854651ff8f006b8d5545e5888ae64e278c49c3bfecad1"
         }
       ],
       "licenses" : [
@@ -7486,7 +7486,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.0?type=jar",
+      "purl" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.1?type=jar",
       "modified" : false,
       "properties" : [
         {
@@ -13732,12 +13732,12 @@
         "pkg:maven/com.github.librepdf/openpdf@3.0.5?type=jar",
         "pkg:maven/io.micrometer/micrometer-registry-prometheus@1.17.1?type=jar",
         "pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-postgresql@13.4.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-postgresql@13.5.0?type=jar",
         "pkg:maven/org.mapstruct/mapstruct@1.6.3?type=jar",
         "pkg:maven/org.postgresql/postgresql@42.7.13?type=jar",
         "pkg:maven/org.semver4j/semver4j@6.0.0?type=jar",
-        "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.0?type=jar",
+        "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-devtools@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-cache@4.1.1?type=jar",
@@ -14191,18 +14191,18 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.52?type=jar",
+      "ref" : "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar",
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.52?type=jar",
+      "ref" : "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar",
       "dependsOn" : [
         "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar",
         "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.5?type=jar",
         "pkg:maven/com.fasterxml.jackson.dataformat/jackson-dataformat-yaml@2.21.5?type=jar",
         "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.5?type=jar",
-        "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.52?type=jar",
-        "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.52?type=jar",
+        "pkg:maven/io.swagger.core.v3/swagger-annotations-jakarta@2.2.55?type=jar",
+        "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.55?type=jar",
         "pkg:maven/jakarta.validation/jakarta.validation-api@3.1.1?type=jar",
         "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.5?type=jar",
         "pkg:maven/org.apache.commons/commons-lang3@3.20.0?type=jar",
@@ -14211,7 +14211,7 @@
       ]
     },
     {
-      "ref" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.52?type=jar",
+      "ref" : "pkg:maven/io.swagger.core.v3/swagger-models-jakarta@2.2.55?type=jar",
       "dependsOn" : [
         "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"
       ]
@@ -14318,22 +14318,22 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/tools.jackson.core/jackson-databind@3.1.5?type=jar"
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.4.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.5.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar"
       ]
     },
     {
-      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.4.0?type=jar",
+      "ref" : "pkg:maven/org.flywaydb/flyway-database-postgresql@13.5.0?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.flywaydb/flyway-core@13.4.0?type=jar",
-        "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.4.0?type=jar"
+        "pkg:maven/org.flywaydb/flyway-core@13.5.0?type=jar",
+        "pkg:maven/org.flywaydb/flyway-database-cockroachdb@13.5.0?type=jar"
       ]
     },
     {
@@ -14442,9 +14442,9 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.0?type=jar",
+      "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.52?type=jar",
+        "pkg:maven/io.swagger.core.v3/swagger-core-jakarta@2.2.55?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-jackson@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter@4.1.1?type=jar",
@@ -14452,9 +14452,9 @@
       ]
     },
     {
-      "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.0?type=jar",
+      "ref" : "pkg:maven/org.springdoc/springdoc-openapi-starter-webmvc-api@3.1.1?type=jar",
       "dependsOn" : [
-        "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.0?type=jar",
+        "pkg:maven/org.springdoc/springdoc-openapi-starter-common@3.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-web-server@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-webmvc@4.1.1?type=jar"
       ]
