@@ -165,8 +165,7 @@ public class OperationPageController {
 
     // The "and not anonymous" half is gone with the caller (ADR-0159): every caller here holds
     // a session, so the archive toggle means what it says.
-    boolean effectiveShowPast = showPast;
-    if (effectiveShowPast) {
+    if (showPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
       uri.append("status=PLANNED&status=ACTIVE&");
@@ -182,7 +181,7 @@ public class OperationPageController {
       model.addAttribute("search", search);
       model.addAttribute("start", start);
       model.addAttribute("end", end);
-      model.addAttribute("showPast", effectiveShowPast);
+      model.addAttribute("showPast", showPast);
     } catch (Exception e) {
       log.error("Error loading operations", e);
       model.addAttribute("error", "error.operations.load");

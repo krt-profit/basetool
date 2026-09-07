@@ -36,6 +36,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
@@ -328,6 +329,9 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    *
    * @param request the rejected request (its URI becomes the {@code instance})
    * @param response the response to write the problem body into
+   * @param refusal which of the two refusals to write — the pending-approval one or the role-less
+   *     one; they answer on the same status with different instructions, so this is the argument
+   *     that decides what the caller is told to do
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbidden(
@@ -350,7 +354,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @return the parsed id, or {@code null} for a subject that is not a UUID (a service account, or
    *     a realm that does not mint UUID subjects) - such a caller simply does not enter the window
    */
-  @org.jetbrains.annotations.Nullable
+  @Nullable
   private static UUID toUuidOrNull(String subject) {
     try {
       return UUID.fromString(subject);
@@ -401,6 +405,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    *
    * @param request the rejected request (its URI becomes the {@code instance})
    * @param response the response to write the problem body into
+   * @param refusal the refusal whose code, title, detail and problem type are written
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbiddenBody(

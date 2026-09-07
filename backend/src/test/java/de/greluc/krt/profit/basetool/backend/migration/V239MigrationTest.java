@@ -110,6 +110,27 @@ class V239MigrationTest {
   }
 
   @Test
+  void theSelectorCleanupIsCaseInsensitive() {
+    // The stored casing is whatever the client sent: `applySelectors` persisted
+    // `trimToNull(request.roleCode())` until this release, and only now canonicalises it. An
+    // exact-match DELETE would leave `Guest` / `guest` behind, and the new case-insensitive
+    // existence check would then refuse every future edit of that rule with a 400 - the exact
+    // failure the DELETE exists to prevent. Asserted against the migration's own statement rather
+    // than a fixture, because the statement is what has to be right.
+    String selectorSql =
+        "SELECT count(*) FROM notification_rule_selector"
+            + " WHERE kind = 'ROLE' AND upper(role_code) = 'GUEST'";
+    assertThat(count(selectorSql)).as("no GUEST selector in any casing").isZero();
+
+    assertThat(
+            count(
+                "SELECT count(*) FROM role WHERE upper(code) = 'GUEST' OR upper(name) ="
+                    + " 'GUEST'"))
+        .as("nor a role row under a differently-cased name")
+        .isZero();
+  }
+
+  @Test
   void noNotificationRuleSelectorPointsAtARoleThatDoesNotExist() {
     // The general form of the case above, so the next role deletion is covered on the day it
     // happens: any ROLE selector naming a code with no row in `role` is the same trap.

@@ -192,14 +192,13 @@ public class SecurityConfig {
         .headers(SecurityHeaders.frontend(keycloakIssuerUri))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
-                        org.springframework.http.HttpMethod.POST,
-                        "/missions/*/managers",
-                        "/missions/*/managers/*")
-                    .authenticated()
-                    .requestMatchers(
-                        org.springframework.http.HttpMethod.DELETE, "/missions/*/managers/*")
-                    .authenticated()
+                auth
+                    // The three manager-write entries that stood here are gone. They existed to
+                    // carve those writes back OUT of the /missions/** permitAll that used to sit
+                    // below them; with that block deleted (REQ-SEC-052) they said exactly what
+                    // anyRequest().authenticated() already says. A matrix in which most entries
+                    // restate the catch-all cannot be read against REQ-SEC-052's table, which is
+                    // why every other such entry went in this change too.
                     // Actuator health endpoint reached by the Docker HEALTHCHECK / compose
                     // service_healthy gating. Other actuator endpoints fall through to the
                     // anyRequest().authenticated() catch-all below.

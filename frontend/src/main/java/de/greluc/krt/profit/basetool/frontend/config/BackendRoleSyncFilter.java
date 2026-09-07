@@ -126,9 +126,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
    */
   static final String STATE_NO_ROLE = "NO_ROLE";
 
-  /** The stable problem code the backend answers a role-less caller with (REQ-SEC-053). */
-  private static final String NO_ROLE_CODE = "NO_ROLE";
-
   /**
    * Whether this session's cached gate verdict is "approved, but holding no role" (REQ-SEC-053).
    *
@@ -576,7 +573,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       // same refusal on every navigation, and expiring on the same interval as the approval verdict
       // so an administrator granting a role reaches the member without a re-login.
       if (e instanceof BackendServiceException backendFailure
-          && NO_ROLE_CODE.equals(backendFailure.getProblemCode())) {
+          && BackendServiceException.CODE_NO_ROLE.equals(backendFailure.getProblemCode())) {
         session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
         session.setAttribute(APPROVAL_CHECKED_AT_FLAG, System.currentTimeMillis());
         log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");

@@ -206,6 +206,21 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 
 ### REQ-SEC-007 — Peer minimisation & field redaction
 
+> [!important] The mission surface asks for membership, not merely for a login — 2026-09-07
+> `getAllMissions` / `searchMissions` gained `isMemberOrAbove()` with this change, and
+> `LiveSyncSubscriptionAuthorizer` has always asked for it, but the **detail** read and the
+> participant paths were left on bare `isAuthenticated()` — so they were the outlier, not the rule.
+> A caller who is authenticated without being a member (the bank roles reach no `KRT_MEMBER` edge in
+> the hierarchy) would have read the full peer view of any non-internal mission: the roster, the
+> assigned units, the organisation and every participant's payout preference and free-text comment.
+> Before ADR-0159 that caller fell into the stricter *outsider* tier, which withheld all of them;
+> removing the tier widened what was left.
+>
+> All four `canSeeMission` gates and all ten `canAccessParticipant` gates now carry
+> `@authHelperService.isMemberOrAbove()`. It locks nobody out — `default-roles-iri` grants
+> `KRT Member` to every account Keycloak creates — and it means the mission surface asks one
+> question consistently instead of two different ones on adjacent endpoints.
+
 For a **member below Logistician**, return only the minimum required data. Sensitive fields
 (e-mail, real name, internal orders/items) MUST be explicitly cleared in the controller via a
 `cleanup…ForPeer`-style helper to prevent information disclosure. (E-mail is shown only in a user's
@@ -2978,7 +2993,7 @@ it is anonymous access in the brief's sense.
 
 **Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
 `AnonymousSurfaceSweepMvcTest` (the frontend, navigation and background shapes) ·
-`ArchitectureTest#permitAllIsDeclaredOnlyOnTheThreePublicEndpoints`,
+`ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
 `SecurityConfigStaticAssetPermitAllTest` · `ManagementPortIsolationTest` ·
@@ -3033,7 +3048,24 @@ the roster sync had to be fixed in the same change:
 >
 > A run in which the realm matches **none** of the app's roles aborts rather than writing, because
 > that is a rename or a broken query and never a legitimate state. A **single** account resolving to
-> no role is still written through — removing someone's roles in Keycloak still removes their access.
+> no role is still written through.
+>
+> [!bug] Corrected 2026-09-07 — stripping roles is not how a member is offboarded
+> The callout above used to end "removing someone's roles in Keycloak still removes their access".
+> It does not, and the refutation is the fold-in it names two sentences earlier:
+> `default-roles-<realm>` is assigned to every account Keycloak creates and is **not** removed when
+> an admin clears the user's other role mappings, so the composite credits `KRT Member` back on the
+> next nightly run. The two statements cannot both hold, and the fold-in is the one this
+> requirement needs.
+>
+> **Offboarding is disabling or deleting the account in Keycloak** (owner decision, 2026-09-07), and
+> the enforcement is the IdP's own: neither account is issued a token, so no request reaches this
+> requirement. The local row mirrors both facts anyway — `in_keycloak` for presence,
+> `enabled_in_keycloak` for the `enabled` flag (V230) — because the ingest gateway's acting-member
+> path (ADR-0129) installs an authentication with no token to refuse, and its liveness guard is the
+> only reader of either. An account that reaches the sync with no role is therefore one the realm
+> never granted anything, not one somebody meant to remove; the `basetool_norole_refused_subjects`
+> gauge and `NoRoleBlockSpike` are what make that population visible.
 
 **Acceptance**
 

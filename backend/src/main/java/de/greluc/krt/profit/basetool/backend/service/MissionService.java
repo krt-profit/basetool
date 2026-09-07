@@ -819,16 +819,17 @@ public class MissionService {
    *       Staffel and Spezialkommando they belong to); the submitted {@code orgUnitIds} are
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
-   *   <li><b>Guest</b> — the caller-submitted {@code orgUnitIds} are honoured after the
-   *       authorization filter in {@code MissionParticipantService.resolveSubmittedOrgUnits}
-   *       (anonymous callers cannot label a guest at all; authenticated callers may label only org
-   *       units they can edit).
+   *   <li><b>External participant</b> — the caller-submitted {@code orgUnitIds} are honoured <b>as
+   *       submitted</b> by {@code MissionParticipantService.resolveSubmittedOrgUnits}, which
+   *       applies no per-org-unit authorization filter: the affiliation is a roster label that
+   *       grants nothing, and the endpoint's gate already decides who may record the participant.
+   *       There is no anonymous caller left to consider (ADR-0159).
    * </ul>
    *
    * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
    * the sign-up modal's "Auszahlungsart" select. A non-null value wins over the registered user's
    * profile default (REQ-MISSION-002); {@code null} keeps the existing default chain (profile
-   * default for users, entity default {@code PAYOUT} for guests).
+   * default for registered users, entity default {@code PAYOUT} for external participants).
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
    *     id is unknown

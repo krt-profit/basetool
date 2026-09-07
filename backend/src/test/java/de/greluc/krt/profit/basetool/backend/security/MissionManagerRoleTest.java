@@ -268,10 +268,18 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditFalseForRegularMember() throws Exception {
+    // The authority is what makes this caller the regular member the name claims: the mission read
+    // asks for membership since REQ-SEC-007, and `default-roles-iri` grants KRT Member to every
+    // account Keycloak creates - so a bare token models an account shape that cannot occur.
     mockMvc
         .perform(
             get("/api/v1/missions/" + mission.getId())
-                .with(jwt().jwt(builder -> builder.subject(otherMember.getId().toString()))))
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(otherMember.getId().toString()))
+                        .authorities(
+                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.canEdit")

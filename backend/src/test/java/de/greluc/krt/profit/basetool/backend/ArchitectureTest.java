@@ -98,6 +98,20 @@ class ArchitectureTest {
 
   private static final String GET_MAPPING = "org.springframework.web.bind.annotation.GetMapping";
 
+  /**
+   * The verb-agnostic spelling, selected alongside every verb-specific one.
+   *
+   * <p>ArchUnit compares the annotation TYPE, not its meta-annotations, so {@code @GetMapping} and
+   * {@code @RequestMapping(method = GET)} are two different things to a rule even though Spring
+   * treats them alike. A read declared the second way would have shipped with no
+   * {@code @PreAuthorize} at all and left the build green - on the guard REQ-SEC-052 relies on now
+   * that the URL matrix names only the public surface. Selecting it here closes the spelling gap
+   * the same way the permitAll rule closes the matcher gap. It is deliberately added to the write
+   * rule too: the same reasoning holds for a write.
+   */
+  private static final String REQUEST_MAPPING =
+      "org.springframework.web.bind.annotation.RequestMapping";
+
   private static final String POST_MAPPING = "org.springframework.web.bind.annotation.PostMapping";
   private static final String PUT_MAPPING = "org.springframework.web.bind.annotation.PutMapping";
   private static final String DELETE_MAPPING =
@@ -408,12 +422,12 @@ class ArchitectureTest {
             "Every REST controller class must declare at least one @PreAuthorize annotation (either"
                 + " on the class or on any method) so it cannot silently bypass authorisation."
                 + " Public endpoints must use @PreAuthorize(\"permitAll()\") and are limited to"
-                + " the three REQ-SEC-052 names.")
+                + " the four REQ-SEC-052 names.")
         .check(CLASSES);
   }
 
   /**
-   * The three methods that may declare {@code @PreAuthorize("permitAll()")} — and no others.
+   * The four methods that may declare {@code @PreAuthorize("permitAll()")} — and no others.
    *
    * <p>REQ-SEC-052 states the public surface as a list, and a list is only a requirement if
    * something refuses to grow it. Two are the anonymous reads (D2 / D3 of ADR-0159): an app too old
@@ -422,6 +436,12 @@ class ArchitectureTest {
    * account-existence precheck, which is machine-to-machine behind a constant-time shared-secret
    * header — not an anonymous data path, and it carries no JWT because Keycloak sits outside the
    * resource server's trust boundary.
+   *
+   * <p>The fourth is {@code /error}, the fourth REQ-SEC-052 path and Spring's own dispatch. It
+   * gained the annotation on 2026-09-07, when the read/write rules learned to select
+   * {@code @RequestMapping} alongside the verb-specific spellings and found the one endpoint in the
+   * codebase declared that way — a read whose publicness had only ever been stated in the URL
+   * matrix. It carries no data of its own: only the status the failed request already produced.
    */
   private static final Set<String> PERMIT_ALL_ALLOWED_METHODS =
       Set.of(
@@ -429,10 +449,12 @@ class ArchitectureTest {
               + ".versionPolicy()",
           "de.greluc.krt.profit.basetool.backend.controller.TermsDocumentController.document"
               + "(java.util.Locale)",
-          "de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController");
+          "de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController",
+          "de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController.handleError"
+              + "(jakarta.servlet.http.HttpServletRequest)");
 
   @Test
-  void permitAllIsDeclaredOnlyOnTheThreePublicEndpoints() {
+  void permitAllIsDeclaredOnlyOnTheFourPublicEndpoints() {
     List<String> offenders = new java.util.ArrayList<>();
     for (JavaClass clazz : CLASSES) {
       if (!clazz.getPackageName().contains(".backend.controller")) {
@@ -489,7 +511,7 @@ class ArchitectureTest {
         .resideInAPackage("..backend.controller..")
         .and()
         .arePublic()
-        .and(isAnnotatedWithAnyOf(GET_MAPPING))
+        .and(isAnnotatedWithAnyOf(GET_MAPPING, REQUEST_MAPPING))
         .should(haveMethodOrClassLevelPreAuthorize())
         .because(
             "Every read endpoint must carry an explicit @PreAuthorize (method- or class-level)."
@@ -806,7 +828,9 @@ class ArchitectureTest {
         .resideInAPackage("..backend.controller..")
         .and()
         .arePublic()
-        .and(isAnnotatedWithAnyOf(POST_MAPPING, PUT_MAPPING, DELETE_MAPPING, PATCH_MAPPING))
+        .and(
+            isAnnotatedWithAnyOf(
+                POST_MAPPING, PUT_MAPPING, DELETE_MAPPING, PATCH_MAPPING, REQUEST_MAPPING))
         .should(haveMethodOrClassLevelPreAuthorize())
         .because(
             "Every state-changing HTTP endpoint must carry an explicit @PreAuthorize "

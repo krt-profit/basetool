@@ -83,7 +83,18 @@ class MissionAccessControlTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+
+  /**
+   * An ordinary member who signs up for the mission - the counterpart to {@link #officerUser}.
+   *
+   * <p>Named {@code guestUser} until ADR-0159, when the tier it referred to stopped existing. It
+   * was always a real {@code User} row with an IRIDIUM membership, and its tokens now carry {@code
+   * ROLE_KRT_MEMBER} explicitly: {@code default-roles-iri} grants it to every account Keycloak
+   * creates, so a token without it models an account shape that cannot occur, and the mission gates
+   * ask for membership since REQ-SEC-007.
+   */
+  private User memberUser;
+
   private JobType testJobType;
 
   @BeforeEach
@@ -97,11 +108,11 @@ class MissionAccessControlTest {
     userRepository.save(officerUser);
     saveIridiumMembership(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guest1");
-    userRepository.save(guestUser);
-    saveIridiumMembership(guestUser);
+    memberUser = new User();
+    memberUser.setId(UUID.randomUUID());
+    memberUser.setUsername("member1");
+    userRepository.save(memberUser);
+    saveIridiumMembership(memberUser);
 
     testJobType = new JobType();
     testJobType.setName("Test Job");
@@ -167,13 +178,16 @@ class MissionAccessControlTest {
 
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -187,7 +201,7 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
@@ -195,29 +209,32 @@ class MissionAccessControlTest {
   }
 
   @Test
-  void testUpdateParticipant_OtherGuest_Forbidden() throws Exception {
+  void testUpdateParticipant_OtherMember_Forbidden() throws Exception {
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // guest1 joins
+    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    User otherGuest = new User();
-    otherGuest.setId(UUID.randomUUID());
-    otherGuest.setUsername("guest2");
-    userRepository.save(otherGuest);
-    saveIridiumMembership(otherGuest);
+    User otherMember = new User();
+    otherMember.setId(UUID.randomUUID());
+    otherMember.setUsername("member2");
+    userRepository.save(otherMember);
+    saveIridiumMembership(otherMember);
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -226,13 +243,13 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Malicious\", \"version\": 0}";
 
-    // guest-2 tries to update guest-1 -> Now Forbidden
+    // The other member tries to edit the first one's row -> forbidden
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(otherGuest.getId().toString()))
+                        .jwt(builder -> builder.subject(otherMember.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
@@ -247,16 +264,19 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // guest1 joins
+    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -265,7 +285,7 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Approved\", \"version\": 0}";
 
-    // Officer updates guest-1
+    // Officer updates the member's row
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
@@ -293,13 +313,16 @@ class MissionAccessControlTest {
 
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -319,7 +342,7 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(plannedAttempt))
@@ -337,7 +360,7 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
                         .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ownFieldsUpdate))
@@ -346,7 +369,7 @@ class MissionAccessControlTest {
     // Verification via Repository
     de.greluc.krt.profit.basetool.backend.model.MissionParticipant participant =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
-            .filter(mp1 -> mp1.getUser().getId().equals(guestUser.getId()))
+            .filter(mp1 -> mp1.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 

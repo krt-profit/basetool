@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
@@ -148,7 +149,11 @@ public class NotificationRuleService {
   private void applySelectors(
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
-      validateSelector(selectorRequest);
+      // One catalogue read per ROLE selector, not two. validateSelector resolved the code to check
+      // it exists and canonicalRoleCode resolved the same string again to read its casing, inside
+      // the write transaction - so a rule with eight role selectors issued sixteen reads to answer
+      // eight questions. The validation now returns what it looked up.
+      Role resolvedRole = validateSelector(selectorRequest);
       rule.addSelector(
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
@@ -156,7 +161,7 @@ public class NotificationRuleService {
               // Stored in the catalogue's own casing, not the caller's: the recipient query is
               // the case-sensitive `r.code = :roleCode`, so a rule saved as `admin` would match
               // nobody while looking perfectly valid on the admin screen.
-              .roleCode(canonicalRoleCode(selectorRequest.roleCode()))
+              .roleCode(resolvedRole != null ? resolvedRole.getCode() : null)
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
               .build());
@@ -164,26 +169,16 @@ public class NotificationRuleService {
   }
 
   /**
-   * Resolves a submitted role code to the catalogue's own casing.
+   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue row it names.
    *
-   * @param submitted the caller's role code, possibly {@code null}, blank or differently cased
-   * @return the catalogue's code, or the trimmed input when it names no role (which {@link
-   *     #validateSelector} has already refused for a {@code ROLE} selector, and which is {@code
-   *     null} for every other kind)
+   * @param selector the submitted selector
+   * @return the resolved {@link Role} for a {@code ROLE} selector, {@code null} for every other
+   *     kind
+   * @throws IllegalArgumentException when the selector is incomplete, or names a role the catalogue
+   *     does not know
    */
   @Nullable
-  private String canonicalRoleCode(@Nullable String submitted) {
-    String trimmed = trimToNull(submitted);
-    if (trimmed == null) {
-      return null;
-    }
-    return roleRepository
-        .findByCodeIgnoreCase(trimmed)
-        .map(de.greluc.krt.profit.basetool.backend.model.Role::getCode)
-        .orElse(trimmed);
-  }
-
-  private void validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
+  private Role validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
         if (selector.userId() == null) {
@@ -199,10 +194,15 @@ public class NotificationRuleService {
         // screen sent, and the screen offered `GUEST` — a role V239 deleted, so the rule would
         // have addressed nobody, for ever, without saying so. A selector nobody can match is a
         // notification silently not sent, which is the hardest kind of defect to notice.
-        if (roleRepository.findByCodeIgnoreCase(roleCode).isEmpty()) {
-          throw new IllegalArgumentException(
-              "ROLE selector names an unknown roleCode: " + roleCode);
-        }
+        //
+        // The resolved row is RETURNED rather than discarded: the caller needs its canonical
+        // casing, and looking the same string up twice for that is a read per selector wasted.
+        return roleRepository
+            .findByCodeIgnoreCase(roleCode)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "ROLE selector names an unknown roleCode: " + roleCode));
       }
       case ORG_RELATIVE_ROLE -> {
         if (selector.orgRelativeRole() == null || selector.contextRole() == null) {
@@ -213,6 +213,8 @@ public class NotificationRuleService {
       default ->
           throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
     }
+    // Every arm but ROLE resolves no role, and the caller stores null for their roleCode.
+    return null;
   }
 
   @NotNull

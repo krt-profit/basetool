@@ -408,10 +408,22 @@ public class KeycloakService {
     // at once. It is a realm-side rename or a broken query, never a legitimate state, so the run
     // is ABORTED here and skipped by fetchUsers' top-level catch.
     //
-    // Deliberately narrow. A single account resolving to no role IS legitimate — a leaver whose
-    // realm roles were stripped — and is written through, so removing someone's roles in Keycloak
-    // still removes their access. Only the whole-index failure is treated as "the realm did not
-    // answer the question", which is what it is.
+    // Deliberately narrow. A single account resolving to no role IS legitimate and is written
+    // through; only the whole-index failure is treated as "the realm did not answer the question",
+    // which is what it is.
+    //
+    // It is NOT, however, how a member is offboarded, and this comment used to claim it was
+    // ("removing someone's roles in Keycloak still removes their access"). That was wrong.
+    // `default-roles-<realm>` is assigned to every account Keycloak creates and is not removed
+    // when an admin clears the user's other role mappings, so the composite fold-in below credits
+    // `KRT Member` back on the next run. **Offboarding is disabling or deleting the account in
+    // Keycloak**, confirmed by the owner on 2026-09-07, and the enforcement is Keycloak's own:
+    // neither account is issued a token, so no request reaches this application at all. The local
+    // row mirrors both facts anyway — `in_keycloak` for presence, `enabled_in_keycloak` for the
+    // `enabled` flag (V230) — because the ingest gateway's acting-member path (ADR-0129) installs
+    // an authentication with no token to refuse, and its liveness guard is the only reader of
+    // either. An account that reaches this code with no role is one whose realm never granted it
+    // anything, not one somebody meant to remove.
     if (matched == 0) {
       throw new IllegalStateException(
           "Keycloak role index: none of the "

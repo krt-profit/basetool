@@ -517,31 +517,29 @@ public class MissionPageController {
       }
 
       // Fetch Ships
-      {
-        // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
-        // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
-        // ships already assigned to a unit. Only fetched when the caller may edit the mission —
-        // otherwise the modals don't render and the endpoint would 403.
-        // unit-ship-options only populates the unit add/edit modals (crew board area); skip its
-        // backend read for finance/mgmt/overview/steps/... fragment refetches.
-        Boolean canEdit = mission.canEdit();
-        if (canEdit != null && canEdit && needCrewBoard) {
-          try {
-            List<ShipDto> unitShipOptions =
-                backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
-            model.addAttribute("unitShipOptions", unitShipOptions);
-          } catch (Exception e) {
-            // Ignore, e.g. if the caller cannot manage the mission
-          }
-        }
-
+      // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
+      // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
+      // ships already assigned to a unit. Only fetched when the caller may edit the mission —
+      // otherwise the modals don't render and the endpoint would 403.
+      // unit-ship-options only populates the unit add/edit modals (crew board area); skip its
+      // backend read for finance/mgmt/overview/steps/... fragment refetches.
+      Boolean canEdit = mission.canEdit();
+      if (canEdit != null && canEdit && needCrewBoard) {
         try {
-          PageResponse<ShipTypeDto> allShipTypesPage =
-              backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE);
-          model.addAttribute("allShipTypes", allShipTypesPage.content());
+          List<ShipDto> unitShipOptions =
+              backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
+          model.addAttribute("unitShipOptions", unitShipOptions);
         } catch (Exception e) {
-          // Ignore, e.g. if user has no HANGAR_READ or other issue
+          // Ignore, e.g. if the caller cannot manage the mission
         }
+      }
+
+      try {
+        PageResponse<ShipTypeDto> allShipTypesPage =
+            backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE);
+        model.addAttribute("allShipTypes", allShipTypesPage.content());
+      } catch (Exception e) {
+        // Ignore, e.g. if user has no HANGAR_READ or other issue
       }
 
       // Fetch Finance Entries and Refinery Orders — member-only (the finance ledger is the

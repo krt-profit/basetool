@@ -35,10 +35,12 @@ import java.util.UUID;
  * until the {@code mission_participant} table was full (audit finding H-2). They stay — a member
  * can fill a table too, and a bound on a free-text column is cheap.
  *
- * <p>{@code orgUnitIds} is honoured only for an external entry (and only when the caller may label
- * those org units — see {@code MissionParticipantService.resolveSubmittedOrgUnits}); for a
- * registered participant the affiliations are auto-derived server-side from the user's memberships
- * and any submitted list is ignored.
+ * <p>{@code orgUnitIds} is honoured only for an external entry, and then <b>as submitted</b>:
+ * {@code MissionParticipantService.resolveSubmittedOrgUnits} applies no per-org-unit authorization
+ * filter, because the affiliation is a roster label that grants no authority — the endpoint's own
+ * gate is what decides who may record the participant. For a registered participant the
+ * affiliations are auto-derived server-side from the user's memberships and any submitted list is
+ * ignored.
  *
  * <p>{@code payoutPreference} optionally fixes the per-mission payout choice at sign-up time (the
  * "Auszahlungsart" select in the sign-up modal). When {@code null}, the registered user's profile

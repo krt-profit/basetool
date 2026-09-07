@@ -111,19 +111,28 @@ leadership's, because the row carries no creator to bind a self-edit to.
   enumerates every `RequestMappingInfo` the dispatcher knows and issues each one without a token,
   with a `PENDING` bearer, and with a role-less bearer — plus `HEAD` for every `GET`, because a
   `GET`-scoped rule and `String.equals` verb matching are how REQ-SEC-032 leaked once. A path added
-  next month is covered on the day it is added. `permitAllIsDeclaredOnlyOnTheThreePublicEndpoints`
-  refuses a fourth `permitAll()`; `OpenApiAnonymousOperationsTest` refuses a third `security: []`.
+  next month is covered on the day it is added. `permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`
+  refuses a fifth `permitAll()`; `OpenApiAnonymousOperationsTest` refuses a third `security: []`.
+  The fourth is `/error`, which the rule found on 2026-09-07 once the read/write rules learned to
+  select `@RequestMapping` alongside the verb-specific spellings — a public read whose publicness
+  had only ever been stated in the URL matrix.
 - **The roster sync had to be fixed first.** It now reads the realm's default-role composite, and a
   run in which the realm matches *none* of the app's roles aborts rather than writing a role-strip
-  for every account. A single account resolving to no role is still written through — removing
-  someone's roles in Keycloak still removes their access.
+  for every account. A single account resolving to no role is still written through.
+  **Corrected 2026-09-07:** this bullet used to end "removing someone's roles in Keycloak still
+  removes their access". It does not — `default-roles-<realm>` is assigned to every account Keycloak
+  creates and is not removed when an admin clears the other mappings, so the composite fold-in this
+  very bullet describes credits `KRT Member` back on the next run. **Offboarding is disabling or
+  deleting the account** (owner decision), and the enforcement is the IdP's own: neither account is
+  issued a token. See `REQ-SEC-053`.
 - **No edge paste is needed.** The vhost allow-list keeps admitting the same paths; what changed is
   that the backend now refuses the callers behind them. The runbook says so explicitly, so nobody
   pastes.
 - **Rollback after promotion is a forward fix.** `V239` drops a column and deletes rows, so a
   reverted image validates its schema against a missing column and fails to boot. The migration logs
-  the affected user ids at INFO before deleting — identifiers, not identities — so the assignments
-  can be restored.
+  the affected user ids at WARNING before deleting — identifiers, not identities — so the
+  assignments can be restored. `WARNING` rather than `INFO` because PostgreSQL never writes `INFO`
+  to the server log, which is the log the recipe tells the reader to recover them from.
 - **Members lose nothing.** The mission list, detail, join, check-in, payout preference, crew board,
   Ablauf, Ziele, Funk and the finance ledger are unchanged; only the caller set shrinks. The
   `isInternal = false` escape keeps cross-Staffel visibility, and its wording changes from

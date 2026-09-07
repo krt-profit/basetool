@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -269,10 +271,20 @@ public class MissionPeerRedactor {
    * MissionParticipantDto.orgUnits} anyway. Recorded here so the next reader meets the difference
    * as a known one instead of assuming the two are interchangeable.
    *
-   * @param dto the user DTO
-   * @return a redacted copy safe for a member below Logistician
+   * @param dto the user DTO, or {@code null}
+   * @return a redacted copy safe for a member below Logistician, or {@code null} for a {@code null}
+   *     input
    */
-  public UserDto cleanupUserForPeer(UserDto dto) {
+  @Contract("null -> null; !null -> !null")
+  public UserDto cleanupUserForPeer(@Nullable UserDto dto) {
+    // Null in, null out - the same contract UserDtoRedaction.toPeerShape carries, and the reason
+    // this guard exists rather than relying on every caller. That method's Javadoc now names this
+    // one as its sibling, so a developer who reaches for the mission-surface twin on the strength
+    // of that cross-reference and hands it a nullable UserDto would otherwise get a 500. Every
+    // current caller already guards; the guard is for the next one.
+    if (dto == null) {
+      return null;
+    }
     return new UserDto(
         dto.id(),
         dto.username(),

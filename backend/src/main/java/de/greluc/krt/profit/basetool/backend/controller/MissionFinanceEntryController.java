@@ -221,11 +221,9 @@ public class MissionFinanceEntryController {
    * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
    * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
    * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the nested user is stripped via {@link MissionPeerRedactor#cleanupUserForPeer} while
-   * the participant's non-sensitive fields (org units, job types, comment, times, payout
-   * preference) are kept. Mirrors {@link MissionPeerRedactor#cleanupParticipantForPeer}, which is
-   * now field-for-field the same pass: the one field that used to differ was the guest edit token,
-   * and V239 deleted the column behind it (ADR-0159).
+   * otherwise the participant goes through {@link MissionPeerRedactor#cleanupParticipantForPeer}
+   * itself — the same pass the mission surface applies, which since V239 deleted the guest edit
+   * token is field-for-field what this method used to spell out on its own (ADR-0159).
    *
    * @param dto the finance-entry DTO straight from the service
    * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
@@ -236,19 +234,13 @@ public class MissionFinanceEntryController {
     if (participant == null || participant.user() == null) {
       return dto;
     }
-    MissionParticipantDto redacted =
-        new MissionParticipantDto(
-            participant.id(),
-            missionPeerRedactor.cleanupUserForPeer(participant.user()),
-            participant.guestName(),
-            participant.orgUnits(),
-            participant.desiredMissionJobType(),
-            participant.plannedMissionJobType(),
-            participant.comment(),
-            participant.startTime(),
-            participant.endTime(),
-            participant.payoutPreference(),
-            participant.version());
+    // Delegated, not repeated. The explicit full-field reconstruction is the redactor's whole
+    // safety net: adding a field to MissionParticipantDto is a compile error until somebody decides
+    // whether a peer may see it. A second copy of that reconstruction produces TWO compile errors
+    // for one decision, and answering only the one in MissionPeerRedactor - the file that carries
+    // the class comment explaining why pass-through is the dangerous default - would leak the new
+    // field through every finance-ledger read and create. One copy, one decision.
+    MissionParticipantDto redacted = missionPeerRedactor.cleanupParticipantForPeer(participant);
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());
   }

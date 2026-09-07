@@ -151,8 +151,11 @@ public class AuthHelperService {
    * <p>Kept as a distinct question from {@code isAuthenticated()} even though the two now agree on
    * nearly every caller. Since ADR-0159 an account that maps to no application role is refused with
    * {@code 403 NO_ROLE} before a handler runs, so the gap between "authenticated" and "member" has
-   * shrunk to the PENDING/REJECTED registration and to whatever authority set a future integration
-   * introduces. Membership is the honest predicate for the questions that ask it — the mission
+   * shrunk to two cohorts — neither of them hypothetical. One is the PENDING/REJECTED registration.
+   * The other is the ingest gateway (ADR-0129): {@code CustomJwtGrantedAuthoritiesConverter}
+   * short-circuits it to {@code ROLE_INGEST_GATEWAY} alone, ahead of {@code assembleFor}, so it
+   * arrives authenticated, with a non-empty authority set, and this method answers {@code false}
+   * for it. Membership is the honest predicate for the questions that ask it — the mission
    * description (REQ-SEC-041), the live-sync rooms — and collapsing it into authentication would
    * make each of those depend on a refusal happening earlier in the chain.
    *

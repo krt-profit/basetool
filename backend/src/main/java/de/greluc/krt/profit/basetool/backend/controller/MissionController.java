@@ -159,22 +159,19 @@ public class MissionController {
             sort,
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
-    Page<Mission> pageResult;
-    {
-      // Every caller MUST go through searchMissions so the org-unit scope (own Staffel OR
-      // is_internal=false organisation-wide) is applied — getAllMissions would call
-      // missionRepository.findAll() unfiltered and leak internal missions of other squadrons to
-      // every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
-      pageResult =
-          missionService.searchMissions(
-              null,
-              null,
-              null,
-              List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
-              null,
-              null,
-              pageable);
-    }
+    // Every caller MUST go through searchMissions so the org-unit scope (own Staffel OR
+    // is_internal=false organisation-wide) is applied — getAllMissions would call
+    // missionRepository.findAll() unfiltered and leak internal missions of other squadrons to
+    // every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
+    Page<Mission> pageResult =
+        missionService.searchMissions(
+            null,
+            null,
+            null,
+            List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"),
+            null,
+            null,
+            pageable);
     return PageResponse.of(withRegisteredCounts(pageResult));
   }
 
@@ -251,7 +248,9 @@ public class MissionController {
    */
   @GetMapping("/{id}")
   @Operation(summary = "Get mission by ID")
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize(
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
     var mission = missionService.getMissionById(id);
@@ -494,7 +493,9 @@ public class MissionController {
   // a caller with no JWT reaches the handler and NPEs in `getUserIdFromJwt`.
   // `canSeeMission` enforces MULTI_SQUADRON_PLAN.md §1: members of another squadron may join
   // only non-internal missions, own-squadron members + admins may join anything.
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize(
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @ownerScopeService.canSeeMission(#id)")
   public MissionDto joinMission(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
@@ -729,7 +730,6 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO, redacted via {@link
    *     MissionPeerRedactor#cleanupMissionForPeer} for a caller below Logistician (REQ-SEC-007)
    * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
@@ -737,7 +737,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
@@ -753,7 +754,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt,
       Authentication authentication) {
     MissionDto dto =
         missionMapper.toDto(
@@ -789,7 +789,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-in")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
@@ -825,7 +826,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PostMapping("/{id}/participants/{participantId}/check-out")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
@@ -866,7 +868,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @PutMapping("/{id}/participants/{participantId}/payout-preference")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
@@ -932,7 +935,8 @@ public class MissionController {
   @Deprecated(forRemoval = true)
   @DeleteMapping("/{id}/participants/{participantId}")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
       sunset = SLIM_DEPRECATION_SUNSET,
@@ -975,7 +979,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param request add-participant payload (userId XOR guestName + comment + squadron)
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO
    */
   @PostMapping("/{id}/participants/add")
@@ -1004,19 +1007,25 @@ public class MissionController {
   // missions; internal missions of a foreign squadron must reject sign-ups. `canSeeMission`
   // returns true for own-squadron, admin, and non-internal-anywhere — exactly the matrix we need.
   // The isAuthenticated() half is REQ-SEC-052's: the URL used to be permitAll.
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize(
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @ownerScopeService.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt,
       Authentication authentication) {
     UUID finalUserId = request.userId();
     String finalGuestName = request.guestName();
 
-    if (jwt != null
-        && finalUserId == null
-        && (finalGuestName == null || finalGuestName.isBlank())) {
-      finalUserId = userService.getUserIdFromJwt(jwt);
+    // The caller resolved ONCE, through the seam that answers alike for a bearer and for the
+    // token-less acting-member identity (ADR-0129). It used to be `jwt != null` here and
+    // unconditioned in the self-vs-manager check below, so the two adjacent blocks disagreed about
+    // what a null JWT means: for the gateway's identity an empty body left both the id and the
+    // name null and the service answered 400, on a request that names nobody but the caller.
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+
+    if (finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
+      finalUserId = callerId;
     }
 
     // Resolve free-text participant name to an existing registered user (case-insensitive,
@@ -1049,7 +1058,6 @@ public class MissionController {
     // entirely and let it name anyone. Fail closed instead: no resolvable caller id means the
     // participant is somebody else.
     if (finalUserId != null) {
-      UUID callerId = jwt != null ? userService.getUserIdFromJwt(jwt) : null;
       if ((callerId == null || !finalUserId.equals(callerId))
           && !missionSecurityService.canManageMission(id, authentication)) {
         throw new AccessDeniedException(
@@ -1913,12 +1921,12 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request participant payload (carries the expected participant version)
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the updated participant DTO
    */
   @PutMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @Operation(
       summary = "Update a participant (slim response)",
@@ -1927,7 +1935,6 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt,
       Authentication authentication) {
     var mission =
         missionService.updateParticipantAttributes(
@@ -1965,7 +1972,8 @@ public class MissionController {
    */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @Operation(
       summary = "Check in a participant (slim response)",
@@ -1994,7 +2002,8 @@ public class MissionController {
    */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @Operation(
       summary = "Check out a participant (slim response)",
@@ -2024,7 +2033,8 @@ public class MissionController {
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @Operation(
       summary = "Update payout preference for a participant (slim response)",
@@ -2051,7 +2061,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param request add-participant payload (userId XOR guestName + meta)
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @param authentication current Spring Security authentication
    * @return the updated participant list
    */
@@ -2067,20 +2076,24 @@ public class MissionController {
   // MULTI_SQUADRON_PLAN.md §1: same gate as the legacy `/participants/add` endpoint — only
   // non-internal missions accept cross-staffel sign-ups. Internal missions of a foreign squadron
   // are refused here, not at the URL matrix.
-  @PreAuthorize("isAuthenticated() and @ownerScopeService.canSeeMission(#id)")
+  @PreAuthorize(
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @ownerScopeService.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
       @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
-      @AuthenticationPrincipal Jwt jwt,
       Authentication authentication) {
     UUID finalUserId = request.userId();
     String finalGuestName = request.guestName();
 
-    // Default self-enroll when the caller submits an empty form.
-    if (jwt != null
-        && finalUserId == null
-        && (finalGuestName == null || finalGuestName.isBlank())) {
-      finalUserId = userService.getUserIdFromJwt(jwt);
+    // Default self-enroll when the caller submits an empty form. The caller is resolved once,
+    // through the seam that answers alike for a bearer and for the token-less acting-member
+    // identity (ADR-0129) - see addParticipantPublic for why the two adjacent blocks must not
+    // disagree about what a null JWT means.
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+
+    if (finalUserId == null && (finalGuestName == null || finalGuestName.isBlank())) {
+      finalUserId = callerId;
     }
 
     // Resolve free-text names against registered users (case-insensitive, exact match on username
@@ -2101,7 +2114,6 @@ public class MissionController {
     // stays permitted. Not conditioned on `jwt != null` — see addParticipantPublic for why the
     // token-less acting-member identity must fail closed here rather than skip the check.
     if (finalUserId != null) {
-      UUID callerId = jwt != null ? userService.getUserIdFromJwt(jwt) : null;
       if ((callerId == null || !finalUserId.equals(callerId))
           && !missionSecurityService.canManageMission(id, authentication)) {
         throw new AccessDeniedException(
@@ -2140,7 +2152,8 @@ public class MissionController {
    */
   @DeleteMapping("/{id}/participants/{participantId}/slim")
   @PreAuthorize(
-      "isAuthenticated() and @missionSecurityService.canAccessParticipant(#id, #participantId,"
+      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
+          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
           + " authentication)")
   @Operation(
       summary = "Remove a participant (slim response)",

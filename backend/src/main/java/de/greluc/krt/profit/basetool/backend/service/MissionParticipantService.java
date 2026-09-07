@@ -130,9 +130,11 @@ public class MissionParticipantService {
    *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
    *       fallback).
    *   <li><b>External participant</b> (a person with no account, entered by the Einsatzleitung) —
-   *       the caller-submitted {@code orgUnitIds} are honoured after the authorization filter in
-   *       {@link #resolveSubmittedOrgUnits(java.util.List)}: the caller may label only org units
-   *       they can edit. There is no anonymous caller to consider any more (ADR-0159).
+   *       the caller-submitted {@code orgUnitIds} are honoured <b>as submitted</b>, resolved by
+   *       {@link #resolveSubmittedOrgUnits(java.util.List)}. That method applies <b>no</b>
+   *       per-org-unit authorization filter, deliberately: the affiliation is a roster label that
+   *       grants nothing, and the endpoint's own gate already decides who may record the
+   *       participant at all. See its Javadoc for why the former audit-H-3 filter was dropped.
    * </ul>
    *
    * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
@@ -811,12 +813,14 @@ public class MissionParticipantService {
   }
 
   /**
-   * Resolves a caller-submitted {@code orgUnitIds} list for a GUEST participant entry to the org
-   * units to persist. A guest's org-unit affiliation is mission-scoped roster metadata only: it is
-   * a label on a single mission's participant row, drives nothing but the roster badges (see {@code
-   * MissionMapper.orgUnitsToReferenceDtos}), grants no permissions and touches no user data. Anyone
-   * who may record the external participant at all — the endpoint's {@code canSeeMission} gate
-   * already governs that, cross-Staffel included — may therefore label it with any Staffel or SK:
+   * Resolves a caller-submitted {@code orgUnitIds} list for an <b>external</b> participant entry (a
+   * person with no account, ADR-0159 decision D4) to the org units to persist. That affiliation is
+   * mission-scoped roster metadata only: it is a label on a single mission's participant row,
+   * drives nothing but the roster badges (see {@code MissionMapper.orgUnitsToReferenceDtos}),
+   * grants no permissions and touches no user data. Anyone who may record or edit the external
+   * participant at all — the endpoint gates govern that, {@code canSeeMission} on the add paths and
+   * {@code canAccessParticipant} on the attribute edit, cross-Staffel included — may therefore
+   * label it with any Staffel or SK:
    *
    * <ul>
    *   <li>{@code null} / empty input → empty list (no affiliation).

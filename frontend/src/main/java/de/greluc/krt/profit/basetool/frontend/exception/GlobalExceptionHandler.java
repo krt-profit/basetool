@@ -327,15 +327,12 @@ public class GlobalExceptionHandler {
     // The `unauthenticated` model attribute stays: the backend's own UNAUTHENTICATED problem code
     // still sets it (see handleBackendServiceException), and the error view renders the sign-in CTA
     // off that — a session that expired mid-request is a real case and a different one.
-    String messageKey = "error.forbidden";
-    boolean anonymous = false;
-    String message = resolve(messageKey, locale, "Access denied.");
+    String message = resolve("error.forbidden", locale, "Access denied.");
     log.warn(
-        "Access denied for {} {} [exception={}, anonymous={}]: {}",
+        "Access denied for {} {} [exception={}]: {}",
         request.getMethod(),
         request.getRequestURI(),
         ex.getClass().getSimpleName(),
-        anonymous,
         ex.getMessage());
     if (wantsJson(request)) {
       Map<String, Object> body = new LinkedHashMap<>();
@@ -343,7 +340,10 @@ public class GlobalExceptionHandler {
       body.put("status", 403);
       body.put("title", title);
       body.put("message", message);
-      body.put("unauthenticated", anonymous);
+      // Always false on THIS path - see above. The attribute itself stays because
+      // handleBackendServiceException sets it true for the backend's own
+      // UNAUTHENTICATED code, and the error view renders the sign-in CTA off it.
+      body.put("unauthenticated", false);
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
           .contentType(MediaType.APPLICATION_JSON)
           .body(body);
@@ -351,7 +351,7 @@ public class GlobalExceptionHandler {
     model.addAttribute("error", title);
     model.addAttribute("message", message);
     model.addAttribute("status", "403");
-    model.addAttribute("unauthenticated", anonymous);
+    model.addAttribute("unauthenticated", false);
     return "error/error";
   }
 

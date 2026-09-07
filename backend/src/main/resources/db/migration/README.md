@@ -168,7 +168,7 @@ Rules:
     mint, rotate or check it, and the whole point of the change is that the capability no longer
     exists. The rule's own reason — room to roll the app back — is what the file's header states
     is being given up, and it names the forward fix (re-add nullable, let `DataInitializer`
-    re-seed the role, replay the assignments from the migration's INFO line) rather than a
+    re-seed the role, replay the assignments from the migration's WARNING line) rather than a
     backward one. **This is the shape of exception the rule admits: a column whose *content* is
     the risk, approved by the repository owner in the plan, with the rollback written down.** It
     is not a precedent for dropping ordinary data a release early.

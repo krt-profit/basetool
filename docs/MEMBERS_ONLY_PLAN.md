@@ -9,8 +9,10 @@
 > (§11); the thirteen decisions were taken by the owner on 2026-09-05 (§3). Two things were decided
 > during implementation rather than in §3 and are recorded here because the plan does not say them:
 > the roster sync reads the `default-roles-iri` composite and aborts only on a **total** match
-> failure (a single role-less account is written through, so a leaver loses access — the owner chose
-> this over the plan's literal "never write an empty set"), and `MissionPeerRedactor` forwards the
+> failure (a single role-less account is written through — the owner chose this over the plan's
+> literal "never write an empty set"; the rider that a leaver therefore loses access was corrected
+> on 2026-09-07, see REQ-SEC-053: the default-role composite credits `KRT Member` back, and
+> offboarding is disabling the account, not stripping its roles), and `MissionPeerRedactor` forwards the
 > caller's own `canEdit` / `canManageManagers` flags, which the widened peer tier would otherwise
 > have taken away from a MISSION_MANAGER.
 >
@@ -221,13 +223,13 @@ the same commit on 2026-09-05. Line numbers are as of that commit.
 
 ### 4.3 Backend — data model
 
-|                                                                                            Item                                                                                            |                                                                                                                     Disposition                                                                                                                     |
-|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MissionParticipant.guestEditTokenHash` (`:143–145`), `guestEditToken` (`:156`), `MissionParticipantDto.guestEditToken` (`:51`), `V177` column                                             | `V239` drops the column in the same PR (D10 as decided); the mapping, the DTO field and the token code go with it — a revert after promotion would boot against a missing column (`ddl-auto = validate`), see §10                                   |
-| `MissionParticipant.guestName`, `Mission.partyLeadGuestName`, `OperationPayoutStatus.participantKey = guest_<name>`, `UpdateParticipantRequest.guestName`, `SetPartyLeadRequest.guestName` | keep (D4)                                                                                                                                                                                                                                           |
-| `AddParticipantPublicRequest` (`guestName`, `comment`, `orgUnitIds`)                                                                                                                       | renamed `AddExternalParticipantRequest` — **not** `AddParticipantRequest`, which already exists (`@NotNull UUID userId`, `MissionController:920`)                                                                                                   |
-| `role` row `GUEST` (seeded by `DataInitializer:87`, code stamped by `V73`) and its `user_roles` rows                                                                                       | `V239__drop_guest_role.sql`: delete `user_roles` / `role_permission` rows for `GUEST`, then the role row, logging the affected user ids at INFO (identifiers, not identities). A user left with no role is refused (D5) until an admin assigns one. |
-| `Mission.isInternal` and its indexes                                                                                                                                                       | unchanged (D8)                                                                                                                                                                                                                                      |
+|                                                                                            Item                                                                                            |                                                                                                                      Disposition                                                                                                                       |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MissionParticipant.guestEditTokenHash` (`:143–145`), `guestEditToken` (`:156`), `MissionParticipantDto.guestEditToken` (`:51`), `V177` column                                             | `V239` drops the column in the same PR (D10 as decided); the mapping, the DTO field and the token code go with it — a revert after promotion would boot against a missing column (`ddl-auto = validate`), see §10                                      |
+| `MissionParticipant.guestName`, `Mission.partyLeadGuestName`, `OperationPayoutStatus.participantKey = guest_<name>`, `UpdateParticipantRequest.guestName`, `SetPartyLeadRequest.guestName` | keep (D4)                                                                                                                                                                                                                                              |
+| `AddParticipantPublicRequest` (`guestName`, `comment`, `orgUnitIds`)                                                                                                                       | renamed `AddExternalParticipantRequest` — **not** `AddParticipantRequest`, which already exists (`@NotNull UUID userId`, `MissionController:920`)                                                                                                      |
+| `role` row `GUEST` (seeded by `DataInitializer:87`, code stamped by `V73`) and its `user_roles` rows                                                                                       | `V239__drop_guest_role.sql`: delete `user_roles` / `role_permission` rows for `GUEST`, then the role row, logging the affected user ids at WARNING (identifiers, not identities). A user left with no role is refused (D5) until an admin assigns one. |
+| `Mission.isInternal` and its indexes                                                                                                                                                       | unchanged (D8)                                                                                                                                                                                                                                         |
 
 ### 4.4 Frontend — what an unauthenticated visitor reaches today
 
@@ -698,8 +700,10 @@ outside, `curl -I https://profit-base.online/missions` → `302` into the OAuth2
 **Rollback.** Before promotion a revert of the PR is enough. After promotion it is not: `V239` has
 dropped `guest_edit_token_hash` and deleted the `GUEST` role and its `user_roles` rows, so a
 reverted image would validate its schema against a missing column and fail to boot. The rollback is
-a **forward fix**. The migration logs the affected user ids at INFO before deleting (identifiers,
-not identities) so the role assignments can be restored by hand.
+a **forward fix**. The migration logs the affected user ids at WARNING before deleting
+(identifiers, not identities) so the role assignments can be restored by hand. The level is
+deliberate: PostgreSQL never writes `INFO` to the server log, so at `INFO` the one artefact this
+recipe depends on would not be in the log it tells you to read.
 
 > [!important] Prepared as a recipe, not as a branch — decided 2026-09-06
 > The plan said "a ready-to-merge branch before the promotion". A branch would claim the next
@@ -727,7 +731,7 @@ not identities) so the role assignments can be restored by hand.
 >    with `Roles.GUEST` restored in `backend/…/support/Roles.java`. The empty permission set is the
 >    point: it is what the role always had.
 >
-> **The assignments are not restored by either.** They come from the `V239` INFO line
+> **The assignments are not restored by either.** They come from the `V239` WARNING line
 > (`V239: dropping GUEST assignments for user ids: …`), by hand, and only if anyone still needs
 > them — which after ADR-0159 is a question for the owner, not a mechanical step: those accounts
 > are better served by an administrator assigning `KRT Member`.
