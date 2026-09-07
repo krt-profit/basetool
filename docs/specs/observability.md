@@ -111,7 +111,9 @@ class then ate the rest. In the centralized log a stack frame
 `GuestEditTokenContextFilter.doFilterInternal(GuestEditTokenContextFilter.java:70)` arrived as
 `GuestEditToken***(GuestEditToken***:70)` and `…intercept.AuthorizationFilter.doFilter` as
 `Authorization***` — the frames an incident is triaged from, destroyed by the masker rather than by
-the failure. The separator is now required. Nothing is unmasked by this: a secret is logged as
+the failure. (That class was deleted by ADR-0159; the incident is recorded with the name it
+happened under, while the code's own example and its test now use
+`BearerTokenAuthenticationFilter`, which still exists and still carries the keyword.) The separator is now required. Nothing is unmasked by this: a secret is logged as
 `token=x`, `token: x`, `token x` or `Bearer x`, never as `tokenx`; a keyword-suffixed field name
 (`guestEditToken=…`) still masks, because the narrowing is about the separator, not about where the
 keyword sits. All three module copies of the masker carry the change.

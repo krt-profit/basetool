@@ -13,6 +13,17 @@
 > this over the plan's literal "never write an empty set"), and `MissionPeerRedactor` forwards the
 > caller's own `canEdit` / `canManageManagers` flags, which the widened peer tier would otherwise
 > have taken away from a MISSION_MANAGER.
+>
+> **Two more were decided after the security reviews of 2026-09-06, and one of them contradicts
+> §7.** §7 says the mission endpoints are "unchanged for a member; only the caller set shrinks".
+> That is no longer true of the **write** endpoints: twenty-three of them returned the unredacted
+> aggregate to a member below Logistician, which `canManageMission` admits because it falls through
+> to owner-or-manager without consulting a role. They run the same peer pass as the reads now
+> (REQ-SEC-007). It is a tightening, not a functional change — the web UI requests those responses
+> with `Void.class` and the read path already withheld the same fields — but §7 as written would
+> mislead the next reader, so it is corrected here rather than left standing. The second: the
+> mission's `owner` and `managers` travel with those capability flags, because withholding the list
+> from a caller the same response says may edit it produced a management panel with nothing in it.
 > **Epic:** tbd · **Spec:** [`docs/specs/security-and-access.md`](specs/security-and-access.md)
 > (REQ-SEC-052/053, new) · **ADR:** 0159 (new; supersedes ADR-0034)
 
@@ -333,7 +344,10 @@ sends its bearer on every call whenever a session exists (`MandatoryHeadersInter
 session is restored later (`UpdateGate.kt:150–156`, `AuthSession.kt:61–81`).
 `basetool-sc-extractor` makes no anonymous backend call and needs nothing. The design-system
 submodule carries stale mock copy ("Create an order as guest") in `_ds_bundle.js:4485–4491` — a
-note for that repository, not this plan.
+note for that repository, not this plan: raised as
+[krt-profit/design-system#3](https://github.com/krt-profit/design-system/issues/3) on 2026-09-06.
+Deliberately an issue rather than a commit in the submodule: changing it would move the pointer this
+repository pins, which is a change to the Basetool for a mock nothing here renders.
 
 ## 5. Work packages
 
@@ -564,7 +578,8 @@ Meta/vaultcheck.py"` green before each commit. The three already-wrong facts wer
 
 `basetool-android`: the `NO_ROLE` mapping (D13, shipped first) and the documents in §4.7; the
 regenerated contract's descriptions land with the next contract sync. `basetool-sc-extractor`:
-nothing. Design system: a note about the stale mock copy.
+nothing. Design system: a note about the stale mock copy —
+[krt-profit/design-system#3](https://github.com/krt-profit/design-system/issues/3).
 
 ## 6. Test strategy — "nobody without a login reads anything"
 
@@ -649,6 +664,9 @@ to the new statuses.
 - The mission list, search, detail, join, check-in/out, payout preference, leave, crew board,
   Ablauf, Ziele, Funk, finance ledger and the seven-day grid are unchanged for a member; only the
   caller set shrinks. The `isInternal = false` escape keeps cross-Staffel visibility.
+  **Corrected 2026-09-06:** the mission *write* endpoints are not unchanged — they now apply the
+  same REQ-SEC-007 peer pass the reads always did, so a member below Logistician no longer reads
+  another participant's e-mail, roles or join date back out of a `PATCH` response. See the header.
 - The catalogue pickers (`/catalog/**`, `CachedCatalog`) are unchanged in payload; they now ride
   the bearer client, which every member page already holds.
 - The Android app is unaffected in function for every account that holds a role: it sends a bearer

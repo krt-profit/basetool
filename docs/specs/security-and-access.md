@@ -819,14 +819,14 @@ mission sign-up flow worked without an account. A **guest** (unlinked) participa
 mutable by a caller who merely knows its id — the anonymous-readable roster exposed participant ids,
 so a bare id was not an authorization secret.
 
-- On creation of a guest sign-up the backend mints an unguessable 256-bit **capability token**,
-  persists only its SHA-256 hash on `mission_participant.guest_edit_token_hash`, and returns the
-  plaintext **once** in the create response (`MissionParticipantDto.guestEditToken`).
-- Every subsequent guest-row mutate/delete is authorised by
-  `MissionSecurityService.canAccessParticipant` iff the caller (a) presents a token (header
-  `X-Guest-Edit-Token`) that hashes to the stored hash, OR (b) holds a mission-management role in scope
-  (`canManageMission`). A guest row with no stored hash (pre-V177) is editable only via (b) — the gate
-  **fails closed**.
+- On creation of a guest sign-up the backend **minted** an unguessable 256-bit **capability
+  token**, persisted only its SHA-256 hash on `mission_participant.guest_edit_token_hash`, and
+  returned the plaintext **once** in the create response (`MissionParticipantDto.guestEditToken`).
+  `V239` dropped the column; the DTO field is gone from both modules.
+- Every subsequent guest-row mutate/delete **was** authorised by
+  `MissionSecurityService.canAccessParticipant` iff the caller (a) presented a token (header
+  `X-Guest-Edit-Token`) that hashed to the stored hash, OR (b) held a mission-management role in
+  scope (`canManageMission`). Only branch (b) survives, and it is now unconditional.
 - **The token proves *which row*, never *whether the mission is still open*.** Branch (a) MUST
   additionally require `OwnerScopeService.canSeeMission(missionId)`. Without it the capability
   outlived the surface that granted it: a guest who signed up while the mission was public kept
@@ -850,8 +850,8 @@ so a bare id was not an authorization secret.
   callsign was the loophole around both — and because the payout key is `"guest_" + guestName`, the
   rename also merged two guest rows into one payout bucket and orphaned an already-settled
   `OperationPayoutStatus`, flipping a "Bezahlt" back to unpaid.
-- The frontend stores the token client-side (localStorage, keyed by participant id) and replays it via
-  the `X-Guest-Edit-Token` header, relayed browser→frontend→backend by the
+- The frontend **stored** the token client-side (localStorage, keyed by participant id) and
+  **replayed** it via the `X-Guest-Edit-Token` header, relayed browser→frontend→backend by the
   `GuestEditTokenContext`/`GuestEditTokenContextFilter`/`GuestEditTokenRelayFilter` trio (Reactor
   context propagation, mirroring the client-IP relay). The token is intentionally lost when the user
   clears site data — an anonymous caller has no durable server-verifiable identity, so a cleared token
@@ -859,16 +859,23 @@ so a bare id was not an authorization secret.
 
 **Acceptance**
 
-- [x] An anonymous caller without the token is denied (403) on a guest-row mutate/delete/payout.
-- [x] The anonymous creator presenting the minted token may edit/withdraw their own guest row.
-- [x] A mission manager / officer / admin in scope may still manage guest rows without a token.
-- [x] Only the create response ever carries the plaintext token; reads/edits return `null`.
+**Retired with the mechanism (ADR-0159, 2026-09-06).** The four criteria below all describe the
+capability token, and none of them can be evaluated any more: there is no anonymous creator to mint
+one for, `V239` dropped the column that stored its hash, and `MissionParticipantDto.guestEditToken`
+is gone from both modules. They are struck rather than deleted so the requirement still reads as a
+record of what was once true and why.
 
-**Enforced by:** `MissionSecurityServiceTest` (`canAccessParticipant_GuestWithValidToken_*`,
-`…_GuestWrongTokenNotManager_ShouldReturnFalse`, `…_GuestNoTokenButManager_*`),
-`GuestParticipantTokenServiceTest`, and the MockMvc integration tests `MissionGuestAccessTest`
-(without-token-forbidden + with-token-allowed) and `MissionAccessControlTest`. **Migration:** V177.
-**Security audit:** finding M1.
+- [x] ~~An anonymous caller without the token is denied (403) on a guest-row mutate/delete/payout.~~
+- [x] ~~The anonymous creator presenting the minted token may edit/withdraw their own guest row.~~
+- [x] ~~Only the create response ever carries the plaintext token; reads/edits return `null`.~~
+- [x] A mission manager / officer / admin in scope manages participant rows — the branch that
+  survived, and the only one there is now. It is what an external participant's row hangs off
+  (REQ-SEC-052, D4).
+
+**Enforced by:** `MissionSecurityServiceTest` (the surviving `canAccessParticipant` cases) and
+`MissionAccessControlTest`. `GuestParticipantTokenServiceTest` and `MissionGuestAccessTest` went
+with the service and the flow they tested; the token cases inside `MissionSecurityServiceTest` went
+with the token. **Migration:** V177, undone by `V239`. **Security audit:** finding M1.
 
 ### REQ-SEC-019 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
 
