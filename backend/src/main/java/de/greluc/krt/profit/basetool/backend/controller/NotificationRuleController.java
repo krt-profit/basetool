@@ -53,7 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_ADMIN)
 @Tag(name = "Notification Rules", description = "Admin-managed notification recipient rules.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class NotificationRuleController {
 
   private final NotificationRuleService service;

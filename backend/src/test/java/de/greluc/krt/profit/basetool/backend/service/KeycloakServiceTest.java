@@ -314,12 +314,16 @@ class KeycloakServiceTest {
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
       // token, single short roster page (stop), the realm-role listing (ADMIN), one ADMIN member
-      // page (A, short → stop), then federated identities A (empty, A is not pre-known-linked).
+      // page (A, short → stop), the default-role composite read, then federated identities A
+      // (empty, A is not pre-known-linked).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
+      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
+      server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
@@ -371,12 +375,16 @@ class KeycloakServiceTest {
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
       // token, roster (A), realm-role listing names the role "admin" (lower case), member page for
-      // /roles/admin/users lists A, federated identities A (empty).
+      // /roles/admin/users lists A, the default-role composite read, federated identities A
+      // (empty).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"admin\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
+      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
+      server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
@@ -406,8 +414,8 @@ class KeycloakServiceTest {
    * role's members must SKIP the whole run (empty result → the scheduler treats it as "skip")
    * rather than persisting a degraded, role-stripped set. Otherwise a 5xx on {@code
    * /roles/ADMIN/users} would silently strip {@code ADMIN} from every holder — creating a brand-new
-   * admin {@code PENDING} instead of {@code ACTIVE} and mass-downgrading existing admins to the
-   * {@code Guest} fallback.
+   * admin {@code PENDING} instead of {@code ACTIVE} and mass-downgrading existing admins to no role
+   * at all — which, since REQ-SEC-053, is an outright refusal rather than a reduced view.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -472,12 +480,16 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), realm-role listing (ADMIN), a 404 on the member query, then federated
-      // identities A (empty — A is not pre-known-linked, so the read still happens).
+      // token, roster (A), realm-role listing (ADMIN), a 404 on the member query, the default-role
+      // composite read, then federated identities A (empty — A is not pre-known-linked, so the
+      // read still happens).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
+      server.enqueue(errorResponse(404));
+      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
+      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
       server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
@@ -822,15 +834,18 @@ class KeycloakServiceTest {
 
   /**
    * The role index must state how many of the app's roles the realm still knows — and must NOT
-   * escalate merely because one of them found no counterpart. The local catalog deliberately
-   * contains local-only roles (the seeded {@code Guest} fallback), so a per-role "missing from the
-   * realm" warning would fire on every single run and be tuned out long before a real rename
-   * happened.
+   * escalate merely because one of them found no counterpart. The local catalog can hold roles the
+   * realm does not (this case uses {@code Bereichsleitung}, which is granted through the OrgUnit
+   * membership rather than the realm), so a per-role "missing from the realm" warning would fire on
+   * every single run and be tuned out long before a real rename happened.
+   *
+   * <p>The case used to be written around the seeded {@code Guest} fallback, which {@code V239}
+   * deleted (ADR-0159). The behaviour under test is unchanged; only the example role is.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
   @Test
-  void fetchUsers_logsTheRoleIntersectionAtInfo_andDoesNotWarnAboutTheLocalOnlyGuestRole()
+  void fetchUsers_logsTheRoleIntersectionAtInfo_andDoesNotWarnAboutALocalOnlyRole()
       throws Exception {
     when(sslBundles.getBundle("keycloak-trust"))
         .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
@@ -844,9 +859,12 @@ class KeycloakServiceTest {
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
-      // The realm knows ADMIN but not the app's local-only Guest fallback.
+      // The realm knows ADMIN but not the app's local-only role.
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      // REQ-SEC-053: the default-role composite read. Empty here — its own folding is covered by
+      // fetchUsers_foldsInWhatTheDefaultRoleCompositeGrants().
+      server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
@@ -856,7 +874,7 @@ class KeycloakServiceTest {
       appender.start();
       logger.addAppender(appender);
       try {
-        service.fetchUsers(List.of("ADMIN", "Guest"), Set.of());
+        service.fetchUsers(List.of("ADMIN", "Bereichsleitung"), Set.of());
       } finally {
         logger.detachAppender(appender);
       }
@@ -873,6 +891,126 @@ class KeycloakServiceTest {
       assertTrue(
           appender.list.stream().noneMatch(e -> e.getLevel() == Level.WARN),
           "an unmatched local-only role must not warn — it would fire on every run");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * REQ-SEC-053 / the roster-sync precondition: {@code KRT Member} is granted through the realm's
+   * {@code default-roles-iri} composite, and a role held only through a composite appears in
+   * <em>neither</em> the per-user nor the role-indexed view. Until ADR-0159 that cost nothing —
+   * such an account came back empty, was mapped onto the authority-less {@code Guest} fallback and
+   * healed at its owner's next web login. With a role-less account refused outright, the same run
+   * would lock every composite-only member out overnight, so the composite's grants are folded in.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_foldsInWhatTheDefaultRoleCompositeGrants() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), realm-role listing (ADMIN + KRT Member), no direct ADMIN member, no
+      // direct KRT Member member, the composite granting KRT Member, its member page listing A,
+      // then federated identities A.
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"},{\"name\":\"KRT Member\"}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[{\"name\":\"KRT Member\"}]"));
+      server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
+      server.enqueue(jsonResponse("[]"));
+      server.enqueue(jsonResponse("[]"));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN", "KRT Member"), Set.of());
+
+      assertEquals(1, users.size());
+      assertEquals(
+          Set.of("KRT Member"),
+          users.get(0).roles(),
+          "a member who holds the role only through the default-role composite must resolve");
+
+      server.takeRequest(); // token
+      server.takeRequest(); // roster page
+      server.takeRequest(); // realm-role listing
+      server.takeRequest(); // direct ADMIN members
+      server.takeRequest(); // direct KRT Member members
+      RecordedRequest composites = server.takeRequest();
+      assertTrue(
+          composites.getPath().contains("/roles/default-roles-iri/composites/realm"),
+          "the composite is read on the realm's own default role: " + composites.getPath());
+      RecordedRequest compositeMembers = server.takeRequest();
+      assertTrue(
+          compositeMembers.getPath().contains("/roles/default-roles-iri/users"),
+          "its members are everyone the composite grants to: " + compositeMembers.getPath());
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * REQ-SEC-053: a run in which the realm matches <em>none</em> of the app's roles is a realm-side
+   * rename or a broken query, never a legitimate state — and writing it would strip every account
+   * of every role and refuse the whole organisation with {@code NO_ROLE} at once. It aborts, so the
+   * scheduler skips the run. Deliberately narrow: a <em>single</em> account resolving to no role is
+   * a leaver and is still written through, which {@code
+   * fetchUsers_roleMemberFetchNotFound_keepsRosterWithoutTheRole} pins.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void fetchUsers_realmMatchesNoAppRole_skipsTheRunRatherThanStrippingEveryone() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = new KeycloakSyncProperties();
+      properties.setEnabled(true);
+      properties.setAdminUrl(server.url("/").toString().replaceAll("/+$", ""));
+      properties.setRealm("iri");
+      properties.setClientId("client");
+      properties.setClientSecret("secret");
+      properties.setPageSize(100);
+
+      UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+      // token, roster (A), then a realm-role listing that names nothing the app maps — the shape a
+      // realm-wide rename produces.
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(
+          jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
+      server.enqueue(jsonResponse("[{\"name\":\"offline_access\"}]"));
+      server.enqueue(errorResponse(404));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      List<KeycloakUserDto> users = service.fetchUsers(List.of("ADMIN", "KRT Member"), Set.of());
+
+      assertTrue(
+          users.isEmpty(),
+          "an index that matched nothing must skip the run, not write a role-strip for everyone");
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).count(),
+          "the aborted run must be visible as a fetch failure, not as a quiet success");
     } finally {
       server.shutdown();
     }

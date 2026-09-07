@@ -90,6 +90,19 @@ import tools.jackson.databind.ObjectMapper;
  * role/authority. The order matters — Spring evaluates the matchers top-down. Method-level
  * {@code @PreAuthorize} on services adds fine-grained checks but never weakens the chain matcher.
  *
+ * <p><strong>Four paths answer without a token, and that list is the requirement</strong>
+ * (REQ-SEC-052, ADR-0159): {@code /error}, {@code /actuator/health(/**)}, {@code /internal/**} —
+ * machine-to-machine behind a constant-time shared-secret header, not an anonymous data path — and
+ * the two {@code GET}-scoped reads {@code /api/v1/terms/document} and {@code
+ * /api/v1/app/version-policy}. Everything else requires authentication at this layer <em>and</em> a
+ * method gate; a {@code HEAD} on either read falls to the catch-all and answers {@code 401},
+ * because the rules name the verb.
+ *
+ * <p>An authenticated caller is still not admitted by default. A token whose realm roles map to no
+ * application role is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before it reaches a handler,
+ * on the JWT path and on the ingest gateway's acting-member path alike. There is no role below
+ * member: the {@code GUEST} role was removed with {@code V239}.
+ *
  * <p>CSRF is enabled with the cookie token repository except in the {@code test} profile, where it
  * is disabled so MockMvc tests do not need to plumb the token through every call. API endpoints
  * that are exclusively JSON and bearer-token authenticated ({@code /api/v1/missions/**}, {@code
@@ -301,6 +314,27 @@ public class SecurityConfig {
   }
 
   /**
+   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
+   *
+   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
+   * separate instance on purpose: the two answer different questions and one member can be in both
+   * (a role-less account that has also not accepted the terms), so sharing a window would report
+   * them as one population.
+   *
+   * @param meterRegistry the registry the gauge is published to
+   * @return the window the role gate records refusals into
+   */
+  @Bean
+  public RefusedSubjectWindow noRoleRefusedSubjectWindow(MeterRegistry meterRegistry) {
+    RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
+    Gauge.builder(MetricNames.NO_ROLE_REFUSED_SUBJECTS, window, RefusedSubjectWindow::size)
+        .description("Distinct subjects the role gate refused with NO_ROLE in the last 15 min.")
+        .register(meterRegistry);
+    return window;
+  }
+
+  /**
    * The sliding window of distinct subjects the consent gate refused, published as the {@code
    * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
    *
@@ -345,6 +379,9 @@ public class SecurityConfig {
    * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
    * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
    *     basetool_http_error_total} (REQ-OBS-011)
+   * @param noRoleRefusedSubjectWindow the distinct-subject window {@code
+   *     PendingApprovalAccessFilter} records its {@code NO_ROLE} refusals into; a separate instance
+   *     from the consent one, because a member can be in both populations at once
    * @param clientAttribution bounds the {@code client_id} label of {@code
    *     basetool_api_client_requests_total} (A8, REQ-OBS-018) — the same mapping the audit trail's
    *     client column records (REQ-AUDIT-005)
@@ -363,6 +400,7 @@ public class SecurityConfig {
       MeterRegistry meterRegistry,
       TermsConsentCheck termsConsentCheck,
       RefusedSubjectWindow refusedSubjectWindow,
+      RefusedSubjectWindow noRoleRefusedSubjectWindow,
       IngestGatewayProperties ingestGatewayProperties,
       ActingMemberAuthorities actingMemberAuthorities,
       RateLimitProperties rateLimitProperties,
@@ -476,13 +514,30 @@ public class SecurityConfig {
             })
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/error", "/v3/api-docs/**")
+                // Spring's error dispatch. It carries no data of its own and must stay
+                // reachable, or a refusal cannot render its own problem body.
+                auth.requestMatchers("/error")
+                    .permitAll()
                     // Swagger UI has been removed from the project (springdoc -api starter, no
                     // -ui). Only the raw OpenAPI document is served at /v3/api-docs, and only in
                     // non-prod profiles: the prod profile sets springdoc.api-docs.enabled=false so
                     // this matcher resolves to a 404 there. The committed openapi.json remains the
                     // single source of API documentation.
-                    .permitAll()
+                    //
+                    // REQ-SEC-052: it is no longer permitAll. The document enumerates every path,
+                    // parameter and DTO field of the whole API — the most efficient description of
+                    // the attack surface the project can produce — and it was readable without a
+                    // token on any profile that serves it. Being a 404 in prod is a deployment
+                    // property, not an access rule, and this file is where the access rule belongs.
+                    //
+                    // Both spellings, because springdoc registers two handlers for one document:
+                    // /v3/api-docs and /v3/api-docs.yaml. `**` spans whole segments, so the pattern
+                    // that has stood here since the permitAll days never matched the YAML variant —
+                    // it fell through to the catch-all and was merely authenticated, which is not
+                    // what the line next to it claims. `*` matches within the segment and closes
+                    // it.
+                    .requestMatchers("/v3/api-docs*", "/v3/api-docs/**")
+                    .hasRole(Roles.ADMIN)
                     // Spring Boot Actuator health endpoint, used by Docker HEALTHCHECK and by
                     // docker-compose `depends_on: condition: service_healthy`. Other actuator
                     // endpoints stay behind authentication (the `anyRequest().authenticated()`
@@ -515,16 +570,6 @@ public class SecurityConfig {
                     // the controller enforces its own constant-time shared-secret header instead.
                     .requestMatchers("/internal/**")
                     .permitAll()
-                    // A6 / REQ-SEC-032: carved OUT of the catalog permitAll below, which it would
-                    // otherwise fall into via /api/v1/materials/**. The material x terminal price
-                    // matrix is the largest single response the API can produce — the frontend
-                    // page-walks it at size=100000 — so leaving it anonymous hands an
-                    // unauthenticated
-                    // caller the cheapest amplification lever on the whole surface. It is operating
-                    // data, not guest content: its only consumer is MaterialsPageController, which
-                    // carries @PreAuthorize("isAuthenticated()"), so requiring a token here costs
-                    // nothing. Ordering matters — Spring Security takes the FIRST matching rule, so
-                    // this must stay above the /api/v1/materials/** entry.
                     // ADR-0138 / REQ-SEC-028: the Terms-of-Use WORDING is anonymous, while
                     // /api/v1/terms/status and /acceptance below it stay authenticated. A document
                     // everyone must be able to read before agreeing to anything cannot require
@@ -546,138 +591,23 @@ public class SecurityConfig {
                     // stay ahead of any broader /api/v1/app rule and the authenticated catch-all.
                     .requestMatchers(HttpMethod.GET, "/api/v1/app/version-policy")
                     .permitAll()
-                    // Deliberately NOT method-scoped. A tightening placed above an all-verb
-                    // permitAll must itself be all-verb, or the rule underneath grants every verb
-                    // the tightening does not claim: with HttpMethod.GET here, a HEAD fell through
-                    // to the catalogue permitAll below, and Spring MVC answers HEAD from the
-                    // @GetMapping handler - so the query ran anonymously and the response's
-                    // Content-Length leaked back, on the two paths REQ-SEC-032 exists to close.
-                    // Both paths serve only GET, so all-verb authenticated() costs nothing here.
-                    .requestMatchers(
-                        "/api/v1/materials/matrix",
-                        // Same carve-out, same reason, and it was meant to land with the line
-                        // above: the per-material slice of that price matrix. Its only consumer is
-                        // the inventory page's "where can I sell this" suggestion, which is
-                        // authenticated, so a token costs nothing here either — while leaving it
-                        // anonymous publishes UEX trade prices per material to the whole internet
-                        // from the API vhost. The nightly edge-deny probe has asserted 401 for it
-                        // since the phase-3 paste and got 200: the expectation was right and the
-                        // carve-out was simply missing. Ordering matters — Spring Security takes
-                        // the FIRST matching rule, so both must stay above /api/v1/materials/**.
-                        "/api/v1/materials/*/terminals",
-                        // 2026-09-06: the same data through three more doors, found while the app's
-                        // Handel screens were being admitted at the edge (runbook phase W). Each
-                        // was
-                        // measured anonymously before it was changed: `prices-overview` answered
-                        // 200, `*/prices` answered 200, and `profit-calculation` answered 500 —
-                        // dispatched anonymously and crashing rather than refusing, which is not a
-                        // gate either.
-                        //
-                        // `MaterialPriceOverviewDto` carries `minPriceBuy`/`maxPriceSell`,
-                        // `MaterialPriceDto` carries `priceBuy`/`priceSell`/`scu*`/`terminalName`,
-                        // and the profit calculation is the route arithmetic over both. That is the
-                        // UEX trade data the two lines above exist to keep off the public vhost,
-                        // reachable by a different path — so it joins them rather than getting a
-                        // rule of its own.
-                        //
-                        // `GET /api/v1/materials/{id}` deliberately stays anonymous: MaterialDto is
-                        // catalogue only — name, quantity type, category, flags, no price — and
-                        // `/api/v1/materials/search` has published those same fields anonymously
-                        // since phase 2. Closing it would be a different change with a different
-                        // reason.
-                        "/api/v1/materials/prices-overview",
-                        "/api/v1/materials/profit-calculation",
-                        "/api/v1/materials/*/prices")
-                    .authenticated()
-                    .requestMatchers(
-                        "/api/v1/frequency-types", "/api/v1/frequency-types/**",
-                        "/api/v1/locations", "/api/v1/locations/**",
-                        "/api/v1/job-types", "/api/v1/job-types/**",
-                        "/api/v1/manufacturers", "/api/v1/manufacturers/**",
-                        "/api/v1/materials", "/api/v1/materials/**",
-                        "/api/v1/refining-methods", "/api/v1/refining-methods/**",
-                        "/api/v1/settings", "/api/v1/settings/**",
-                        "/api/v1/ship-types", "/api/v1/ship-types/**",
-                        "/api/v1/squadrons", "/api/v1/squadrons/**",
-                        "/api/v1/star-systems", "/api/v1/star-systems/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/missions/next")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/missions/search")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/missions/{id}")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/v1/missions", "/api/v1/missions/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/missions")
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.GET,
-                        "/api/v1/refinery-orders/mission/**",
-                        "/api/v1/system/**",
-                        "/api/v2/system/**")
-                    .authenticated()
-                    .requestMatchers(
-                        HttpMethod.POST,
-                        "/api/v1/missions/*/participants/add",
-                        "/api/v1/missions/*/participants/slim")
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.POST,
-                        "/api/v1/missions/*/participants/*/check-in",
-                        "/api/v1/missions/*/participants/*/check-out")
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.POST,
-                        "/api/v1/missions/*/participants/*/check-in/slim",
-                        "/api/v1/missions/*/participants/*/check-out/slim")
-                    .permitAll()
-                    // Both order creates require a login (ADR-0149). They were permitAll — the
-                    // public request form, which let an outsider ask the organisation for material
-                    // without an account and stamped the order onto the intake Spezialkommando
-                    // because it had no author. That form is gone: every write in this system is
-                    // attributable to a person, and this was the one that was not. Listed
-                    // explicitly rather than left to the authenticated catch-all so the change is
-                    // visible at the place that used to say the opposite.
-                    .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/items")
-                    .authenticated()
-                    // The item catalogue followed the anonymous item create and has no other
-                    // anonymous consumer, so it follows it out again.
-                    .requestMatchers(
-                        HttpMethod.GET,
-                        "/api/v1/orders/item-catalog",
-                        "/api/v1/orders/item-catalog/**")
-                    .authenticated()
-                    // The active Staffel/SK catalogue stays anonymous. Its stated reason was the
-                    // public order form (now gone, ADR-0149), but it is not the only one: it
-                    // mirrors the already-permitAll /api/v1/squadrons catalogue, carries no PII —
-                    // name + shorthand + kind + profit flag — and the anonymous mission sign-up
-                    // still renders org names. Closing it would be a second, unrelated change.
-                    .requestMatchers(HttpMethod.GET, "/api/v1/org-units/active")
-                    .permitAll()
-                    // Finance-entry creation is no longer anonymous: the method-level
-                    // @PreAuthorize on MissionFinanceEntryController#createFinanceEntry requires an
-                    // authenticated member (isMemberOrAbove), blocking anonymous AND role-less
-                    // GUEST
-                    // callers. The URL gate only has to stop being permitAll; the method gate is
-                    // the
-                    // source of truth for the member requirement.
-                    .requestMatchers(HttpMethod.POST, "/api/v1/finance-entries")
-                    .authenticated()
-                    .requestMatchers(
-                        HttpMethod.PUT,
-                        "/api/v1/missions/*/participants/*",
-                        "/api/v1/missions/*/participants/*/payout-preference")
-                    .permitAll()
-                    .requestMatchers(
-                        HttpMethod.PUT,
-                        "/api/v1/missions/*/participants/*/slim",
-                        "/api/v1/missions/*/participants/*/payout-preference/slim")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.DELETE, "/api/v1/missions/*/participants/*")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.DELETE, "/api/v1/missions/*/participants/*/slim")
-                    .permitAll()
+                    // Everything from here down is a TIGHTENING of the authenticated catch-all,
+                    // never a widening. REQ-SEC-052 / ADR-0159: the five matcher families that used
+                    // to sit here — the ten-family catalogue block on all verbs, the five mission
+                    // GET rules, the mission POST, the twelve participant write patterns and
+                    // `GET /api/v1/org-units/active` — are gone, and with them the anonymous API
+                    // surface. What replaced them is nothing: they fall through to
+                    // `anyRequest().authenticated()` at the bottom of this matrix.
+                    //
+                    // Several `authenticated()` entries went with them. They existed to carve a
+                    // path back OUT of a permitAll block sitting below them — the two REQ-SEC-032
+                    // material price paths and the three ADR-0149 order/finance writes — and with
+                    // the block gone they restated the catch-all. A matrix in which most entries
+                    // say what the catch-all already says cannot be read against REQ-SEC-052's
+                    // table, which is the whole point of writing that requirement down. Their
+                    // history is in ADR-0149 and ADR-0159; their behaviour is pinned by
+                    // `AnonymousSurfaceSweepTest`, which asserts the status of EVERY mapping rather
+                    // than trusting this file to be complete.
                     .requestMatchers("/api/v1/users/search")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     // Bank-audience search twin (ADR-0089, the #1193 remoteSource switch): the bank
@@ -853,7 +783,11 @@ public class SecurityConfig {
                 .BearerTokenAuthenticationFilter.class)
         .addFilterAfter(
             new PendingApprovalAccessFilter(
-                messageSource, problemResponseFactory, objectMapper, meterRegistry),
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry,
+                noRoleRefusedSubjectWindow),
             ActingMemberFilter.class)
         // REQ-SEC-028: refuse the API until the Terms of Use are accepted. Enforced HERE rather
         // than only in the frontend because the backend is the one place every caller passes
@@ -871,23 +805,21 @@ public class SecurityConfig {
                 meterRegistry,
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
-        // A6 / REQ-SEC-032: bound the page size an unauthenticated caller may ask for. Placed here
-        // because the only question it asks is "is this caller anonymous", which is settled by the
-        // authentication filters above; an authenticated caller passes straight through.
-        .addFilterAfter(
-            new AnonymousPageSizeFilter(
-                messageSource, problemResponseFactory, objectMapper, meterRegistry),
-            TermsAcceptanceAccessFilter.class)
-        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API.
-        // Anchored behind the anonymous page-size gate above rather than behind the terms
-        // filter, so the order of these two is stated here instead of falling out of the
-        // registration order (addFilterAfter inserts directly after its anchor, so two calls
-        // naming the same one end up reversed). The two are disjoint anyway — one only ever
-        // sees anonymous callers, the other only authenticated ones. The per-IP
+        // A3 / REQ-SEC-033: bound how hard one authenticated ACCOUNT can drive the API. The per-IP
         // limiter ahead of the chain bounds a network position, which is the wrong unit in both
         // directions — CGNAT puts many members behind one address, and an address pool escapes it
         // entirely. Placed after the gates above so a pending or unconsented caller is refused on
         // its own terms rather than spending a token first.
+        //
+        // Re-anchored on TermsAcceptanceAccessFilter by ADR-0159. It used to hang off
+        // AnonymousPageSizeFilter, which bounded the page size an unauthenticated caller could ask
+        // for (REQ-SEC-032) and is gone with the anonymous surface itself — there is no
+        // unauthenticated caller left on any paginated path to bound. The anchor was doing real
+        // work beyond ordering: two addFilterAfter calls naming ONE anchor end up reversed, so
+        // naming the page-size filter is what stated this filter's position instead of leaving it
+        // to registration order. TermsAcceptanceAccessFilter now has exactly one filter after it,
+        // so the hazard is not live — SecurityFilterChainOrderTest pins the order regardless,
+        // because "not live" is a property of today's registrations and not of this line.
         .addFilterAfter(
             new SubjectRateLimitingFilter(
                 rateLimitProperties,
@@ -895,7 +827,7 @@ public class SecurityConfig {
                 problemResponseFactory,
                 objectMapper,
                 meterRegistry),
-            AnonymousPageSizeFilter.class)
+            TermsAcceptanceAccessFilter.class)
         // REQ-SEC-024: catch an identity-provider-unreachable failure (JWKS fetch timeout / 5xx /
         // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
         // AuthenticationServiceException and re-map it to a retryable 503 instead of the opaque 500

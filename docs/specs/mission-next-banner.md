@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
-> **Owner area:** MISSION · **Related ADRs:** none
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-06.
+> **Owner area:** MISSION · **Related ADRs:** ADR-0159
 
 # Home-page upcoming-missions overview
 
@@ -8,16 +8,21 @@
 The home page (`/`) shows the **upcoming missions of the next seven days** as a tile grid, nearest
 planned start first (REQ-MISSION-012). Each tile carries the same fields as the legacy single "next
 mission" card — name, status, schedule, optional calendar link, the **owning org unit**
-(Staffel/SK/Bereich/OL, or "ownerless", read from the `owningSquadron` field; non-PII, shown to
-guests too) and, for authenticated members, a Markdown description preview clamped to three lines.
-The grid is guest-visible — anonymous visitors see only public `PLANNED`/`ACTIVE` missions;
-authenticated members additionally see their own units' internal ones. It is populated from `GET
-/api/v1/missions/search` and uses the **broad mission-list scope** (the viewer's own org units plus
-every unit's public missions), deliberately wider than the own-unit `/next` lookup described below.
+(Staffel/SK/Bereich/OL, or "ownerless", read from the `owningSquadron` field) and a Markdown
+description preview clamped to three lines. It is populated from `GET /api/v1/missions/search` and
+uses the **broad mission-list scope** (the viewer's own org units plus every unit's
+organisation-wide missions), deliberately wider than the own-unit `/next` lookup described below.
+
+**The grid needs a login (REQ-SEC-052, ADR-0159).** It used to render for anyone who asked — the
+largest anonymous read surface the tool had, carrying unit, status, meeting point and times for
+every mission of the coming week. An unauthenticated visitor now gets the landing page, which
+carries no mission data at all. Everything below therefore describes what a **member** sees; the
+former "guest" tier had no other rule of its own than "public missions, no description", and it is
+gone with its audience.
 
 The single-mission `GET /api/v1/missions/next` endpoint (REQ-MISSION-003, REQ-MISSION-008) is
-**retained** as a public API endpoint, but it is no longer what the home page renders; the two
-requirements below still govern its behaviour for API consumers.
+**retained** for API consumers — the Android app is one — but it is no longer what the home page
+renders, and it too requires a login.
 
 The `/next` lookup must surface only missions that are still **operationally relevant**. A mission
 that has already been `COMPLETED` or `CANCELLED` but happens to carry a future planned-start time
@@ -27,8 +32,8 @@ something the squadron is heading towards, and returning it as "next mission" is
 The `/next` lookup must also be **org-unit relevant**. A member should get the next mission of their
 _own_ org unit (or, for a Bereich/Organisationsleitung leader, their subordinate units), not the
 organisation-wide next mission that may belong to a squadron they have nothing to do with. A viewer
-who belongs to no org unit (anonymous guest, brand-new account, admin in "all squadrons" mode) keeps
-the organisation-wide next mission as before. (The home-page grid above deliberately does **not**
+who belongs to no org unit (a brand-new account, an admin in "all squadrons" mode) keeps the
+organisation-wide next mission as before. (The home-page grid above deliberately does **not**
 apply this narrowing — it uses the broad mission-list scope per REQ-MISSION-012.)
 
 ## Requirements
@@ -41,9 +46,10 @@ strictly after "now" is the next mission.
 
 - A `COMPLETED` or `CANCELLED` mission is **never** the next mission, even if its `plannedStartTime`
   is in the future and earlier than every eligible mission's.
-- The existing visibility rule is unchanged: guests (`allowInternal = false`) see only public
-  (`isInternal = false`) missions; authenticated callers (`allowInternal = true`) also see internal
-  ones.
+- Every caller is authenticated, so `allowInternal = true` throughout and internal missions in
+  scope are eligible. The `allowInternal = false` variant existed for the anonymous and role-less
+  tier and has no caller left (ADR-0159); the query variant itself survives because the
+  membershipless fallback below still uses the scope, not the flag.
 - When no eligible mission is upcoming, the endpoint returns `204 No Content` and the page renders
   its empty state — unchanged.
 
@@ -51,7 +57,7 @@ strictly after "now" is the next mission.
 
 - [ ] Given an upcoming `PLANNED` mission and an upcoming `ACTIVE` mission, the banner shows whichever has the earlier planned start.
 - [ ] Given a `COMPLETED`/`CANCELLED` mission with an earlier future planned start and a later `PLANNED` mission, the banner shows the `PLANNED` mission — the terminal one is skipped, not merely sorted behind.
-- [ ] A guest never sees an internal mission in the banner; an authenticated member does.
+- [ ] A member sees an internal mission of their own unit in the banner.
 - [ ] When no `PLANNED`/`ACTIVE` mission is upcoming, the endpoint returns 204.
 
 **Enforced by:** `MissionServiceTest` (`getNextMission_*` — status passed to the finder),
@@ -79,9 +85,8 @@ the viewer has any:
   units' public ones**; the cross-staffel public escape that widens the mission _lists_ deliberately
   does **not** apply to the banner, because the banner answers "what is _my_ unit heading towards".
 - A viewer with **no** effective org-unit scope keeps the unchanged organisation-wide behaviour of
-  REQ-MISSION-003: an admin in "all squadrons" mode (no active pin), an anonymous guest, and an
-  authenticated user who belongs to no org unit all see the soonest eligible mission across the whole
-  organisation (internal ones only for members).
+  REQ-MISSION-003: an admin in "all squadrons" mode (no active pin) and a member who belongs to no
+  org unit both see the soonest eligible mission across the whole organisation.
 - When no eligible mission exists in scope, the endpoint returns `204 No Content` and the page
   renders its empty state — unchanged.
 
@@ -90,7 +95,7 @@ the viewer has any:
 - [ ] A member of Staffel A whose own next mission is later than Staffel B's public next mission sees Staffel A's mission, not Staffel B's.
 - [ ] A Bereichsleitung sees the soonest mission across their Bereich's Staffeln/SKs; an OL member sees the soonest across every org unit.
 - [ ] A member sees their own org unit's **internal** next mission (it is not hidden by the public-escape removal).
-- [ ] An authenticated user with no org-unit membership, and an anonymous guest, still see the organisation-wide next mission (public-only for the guest).
+- [ ] A member with no org-unit membership still sees the organisation-wide next mission.
 - [ ] A scoped viewer with no upcoming own-unit mission gets `204`, even if other units have upcoming missions.
 
 **Enforced by:** `MissionServiceTest`
@@ -98,7 +103,7 @@ the viewer has any:
 `getNextMission_scopedPinned_passesActiveOrgUnitId`,
 `getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch`,
 `getNextMission_allowInternal_refetchesByIdThroughGraph` (admin all-scope fallback),
-`getNextMission_guest_usesInternalFalseVariantThenRefetches` (membershipless fallback)),
+`getNextMission_allowInternalFalse_usesTheIsInternalFalseVariantThenRefetches`),
 `MissionRepositoryLookupOrderingTest`
 (`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
 `findNextScopedMission_allowInternalFalse_excludesOwnInternalMission`).
@@ -129,19 +134,19 @@ the soonest upcoming mission.
   `org_unit_membership` rows mapped to their org-unit ids), unioned with the Staffel ids already on
   the `/me` `UserDto` as a fallback; the mission's `owningSquadron.id` is matched against that set.
   The **leadership cascade** of the `/next` lookup (REQ-MISSION-008) is intentionally **not** applied
-  (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and guests (no memberships)
-  never see the chip. The chip is pinned to the **bottom-right** of the tile (right of the "Einsatz
+  (a Bereichs-/OL-leader's subordinate units are not "their unit" here), and a member with no
+  memberships never sees the chip. The chip is pinned to the **bottom-right** of the tile (right of the "Einsatz
   öffnen" CTA), **not** the top — so it never inserts a row above the tile body and every tile's body
   text starts at the same height whether or not it carries the chip.
 - **Eligibility & redaction.** Only `PLANNED` / `ACTIVE` missions appear (terminal ones are excluded
-  by the status filter). Guest/outsider redaction is unchanged: anonymous and role-less `GUEST`
-  callers see only public (`isInternal = false`) `PLANNED` / `ACTIVE` missions, with the description
-  hidden ([`security-and-access.md`](security-and-access.md)).
+  by the status filter). The outsider tier that hid the description from anonymous and role-less
+  callers is gone with its audience (ADR-0159); what remains is REQ-SEC-007's peer redaction, which
+  strips participant PII and never touched the tile fields
+  ([`security-and-access.md`](security-and-access.md)).
 - **Tile content.** Each tile carries the same fields as the legacy next-mission card — name, owning
   org unit (or "Keine"), status pill, meeting time, planned start, optional calendar link, and — for
-  authenticated members only — a Markdown description **preview clamped to three lines**; the full
-  description is on the mission detail page. The "Einsatz öffnen" link (members only) opens the
-  mission.
+  a Markdown description **preview clamped to three lines**; the full description is on the mission
+  detail page. The "Einsatz öffnen" link opens the mission.
 - **Empty state.** When no `PLANNED` / `ACTIVE` mission starts within the next seven days, the
   section renders its localized empty state (`home.upcoming.empty`); a mission whose planned start is
   more than seven days out is **not** shown, even if it is the soonest upcoming one.
@@ -153,10 +158,11 @@ the soonest upcoming mission.
 
 - [ ] The home page lists every `PLANNED`/`ACTIVE` mission with a planned start in `[now, now+7d]` as a tile, nearest planned start first.
 - [ ] A mission starting more than seven days out is not shown; when none qualify, the localized empty state renders.
-- [ ] A guest sees only public `PLANNED`/`ACTIVE` tiles with no description; a member additionally sees own-unit internal missions and the three-line description preview.
+- [ ] A member sees own-unit internal missions alongside the organisation-wide ones, each with the three-line description preview.
+- [ ] An unauthenticated visitor gets the landing page and no tile at all (REQ-SEC-052).
 - [ ] Each tile's description preview is truncated to three lines; the full text is visible on the mission detail page.
 - [ ] The information panel spans the full width and collapses to its header height.
-- [ ] An own-unit mission's tile shows the "Meine Einheit" chip for the authenticated member; a foreign mission's tile does not, and a guest never sees it.
+- [ ] An own-unit mission's tile shows the "Meine Einheit" chip; a foreign mission's tile does not.
 - [ ] The own-unit match covers every direct membership kind — a Spezialkommando, a directly-assigned Bereich and a directly-assigned Organisationsleitung mission are flagged, not only Staffel missions — while a subordinate unit reached only via the leadership cascade is **not**.
 
 **Enforced by:** `HomeControllerMvcTest`
@@ -178,8 +184,9 @@ kind-agnostic own-membership id lookup.
 
 ## Out of scope
 
-- The guest field redaction applied to the returned mission DTO — owned by the security spec
-  (see [`security-and-access.md`](security-and-access.md)).
+- The peer field redaction applied to the returned mission DTO, and who may reach the page at all —
+  owned by the security spec (see [`security-and-access.md`](security-and-access.md), REQ-SEC-007 /
+  REQ-SEC-052).
 - The broader mission list / search status filtering, which already accepts an explicit status set.
 - The org-unit scope vector and the leadership cascade themselves — owned by
   [`org-unit-tenancy.md`](org-unit-tenancy.md) (`REQ-ORG-*`); this spec only consumes them.

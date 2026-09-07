@@ -37,11 +37,13 @@ import ch.qos.logback.core.AppenderBase;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.support.RefusedSubjectWindow;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +65,9 @@ class PendingApprovalAccessFilterTest {
   private PendingApprovalAccessFilter filter;
   private SimpleMeterRegistry meterRegistry;
 
+  /** The distinct-subject window the NO_ROLE refusals are recorded into (REQ-SEC-053). */
+  private RefusedSubjectWindow noRoleRefusedSubjects;
+
   @BeforeEach
   void setUp() {
     // Message source returns the caller-supplied default (arg 2) so the assertions run against a
@@ -71,12 +76,14 @@ class PendingApprovalAccessFilterTest {
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
     meterRegistry = new SimpleMeterRegistry();
+    noRoleRefusedSubjects = new RefusedSubjectWindow(java.time.Duration.ofMinutes(15), 5_000);
     filter =
         new PendingApprovalAccessFilter(
             messageSource,
             new ProblemResponseFactory(new AppProblemProperties()),
             JsonMapper.builder().build(),
-            meterRegistry);
+            meterRegistry,
+            noRoleRefusedSubjects);
   }
 
   @AfterEach
@@ -254,6 +261,55 @@ class PendingApprovalAccessFilterTest {
                 MetricNames.TAG_CODE,
                 PendingApprovalAccessFilter.CODE_PENDING_APPROVAL)
             .count());
+  }
+
+  @Test
+  void roleLessUser_isCountedAsASubject_notJustAsARequest() throws Exception {
+    // REQ-SEC-053 / REQ-OBS-011: NoRoleBlockSpike reads the SUBJECT gauge, because the refusal
+    // rate cannot separate one member's polling tab from a locked-out membership - and the event
+    // the alert exists for, a realm-side role rename, happens when the request rate is near zero.
+    // Three requests from one subject are one subject.
+    UUID subject = UUID.randomUUID();
+    authenticateWithJwt(subject.toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
+
+    for (int i = 0; i < 3; i++) {
+      run("GET", "/api/v1/inventory", mock(FilterChain.class));
+    }
+
+    assertEquals(1, noRoleRefusedSubjects.size(), "three requests, one subject");
+  }
+
+  @Test
+  void roleLessUsers_areCountedSeparately() throws Exception {
+    // The counterpart, so the case above cannot pass because the window counts nothing.
+    for (int i = 0; i < 3; i++) {
+      authenticateWithJwt(
+          UUID.randomUUID().toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
+      run("GET", "/api/v1/inventory", mock(FilterChain.class));
+    }
+
+    assertEquals(3, noRoleRefusedSubjects.size(), "three subjects, three entries");
+  }
+
+  @Test
+  void pendingUser_doesNotEnterTheRoleLessWindow() throws Exception {
+    // Two gates, two populations. Sharing a window would report a pending member as a role-less
+    // one and inflate the lockout signal with the approval queue.
+    authenticateWithJwt(
+        UUID.randomUUID().toString(), PendingApprovalAccessFilter.PENDING_AUTHORITY);
+
+    run("GET", "/api/v1/inventory", mock(FilterChain.class));
+
+    assertEquals(0, noRoleRefusedSubjects.size());
+  }
+
+  /** Authenticates with a bearer token carrying {@code sub} and the given authorities. */
+  private void authenticateWithJwt(String sub, String... authorities) {
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(sub).build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(
+                jwt, Arrays.stream(authorities).map(SimpleGrantedAuthority::new).toList()));
   }
 
   /** Authenticates with a pending-approval bearer token carrying {@code sub}. */

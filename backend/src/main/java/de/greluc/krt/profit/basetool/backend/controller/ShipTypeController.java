@@ -44,11 +44,16 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Read-mostly REST surface over the ship-type catalog plus the admin-only visibility toggle. The
  * catalog is owned by {@code UexVehicleService}.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/ship-types")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class ShipTypeController {
 
   private final ShipTypeService shipTypeService;

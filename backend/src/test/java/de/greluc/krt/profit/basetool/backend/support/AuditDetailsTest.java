@@ -114,16 +114,17 @@ class AuditDetailsTest {
 
   @Test
   void ternaryValue_rendersLikeConcatenation() {
-    // Given — the participant "type" ternary from MissionService
+    // Given — the participant "type" ternary from MissionParticipantService. It reads `external`
+    // since ADR-0159 renamed the tier; this case mirrors the call site, so it moves with it.
     UUID finalUserId = null;
     // When
     String built =
         AuditDetails.of("participant", "p1")
-            .with("type", finalUserId != null ? "user" : "guest")
+            .with("type", finalUserId != null ? "user" : "external")
             .toString();
     // Then
-    assertEquals("participant=p1 type=" + (finalUserId != null ? "user" : "guest"), built);
-    assertEquals("participant=p1 type=guest", built);
+    assertEquals("participant=p1 type=" + (finalUserId != null ? "user" : "external"), built);
+    assertEquals("participant=p1 type=external", built);
   }
 
   @Test

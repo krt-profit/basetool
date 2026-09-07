@@ -23,6 +23,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -33,12 +34,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintImportService;
 import de.greluc.krt.profit.basetool.backend.service.CustomJwtGrantedAuthoritiesConverter;
 import de.greluc.krt.profit.basetool.backend.service.RefineryImportService;
 import de.greluc.krt.profit.basetool.backend.service.TermsAcceptanceService;
 import de.greluc.krt.profit.basetool.backend.support.ActingMemberHeader;
+import de.greluc.krt.profit.basetool.backend.support.Roles;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -139,6 +142,7 @@ class ActingMemberIdentityChainTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private TermsAcceptanceService termsAcceptanceService;
 
   @MockitoBean private RefineryImportService refineryImportService;
@@ -155,11 +159,23 @@ class ActingMemberIdentityChainTest {
 
     // An approved, live member — the state both gates are supposed to let through. Seeded rather
     // than mocked because the liveness check and both gates read the real row.
+    //
+    // REQ-SEC-053: the row carries KRT Member. It did not until ADR-0159, and it did not have to,
+    // because a role-less account was mapped onto the authority-less GUEST role and admitted. The
+    // acting-member path reuses assembleFor (ADR-0129), so it refuses a role-less member with 403
+    // NO_ROLE exactly like the bearer path — which is the point of putting the check there and not
+    // on the JWT. A member with no role is not a shape production has any more.
     User member = new User();
     member.setId(MEMBER);
     member.setUsername("acting-member");
     member.setApprovalStatus(ApprovalStatus.ACTIVE);
     member.setInKeycloak(true);
+    member.setRoles(
+        new java.util.HashSet<>(
+            java.util.Set.of(
+                roleRepository
+                    .findByCode(Roles.KRT_MEMBER)
+                    .orElseThrow(() -> new IllegalStateException("KRT_MEMBER role not seeded")))));
     userRepository.saveAndFlush(member);
 
     when(refineryImportService.buildDraft(any(), any())).thenReturn(null);
@@ -189,6 +205,40 @@ class ActingMemberIdentityChainTest {
         .andExpect(status().isOk());
 
     verify(refineryImportService).buildDraft(any(), eq(MEMBER));
+  }
+
+  /**
+   * REQ-SEC-053 / ADR-0159: the acting-member path refuses a role-less member the same way the
+   * bearer path does.
+   *
+   * <p>This is why the {@code NO_ROLE} short-circuit sits in {@code assembleFor} and not on the JWT
+   * conversion. {@code DatabaseActingMemberAuthorities} installs an authentication without
+   * inspecting it (ADR-0129), so a check on the token would have left this door open: a gateway
+   * call on behalf of an account with no roles would have been admitted with an empty authority set
+   * — a principal that passes every {@code isAuthenticated()} gate and fails only the ones that
+   * name a role.
+   */
+  @Test
+  void refusesAnActingMemberWhoHoldsNoRole() throws Exception {
+    User roleLess = userRepository.findById(MEMBER).orElseThrow();
+    // A mutable set: the row is managed here, so Hibernate wraps whatever it is handed in a
+    // PersistentSet and writes through it.
+    roleLess.setRoles(new java.util.HashSet<>());
+    userRepository.saveAndFlush(roleLess);
+    termsAcceptanceService.acceptCurrentTerms(MEMBER);
+
+    mockMvc
+        .perform(
+            post(INGEST_PATH)
+                .with(
+                    jwt().jwt(token -> token.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
+                .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, MEMBER.toString())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(EXTRACT))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("NO_ROLE"));
+
+    verify(refineryImportService, never()).buildDraft(any(), any());
   }
 
   /**

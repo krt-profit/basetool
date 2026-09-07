@@ -63,7 +63,7 @@ class StarSystemTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
 
   @BeforeEach
   void setUp() {
@@ -74,10 +74,10 @@ class StarSystemTest {
     officerUser.setUsername("officerSystem");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestSystem");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestSystem");
+    userRepository.save(roleLessUser);
   }
 
   @Test
@@ -106,7 +106,7 @@ class StarSystemTest {
   }
 
   @Test
-  void testCreateStarSystem_Guest_Forbidden() throws Exception {
+  void testCreateStarSystem_RoleLess_Forbidden() throws Exception {
     StarSystem system = new StarSystem();
     system.setName("Pyro");
 
@@ -115,8 +115,8 @@ class StarSystemTest {
             post("/api/v1/star-systems")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(system)))
         .andExpect(status().isForbidden());

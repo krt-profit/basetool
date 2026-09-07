@@ -24,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.logging.ClientIpContext;
 import de.greluc.krt.profit.basetool.frontend.logging.CorrelationContext;
-import de.greluc.krt.profit.basetool.frontend.logging.GuestEditTokenContext;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -52,11 +51,12 @@ import reactor.core.scheduler.Schedulers;
  * reactor.core.publisher.Hooks#enableAutomaticContextPropagation()} being on. That is activated in
  * {@link ReactorContextPropagationConfig#enableContextPropagation()}; we trigger it once at {@link
  * BeforeAll} time, then run a parallel-scheduler-bound assertion for each registered accessor —
- * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext}, {@link
- * GuestEditTokenContext} and the {@link LocaleContextHolder}-backed user locale. The three
- * later-added accessors (client IP for the backend per-IP rate limiter, guest edit token for
- * anonymous mission sign-up edits, user locale for the {@code Accept-Language} relay) would each
- * silently drop their outbound header if the registration or its null/blank branch regressed.
+ * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext} and the {@link
+ * LocaleContextHolder}-backed user locale. The two later-added accessors (client IP for the backend
+ * per-IP rate limiter, user locale for the {@code Accept-Language} relay) would each silently drop
+ * their outbound header if the registration or its null/blank branch regressed. A fifth accessor
+ * carried the guest edit token for anonymous mission sign-up edits; it went with the token itself
+ * (ADR-0159, V239).
  */
 class ReactorContextPropagationConfigTest {
 
@@ -70,7 +70,6 @@ class ReactorContextPropagationConfigTest {
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
     ClientIpContext.clear();
-    GuestEditTokenContext.clear();
     LocaleContextHolder.resetLocaleContext();
   }
 
@@ -119,33 +118,6 @@ class ReactorContextPropagationConfigTest {
     assertThat(observedOnReactorThread.get())
         .as("CorrelationContext must be visible on the Reactor parallel-scheduler thread")
         .isEqualTo(correlationId);
-  }
-
-  @Test
-  void guestEditTokenContext_isVisibleInsideMonoOnDifferentScheduler() {
-    String guestToken = "guest-edit-token-" + UUID.randomUUID();
-    GuestEditTokenContext.set(guestToken);
-
-    AtomicReference<String> observedOnReactorThread = new AtomicReference<>();
-    AtomicReference<String> observedThreadName = new AtomicReference<>();
-
-    Mono.fromCallable(
-            () -> {
-              observedOnReactorThread.set(GuestEditTokenContext.get());
-              observedThreadName.set(Thread.currentThread().getName());
-              return "done";
-            })
-        .subscribeOn(Schedulers.parallel())
-        .block();
-
-    assertThat(observedOnReactorThread.get())
-        .as("GuestEditTokenContext must be visible on the Reactor parallel-scheduler thread")
-        .isEqualTo(guestToken);
-    assertThat(observedThreadName.get())
-        .as(
-            "sanity: the callable must have run on a Reactor parallel-N worker, not the JUnit"
-                + " thread")
-        .startsWith("parallel-");
   }
 
   @Test

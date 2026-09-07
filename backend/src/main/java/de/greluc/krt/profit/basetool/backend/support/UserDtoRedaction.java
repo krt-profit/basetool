@@ -52,6 +52,11 @@ public final class UserDtoRedaction {
    * lastReadAnnouncementId}, the {@code isLogistician} / {@code isMissionManager} flags, {@code
    * joinDate} and {@code discordLinked}.
    *
+   * <p><b>Not identical to {@code MissionPeerRedactor.cleanupUserForPeer}</b>, the mission and
+   * finance surfaces' peer projection of the same record: that one additionally nulls {@code
+   * squadron} and {@code squadrons}. Noticed in the 2026-09-06 review; see that method's Javadoc
+   * for why the difference was recorded rather than reconciled.
+   *
    * @param dto the persisted user DTO, or {@code null}.
    * @return the peer-shaped DTO, or {@code null} when {@code dto} was {@code null}.
    */

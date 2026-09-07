@@ -397,6 +397,47 @@ main {
     margin-top: var(--space-2);
 }
 
+/* Landing page — the only surface a visitor without a session sees (REQ-SEC-052).
+   The four classes below were written with the page and had no rules at all, so the
+   two call-to-action buttons stacked as plain inline anchors and the notice, hint and
+   legal row rendered at body colour and size. */
+
+.krt-landing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+}
+
+.krt-landing-notice,
+.krt-landing-hint {
+    color: var(--color-gray-2-text);
+    font-size: var(--fs-sm);
+}
+
+/* The lead paragraph above is 1.1rem via `.greeting p`; these three are secondary text
+   and must not inherit it. */
+.greeting p.krt-landing-notice,
+.greeting p.krt-landing-hint {
+    font-size: var(--fs-sm);
+}
+
+.krt-landing-legal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    font-size: var(--fs-sm);
+}
+
+.krt-landing-legal a {
+    color: var(--color-gray-2-text);
+}
+
+.krt-landing-legal a:hover,
+.krt-landing-legal a:focus-visible {
+    color: var(--color-primary);
+}
+
 /* Table Styles — one canonical treatment for every data table. The bare
    `table` element selector, `.krt-table` and `.data-table` are interchangeable
    aliases (templates use all three historically); keeping them on a single rule

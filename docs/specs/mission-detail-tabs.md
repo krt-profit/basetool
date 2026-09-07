@@ -113,10 +113,12 @@ near the **top or bottom viewport edge auto-scrolls the page** (speed eases with
 edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops on drop /
 drag-end.
 
-Each person row shows: check-in status dot, name (+ guest chip), org-unit badges (incl. SK),
+Each person row shows: check-in status dot, name (+ "Extern" chip), org-unit badges (incl. SK),
 desired job, planned job, comment as a tooltip mark, on-board function(s), check-in/check-out
 (only while the mission is running and the participant's time state matches), edit, and
-unregister. Row actions keep their previous gates (`canEdit` or own row or guest row). The
+unregister. Row actions keep their previous gates (`canEdit`, own row, or an external row —
+a `user == null` participant, which any member who can see the Einsatz may record and its
+leadership maintains; ADR-0159 decision D4). The
 on-board function is a `.chip-select` per person (canEdit only): a quick single-function setter
 against the crew update endpoint, with an "Edit functions…" entry opening the multi-select crew
 modal (multiple functions per person stay supported). Unit heads show name, ship type, responsible
@@ -138,14 +140,15 @@ delete confirm) use the `.krt-modal*` frame: one filled CTA per modal, ghost can
 
 The **sign-up modal** carries an "Auszahlungsart" select: an explicit choice is stored on the new
 participant and wins over the user's profile default; the empty "Standard" option keeps the
-existing default chain (profile default for members per REQ-MISSION-002, `PAYOUT` for guests).
+existing default chain (profile default for members per REQ-MISSION-002, `PAYOUT` for an
+external participant, who has no profile to read one from).
 
-**Org-unit assignment is guest-only.** The participant modals' "Org-Einheiten" multi-select is offered
-only when signing up / editing a **guest**; a registered member's org units are derived from their
-account and are never selected — the edit modal shows them **read-only** (all of them, as badges) and
-hides the picker (owner request 2026-07-03). The add modal already hides the picker once a registered
-user is matched; the edit modal toggles picker vs. read-only badge list from the row's `data-guest` /
-`data-org-unit-names`.
+**Org-unit assignment is for external participants only.** The participant modals'
+"Org-Einheiten" multi-select is offered only when recording / editing an **external** participant; a
+registered member's org units are derived from their account and are never selected — the edit modal
+shows them **read-only** (all of them, as badges) and hides the picker (owner request 2026-07-03).
+The add modal already hides the picker once a registered user is matched; the edit modal toggles
+picker vs. read-only badge list from the row's `data-external` / `data-org-unit-names`.
 
 The **unit modal** matches the approved mock: ship type and hangar ship are offered
 **separately** (hangar select filtered by type, with an explicit "— keines · nur Typ verwenden —"
@@ -167,7 +170,7 @@ sub-section (participant / unit incl. crew fallback to the pool / crew / mission
 
 Every `sec:authorize` / `th:if` permission gate of the previous layout carries over 1:1 (finance
 panel member+; participation % authenticated; payout-select disable logic; participant actions
-canEdit/own/guest; check-in/out time-state conditions; Wirtschaft authenticated + data; Verwaltung
+canEdit/own/external; check-in/out time-state conditions; Wirtschaft authenticated + data; Verwaltung
 by edit permission). Backend endpoints, DTOs and the optimistic-locking flow (`version` echo,
 `data-version` DOM sync, 409 handling via `MissionSubresource`) are unchanged. Mission data shown
 read-only to non-editors in the old Details panel remains visible via the Übersicht tab.
@@ -284,8 +287,10 @@ steps are authored the whole Ablauf tile is omitted** from the Übersicht — no
 "Noch keine Schritte." placeholder — and reappears in place through the `['steps','overview']`
 section swap once the first step is added (owner request 2026-07-01). Edit-authorised
 users (`mission.canEdit` / `@missionSecurityService.canManageMission`) toggle a step's shared `done`
-check directly on the overview checklist; the state is visible to every viewer. Outsiders/guests see
-the Ablauf read-only (it is non-PII planning data, forwarded like units/frequencies; ADR-0044).
+check directly on the overview checklist; the state is visible to every viewer. A member below
+Logistician sees the Ablauf read-only (it is non-PII planning data, forwarded like
+units/frequencies; ADR-0044). It used to be forwarded to the anonymous tier too; that tier is gone
+(ADR-0159), not the forwarding.
 
 All five mutations (add / edit / remove / reorder / done-toggle) go through dedicated slim endpoints
 `…/missions/{id}/steps[/{stepId}][/reorder|/done]/slim` (`@PreAuthorize canManageMission`), each
@@ -306,10 +311,10 @@ mission-create time** (each still recording `MISSION_STEP_ADDED`) — REQ-MISSIO
 A mission carries the short free-text core-section field **`meetingPoint`** (Treffpunkt, ≤200 chars —
 the rally point), edited in the Verwaltung details form and belonging to the **core** section (guarded
 by `coreVersion`, persisted via the existing `/core` patch; no new lock). It is non-PII planning data,
-forwarded to outsiders/guests like the units and frequencies (the long Markdown description remains the
-one free-text field hidden from outsiders, capped at **20,000 chars** — owner request 2026-07-03;
-the `mission.description` column is already `TEXT`, so the cap moved only on the DTOs / form, no
-migration). Migration: V192 (`mission.meeting_point`).
+forwarded through the peer redaction like the units and frequencies. The long Markdown description
+was the one free-text field the **outsider** tier hid; with that tier gone (ADR-0159) every member
+reads it, and its **20,000-char** cap stays (owner request 2026-07-03; the `mission.description`
+column is already `TEXT`, so the cap moved only on the DTOs / form, no migration). Migration: V192 (`mission.meeting_point`).
 
 > The former single short **`objective`** (Ziel, ≤250 chars, shown first in "Mission auf einen Blick")
 > was **superseded by the structured, classified mission goals** of REQ-MISSION-012. V199 drops
@@ -359,8 +364,8 @@ then Nicht-Ziele, each group under its localized header, empty groups omitted. *
 no goals at all the whole Ziele box is omitted** — no empty "Noch keine Ziele." placeholder — and
 reappears in place through the `['objectives','overview']` section swap once the first goal is added
 (owner request 2026-07-01). Edit access is the mission's `canManageMission` gate (no new permission).
-Outsiders/guests see the Ziele box read-only — it is non-PII planning data, forwarded like the Ablauf
-steps, units and frequencies (ADR-0057).
+A member below Logistician sees the Ziele box read-only — it is non-PII planning data, forwarded
+like the Ablauf steps, units and frequencies (ADR-0057).
 
 All four mutations (add / edit / remove / reorder) go through dedicated slim endpoints
 `…/missions/{id}/objectives[/{objId}][/reorder]/slim` (`@PreAuthorize canManageMission`), each echoing
@@ -385,8 +390,8 @@ Goals may additionally be **seeded at mission-create time** (each still recordin
 **Leader.** The sticky facts-bar **"Leiter"** cell shows the mission's **Einsatzleiter** — the
 participant whose `plannedMissionJobType` is the single designated **mission-lead** job type
 (`JobType.isMissionLead`) — falling back to the mission **owner** when no Einsatzleiter is assigned,
-and to "none" otherwise (the owner is redacted for outsiders, so a guest with no Einsatzleiter sees
-"none"). This **replaces** the former behaviour where the facts bar mirrored the built-in
+and to "none" otherwise (the owner is redacted for a member below Logistician, so such a viewer
+sees "none" when no Einsatzleiter is assigned). This **replaces** the former behaviour where the facts bar mirrored the built-in
 **Partyleiter** (`partyLeadUser`); the Partyleiter remains a separate field shown in the "Mission auf
 einen Blick" panel and is no longer reflected in the facts bar. The same Einsatzleiter is **also**
 surfaced as a dedicated **"Einsatzleiter" row directly above the Partyleiter** in that overview panel
@@ -461,8 +466,8 @@ two decimals (0 – 999.99), matching the `precision = 5, scale = 2` column and 
 in the **Verwaltung** tab's "Organisation" card under a "Weitere Frequenzen" editor (a list with an
 "Frequenz hinzufügen" button plus per-row edit/delete, add/edit through a shared KRT modal — no native
 dialogs) and shown **read-only** in the Übersicht "Funk" panel alongside the typed and per-unit
-channels. They are non-PII planning data, forwarded to outsiders/guests like the typed frequencies,
-units and Ablauf steps.
+channels. They are non-PII planning data, forwarded through the peer redaction like the typed
+frequencies, units and Ablauf steps.
 
 The three mutations go through dedicated slim endpoints: `POST …/missions/{id}/frequencies/custom/slim`
 (add) and `PUT …/missions/{id}/frequencies/custom/{freqId}/slim` (edit) each return the updated slim
@@ -530,8 +535,8 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 
 ### REQ-MISSION-018 — Registration count on the mission list row
 
-Every mission **list** row carries `registeredCount` — how many members and guests are registered for
-that mission. A `MissionParticipant` row **is** the registration (there is no accept/decline state to
+Every mission **list** row carries `registeredCount` — how many members and external participants
+are registered for that mission. A `MissionParticipant` row **is** the registration (there is no accept/decline state to
 weigh), so the figure is that row count. It is the number the Android app's mission tile shows as
 "{n} angemeldet" (design chapter 05); until now the count existed only on the **detail** DTO, so a
 list consumer could not show it without one detail read per row.

@@ -120,7 +120,7 @@ class RefineryOrderCreateImportRenderTest {
             0L);
     PageResponse<MaterialDto> materials =
         new PageResponse<>(List.of(raw, suggested), 0, 1000, 2, 1, Collections.emptyList());
-    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef(), eq(true)))
+    when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS), anyTypeRef()))
         .thenReturn(materials);
   }
 

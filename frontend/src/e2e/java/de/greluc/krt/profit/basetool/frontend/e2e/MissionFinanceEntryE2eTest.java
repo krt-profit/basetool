@@ -93,7 +93,7 @@ class MissionFinanceEntryE2eTest {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       missionId = seeder.createMission(USERNAME, PASSWORD, "E2E Finance Mission", true);
-      seeder.addGuestParticipant(USERNAME, PASSWORD, missionId, GUEST_PARTICIPANT_NAME);
+      seeder.addExternalParticipant(USERNAME, PASSWORD, missionId, GUEST_PARTICIPANT_NAME);
     }
   }
 

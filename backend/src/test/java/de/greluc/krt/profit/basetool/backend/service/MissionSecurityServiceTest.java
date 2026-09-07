@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,12 +60,6 @@ class MissionSecurityServiceTest {
 
   @Mock private OwnerScopeService ownerScopeService;
 
-  @Mock private HttpServletRequest request;
-
-  // Real (deterministic) token service so the M1 hash/verify round-trip is genuinely exercised.
-  private final GuestParticipantTokenService guestParticipantTokenService =
-      new GuestParticipantTokenService();
-
   private RoleHierarchy roleHierarchy;
 
   @InjectMocks private MissionSecurityService missionSecurityService;
@@ -87,9 +80,7 @@ class MissionSecurityServiceTest {
             roleHierarchy,
             missionParticipantRepository,
             missionFinanceEntryRepository,
-            ownerScopeService,
-            guestParticipantTokenService,
-            request);
+            ownerScopeService);
 
     missionId = UUID.randomUUID();
     userId = UUID.randomUUID();
@@ -312,93 +303,72 @@ class MissionSecurityServiceTest {
   }
 
   // ---------------------------------------------------------------------
-  // M1 / REQ-SEC-018: a guest (unlinked) participant is editable only by the
-  // anonymous creator presenting the per-row capability token, or by a mission
-  // manager / officer / admin. Before M1 a guest row was editable by anyone who
-  // knew its id (cross-actor vandalism / payout tampering on public missions).
+  // ADR-0159 / decision D4: an EXTERNAL (unlinked) participant row is editable
+  // by the mission leadership and by nobody else. The row carries no creator to
+  // bind a self-edit to, and knowing its id proves nothing — the roster shows
+  // every id to every member who can see the mission.
+  //
+  // This block replaces the M1 / REQ-SEC-018 capability-token cases. Those bound
+  // an anonymous guest sign-up to its creator with a per-row token; there is no
+  // anonymous sign-up left to mint one for, V239 dropped the column that stored
+  // its hash, and the token's own safety net (a canSeeMission re-check, without
+  // which the capability outlived the surface that granted it) is inherent in
+  // canManageMission.
   // ---------------------------------------------------------------------
 
+  /** An external row is not editable by a member who cannot manage the mission. */
   @Test
-  void canAccessParticipant_GuestWithValidToken_ShouldReturnTrue() {
+  void canAccessParticipant_ExternalRowPlainMember_ShouldReturnFalse() {
     UUID participantId = UUID.randomUUID();
-    String token = guestParticipantTokenService.generateToken();
     MissionParticipant participant = new MissionParticipant();
     participant.setId(participantId);
     participant.setMission(mission);
     participant.setUser(null);
     participant.setGuestName("Somebody");
-    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
-    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER)).thenReturn(token);
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getAuthorities())
+        .thenAnswer(i -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
 
-    // The creator's matching token authorises the edit without any mission-management role - as
-    // long as the mission is still one a guest may see at all (see the sibling test below).
-    assertTrue(
+    assertFalse(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
 
   /**
-   * Audit MEDIUM-5: the token proves WHICH row, never WHETHER the mission is still open to a guest.
+   * An external row is not editable by an anonymous caller either.
    *
-   * <p>Without the visibility re-check the capability outlived the surface that granted it: a guest
-   * who signed up while the mission was public kept write access after it was flipped to internal
-   * and after it reached COMPLETED / CANCELLED. Since the operation payout split is recomputed on
-   * every read, back-dating start/end on a settled operation moved money away from every other
-   * participant. {@code canSeeMission} covers both halves - internal-to-a-non-member, and (audit
-   * hardening M-2) terminal-to-an-unauthenticated-caller.
+   * <p>Nothing anonymous reaches this service any more — the security matrix refuses first — but
+   * the gate must not depend on that. {@code canManageMission} spells the principal test out for
+   * exactly this reason: an {@code AnonymousAuthenticationToken} IS authenticated and carries
+   * {@code ROLE_ANONYMOUS}, so a bare {@code isAuthenticated()} check would let it through.
    */
   @Test
-  void canAccessParticipant_GuestWithValidTokenButMissionNoLongerVisible_ShouldReturnFalse() {
+  void canAccessParticipant_ExternalRowAnonymous_ShouldReturnFalse() {
     UUID participantId = UUID.randomUUID();
-    String token = guestParticipantTokenService.generateToken();
     MissionParticipant participant = new MissionParticipant();
     participant.setId(participantId);
     participant.setMission(mission);
     participant.setUser(null);
     participant.setGuestName("Somebody");
-    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
-    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER)).thenReturn(token);
-    when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
+    when(authentication.isAuthenticated()).thenReturn(true);
+    when(authentication.getPrincipal()).thenReturn("anonymousUser");
 
     assertFalse(
         missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
   }
 
+  /** The leadership may edit an external row — the rule D4 kept. */
   @Test
-  void canAccessParticipant_GuestWrongTokenNotManager_ShouldReturnFalse() {
-    UUID participantId = UUID.randomUUID();
-    String token = guestParticipantTokenService.generateToken();
-    MissionParticipant participant = new MissionParticipant();
-    participant.setId(participantId);
-    participant.setMission(mission);
-    participant.setUser(null);
-    participant.setGuestName("Somebody");
-    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
-
-    when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
-    // A third party presents a foreign token and is not a mission manager → denied (the core M1
-    // fix: knowing the public participant id is no longer enough to mutate the guest row).
-    when(request.getHeader(MissionSecurityService.GUEST_EDIT_TOKEN_HEADER))
-        .thenReturn("not-the-real-token");
-    when(authentication.isAuthenticated()).thenReturn(false);
-
-    assertFalse(
-        missionSecurityService.canAccessParticipant(missionId, participantId, authentication));
-  }
-
-  @Test
-  void canAccessParticipant_GuestNoTokenButManager_ShouldReturnTrue() {
+  void canAccessParticipant_ExternalRowManager_ShouldReturnTrue() {
     UUID participantId = UUID.randomUUID();
     MissionParticipant participant = new MissionParticipant();
     participant.setId(participantId);
     participant.setMission(mission);
     participant.setUser(null);
     participant.setGuestName("Somebody");
-    // pre-V177-style guest row: no token hash at all — only an elevated caller may edit it.
 
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(authentication.isAuthenticated()).thenReturn(true);

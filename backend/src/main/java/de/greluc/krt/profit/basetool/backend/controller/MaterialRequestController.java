@@ -63,7 +63,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Material Requests",
     description = "The Materialbörse Gesuche (wanted-listings) board (Flotte & Logistik).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class MaterialRequestController {
 
   private final MaterialRequestService service;

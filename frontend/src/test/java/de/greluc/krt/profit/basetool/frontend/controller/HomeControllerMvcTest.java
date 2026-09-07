@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.when;
@@ -68,6 +67,12 @@ import org.springframework.web.context.WebApplicationContext;
  * regression cases here intentionally supply a matching query parameter.
  */
 @SpringBootTest
+// REQ-SEC-052: these cases exist to render the WHOLE index template through Thymeleaf — the
+// sidebar, the toast fragment, the SpEL in both. That template is the member's dashboard now, so
+// every request carries an OIDC principal (`oidcLogin()`, not `@WithMockUser`: the handler binds
+// `@AuthenticationPrincipal OidcUser`, and a username/password principal arrives as null and routes
+// to the landing page). The anonymous half of GET / has its own case at the bottom, and it asserts
+// the opposite of rendering: no data, no backend call, no session.
 class HomeControllerMvcTest {
 
   private static final String ERROR_TOAST_ID = "errorNotificationParam";
@@ -87,21 +92,24 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // Anonymous home() path: backendApiClient.get(searchUri, typeRef, isPublic=true) for the
+    // The member's home() path: backendApiClient.get(searchUri, typeRef) for the
     // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
     // response and keeps the template's empty-state branch simple.
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }
 
   @Test
   void home_ShouldRenderIndex_WithoutQueryParams() throws Exception {
     // Given: no toast-controlling query parameters
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: index renders normally; the toast fragment's param-gated branches stay
     //       inactive, but the rest of fragments/toast (script + style block) still
     //       runs through Thymeleaf and SpEL.
-    mockMvc.perform(get("/")).andExpect(status().isOk()).andExpect(view().name("index"));
+    mockMvc
+        .perform(get("/").with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(view().name("index"));
   }
 
   /**
@@ -113,10 +121,10 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WhenErrorParamMatchesKeyPattern() throws Exception {
     // Given: ?error= with a value that matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is in the HTML.
     mockMvc
-        .perform(get("/").param("error", "notification.error.title"))
+        .perform(get("/").with(oidcLogin()).param("error", "notification.error.title"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(containsString(ERROR_TOAST_ID)));
@@ -130,7 +138,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WhenSuccessParamMatchesKeyPattern() throws Exception {
     mockMvc
-        .perform(get("/").param("success", "notification.success.title"))
+        .perform(get("/").with(oidcLogin()).param("success", "notification.success.title"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(containsString(SUCCESS_TOAST_ID)));
@@ -146,10 +154,10 @@ class HomeControllerMvcTest {
   void home_ShouldRenderIndex_WithoutParamErrorToast_WhenErrorParamFailsKeyPattern()
       throws Exception {
     // Given: a value that violates the key pattern (contains spaces, starts with digit)
-    // When: anonymous GET /
+    // When: GET / as a member
     // Then: 200, view "index", and the param-error toast div is absent.
     mockMvc
-        .perform(get("/").param("error", "9 invalid value with spaces"))
+        .perform(get("/").with(oidcLogin()).param("error", "9 invalid value with spaces"))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(not(containsString(ERROR_TOAST_ID))));
@@ -163,7 +171,7 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WithoutParamSuccessToast_WhenSuccessParamIsEmpty() throws Exception {
     mockMvc
-        .perform(get("/").param("success", ""))
+        .perform(get("/").with(oidcLogin()).param("success", ""))
         .andExpect(status().isOk())
         .andExpect(view().name("index"))
         .andExpect(content().string(not(containsString(SUCCESS_TOAST_ID))));
@@ -195,11 +203,11 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
-        .perform(get("/"))
+        .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Alpha Staffel")));
   }
@@ -229,11 +237,11 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(mission), 0, 50, 1, 1, List.of()));
 
     mockMvc
-        .perform(get("/"))
+        .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Keine")));
   }
@@ -288,7 +296,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ownMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -346,7 +354,7 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(foreignMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
@@ -408,12 +416,84 @@ class HomeControllerMvcTest {
             null,
             0L,
             0L);
-    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef(), anyBoolean()))
+    when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(skMission), 0, 50, 1, 1, List.of()));
 
     mockMvc
         .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Meine Einheit")));
+  }
+
+  /**
+   * The landing page renders no data, calls no backend and mints no session (REQ-SEC-052, D7).
+   *
+   * <p>All three used to be violated on every hit. The seven-day mission grid was fetched and
+   * rendered for anyone who asked; and a session was created twice over — once by the {@code
+   * HttpSession} parameter Spring resolves with {@code getSession(true)} whether the body uses it
+   * or not, and once by {@code SafeCsrfAdvice} forcing the deferred CSRF token, which the default
+   * {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any template runs.
+   * Every crawler hit cost two sessions in Redis for a page that carries no form.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void anonymousRootRendersTheLandingPageWithoutDataOrSession() throws Exception {
+    org.springframework.test.web.servlet.MvcResult result =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andExpect(view().name("landing"))
+            .andReturn();
+
+    org.assertj.core.api.Assertions.assertThat(result.getRequest().getSession(false))
+        .as("the landing page must not mint a session — REQ-SEC-025 counts every one of these")
+        .isNull();
+    org.assertj.core.api.Assertions.assertThat(result.getResponse().getHeaders("Set-Cookie"))
+        .as("nor set a session cookie")
+        .noneMatch(header -> header.startsWith("SESSION="));
+    org.mockito.Mockito.verifyNoInteractions(backendApiClient);
+  }
+
+  /**
+   * The landing page shows a logged-out visitor no navigation.
+   *
+   * <p>Pinned because of what it depends on: {@code landing.html} includes {@code
+   * fragments/sidebar}, and that fragment carries the tool's whole navigation, the notification
+   * bell and the org-unit switcher behind {@code sec:authorize="isAuthenticated()"}. Those three
+   * guards look exactly like the twenty-five on the pages behind the login — which are redundant
+   * with the URL matrix, because those pages answer nobody without a session. These are not: this
+   * page is one of the four surfaces REQ-SEC-052 serves without one, so the guards are the only
+   * thing between a visitor and the navigation. Somebody tidying "always-true" template guards
+   * would delete all twenty-eight, and only this case would notice.
+   *
+   * @throws Exception if the request could not be performed
+   */
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void anonymousLandingPageShowsNoNavigation() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("the notification bell is behind sec:authorize and must not render")
+        .doesNotContain("id=\"notification-bell\"");
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("nor any of the tool's own destinations")
+        .doesNotContain("/missions")
+        .doesNotContain("/inventory")
+        .doesNotContain("/orders")
+        .doesNotContain("/hangar");
+    org.assertj.core.api.Assertions.assertThat(html)
+        .as("what it DOES carry: the two login entry points and the legal pages")
+        .contains("/oauth2/authorization/keycloak")
+        .contains("/impressum")
+        .contains("/privacy");
   }
 }

@@ -407,7 +407,7 @@ public class InventoryItemService {
    * Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded {@code
    * MissionDto.inventoryEntries} with a dedicated read. Deliberately unscoped among members — it
    * reproduces exactly the removed field's behaviour, the shared mission-stockpile view visible to
-   * any member (the {@code /api/v1/inventory/**} filter rule already keeps guests out).
+   * any member (the {@code /api/v1/inventory/**} filter rule already refuses a non-member).
    *
    * @param missionId the mission whose linked inventory to list
    * @return the mission's inventory items as DTOs (empty when none)

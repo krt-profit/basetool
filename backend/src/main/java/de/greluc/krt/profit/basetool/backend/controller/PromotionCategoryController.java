@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Promotion Categories", description = "Manage promotion system evaluation categories.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class PromotionCategoryController {
 
   private final PromotionCategoryService service;

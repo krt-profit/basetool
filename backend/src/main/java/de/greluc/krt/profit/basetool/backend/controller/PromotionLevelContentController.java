@@ -58,7 +58,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Promotion Level Contents",
     description = "Manage level content definitions for promotion categories.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class PromotionLevelContentController {
 
   private final PromotionLevelContentService service;

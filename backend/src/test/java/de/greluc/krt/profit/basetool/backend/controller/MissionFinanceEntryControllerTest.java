@@ -67,10 +67,10 @@ class MissionFinanceEntryControllerTest {
   @Mock private MissionFinanceEntryService service;
 
   // Real redactor (not a mock) so the participant-PII assertions exercise the actual
-  // MissionGuestRedactor logic; @Spy makes @InjectMocks wire it into the controller.
+  // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
   @org.mockito.Spy
-  private de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor missionGuestRedactor =
-      new de.greluc.krt.profit.basetool.backend.support.MissionGuestRedactor();
+  private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
+      new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
   @InjectMocks private MissionFinanceEntryController controller;
 
@@ -108,7 +108,7 @@ class MissionFinanceEntryControllerTest {
             false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L, null);
+            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L);
     return new MissionFinanceEntryDto(
         UUID.randomUUID(),
         missionId,

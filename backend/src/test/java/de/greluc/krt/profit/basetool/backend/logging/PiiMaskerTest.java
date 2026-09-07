@@ -319,13 +319,18 @@ class PiiMaskerTest {
 
     @Test
     void stackFrameCarryingTokenInAClassName_survivesIntact() {
-      // Observed in production: this frame reached the centralized log as
-      // "GuestEditToken***(GuestEditToken***:70)" because the separator between keyword and value
-      // was optional, so "Token" matched and swallowed the rest of the identifier. A stack trace
-      // whose frames are truncated at every "Token"/"Authorization" is unusable during triage.
+      // Observed in production: a frame like this reached the centralized log as
+      // "BearerToken***(BearerToken***:60)" because the separator between keyword and value was
+      // optional, so "Token" matched and swallowed the rest of the identifier. A stack trace whose
+      // frames are truncated at every "Token"/"Authorization" is unusable during triage.
+      //
+      // The frame that produced the incident named GuestEditTokenContextFilter, a class ADR-0159
+      // deleted. The example is a Spring Security frame that exists and appears in this app's own
+      // traces, so a reader can reproduce it instead of grepping for a class that is gone.
       String frame =
-          "at de.greluc.krt.profit.basetool.frontend.logging."
-              + "GuestEditTokenContextFilter.doFilterInternal(GuestEditTokenContextFilter.java:70)";
+          "at org.springframework.security.oauth2.server.resource.web.authentication."
+              + "BearerTokenAuthenticationFilter.doFilterInternal"
+              + "(BearerTokenAuthenticationFilter.java:60)";
       assertEquals(frame, PiiMasker.mask(frame));
     }
 

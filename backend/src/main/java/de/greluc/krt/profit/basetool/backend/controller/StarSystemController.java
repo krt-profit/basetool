@@ -47,11 +47,16 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST surface for the star-system reference table. UEX owns the bulk of the data; this controller
  * adds the admin-mutable CRUD for systems UEX doesn't know about yet.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/star-systems")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class StarSystemController {
 
   private final StarSystemService starSystemService;

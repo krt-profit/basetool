@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Admin – Default Blueprints",
     description = "Administrator endpoints for curating the auto-granted default blueprint set.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class AdminDefaultBlueprintController {
 

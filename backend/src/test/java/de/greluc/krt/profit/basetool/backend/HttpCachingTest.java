@@ -41,6 +41,9 @@ import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 @SpringBootTest
 @ActiveProfiles("test")
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 class HttpCachingTest {
 
   @Autowired private WebApplicationContext context;

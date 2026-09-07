@@ -16,7 +16,7 @@
  *    and retries the write exactly once before surfacing the error.
  *  - write (JSON) / submitForm (multipart FormData) — the two write entry
  *    points share ONE request orchestration (send): CSRF header, bare-403
- *    refresh-and-retry-once, X-Reauthenticate redirect, guest-token replay,
+ *    refresh-and-retry-once, X-Reauthenticate redirect,
  *    error/conflict handling, syncVersion and success toast. submitForm lets a
  *    page drop its hand-rolled CSRF+retry FormData loop (S10, #916); it omits
  *    Content-Type so the browser sets the multipart boundary itself.
@@ -239,66 +239,25 @@
     window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
     window.krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
 
-    // ----------------------------------------------- guest edit token (M1)
-
-    // Security audit M1 / REQ-SEC-018: an anonymous guest who signs up for a mission receives a
-    // per-row capability token in the create response. We persist it in localStorage keyed by the
-    // participant id and replay it as the X-Guest-Edit-Token header on later edit/withdraw of THAT
-    // row, so the guest can self-manage their own sign-up without a login while a third party (who
-    // only saw the public roster) cannot. The token is intentionally lost when the user clears site
-    // data — an anonymous caller has no durable server-verifiable identity, so a cleared token falls
-    // back to "a mission manager edits it", never to "anyone can edit it".
-    const GUEST_TOKEN_PREFIX = 'krtGuestParticipantToken:';
-    const GUEST_TOKEN_HEADER = 'X-Guest-Edit-Token';
-    // Matches the participant id segment of a frontend participant write URL
-    // (/missions/{missionId}/participants/{participantId}/...). The create URL
-    // (.../participants/ajax) has no id segment, so no token is attached to it.
-    const PARTICIPANT_URL_RE = /\/participants\/([0-9a-fA-F-]{36})(?:\/|$|\?)/;
-
-    function storeGuestToken(participantId, token) {
-        if (!participantId || !token) {
-            return;
-        }
-        try {
-            window.localStorage.setItem(GUEST_TOKEN_PREFIX + participantId, token);
-        } catch (_unavailable) {
-            /* localStorage blocked (private mode / policy): self-edit then falls back to staff */
-        }
-    }
-
-    function readGuestToken(participantId) {
-        if (!participantId) {
-            return null;
-        }
-        try {
-            return window.localStorage.getItem(GUEST_TOKEN_PREFIX + participantId);
-        } catch (_unavailable) {
-            return null;
-        }
-    }
-
-    function guestTokenForUrl(url) {
-        if (typeof url !== 'string') {
-            return null;
-        }
-        const m = PARTICIPANT_URL_RE.exec(url);
-        return m ? readGuestToken(m[1]) : null;
-    }
+    // The guest edit token (security audit M1 / REQ-SEC-018) lived here: a per-row capability
+    // token handed to an anonymous mission sign-up, persisted in localStorage by participant id and
+    // replayed as X-Guest-Edit-Token so the creator could edit their own row without a login. It is
+    // gone with the sign-up that minted it (ADR-0159) — the backend dropped the column in V239, and
+    // an external participant row is the mission leadership's to edit. Nothing reads the stored
+    // values any more; a browser that still holds one simply never sends it.
 
     /**
      * Assembles the request headers shared by every krtFetch write — the JSON {@link write} and the
      * multipart {@link submitForm} alike: {@code Accept}, {@code X-Requested-With}, the CSRF header
-     * read fresh from the meta tags, and (for a per-row participant write) the REQ-SEC-018 guest edit
-     * token replayed from local storage. A {@code Content-Type: application/json} is added only when
+     * read fresh from the meta tags. A {@code Content-Type: application/json} is added only when
      * {@code json} is true; it is deliberately omitted for a {@code FormData} body so the browser sets
-     * the {@code multipart/form-data} boundary itself. Centralising this here keeps the CSRF + guest
-     * token assembly in one place so the two write paths cannot drift.
+     * the {@code multipart/form-data} boundary itself. Centralising this here keeps the CSRF header
+     * assembly in one place so the two write paths cannot drift.
      *
-     * @param url  the target URL, used to look up a matching per-row guest edit token
      * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
      * @return a plain headers object ready to hand to {@code fetch}
      */
-    function writeHeaders(url, json) {
+    function writeHeaders(json) {
         const headers = { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
         if (json) {
             headers['Content-Type'] = 'application/json';
@@ -308,29 +267,8 @@
         if (token && header) {
             headers[header] = token;
         }
-        // M1 / REQ-SEC-018: replay the per-row guest edit token (if we hold one for this participant)
-        // so an anonymous guest can edit/withdraw their own sign-up. The frontend relays the header to
-        // the backend, which verifies it against the stored hash.
-        const guestToken = guestTokenForUrl(url);
-        if (guestToken) {
-            headers[GUEST_TOKEN_HEADER] = guestToken;
-        }
         return headers;
     }
-
-    // Captures any guest edit token returned by a write response (the create response of a guest
-    // sign-up) into the store. The body is either a single participant object or the slim
-    // participant list; only the freshly created guest row carries a non-null guestEditToken.
-    function captureGuestTokens(body) {
-        const items = Array.isArray(body) ? body : [body];
-        items.forEach(function (it) {
-            if (it && typeof it === 'object' && it.guestEditToken && it.id) {
-                storeGuestToken(it.id, it.guestEditToken);
-            }
-        });
-    }
-
-    window.krtGuestToken = { store: storeGuestToken, read: readGuestToken };
 
     // --------------------------------------------------------------- helpers
 
@@ -666,10 +604,6 @@
                 return { ok: false, status: response.status, body: body };
             }
 
-            // M1 / REQ-SEC-018: capture a per-row guest edit token returned by a guest sign-up
-            // create response so a later edit/withdraw of that row authenticates as the creator.
-            captureGuestTokens(body);
-
             if (opts.containerSelector && body && body.version != null) {
                 syncVersion(opts.containerSelector, body.version);
             }
@@ -727,7 +661,7 @@
             const url = typeof opts.url === 'function' ? opts.url() : opts.url;
             const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
             function buildInit() {
-                const headers = writeHeaders(url, true);
+                const headers = writeHeaders(true);
                 const init = { method: method, headers: headers };
                 if (payload !== undefined && method !== 'GET' && method !== 'DELETE') {
                     init.body = JSON.stringify(payload);
@@ -744,14 +678,13 @@
      * Submits a multipart/form-data (or urlencoded) form write and handles the response via {@link
      * send} — the FormData twin of {@link write} that lets a page drop its hand-rolled CSRF-header +
      * retry-on-403 loop (S10, #916). It inherits every response-side behaviour from {@link send},
-     * including the bare-403 CSRF refresh-and-retry, the X-Reauthenticate redirect (REQ-SEC-012) and
-     * the per-row guest edit token replay (REQ-SEC-018), so a migrated site is a net security
-     * improvement over its bespoke loop.
+     * including the bare-403 CSRF refresh-and-retry and the X-Reauthenticate redirect
+     * (REQ-SEC-012), so a migrated site is a net security improvement over its bespoke loop.
      *
      * <p><b>Content-Type is deliberately NOT set.</b> When the body is a {@code FormData} the browser
      * must set {@code multipart/form-data} together with the boundary parameter itself; a manual
      * Content-Type would omit the boundary and corrupt the parse. So it asks {@link writeHeaders} for
-     * the shared CSRF + guest-token header set with {@code json=false}, which omits the
+     * the shared CSRF header set with {@code json=false}, which omits the
      * {@code Content-Type} that {@link write} forces to {@code application/json}. The CSRF token rides
      * in the header, never in the form body.
      *
@@ -788,7 +721,7 @@
             ).toUpperCase();
 
             function buildInit() {
-                const headers = writeHeaders(url, false);
+                const headers = writeHeaders(false);
                 const body =
                     opts.formData !== undefined
                         ? opts.formData

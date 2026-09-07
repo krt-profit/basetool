@@ -1,0 +1,64 @@
+# promtool unit test for NoRoleBlockSpike (REQ-SEC-053 / REQ-OBS-011, ADR-0159).
+#
+# The alert was rewritten on 2026-09-06 from a request rate onto a distinct-subject gauge, and the
+# two cases below are exactly the pair the rate could not tell apart:
+#
+#   - ONE member waiting for an administrator, whose open tab polls in the background. The refusal
+#     rate is arbitrarily high and sustained; the subject count is 1. The rate version fired.
+#   - A realm-side role rename at 03:00, which locks the whole membership out at a moment when
+#     nobody is making requests. The refusal rate is near zero; the subject count is the
+#     membership. The rate version stayed silent, on the one event it exists for.
+#
+# The third case pins the aggregation: max(), never sum(). The gauge is per process, and two
+# instances refusing the same subject must not read as two people locked out.
+#
+# Run locally (no promtool on the host - use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 promtool test rules tests/norole_block_subjects_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 30s
+
+tests:
+  # ── The event the alert exists for: several accounts at once. ──
+  - name: NoRoleBlockSpike fires when several distinct accounts are refused
+    interval: 30s
+    input_series:
+      - series: 'basetool_norole_refused_subjects{application="basetool-backend", instance="backend:11261"}'
+        values: "12x40"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: NoRoleBlockSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+            exp_annotations:
+              summary: "Several accounts hold no role (basetool-backend)"
+              description: "basetool-backend refused 12 distinct accounts with 403 NO_ROLE in the last 15 minutes (REQ-SEC-053). One or two is ordinary — an admin has not assigned a role yet. More at once is a realm-side role rename, a hand-edit, or tokens arriving from the wrong realm; check the Keycloak role index line in the sync summary."
+
+  # ── The false positive the rewrite removes: one member, polling hard. ──
+  - name: NoRoleBlockSpike stays silent for a single waiting account
+    interval: 30s
+    input_series:
+      - series: 'basetool_norole_refused_subjects{application="basetool-backend", instance="backend:11261"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: NoRoleBlockSpike
+        exp_alerts: []
+
+  # ── The aggregation: two instances holding the same population is still that population. ──
+  - name: NoRoleBlockSpike takes the max across instances rather than summing them
+    interval: 30s
+    input_series:
+      - series: 'basetool_norole_refused_subjects{application="basetool-backend", instance="backend-a:11261"}'
+        values: "2x40"
+      - series: 'basetool_norole_refused_subjects{application="basetool-backend", instance="backend-b:11261"}'
+        values: "2x40"
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: NoRoleBlockSpike
+        exp_alerts: []

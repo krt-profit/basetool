@@ -52,6 +52,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 import org.springframework.security.web.session.SessionInformationExpiredStrategy;
 
@@ -108,12 +110,41 @@ public class SecurityConfig {
         """);
   }
 
+  /** The browser's own word for "this is a page navigation" (Fetch Metadata). */
+  private static final String SEC_FETCH_MODE_HEADER = "Sec-Fetch-Mode";
+
+  /** The {@code Sec-Fetch-Mode} value a top-level navigation carries. */
+  private static final String NAVIGATE_FETCH_MODE = "navigate";
+
+  /**
+   * Marks one of our own monitoring probes, so the request cache does not remember it.
+   *
+   * <p>Set by the {@code http_members_only_redirect} blackbox module and by the nightly {@code
+   * edge-deny-probe} workflow. Both assert {@code Sec-Fetch-Mode: navigate} deliberately - a
+   * background call answers {@code 401} by design (REQ-SEC-012), so probing without it would assert
+   * the wrong half of the contract - and that is exactly the branch {@link
+   * #navigationRequestCache()} saves.
+   */
+  private static final String MONITORING_PROBE_HEADER = "X-Basetool-Probe";
+
   /**
    * Main security filter chain. Wires CSP-nonce, bot-protection, session-debug, request-logging and
    * backend-role-sync filters; configures OAuth2 login against Keycloak with smart OIDC logout; and
    * declares the path-by-path permitAll / authenticated matrix. The injected Keycloak issuer URI
    * feeds the CSP {@code form-action} allow-list so the POST-logout redirect to Keycloak's
    * end-session endpoint is not blocked by the browser.
+   *
+   * @param http the builder to configure
+   * @param clientRegistrationRepository the OAuth2 client registry the entry point redirects
+   *     through
+   * @param keycloakIssuerUri the issuer URI fed into the CSP {@code form-action} allow-list
+   * @param sessionRegistryProvider the Redis-backed session registry, absent in the {@code test}
+   *     profile
+   * @param oauth2LoginSuccessHandler the post-login handler chain
+   * @param navigationRequestCache the one request cache, shared with that handler and its delegate
+   * @param oauthAuthorizationCodeTokenResponseClient the pool-hardened token client (ADR-0115)
+   * @return the configured filter chain
+   * @throws Exception if the builder rejects the configuration
    */
   @Bean
   public SecurityFilterChain filterChain(
@@ -125,6 +156,7 @@ public class SecurityConfig {
               org.springframework.security.core.session.SessionRegistry>
           sessionRegistryProvider,
       AuthenticationSuccessHandler oauth2LoginSuccessHandler,
+      RequestCache navigationRequestCache,
       org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient<
               org.springframework.security.oauth2.client.endpoint
                   .OAuth2AuthorizationCodeGrantRequest>
@@ -166,18 +198,18 @@ public class SecurityConfig {
         // `th:action` auto-include the `_csrf` hidden field through Spring Security's view
         // integration. The default Spring Security CSRF setup is therefore left intact, no
         // ignoringRequestMatchers needed.
+        .requestCache(cache -> cache.requestCache(navigationRequestCache))
         .csrf(org.springframework.security.config.Customizer.withDefaults())
         .headers(SecurityHeaders.frontend(keycloakIssuerUri))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(
-                        org.springframework.http.HttpMethod.POST,
-                        "/missions/*/managers",
-                        "/missions/*/managers/*")
-                    .authenticated()
-                    .requestMatchers(
-                        org.springframework.http.HttpMethod.DELETE, "/missions/*/managers/*")
-                    .authenticated()
+                auth
+                    // The three manager-write entries that stood here are gone. They existed to
+                    // carve those writes back OUT of the /missions/** permitAll that used to sit
+                    // below them; with that block deleted (REQ-SEC-052) they said exactly what
+                    // anyRequest().authenticated() already says. A matrix in which most entries
+                    // restate the catch-all cannot be read against REQ-SEC-052's table, which is
+                    // why every other such entry went in this change too.
                     // Actuator health endpoint reached by the Docker HEALTHCHECK / compose
                     // service_healthy gating. Other actuator endpoints fall through to the
                     // anyRequest().authenticated() catch-all below.
@@ -221,46 +253,27 @@ public class SecurityConfig {
                         "/sm/**",
                         "/**/*.map")
                     .permitAll()
-                    .requestMatchers("/missions", "/missions/")
-                    .permitAll()
-                    .requestMatchers("/missions/**")
-                    .permitAll() // Still permitAll for general access, @PreAuthorize or logic
-                    // inside handles details
-                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one socket
-                    // per tab carrying every peer-sync topic. Authenticated only — anonymous guests
-                    // get no socket (their order creates are relayed server-side instead), and both
-                    // publish and subscribe require an authenticated principal; only opaque section
-                    // keys cross it and each fragment re-pull re-authorizes per viewer.
+                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one
+                    // socket per tab carrying every peer-sync topic. Both publish and subscribe
+                    // require an authenticated principal; only opaque section keys cross it and
+                    // each fragment re-pull re-authorizes per viewer. Listed explicitly rather than
+                    // left to the catch-all because the handshake interceptor itself always returns
+                    // true — this rule is the whole gate.
                     .requestMatchers("/ws/sync")
                     .authenticated()
-                    .requestMatchers("/operations", "/operations/")
-                    .permitAll()
-                    .requestMatchers("/operations/**")
-                    .permitAll()
-                    // The order queue stays readable without a login, as it always was. Creating
-                    // one does not: the public request form is gone (ADR-0149), so /orders/create
-                    // — and the POST behind it — need a principal. Listed before the wildcard so
-                    // the wildcard cannot re-open it.
-                    .requestMatchers(
-                        "/orders/create",
-                        "/orders/create/**",
-                        "/orders/items",
-                        "/orders/item-search",
-                        "/orders/item-blueprints/**",
-                        "/orders/item-derivation/**")
-                    .authenticated()
-                    .requestMatchers("/orders", "/orders/")
-                    .permitAll()
-                    .requestMatchers("/orders/**")
-                    .permitAll()
-                    // Catalog picker live-search relays (REQ-FE-016). They proxy permitAll backend
-                    // catalog endpoints and expose only public catalog names (materials /
-                    // locations). Their original reason was the anonymous order form's material
-                    // picker (gone, ADR-0149), but they now serve authenticated pickers across
-                    // several forms and the payload was never caller-specific, so they stay public
-                    // rather than being closed as a side effect of an unrelated change.
-                    .requestMatchers("/catalog/**")
-                    .permitAll()
+                    // REQ-SEC-052 / ADR-0159: everything else requires a login. The five families
+                    // that used to sit here — /missions, /missions/**, /operations(/**),
+                    // /orders(/**) and /catalog/** — are gone, and with them the last surface an
+                    // unauthenticated visitor could read data from. They fall through to
+                    // anyRequest().authenticated() below, so a navigation is sent into the OAuth2
+                    // entry point and a background fetch answers 401 REAUTH_REQUIRED.
+                    //
+                    // The /orders/create block that preceded them is gone too: it carved the
+                    // creation paths back OUT of the /orders/** permitAll after ADR-0149 took the
+                    // public request form away, and with the wildcard removed it restates the
+                    // catch-all. Its history is in ADR-0149; its behaviour is pinned by
+                    // AnonymousSurfaceSweepMvcTest, which asserts the status of every mapping
+                    // rather than trusting this list to be complete.
                     .anyRequest()
                     .authenticated())
         .oauth2Login(
@@ -375,6 +388,113 @@ public class SecurityConfig {
   }
 
   /**
+   * The one request cache in the frontend, and the only place a pre-login request may create a
+   * session.
+   *
+   * <p>Spring Security's default {@link HttpSessionRequestCache} saves <em>every</em> refused
+   * request so the caller can be sent back after login. That was tolerable while most of the tool
+   * answered anonymously; with REQ-SEC-052 every path refuses, so each background call a logged-out
+   * browser makes — a poll, a prefetch, an {@code Accept: application/json} fetch, an SSE reconnect
+   * — would mint a session in Redis to hold a URL nobody will ever be redirected to.
+   *
+   * <p>The matcher therefore admits only what a redirect-after-login can sensibly replay: a {@code
+   * GET} the browser itself calls a navigation. {@code Sec-Fetch-Mode: navigate} is the browser's
+   * own word for it and is sent by every engine the tool supports; the {@code Accept: text/html}
+   * fallback covers a client that does not send Fetch Metadata. Everything else is refused without
+   * a saved request and therefore without a session.
+   *
+   * <p><strong>One instance, injected in both directions.</strong> {@link
+   * AssetAwareAuthenticationSuccessHandler} used to construct a private {@code new
+   * HttpSessionRequestCache()} and its {@code SavedRequestAwareAuthenticationSuccessHandler}
+   * delegate a third — three caches over the same session attribute, which happened to agree only
+   * because they all used the default attribute name. A matcher on one of them would have been read
+   * by none of the others.
+   *
+   * @return the shared request cache; never {@code null}
+   */
+  @Bean
+  public RequestCache navigationRequestCache() {
+    HttpSessionRequestCache cache = new HttpSessionRequestCache();
+    cache.setRequestMatcher(
+        request ->
+            org.springframework.http.HttpMethod.GET.matches(request.getMethod())
+                && isNavigation(request)
+                && !isMonitoringProbe(request));
+    return cache;
+  }
+
+  /**
+   * Whether this request is a browser navigation, and therefore worth remembering for the redirect
+   * after the login.
+   *
+   * <p><b>The Fetch Metadata header wins where it is present; the {@code Accept} test is the
+   * fallback, not a second chance.</b> The two were ORed at first, which meant a background call
+   * that says {@code Sec-Fetch-Mode: cors} and also asks for HTML — a fragment refetch, an
+   * htmx-style partial, a prefetch — saved a request and minted a Redis session anyway. That is the
+   * churn WP-F 11 exists to remove, and it lands hardest on exactly the five page families this
+   * change moved out of {@code permitAll}; it can also overwrite a genuine deep link with a
+   * fragment URL, so the member returns from the login to half a page. A browser that sends the
+   * header has already answered the question, and {@code
+   * SsoReAuthenticationEntryPoint.isBackgroundRequest} treats it the same way.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} for a declared navigation, or for an HTML {@code Accept} when the client
+   *     sends no Fetch Metadata at all
+   */
+  private static boolean isNavigation(@NotNull jakarta.servlet.http.HttpServletRequest request) {
+    String fetchMode = request.getHeader(SEC_FETCH_MODE_HEADER);
+    if (fetchMode != null) {
+      return NAVIGATE_FETCH_MODE.equalsIgnoreCase(fetchMode);
+    }
+    return acceptsHtml(request);
+  }
+
+  /**
+   * Whether this request is one of our own monitoring probes, which must not be remembered.
+   *
+   * <p><b>Saving a probe costs a Redis session, permanently.</b> {@code HttpSessionRequestCache}
+   * calls {@code request.getSession()} to hold the saved request, and
+   * {@code @EnableRedisIndexedHttpSession} writes it. The members-only probe hits three targets
+   * every 30 seconds and declares itself a navigation on purpose, so against the 30-minute {@code
+   * app.session.anonymous-timeout} it settles at roughly 180 permanently resident anonymous
+   * sessions and some 8,600 session writes a day, indefinitely - plus three more per nightly
+   * edge-deny run. That is precisely the accretion WP-F 11 exists to remove and the mechanism
+   * behind the >16k-orphan incident this cache's own comment cites: monitoring the fix must not
+   * reintroduce what the fix removed.
+   *
+   * <p>Keyed on a header rather than on the User-Agent because the probe can simply declare itself,
+   * and a User-Agent match would be a guess that breaks the day the exporter is upgraded. The
+   * header being client-settable is not a weakness: the only thing sending it can do is give up
+   * <em>your own</em> deep-link replay after login. It grants nothing, reveals nothing, and reaches
+   * no authorization decision - {@code anyRequest().authenticated()} refuses the request either
+   * way.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} when the request carries the probe marker
+   */
+  private static boolean isMonitoringProbe(
+      @NotNull jakarta.servlet.http.HttpServletRequest request) {
+    return request.getHeader(MONITORING_PROBE_HEADER) != null;
+  }
+
+  /**
+   * Whether the request asks for HTML, used as the fallback when a client sends no {@code
+   * Sec-Fetch-Mode}. Deliberately a substring test on the raw header: a browser navigation sends a
+   * long {@code Accept} list beginning with {@code text/html}, and a background fetch does not name
+   * it at all.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} when the {@code Accept} header names {@code text/html}
+   */
+  private static boolean acceptsHtml(@NotNull jakarta.servlet.http.HttpServletRequest request) {
+    String accept = request.getHeader(org.springframework.http.HttpHeaders.ACCEPT);
+    return accept != null
+        && accept
+            .toLowerCase(java.util.Locale.ROOT)
+            .contains(org.springframework.http.MediaType.TEXT_HTML_VALUE);
+  }
+
+  /**
    * Builds the post-OAuth2-login success handler chain. Innermost is the {@link
    * AssetAwareAuthenticationSuccessHandler}, which wraps the default {@link
    * org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler}
@@ -392,7 +512,8 @@ public class SecurityConfig {
    */
   @Bean
   public AuthenticationSuccessHandler oauth2LoginSuccessHandler(
-      @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout) {
+      @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout,
+      RequestCache navigationRequestCache) {
     // #1041 item 18: the outer metrics handler counts a success into
     // basetool_login_total{outcome="success"} — the denominator FrontendLoginBroken checks against.
     // REQ-SEC-025: the middle handler upgrades the just-authenticated session's idle window from
@@ -402,7 +523,10 @@ public class SecurityConfig {
     return new LoginSuccessMetricsHandler(
         meterRegistry,
         new SessionLifetimeUpgradeSuccessHandler(
-            authenticatedSessionTimeout, new AssetAwareAuthenticationSuccessHandler()));
+            authenticatedSessionTimeout,
+            // WP-F 11: the SAME cache the chain saves into. A second instance here would read the
+            // same session attribute by luck and ignore the matcher above.
+            new AssetAwareAuthenticationSuccessHandler(navigationRequestCache)));
   }
 
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(

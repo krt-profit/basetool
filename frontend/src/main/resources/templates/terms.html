@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{})}">
-    <title th:text="${appTitle} + ' - ' + ${terms.title}">Profit Basetool - Nutzungsbedingungen</title>
+    <title th:text="${appTitle} + ' - ' + (${terms} != null ? ${terms.title} : ${#messages.msg('terms.unavailable.title')})">Profit Basetool - Nutzungsbedingungen</title>
 </head>
 <body>
 <th:block th:replace="~{fragments/sidebar :: sidebar}" />
@@ -21,8 +21,21 @@
 </header>
 <main>
     <div class="hud-box mt-2">
-        <h1 th:text="${terms.title}">Nutzungsbedingungen</h1>
-        <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
+        <h1 th:if="${terms != null}" th:text="${terms.title}">Nutzungsbedingungen</h1>
+        <h1 th:if="${terms == null}" th:text="#{terms.unavailable.title}">Nutzungsbedingungen</h1>
+        <!-- The document comes from the backend, and this is a PUBLIC page (REQ-SEC-052) reachable
+             with no session at all: a Resilience4j fallback or a backend blip hands the model a
+             null, and every expression below would then fail during rendering. Spring MVC does not
+             route a render failure through the exception resolvers, so it surfaces as a bare 500 on
+             the one page a logged-out visitor is meant to be able to read - and on the page the
+             terms gate sends every member to. It degrades to a notice instead. -->
+        <!-- The th:if sits on an OUTER element on purpose: Thymeleaf evaluates fragment inclusion
+             (precedence 100) BEFORE th:if (300), so the two on one element include the fragment
+             regardless and it throws on the null anyway. -->
+        <th:block th:if="${terms != null}">
+            <th:block th:replace="~{fragments/terms-body :: termsBody(${terms})}" />
+        </th:block>
+        <p th:if="${terms == null}" th:text="#{terms.unavailable}">Die Nutzungsbedingungen k&ouml;nnen gerade nicht geladen werden.</p>
     </div>
 </main>
 </body>

@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
  *   <li>Values introduced by the keywords {@code bearer}, {@code token}, {@code session-id} or
  *       {@code authorization} keep the keyword and replace the trailing value with {@code ***}. The
  *       keyword only counts when a separator follows it ({@code :}, {@code =} or whitespace), so an
- *       identifier that merely contains one of them -&gt; a {@code GuestEditTokenContextFilter}
+ *       identifier that merely contains one of them -&gt; a {@code BearerTokenAuthenticationFilter}
  *       stack frame, an {@code AuthorizationFilter} class name -&gt; survives intact instead of
  *       being truncated at the keyword.
  * </ul>
@@ -60,7 +60,7 @@ public final class PiiMasker {
   // The keyword must be followed by a real separator - ":", "=" or whitespace. With the
   // separator optional, every identifier that merely CONTAINS one of the keywords was eaten
   // together with everything after it: a stack frame
-  // "GuestEditTokenContextFilter.doFilterInternal" reached the log as "GuestEditToken***" and
+  // "BearerTokenAuthenticationFilter.doFilter" reached the log as "BearerToken***" and
   // "...intercept.AuthorizationFilter.doFilter" as "Authorization***", which is exactly the
   // information an incident needs. Requiring the separator loses no secret: a token is logged as
   // "token=x", "token: x" or "Bearer x", never as "tokenx".

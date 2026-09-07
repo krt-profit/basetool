@@ -170,7 +170,7 @@ app:
       client-ids: ${APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS:}
     # Which Keycloak clients mint tokens whose realm-role claim is deliberately incomplete, and
     # whose roles must therefore never be written to app_user (REQ-SEC-036). The mobile client runs
-    # with fullScopeAllowed:false and an explicit five-role scope; the realm holds eight, so Guest,
+    # with fullScopeAllowed:false and an explicit five-role scope; the realm holds more, so
     # Logistician and Mission Manager are absent from its tokens and persisting its claim would
     # strip them from a member's row. (Until 2026-09-02 the missing role was Admin, which is the
     # form of this that actually bit -- see the REQ-SEC-035 reversal.) Matched on azp. Unlike
@@ -338,16 +338,14 @@ app:
       refillPeriod: 1m
     # Audit finding L-5 (2026-05-20): tighter per-endpoint budgets layered on top of the global
     # 300/min/IP bucket. A spam attacker with one fixed IP trips the per-endpoint budget below
-    # before the loose global budget is even touched, so a flood of anonymous joborder POSTs
-    # cannot starve the legitimate read traffic. Capacities are sized for the realistic squadron
+    # before the loose global budget is even touched, so a flood of job-order POSTs from one
+    # address cannot starve the legitimate read traffic. Capacities are sized for the realistic squadron
     # workload — a single human files at most a handful of these per minute; the limits leave
     # the legitimate user with comfortable headroom while flagging programmatic abuse.
     rules:
       - name: mission-create
-        # POST /api/v1/missions is permitAll at the URL layer but the method gate
-        # (MissionController#createMission @PreAuthorize("isAuthenticated()")) requires an
-        # authenticated caller — anonymous creation is NOT possible. The endpoint runs a Mission
-        # row insert + index update. 100/min/IP so legitimate high-volume submission (an operator
+        # POST /api/v1/missions requires a login at both layers (REQ-SEC-052 and the method gate
+        # MissionController#createMission). The endpoint runs a Mission row insert + index update. 100/min/IP so legitimate high-volume submission (an operator
         # seeding many missions back-to-back) is not throttled; the edge limiter (20 r/s per IP,
         # REQ-SEC-023) and the global budget still bound outright flooding.
         methods: [POST]
@@ -357,8 +355,8 @@ app:
         refillTokens: 100
         refillPeriod: 1m
       - name: order-create
-        # Anonymous can create job orders via POST /api/v1/orders AND item job orders via POST
-        # /api/v1/orders/items (both permitAll, CLAUDE.md: gewollt). The item-order create is the
+        # Both job-order creates — POST /api/v1/orders and POST /api/v1/orders/items — require a
+        # login (ADR-0149, and REQ-SEC-052 for the URL layer). The item-order create is the
         # heavier of the two (it derives each ordered item's materials from its blueprint and, like
         # the material create, opens with a table-wide pessimistic lock over job_orders), so it MUST
         # share this tight budget. Both paths are listed explicitly: the matcher uses Spring
@@ -374,8 +372,9 @@ app:
         refillTokens: 100
         refillPeriod: 1m
       - name: finance-entry-create
-        # POST /api/v1/finance-entries requires an authenticated member: it is .authenticated() in
-        # SecurityConfig and gated by isMemberOrAbove at the method layer (no longer anonymous). A
+        # POST /api/v1/finance-entries requires an authenticated member: it falls to the
+        # authenticated catch-all in SecurityConfig and is gated by isMemberOrAbove at the method
+        # layer. A
         # mission may legitimately accrue many finance entries across its lifecycle from the same
         # member IP. 200/min/IP; the edge limiter (20 r/s per IP, REQ-SEC-023) and the global budget
         # still bound outright flooding.
@@ -386,15 +385,20 @@ app:
         refillTokens: 200
         refillPeriod: 1m
       - name: participant-mutations
-        # Covers the participant flows reachable by both anonymous guests and mission managers:
-        # add, slim add, update, check-in, check-out, payout-preference change, delete (legacy and
-        # /slim variants). The tightest realistic load is NOT the lone guest (join -> check-in ->
-        # maybe a payout flip -> check-out ~= 4-6 calls) but a mission manager building out a large
-        # operation's roster in one sitting — bulk-adding dozens of participants and checking them in
-        # back-to-back while assigning crews. 500/min/IP gives that power-user flow ample headroom
-        # while still killing a script that spams the participant table (a human cannot click ~8
-        # participant mutations per second). Raised from 30 (via 120), which was tuned for the
-        # lone-guest path and kept blocking managers mid-roster.
+        # Covers every participant flow: add, slim add, update, check-in, check-out,
+        # payout-preference change, delete (legacy and /slim variants). The tightest realistic load
+        # is NOT a member managing their own row (join -> check-in -> maybe a payout flip ->
+        # check-out ~= 4-6 calls) but a mission manager building out a large operation's roster in
+        # one sitting — bulk-adding dozens of participants and checking them in back-to-back while
+        # assigning crews. 500/min/IP gives that power-user flow ample headroom while still killing
+        # a script that spams the participant table (a human cannot click ~8 participant mutations
+        # per second). Raised from 30 (via 120), which was tuned for a single sign-up path and kept
+        # blocking managers mid-roster.
+        #
+        # Still keyed by IP rather than by subject, and that is now the only reason this bucket is
+        # not simply the per-subject limiter's job: a CGNAT'd squadron shares one address, which is
+        # why the cap is generous. REQ-SEC-033's per-subject budget bounds the account; this bounds
+        # the address.
         methods: [POST, PUT, DELETE]
         paths:
           - /api/v1/missions/*/participants

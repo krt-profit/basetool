@@ -104,7 +104,7 @@ class MissionServiceTest {
   // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
   // covers REQ-MISSION-008 — admin all-scope falls back to the organisation-wide next mission
   @Test
-  void getNextMission_allowInternal_refetchesByIdThroughGraph() {
+  void getNextMission_refetchesByIdThroughGraph() {
     // The limit-1 lookup is intentionally not graphed (a collection fetch + limit forces in-memory
     // pagination, HHH90003004); the service re-fetches the hit by id via the graphed findById so
     // the collections are eagerly loaded for the mapper.
@@ -121,37 +121,11 @@ class MissionServiceTest {
         .thenReturn(Optional.of(head));
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
-    Optional<Mission> result = missionService.getNextMission(true);
+    Optional<Mission> result = missionService.getNextMission();
 
     assertSame(detail, result.orElseThrow(), "must return the graphed findById re-fetch");
     verify(missionRepository)
         .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-            any(), eq(List.of("PLANNED", "ACTIVE")));
-    verify(missionRepository).findById(id);
-  }
-
-  // covers REQ-MISSION-008 — an anonymous/membershipless caller keeps the unscoped public fallback
-  @Test
-  void getNextMission_guest_usesInternalFalseVariantThenRefetches() {
-    UUID id = UUID.randomUUID();
-    Mission head = new Mission();
-    head.setId(id);
-    Mission detail = new Mission();
-    detail.setId(id);
-    // No admin-all, no pin, no membership → unscoped fallback path; allowInternal=false → public.
-    when(ownerScopeService.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(missionRepository
-            .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
-                any(), eq(List.of("PLANNED", "ACTIVE"))))
-        .thenReturn(Optional.of(head));
-    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
-
-    Optional<Mission> result = missionService.getNextMission(false);
-
-    assertSame(detail, result.orElseThrow());
-    verify(missionRepository)
-        .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
             any(), eq(List.of("PLANNED", "ACTIVE")));
     verify(missionRepository).findById(id);
   }
@@ -164,7 +138,7 @@ class MissionServiceTest {
             any(), eq(List.of("PLANNED", "ACTIVE"))))
         .thenReturn(Optional.empty());
 
-    Optional<Mission> result = missionService.getNextMission(true);
+    Optional<Mission> result = missionService.getNextMission();
 
     assertEquals(Optional.empty(), result);
     verify(missionRepository, never()).findById(any());
@@ -182,16 +156,16 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any()))
+            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
         .thenReturn(List.of(head));
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
-    Optional<Mission> result = missionService.getNextMission(true);
+    Optional<Mission> result = missionService.getNextMission();
 
     assertSame(detail, result.orElseThrow(), "scoped lookup must re-fetch the hit by id");
     verify(missionRepository)
         .findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any());
+            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any());
     verify(missionRepository).findById(id);
     // The unscoped finders must NOT run for a scoped caller.
     verify(missionRepository, never())
@@ -210,16 +184,16 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pin, Set.of()));
     when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), eq(pin), eq(Set.of()), any()))
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any()))
         .thenReturn(List.of(head));
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
-    Optional<Mission> result = missionService.getNextMission(true);
+    Optional<Mission> result = missionService.getNextMission();
 
     assertSame(detail, result.orElseThrow());
     verify(missionRepository)
         .findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), eq(pin), eq(Set.of()), any());
+            any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any());
   }
 
   // covers REQ-MISSION-008 — a scoped caller with no upcoming own-unit mission gets nothing
@@ -229,10 +203,10 @@ class MissionServiceTest {
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
     when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(true), isNull(), eq(Set.of(orgA)), any()))
+            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
         .thenReturn(List.of());
 
-    Optional<Mission> result = missionService.getNextMission(true);
+    Optional<Mission> result = missionService.getNextMission();
 
     assertEquals(Optional.empty(), result);
     verify(missionRepository, never()).findById(any());
@@ -357,21 +331,23 @@ class MissionServiceTest {
     List<String> status =
         List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED"); // Default expected when null passed
 
-    // M-1: searchMissions now forces {@code isInternal=false} for anonymous callers. This
-    // Mockito unit test runs with no SecurityContext (anonymous), so the service rewrites the
-    // {@code null} input to {@code Boolean.FALSE} before delegating to the repository.
+    // The M-1 override is gone with ADR-0159: searchMissions used to rewrite a null isInternal to
+    // FALSE for an unauthenticated caller, as defence-in-depth against a controller forgetting to
+    // pass it. There is no unauthenticated caller on this path any more, and
+    // currentScopePredicate() throws for one rather than building an empty predicate — so the
+    // filter is passed through untouched and the scope decides.
     Pageable pageable = PageRequest.of(0, 10);
     when(ownerScopeService.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(missionRepository.searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable))
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable))
         .thenReturn(Page.empty());
 
     missionService.searchMissions(query, start, end, null, null, null, pageable);
 
     verify(missionRepository)
         .searchMissions(
-            query, start, end, status, Boolean.FALSE, null, false, null, Set.of(), false, pageable);
+            query, start, end, status, null, null, false, null, Set.of(), false, pageable);
   }
 
   @Test

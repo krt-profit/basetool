@@ -324,9 +324,10 @@ for a change that never needed one.
 
 Leave **Full scope allowed** off while doing it. Turning it on is the one Console switch that
 quietly undoes REQ-SEC-035: the scope mapping would stop deciding anything and the app would carry
-every realm role the member holds, `Logistician`, `Mission Manager` and `Guest` included. Since the
-2026-09-02 reversal the scope does carry `Admin`, so this is no longer about that one role — it is
-about the list staying an explicit, converged decision rather than "whatever the member has".
+every realm role the member holds. Since the 2026-09-02 reversal the scope does carry `Admin`, so
+this is no longer about that one role — it is about the list staying an explicit, converged decision
+rather than "whatever the member has". (`Guest` used to be on that list of examples; `V239` deleted
+the role — ADR-0159.)
 
 **Rollback.** Remove the two entries by name and, if the client itself should go, delete it. Both
 client-policy endpoints replace the whole realm-global list, so read the current list first and

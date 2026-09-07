@@ -89,8 +89,6 @@ public class AccessGateService {
    *   <li>Admin or non-admin pinned to one org unit: {@code true} only for that pinned id.
    *   <li>Non-admin without a pin: {@code true} for any org unit they are a member of — the union
    *       of their Staffel <em>and</em> every Spezialkommando they belong to.
-   *   <li>Anonymous: {@code false} for everything (only Mission's {@code isInternal = false} public
-   *       escape, applied by the callers, lets a guest through).
    * </ul>
    *
    * <p>Before this delegated to {@link RequestScopeResolver#currentScopePredicate()} it consulted
@@ -207,13 +205,18 @@ public class AccessGateService {
    * <p>Audit hardenings on top of the cross-staffel rule:
    *
    * <ul>
-   *   <li><b>M-2</b>: anonymous callers do not see {@code COMPLETED} / {@code CANCELLED} missions
-   *       at all. The mission archive is restricted to authenticated members so a guest cannot
-   *       (re-)write the participant list / finance ledger of an already-archived mission.
    *   <li><b>M-3</b>: walks the {@code parent} chain — a sub-mission with {@code isInternal=false}
-   *       below an {@code isInternal=true} parent does not leak the parent's existence to anonymous
-   *       callers. If ANY ancestor is internal-and-foreign, access is denied.
+   *       below an {@code isInternal=true} parent does not leak the parent's existence to a member
+   *       outside the owning unit. If ANY ancestor is internal-and-foreign, access is denied.
    * </ul>
+   *
+   * <p><b>M-2 is gone with its audience.</b> It denied {@code COMPLETED} / {@code CANCELLED}
+   * missions to unauthenticated callers, so a guest holding a row capability token could not
+   * (re-)write the participant list or finance ledger of an archived mission. Both halves of that
+   * sentence stopped existing with ADR-0159 — there is no unauthenticated caller and no capability
+   * token — and keeping the branch would have meant a condition that can only ever be false sitting
+   * in the middle of the mission visibility rule, read by every later reader as if it did
+   * something.
    *
    * @param missionId mission to inspect; never {@code null}.
    * @return {@code true} iff the caller may read the mission.
@@ -228,10 +231,6 @@ public class AccessGateService {
         .findByIdForAuthorization(missionId)
         .map(
             m -> {
-              if (!authHelper.isAuthenticated()
-                  && ("COMPLETED".equals(m.getStatus()) || "CANCELLED".equals(m.getStatus()))) {
-                return false;
-              }
               for (Mission ancestor = m; ancestor != null; ancestor = ancestor.getParent()) {
                 if (!canSeeMissionRow(ancestor)) {
                   return false;
@@ -248,12 +247,12 @@ public class AccessGateService {
    * <ul>
    *   <li><b>Ownerless mission</b> ({@code owningOrgUnit == null}, a leadership / "Bereichsleitung"
    *       mission created by a user who belongs to no OrgUnit): visible to everyone when
-   *       non-internal (the public default), and to organisation members-or-above ({@link
-   *       AuthHelperService#isMemberOrAbove()}, which reaches admins) when internal. An internal
-   *       ownerless mission is thus hidden from guests and anonymous visitors — the membershipless
-   *       analogue of a Staffel-internal mission being visible to that Staffel.
+   *       non-internal (the organisation-wide default), and to members-or-above ({@link
+   *       AuthHelperService#isMemberOrAbove()}, which reaches admins) when internal — the
+   *       membershipless analogue of a Staffel-internal mission being visible to that Staffel.
    *   <li><b>Org-owned mission</b>: visible if the caller may see the owning org unit, or the
-   *       mission is explicitly non-internal (the cross-staffel public escape).
+   *       mission is explicitly non-internal (the organisation-wide escape of REQ-ORG-009: every
+   *       <em>member</em>, never everyone).
    * </ul>
    */
   private boolean canSeeMissionRow(Mission m) {
@@ -582,8 +581,8 @@ public class AccessGateService {
   /**
    * {@code true} iff the current authenticated principal is the per-user owner of the row carrying
    * {@code owner}. The JWT {@code sub} is the {@code app_user} primary key, so {@link
-   * AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}. An
-   * anonymous caller (no {@code currentUserId}) and a {@code null} / id-less owner never match.
+   * AuthHelperService#currentUserId()} compares directly against {@code owner.getId()}. An caller
+   * with no resolvable id and a {@code null} / id-less owner never match.
    *
    * @param owner the row's per-user owner ({@code inventory_item.user}, {@code ship.owner}, {@code
    *     refinery_order.owner}); may be {@code null}, which never matches.
@@ -871,10 +870,10 @@ public class AccessGateService {
    *   <li>the operation is an <em>ownerless leadership operation</em> ({@code owningOrgUnit ==
    *       null}, V145) and the caller is a member-or-above — operations have no public escape, so
    *       an ownerless operation is the org-wide analogue of a Staffel-internal operation, hidden
-   *       from guests/anonymous (REQ-ORG-009);
+   *       from members outside the owning unit (REQ-ORG-009);
    *   <li>the caller <em>participated</em> in one of the operation's linked missions (#500) — any
    *       authenticated participant may view the operation and their payout regardless of its
-   *       owning OrgUnit. Anonymous callers never match (no {@code currentUserId}).
+   *       owning OrgUnit. A caller with no resolvable id never matches.
    * </ul>
    *
    * <p>Non-existent ids return {@code false}.
@@ -927,7 +926,7 @@ public class AccessGateService {
   /**
    * {@code true} iff the current (authenticated) caller participated in one of the operation's
    * linked missions (#500). Backs the participant-visibility escape of {@link
-   * #canSeeOperation(UUID)}; an anonymous caller (no {@code currentUserId}) never participates.
+   * #canSeeOperation(UUID)}; a caller with no resolvable id never participates.
    *
    * @param operationId the operation to test; never {@code null}.
    * @return {@code true} iff the caller is a participant of one of the operation's missions.

@@ -385,13 +385,14 @@ Concrete handling, in order:
   attribute the claim, and the claim is a live independent aggregate that must survive).
 
 **The deleted-user placeholder.** A participant row whose `user_id` was nulled by `unlinkUser`
-carries no name: `guest_name` is populated only on the guest branch of sign-up, never for a
-user-linked one. `user_id IS NULL AND guest_name IS NULL` is therefore an unambiguous marker for
-"this was a deleted account", and every render site resolves it to `mission.participant.deleted`
-("Gelöschter Nutzer" / "Deleted user") instead of an empty cell. Two behaviours hang off the same
-discriminator: the roster's "Gast" chip and the edit/delete actions that any viewer may use on a
-guest row are both narrowed to `guest_name != null`, so a deleted account is neither mislabelled as
-a guest nor made editable by everyone. `OperationPayoutCalculator.participantKey` returns
+carries no name: `guest_name` — the column that holds an **external** participant's free-text name
+(ADR-0159 decision D4; the column keeps its name, the concept is no longer a "guest") — is populated
+only on that branch of sign-up, never for a user-linked row. `user_id IS NULL AND guest_name IS NULL`
+is therefore an unambiguous marker for "this was a deleted account", and every render site resolves
+it to `mission.participant.deleted` ("Gelöschter Nutzer" / "Deleted user") instead of an empty cell.
+Two behaviours hang off the same discriminator: the roster's "Extern" chip and the edit/delete
+actions available on an external row are both narrowed to `guest_name != null`, so a deleted account
+is neither mislabelled as external nor made editable by everyone. `OperationPayoutCalculator.participantKey` returns
 `deleted_<participantId>` for such a row — without it the key was `null`, the row dropped out of the
 payout breakdown entirely, and the percentages and aUEC of an **already-settled historical**
 operation silently recomputed whenever some unrelated member was deleted, redistributing expenses

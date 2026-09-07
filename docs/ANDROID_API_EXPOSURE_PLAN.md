@@ -1,10 +1,21 @@
 # Android API Exposure — Phase 0 execution plan
 
 Doc type: **living plan** (draft, pending approval by @greluc).
-Scope: everything that must happen **in this repository and on the production host** before the
-native Android app (`krt-profit/basetool-android`) can talk to the Basetool for real. The app-side
-concept lives in the app repo (`docs/ANDROID_APP_PLAN.md`, `docs/ANDROID_APP_SECURITY.md`); this
-document is the server half of its Phase 0 and the only place where the work is ordered.
+
+> **Dated note, 2026-09-06 — the anonymous surface this plan works around is gone.**
+> [ADR-0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md) / `REQ-SEC-052` closed
+> every anonymous path except the landing page, the legal pages, the assets and two documented API
+> reads (`GET /api/v1/terms/document`, `GET /api/v1/app/version-policy`). Everything below that
+> reasons about guest mission edits, anonymous order creation or a branchy anonymous surface
+> describes the state this plan was written in and is kept as the record of why the vhost is a
+> default-deny allow-list. The allow-list itself is **unchanged** by that decision: it still admits
+> the same paths, and the backend now refuses the caller behind them. The current truth is
+> [`docs/specs/security-and-access.md`](specs/security-and-access.md), `REQ-SEC-037` and
+> `REQ-SEC-052`.
+> Scope: everything that must happen **in this repository and on the production host** before the
+> native Android app (`krt-profit/basetool-android`) can talk to the Basetool for real. The app-side
+> concept lives in the app repo (`docs/ANDROID_APP_PLAN.md`, `docs/ANDROID_APP_SECURITY.md`); this
+> document is the server half of its Phase 0 and the only place where the work is ordered.
 
 Fact base: the code-level security audit of 2026-08-17 (findings folded into the app repo's
 security concept, "code-verified" markers) plus the current `main` of this repository.

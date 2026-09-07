@@ -690,6 +690,24 @@ public final class MetricNames {
   public static final String TERMS_REFUSED_SUBJECTS = "basetool.terms.refused.subjects";
 
   /**
+   * Gauge: distinct subjects the role gate refused with {@code 403 NO_ROLE} in the last 15 minutes
+   * (REQ-SEC-053).
+   *
+   * <p>The exact counterpart of {@link #TERMS_REFUSED_SUBJECTS}, for the same reason and against a
+   * sharper failure. The refusal <em>rate</em> ({@link #HTTP_ERROR}{@code {code="NO_ROLE"}}) is a
+   * request rate answering a distinct-subject question, and it fails in <b>both</b> directions
+   * here: one member's tab polling in the background sustains it on its own, while a realm-side
+   * role rename at 03:00 - the event the alert exists for - locks the whole membership out at a
+   * moment when nobody is making requests, so the rate stays near zero until the morning. Whether
+   * one account is waiting for an administrator or four hundred are locked out is exactly the
+   * distinction the alert has to make, and only a subject count makes it.
+   *
+   * <p>Untagged, so the series stays a single bounded number (REQ-OBS-011). Per process - read it
+   * with {@code max()}, never {@code sum()}, or a subject refused on two instances counts twice.
+   */
+  public static final String NO_ROLE_REFUSED_SUBJECTS = "basetool.norole.refused.subjects";
+
+  /**
    * Counter {@code basetool_on_behalf_of_refused_total} — tag {@code reason} ({@link
    * #ON_BEHALF_OF_NOT_A_GATEWAY}, {@link #ON_BEHALF_OF_ENDPOINT_NOT_BOUND}, {@link
    * #ON_BEHALF_OF_NO_CALLER}, {@link #ON_BEHALF_OF_MALFORMED}, {@link

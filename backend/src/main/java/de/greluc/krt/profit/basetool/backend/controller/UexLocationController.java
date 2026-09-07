@@ -43,7 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "UEX Locations", description = "Lookup UEX cities and space stations.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class UexLocationController {
 
   /** Hard cap to keep typeahead payloads small. */

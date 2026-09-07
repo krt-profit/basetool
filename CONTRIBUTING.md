@@ -73,18 +73,18 @@ confidentially to
 Most of the substance lives in dedicated documents. Read the one that
 matches what you are about to change *before* you open a PR:
 
-| Topic                                                                                                    | Where                                                                                                                                                                            |
-|:---------------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Project overview, prerequisites, local dev/test stack, deployment runbook                                | [`README.md`](README.md)                                                                                                                                                         |
-| Release notes and every user-visible change                                                              | [`CHANGELOG.md`](CHANGELOG.md)                                                                                                                                                   |
-| Security vulnerability reporting, supported versions, scope, safe harbor                                 | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
-| Architectural invariants, build/test commands, AI-assistant guardrails                                   | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
-| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`, `GUEST`) | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
-| Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist)      | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md)                                                                         |
-| "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                         | [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md) (binding rules: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)) |
-| Pull-request expectations (template + checklist that ships with every PR)                                | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)                                                                                                           |
-| Production deployment runbook (host bootstrap, releases, rollback, PAT rotation)                         | [`docs/deployment.md`](docs/deployment.md)                                                                                                                                       |
-| License                                                                                                  | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                                                                                             |
+| Topic                                                                                               | Where                                                                                                                                                                            |
+|:----------------------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Project overview, prerequisites, local dev/test stack, deployment runbook                           | [`README.md`](README.md)                                                                                                                                                         |
+| Release notes and every user-visible change                                                         | [`CHANGELOG.md`](CHANGELOG.md)                                                                                                                                                   |
+| Security vulnerability reporting, supported versions, scope, safe harbor                            | [`.github/SECURITY.md`](.github/SECURITY.md)                                                                                                                                     |
+| Architectural invariants, build/test commands, AI-assistant guardrails                              | [`CLAUDE.md`](CLAUDE.md)                                                                                                                                                         |
+| Role and permission matrix (`ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER`)     | [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md)                                                                                                                           |
+| Flyway migration conventions (destructive-ops two-phase rule, data migrations, pre-merge checklist) | [`backend/src/main/resources/db/migration/README.md`](backend/src/main/resources/db/migration/README.md)                                                                         |
+| "DAS KARTELL" Corporate Design Manual (brand colours, fonts, department palette)                    | [`.claude/skills/das-kartell-design/README.md`](.claude/skills/das-kartell-design/README.md) (binding rules: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md)) |
+| Pull-request expectations (template + checklist that ships with every PR)                           | [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)                                                                                                           |
+| Production deployment runbook (host bootstrap, releases, rollback, PAT rotation)                    | [`docs/deployment.md`](docs/deployment.md)                                                                                                                                       |
+| License                                                                                             | [`LICENSE.md`](LICENSE.md) — GPL-3.0                                                                                                                                             |
 
 CLAUDE.md and the SECURITY.md are the two documents that most often
 surprise first-time contributors — please read them before touching the
@@ -445,7 +445,7 @@ apply there.
 feat(multi-tenant): make Basetool multi-squadron capable
 fix(db/V80): drop+recreate mission_participant FK around IRIDIUM UUID swap
 chore(multi-tenant): Phase 7 part 1 - stop writing legacy job_order.squadron VARCHAR
-fix(frontend/orders): use public WebClient for guest material fetch
+fix(frontend/orders): relay the material fetch through the member's bearer
 refactor(logging): replace [DEBUG_LOG] markers with debug-level logging
 docs(github): translate issue and PR templates to English
 chore(deps): refreshVersions proposals
@@ -466,7 +466,7 @@ There is no strict naming policy, but a useful convention is:
 <type>/<short-kebab-case-description>
 ```
 
-Examples: `feat/squadron-switcher-ui`, `fix/orders-guest-webclient`,
+Examples: `feat/squadron-switcher-ui`, `fix/orders-material-relay`,
 `chore/refresh-versions-may`. Avoid embedding issue numbers in branch
 names — they go into commit messages and PR descriptions instead.
 
@@ -630,10 +630,11 @@ you touch these areas.
 - Every read / write must filter by JWT `sub` unless the caller has an
   elevated role (`ADMIN`, `OFFICER`, …). Enforce this in the service
   layer, not the controller.
-- For unauthenticated guests, the controller must explicitly clear
-  sensitive fields (email, real name, internal orders / items) via a
-  `cleanupForGuest`-style helper. Returning a full DTO to a guest is an
-  information-disclosure bug.
+- For a member below Logistician, the controller must explicitly clear
+  sensitive fields (e-mail, real name, internal orders / items) via a
+  `cleanup…ForPeer`-style helper (REQ-SEC-007). Returning a full DTO to a peer
+  is an information-disclosure bug, and the ArchUnit rule
+  `peerReadableMissionEndpointsMustRedactPii` fails the build on one.
 
 ### Multi-squadron tenancy
 

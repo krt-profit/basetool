@@ -69,7 +69,7 @@ class ShipTypeTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+  private User roleLessUser;
   private Manufacturer aegis;
 
   @BeforeEach
@@ -81,10 +81,10 @@ class ShipTypeTest {
     officerUser.setUsername("officerShip");
     userRepository.save(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guestShip");
-    userRepository.save(guestUser);
+    roleLessUser = new User();
+    roleLessUser.setId(UUID.randomUUID());
+    roleLessUser.setUsername("guestShip");
+    userRepository.save(roleLessUser);
 
     aegis = new Manufacturer();
     aegis.setName("Aegis Dynamics");
@@ -119,7 +119,7 @@ class ShipTypeTest {
   }
 
   @Test
-  void testToggleShipTypeVisibility_Guest_Forbidden() throws Exception {
+  void testToggleShipTypeVisibility_RoleLess_Forbidden() throws Exception {
     ShipType shipType = new ShipType();
     shipType.setName("Hacked Ship");
     shipType.setHidden(false);
@@ -130,8 +130,8 @@ class ShipTypeTest {
             put("/api/v1/ship-types/" + shipType.getId() + "/visibility?hidden=true")
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                        .jwt(builder -> builder.subject(roleLessUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 }

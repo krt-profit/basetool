@@ -242,9 +242,11 @@ class MissionTimeTest {
                     + getParticipantId(memberUser))
                 .with(
                     jwt()
-                        .jwt(
-                            builder ->
-                                builder.subject(memberUser.getId().toString()))) // Self update
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                        // Self update, and the mission gates ask for membership (REQ-SEC-007).
+                        // `default-roles-iri` grants KRT Member to every account, so a token
+                        // without it models an account shape that cannot occur.
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk());
@@ -266,7 +268,10 @@ class MissionTimeTest {
                     + mission.getId()
                     + "/participants/"
                     + getParticipantId(memberUser))
-                .with(jwt().jwt(builder -> builder.subject(memberUser.getId().toString())))
+                .with(
+                    jwt()
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk());

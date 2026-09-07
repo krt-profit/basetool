@@ -495,7 +495,7 @@
                                 <dt th:text="#{mission.party_lead}">Partyleiter</dt>
                                 <dd id="overview-party-lead">
                                     <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead</span>
-                                    <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                    <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Externer Lead</span>
                                     <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                 </dd>
                             </dl>
@@ -1251,7 +1251,7 @@
                                 <div class="krtm-display-flex-gap-0-5rem-flex-direction-colum-3289">
                                     <div id="party-lead-display" class="data-value krtm-background-var-color-surface-input-padding-0-fd20" th:data-none-label="#{general.none}">
                                         <span th:if="${mission.partyLeadUser != null}" th:text="${mission.partyLeadUser.effectiveName}">Lead Name</span>
-                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Guest Lead</span>
+                                        <span th:if="${mission.partyLeadUser == null and mission.partyLeadGuestName != null and !mission.partyLeadGuestName.isEmpty()}" th:text="${mission.partyLeadGuestName}">Externer Lead</span>
                                         <span th:if="${mission.partyLeadUser == null and (mission.partyLeadGuestName == null or mission.partyLeadGuestName.isEmpty())}" th:text="#{general.none}">Keine</span>
                                     </div>
                                     <form th:if="${mission.canEdit}" id="party-lead-form" autocomplete="off"
@@ -1441,7 +1441,7 @@
                          blank and was additionally mislabelled "Gast". -->
                     <span class="person-name"
                           th:text="${p?.user != null ? p.user.effectiveName : (p?.guestName != null ? p.guestName : #messages.msg('mission.participant.deleted'))}">Name</span>
-                    <span th:if="${p?.user == null and p?.guestName != null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.guest}">Gast</span>
+                    <span th:if="${p?.user == null and p?.guestName != null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.external}">Extern</span>
                     <span th:if="${p?.user == null and p?.guestName == null}" class="chip chip--muted chip-xs" th:text="#{mission.participant.deleted}">Gel&ouml;schter Nutzer</span>
                     <span th:if="${p?.orgUnits == null or p.orgUnits.isEmpty()}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                     <span th:if="${p?.orgUnits != null and !p.orgUnits.isEmpty()}" class="squadron-badge-group">
@@ -1479,10 +1479,13 @@
             <span th:if="${crew != null and !mission.canEdit and crew.jobTypes != null and !crew.jobTypes.isEmpty()}"
                   class="crew-jobs-static" th:text="${#strings.listJoin(crew.jobTypes.![name], ', ')}"
                   th:title="${#strings.listJoin(crew.jobTypes.![name], ', ')}">Pilot</span>
-            <!-- The `user == null` arm exists so anyone may maintain a GUEST entry. A deleted
-                 account also has a null user but must not become editable-by-everyone, so the arm
-                 is narrowed to rows that actually carry a guest name. -->
-            <div class="row-actions" th:if="${mission.canEdit or own or (p?.user == null and p?.guestName != null)}">
+            <!-- ADR-0159 / decision D4: an EXTERNAL row (no user, but a name) is the mission
+                 leadership's to edit and remove — it carries no creator to bind a self-edit to, and
+                 the roster shows its id to every member who can see the Einsatz. The arm that used
+                 to let ANY viewer maintain such a row is gone; the backend refuses it either way
+                 (MissionSecurityService.canAccessParticipant), and rendering a control that always
+                 fails is worse than not rendering it. -->
+            <div class="row-actions" th:if="${mission.canEdit or own}">
                 <form th:action="@{/missions/{id}/participants/{pId}/check-in(id=${mission.id}, pId=${p?.id})}" method="post" th:if="${p?.startTime == null and mission.actualStartTime != null and mission.actualEndTime == null}" class="participant-action-form krtm-display-inline-2f87" data-participant-action="check-in" th:data-participant-id="${p?.id}">
                     <button type="submit" class="btn btn-success btn-icon" th:title="#{mission.participant.checkin.tooltip}" th:aria-label="#{mission.participant.checkin}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-login"/></svg></button>
                 </form>
@@ -1496,8 +1499,7 @@
                         th:data-planned-job="${p?.plannedMissionJobType != null ? p.plannedMissionJobType.id : ''}"
                         th:data-org-units="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![id], ',') : ''}"
                         th:data-org-unit-names="${p?.orgUnits != null ? #strings.listJoin(p.orgUnits.![name], ',') : ''}"
-                        th:data-guest="${p?.user == null and p?.guestName != null}"
-                        th:data-is-member="${p?.user != null and p.user.roles != null and (p.user.roles.contains('KRT_MEMBER') or p.user.roles.contains('ROLE_KRT_MEMBER') or p.user.roles.contains('ADMIN') or p.user.roles.contains('ROLE_ADMIN') or p.user.roles.contains('OFFICER') or p.user.roles.contains('ROLE_OFFICER'))}"
+                        th:data-external="${p?.user == null and p?.guestName != null}"
                         th:data-payout-preference="${p?.payoutPreference?.name()}"
                         th:data-comment="${p?.comment}"
                         th:data-version="${p?.version}"
@@ -1528,14 +1530,13 @@
             </div>
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="krt-modal-body">
-                <div class="form-group" sec:authorize="isAnonymous()">
+                <!-- The anonymous variant of this field is gone with the anonymous caller
+                     (ADR-0159). What is left is the member's control, which doubles as the way to
+                     record an EXTERNAL participant: type a name nobody matches and the row is
+                     created without a user (decision D4). -->
+                <div class="form-group krtm-position-relative-a8a9">
                     <label th:text="#{mission.participant.name}">Name</label>
-                    <input type="text" name="guestName" th:value="*{guestName}" required>
-                    <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" class="field-error"></div>
-                </div>
-                <div class="form-group krtm-position-relative-a8a9" sec:authorize="isAuthenticated()">
-                    <label th:text="#{mission.participant.name}">Name</label>
-                    <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.guest_name_placeholder}">
+                    <input type="text" id="participant-search-input" name="guestName" autocomplete="off" th:value="*{guestName}" th:placeholder="#{mission.participant.external_name_placeholder}">
                     <input type="hidden" id="participant-user-id" name="userId" th:value="*{userId}">
                     <div id="participant-search-results" class="autocomplete-items"></div>
                     <div th:if="${#fields.hasErrors('guestName')}" th:errors="*{guestName}" class="field-error"></div>
@@ -1546,7 +1547,7 @@
                     <select name="orgUnitIds" id="participant-org-units" multiple>
                         <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">IRIDIUM</option>
                     </select>
-                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
 
                 <div class="form-row">
@@ -1617,7 +1618,7 @@
                     <select name="orgUnitIds" id="edit-org-units" multiple>
                         <option th:if="${orgUnits}" th:each="ou : ${orgUnits}" th:value="${ou.orgUnitId}" th:text="${ou.orgUnitName}">Alpha</option>
                     </select>
-                    <small class="form-hint" th:text="#{mission.participant.org_units.guest_hint}">Nur fuer Gaeste relevant.</small>
+                    <small class="form-hint" th:text="#{mission.participant.org_units.external_hint}">Nur fuer externe Teilnehmer relevant.</small>
                 </div>
                 <!-- Registered members get their org units from their account (never selected). JS
                      shows this read-only list (populated from the row's data-org-unit-names) and hides

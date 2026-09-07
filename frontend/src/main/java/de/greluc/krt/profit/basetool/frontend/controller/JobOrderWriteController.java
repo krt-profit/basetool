@@ -47,7 +47,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.support.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -93,11 +92,17 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * leaf helpers shared with the read side ({@code fetchUsers}, {@code getCurrentUserId}, {@code
  * isLogistician} and the {@code PAGE_OF_USER} response type) are duplicated verbatim per the
  * campaign precedent instead of introducing a new shared type.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
+ * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
+ * package carried no gate of their own at all — protected by a matcher two folders away rather than
+ * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("isAuthenticated()")
 public class JobOrderWriteController {
 
   /** Typed WebClient wrapper relaying every job-order mutation to the backend REST API. */
@@ -117,16 +122,12 @@ public class JobOrderWriteController {
   private final MutationResponseHelper mutationResponseHelper;
 
   /**
-   * Auth helper resolving whether the SecurityContext is anonymous, backing the guest-routing
-   * checks on the order-create handlers.
-   */
-  private final FrontendAuthHelperService authHelper;
-
-  /**
    * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff
-   * {@code orders} queue room from here rather than the client, because an <b>anonymous guest</b>
-   * create has no {@code /ws/sync} socket to publish from — yet every logged-in queue viewer must
-   * still see the new order appear in place.
+   * {@code orders} queue room from here rather than from the client. The seam was introduced for
+   * the anonymous guest create, which had no {@code /ws/sync} socket at all and which ADR-0159
+   * removed; what keeps it is that <b>the creator is not necessarily in the room</b> — a member who
+   * may not browse the queue is not subscribed to it — while every viewer who is must still see the
+   * new order appear in place.
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -182,9 +183,10 @@ public class JobOrderWriteController {
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
-      // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (authHelper.isAnonymous() || !canViewJobOrders) {
+      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
+      // (with the success toast) instead of bouncing them to a list they may not see. The
+      // anonymous half of this condition went with the caller (ADR-0159).
+      if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
@@ -401,9 +403,10 @@ public class JobOrderWriteController {
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // Anonymous guests and non-profit members cannot browse the queue, so keep them on the create
-      // form (with the success toast) instead of bouncing them to a list they may not see.
-      if (authHelper.isAnonymous() || !canViewJobOrders) {
+      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
+      // (with the success toast) instead of bouncing them to a list they may not see. The
+      // anonymous half of this condition went with the caller (ADR-0159).
+      if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
       }
@@ -423,11 +426,13 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Shared post-create navigation target (#575): viewers go to the order list, anonymous guests and
-   * non-profit members stay on the create form (mirrors the classic {@link #createOrder} / {@link
-   * #createItemOrder} redirects, since they cannot browse the queue).
+   * Shared post-create navigation target (#575): viewers go to the order list, members who may not
+   * browse the queue stay on the create form (mirrors the classic {@link #createOrder} / {@link
+   * #createItemOrder} redirects).
    *
-   * @param principal the caller (null for an anonymous guest)
+   * @param principal the caller. Since ADR-0159 this cannot be {@code null} — the whole surface is
+   *     authenticated — and the null branch survives only as the fail-closed default: an
+   *     unidentifiable caller is sent to the form, never to the queue
    * @param canViewJobOrders whether the caller may browse the order queue
    * @param source the create-page source param to carry on the stay-on-create target
    * @return the URL the AJAX caller should navigate to on success
@@ -505,7 +510,6 @@ public class JobOrderWriteController {
    * @return redirect to {@code /orders}
    */
   @PostMapping("/{id}/priority")
-  @PreAuthorize("isAuthenticated()")
   public String updatePriority(
       @PathVariable UUID id,
       @RequestParam Integer priority,
@@ -561,7 +565,6 @@ public class JobOrderWriteController {
    * @return updated order on success, propagated backend status code on failure
    */
   @PostMapping("/{id}/status")
-  @PreAuthorize("isAuthenticated()")
   @org.springframework.web.bind.annotation.ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateStatus(
       @PathVariable UUID id, @RequestBody UpdateJobOrderStatusDto dto) {
@@ -775,7 +778,6 @@ public class JobOrderWriteController {
    * @return redirect back to the order detail
    */
   @PostMapping("/{id}/requested-update")
-  @PreAuthorize("isAuthenticated()")
   public String updateOrderAsRequester(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -822,7 +824,6 @@ public class JobOrderWriteController {
   @PostMapping(
       value = "/{id}/requested-update",
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateOrderAsRequesterAjax(
       @PathVariable UUID id, @RequestBody JobOrderForm form) {
@@ -857,7 +858,6 @@ public class JobOrderWriteController {
    * @return redirect to {@code /orders}
    */
   @PostMapping("/{id}/delete")
-  @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     return mutationResponseHelper.mutate(
         redirectAttributes,
@@ -878,7 +878,6 @@ public class JobOrderWriteController {
    * @return 204 on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}")
-  @PreAuthorize("isAuthenticated()")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> deleteOrderAjax(@PathVariable UUID id) {
     return relay(
@@ -901,7 +900,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @PostMapping("/{id}/assignees")
-  @PreAuthorize("isAuthenticated()")
   public String addAssignee(
       @PathVariable UUID id,
       @RequestParam UUID userId,
@@ -1381,7 +1379,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @DeleteMapping("/{id}/assignees/{userId}")
-  @PreAuthorize("isAuthenticated()")
   public String removeAssignee(
       @PathVariable UUID id,
       @PathVariable UUID userId,
@@ -1411,7 +1408,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @PutMapping("/{id}/assignees/{userId}/note")
-  @PreAuthorize("isAuthenticated()")
   public String setAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,
@@ -1442,7 +1438,6 @@ public class JobOrderWriteController {
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
   @DeleteMapping("/{id}/assignees/{userId}/note")
-  @PreAuthorize("isAuthenticated()")
   public String deleteAssigneeNote(
       @PathVariable UUID id,
       @PathVariable UUID userId,

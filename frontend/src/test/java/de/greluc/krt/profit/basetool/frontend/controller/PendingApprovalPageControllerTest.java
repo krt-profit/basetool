@@ -175,6 +175,50 @@ class PendingApprovalPageControllerTest {
   }
 
   @Test
+  void pendingApproval_forARoleLessCaller_staysPutEvenThoughTheRegistrationIsActive() {
+    // Redirect-loop regression, found by the E2E suite (2026-09-06). A role-less account IS
+    // approved — the registration endpoint answers ACTIVE for it — so the ACTIVE branch alone sends
+    // the one caller this page exists for back to the dashboard, where BackendRoleSyncFilter meets
+    // the same 403 NO_ROLE and returns them here. The redirect also clears the cached verdict, so
+    // neither side settles and the browser gives up with a redirect-cap error. The role-less
+    // verdict is therefore read before the redirect and suppresses it.
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("ACTIVE"));
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute("BACKEND_APPROVAL_STATE", "NO_ROLE");
+    session.setAttribute("BACKEND_APPROVAL_CHECKED_AT", System.currentTimeMillis());
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setSession(session);
+    Model model = new ConcurrentModel();
+
+    assertThat(controller.pendingApproval(model, request)).isEqualTo("pending-approval");
+    assertThat(model.getAttribute(PendingApprovalPageController.MODEL_NO_ROLE))
+        .as("the role-less copy, not the waiting copy: this member has already been approved")
+        .isEqualTo(Boolean.TRUE);
+    assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED)).isEqualTo(false);
+    assertThat(session.getAttribute("BACKEND_APPROVAL_STATE"))
+        .as("the verdict that routed them here must survive, or the next request re-derives it")
+        .isEqualTo("NO_ROLE");
+  }
+
+  @Test
+  void pendingApproval_forARoleLessCallerWhoseRegistrationWasRejected_showsTheRejection() {
+    // The two states are not mutually exclusive in the session, and REJECTED is the stronger
+    // statement: it is terminal, while a missing role is a thing an administrator still fixes.
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("REJECTED"));
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute("BACKEND_APPROVAL_STATE", "NO_ROLE");
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.setSession(session);
+    Model model = new ConcurrentModel();
+
+    assertThat(controller.pendingApproval(model, request)).isEqualTo("pending-approval");
+    assertThat(model.getAttribute(PendingApprovalPageController.MODEL_REJECTED)).isEqualTo(true);
+    assertThat(model.getAttribute(PendingApprovalPageController.MODEL_NO_ROLE)).isEqualTo(false);
+  }
+
+  @Test
   void pendingApproval_withoutASession_stillRedirectsAnApprovedCaller() {
     // getSession(false) hands back null rather than creating one; the redirect must not NPE on it.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))

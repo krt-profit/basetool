@@ -82,7 +82,8 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   org-unit `kind:id` refs only); party-lead change; manager add / remove; finance
   entry create / edit / delete; Ablauf step add / edit / remove / reorder / done-toggle; goal (Ziel)
   add / edit / remove / reorder (the goal's non-personal `kind` enum may appear in the details). Free-text
-  (mission/guest names beyond the snapshot label, notes, **step titles and time/place hints, goal
+  (mission/external participant names beyond the snapshot label, notes, **step titles and
+  time/place hints, goal
   titles, and custom-frequency labels**) is never written to the details payload — only ids, counts,
   the goal kind enum and the non-personal mission name snapshot.
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
@@ -156,6 +157,16 @@ The audit table is **business data, not logging** — the [`observability.md`](o
 details payload — only ids, counts and lengths (the actor handle and non-personal subject labels
 such as a material name or order title are snapshotted, exactly as the bank trail snapshots holder
 handles).
+
+> [!note] A detail *value* may be renamed; the rows already written are not rewritten — 2026-09-07
+> `MISSION_PARTICIPANT_ADDED` writes `type=user|external` and `MISSION_PARTY_LEAD_CHANGED`
+> `kind=user|external|cleared`. Both said `guest` until ADR-0159 renamed the tier (decision D4), and
+> the audit trail was the last place still writing the old word. **Rows written before that release
+> keep `guest`**, deliberately: the viewer renders `details` verbatim, no query filters the column
+> and no i18n key is derived from it, so both spellings are simply readable — while back-dating an
+> audit payload to a vocabulary that did not exist when the row was written would make the trail
+> claim something that never happened. An admin searching the log for one tier must know to read
+> both words, which is why it is written down here rather than left to be discovered.
 
 **Details payload format & the `AuditDetails` builder (S8, #914).** The common `details` shape is a
 space-separated list of `key=value` pairs (e.g. `section=full status=PLANNED`). Those payloads are

@@ -1,0 +1,82 @@
+# promtool unit test for EdgeMembersOnlyRedirectBroken (REQ-SEC-052 / REQ-OBS-012, ADR-0159).
+#
+# The alert exists because the members-only cut-over's user-visible contract lives at the EDGE: a
+# browser navigating to /missions must be sent into the OAuth2 flow. The app's own sweep runs
+# in-process against MockMvc and would stay green while a cache rule, a stale upstream or a
+# mis-ordered NPM location served the old public page — which publishes the roster again and
+# nothing else would notice.
+#
+# Two things are pinned here, and the second is the one that gets written wrong:
+#   - the alert fires per failing target while the edge itself is up;
+#   - the `and on()` guard SUPPRESSES it while the edge is down, because a probe against a dead
+#     edge carries no posture signal and BlackboxProbeFailed already pages that case. Without the
+#     guard, one edge outage pages three extra criticals that say the wrong thing.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 promtool test rules tests/members_only_redirect_alert_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 30s
+
+tests:
+  # ── The regression the alert is for: the page answers something other than the redirect. ──
+  - name: EdgeMembersOnlyRedirectBroken fires per failing page while the edge is up
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/missions"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/operations"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/orders"}'
+        values: "1x20"
+      # The edge is up, so the guard does not suppress.
+      - series: 'probe_success{job="blackbox-http", instance="https://profit-base.online"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: EdgeMembersOnlyRedirectBroken
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-members-only
+              instance: "https://profit-base.online/missions"
+            exp_annotations:
+              summary: "Members-only redirect broken: https://profit-base.online/missions"
+              description: "https://profit-base.online/missions no longer answers a browser navigation with a 302 into /oauth2/authorization/keycloak. REQ-SEC-052 requires every page except /, /impressum, /privacy and /terms to need a login; a 200 here means the page is being served to anonymous visitors. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the frontend image carries the members-only SecurityConfig."
+
+  # ── The guard: an edge outage must page once, as an outage, not three times as a posture drift. ──
+  - name: EdgeMembersOnlyRedirectBroken stays silent while the edge itself is down
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/missions"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/operations"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/orders"}'
+        values: "0x20"
+      - series: 'probe_success{job="blackbox-http", instance="https://profit-base.online"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: EdgeMembersOnlyRedirectBroken
+        exp_alerts: []
+
+  # ── The healthy steady state, so the case above cannot pass by the rule never firing at all. ──
+  - name: EdgeMembersOnlyRedirectBroken is silent while every page redirects
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/missions"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/operations"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-members-only", instance="https://profit-base.online/orders"}'
+        values: "1x20"
+      - series: 'probe_success{job="blackbox-http", instance="https://profit-base.online"}'
+        values: "1x20"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: EdgeMembersOnlyRedirectBroken
+        exp_alerts: []
