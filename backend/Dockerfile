@@ -49,6 +49,12 @@ RUN ./gradlew :backend:dependencies --no-daemon
 # runs `./gradlew check` separately on a controlled environment where format
 # enforcement is the right call.
 COPY backend/src/ backend/src/
+# The shared test-support MAIN sources too: `:<module>:build` still runs
+# `compileTestJava` even with `-x test`, because the disabled `checkstyleTest` and
+# `jacocoTestCoverageVerification` hang off `check` and depend on it. The sweep's test
+# source set references `Call` from that module, so without these the image build fails
+# to compile tests it will never run. Only `src/main` - its own tests are not needed.
+COPY test-support/src/main/ test-support/src/main/
 RUN ./gradlew :backend:build \
     -x test \
     -x checkstyleMain \

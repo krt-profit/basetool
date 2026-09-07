@@ -66,6 +66,12 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 # LF copy in git. CI runs `./gradlew check` separately on a controlled
 # environment where format enforcement is the right call.
 COPY frontend/src/ frontend/src/
+# The shared test-support MAIN sources too: `:<module>:build` still runs
+# `compileTestJava` even with `-x test`, because the disabled `checkstyleTest` and
+# `jacocoTestCoverageVerification` hang off `check` and depend on it. The sweep's test
+# source set references `Call` from that module, so without these the image build fails
+# to compile tests it will never run. Only `src/main` - its own tests are not needed.
+COPY test-support/src/main/ test-support/src/main/
 # `${APP_VERSION:+...}` only expands when the build-arg was set and non-empty,
 # so a `docker build` without `--build-arg APP_VERSION=...` still works and the
 # Gradle fallback in `frontend/build.gradle.kts` kicks in.
