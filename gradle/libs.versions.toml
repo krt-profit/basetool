@@ -15,6 +15,9 @@ owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owasp
 
 [versions]
 
+# Held at 4.1.1 on purpose: the only newer build refreshVersions sees is a 4.2.0 MILESTONE.
+# The marker below stays so the next sweep does not have to re-derive that -- clear it when
+# 4.2.0 goes GA, not before.
 springBoot = "4.1.1"
 ##      ⬆ = "4.2.0-M1"
 springDependencyManagement = "1.1.7"
@@ -26,8 +29,13 @@ testcontainers = "2.0.5"
 # replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
 # Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
 # "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
-flyway = "13.4.0"
-##  ⬆ = "13.5.0"
+# 13.5.0 (2026-09): `jackson-databind` became an OPTIONAL dependency and JSON support moved
+# into a new `flyway-core-utilities` module. A no-op here -- Spring Boot's web starter puts
+# `jackson-databind` on the compile and runtime classpath regardless, and nothing in this repo
+# asks Flyway for JSON (no `flyway.toml`, no JSON-configured callbacks; every profile sets only
+# `enabled` + `locations`). The rest of the release is debug-log and dry-run polish plus Jackson
+# and MariaDB-driver bumps, with no documented bug fixes.
+flyway = "13.5.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
@@ -41,8 +49,14 @@ bucket4j = "8.19.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.0"
-springdocOpenapi = "3.1.0"
-##            ⬆ = "3.1.1"
+# 3.1.1 is a SECURITY release (eight advisories). Two of them can reach this deployment and are
+# why it is taken rather than deferred: the per-locale OpenAPI cache was unbounded, so
+# `Accept-Language` could grow it without limit (now capped by `springdoc.cache.max-entries`,
+# default 100), and a ThreadLocal leaked headers between concurrent requests. The rest cannot
+# reach it: the MCP advisories need the AI module and the bundled-DOMPurify XSS needs Swagger
+# UI -- this project uses the `-api` starter, which ships neither, with `api-docs.enabled:
+# false` in prod on top.
+springdocOpenapi = "3.1.1"
 okhttp3 = "5.5.0"
 playwright = "1.62.0"
 axeCorePlaywright = "4.13.0"
@@ -59,8 +73,11 @@ spotbugs = "6.5.11"
 pitest = "1.19.0"
 pitestJunit5 = "1.2.3"
 nodeGradle = "7.1.0"
-spotless = "8.10.1"
-##    ⬆ = "8.10.2"
+# 8.10.2 fixes two steps this build does not run: `shortenFullyQualifiedTypes()` -- not
+# configured anywhere, and it is the one change that would rewrite existing files -- and the
+# Eclipse JDT formatter under a lombok agent, where Java here is formatted by
+# google-java-format. So the bump changes no formatting output.
+spotless = "8.10.2"
 # 13.0.0 (2026-07): the single breaking change is a no-op here — the plugin's default report
 # directory moved to `build/reports/dependency-check` to stop clashing with other reports, and the
 # root build script already sets exactly that path explicitly. The other `!`-flagged item (dropping

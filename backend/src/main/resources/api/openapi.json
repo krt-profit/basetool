@@ -57728,7 +57728,7 @@
           "desiredAmount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "minQuality" : {
             "type" : "integer",
@@ -57933,7 +57933,7 @@
           "offeredAmount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -58574,12 +58574,12 @@
           "width" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "height" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "cropMode" : {
             "type" : "string",
@@ -59260,7 +59260,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           }
         },
         "required" : [ "amount", "claimingOrgUnitId", "materialId", "qualityRequirement" ]
@@ -59303,7 +59303,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "version" : {
             "type" : "integer",
@@ -59390,7 +59390,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           }
         },
         "required" : [ "amount", "targetId" ]
@@ -59429,7 +59429,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "missionReductions" : {
             "type" : "array",
@@ -59855,7 +59855,7 @@
           "requestedAmount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -59903,7 +59903,7 @@
           "offeredAmount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "remark" : {
             "type" : "string",
@@ -59971,7 +59971,7 @@
           "amount" : {
             "type" : "number",
             "format" : "double",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           }
         },
         "required" : [ "amount", "targetId" ]
