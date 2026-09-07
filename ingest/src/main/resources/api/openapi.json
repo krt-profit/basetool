@@ -289,12 +289,12 @@
           "width" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "height" : {
             "type" : "integer",
             "format" : "int32",
-            "minimum" : 0
+            "exclusiveMinimum" : 0
           },
           "cropMode" : {
             "type" : "string",
