@@ -281,7 +281,7 @@ public class MissionController {
   @Transactional(readOnly = true)
   public ResponseEntity<MissionDto> getNextMission() {
     return missionService
-        .getNextMission(true)
+        .getNextMission()
         .map(
             m -> {
               var dto = missionMapper.toDto(m);
@@ -302,8 +302,14 @@ public class MissionController {
    * @param request create payload
    * @return the persisted DTO
    */
+  // The last mission endpoint that asked only for a login. Everything else on this surface reads
+  // `isAuthenticated() and isMemberOrAbove() and <scope predicate>`, and creation had no scope
+  // predicate to carry - so it was the one caller set the stated invariant did not cover, and the
+  // one an authenticated non-member could still reach. `ROLE_INGEST_GATEWAY` is that shape today
+  // (ADR-0129): authenticated, deliberately not a member. It calls only the two import endpoints
+  // and never this one, so the gate closes a hole rather than a path. Owner decision, 2026-09-07.
   @PostMapping
-  @PreAuthorize("isAuthenticated()")
+  @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
   public MissionDto createMission(
       @RequestBody @jakarta.validation.Valid @NotNull
@@ -782,7 +788,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
    * @deprecated use {@link #checkInParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
@@ -803,9 +808,7 @@ public class MissionController {
               + " only the updated participant.",
       deprecated = true)
   public MissionDto checkInParticipant(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
     // REQ-SEC-007: a member below Logistician reads the roster without its PII.
     if (!authHelperService.isLogisticianOrAbove()) {
@@ -819,7 +822,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
    * @deprecated use {@link #checkOutParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
@@ -840,9 +842,7 @@ public class MissionController {
               + " only the updated participant.",
       deprecated = true)
   public MissionDto checkOutParticipant(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
     // REQ-SEC-007: a member below Logistician reads the roster without its PII.
     if (!authHelperService.isLogisticianOrAbove()) {
@@ -861,7 +861,6 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request payout preference payload
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
    * @deprecated use {@link #updatePayoutPreferenceSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
@@ -884,8 +883,7 @@ public class MissionController {
   public MissionDto updatePayoutPreference(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
+      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request) {
     MissionDto dto =
         missionMapper.toDto(
             missionService.updatePayoutPreference(id, participantId, request.preference()));
@@ -928,7 +926,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
    * @deprecated use {@link #removeParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
    */
@@ -949,9 +946,7 @@ public class MissionController {
               + " Content.",
       deprecated = true)
   public MissionDto removeParticipant(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
     // REQ-SEC-007: a member below Logistician reads the roster without its PII.
     if (!authHelperService.isLogisticianOrAbove()) {
@@ -1967,7 +1962,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PostMapping("/{id}/participants/{participantId}/check-in/slim")
@@ -1980,9 +1974,7 @@ public class MissionController {
       description =
           "Checks in a participant and returns only the updated participant as a slim DTO.")
   public MissionParticipantDto checkInParticipantSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkIn(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
@@ -1997,7 +1989,6 @@ public class MissionController {
    *
    * @param id mission id
    * @param participantId participant id
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PostMapping("/{id}/participants/{participantId}/check-out/slim")
@@ -2010,9 +2001,7 @@ public class MissionController {
       description =
           "Checks out a participant and returns only the updated participant as a slim DTO.")
   public MissionParticipantDto checkOutParticipantSlim(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkOut(id, participantId);
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
@@ -2028,7 +2017,6 @@ public class MissionController {
    * @param id mission id
    * @param participantId participant id
    * @param request payout preference payload
-   * @param jwt caller's JWT, absent for the token-less acting-member identity (ADR-0129)
    * @return the updated participant DTO, redacted below Logistician (REQ-SEC-007)
    */
   @PutMapping("/{id}/participants/{participantId}/payout-preference/slim")
@@ -2043,8 +2031,7 @@ public class MissionController {
   public MissionParticipantDto updatePayoutPreferenceSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request,
-      @AuthenticationPrincipal Jwt jwt) {
+      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
     MissionParticipantDto dto = missionMapper.toDto(findParticipant(mission, participantId));
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.

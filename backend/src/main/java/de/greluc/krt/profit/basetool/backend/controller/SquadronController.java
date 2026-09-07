@@ -68,9 +68,10 @@ public class SquadronController {
 
   /**
    * Paged list with {@code includeInactive} for the admin view. The {@code includeInactive=true}
-   * flavour is admin-only — soft-deleted squadron descriptions can carry internal context, and the
-   * public {@code /api/v1/squadrons} matcher is {@code permitAll} so a guest could otherwise
-   * enumerate every archived squadron (audit finding M-6).
+   * flavour is admin-only — soft-deleted squadron descriptions can carry internal context, and any
+   * member could otherwise enumerate every archived squadron (audit finding M-6). The finding was
+   * written when {@code /api/v1/squadrons} was {@code permitAll} and the reader was an anonymous
+   * one; ADR-0159 deleted that matcher, which narrows the audience but does not remove the reason.
    *
    * @return paged squadron DTOs
    */

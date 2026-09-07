@@ -77,13 +77,23 @@ BEGIN
 END $$;
 
 -- Order matters: both child tables reference role(id).
+--
+-- `upper(code)` and not `code`, so these match exactly what the audit block
+-- above logged. The block records every row with `upper(r.code) = 'GUEST'`;
+-- an exact-match DELETE would leave a `guest`-coded row and its `user_roles`
+-- behind while the WARNING line said the assignments were dropped -- telling
+-- the operator that access was removed which is in fact still granted, and
+-- leaving the role this migration exists to delete in the catalogue.
+-- `role.code` is stamped by V73 as `'GUEST'` (and its fallback derives
+-- `UPPER(...)`), so in practice the two spellings select the same rows; the
+-- point is that the log and the delete cannot disagree even if they did not.
 DELETE FROM user_roles
- WHERE role_id IN (SELECT id FROM role WHERE code = 'GUEST');
+ WHERE role_id IN (SELECT id FROM role WHERE upper(code) = 'GUEST');
 
 DELETE FROM role_permissions
- WHERE role_id IN (SELECT id FROM role WHERE code = 'GUEST');
+ WHERE role_id IN (SELECT id FROM role WHERE upper(code) = 'GUEST');
 
-DELETE FROM role WHERE code = 'GUEST';
+DELETE FROM role WHERE upper(code) = 'GUEST';
 
 -- Matched on `code`, which V73 stamped and which survives a rename, but a
 -- deployment that never ran under a renamed role still carries the name.
@@ -136,6 +146,27 @@ END $$;
 
 DELETE FROM notification_rule_selector
  WHERE kind = 'ROLE' AND upper(role_code) = 'GUEST';
+
+-- AND THE SAME DEFECT FOR EVERY OTHER ROLE, WHICH ONLY GUEST WAS BEING SPARED.
+-- The argument above is not about GUEST: `applySelectors` stored
+-- `trimToNull(request.roleCode())` -- the client's casing -- for ANY role, and
+-- `NotificationRuleRepository`'s recipient query matches `r.code = :roleCode`
+-- case-SENSITIVELY. So a rule persisted as `Admin` or `officer` addresses
+-- nobody, silently and for ever, and after this release it also PASSES the new
+-- `findByCodeIgnoreCase` validation -- so nothing surfaces it either. Deleting
+-- the GUEST rows and leaving those is repairing the one case that no longer
+-- matters while the ones that do stay broken.
+--
+-- Narrow by construction: only rows that resolve case-insensitively to a role
+-- that exists and whose stored spelling differs from the catalogue's are
+-- touched. A selector naming no role at all is left alone -- that is a
+-- different defect, and this migration is not the place to guess at it.
+UPDATE notification_rule_selector s
+   SET role_code = r.code
+  FROM role r
+ WHERE s.kind = 'ROLE'
+   AND upper(s.role_code) = upper(r.code)
+   AND s.role_code <> r.code;
 
 -- The capability token (V177). Dropped in the same unit of work as the
 -- role, by owner decision D10 of the members-only plan -- deliberately

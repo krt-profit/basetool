@@ -436,9 +436,9 @@ public class InventoryItemController {
    * table (#1138). Replaces the former eagerly embedded {@code MissionDto.inventoryEntries} field
    * with a dedicated read so the hottest mission GET no longer drags an unbounded list through its
    * payload. Member-visible: the {@code /api/v1/inventory/**} security rule already requires a
-   * member role, so guests never reach it (matching the removed field, which was cleared for
-   * guests). Deliberately unscoped among members — the shared mission-stockpile view, reproducing
-   * the removed field's behaviour exactly.
+   * member role, so a non-member never reaches it (matching the removed field, which was cleared
+   * for the tier that no longer exists). Deliberately unscoped among members — the shared
+   * mission-stockpile view, reproducing the removed field's behaviour exactly.
    *
    * @param missionId the mission whose linked inventory to list
    * @return the mission's inventory items
@@ -583,13 +583,15 @@ public class InventoryItemController {
 
   /**
    * Paged picker of the game items bookable as Lager item stock — the output of at least one active
-   * blueprint, deliberately a superset of the anonymous order picker's predicate (design §5.3/§5.4,
+   * blueprint, deliberately a superset of the order picker's predicate (design §5.3/§5.4,
    * REQ-INV-029). A dedicated endpoint rather than a reuse of {@code GET
-   * /api/v1/orders/item-catalog}: that one is {@code permitAll()} for the anonymous item-order
-   * request form, and Member-facing Lager UI must not hang on an anonymous surface. No method-level
-   * {@code @PreAuthorize} needed — the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER,
-   * LOGISTICIAN, KRT_MEMBER)} from the {@code /api/v1/inventory/**} URL umbrella in {@code
-   * SecurityConfig} (verified), matching the controller's other read handlers.
+   * /api/v1/orders/item-catalog}: that one was {@code permitAll()} for the anonymous item-order
+   * request form, and the Member-facing Lager UI must not hang on a surface maintained for another
+   * audience. ADR-0159 closed it and removed the form, so the two now differ only in predicate —
+   * the separation stands on that, not on the gate. No method-level {@code @PreAuthorize} needed —
+   * the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)} from the
+   * {@code /api/v1/inventory/**} URL umbrella in {@code SecurityConfig} (verified), matching the
+   * controller's other read handlers.
    *
    * @param q optional case-insensitive item-name filter
    * @param page zero-based page index

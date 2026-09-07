@@ -50,7 +50,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the mission participant lifecycle: sign-up (registered user and anonymous guest), the
+ * Owns the mission participant lifecycle: sign-up (registered user and external participant), the
  * per-participant attribute edit, check-in / check-out, payout-preference changes, removal, the
  * party-lead assignment, and co-manager add/remove. Extracted from {@code MissionService} (L1 step
  * 2, #920) so the participants responsibility no longer shares that god-class's dependencies.
@@ -161,7 +161,7 @@ public class MissionParticipantService {
             .orElseThrow(() -> new NotFoundException("Mission not found"));
 
     // Audit finding M-4: hard cap of {@value MissionService#MAX_PARTICIPANTS_PER_MISSION} per
-    // mission. Closes the DoS vector where an anonymous caller scripts thousands of guest sign-ups
+    // mission. Closes the DoS vector where a caller scripts thousands of external sign-ups
     // until the mission_participant table holds millions of rows for a single mission and {@code
     // mission.getParticipants()} (eager-fetched via the findById EntityGraph) starts scanning
     // hundreds of MB per request. 500 covers every realistic IRIDIUM-scale operation by a large
@@ -226,13 +226,13 @@ public class MissionParticipantService {
       // and/or any Spezialkommandos). Auto-derived from org_unit_membership — empty when the user
       // belongs to none (admins / brand-new accounts) so the roster shows no affiliation instead of
       // the old, wrong IRIDIUM fallback. The caller-submitted orgUnitIds are intentionally ignored
-      // for registered participants; the picker is guest-only.
+      // for registered participants; the picker is for external entries only.
       participant.setOrgUnits(resolveMembershipOrgUnits(user.getId()));
       // REQ-MISSION-002: pre-fill the per-participant payout preference from the signing-up user's
       // personal default. A user who never chose one keeps the entity default (PAYOUT). This is a
       // one-time seed at sign-up — the per-mission value stays editable afterwards via
       // updateParticipantAttributes and is NOT rewritten when the user later changes their profile
-      // default. Guests (the else branch) have no profile and keep PAYOUT.
+      // default. External participants (the else branch) have no profile and keep PAYOUT.
       if (user.getDefaultPayoutPreference() != null) {
         participant.setPayoutPreference(user.getDefaultPayoutPreference());
       }
@@ -373,10 +373,10 @@ public class MissionParticipantService {
    *
    * @param authentication the caller's authentication, used to answer "may this caller manage the
    *     mission" against the mission this method has already loaded. A caller who may not - in
-   *     practice an anonymous guest holding only their row's capability token - may edit their own
-   *     desired job type, comment, payout preference and guest name, but may neither set nor clear
-   *     the planned mission job type (the Einsatzleiter designation), and may not rename their row
-   *     onto a registered member or onto another guest of the same mission.
+   *     practice, until ADR-0159, an anonymous guest holding their row's capability token - may
+   *     edit their own desired job type, comment, payout preference and guest name, but may neither
+   *     set nor clear the planned mission job type (the Einsatzleiter designation), and may not
+   *     rename their row onto a registered member or onto another guest of the same mission.
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     or any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale

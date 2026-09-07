@@ -251,6 +251,12 @@ modules:
         # the wrong half of the contract.
         Accept: "text/html,application/xhtml+xml"
         Sec-Fetch-Mode: "navigate"
+        # And says it is us, so the frontend's request cache does not remember the probe.
+        # `Sec-Fetch-Mode: navigate` is the branch that cache saves, and saving creates a Redis
+        # session: three targets every 30s against a 30-minute anonymous timeout settle at roughly
+        # 180 permanently resident sessions, for ever. Monitoring the members-only change must not
+        # reintroduce the session accretion the change removed (WP-F 11, REQ-SEC-025).
+        X-Basetool-Probe: "members-only"
       fail_if_header_not_matches:
         - header: Location
           regexp: "/oauth2/authorization/keycloak"

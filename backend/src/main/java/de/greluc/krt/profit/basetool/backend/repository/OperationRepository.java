@@ -77,15 +77,16 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *       have no public escape; see REQ-ORG-009).
    *   <li><b>Participant escape</b> (#500) — any authenticated user who participated in one of the
    *       operation's linked missions sees the operation regardless of owning OrgUnit, gated by a
-   *       non-null {@code viewerUserId} matching a {@code mission_participant.user_id}. Anonymous
-   *       callers ({@code viewerUserId == null}) never match.
+   *       non-null {@code viewerUserId} matching a {@code mission_participant.user_id}. A caller
+   *       with no resolvable subject ({@code viewerUserId == null}) never matches.
    * </ul>
    *
    * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
    *     member-or-above ({@code AuthHelperService.isMemberOrAbove()}); gates the ownerless branch
-   *     so guests/anonymous never see ownerless operations.
+   *     so a non-member never sees ownerless operations. Since ADR-0159 the only authenticated
+   *     non-member is an integration identity, but the gate is the predicate, not the audience.
    * @param viewerUserId the caller's user id ({@code AuthHelperService.currentUserId()}), or {@code
-   *     null} for an anonymous caller; gates the participant escape.
+   *     null} when no subject resolves; gates the participant escape.
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @org.springframework.data.jpa.repository.Query(

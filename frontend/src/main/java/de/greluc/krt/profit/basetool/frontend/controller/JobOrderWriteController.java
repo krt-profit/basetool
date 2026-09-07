@@ -123,9 +123,11 @@ public class JobOrderWriteController {
 
   /**
    * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff
-   * {@code orders} queue room from here rather than the client, because an <b>anonymous guest</b>
-   * create has no {@code /ws/sync} socket to publish from — yet every logged-in queue viewer must
-   * still see the new order appear in place.
+   * {@code orders} queue room from here rather than from the client. The seam was introduced for
+   * the anonymous guest create, which had no {@code /ws/sync} socket at all and which ADR-0159
+   * removed; what keeps it is that <b>the creator is not necessarily in the room</b> — a member who
+   * may not browse the queue is not subscribed to it — while every viewer who is must still see the
+   * new order appear in place.
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -424,11 +426,13 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Shared post-create navigation target (#575): viewers go to the order list, anonymous guests and
-   * non-profit members stay on the create form (mirrors the classic {@link #createOrder} / {@link
-   * #createItemOrder} redirects, since they cannot browse the queue).
+   * Shared post-create navigation target (#575): viewers go to the order list, members who may not
+   * browse the queue stay on the create form (mirrors the classic {@link #createOrder} / {@link
+   * #createItemOrder} redirects).
    *
-   * @param principal the caller (null for an anonymous guest)
+   * @param principal the caller. Since ADR-0159 this cannot be {@code null} — the whole surface is
+   *     authenticated — and the null branch survives only as the fail-closed default: an
+   *     unidentifiable caller is sent to the form, never to the queue
    * @param canViewJobOrders whether the caller may browse the order queue
    * @param source the create-page source param to carry on the stay-on-create target
    * @return the URL the AJAX caller should navigate to on success

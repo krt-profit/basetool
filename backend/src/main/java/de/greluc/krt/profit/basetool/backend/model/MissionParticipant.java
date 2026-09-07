@@ -74,9 +74,11 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * The org units (Staffel and/or Spezialkommandos) this participant is affiliated with for this
    * mission, stamped at sign-up time. For a registered user this is auto-derived from their
    * memberships (empty when they belong to none, the Staffel or SK when they belong to one, both
-   * when they belong to both); for a guest it is the caller-submitted, authorization-filtered
-   * selection. Replaces the former single {@code squadron_id} FK so a member of both a Staffel and
-   * an SK no longer loses one of the two affiliations.
+   * when they belong to both); for an external participant it is the caller-submitted selection,
+   * stored <b>as submitted</b> — {@code MissionParticipantService.resolveSubmittedOrgUnits} applies
+   * no per-org-unit authorization filter, and says so itself. Replaces the former single {@code
+   * squadron_id} FK so a member of both a Staffel and an SK no longer loses one of the two
+   * affiliations.
    *
    * <p>Mapped EAGER (matching the eager fetch of the former {@code @ManyToOne squadron}) because
    * the slim participant endpoints map the entity to its DTO after the service transaction has

@@ -654,7 +654,7 @@ public class WebClientConfig {
    * redeploy — is attributed to the one frontend-container IP and shares a single org-wide per-IP
    * rate-limit bucket, so a reconnect burst can trip the shared limit and blank live push for
    * everyone. The guest-edit-token relay is intentionally omitted: the notification stream is an
-   * authenticated-member surface with no anonymous guest path.
+   * authenticated-member surface, and since ADR-0159 there is no other kind.
    *
    * <p>Also deliberately NOT wired to the observation registry (REQ-OBS-009): a ~30-minute SSE
    * relay would hold a single client observation/span open for the whole stream, skewing the

@@ -468,7 +468,8 @@ public class RequestScopeResolver {
    * Spezialkommando) participate in the order workflow: Kartell departments are split into Profit
    * and non-Profit, and only the Profit side processes orders. A non-Profit unit may still
    * <em>place</em> orders (as the requesting/Auftraggeber side) but its members must not see the
-   * order queue — mirroring how anonymous guests can submit an order yet cannot track it.
+   * order queue — mirroring how, until ADR-0159, an anonymous guest could submit an order yet not
+   * track it.
    *
    * <ul>
    *   <li>Admin → always {@code true} (system-wide oversight, like every other {@code can*}

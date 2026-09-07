@@ -117,6 +117,17 @@ public class SecurityConfig {
   private static final String NAVIGATE_FETCH_MODE = "navigate";
 
   /**
+   * Marks one of our own monitoring probes, so the request cache does not remember it.
+   *
+   * <p>Set by the {@code http_members_only_redirect} blackbox module and by the nightly {@code
+   * edge-deny-probe} workflow. Both assert {@code Sec-Fetch-Mode: navigate} deliberately - a
+   * background call answers {@code 401} by design (REQ-SEC-012), so probing without it would assert
+   * the wrong half of the contract - and that is exactly the branch {@link
+   * #navigationRequestCache()} saves.
+   */
+  private static final String MONITORING_PROBE_HEADER = "X-Basetool-Probe";
+
+  /**
    * Main security filter chain. Wires CSP-nonce, bot-protection, session-debug, request-logging and
    * backend-role-sync filters; configures OAuth2 login against Keycloak with smart OIDC logout; and
    * declares the path-by-path permitAll / authenticated matrix. The injected Keycloak issuer URI
@@ -407,7 +418,8 @@ public class SecurityConfig {
     cache.setRequestMatcher(
         request ->
             org.springframework.http.HttpMethod.GET.matches(request.getMethod())
-                && isNavigation(request));
+                && isNavigation(request)
+                && !isMonitoringProbe(request));
     return cache;
   }
 
@@ -435,6 +447,34 @@ public class SecurityConfig {
       return NAVIGATE_FETCH_MODE.equalsIgnoreCase(fetchMode);
     }
     return acceptsHtml(request);
+  }
+
+  /**
+   * Whether this request is one of our own monitoring probes, which must not be remembered.
+   *
+   * <p><b>Saving a probe costs a Redis session, permanently.</b> {@code HttpSessionRequestCache}
+   * calls {@code request.getSession()} to hold the saved request, and
+   * {@code @EnableRedisIndexedHttpSession} writes it. The members-only probe hits three targets
+   * every 30 seconds and declares itself a navigation on purpose, so against the 30-minute {@code
+   * app.session.anonymous-timeout} it settles at roughly 180 permanently resident anonymous
+   * sessions and some 8,600 session writes a day, indefinitely - plus three more per nightly
+   * edge-deny run. That is precisely the accretion WP-F 11 exists to remove and the mechanism
+   * behind the >16k-orphan incident this cache's own comment cites: monitoring the fix must not
+   * reintroduce what the fix removed.
+   *
+   * <p>Keyed on a header rather than on the User-Agent because the probe can simply declare itself,
+   * and a User-Agent match would be a guess that breaks the day the exporter is upgraded. The
+   * header being client-settable is not a weakness: the only thing sending it can do is give up
+   * <em>your own</em> deep-link replay after login. It grants nothing, reveals nothing, and reaches
+   * no authorization decision - {@code anyRequest().authenticated()} refuses the request either
+   * way.
+   *
+   * @param request the request to inspect; never {@code null}
+   * @return {@code true} when the request carries the probe marker
+   */
+  private static boolean isMonitoringProbe(
+      @NotNull jakarta.servlet.http.HttpServletRequest request) {
+    return request.getHeader(MONITORING_PROBE_HEADER) != null;
   }
 
   /**

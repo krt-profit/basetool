@@ -159,6 +159,31 @@ class NavigationRequestCacheTest {
   }
 
   @Test
+  void aMonitoringProbeIsNotSaved_soTheProbeMintsNoSession() throws Exception {
+    // The members-only blackbox module asserts Sec-Fetch-Mode: navigate on purpose - a background
+    // call answers 401 by design, so probing without it would assert the wrong half of the
+    // contract - which puts the probe on exactly the branch this cache saves. Saving calls
+    // request.getSession(), and three targets every 30s against a 30-minute anonymous timeout
+    // settle at roughly 180 permanently resident Redis sessions, for ever. Monitoring the fix must
+    // not reintroduce what the fix removed (WP-F 11).
+    MvcResult result =
+        mockMvc
+            .perform(
+                get(PROTECTED_PATH)
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header(HttpHeaders.ACCEPT, MediaType.TEXT_HTML_VALUE)
+                    .header("X-Basetool-Probe", "members-only"))
+            .andReturn();
+
+    assertThat(navigationRequestCache.getRequest(result.getRequest(), result.getResponse()))
+        .as("nobody logs in after a probe, so there is nothing to send it back to")
+        .isNull();
+    assertThat(result.getRequest().getSession(false))
+        .as("and holding nothing needs no session - this is the whole point of the header")
+        .isNull();
+  }
+
+  @Test
   void theChainAndTheSuccessHandlerShareOneCache() {
     // The bean the chain saves into is the bean the success handler replays from. Constructed
     // separately they would still "work", because HttpSessionRequestCache defaults to one session

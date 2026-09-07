@@ -84,7 +84,7 @@ jobs:
           fail=0
           for path in /missions /operations /orders; do
             url="https://profit-base.online$path"
-            read -r code location <<<"$(curl -s -o /dev/null               -w '%{http_code} %{redirect_url}' --max-time 20 --retry 2 --retry-delay 10               -H 'Accept: text/html,application/xhtml+xml'               -H 'Sec-Fetch-Mode: navigate' "$url" || true)"
+            read -r code location <<<"$(curl -s -o /dev/null               -w '%{http_code} %{redirect_url}' --max-time 20 --retry 2 --retry-delay 10               -H 'Accept: text/html,application/xhtml+xml'               -H 'Sec-Fetch-Mode: navigate'               -H 'X-Basetool-Probe: edge-deny' "$url" || true)"
             echo "GET $path -> HTTP ${code:-000} ${location:-}"
             if [ "$code" != "302" ]; then
               echo "::error::$url answered ${code:-000} instead of 302 — a former public page is being served without a login. REQ-SEC-052 allows exactly /, /impressum, /privacy and /terms. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the deployed frontend image carries the members-only SecurityConfig."

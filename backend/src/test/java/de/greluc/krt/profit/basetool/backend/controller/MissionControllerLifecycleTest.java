@@ -468,7 +468,7 @@ class MissionControllerLifecycleTest {
 
   @Test
   void getNextMission_noMission_returns204() {
-    when(missionService.getNextMission(true)).thenReturn(Optional.empty());
+    when(missionService.getNextMission()).thenReturn(Optional.empty());
 
     ResponseEntity<MissionDto> response = controller.getNextMission();
 
@@ -477,21 +477,21 @@ class MissionControllerLifecycleTest {
   }
 
   @Test
-  void getNextMission_peer_allowInternalIsTrue_andResponseRedacted() {
+  void getNextMission_peer_responseIsRedacted() {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id, false);
     // A member below Logistician.
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
-    when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
+    when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
     ResponseEntity<MissionDto> response = controller.getNextMission();
 
-    // allowInternal is true for every caller now. It was false for the outsider tier, whose whole
-    // point was that internal missions must not surface at all; a peer is a member of the
+    // There is no internal-visibility argument any more. It was false for the outsider tier, whose
+    // whole point was that internal missions must not surface at all; a peer is a member of the
     // organisation, is scoped by canSeeMission like anyone else, and reads the redacted DTO.
-    verify(missionService).getNextMission(true);
+    verify(missionService).getNextMission();
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
     assertThat(response.getBody().owner()).isNull();
@@ -503,7 +503,7 @@ class MissionControllerLifecycleTest {
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
-    when(missionService.getNextMission(true)).thenReturn(Optional.of(upcoming));
+    when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
     ResponseEntity<MissionDto> response = controller.getNextMission();

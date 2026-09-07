@@ -24,7 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 /**
  * The calling user's own approval status (epic #720, Track 1). The frontend reads this once per
  * session to route a {@code PENDING}/{@code REJECTED} user to the "waiting for approval" page
- * instead of the guest surface.
+ * instead of into the tool — it read "instead of the guest surface" until ADR-0159 removed it.
  *
  * @param approvalStatus the caller's current approval lifecycle state
  */

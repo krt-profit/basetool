@@ -131,6 +131,23 @@ class V239MigrationTest {
   }
 
   @Test
+  void everyRoleSelectorCarriesTheCatalogueOwnCasing() {
+    // The migration argues at length that the recipient query is the case-SENSITIVE
+    // `r.code = :roleCode` while applySelectors stored whatever casing the client sent - and then
+    // repaired only GUEST. A rule persisted as `Admin` or `officer` addresses nobody, silently and
+    // for ever, and after this release it also PASSES the new findByCodeIgnoreCase validation, so
+    // nothing surfaces it either. V239 canonicalises every ROLE selector; this asserts the
+    // invariant that leaves behind, which is also what a future write must not break.
+    assertThat(
+            count(
+                "SELECT count(*) FROM notification_rule_selector s JOIN role r"
+                    + " ON upper(s.role_code) = upper(r.code)"
+                    + " WHERE s.kind = 'ROLE' AND s.role_code <> r.code"))
+        .as("a selector whose casing differs from the catalogue matches no recipient at all")
+        .isZero();
+  }
+
+  @Test
   void noNotificationRuleSelectorPointsAtARoleThatDoesNotExist() {
     // The general form of the case above, so the next role deletion is covered on the day it
     // happens: any ROLE selector naming a code with no row in `role` is the same trap.

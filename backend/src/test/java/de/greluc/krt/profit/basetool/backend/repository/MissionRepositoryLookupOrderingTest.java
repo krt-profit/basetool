@@ -148,7 +148,6 @@ class MissionRepositoryLookupOrderingTest {
         missionRepository.findNextScopedMission(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
-            true,
             null,
             Set.of(mine.getId()),
             PageRequest.of(0, 1));
@@ -160,7 +159,6 @@ class MissionRepositoryLookupOrderingTest {
         missionRepository.findNextScopedMission(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
-            true,
             null,
             Set.of(mine.getId()),
             PageRequest.of(0, 50));
@@ -168,42 +166,36 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Verifies that within the caller's own org unit the {@code allowInternal=false} gate still hides
-   * internal missions — the defensive flag the service passes for a (rare) non-member caller that
-   * nonetheless carries an org-unit scope.
+   * An internal mission of the caller's own org unit is eligible for the banner, and beats a later
+   * public one.
+   *
+   * <p>This case used to prove the other half too: an {@code allowInternal=false} argument hid it,
+   * described as "the defensive flag the service passes for a (rare) non-member caller that
+   * nonetheless carries an org-unit scope". No caller ever passed {@code false} — the anonymous
+   * banner was its only audience and ADR-0159 removed it — so the parameter is gone and internal
+   * missions are unconditionally in scope. What is left is the half that describes the query as it
+   * now behaves.
    */
-  // covers REQ-MISSION-008 — allowInternal gate applies inside the org-unit scope
+  // covers REQ-MISSION-008 — an own-unit internal mission is banner-eligible
   @Test
-  void findNextScopedMission_allowInternalFalse_excludesOwnInternalMission() {
+  void findNextScopedMission_includesOwnInternalMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
-    // Earlier but internal — excluded when allowInternal=false, returned when true.
+    // Earlier and internal — the head, because an own-unit internal mission is in scope.
     UUID internalId =
         saveMission(mine, "Mine-Internal", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", true);
-    UUID publicId =
-        saveMission(mine, "Mine-Public", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
+    saveMission(mine, "Mine-Public", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
 
-    List<Mission> publicOnly =
+    List<Mission> head =
         missionRepository.findNextScopedMission(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
-            false,
             null,
             Set.of(mine.getId()),
             PageRequest.of(0, 1));
-    assertThat(publicOnly).extracting(Mission::getId).containsExactly(publicId);
-
-    List<Mission> withInternal =
-        missionRepository.findNextScopedMission(
-            lowerBound,
-            List.of("PLANNED", "ACTIVE"),
-            true,
-            null,
-            Set.of(mine.getId()),
-            PageRequest.of(0, 1));
-    assertThat(withInternal).extracting(Mission::getId).containsExactly(internalId);
+    assertThat(head).extracting(Mission::getId).containsExactly(internalId);
   }
 
   /**

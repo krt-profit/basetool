@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharing
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
-import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -85,7 +84,6 @@ public class ProfileController {
 
   private final BackendApiClient backendApiClient;
   private final MessageSource messageSource;
-  private final FrontendAuthHelperService authHelper;
 
   @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
   private String issuerUri;

@@ -68,7 +68,7 @@ public abstract class MissionMapper {
   /**
    * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
    * top of the default field copy so the DTO carries the caller-aware projections ({@code canEdit},
-   * {@code canManageManagers}, description redaction for guests, participant counts).
+   * {@code canManageManagers}, description redaction below Logistician, participant counts).
    *
    * <p>After R9 Step 2 the mission entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
    * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API

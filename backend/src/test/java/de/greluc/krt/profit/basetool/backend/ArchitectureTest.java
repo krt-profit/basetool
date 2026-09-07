@@ -486,9 +486,10 @@ class ArchitectureTest {
     }
     org.assertj.core.api.Assertions.assertThat(offenders)
         .as(
-            "REQ-SEC-052: only the two anonymous reads and the Keycloak SPI precheck may declare"
-                + " permitAll(). A new one is a widening of the public surface and needs the"
-                + " requirement amended first.")
+            "REQ-SEC-052: only the two anonymous reads, the Keycloak SPI precheck and Spring's"
+                + " own /error dispatch may declare permitAll() -- the four entries of"
+                + " PERMIT_ALL_ALLOWED_METHODS. A new one is a widening of the public surface and"
+                + " needs the requirement amended first.")
         .isEmpty();
   }
 
@@ -1396,28 +1397,27 @@ class ArchitectureTest {
         JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
         String value =
             ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-        // Every gate below admits an ordinary member, which is the audience the peer redaction
-        // exists for. canSeeMission admits any member who may see the Einsatz; canAccessParticipant
-        // admits the participant themselves.
+        // PEER-REACHABLE IS THE DEFAULT; THE GATE HAS TO EARN THE EXEMPTION. Until 2026-09-07
+        // this was an ALLOW-LIST of five scope predicates — canSeeMission, canAccessParticipant,
+        // canManageMission, canManageManagers, canChangeOwner — which meant a handler whose gate
+        // named none of them was invisible to the rule rather than caught by it. createMission is
+        // exactly that shape: `isAuthenticated()` alone, returning a full MissionDto to the member
+        // who just created the Einsatz. Deleting its redaction call left the build green while
+        // POST /api/v1/missions handed that member every participant's e-mail, real name, roles
+        // and permissions — the same blind-by-construction failure the 2026-09-06 rewrite removed
+        // one layer up, surviving in the selector instead of in the exemptions.
         //
-        // canManageMission, canManageManagers and canChangeOwner used to be listed here as
-        // EXEMPTIONS, on the premise that "a gate that already requires leadership returns the
+        // canManageMission, canManageManagers and canChangeOwner were once listed as EXEMPTIONS
+        // here, on the premise that "a gate that already requires leadership returns the
         // unredacted aggregate on purpose". That premise is false, and the 2026-09-06 review is
         // what established it: all three fall through to isOwnerOrManager, which grants on
         // mission.getOwner() or membership of getManagers() without consulting a role at all — and
         // the role hierarchy declares no MISSION_MANAGER > LOGISTICIAN edge either. Creating a
-        // mission makes you its owner, so a plain KRT_MEMBER passes them. The exemptions therefore
-        // covered exactly the audience the peer tier was created for, and the rule could not fail
-        // on twenty-three write handlers that returned the unredacted aggregate.
-        if (!value.contains("canSeeMission")
-            && !value.contains("canAccessParticipant")
-            && !value.contains("canManageMission")
-            && !value.contains("canManageManagers")
-            && !value.contains("canChangeOwner")) {
-          return false;
-        }
-        // A gate that names a role or authority genuinely cannot admit a member below Logistician:
-        // the hierarchy is what decides those, and it puts nobody below LOGISTICIAN above it.
+        // mission makes you its owner, so a plain KRT_MEMBER passes them.
+        //
+        // What genuinely cannot admit a member below Logistician is a gate naming a role or an
+        // authority: the hierarchy is what decides those, and it puts nobody below LOGISTICIAN
+        // above it. That is the whole exemption, and a new gate is caught until it says so.
         return !value.contains("hasRole(")
             && !value.contains("hasAnyRole(")
             && !value.contains("hasAuthority(")
@@ -1426,29 +1426,47 @@ class ArchitectureTest {
     };
   }
 
+  /**
+   * The PII-carrying mission DTOs a method's return type exposes.
+   *
+   * <p>The raw type when it is one of {@link #MISSION_PII_CARRYING_DTOS}, otherwise the matching
+   * type arguments of a known generic wrapper. Returned as a set rather than a boolean because the
+   * redaction rule needs to compare a handler's protected type against its helper's: a hop that
+   * only proves "some redaction happened somewhere" proves nothing about the object being returned.
+   *
+   * @param method the method whose return type to inspect
+   * @return the matching entries of {@link #MISSION_PII_CARRYING_DTOS}; empty when the return type
+   *     carries no participant PII
+   */
+  private static Set<String> protectedDtosOf(JavaMethod method) {
+    JavaClass rawReturnType = method.getRawReturnType();
+    if (MISSION_PII_CARRYING_DTOS.contains(rawReturnType.getFullName())) {
+      return Set.of(rawReturnType.getFullName());
+    }
+    JavaType returnType = method.getReturnType();
+    if (!(returnType instanceof JavaParameterizedType parameterized)) {
+      return Set.of();
+    }
+    if (!ENTITY_GENERIC_WRAPPERS.contains(parameterized.toErasure().getFullName())) {
+      return Set.of();
+    }
+    Set<String> exposed = new java.util.LinkedHashSet<>();
+    for (JavaType arg : parameterized.getActualTypeArguments()) {
+      String name = arg.toErasure().getFullName();
+      if (MISSION_PII_CARRYING_DTOS.contains(name)) {
+        exposed.add(name);
+      }
+    }
+    return exposed;
+  }
+
   private static DescribedPredicate<JavaMethod>
       returnsMissionDtoOrMissionParticipantDtoOrCollection() {
     return new DescribedPredicate<JavaMethod>(
         "returns MissionDto / MissionParticipantDto, or a known generic wrapper of either") {
       @Override
       public boolean test(JavaMethod method) {
-        JavaClass rawReturnType = method.getRawReturnType();
-        if (MISSION_PII_CARRYING_DTOS.contains(rawReturnType.getFullName())) {
-          return true;
-        }
-        JavaType returnType = method.getReturnType();
-        if (!(returnType instanceof JavaParameterizedType parameterized)) {
-          return false;
-        }
-        if (!ENTITY_GENERIC_WRAPPERS.contains(parameterized.toErasure().getFullName())) {
-          return false;
-        }
-        for (JavaType arg : parameterized.getActualTypeArguments()) {
-          if (MISSION_PII_CARRYING_DTOS.contains(arg.toErasure().getFullName())) {
-            return true;
-          }
-        }
-        return false;
+        return !protectedDtosOf(method).isEmpty();
       }
     };
   }
@@ -1569,12 +1587,23 @@ class ArchitectureTest {
         // isLogisticianOrAbove block, and a rule that forced the copy would be arguing for worse
         // code than it protects. The hop is bounded on purpose: only a private helper of the very
         // same controller, so the redaction stays visible in the file the reviewer is reading.
+        //
+        // AND THE HELPER MUST REDACT THE TYPE THIS HANDLER RETURNS. The hop used to accept any
+        // same-class method that mentioned any cleanup…ForPeer name, without ever relating the two
+        // — so with five such helpers in MissionController, a handler returning MissionDto
+        // satisfied the rule by calling redactShipsForPeer on an unrelated list of ships. A rule
+        // that can be satisfied by redacting something else is not checking the return value.
+        Set<String> protectedByHandler = protectedDtosOf(method);
         boolean callsALocalHelperThatRedacts =
             method.getMethodCallsFromSelf().stream()
                 .filter(
                     call ->
                         call.getTargetOwner().getFullName().equals(method.getOwner().getFullName()))
                 .flatMap(call -> call.getTarget().resolveMember().stream())
+                .filter(
+                    target ->
+                        !java.util.Collections.disjoint(
+                            protectedDtosOf(target), protectedByHandler))
                 .anyMatch(
                     target ->
                         target.getAccessesFromSelf().stream()

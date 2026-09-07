@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Benachrichtigungsregeln, die eine Rolle in abweichender Schreibweise gespeichert hatten,
+  erreichten niemanden.** Die Empfängersuche vergleicht den Rollen-Code exakt, gespeichert wurde
+  aber die Schreibweise des Absenders — eine Regel mit `Admin` statt `ADMIN` benachrichtigte
+  stillschweigend keinen einzigen Empfänger. Die Migration zieht alle betroffenen Regeln auf die
+  Schreibweise des Rollenkatalogs nach; neue Regeln werden beim Speichern kanonisiert.
+
 ### Security
 
 - **Das Basetool ist ab jetzt nur noch für Mitglieder.** Ohne Anmeldung siehst du die Startseite und die Rechtsseiten — sonst nichts. Einsätze, Operationen, die Auftragswarteschlange und die Spieldaten-Kataloge brauchen einen Login; jeder Link dorthin führt zur Anmeldung und danach zurück auf die gewünschte Seite.

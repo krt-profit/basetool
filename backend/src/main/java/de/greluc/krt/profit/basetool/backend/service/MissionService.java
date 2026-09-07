@@ -243,8 +243,8 @@ public class MissionService {
 
   /**
    * Returns the next upcoming mission by planned-start time. Drives the home-page "next mission"
-   * banner. Only missions in status {@code PLANNED} or {@code ACTIVE} are considered. {@code
-   * allowInternal=true} includes internal missions in the caller's scope.
+   * banner. Only missions in status {@code PLANNED} or {@code ACTIVE} are considered, and internal
+   * missions within the caller's scope are among them.
    *
    * <p>Org-unit scoping (REQ-MISSION-008): when the caller has an effective org-unit scope — a
    * plain member's own unit(s), or the cascade-expanded reach of a Bereich/OL leader (REQ-ORG-015)
@@ -255,10 +255,14 @@ public class MissionService {
    * unchanged organisation-wide next mission. The scope vector is the same {@link
    * OwnerScopeService#currentScopePredicate()} the scoped mission lists use.
    *
-   * @param allowInternal whether internal missions should be included
+   * <p>There is no public-only variant any more. The {@code allowInternal} parameter this method
+   * carried until ADR-0159 had exactly one production caller, passing the literal {@code true}; the
+   * {@code false} arm served the anonymous banner, and that audience is gone (REQ-SEC-052). The
+   * signature no longer offers a choice nobody can make.
+   *
    * @return the next mission, or empty when none upcoming
    */
-  public Optional<Mission> getNextMission(boolean allowInternal) {
+  public Optional<Mission> getNextMission() {
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     Instant now = Instant.now();
     Optional<Mission> next;
@@ -266,12 +270,12 @@ public class MissionService {
         || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty())) {
       // No org-unit scope: admin all-scope, or a member with no membership. Unchanged behaviour —
       // the soonest PLANNED/ACTIVE mission across the whole organisation. REQ-MISSION-008.
-      next = findNextMissionHead(now, allowInternal);
+      next = findNextMissionHead(now);
     } else {
       // The caller has an org-unit scope: restrict the banner to missions owned by those org units.
       // A Bereich/OL leader's scope already carries the cascaded descendants (REQ-ORG-015 via
       // OwnerScopeService.currentMemberOrgUnitIds); a plain member sees only their own units.
-      next = findNextScopedMissionHead(now, allowInternal, scope);
+      next = findNextScopedMissionHead(now, scope);
     }
     // The limit-1 lookups above are intentionally not graphed — a collection fetch combined with
     // the
@@ -284,23 +288,16 @@ public class MissionService {
 
   /**
    * Resolves the ungraphed limit-1 head of the unscoped next-mission lookup, filtered to {@link
-   * #NEXT_MISSION_STATUSES}. Split out from {@link #getNextMission(boolean)} only so the long
-   * derived-query method names sit at a shallow enough indentation to stay within the line-length
-   * limit; it carries no behaviour of its own beyond the {@code allowInternal} branch.
+   * #NEXT_MISSION_STATUSES}. Split out from {@link #getNextMission()} only so the long
+   * derived-query method name sits at a shallow enough indentation to stay within the line-length
+   * limit; it carries no behaviour of its own.
    *
    * @param now exclusive lower bound on {@code plannedStartTime}
-   * @param allowInternal whether internal missions should be included
    * @return the next-mission head (id-only matters; caller re-fetches through the graphed findById)
    */
-  private Optional<Mission> findNextMissionHead(Instant now, boolean allowInternal) {
-    if (allowInternal) {
-      return missionRepository
-          .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-              now, NEXT_MISSION_STATUSES);
-    }
-    return missionRepository
-        .findFirstByPlannedStartTimeAfterAndIsInternalFalseAndStatusInOrderByPlannedStartTimeAsc(
-            now, NEXT_MISSION_STATUSES);
+  private Optional<Mission> findNextMissionHead(Instant now) {
+    return missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
+        now, NEXT_MISSION_STATUSES);
   }
 
   /**
@@ -309,21 +306,17 @@ public class MissionService {
    * MissionRepository#findNextScopedMission} with a {@code PageRequest.of(0, 1)} so only the
    * soonest matching mission is fetched, then returns its head. The scope's {@code activeOrgUnitId}
    * (when pinned) or {@code memberOrgUnitIds} (the cascade-expanded membership union) selects the
-   * eligible owning org units; {@code allowInternal} mirrors the unscoped variant's
-   * internal-visibility gate.
+   * eligible owning org units.
    *
    * @param now exclusive lower bound on {@code plannedStartTime}
-   * @param allowInternal whether internal missions should be included
    * @param scope the caller's effective org-unit scope (never admin-all / never empty here)
    * @return the next-mission head (id-only matters; caller re-fetches through the graphed findById)
    */
-  private Optional<Mission> findNextScopedMissionHead(
-      Instant now, boolean allowInternal, ScopePredicate scope) {
+  private Optional<Mission> findNextScopedMissionHead(Instant now, ScopePredicate scope) {
     return missionRepository
         .findNextScopedMission(
             now,
             NEXT_MISSION_STATUSES,
-            allowInternal,
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
             PageRequest.of(0, 1))
@@ -888,10 +881,10 @@ public class MissionService {
    *
    * @param authentication the caller's authentication, used to answer "may this caller manage the
    *     mission" against the mission this method has already loaded. A caller who may not - in
-   *     practice an anonymous guest holding only their row's capability token - may edit their own
-   *     desired job type, comment, payout preference and guest name, but may neither set nor clear
-   *     the planned mission job type (the Einsatzleiter designation), and may not rename their row
-   *     onto a registered member or onto another guest of the same mission.
+   *     practice, until ADR-0159, an anonymous guest holding their row's capability token - may
+   *     edit their own desired job type, comment, payout preference and guest name, but may neither
+   *     set nor clear the planned mission job type (the Einsatzleiter designation), and may not
+   *     rename their row onto a registered member or onto another guest of the same mission.
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     or any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale

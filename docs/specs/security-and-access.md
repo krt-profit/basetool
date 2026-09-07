@@ -220,6 +220,12 @@ Every read/write filters by JWT `sub` unless the caller has an elevated role (`A
 > `@authHelperService.isMemberOrAbove()`. It locks nobody out — `default-roles-iri` grants
 > `KRT Member` to every account Keycloak creates — and it means the mission surface asks one
 > question consistently instead of two different ones on adjacent endpoints.
+>
+> **`createMission` joined them on 2026-09-07**, which makes fifteen. It was the one mission
+> endpoint with no scope predicate to carry, so it asked only for a login and was the single
+> exception to the invariant this callout states — reachable by `ROLE_INGEST_GATEWAY`, the
+> authenticated non-member ADR-0129 introduced. That gateway calls only the two import endpoints, so
+> the gate closes a hole rather than a path.
 
 For a **member below Logistician**, return only the minimum required data. Sensitive fields
 (e-mail, real name, internal orders/items) MUST be explicitly cleared in the controller via a
