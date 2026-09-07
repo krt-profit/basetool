@@ -53,8 +53,9 @@ import org.springframework.web.context.request.RequestContextHolder;
  * allows up to two Staffeln, {@code squadrons} carries the complete set, {@code squadron} the
  * primary (first by name), and the {@code isLogistician} / {@code isMissionManager} indicators are
  * the OR across all Staffel rows (the flag grants flat authority regardless of which row holds it,
- * REQ-SEC-005). A user without a Staffel membership row (admin / guest) maps to {@code squadron =
- * null}, {@code squadrons = []}, {@code isLogistician = false}, {@code isMissionManager = false}.
+ * REQ-SEC-005). A user without a Staffel membership row (an admin, or any member of no Staffel)
+ * maps to {@code squadron = null}, {@code squadrons = []}, {@code isLogistician = false}, {@code
+ * isMissionManager = false}.
  *
  * <p>Implemented as an abstract class so MapStruct can field-inject the helper repositories. The
  * generated subclass overrides {@link #toDto(User)} with the field copy and forwards through {@link
@@ -142,8 +143,8 @@ public abstract class UserMapper {
    * so this projection's order agrees with {@code OwnerScopeService} and {@code
    * OrgUnitMembershipService} by construction. Each resolved {@link Squadron} becomes a {@link
    * SquadronReferenceDto}; a row whose squadron no longer resolves is dropped by the resolver.
-   * Returns an empty list when the user has no Staffel membership (admins / guests) or is itself
-   * {@code null}.
+   * Returns an empty list when the user has no Staffel membership (admins, members of no Staffel)
+   * or is itself {@code null}.
    *
    * @param user the user being projected; may be {@code null}.
    * @return the user's Staffel reference DTOs, name-sorted; never {@code null}, possibly empty.

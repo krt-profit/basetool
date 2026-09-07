@@ -69,12 +69,17 @@ public class SecurityHardeningIntegrationTest {
   }
 
   @Test
-  void testUserSearch_RegularUser_Forbidden() throws Exception {
+  void testUserSearch_RoleLessAccount_Forbidden() throws Exception {
+    // The "regular user" here was ROLE_GUEST — the authority-less role every account with no realm
+    // role was mapped onto, and which V239 deleted. Its successor is the ROLE_NO_ROLE marker
+    // (REQ-SEC-053), and the case means the same thing it always did: an account below member
+    // reaches nothing. A MEMBER is on this endpoint's allow-list and always was, so substituting
+    // one would have quietly turned a refusal case into a passing 200.
     mockMvc
         .perform(
             get("/api/v1/users/search")
                 .param("query", "test")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 
@@ -89,11 +94,13 @@ public class SecurityHardeningIntegrationTest {
   }
 
   @Test
-  void testInventoryAggregated_RegularUser_Forbidden() throws Exception {
+  void testInventoryAggregated_RoleLessAccount_Forbidden() throws Exception {
+    // Same substitution as above: ROLE_GUEST became the ROLE_NO_ROLE marker (REQ-SEC-053). The
+    // Lager admits every member, so this case is only a refusal while its caller is below one.
     mockMvc
         .perform(
             get("/api/v1/inventory/aggregated")
-                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE"))))
         .andExpect(status().isForbidden());
   }
 
@@ -124,22 +131,23 @@ public class SecurityHardeningIntegrationTest {
   }
 
   @Test
-  void testMissionGet_Anonymous_Ok() throws Exception {
-    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isOk());
+  void testMissionGet_Anonymous_Refused() throws Exception {
+    // Answered 200 until REQ-SEC-052. The mission list was the widest anonymous read the tool had.
+    mockMvc.perform(get("/api/v1/missions")).andExpect(status().isUnauthorized());
   }
 
   @Test
-  void testFinanceEntries_Anonymous_Forbidden() throws Exception {
+  void testFinanceEntries_Anonymous_Unauthorized() throws Exception {
     mockMvc
         .perform(get("/api/v1/missions/" + UUID.randomUUID() + "/finance-entries"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void testFinanceEntriesSum_Anonymous_Forbidden() throws Exception {
+  void testFinanceEntriesSum_Anonymous_Unauthorized() throws Exception {
     mockMvc
         .perform(get("/api/v1/missions/" + UUID.randomUUID() + "/finance-entries/sum"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

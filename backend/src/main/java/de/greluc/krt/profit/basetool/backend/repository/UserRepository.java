@@ -92,8 +92,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * <p>Multi-tenant: {@code scopeSquadronIds} restricts the result to members of those squadrons
    * (REQ-ORG-017: a non-admin's unpinned scope is the union of their up-to-two Staffeln). {@code
    * null} signals admin "all squadrons" mode and falls back to the cross-staffel list. Users that
-   * have no squadron assigned (admins, guests) are always included so an admin in focused mode
-   * still sees the unassigned bucket alongside the squadron members.
+   * have no squadron assigned (admins, members of no Staffel) are always included so an admin in
+   * focused mode still sees the unassigned bucket alongside the squadron members.
    */
   @Query(
       """
@@ -171,8 +171,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   /**
    * Squadron-scoped paged listing. Filters by the user's SQUADRON-kind membership(s) in {@code
    * org_unit_membership} against the caller's scope set (REQ-ORG-017: up to two Staffeln) — users
-   * without a Staffel membership (admins, guests) are always visible so the focused admin can
-   * manage them.
+   * without a Staffel membership (admins, members of no Staffel) are always visible so the focused
+   * admin can manage them.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(

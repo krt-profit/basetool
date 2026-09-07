@@ -83,18 +83,11 @@ class ProfileControllerTest {
 
   // ── GET /profile — auth / backend-precedence / claim handling ────────────
 
-  @Test
-  void profile_unauthenticated_redirectsHome() {
-    // The page is public but only meaningful for logged-in users; the
-    // controller short-circuits before hitting the backend so a logged-out
-    // request doesn't burn a HTTP call. Since #906 Q10 the anonymous check reads
-    // authHelper.isAnonymous() rather than the null principal parameter.
-    when(authHelper.isAnonymous()).thenReturn(true);
-    String view = controller.profile(new ConcurrentModel(), /*principal*/ null);
-
-    assertEquals("redirect:/", view);
-    verifyNoInteractions(backendApiClient);
-  }
+  // The "unauthenticated visitor is redirected home" case stood here. The page was never public
+  // in any useful sense — it short-circuited before the backend call — and since ADR-0159 the route
+  // requires a login, so an unauthenticated request meets the OAuth2 entry point and never reaches
+  // the handler. AnonymousSurfaceSweepMvcTest asserts that for /profile along with every other
+  // mapping, which is a stronger statement than this test made.
 
   @Test
   void profile_authenticated_populatesModelFromTokenAndBackendOverride() {

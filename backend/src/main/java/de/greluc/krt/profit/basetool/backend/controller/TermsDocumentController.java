@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.backend.service.TermsDocumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,12 @@ public class TermsDocumentController {
    */
   @GetMapping
   @PreAuthorize("permitAll()")
+  // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the
+  // only two carrying an empty `security` list. The global requirement declared in OpenApiConfig
+  // applies to every other operation; an empty list here overrides it, so a generated client does
+  // not attach a bearer it may not have yet — and OpenApiAnonymousOperationsTest asserts that
+  // exactly these two carry it.
+  @SecurityRequirements
   @Operation(
       summary = "The Terms-of-Use wording in force",
       description =

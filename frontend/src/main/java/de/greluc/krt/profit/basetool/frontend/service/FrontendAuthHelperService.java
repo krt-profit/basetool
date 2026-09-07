@@ -59,21 +59,6 @@ public class FrontendAuthHelperService {
   }
 
   /**
-   * {@code true} when the current request carries no authenticated, non-anonymous principal — the
-   * negation of {@link #isAuthenticated()}, centralising the {@code @AuthenticationPrincipal
-   * OidcUser principal == null} guard the page controllers used to inline. On the frontend the only
-   * authenticated principal type is the Keycloak {@code OidcUser}, so a null
-   * {@code @AuthenticationPrincipal} and an anonymous / missing security context are the same
-   * condition; reading the request {@link Authentication} keeps the anonymous check on the same
-   * source as {@link #isAuthenticated()}, {@code sec:authorize} and {@code @PreAuthorize}.
-   *
-   * @return whether the current request is anonymous (guest / not logged in).
-   */
-  public boolean isAnonymous() {
-    return !isAuthenticated();
-  }
-
-  /**
    * {@code true} if the current authentication carries the {@code ROLE_ADMIN} authority directly.
    * The frontend does not configure a role hierarchy of its own — the bearer-token relay forwards
    * authorities verbatim — so this is a literal-match check rather than a reachability check.
@@ -102,8 +87,8 @@ public class FrontendAuthHelperService {
    * a member check that reads the principal misses every {@code ROLE_*} unless {@code
    * BackendRoleSyncFilter} happened to rebuild the principal that session — which made the
    * member-only mission finance/refinery panel silently collapse whenever that one-shot sync was
-   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less {@code GUEST}
-   * callers all yield {@code false}.
+   * skipped (REQ-SEC-013). Anonymous tokens, missing security contexts and role-less callers all
+   * yield {@code false}.
    *
    * @return whether the current principal is a registered member or above.
    */

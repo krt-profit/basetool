@@ -62,7 +62,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Notifications", description = "Per-user notification inbox.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class NotificationController {
 

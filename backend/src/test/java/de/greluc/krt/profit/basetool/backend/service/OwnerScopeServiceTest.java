@@ -124,6 +124,13 @@ class OwnerScopeServiceTest {
 
   @BeforeEach
   void setUp() {
+    // REQ-SEC-052: every scoped read now requires a login, and RequestScopeResolver throws rather
+    // than hand back an all-empty predicate for a caller with no identity. These cases are about
+    // WHAT a caller in scope may see, not about whether they are logged in, so the principal is a
+    // class-wide given. The refusal itself is asserted in RequestScopeResolverScopeTest.
+    // UnauthenticatedCallerTests.
+    lenient().when(authHelper.isAuthenticated()).thenReturn(true);
+
     squadronA = new Squadron();
     squadronA.setId(SQUADRON_A_ID);
     squadronA.setShorthand("ALF");

@@ -74,8 +74,11 @@ import tools.jackson.databind.ObjectMapper;
  * writes is the intended outcome: both come from the same misbehaving client, and splitting them
  * would let one starve the server while the other stayed within its own budget.
  *
- * <p>Anonymous requests pass straight through — they carry no subject to key on, and the per-IP
- * limiter plus the anonymous page-size ceiling (REQ-SEC-032) are their bounds.
+ * <p>Anonymous requests pass straight through — they carry no subject to key on. That is no longer
+ * a hole worth naming a ceiling for: since ADR-0159 the only paths an anonymous caller reaches are
+ * {@code GET /api/v1/terms/document} and {@code GET /api/v1/app/version-policy}, neither of which
+ * is paginated, and the per-IP limiter ahead of the chain bounds them. The anonymous page-size
+ * ceiling this paragraph used to cite (REQ-SEC-032) went with the surface it bounded.
  */
 @Slf4j
 public class SubjectRateLimitingFilter extends OncePerRequestFilter {

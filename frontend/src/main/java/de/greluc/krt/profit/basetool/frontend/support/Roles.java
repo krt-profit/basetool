@@ -52,7 +52,6 @@ public final class Roles {
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
-  public static final String GUEST = "GUEST";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
   public static final String LOGISTICIAN = "LOGISTICIAN";
@@ -73,14 +72,17 @@ public final class Roles {
 
   /**
    * The "registered member or above" authority set: holding any one of these marks the caller as an
-   * organisation member or above; holding none — anonymous OR an authenticated but role-less {@code
-   * GUEST} — marks a mission outsider. Kept in sync with the backend role matrix in {@code
+   * organisation member or above. Kept in sync with the backend role matrix in {@code
    * ROLES_AND_PERMISSIONS.md}.
    *
-   * <p><b>Not "all roles."</b> {@link #GUEST}, {@link #BANK_EMPLOYEE} and {@link #BANK_MANAGEMENT}
-   * are deliberately excluded — a bank-only or guest authority does not by itself make the caller
-   * an organisation member. Do not widen this to a generic "every constant in this class" helper;
-   * that would silently admit those three into every member-or-above check.
+   * <p><b>Not "all roles."</b> {@link #BANK_EMPLOYEE} and {@link #BANK_MANAGEMENT} are deliberately
+   * excluded — a bank-only authority does not by itself make the caller an organisation member. Do
+   * not widen this to a generic "every constant in this class" helper; that would silently admit
+   * both into every member-or-above check.
+   *
+   * <p>{@code GUEST} was a third exclusion until ADR-0159 removed the role. Nothing holds an empty
+   * authority set any more: such a token is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before a
+   * request reaches a handler.
    */
   public static final Set<String> MEMBER_AUTHORITIES =
       Set.of(

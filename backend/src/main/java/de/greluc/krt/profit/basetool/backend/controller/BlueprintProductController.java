@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Blueprint Products", description = "User-facing blueprint product search (#327).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class BlueprintProductController {
 
   private final BlueprintProductService blueprintProductService;

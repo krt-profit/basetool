@@ -101,8 +101,9 @@ public class CapabilityFlagsAdvice {
    * Whether the authenticated caller may enter the Job-Order area (the order list + order details).
    * Drives the sidebar's "Aufträge" vs "Auftrag anlegen" link split and the {@code
    * JobOrderPageController} redirect for non-viewers: only admins and members of a profit-eligible
-   * Staffel/SK may see orders, while a non-profit member keeps the create entry only — mirroring
-   * the anonymous "submit but don't track" flow. The backend gate ({@code
+   * Staffel/SK may see orders, while a non-profit member keeps the create entry only — the "submit
+   * but don't track" posture the public request form used to give an anonymous visitor
+   * (REQ-ORDERS-023 relaxes it for the requesting unit's own members). The backend gate ({@code
    * OwnerScopeService.canViewJobOrders}) is authoritative; this attribute only steers the UI and
    * fails closed via {@link #meCapabilities()}.
    *

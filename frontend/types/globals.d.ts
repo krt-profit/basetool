@@ -333,14 +333,6 @@ interface KrtLiveSyncApi {
     subscribedTopics(): string[];
 }
 
-/** Per-participant guest edit tokens, installed by `krt-fetch.js` (REQ-SEC). */
-interface KrtGuestTokenApi {
-    /** Persists the guest edit token for a participant in localStorage. */
-    store(participantId: string, token: string): void;
-    /** Reads a stored guest edit token, or null when none is held. */
-    read(participantId: string): string | null;
-}
-
 /** Re-authentication helpers installed by `krt-fetch.js` (REQ-SEC-012). */
 interface KrtReauthApi {
     /** Redirects the window to a same-origin re-authentication path. */
@@ -528,7 +520,6 @@ interface Window {
     // --- installed by krt-fetch.js
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
-    krtGuestToken: KrtGuestTokenApi;
     krtReauth: KrtReauthApi;
     krtTermsGate: KrtTermsGateApi;
 

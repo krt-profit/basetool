@@ -60,17 +60,18 @@ JSON
   echo '[]' >"${state}/mappers.json"
   echo '[]' >"${state}/optional-scopes.json"
   # The realm's own roles, as `kcadm get roles` would serve them, and what the client's scope
-  # already holds. The pre-existing Guest mapping is the interesting part: it is a real realm role
-  # that MEMBER_REALM_ROLES does not name, so the provisioner has to take it back, or a hand-edit
-  # in the Admin Console survives every later run. It was `Admin` here until 2026-09-01, when Admin
-  # became a granted role (REQ-SEC-035 reversed) and could no longer serve as the probe.
+  # already holds. The pre-existing `Bereichsleitung` mapping is the interesting part: it is a real
+  # realm role that MEMBER_REALM_ROLES does not name, so the provisioner has to take it back, or a
+  # hand-edit in the Admin Console survives every later run. It was `Admin` until 2026-09-01 (Admin
+  # became a granted role, REQ-SEC-035 reversed) and `Guest` until 2026-09-06, when ADR-0159 removed
+  # that role — a probe has to be a role that exists.
   cat >"${state}/realm-roles.json" <<'JSON'
 [{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
- {"id":"r-adm","name":"Admin"},{"id":"r-gue","name":"Guest"},
+ {"id":"r-adm","name":"Admin"},{"id":"r-brl","name":"Bereichsleitung"},
  {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"}]
 JSON
   cat >"${state}/scope-mappings.json" <<'JSON'
-[{"id":"r-gue","name":"Guest"}]
+[{"id":"r-brl","name":"Bereichsleitung"}]
 JSON
 
   # The stub is Python rather than a shell script on purpose: the provisioner spawns it through
@@ -325,8 +326,10 @@ echo "7. the client scope carries exactly the roles the list names, Admin includ
 # ---------------------------------------------------------------------------
 # The failure this pins is not "the app has fewer rights". `fullScopeAllowed` is off, so a client
 # with no scope mappings sends a token with NO realm roles at all — and the backend replaces the
-# local role set from that claim on every login, falling back to Guest. Measured on the test stack
-# before this existed: an account holding Admin + Officer + KRT Member came out holding Guest.
+# local role set from that claim on every login. Measured on the test stack before this existed:
+# an account holding Admin + Officer + KRT Member came out holding the authority-less Guest role of
+# the time; since ADR-0159 the same shape is refused outright with 403 NO_ROLE, which is louder but
+# no less an outage.
 #
 # `Admin` moved from asserted-absent to granted on 2026-09-01 (owner decision, REQ-SEC-035
 # reversed). What survives that reversal is the property this section really guards: the scope is
@@ -344,8 +347,8 @@ assert_contains "$scope" '"Bank Management"' "Bank Management reaches the app"
 # Org-Einheiten" resolves to their own empty reach rather than to everything.
 assert_contains "$scope" '"Admin"' "Admin reaches the app"
 # Converging downwards still has to work, or the list stops being the authority. The stub seeded
-# Guest on the scope to model a hand-edit in the Admin Console.
-assert_not_contains "$scope" '"Guest"' "a hand-added mapping outside the list is taken back"
+# Bereichsleitung on the scope to model a hand-edit in the Admin Console.
+assert_not_contains "$scope" '"Bereichsleitung"' "a hand-added mapping outside the list is taken back"
 
 # A second run must not re-add or re-remove anything.
 before="$scope"
@@ -362,17 +365,17 @@ rc=0
 output="$(run_provisioner "$state" --verify-only)" || rc=$?
 if [[ $rc -ne 0 ]]; then pass "an empty client scope is reported as a failure"; else
   fail "an empty client scope is reported as a failure" "exit was 0"; fi
-assert_contains "$output" "reconciled onto the Guest fallback" "the message names the consequence"
+assert_contains "$output" "refused with NO_ROLE" "the message names the consequence"
 
 echo '[{"id":"r-krt","name":"KRT Member"},{"id":"r-off","name":"Officer"},
       {"id":"r-bem","name":"Bank Employee"},{"id":"r-bmg","name":"Bank Management"},
-      {"id":"r-adm","name":"Admin"},{"id":"r-gue","name":"Guest"}]' >"${state}/scope-mappings.json"
+      {"id":"r-adm","name":"Admin"},{"id":"r-brl","name":"Bereichsleitung"}]' >"${state}/scope-mappings.json"
 rc=0
 output="$(run_provisioner "$state" --verify-only)" || rc=$?
 if [[ $rc -ne 0 ]]; then pass "a widened client scope is reported as a failure"; else
   fail "a widened client scope is reported as a failure" "exit was 0"; fi
 assert_contains "$output" "without a decision" "the message names the failure mode"
-assert_contains "$output" "'Guest'" "the message names the role that was added"
+assert_contains "$output" "'Bereichsleitung'" "the message names the role that was added"
 
 # The complement: the exact intended scope, Admin included, must verify clean. Without this the
 # section above could pass while the granted list itself was wrong.

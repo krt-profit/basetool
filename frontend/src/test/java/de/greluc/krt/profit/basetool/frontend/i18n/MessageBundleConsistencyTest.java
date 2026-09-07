@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -170,6 +173,55 @@ class MessageBundleConsistencyTest {
     }
     assertThat(mismatches)
         .as("keys whose default-bundle value differs from the German bundle")
+        .isEmpty();
+  }
+
+  /** HTML comments, stripped before the key scan so documentation is not read as markup. */
+  private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
+
+  /**
+   * Every {@code #{...}} a template asks for is declared by the bundles.
+   *
+   * <p>The cases above compare the bundles only with each other, so all of them are satisfied by
+   * deleting a key from all three at once — which is exactly how {@code orders.create.link} went.
+   * Its anonymous use went with the public order form (ADR-0149) and the key with it; the
+   * authenticated one in the sidebar survived, and every signed-in member for whom neither {@code
+   * canViewJobOrders} nor {@code canViewOwnJobOrders} holds (the non-profit-unit case {@code
+   * CapabilityFlagsAdvice} preserves deliberately) then read {@code ??orders.create.link_de??} as a
+   * nav label on every page of the tool. Nothing failed: Thymeleaf renders the marker and carries
+   * on.
+   *
+   * <p>Only static keys are checked. A {@code #{'prefix.' + ${x}}} cannot be resolved without
+   * running the page, so the scan skips anything that is not a bare dotted literal rather than
+   * guessing at it.
+   *
+   * @throws IOException when a template or bundle cannot be read
+   */
+  @Test
+  void everyMessageKeyUsedByATemplateIsDeclared() throws IOException {
+    Set<String> declared = keysOf(DEFAULT);
+    Pattern key = Pattern.compile("#\\{\\s*([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+)\\s*\\}");
+    List<String> missing = new ArrayList<>();
+
+    try (Stream<Path> templates = Files.walk(Path.of("src/main/resources/templates"))) {
+      for (Path template : templates.filter(f -> f.toString().endsWith(".html")).toList()) {
+        // Comments are stripped first: fragments/components.html documents its own call shape in
+        // an HTML comment, keys and all, and a key nobody renders is not a key anybody misses.
+        String body =
+            COMMENT.matcher(Files.readString(template, StandardCharsets.UTF_8)).replaceAll("");
+        Matcher matcher = key.matcher(body);
+        while (matcher.find()) {
+          if (!declared.contains(matcher.group(1))) {
+            missing.add(matcher.group(1) + "  (" + template.getFileName() + ")");
+          }
+        }
+      }
+    }
+
+    assertThat(new TreeSet<>(missing))
+        .as(
+            "templates asking for a message key no bundle declares — Thymeleaf renders these as"
+                + " ??key_locale?? to the user instead of failing")
         .isEmpty();
   }
 

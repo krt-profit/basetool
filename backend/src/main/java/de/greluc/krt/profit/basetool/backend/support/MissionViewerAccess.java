@@ -48,15 +48,13 @@ public interface MissionViewerAccess {
   boolean isAuthenticated();
 
   /**
-   * Reports whether the current caller is a squadron member or above — the "mission outsider"
-   * discriminator of REQ-SEC-009, false for both anonymous callers and authenticated but role-less
-   * {@code GUEST} accounts.
+   * Reports whether the current caller is a squadron member or above (REQ-SEC-009).
    *
    * <p>Backs the mission {@code description} redaction (REQ-SEC-041). {@link #isAuthenticated()} is
-   * deliberately <em>not</em> the gate for it: a role-less GUEST is authenticated yet is an
-   * outsider, and the detail endpoint has always hidden the description from that tier via {@code
-   * MissionGuestRedactor#cleanupOutsiderMissionForGuest}. Gating on membership here makes the
-   * list/search rows agree with the detail instead of leaking what the redactor removes.
+   * deliberately <em>not</em> the gate for it: authentication and membership are different
+   * questions, and a caller can hold the first without the second — a PENDING registration does,
+   * and until ADR-0159 a role-less {@code GUEST} token did too. Gating on membership here makes the
+   * list/search rows agree with the detail instead of leaking what the detail's redactor removes.
    *
    * @return {@code true} iff the caller holds a member or elevated role.
    */

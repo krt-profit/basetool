@@ -81,10 +81,10 @@ class BackendApiClientWriteProblemJsonTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    WebClient publicWebClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
+    WebClient termsDocumentClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     meterRegistry = new SimpleMeterRegistry();
     client =
-        new BackendApiClient(webClient, publicWebClient, meterRegistry, new NoOpCacheManager());
+        new BackendApiClient(webClient, termsDocumentClient, meterRegistry, new NoOpCacheManager());
   }
 
   /**

@@ -38,11 +38,16 @@ import org.springframework.web.bind.annotation.RestController;
  * Public/admin REST surface over the single shared announcement. The {@code GET} root path is
  * public (drives the home-page banner); {@code GET /admin} returns the record even when content is
  * blank (admins reuse the same row); PUT/DELETE are ADMIN/OFFICER only.
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
  */
 @RestController
 @RequestMapping("/api/v1/announcement")
 @RequiredArgsConstructor
 @Transactional
+@PreAuthorize("isAuthenticated()")
 public class AnnouncementController {
 
   private final AnnouncementService announcementService;

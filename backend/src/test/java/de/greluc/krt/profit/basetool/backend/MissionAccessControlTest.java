@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.JobType;
@@ -79,16 +78,23 @@ class MissionAccessControlTest {
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
-  @Autowired
-  private de.greluc.krt.profit.basetool.backend.service.GuestParticipantTokenService
-      guestParticipantTokenService;
-
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private User officerUser;
-  private User guestUser;
+
+  /**
+   * An ordinary member who signs up for the mission - the counterpart to {@link #officerUser}.
+   *
+   * <p>Named {@code guestUser} until ADR-0159, when the tier it referred to stopped existing. It
+   * was always a real {@code User} row with an IRIDIUM membership, and its tokens now carry {@code
+   * ROLE_KRT_MEMBER} explicitly: {@code default-roles-iri} grants it to every account Keycloak
+   * creates, so a token without it models an account shape that cannot occur, and the mission gates
+   * ask for membership since REQ-SEC-007.
+   */
+  private User memberUser;
+
   private JobType testJobType;
 
   @BeforeEach
@@ -102,11 +108,11 @@ class MissionAccessControlTest {
     userRepository.save(officerUser);
     saveIridiumMembership(officerUser);
 
-    guestUser = new User();
-    guestUser.setId(UUID.randomUUID());
-    guestUser.setUsername("guest1");
-    userRepository.save(guestUser);
-    saveIridiumMembership(guestUser);
+    memberUser = new User();
+    memberUser.setId(UUID.randomUUID());
+    memberUser.setUsername("member1");
+    userRepository.save(memberUser);
+    saveIridiumMembership(memberUser);
 
     testJobType = new JobType();
     testJobType.setName("Test Job");
@@ -145,37 +151,21 @@ class MissionAccessControlTest {
   }
 
   @Test
-  void testCreateMission_Unauthenticated_Forbidden() throws Exception {
+  void testCreateMission_Unauthenticated_Refused() throws Exception {
     String json = "{\"name\": \"Anonymous Mission\", \"status\": \"PLANNED\", \"version\": 0}";
 
     mockMvc
         .perform(post("/api/v1/missions").contentType(MediaType.APPLICATION_JSON).content(json))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized());
   }
 
+  /**
+   * The next-mission banner used to answer an anonymous caller (with 204 on an empty database).
+   * REQ-SEC-052 closed the whole mission read surface, so it is turned away at the entry point.
+   */
   @Test
-  void testGetNextMission_Anonymous_Allowed() throws Exception {
-    mockMvc
-        .perform(get("/api/v1/missions/next"))
-        .andExpect(status().isNoContent()); // Assuming no missions in test db
-  }
-
-  @Test
-  void testJoinMission_Guest_Allowed() throws Exception {
-    Mission mission = new Mission();
-    mission.setOwningOrgUnit(iridium);
-    mission.setName("Open Mission");
-    mission.setStatus("PLANNED");
-    mission = missionRepository.save(mission);
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/" + mission.getId() + "/join")
-                .with(
-                    jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST"))))
-        .andExpect(status().isOk());
+  void testGetNextMission_Unauthenticated_Refused() throws Exception {
+    mockMvc.perform(get("/api/v1/missions/next")).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -188,13 +178,16 @@ class MissionAccessControlTest {
 
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -208,37 +201,40 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         .andExpect(status().isOk());
   }
 
   @Test
-  void testUpdateParticipant_OtherGuest_Forbidden() throws Exception {
+  void testUpdateParticipant_OtherMember_Forbidden() throws Exception {
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Mission");
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // guest1 joins
+    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    User otherGuest = new User();
-    otherGuest.setId(UUID.randomUUID());
-    otherGuest.setUsername("guest2");
-    userRepository.save(otherGuest);
-    saveIridiumMembership(otherGuest);
+    User otherMember = new User();
+    otherMember.setId(UUID.randomUUID());
+    otherMember.setUsername("member2");
+    userRepository.save(otherMember);
+    saveIridiumMembership(otherMember);
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -247,14 +243,14 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Malicious\", \"version\": 0}";
 
-    // guest-2 tries to update guest-1 -> Now Forbidden
+    // The other member tries to edit the first one's row -> forbidden
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(otherGuest.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(otherMember.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
         .andExpect(status().isForbidden());
@@ -268,16 +264,19 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // guest1 joins
+    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -286,7 +285,7 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Approved\", \"version\": 0}";
 
-    // Officer updates guest-1
+    // Officer updates the member's row
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
@@ -314,19 +313,22 @@ class MissionAccessControlTest {
 
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
-            .with(jwt().jwt(builder -> builder.subject(guestUser.getId().toString()))));
+            .with(
+                jwt()
+                    .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                    .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
     // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
-            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(guestUser.getId()))
+            .filter(mp -> mp.getUser() != null && mp.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
     // The PLANNED job type is the organisation's assignment - it carries the Einsatzleiter
     // designation - so a self-editing participant who cannot manage the mission is refused it
-    // (audit MEDIUM-9). This test asserted the opposite until then: it drove a ROLE_GUEST setting
+    // (audit MEDIUM-9). This test asserted the opposite until then: it drove a role-less setting
     // their OWN planned job type and expected 200, which is precisely the self-designation the
     // single-lead rule then held against the real leader.
     String plannedAttempt =
@@ -340,8 +342,8 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(plannedAttempt))
         .andExpect(status().isForbidden());
@@ -358,8 +360,8 @@ class MissionAccessControlTest {
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
                 .with(
                     jwt()
-                        .jwt(builder -> builder.subject(guestUser.getId().toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_GUEST")))
+                        .jwt(builder -> builder.subject(memberUser.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ownFieldsUpdate))
         .andExpect(status().isOk());
@@ -367,7 +369,7 @@ class MissionAccessControlTest {
     // Verification via Repository
     de.greluc.krt.profit.basetool.backend.model.MissionParticipant participant =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
-            .filter(mp1 -> mp1.getUser().getId().equals(guestUser.getId()))
+            .filter(mp1 -> mp1.getUser().getId().equals(memberUser.getId()))
             .findFirst()
             .orElseThrow();
 
@@ -379,88 +381,14 @@ class MissionAccessControlTest {
     org.junit.jupiter.api.Assertions.assertEquals("Full Update", participant.getComment());
   }
 
+  /**
+   * Recording an external participant is a member's action now (ADR-0159, decision D4).
+   *
+   * <p>The endpoint kept its shape — a {@code guestName} without a {@code userId} — and any member
+   * who can see the mission may still use it. What went is the caller who had no account at all.
+   */
   @Test
-  void testSearchMissions_Guest_Default_ShouldSeeOnlyPlannedAndActive() throws Exception {
-    missionRepository.deleteAll(); // Ensure clean state for counting
-
-    Mission m1 = new Mission();
-
-    m1.setOwningOrgUnit(iridium);
-    m1.setName("M1");
-    m1.setStatus("PLANNED");
-    missionRepository.save(m1);
-    Mission m2 = new Mission();
-    m2.setOwningOrgUnit(iridium);
-    m2.setName("M2");
-    m2.setStatus("ACTIVE");
-    missionRepository.save(m2);
-    Mission m3 = new Mission();
-    m3.setOwningOrgUnit(iridium);
-    m3.setName("M3");
-    m3.setStatus("COMPLETED");
-    missionRepository.save(m3);
-    Mission m4 = new Mission();
-    m4.setOwningOrgUnit(iridium);
-    m4.setName("M4");
-    m4.setStatus("CANCELLED");
-    missionRepository.save(m4);
-
-    mockMvc
-        .perform(get("/api/v1/missions/search"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(2));
-  }
-
-  @Test
-  void testSearchMissions_Guest_ExplicitPast_ShouldBeIgnored() throws Exception {
-    missionRepository.deleteAll();
-
-    Mission m1 = new Mission();
-
-    m1.setOwningOrgUnit(iridium);
-    m1.setName("M1");
-    m1.setStatus("COMPLETED");
-    missionRepository.save(m1);
-    Mission m2 = new Mission();
-    m2.setOwningOrgUnit(iridium);
-    m2.setName("M2");
-    m2.setStatus("CANCELLED");
-    missionRepository.save(m2);
-
-    // Guest requests completed/cancelled explicitly -> Should receive empty list (200 OK)
-    mockMvc
-        .perform(
-            get("/api/v1/missions/search")
-                .param("status", "COMPLETED")
-                .param("status", "CANCELLED"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
-  }
-
-  @Test
-  void testGetMissionById_Guest_Planned_Allowed() throws Exception {
-    Mission m = new Mission();
-    m.setOwningOrgUnit(iridium);
-    m.setName("Public");
-    m.setStatus("PLANNED");
-    m = missionRepository.save(m);
-
-    mockMvc.perform(get("/api/v1/missions/" + m.getId())).andExpect(status().isOk());
-  }
-
-  @Test
-  void testGetMissionById_Guest_Completed_Forbidden() throws Exception {
-    Mission m = new Mission();
-    m.setOwningOrgUnit(iridium);
-    m.setName("Secret");
-    m.setStatus("COMPLETED");
-    m = missionRepository.save(m);
-
-    mockMvc.perform(get("/api/v1/missions/" + m.getId())).andExpect(status().isForbidden());
-  }
-
-  @Test
-  void testAddParticipantPublic_Anonymous_Allowed() throws Exception {
+  void testAddExternalParticipant_Unauthenticated_Refused() throws Exception {
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Public Mission");
@@ -478,70 +406,6 @@ class MissionAccessControlTest {
             post("/api/v1/missions/" + mission.getId() + "/participants/add")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonBody))
-        .andExpect(status().isOk());
-  }
-
-  @Test
-  void testUpdateParticipant_AnonymousGuest_WithToken_Allowed() throws Exception {
-    // Security audit M1 / REQ-SEC-018: an anonymous guest may edit their own sign-up only by
-    // presenting the per-row capability token (X-Guest-Edit-Token) minted at create time.
-    Mission mission = new Mission();
-    mission.setOwningOrgUnit(iridium);
-    mission.setName("Mission");
-    mission.setStatus("PLANNED");
-    mission = missionRepository.save(mission);
-
-    String token = guestParticipantTokenService.generateToken();
-    MissionParticipant participant = new MissionParticipant();
-    participant.setMission(mission);
-    participant.setUser(null); // Guest
-    participant.setGuestName("Guest User");
-    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
-    participant = missionParticipantRepository.save(participant);
-    mission.getParticipants().add(participant);
-    missionRepository.save(mission);
-
-    // When/Then
-    mockMvc
-        .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + participant.getId())
-                .header("X-Guest-Edit-Token", token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\": \"New Name\", \"version\": 0}"))
-        .andExpect(status().isOk());
-  }
-
-  @Test
-  void testUpdatePayoutPreference_AnonymousGuest_WithToken_Allowed() throws Exception {
-    // Security audit M1 / REQ-SEC-018: payout-preference is sticky and finance-relevant, so the
-    // guest-row gate (token or mission-manager) applies here too.
-    Mission mission = new Mission();
-    mission.setOwningOrgUnit(iridium);
-    mission.setName("Mission");
-    mission.setStatus("PLANNED");
-    mission = missionRepository.save(mission);
-
-    String token = guestParticipantTokenService.generateToken();
-    MissionParticipant participant = new MissionParticipant();
-    participant.setMission(mission);
-    participant.setUser(null); // Guest
-    participant.setGuestName("Guest User");
-    participant.setGuestEditTokenHash(guestParticipantTokenService.hashToken(token));
-    participant = missionParticipantRepository.save(participant);
-    mission.getParticipants().add(participant);
-    missionRepository.save(mission);
-
-    // When/Then
-    mockMvc
-        .perform(
-            put("/api/v1/missions/"
-                    + mission.getId()
-                    + "/participants/"
-                    + participant.getId()
-                    + "/payout-preference")
-                .header("X-Guest-Edit-Token", token)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"preference\": \"PAYOUT\", \"version\": 0}"))
-        .andExpect(status().isOk());
+        .andExpect(status().isUnauthorized());
   }
 }

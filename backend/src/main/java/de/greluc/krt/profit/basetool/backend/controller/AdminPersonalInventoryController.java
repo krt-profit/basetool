@@ -62,7 +62,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(
     name = "Admin – Personal Inventory",
     description = "Administrator endpoints for managing any user's personal inventory.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class AdminPersonalInventoryController {
 

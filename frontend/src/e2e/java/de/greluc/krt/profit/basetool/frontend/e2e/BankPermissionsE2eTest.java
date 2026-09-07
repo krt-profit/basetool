@@ -41,12 +41,21 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * bank roles and per-account grants — never org-unit membership — in both directions, plus the
  * admin-only carve-out of the audit log.
  *
- * <p><b>Fixtures (from {@code realm-export.e2e.json}).</b> {@code test-bank-management} (role
- * <em>Bank Management</em>, no squadron), {@code test-bank-employee} (role <em>Bank Employee</em>
- * only, no squadron — pins that bank access does not require org membership), {@code
- * test-bank-member} (roles <em>Bank Employee</em> + <em>KRT Member</em> — pins that org membership
- * does not break bank access), {@code test-member} (a plain squadron member, no bank role — must
- * see nothing), and {@code test-admin}.
+ * <p><b>Fixtures (from {@code realm-export.e2e.json}).</b> {@code test-bank-management} and {@code
+ * test-bank-employee} (their bank role plus <em>KRT Member</em>), {@code test-bank-member} (the
+ * same pair — kept because it is what the "also a squadron member" case below reads, and because
+ * its org-unit membership is seeded app-side, not in the realm), {@code test-member} (a member with
+ * no bank role — must see nothing), and {@code test-admin}.
+ *
+ * <p><b>The two bank accounts carried no <em>KRT Member</em> until 2026-09-06</b>, and the Javadoc
+ * here said that pinned "bank access does not require org membership". It pinned an account shape
+ * Keycloak cannot produce: {@code default-roles-iri} grants <em>KRT Member</em> to every account it
+ * creates, so there is no such thing as a bank-only account (REQ-SEC-053 — every account is at
+ * least a member). The fixtures modelled a cohort that does not exist, and the members-only change
+ * made that visible by gating the mission list on {@code isMemberOrAbove()}: these two accounts,
+ * and only these two, then met an error on the dashboard no real account can meet. What the pair
+ * still asserts is the real rule — the bank gates consult bank roles and per-account grants, never
+ * org membership — which the {@code test-member} case above proves from the other side.
  *
  * <p>The matrix is asserted by calling the scoped backend endpoints as each user (race-free, the
  * established tenancy-test approach), with the member-sees-nothing boundary additionally driven

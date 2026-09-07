@@ -192,10 +192,10 @@ class UserServiceAttributesTest {
 
     @Test
     void rankForNeitherOfficerNorSquadronUser_isSetWithoutValidation() {
-      // Guests/admins/etc. — no rank-range validation; whatever is passed sticks.
+      // Bank employees/admins/etc. — no rank-range validation; whatever is passed sticks.
       User user = newUser(USER_ID);
       user.setVersion(1L);
-      user.setRoles(new HashSet<>(Set.of(roleNamed("GUEST"))));
+      user.setRoles(new HashSet<>(Set.of(roleNamed("Bank Employee"))));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(userRepository.save(user)).thenReturn(user);
 

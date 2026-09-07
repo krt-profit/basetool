@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -53,6 +54,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.ErrorResponseException;
@@ -1154,6 +1156,24 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ProblemDetail> handleAllExceptions(
       Exception ex, HttpServletRequest request) {
+    // A security refusal raised inside a @PreAuthorize SpEL expression does not arrive as itself:
+    // SpEL wraps whatever a bean method threw, so RequestScopeResolver's "no identity" refusal
+    // (REQ-SEC-052) would land here and be answered 500 with a stack trace in the log and a 5xx on
+    // the alerting - for a request whose only problem is that it carried no login. Unwrap before
+    // giving up, so the shape of the answer follows the cause rather than the wrapper.
+    //
+    // NARROWED to the one exception this was written for. Matching any AuthenticationException in
+    // the chain turned a real outage into a silent 401: a Keycloak Admin-API or JWKS call failing
+    // inside a service and rethrown wrapped carries an AuthenticationServiceException or an
+    // OAuth2AuthenticationException, and answering that 401-with-a-DEBUG-line means
+    // LogbackErrorSpike
+    // and the http-error alerting never fire while the incident reads as a 401 spike. The cause
+    // this
+    // handler exists for has exactly one shape; anything else genuinely is a 500.
+    AuthenticationCredentialsNotFoundException wrapped = wrappedMissingCredentials(ex);
+    if (wrapped != null) {
+      return handleAuthentication(wrapped, request);
+    }
     String cid = correlationId();
     // Make sure the correlation id is the same for both the log line and the response.
     MDC.put(MDC_CORRELATION_ID, cid);
@@ -1171,6 +1191,33 @@ public class GlobalExceptionHandler {
     pd.setProperty("code", CODE_INTERNAL_ERROR);
     pd.setProperty("correlationId", cid);
     return toEntity(pd);
+  }
+
+  /**
+   * Digs a {@link AuthenticationCredentialsNotFoundException} out of a wrapper chain.
+   *
+   * <p><b>This type and no other.</b> It is what {@code RequestScopeResolver} raises when a scoped
+   * read is reached with no identity, and SpEL wraps it when the call comes from a
+   * {@code @PreAuthorize} expression. Widening the match to {@link AuthenticationException} would
+   * also catch {@code AuthenticationServiceException} and {@code OAuth2AuthenticationException} —
+   * the shapes an unreachable Keycloak produces — and answer a genuine outage with a {@code 401}
+   * and a DEBUG line, which is precisely the signal an outage must not be able to suppress.
+   *
+   * @param ex the exception that reached the catch-all
+   * @return the first matching exception in its cause chain, or {@code null} when there is none.
+   *     The walk is depth-bounded so a self-referencing cause cannot spin.
+   */
+  @Nullable
+  private static AuthenticationCredentialsNotFoundException wrappedMissingCredentials(
+      Throwable ex) {
+    Throwable current = ex;
+    for (int depth = 0; current != null && depth < 10; depth++) {
+      if (current instanceof AuthenticationCredentialsNotFoundException missing) {
+        return missing;
+      }
+      current = current.getCause() == current ? null : current.getCause();
+    }
+    return null;
   }
 
   /**

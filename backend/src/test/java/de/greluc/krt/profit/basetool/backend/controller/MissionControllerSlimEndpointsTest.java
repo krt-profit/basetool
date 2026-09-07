@@ -410,15 +410,14 @@ class MissionControllerSlimEndpointsTest {
   }
 
   /**
-   * Reproducer for the "anonymous guest cannot sign up to a mission" bug (see live-log/log.txt: 401
-   * UNAUTHENTICATED on POST /api/v1/missions/{id}/participants/slim for `[anonymous]`).
-   *
-   * <p>Backend SecurityConfig must permit anonymous POSTs to the slim signup endpoint, mirroring
-   * the legacy `/participants/add` permit rule, so the controller's own anonymous-guest branch (jwt
-   * == null + guestName) can run.
+   * The row this used to be about survives; its author changed. It was written as the reproducer
+   * for "anonymous guest cannot sign up to a mission" (401 on POST .../participants/slim for
+   * `[anonymous]`), and the fix was a permit rule on the URL. REQ-SEC-052 took that rule away, so
+   * the same row — a named person with no account — is now recorded by a member who can see the
+   * Einsatz (ADR-0159, decision D4). Same shape, different hand.
    */
   @Test
-  void addParticipantSlim_anonymousGuest_withGuestName_isAllowed() throws Exception {
+  void addParticipantSlim_memberRecordsAnExternalParticipant_isAllowed() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
@@ -437,23 +436,20 @@ class MissionControllerSlimEndpointsTest {
         .perform(
             post("/api/v1/missions/{id}/participants/slim", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"Anon-Guest\"}"))
+                .content("{\"guestName\":\"Anon-Guest\"}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$").isArray())
         .andExpect(jsonPath("$[0].id").value(participantId.toString()));
   }
 
   /**
-   * Reproducer for the follow-up bug "anonymous guest cannot edit/delete their own participant
-   * entry" (see live-log/log.txt: 403 on PUT/DELETE /missions/{id}/participants/{pid}/ajax for
-   * `[anonymous]`).
-   *
-   * <p>Backend SecurityConfig must permit anonymous PUT and DELETE on the slim participant
-   * sub-resource so that {@code MissionSecurityService#canAccessParticipant} (which already returns
-   * true for guest entries with {@code user == null}) can apply.
+   * The edit half of the same story: {@code canAccessParticipant} returns true for an external
+   * entry ({@code user == null}) and that is still what decides. Only the caller changed — the URL
+   * permit rule that let an anonymous visitor edit their own row is gone (REQ-SEC-052).
    */
   @Test
-  void updateParticipantSlim_anonymousGuest_isAllowed() throws Exception {
+  void updateParticipantSlim_externalRow_isAllowedForAMemberWhoMayAccessIt() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
@@ -486,13 +482,14 @@ class MissionControllerSlimEndpointsTest {
         .perform(
             put("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}"))
+                .content("{\"version\":0,\"guestName\":\"Anon-Guest\",\"comment\":\"edited\"}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(participantId.toString()));
   }
 
   @Test
-  void deleteParticipantSlim_anonymousGuest_isAllowed() throws Exception {
+  void deleteParticipantSlim_externalRow_isAllowedForAMemberWhoMayAccessIt() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
@@ -500,7 +497,9 @@ class MissionControllerSlimEndpointsTest {
         .thenReturn(true);
 
     mockMvc
-        .perform(delete("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId))
+        .perform(
+            delete("/api/v1/missions/{id}/participants/{pid}/slim", missionId, participantId)
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isNoContent());
   }
 
@@ -532,29 +531,18 @@ class MissionControllerSlimEndpointsTest {
   // "Multi-user data isolation (CRITICAL)" rule lives or dies in these.
   // ===================================================================
 
-  @Test
-  void addParticipantSlim_anonymousSubmittingUserId_isForbidden() throws Exception {
-    // SECURITY: an anonymous caller cannot manufacture a "User" RSVP. The
-    // controller throws AccessDeniedException -> 403 BEFORE any service
-    // call.
-    UUID missionId = UUID.randomUUID();
-    UUID spoofUserId = UUID.randomUUID();
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/{id}/participants/slim", missionId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"userId\":\"" + spoofUserId + "\"}"))
-        .andExpect(status().isForbidden());
-
-    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
-        .addParticipant(any(), any(), any(), any(), any(), any(), any());
-  }
+  // Two cases stood here: an anonymous caller submitting a userId (403) and one typing a
+  // free-text name that resolved to a registered member (400). Both were spoofing
+  // protection for a caller REQ-SEC-052 refuses at the entry point. What they guarded is
+  // guarded better by the self-vs-manager check, which does not care HOW the participant
+  // was named — id or resolved name — only whether it is somebody other than the caller:
+  // addParticipantSlim_memberAddingOtherUser_isForbidden and
+  // addParticipantSlim_memberTypingAnotherMembersName_isForbidden below.
 
   @Test
   void addParticipantSlim_guestNameMatchesMultipleUsers_isConflict() throws Exception {
-    // Ambiguous free-text name -> 409 BusinessConflictException, regardless
-    // of authenticated-vs-anonymous.
+    // Ambiguous free-text name -> 409 BusinessConflictException, before any userId is resolved and
+    // therefore before the self-vs-manager check can have an opinion.
     UUID missionId = UUID.randomUUID();
 
     User a = new User();
@@ -569,7 +557,8 @@ class MissionControllerSlimEndpointsTest {
         .perform(
             post("/api/v1/missions/{id}/participants/slim", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alex\"}"))
+                .content("{\"guestName\":\"alex\"}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isConflict());
 
     org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
@@ -623,21 +612,31 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantSlim_anonymousUsingRegisteredName_isBadRequest() throws Exception {
-    // SECURITY: anonymous user types a free-text name that resolves to a
-    // registered member -> reject (cannot impersonate a member as a guest).
+  void addParticipantSlim_memberTypingAnotherMembersName_isForbidden() throws Exception {
+    // SECURITY: a free-text name that resolves to a registered member is LINKED to that member —
+    // which makes it a request to sign somebody else up, and needs canManageMission. It used to
+    // answer 400 ("Guest name is already taken") for an anonymous caller and link silently for an
+    // authenticated one; with the anonymous caller gone, one rule covers both spellings of
+    // "somebody else", by id and by name.
     UUID missionId = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
     User registered = new User();
     registered.setId(UUID.randomUUID());
     registered.setUsername("alice");
     when(userService.findMatchesByExactName("alice")).thenReturn(java.util.List.of(registered));
+    when(userService.getUserIdFromJwt(any())).thenReturn(callerId);
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
 
     mockMvc
         .perform(
             post("/api/v1/missions/{id}/participants/slim", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alice\"}"))
-        .andExpect(status().isBadRequest());
+                .content("{\"guestName\":\"alice\"}")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(callerId.toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
 
     org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
         .addParticipant(any(), any(), any(), any(), any(), any(), any());
@@ -678,42 +677,18 @@ class MissionControllerSlimEndpointsTest {
   }
 
   // ===================================================================
-  // addParticipantPublic — public RSVP endpoint with the same branching
-  // (no slim wrapping). The legacy endpoint is permitAll() and used by
-  // anonymous / unauthenticated mission RSVPs.
+  // addParticipantPublic — the same branching without the slim wrapping.
+  // It was permitAll() and carried the anonymous RSVP until REQ-SEC-052;
+  // it is a member-only endpoint now and keeps the external-participant
+  // row, which is what the anonymous sign-up actually produced.
   // ===================================================================
 
-  @Test
-  void addParticipantPublic_anonymousSubmittingUserId_isForbidden() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    UUID spoofUserId = UUID.randomUUID();
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/{id}/participants/add", missionId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"userId\":\"" + spoofUserId + "\"}"))
-        .andExpect(status().isForbidden());
-  }
+  // Two anonymous cases stood here (a submitted userId → 403, a name resolving to a
+  // registered member → 400), mirroring the slim ones. Both are the self-vs-manager check
+  // now; the pair above covers it for both endpoints, which share the branch verbatim.
 
   @Test
-  void addParticipantPublic_anonymousUsingRegisteredName_isBadRequest() throws Exception {
-    UUID missionId = UUID.randomUUID();
-    User registered = new User();
-    registered.setId(UUID.randomUUID());
-    registered.setUsername("alice");
-    when(userService.findMatchesByExactName("alice")).thenReturn(java.util.List.of(registered));
-
-    mockMvc
-        .perform(
-            post("/api/v1/missions/{id}/participants/add", missionId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alice\"}"))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  void addParticipantPublic_anonymousAmbiguousName_isConflict() throws Exception {
+  void addParticipantPublic_ambiguousName_isConflict() throws Exception {
     UUID missionId = UUID.randomUUID();
     User a = new User();
     a.setId(UUID.randomUUID());
@@ -727,16 +702,19 @@ class MissionControllerSlimEndpointsTest {
         .perform(
             post("/api/v1/missions/{id}/participants/add", missionId)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"guestName\":\"alex\"}"))
+                .content("{\"guestName\":\"alex\"}")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isConflict());
   }
 
   // ===================================================================
-  // Audit finding C-1: anonymous callers of addParticipantPublic and
-  // addParticipantSlim must never receive participant emails / real
-  // names — the response shape must match getMissionById's redacted
-  // shape. Authenticated callers (officer, member) keep the full PII so
-  // existing UI flows are unchanged.
+  // Audit finding C-1, as REQ-SEC-007 states it since ADR-0159: a caller
+  // BELOW LOGISTICIAN on addParticipantPublic / addParticipantSlim must
+  // never receive participant emails or real names — the response shape
+  // matches getMissionById's redacted shape. The cases were written for
+  // an anonymous caller; that tier is gone and the member below
+  // Logistician inherited it. Logistician and above keep the full PII,
+  // so the existing UI flows are unchanged.
   // ===================================================================
 
   /**
@@ -756,8 +734,8 @@ class MissionControllerSlimEndpointsTest {
     bob.setUsername("bob.callsign");
     bob.setEmail("bob@example.invalid");
     bobEntry.setUser(bob);
-    // ADR-0034: bob carries a free-text comment + the default PAYOUT preference so the outsider
-    // tests can assert both are stripped from the anonymous response.
+    // Bob carries a free-text comment. ADR-0034 stripped it for the outsider tier; the peer tier
+    // that inherited those cases keeps it, and the assertions below say so on purpose.
     bobEntry.setComment("bob-private-note");
     set.add(bobEntry);
 
@@ -771,7 +749,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantSlim_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+  void addParticipantSlim_member_redactsOtherParticipantsPii() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID guestParticipantId = UUID.randomUUID();
@@ -784,30 +762,27 @@ class MissionControllerSlimEndpointsTest {
             .perform(
                 post("/api/v1/missions/{id}/participants/slim", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}"))
+                    .content("{\"guestName\":\"Anon-Guest\"}")
+                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$").isArray())
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    // Outsiders see the roster on a non-internal mission, but PII is stripped to the public
-    // callsign
-    // tuple — the username stays so guests can identify participants, the email never leaks
-    // (audit finding C-1).
+    // A member below Logistician reads the roster with PII stripped to the public callsign tuple:
+    // the username stays so participants can be told apart, the e-mail never leaves (C-1).
     org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "username must remain visible to guests");
+        body.contains("bob.callsign"), "the callsign is what a peer identifies people by");
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
-        "anonymous response must not leak participant email — audit finding C-1");
-    // ADR-0034 / REQ-SEC-021: the anonymous outsider roster must not carry a participant's
-    // free-text comment or payout preference.
-    org.junit.jupiter.api.Assertions.assertFalse(
+        "a peer response must not leak a participant e-mail — audit finding C-1");
+    // The free-text comment and the payout intent were stripped by the OUTSIDER tier (ADR-0034 /
+    // REQ-SEC-021) because its audience was people outside the organisation. Among members they
+    // are what the sign-up sheet is for, so the peer tier that replaced it forwards them.
+    org.junit.jupiter.api.Assertions.assertTrue(
         body.contains("bob-private-note"),
-        "ADR-0034: anonymous outsider must not receive a participant's free-text comment");
-    org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("PAYOUT"),
-        "ADR-0034: anonymous outsider must not receive a participant's payout preference");
+        "a peer reads the sign-up sheet's comments — that tier never hid them");
   }
 
   @Test
@@ -844,7 +819,7 @@ class MissionControllerSlimEndpointsTest {
   }
 
   @Test
-  void addParticipantPublic_anonymousGuest_redactsOtherParticipantsPii() throws Exception {
+  void addParticipantPublic_member_redactsOtherParticipantsPii() throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID guestParticipantId = UUID.randomUUID();
@@ -857,19 +832,20 @@ class MissionControllerSlimEndpointsTest {
             .perform(
                 post("/api/v1/missions/{id}/participants/add", missionId)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"guestName\":\"Anon-Guest\"}"))
+                    .content("{\"guestName\":\"Anon-Guest\"}")
+                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    // The legacy public-add returns the full MissionDto; for an outsider it is redacted via
-    // cleanupOutsiderMissionForGuest, which keeps the roster (PII stripped) and hides only the
-    // description. The username stays visible, the email never leaks (audit finding C-1).
+    // The legacy add returns the full MissionDto; below Logistician it goes through
+    // cleanupMissionForPeer, which keeps the roster and strips its PII. The callsign stays
+    // visible, the e-mail never leaks (audit finding C-1).
     org.junit.jupiter.api.Assertions.assertTrue(
-        body.contains("bob.callsign"), "username must remain visible to guests");
+        body.contains("bob.callsign"), "the callsign is what a peer identifies people by");
     org.junit.jupiter.api.Assertions.assertFalse(
-        body.contains("bob@example.invalid"), "an outsider must never receive a participant email");
+        body.contains("bob@example.invalid"), "a peer must never receive a participant e-mail");
   }
 
   @Test

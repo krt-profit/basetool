@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,6 +32,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.TermsClauseDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsSectionDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +44,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 class TermsControllerTest {
 
   @Autowired private WebApplicationContext context;
@@ -60,9 +62,7 @@ class TermsControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    when(backendApiClient.get(
-            eq("/api/v1/terms/document"), eq(TermsDocumentDto.class), anyBoolean()))
-        .thenReturn(document());
+    when(backendApiClient.getTermsDocumentAnonymously()).thenReturn(document());
   }
 
   /**
@@ -98,6 +98,38 @@ class TermsControllerTest {
   @Test
   void shouldReturnTermsView() throws Exception {
     mockMvc.perform(get("/terms")).andExpect(status().isOk()).andExpect(view().name("terms"));
+  }
+
+  /**
+   * A backend that cannot be read renders the notice, not the error view.
+   *
+   * <p>The template's {@code terms == null} branch used to cover only a {@code 200} with an empty
+   * body — a case that does not occur — because the controller caught nothing. {@code executeGet}
+   * raises {@link BackendServiceException} for every 4xx/5xx and for an open circuit, which is the
+   * case the template comment and the CHANGELOG both describe. Asserted here because this is the
+   * one page reachable without a session and the one every member must read before consenting: an
+   * error view there is the worst of the available answers.
+   *
+   * @throws Exception when the request could not be performed
+   */
+  @Test
+  void aBackendOutageRendersTheNoticeRatherThanTheErrorView() throws Exception {
+    when(backendApiClient.getTermsDocumentAnonymously())
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+
+    mockMvc
+        .perform(get("/terms"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("terms"))
+        // Asserted as the absence of the document rather than the presence of the notice: the
+        // notice is a resolved message and would tie this case to one locale's wording, while
+        // "no clause reached the page" is the property that matters and holds in every language.
+        .andExpect(
+            content()
+                .string(
+                    org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(
+                            "Sie gelten zwischen Betreiber und Nutzer."))));
   }
 
   /**

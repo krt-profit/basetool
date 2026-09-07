@@ -56,6 +56,12 @@ class FrontendAuthHelperServiceTest {
         .setAuthentication(new TestingAuthenticationToken("user", "pw", authorities));
   }
 
+  // The three isAnonymous() cases stood here. The method is gone with the caller it described
+  // (ADR-0159): nothing anonymous reaches a frontend handler any more, so every branch that asked
+  // the question was dead code. What the cases actually pinned — that Spring's anonymous token is
+  // authenticated and must not be mistaken for a member — survives in isAuthenticated()'s own
+  // tests below, which is where the distinction always lived.
+
   @Test
   void isMemberOrAbove_withSquadronMemberRole_returnsTrue() {
     // Given
@@ -73,11 +79,12 @@ class FrontendAuthHelperServiceTest {
   }
 
   @Test
-  void isMemberOrAbove_withOnlyGuestRole_returnsFalse() {
-    // Given — a role-less GUEST carries no member authority
-    authenticateWith("ROLE_GUEST");
+  void isMemberOrAbove_withOnlyTheNoRoleMarker_returnsFalse() {
+    // Given — the marker that replaced the deleted GUEST role (V239 / REQ-SEC-053) carries no
+    // member authority
+    authenticateWith("ROLE_NO_ROLE");
     // When / Then
-    assertFalse(service.isMemberOrAbove(), "a role-less guest is not a member");
+    assertFalse(service.isMemberOrAbove(), "a role-less account is not a member");
   }
 
   @Test
@@ -106,33 +113,5 @@ class FrontendAuthHelperServiceTest {
     authenticateWith("ROLE_OFFICER");
     // When / Then
     assertTrue(service.isMemberOrAbove(), "officer authority on the token counts as member");
-  }
-
-  @Test
-  void isAnonymous_withAuthenticatedToken_returnsFalse() {
-    // Given — a logged-in caller (the #906 Q10 guard replaces "@AuthenticationPrincipal OidcUser
-    // principal == null" with this; an authenticated user is never anonymous)
-    authenticateWith("ROLE_OFFICER");
-    // When / Then
-    assertFalse(service.isAnonymous(), "an authenticated caller is not anonymous");
-  }
-
-  @Test
-  void isAnonymous_withNoAuthentication_returnsTrue() {
-    // Given — empty security context (guest hitting a permitAll page)
-    SecurityContextHolder.clearContext();
-    // When / Then
-    assertTrue(service.isAnonymous(), "a missing authentication is anonymous");
-  }
-
-  @Test
-  void isAnonymous_withAnonymousToken_returnsTrue() {
-    // Given — Spring's anonymous token is treated as not-authenticated
-    SecurityContextHolder.getContext()
-        .setAuthentication(
-            new AnonymousAuthenticationToken(
-                "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
-    // When / Then
-    assertTrue(service.isAnonymous(), "an anonymous token is anonymous");
   }
 }

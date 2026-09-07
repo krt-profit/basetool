@@ -59,18 +59,15 @@ public class CachedCatalogListLoader {
    * @param <T> the catalog row type
    * @param catalog the cached catalog to read
    * @param pageType the paged-envelope response type for {@code catalog}
-   * @param isPublic {@code true} to route through the public (unauthenticated) WebClient, matching
-   *     the {@code getCached(..., isPublic)} overload
    * @param errorLabel a short catalog name for the failure log line (e.g. {@code "ship types"})
    * @return a new, mutable list of the catalog rows; empty (never {@code null}) on any failure
    */
   public <T> @NotNull List<T> loadPageContent(
       @NotNull CachedCatalog catalog,
       @NotNull ParameterizedTypeReference<PageResponse<T>> pageType,
-      boolean isPublic,
       @NotNull String errorLabel) {
     try {
-      PageResponse<T> page = backendApiClient.getCached(catalog, pageType, isPublic);
+      PageResponse<T> page = backendApiClient.getCached(catalog, pageType);
       if (page != null && page.content() != null) {
         return new ArrayList<>(page.content());
       }

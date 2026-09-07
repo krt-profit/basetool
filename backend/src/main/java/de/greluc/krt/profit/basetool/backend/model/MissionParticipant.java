@@ -31,7 +31,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Transient;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
@@ -75,9 +74,11 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * The org units (Staffel and/or Spezialkommandos) this participant is affiliated with for this
    * mission, stamped at sign-up time. For a registered user this is auto-derived from their
    * memberships (empty when they belong to none, the Staffel or SK when they belong to one, both
-   * when they belong to both); for a guest it is the caller-submitted, authorization-filtered
-   * selection. Replaces the former single {@code squadron_id} FK so a member of both a Staffel and
-   * an SK no longer loses one of the two affiliations.
+   * when they belong to both); for an external participant it is the caller-submitted selection,
+   * stored <b>as submitted</b> — {@code MissionParticipantService.resolveSubmittedOrgUnits} applies
+   * no per-org-unit authorization filter, and says so itself. Replaces the former single {@code
+   * squadron_id} FK so a member of both a Staffel and an SK no longer loses one of the two
+   * affiliations.
    *
    * <p>Mapped EAGER (matching the eager fetch of the former {@code @ManyToOne squadron}) because
    * the slim participant endpoints map the entity to its DTO after the service transaction has
@@ -128,32 +129,6 @@ public class MissionParticipant extends AbstractEntity<UUID> {
 
   @Enumerated(EnumType.STRING)
   private PayoutPreference payoutPreference = PayoutPreference.PAYOUT;
-
-  /**
-   * SHA-256 hex of the per-row capability token that authorises mutating/deleting THIS guest
-   * (unlinked) sign-up without a login (security audit M1 / REQ-SEC-018). Minted once at create
-   * time for guest rows only; {@code null} for user-linked participants and for guest rows created
-   * before V177. Only the hash is persisted — the matching plaintext is handed to the anonymous
-   * creator once via {@link #guestEditToken} and never stored — so the column is not a usable
-   * credential at rest. {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionSecurityService#canAccessParticipant}
-   * verifies a presented token against this hash. {@code @ToString.Exclude} keeps the hash out of
-   * log lines.
-   */
-  @Column(name = "guest_edit_token_hash", length = 64)
-  @ToString.Exclude
-  private String guestEditTokenHash;
-
-  /**
-   * Transient, write-once carrier for the PLAINTEXT guest edit token. Populated only on the entity
-   * instance returned from {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#addParticipant} for a freshly
-   * created guest row, so the create response can hand it to the anonymous creator exactly once.
-   * Being {@code @Transient} it is never persisted and is {@code null} on every entity loaded from
-   * the database, so a read/edit response can never surface it. {@code @ToString.Exclude} keeps the
-   * plaintext token out of log lines.
-   */
-  @Transient @ToString.Exclude private String guestEditToken;
 
   /**
    * Returns an unmodifiable view of this participant's org-unit affiliations. The Lombok getter is

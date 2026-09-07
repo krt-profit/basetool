@@ -23,10 +23,12 @@ import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRuleSelector;
+import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleSelectorWriteRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
+import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.Comparator;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +55,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationRuleService {
 
   private final NotificationRuleRepository notificationRuleRepository;
+
+  /** Resolves a {@code ROLE} selector's {@code roleCode} against the catalogue (REQ-SEC-053). */
+  private final RoleRepository roleRepository;
+
   private final NotificationRuleMapper notificationRuleMapper;
 
   /**
@@ -142,19 +149,36 @@ public class NotificationRuleService {
   private void applySelectors(
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
-      validateSelector(selectorRequest);
+      // One catalogue read per ROLE selector, not two. validateSelector resolved the code to check
+      // it exists and canonicalRoleCode resolved the same string again to read its casing, inside
+      // the write transaction - so a rule with eight role selectors issued sixteen reads to answer
+      // eight questions. The validation now returns what it looked up.
+      Role resolvedRole = validateSelector(selectorRequest);
       rule.addSelector(
           NotificationRuleSelector.builder()
               .kind(selectorRequest.kind())
               .userId(selectorRequest.userId())
-              .roleCode(trimToNull(selectorRequest.roleCode()))
+              // Stored in the catalogue's own casing, not the caller's: the recipient query is
+              // the case-sensitive `r.code = :roleCode`, so a rule saved as `admin` would match
+              // nobody while looking perfectly valid on the admin screen.
+              .roleCode(resolvedRole != null ? resolvedRole.getCode() : null)
               .orgRelativeRole(selectorRequest.orgRelativeRole())
               .contextRole(selectorRequest.contextRole())
               .build());
     }
   }
 
-  private void validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
+  /**
+   * Validates one selector and, for a {@code ROLE} selector, returns the catalogue row it names.
+   *
+   * @param selector the submitted selector
+   * @return the resolved {@link Role} for a {@code ROLE} selector, {@code null} for every other
+   *     kind
+   * @throws IllegalArgumentException when the selector is incomplete, or names a role the catalogue
+   *     does not know
+   */
+  @Nullable
+  private Role validateSelector(@NotNull NotificationRuleSelectorWriteRequest selector) {
     switch (selector.kind()) {
       case SPECIFIC_USER -> {
         if (selector.userId() == null) {
@@ -162,9 +186,23 @@ public class NotificationRuleService {
         }
       }
       case ROLE -> {
-        if (trimToNull(selector.roleCode()) == null) {
+        String roleCode = trimToNull(selector.roleCode());
+        if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
         }
+        // REQ-SEC-053: the code has to name a role that exists. It used to be any string the admin
+        // screen sent, and the screen offered `GUEST` — a role V239 deleted, so the rule would
+        // have addressed nobody, for ever, without saying so. A selector nobody can match is a
+        // notification silently not sent, which is the hardest kind of defect to notice.
+        //
+        // The resolved row is RETURNED rather than discarded: the caller needs its canonical
+        // casing, and looking the same string up twice for that is a read per selector wasted.
+        return roleRepository
+            .findByCodeIgnoreCase(roleCode)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "ROLE selector names an unknown roleCode: " + roleCode));
       }
       case ORG_RELATIVE_ROLE -> {
         if (selector.orgRelativeRole() == null || selector.contextRole() == null) {
@@ -175,6 +213,8 @@ public class NotificationRuleService {
       default ->
           throw new IllegalArgumentException("Unsupported selector kind: " + selector.kind());
     }
+    // Every arm but ROLE resolves no role, and the caller stores null for their roleCode.
+    return null;
   }
 
   @NotNull

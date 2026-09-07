@@ -1,8 +1,31 @@
-> **Doc type:** Living plan — **proposed; the thirteen decisions were taken by the owner on
-> 2026-09-05 (§3). Implementation awaits a separate go and has not started.** Drafted 2026-09-04 from a full inventory of the repository, the three sibling
-> repositories and the knowledge base; revised 2026-09-05 after an adversarial review of the draft
-> against the code (§11). Once approved it becomes the working plan; once shipped it is frozen and
-> points at ADR-0159 and REQ-SEC-052/053 as the living truth.
+> **Doc type:** Historical plan — **shipped 2026-09-06 and frozen.** The living truth is
+> [ADR-0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md), `REQ-SEC-052` /
+> `REQ-SEC-053` in [`docs/specs/security-and-access.md`](specs/security-and-access.md), and
+> [`ROLES_AND_PERMISSIONS.md`](../ROLES_AND_PERMISSIONS.md) §1. Read those first; this document
+> records how the change was scoped and why, not what the system does now.
+>
+> Drafted 2026-09-04 from a full inventory of the repository, the three sibling repositories and the
+> knowledge base; revised 2026-09-05 after an adversarial review of the draft against the code
+> (§11); the thirteen decisions were taken by the owner on 2026-09-05 (§3). Two things were decided
+> during implementation rather than in §3 and are recorded here because the plan does not say them:
+> the roster sync reads the `default-roles-iri` composite and aborts only on a **total** match
+> failure (a single role-less account is written through — the owner chose this over the plan's
+> literal "never write an empty set"; the rider that a leaver therefore loses access was corrected
+> on 2026-09-07, see REQ-SEC-053: the default-role composite credits `KRT Member` back, and
+> offboarding is disabling the account, not stripping its roles), and `MissionPeerRedactor` forwards the
+> caller's own `canEdit` / `canManageManagers` flags, which the widened peer tier would otherwise
+> have taken away from a MISSION_MANAGER.
+>
+> **Two more were decided after the security reviews of 2026-09-06, and one of them contradicts
+> §7.** §7 says the mission endpoints are "unchanged for a member; only the caller set shrinks".
+> That is no longer true of the **write** endpoints: twenty-three of them returned the unredacted
+> aggregate to a member below Logistician, which `canManageMission` admits because it falls through
+> to owner-or-manager without consulting a role. They run the same peer pass as the reads now
+> (REQ-SEC-007). It is a tightening, not a functional change — the web UI requests those responses
+> with `Void.class` and the read path already withheld the same fields — but §7 as written would
+> mislead the next reader, so it is corrected here rather than left standing. The second: the
+> mission's `owner` and `managers` travel with those capability flags, because withholding the list
+> from a caller the same response says may edit it produced a management panel with nothing in it.
 > **Epic:** tbd · **Spec:** [`docs/specs/security-and-access.md`](specs/security-and-access.md)
 > (REQ-SEC-052/053, new) · **ADR:** 0159 (new; supersedes ADR-0034)
 
@@ -200,13 +223,13 @@ the same commit on 2026-09-05. Line numbers are as of that commit.
 
 ### 4.3 Backend — data model
 
-|                                                                                            Item                                                                                            |                                                                                                                     Disposition                                                                                                                     |
-|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MissionParticipant.guestEditTokenHash` (`:143–145`), `guestEditToken` (`:156`), `MissionParticipantDto.guestEditToken` (`:51`), `V177` column                                             | `V239` drops the column in the same PR (D10 as decided); the mapping, the DTO field and the token code go with it — a revert after promotion would boot against a missing column (`ddl-auto = validate`), see §10                                   |
-| `MissionParticipant.guestName`, `Mission.partyLeadGuestName`, `OperationPayoutStatus.participantKey = guest_<name>`, `UpdateParticipantRequest.guestName`, `SetPartyLeadRequest.guestName` | keep (D4)                                                                                                                                                                                                                                           |
-| `AddParticipantPublicRequest` (`guestName`, `comment`, `orgUnitIds`)                                                                                                                       | renamed `AddExternalParticipantRequest` — **not** `AddParticipantRequest`, which already exists (`@NotNull UUID userId`, `MissionController:920`)                                                                                                   |
-| `role` row `GUEST` (seeded by `DataInitializer:87`, code stamped by `V73`) and its `user_roles` rows                                                                                       | `V239__drop_guest_role.sql`: delete `user_roles` / `role_permission` rows for `GUEST`, then the role row, logging the affected user ids at INFO (identifiers, not identities). A user left with no role is refused (D5) until an admin assigns one. |
-| `Mission.isInternal` and its indexes                                                                                                                                                       | unchanged (D8)                                                                                                                                                                                                                                      |
+|                                                                                            Item                                                                                            |                                                                                                                      Disposition                                                                                                                       |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `MissionParticipant.guestEditTokenHash` (`:143–145`), `guestEditToken` (`:156`), `MissionParticipantDto.guestEditToken` (`:51`), `V177` column                                             | `V239` drops the column in the same PR (D10 as decided); the mapping, the DTO field and the token code go with it — a revert after promotion would boot against a missing column (`ddl-auto = validate`), see §10                                      |
+| `MissionParticipant.guestName`, `Mission.partyLeadGuestName`, `OperationPayoutStatus.participantKey = guest_<name>`, `UpdateParticipantRequest.guestName`, `SetPartyLeadRequest.guestName` | keep (D4)                                                                                                                                                                                                                                              |
+| `AddParticipantPublicRequest` (`guestName`, `comment`, `orgUnitIds`)                                                                                                                       | renamed `AddExternalParticipantRequest` — **not** `AddParticipantRequest`, which already exists (`@NotNull UUID userId`, `MissionController:920`)                                                                                                      |
+| `role` row `GUEST` (seeded by `DataInitializer:87`, code stamped by `V73`) and its `user_roles` rows                                                                                       | `V239__drop_guest_role.sql`: delete `user_roles` / `role_permission` rows for `GUEST`, then the role row, logging the affected user ids at WARNING (identifiers, not identities). A user left with no role is refused (D5) until an admin assigns one. |
+| `Mission.isInternal` and its indexes                                                                                                                                                       | unchanged (D8)                                                                                                                                                                                                                                         |
 
 ### 4.4 Frontend — what an unauthenticated visitor reaches today
 
@@ -323,7 +346,10 @@ sends its bearer on every call whenever a session exists (`MandatoryHeadersInter
 session is restored later (`UpdateGate.kt:150–156`, `AuthSession.kt:61–81`).
 `basetool-sc-extractor` makes no anonymous backend call and needs nothing. The design-system
 submodule carries stale mock copy ("Create an order as guest") in `_ds_bundle.js:4485–4491` — a
-note for that repository, not this plan.
+note for that repository, not this plan: raised as
+[krt-profit/design-system#3](https://github.com/krt-profit/design-system/issues/3) on 2026-09-06.
+Deliberately an issue rather than a commit in the submodule: changing it would move the pointer this
+repository pins, which is a change to the Basetool for a mock nothing here renders.
 
 ## 5. Work packages
 
@@ -554,7 +580,8 @@ Meta/vaultcheck.py"` green before each commit. The three already-wrong facts wer
 
 `basetool-android`: the `NO_ROLE` mapping (D13, shipped first) and the documents in §4.7; the
 regenerated contract's descriptions land with the next contract sync. `basetool-sc-extractor`:
-nothing. Design system: a note about the stale mock copy.
+nothing. Design system: a note about the stale mock copy —
+[krt-profit/design-system#3](https://github.com/krt-profit/design-system/issues/3).
 
 ## 6. Test strategy — "nobody without a login reads anything"
 
@@ -639,6 +666,9 @@ to the new statuses.
 - The mission list, search, detail, join, check-in/out, payout preference, leave, crew board,
   Ablauf, Ziele, Funk, finance ledger and the seven-day grid are unchanged for a member; only the
   caller set shrinks. The `isInternal = false` escape keeps cross-Staffel visibility.
+  **Corrected 2026-09-06:** the mission *write* endpoints are not unchanged — they now apply the
+  same REQ-SEC-007 peer pass the reads always did, so a member below Logistician no longer reads
+  another participant's e-mail, roles or join date back out of a `PATCH` response. See the header.
 - The catalogue pickers (`/catalog/**`, `CachedCatalog`) are unchanged in payload; they now ride
   the bearer client, which every member page already holds.
 - The Android app is unaffected in function for every account that holds a role: it sends a bearer
@@ -670,10 +700,44 @@ outside, `curl -I https://profit-base.online/missions` → `302` into the OAuth2
 **Rollback.** Before promotion a revert of the PR is enough. After promotion it is not: `V239` has
 dropped `guest_edit_token_hash` and deleted the `GUEST` role and its `user_roles` rows, so a
 reverted image would validate its schema against a missing column and fail to boot. The rollback is
-a **forward fix** — a migration re-adding the column as nullable and `DataInitializer` re-seeding
-the role — prepared as a ready-to-merge branch before the promotion, so it costs minutes, not a
-diagnosis. The migration logs the affected user ids at INFO before deleting (identifiers, not
-identities) so the role assignments can be restored by hand.
+a **forward fix**. The migration logs the affected user ids at WARNING before deleting
+(identifiers, not identities) so the role assignments can be restored by hand. The level is
+deliberate: PostgreSQL never writes `INFO` to the server log, so at `INFO` the one artefact this
+recipe depends on would not be in the log it tells you to read.
+
+> [!important] Prepared as a recipe, not as a branch — decided 2026-09-06
+> The plan said "a ready-to-merge branch before the promotion". A branch would claim the next
+> Flyway number months before it is needed and break silently the day another PR takes it first,
+> which is the failure mode the number-claiming rule exists for. The owner chose the recipe. It is
+> two files, and both are named here so the fix is typing rather than diagnosis:
+>
+> 1. **`V240__restore_guest_edit_token_column.sql`** — claim the number against `origin/main` **and**
+>    the open PRs at the moment you write it, then:
+>
+>    ```sql
+>    ALTER TABLE mission_participant
+>        ADD COLUMN IF NOT EXISTS guest_edit_token_hash VARCHAR(64);
+>    ```
+>
+>    Nullable, no backfill: the hashes are gone and no code mints one. The column exists again only
+>    so `ddl-auto = validate` passes for the reverted image, whose entity still maps it.
+>
+> 2. **`DataInitializer.initRoles()`** — re-add the `GUEST` seed next to the others:
+>
+>    ```java
+>    createRoleIfNotFound(Roles.GUEST, "Guest", Set.of());
+>    ```
+>
+>    with `Roles.GUEST` restored in `backend/…/support/Roles.java`. The empty permission set is the
+>    point: it is what the role always had.
+>
+> **The assignments are not restored by either.** They come from the `V239` WARNING line
+> (`V239: dropping GUEST assignments for user ids: …`), by hand, and only if anyone still needs
+> them — which after ADR-0159 is a question for the owner, not a mechanical step: those accounts
+> are better served by an administrator assigning `KRT Member`.
+>
+> Reverting the *frontend* image alone needs none of this; only the backend's schema validation
+> does.
 
 ## 9. Sizing
 

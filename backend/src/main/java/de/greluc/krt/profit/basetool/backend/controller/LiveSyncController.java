@@ -70,7 +70,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Live sync", description = "Real-time change signals for the native app.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class LiveSyncController {
 

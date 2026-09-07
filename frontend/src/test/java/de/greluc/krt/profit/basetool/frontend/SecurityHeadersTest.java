@@ -38,6 +38,9 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @SpringBootTest
+// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
+// principal. What each case asserts is unchanged — only the caller is.
+@org.springframework.security.test.context.support.WithMockUser
 class SecurityHeadersTest {
 
   @Autowired private WebApplicationContext context;
@@ -46,8 +49,8 @@ class SecurityHeadersTest {
 
   @MockitoBean private WebClient webClient;
 
-  @MockitoBean(name = "publicWebClient")
-  private WebClient publicWebClient;
+  @MockitoBean(name = "termsDocumentClient")
+  private WebClient termsDocumentClient;
 
   @MockitoBean private BackendApiClient backendApiClient;
 

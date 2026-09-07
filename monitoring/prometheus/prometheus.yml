@@ -242,6 +242,29 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
+  # The members-only posture, asserted from outside (REQ-SEC-052, ADR-0159). These three pages
+  # answered anonymously until the members-only cut-over; each must now send a browser navigation
+  # into the OAuth2 entry point. Probed at the edge rather than in-process because that is where
+  # the failure would be invisible: the app's own sweeps run against MockMvc and would stay green
+  # while a cache rule, a stale upstream or a mis-ordered NPM location served the old page.
+  - job_name: blackbox-members-only
+    metrics_path: /probe
+    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    params:
+      module: [http_members_only_redirect]
+    static_configs:
+      - targets:
+          - https://profit-base.online/missions
+          - https://profit-base.online/operations
+          - https://profit-base.online/orders
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   - job_name: blackbox-force-ssl
     metrics_path: /probe
     scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)

@@ -80,7 +80,7 @@ import org.springframework.web.multipart.MultipartFile;
     description =
         "Administrator endpoints for importing the KRT P4K Reader catalog (Game2.dcb master data)"
             + " as asynchronous background jobs.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 @Slf4j
 public class AdminP4kImportController {
 

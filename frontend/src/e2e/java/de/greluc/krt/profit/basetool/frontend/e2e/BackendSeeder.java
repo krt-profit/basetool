@@ -1676,21 +1676,26 @@ public final class BackendSeeder {
    * de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto}, whose top-level {@code id} is the
    * mission id {@link #seedEntity} extracts and returns.
    *
-   * @param username the Keycloak username of the mission's creator (who can see, and thus sign up
-   *     to, their own mission)
+   * <p>Called {@code addGuestParticipant} until ADR-0159. The row is unchanged — a named person
+   * with no account — but its author is not: it used to be the person themselves, signing up
+   * anonymously, and it is now a member who can see the Einsatz recording them (decision D4).
+   *
+   * @param username the Keycloak username of the mission's creator (who can see, and thus record
+   *     participants on, their own mission)
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
-   * @param guestName the guest participant's display name; must not match any registered user's
-   *     name
+   * @param externalName the external participant's display name; must not match any registered
+   *     user's name, or the row is linked to that user instead and the caller needs {@code
+   *     canManageMission}
    * @return the mission id echoed back by the endpoint's {@code MissionDto} response
    */
-  public String addGuestParticipant(
-      String username, String password, String missionId, String guestName) {
+  public String addExternalParticipant(
+      String username, String password, String missionId, String externalName) {
     return seedEntity(
         username,
         password,
         "/api/v1/missions/" + missionId + "/participants/add",
-        "{\"guestName\":\"" + guestName + "\"}");
+        "{\"guestName\":\"" + externalName + "\"}");
   }
 
   /**
@@ -1965,7 +1970,8 @@ public final class BackendSeeder {
               "/api/v1/squadrons/" + squadronId + "/profit-eligible",
               "{\"eligible\":" + eligible + "}");
       if (status < 200 || status >= 300) {
-        throw new IllegalStateException("Profit-eligibility PATCH failed: HTTP " + status);
+        throw new IllegalStateException(
+            "Profit-eligibility PATCH failed: HTTP " + status + " body=" + lastBodyForMessage());
       }
     } catch (IllegalStateException e) {
       throw e;
@@ -2400,53 +2406,6 @@ public final class BackendSeeder {
   }
 
   /**
-   * Posts a material job order to {@code POST /api/v1/orders} with <strong>no</strong> credentials
-   * and returns the HTTP status.
-   *
-   * <p>It used to create one: the endpoint was {@code permitAll} — the public request form — and
-   * this helper returned the parsed body so a test could assert the guest redaction and the intake
-   * Spezialkommando fallback. Creating an order requires a login since ADR-0149, so the only thing
-   * left worth asserting is the refusal, and the helper returns a status rather than a body.
-   *
-   * <p>The payload is deliberately well-formed. A refusal that depended on a malformed body would
-   * pass for the wrong reason, and keep passing if the endpoint were ever reopened.
-   *
-   * @param requestingOrgUnitId the requesting (customer) OrgUnit id
-   * @param handle the order contact handle
-   * @param materialId the requested material id
-   * @param minQuality the minimum quality ({@code >= 650})
-   * @param amount the requested amount
-   * @return the HTTP status the backend answered with; {@code 401} is the expected one
-   */
-  public int anonymousCreateMaterialOrderStatus(
-      String requestingOrgUnitId, String handle, String materialId, int minQuality, double amount) {
-    String body =
-        "{\"responsibleOrgUnitId\":\""
-            + requestingOrgUnitId
-            + "\",\"requestingOrgUnitId\":\""
-            + requestingOrgUnitId
-            + "\",\"handle\":\""
-            + handle
-            + "\",\"materials\":[{\"materialId\":\""
-            + materialId
-            + "\",\"minQuality\":"
-            + minQuality
-            + ",\"amount\":"
-            + amount
-            + "}]}";
-    try {
-      HttpRequest request =
-          HttpRequest.newBuilder(URI.create(BACKEND_BASE_URL + "/api/v1/orders"))
-              .header("Content-Type", "application/json")
-              .POST(HttpRequest.BodyPublishers.ofString(body))
-              .build();
-      return http.send(request, BodyHandlers.ofString()).statusCode();
-    } catch (Exception e) {
-      throw new IllegalStateException("BackendSeeder.anonymousCreateMaterialOrderStatus failed", e);
-    }
-  }
-
-  /**
    * Reads back the Job Order carrying the given (unique) contact handle as an admin via {@code GET
    * /api/v1/orders?size=1000&status=OPEN}, so a test can assert the responsible / requesting org
    * units that an anonymous UI submission persisted — the guest cannot read the order back itself.
@@ -2537,7 +2496,34 @@ public final class BackendSeeder {
             .header("Content-Type", "application/json")
             .method("PATCH", HttpRequest.BodyPublishers.ofString(jsonBody))
             .build();
-    return http.send(request, BodyHandlers.ofString()).statusCode();
+    java.net.http.HttpResponse<String> response = http.send(request, BodyHandlers.ofString());
+    lastResponseBody = response.body();
+    return response.statusCode();
+  }
+
+  /**
+   * The body of the most recent {@link #patch} response, for failure messages.
+   *
+   * <p>A seeding step that fails during {@code beforeAll} takes the whole suite's bring-up with it,
+   * and the artifact a bring-up failure leaves behind carries no backend log — the extension never
+   * gets far enough to dump one. "HTTP 403" then costs a full CI cycle to turn into a cause, twice
+   * on 2026-09-06. The RFC 7807 body names it: {@code NO_ROLE}, {@code PENDING_APPROVAL}, {@code
+   * ACCESS_DENIED} and an unexpected 500 are four different problems behind two status codes.
+   */
+  private String lastResponseBody = "";
+
+  /**
+   * The last response body, trimmed to something a failure message can carry.
+   *
+   * @return at most 400 characters of the body, or a marker when there was none
+   */
+  private String lastBodyForMessage() {
+    if (lastResponseBody == null || lastResponseBody.isBlank()) {
+      return "<empty body>";
+    }
+    return lastResponseBody.length() > 400
+        ? lastResponseBody.substring(0, 400) + "…"
+        : lastResponseBody;
   }
 
   /**

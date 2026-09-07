@@ -56,7 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 @Tag(name = "Promotion Topics", description = "Manage promotion system topic groups.")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class PromotionTopicController {
 
   private final PromotionTopicService service;

@@ -68,7 +68,7 @@ public abstract class MissionMapper {
   /**
    * Full {@link Mission} -&gt; DTO mapping. The five {@code resolve*} expressions are applied on
    * top of the default field copy so the DTO carries the caller-aware projections ({@code canEdit},
-   * {@code canManageManagers}, description redaction for guests, participant counts).
+   * {@code canManageManagers}, description redaction below Logistician, participant counts).
    *
    * <p>After R9 Step 2 the mission entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
    * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
@@ -195,15 +195,19 @@ public abstract class MissionMapper {
   }
 
   /**
-   * Returns the mission description only to squadron members and above; every mission outsider —
-   * anonymous <em>and</em> authenticated role-less {@code GUEST} (REQ-SEC-009) — gets {@code null}.
+   * Returns the mission description only to squadron members and above; anything below gets {@code
+   * null} (REQ-SEC-009).
    *
-   * <p>REQ-SEC-041: the gate is membership, not bare authentication. It used to be {@code
-   * isAuthenticated()}, which the detail endpoint compensated for by nulling the description in
-   * {@code MissionGuestRedactor#cleanupOutsiderMissionForGuest} — but the list/search rows run
-   * through no redactor, so a GUEST token read on {@code /api/v1/missions/search} the free-text
-   * planning notes the detail deliberately withheld from the same caller. Gating here fixes both
-   * projections at their single source instead of bolting a second redactor onto the list path.
+   * <p>REQ-SEC-041: the gate is membership, not bare authentication. <b>Kept after ADR-0159 as belt
+   * and braces, not as live protection.</b> Its original audience — a role-less {@code GUEST} token
+   * that was authenticated yet an outsider — cannot exist any more: such a token is now refused
+   * with {@code 403 NO_ROLE} before a handler runs (REQ-SEC-053). What it still guards is the
+   * PENDING/REJECTED shape and any future authority set that authenticates without membership. The
+   * defect it was written for is worth remembering: the detail endpoint compensated for an {@code
+   * isAuthenticated()} gate by nulling the description in the redactor, while the list/search rows
+   * ran through no redactor at all — so the same caller read on {@code /api/v1/missions/search} the
+   * free-text planning notes the detail withheld. Gating at the single source is what made both
+   * projections agree.
    *
    * @param mission the mission being projected; {@code null} yields {@code null}.
    * @return the description for a member-or-above caller, otherwise {@code null}.

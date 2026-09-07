@@ -416,13 +416,18 @@ class AuthHelperServiceTest {
     }
 
     @Test
-    void falseForRoleLessGuest() {
-      authContextWith("ROLE_GUEST");
-      stubHierarchyReaches(List.of("ROLE_GUEST"));
+    void falseForARoleLessAccount() {
+      // The authority was ROLE_GUEST until V239 deleted the role; ROLE_NO_ROLE is the marker that
+      // replaced it (REQ-SEC-053). What the case pins is unchanged — holding it is not membership
+      // — but the account carrying it no longer reaches anything at all:
+      // PendingApprovalAccessFilter
+      // refuses it with 403 NO_ROLE before a handler runs, so isMemberOrAbove() answering false is
+      // now defence in depth rather than the decision.
+      authContextWith("ROLE_NO_ROLE");
+      stubHierarchyReaches(List.of("ROLE_NO_ROLE"));
 
       assertFalse(
-          helper.isMemberOrAbove(),
-          "an authenticated but role-less GUEST is a mission outsider, like an anonymous visitor");
+          helper.isMemberOrAbove(), "an authenticated but role-less account is not a member");
     }
 
     @Test

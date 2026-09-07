@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.config.AndroidClientProperties;
 import de.greluc.krt.profit.basetool.backend.model.dto.AppVersionPolicyDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,12 @@ public class AppVersionPolicyController {
    */
   @GetMapping
   @PreAuthorize("permitAll()")
+  // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the
+  // only two carrying an empty `security` list. The global requirement declared in OpenApiConfig
+  // applies to every other operation; an empty list here overrides it, so a generated client does
+  // not attach a bearer it may not have yet — and OpenApiAnonymousOperationsTest asserts that
+  // exactly these two carry it.
+  @SecurityRequirements
   @Operation(
       summary = "Which Android builds the server still serves",
       description =

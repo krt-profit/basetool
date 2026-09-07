@@ -155,8 +155,9 @@ public final class MissionDetailModelBuilder {
   /**
    * Facts-bar "Leiter" (REQ-MISSION-013): the participant designated as Einsatzleiter — the one
    * whose planned mission job type is the single mission-lead designation ({@code
-   * JobType.isMissionLead}) — else the mission owner, else {@code null}. The owner is redacted for
-   * outsiders, so a guest with no Einsatzleiter assigned sees "none". A mission can have only one
+   * JobType.isMissionLead}) — else the mission owner, else {@code null}. The owner reaches a caller
+   * below Logistician only when they may manage the Einsatz (REQ-SEC-007), so a member who merely
+   * reads one with no Einsatzleiter assigned sees "none". A mission can have only one
    * Einsatzleiter, so the first match is authoritative.
    *
    * @param participants the sorted participants

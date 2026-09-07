@@ -99,10 +99,13 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   /**
-   * An authenticated but role-less GUEST — passes {@code isAuthenticated()} but not a member gate.
+   * An authenticated but role-less account — passes {@code isAuthenticated()} but not a member
+   * gate. It used to be {@code ROLE_GUEST}, the role every account with no realm role was mapped
+   * onto; {@code V239} deleted it and {@code ROLE_NO_ROLE} is the marker that replaced it
+   * (REQ-SEC-053).
    */
-  private static SimpleGrantedAuthority guest() {
-    return new SimpleGrantedAuthority("ROLE_GUEST");
+  private static SimpleGrantedAuthority roleLess() {
+    return new SimpleGrantedAuthority("ROLE_NO_ROLE");
   }
 
   /**
@@ -134,7 +137,7 @@ class MissionFinanceEntryControllerSecurityTest {
             false);
     MissionParticipantDto participant =
         new MissionParticipantDto(
-            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L, null);
+            UUID.randomUUID(), user, null, null, null, null, null, null, null, null, 1L);
     return new MissionFinanceEntryDto(
         UUID.randomUUID(),
         missionId,
@@ -168,7 +171,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   @Test
-  void createFinanceEntry_roleLessGuest_isForbidden() throws Exception {
+  void createFinanceEntry_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
     // canSeeMission would pass for a non-internal mission, but the method gate also requires
     // isMemberOrAbove(); a role-less GUEST is treated like an anonymous visitor and denied with 403
@@ -185,7 +188,7 @@ class MissionFinanceEntryControllerSecurityTest {
                         + "\",\"participantId\":\""
                         + UUID.randomUUID()
                         + "\",\"type\":\"INCOME\",\"amount\":500.00}")
-                .with(jwt().authorities(guest())))
+                .with(jwt().authorities(roleLess())))
         .andExpect(status().isForbidden());
 
     verify(financeEntryService, never()).createEntry(any());
@@ -370,7 +373,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   @Test
-  void getFinanceEntries_roleLessGuest_isForbidden() throws Exception {
+  void getFinanceEntries_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
     // Even with canSeeMission granting visibility of a non-internal mission, a role-less GUEST is
     // treated like an anonymous visitor on the mission's payout view: isMemberOrAbove() fails the
@@ -380,7 +383,7 @@ class MissionFinanceEntryControllerSecurityTest {
     mockMvc
         .perform(
             get("/api/v1/missions/{id}/finance-entries", missionId)
-                .with(jwt().authorities(guest())))
+                .with(jwt().authorities(roleLess())))
         .andExpect(status().isForbidden());
 
     verify(financeEntryService, never()).getEntriesByMission(any(), any());

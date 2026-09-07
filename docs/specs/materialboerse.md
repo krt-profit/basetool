@@ -44,7 +44,7 @@ REQ-MARKET-015…020.
 
 Every `ACTIVE` offer is visible to every real member (`KRT_MEMBER`) regardless of the offer's owning
 org unit — the board is a single org-wide marketplace, not staffel-scoped. Authenticated-but-roleless
-guests do **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
+an account below member does **not** see the board. The board shows per offer: material, quality (0–1000), quantity in
 the material's own unit (SCU for bulk materials, Stück/piece for `PIECE` materials — never a
 hardcoded SCU), the anbieter (username) followed by their org-unit affiliation badges, when it was
 released, and the interessenten count.
@@ -60,7 +60,8 @@ membership query + one org-unit query per board page) so the board stays free of
 (REQ-DATA-003).
 
 **Acceptance**
-- [ ] A `KRT_MEMBER` sees offers from every squadron; a `GUEST` gets 403 on `/materialboerse`.
+- [ ] A `KRT_MEMBER` sees offers from every squadron; an account below member is refused on
+`/materialboerse` (`403`, or `NO_ROLE` when it holds no role at all — REQ-SEC-053).
 - [ ] The board read applies no OrgUnit scope filter.
 - [ ] The anbieter's every Staffel, Spezialkommando and Bereich membership renders as a badge after
 the username (Staffel first, then SK, then Bereich, each name-sorted); an Organisationsleitung
@@ -484,7 +485,7 @@ request resolves + snapshots the blueprint product (404 if the key resolves to n
 and stores the whole-piece quantity + optional min quality. Neither carries a Lager row.
 - [ ] A min quality outside 0–1000 is rejected (DB `CHECK`); a non-positive amount / non-whole item
 quantity is rejected (400).
-- [ ] A `GUEST` gets 403; a `KRT_MEMBER` sees requests from every squadron.
+- [ ] An account below member is refused; a `KRT_MEMBER` sees requests from every squadron.
 
 **Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest`,
 `MaterialRequestControllerTest`, `MaterialgesuchPageControllerMvcTest` · **Code:**

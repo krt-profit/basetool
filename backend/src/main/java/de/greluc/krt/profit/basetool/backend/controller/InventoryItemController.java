@@ -85,10 +85,21 @@ import org.springframework.web.bind.annotation.RestController;
  * dispatch directly to {@link InventoryAggregationService}'s item siblings. {@code catalog=ITEM}
  * rejects the material-only {@code minQuality} / {@code missionIds} / {@code quality} parameters
  * with 400 (items carry no quality dimension and are never mission-allocated, REQ-INV-031).
+ *
+ * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
+ * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
+ * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ *
+ * <p><b>It is weaker than the URL rule above it, and that is not a licence to delete either.</b>
+ * The chain gates {@code /api/v1/inventory/**} on {@code hasAnyRole(ADMIN, OFFICER, LOGISTICIAN,
+ * KRT_MEMBER)}, which every request must pass as well — the two are ANDed. Reading this annotation
+ * as the whole rule and removing the matcher as "redundant" would widen the surface from that set
+ * to any authenticated caller.
  */
 @RestController
 @RequestMapping("/api/v1/inventory")
 @RequiredArgsConstructor
+@PreAuthorize("isAuthenticated()")
 public class InventoryItemController {
 
   /** Default page size for a stack-entries drill-down when the caller does not specify one. */
@@ -425,9 +436,9 @@ public class InventoryItemController {
    * table (#1138). Replaces the former eagerly embedded {@code MissionDto.inventoryEntries} field
    * with a dedicated read so the hottest mission GET no longer drags an unbounded list through its
    * payload. Member-visible: the {@code /api/v1/inventory/**} security rule already requires a
-   * member role, so guests never reach it (matching the removed field, which was cleared for
-   * guests). Deliberately unscoped among members — the shared mission-stockpile view, reproducing
-   * the removed field's behaviour exactly.
+   * member role, so a non-member never reaches it (matching the removed field, which was cleared
+   * for the tier that no longer exists). Deliberately unscoped among members — the shared
+   * mission-stockpile view, reproducing the removed field's behaviour exactly.
    *
    * @param missionId the mission whose linked inventory to list
    * @return the mission's inventory items
@@ -572,13 +583,15 @@ public class InventoryItemController {
 
   /**
    * Paged picker of the game items bookable as Lager item stock — the output of at least one active
-   * blueprint, deliberately a superset of the anonymous order picker's predicate (design §5.3/§5.4,
+   * blueprint, deliberately a superset of the order picker's predicate (design §5.3/§5.4,
    * REQ-INV-029). A dedicated endpoint rather than a reuse of {@code GET
-   * /api/v1/orders/item-catalog}: that one is {@code permitAll()} for the anonymous item-order
-   * request form, and Member-facing Lager UI must not hang on an anonymous surface. No method-level
-   * {@code @PreAuthorize} needed — the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER,
-   * LOGISTICIAN, KRT_MEMBER)} from the {@code /api/v1/inventory/**} URL umbrella in {@code
-   * SecurityConfig} (verified), matching the controller's other read handlers.
+   * /api/v1/orders/item-catalog}: that one was {@code permitAll()} for the anonymous item-order
+   * request form, and the Member-facing Lager UI must not hang on a surface maintained for another
+   * audience. ADR-0159 closed it and removed the form, so the two now differ only in predicate —
+   * the separation stands on that, not on the gate. No method-level {@code @PreAuthorize} needed —
+   * the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)} from the
+   * {@code /api/v1/inventory/**} URL umbrella in {@code SecurityConfig} (verified), matching the
+   * controller's other read handlers.
    *
    * @param q optional case-insensitive item-name filter
    * @param page zero-based page index

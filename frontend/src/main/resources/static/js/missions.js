@@ -2,7 +2,7 @@
 // When anyone creates, core-edits (name / status / planned start) or deletes a mission, every other
 // viewer's list re-fetches its OWN filter/page in place over the shared /ws/sync `missions` room.
 // Only the opaque `list` key crosses the wire; each viewer re-pulls its own org-unit-scoped,
-// guest-redacted fragment, so a peer outside the actor's scope simply re-renders the same rows.
+// peer-redacted fragment, so a viewer outside the actor's scope simply re-renders the same rows.
 // MISSIONS_SECTIONS mirrors the server LiveSyncTopicClass.MISSIONS_LIST whitelist (the REQ-FE-010
 // three-mirror-points rule, build-enforced by LiveSyncSectionMapParityTest).
 //

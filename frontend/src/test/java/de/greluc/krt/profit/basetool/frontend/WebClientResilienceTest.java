@@ -67,7 +67,7 @@ class WebClientResilienceTest {
 
   private static MockWebServer server;
 
-  @Autowired private WebClient publicWebClient;
+  @Autowired private WebClient termsDocumentClient;
 
   @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
 
@@ -119,7 +119,7 @@ class WebClientResilienceTest {
   void retry_ShouldPerformMultipleAttempts_On5xx() {
     int before = server.getRequestCount();
     try {
-      publicWebClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+      termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
       fail("Expected exception due to 5xx");
     } catch (Exception ignored) {
     }
@@ -133,7 +133,7 @@ class WebClientResilienceTest {
     // First two calls fail and should count towards the circuit breaker window
     for (int i = 0; i < 2; i++) {
       try {
-        publicWebClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+        termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
         fail("Expected exception");
       } catch (Exception ignored) {
       }
@@ -141,7 +141,7 @@ class WebClientResilienceTest {
     int before = server.getRequestCount();
     // Third call should be short-circuited by the open breaker → no new backend hit
     try {
-      publicWebClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+      termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
       fail("Expected CallNotPermittedException");
     } catch (Exception e) {
       assertTrue(
@@ -168,7 +168,7 @@ class WebClientResilienceTest {
     // (a) A 4xx GET is not retried: exactly one backend hit, not the 1 + 1-retry a 5xx would incur.
     int beforeSingle = server.getRequestCount();
     try {
-      publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
       fail("Expected 429 TooManyRequests");
     } catch (Exception ignored) {
       // expected — the 429 surfaces as a WebClientResponseException, not a retry loop
@@ -185,14 +185,14 @@ class WebClientResilienceTest {
     // and the final call would be short-circuited — beforeFinal + 0.)
     for (int i = 0; i < 8; i++) {
       try {
-        publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+        termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
       } catch (Exception ignored) {
         // each 429 is expected
       }
     }
     int beforeFinal = server.getRequestCount();
     try {
-      publicWebClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
       fail("Expected 429 TooManyRequests, not a circuit-breaker short-circuit");
     } catch (Exception e) {
       assertFalse(
@@ -211,7 +211,7 @@ class WebClientResilienceTest {
     int before = server.getRequestCount();
     long start = System.currentTimeMillis();
     try {
-      publicWebClient.get().uri("/api/v1/slow").retrieve().bodyToMono(String.class).block();
+      termsDocumentClient.get().uri("/api/v1/slow").retrieve().bodyToMono(String.class).block();
       fail("Expected timeout due to slow response");
     } catch (Exception ignored) {
     }
@@ -237,7 +237,7 @@ class WebClientResilienceTest {
     int before = server.getRequestCount();
     long start = System.currentTimeMillis();
     try {
-      publicWebClient
+      termsDocumentClient
           .method(HttpMethod.valueOf(method))
           .uri("/api/v1/slow")
           .retrieve()
@@ -275,7 +275,7 @@ class WebClientResilienceTest {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
     int before = server.getRequestCount();
     try {
-      publicWebClient
+      termsDocumentClient
           .method(HttpMethod.valueOf(method))
           .uri("/api/v1/ping")
           .retrieve()

@@ -50,7 +50,7 @@ public class SystemController {
    * @return {@code {status, version, message}} map
    */
   @GetMapping("/v1/system/ping")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "System Ping (Legacy)",
       description = "Deprecated. Use /api/v2/system/ping instead.")
@@ -70,7 +70,7 @@ public class SystemController {
    * @return ping response with UTC timestamp
    */
   @GetMapping("/v2/system/ping")
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("isAuthenticated()")
   @Operation(
       summary = "System Ping (Current)",
       description = "Returns system status with UTC timestamp.")

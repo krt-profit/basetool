@@ -290,8 +290,11 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"GUEST"})
-  void orgUnitBank_guestIsForbidden() throws Exception {
+  // The role was GUEST until V239 deleted it; NO_ROLE is the marker that replaced it
+  // (REQ-SEC-053). Such a caller never reaches the frontend at all now — BackendRoleSyncFilter
+  // parks it on the pending-approval page — so this is the page's own gate, held for defence.
+  @WithMockUser(roles = {"NO_ROLE"})
+  void orgUnitBank_roleLessCallerIsForbidden() throws Exception {
     mockMvc.perform(get("/org-unit-bank")).andExpect(status().isForbidden());
   }
 

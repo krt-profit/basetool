@@ -421,7 +421,7 @@ nested `user` + `owningSquadron` on the picker `InventoryItemDto`) and the locat
 (`location`/`locationId`) — amounts, quality, the delivered marker and the ordered/manufactured
 context are always kept, so the requesting side still sees the order's progress. The redactor
 reconstructs each record field-by-field (never a wither) so a newly added owner/location field is a
-compile error until it is classified (mirrors `MissionGuestRedactor`, REQ-SEC-007). The frontend
+compile error until it is classified (mirrors `MissionPeerRedactor`, REQ-SEC-007). The frontend
 renders a blanked owner/location as `—` (inline item stock, Itemsammelübersicht + material-collection
 pages); the JS drill-down / orphaned / Herstellung surfaces already fall back to a dash.
 

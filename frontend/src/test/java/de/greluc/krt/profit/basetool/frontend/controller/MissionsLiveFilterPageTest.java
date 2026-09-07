@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -72,7 +71,7 @@ class MissionsLiveFilterPageTest {
 
     PageResponse<MissionListDto> emptyPage =
         new PageResponse<>(List.<MissionListDto>of(), 0, 20, 0L, 0, List.of());
-    when(backendApiClient.get(anyString(), anyTypeRef(), anyBoolean())).thenReturn(emptyPage);
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(emptyPage);
   }
 
   @Test

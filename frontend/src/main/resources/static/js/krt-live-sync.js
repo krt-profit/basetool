@@ -413,7 +413,7 @@
 
         // Marks every section this viewer can actually SEE as held back and raises the pill, so the
         // user gets the same "click to load the current state" affordance the busy-guard already
-        // uses. Sections whose container is absent (guest redaction, requester view, a panel this
+        // uses. Sections whose container is absent (peer redaction, requester view, a panel this
         // role has no access to) are skipped for the same reason apply() skips them — that
         // asymmetry is the auth model, not a fault. Used when the live channel itself is
         // unavailable, i.e. no `changed` frame will ever arrive to trigger the normal path.
@@ -480,7 +480,7 @@
             keys.forEach(function (sectionKey) {
                 const sel = sectionContainers[sectionKey];
                 if (!sel || !document.querySelector(sel)) {
-                    // Unknown key, or this viewer cannot see the section (guest redaction, requester
+                    // Unknown key, or this viewer cannot see the section (peer redaction, requester
                     // view, absent panel) — silently skip; that asymmetry is the auth model.
                     return;
                 }

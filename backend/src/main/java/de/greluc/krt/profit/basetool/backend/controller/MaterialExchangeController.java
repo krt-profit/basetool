@@ -52,10 +52,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * REST API for the Materialbörse — the org-wide material-exchange trade board of Flotte &amp;
- * Logistik (REQ-MARKET-001…). The whole surface is gated on {@code KRT_MEMBER} (decision D2:
- * authenticated-but-roleless guests do not see the internal trade board); the read endpoints
- * delegate to {@link MaterialExchangeBoardService} (board / detail / counts / picker + the
- * interessenten-anonymity redaction), the write endpoints to {@link MaterialExchangeService}
+ * Logistik (REQ-MARKET-001…). The whole surface is gated on {@code KRT_MEMBER} (decision D2: an
+ * authenticated caller that is not a member does not see the internal trade board — written for the
+ * role-less tier ADR-0159 removed, and still the right predicate for an integration identity); the
+ * read endpoints delegate to {@link MaterialExchangeBoardService} (board / detail / counts / picker
+ * + the interessenten-anonymity redaction), the write endpoints to {@link MaterialExchangeService}
  * (release / edit / deactivate / interest lifecycle), which enforces per-offer ownership.
  */
 @RestController
@@ -63,7 +64,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @PreAuthorize(Roles.HAS_ROLE_KRT_MEMBER)
 @Tag(name = "Material Exchange", description = "The Materialbörse trade board (Flotte & Logistik).")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "bearer-jwt")
 public class MaterialExchangeController {
 
   private final MaterialExchangeService service;

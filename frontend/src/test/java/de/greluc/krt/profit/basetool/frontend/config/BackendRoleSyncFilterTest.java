@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,7 +43,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -77,6 +80,8 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
  *       revoked, a permission only when a previous sync asserted it, the login-owned {@code
  *       OIDC_USER} / {@code SCOPE_*} authorities survive every sync, and a response with no
  *       role/permission list revokes nothing.
+ *   <li>The role-less gate (REQ-SEC-053): a {@code 403 NO_ROLE} from the role read is a verdict of
+ *       its own, and it routes the request that discovered it rather than the one after it.
  * </ul>
  */
 class BackendRoleSyncFilterTest {
@@ -539,6 +544,109 @@ class BackendRoleSyncFilterTest {
     // getSession(false) yields null for a session-less request; there is no verdict to forget.
     assertThatCode(() -> BackendRoleSyncFilter.forgetApprovalVerdict(null))
         .doesNotThrowAnyException();
+  }
+
+  @Test
+  void noRole_isDiscoveredByTheRoleRead_andRoutesThatSameRequest() throws Exception {
+    // Given - an approved account holding no role. The registration status says ACTIVE (it IS
+    // approved), so the approval gate above lets it through; the refusal only surfaces one step
+    // later, when the role read comes back 403 NO_ROLE.
+    Map<String, Object> attributes = statefulSession();
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("ACTIVE"));
+    when(backendApiClient.get(USERS_ME, UserDto.class)).thenThrow(noRoleRefusal());
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then - the discovering request is the one that gets routed. Serving it and routing only the
+    // next navigation would render the dashboard to a member who may see nothing on it: every
+    // fragment on that page answers 403 NO_ROLE, so the page arrives empty and the account-status
+    // copy explaining why arrives one click late.
+    verify(response).sendRedirect("/pending-approval");
+    verify(chain, never()).doFilter(request, response);
+    assertThat(attributes).containsEntry(APPROVAL_STATE_FLAG, "NO_ROLE");
+    assertThat(attributes).containsKey(APPROVAL_CHECKED_AT_FLAG);
+    // The sync did not succeed, so its stamp stays unset and the next request retries (REQ-SEC-013)
+    // - which is what lets an administrator's role grant reach the session without a re-login.
+    assertThat(attributes).doesNotContainKey(ROLES_SYNCED_AT_FLAG);
+  }
+
+  @Test
+  void noRole_onTheDiscoveringRequest_stillLetsAnExemptPathThrough() throws Exception {
+    // Given - the same discovery, but on /logout. A role-less member must be able to leave; the
+    // account-status page is a dead end, not a trap.
+    statefulSession();
+    when(request.getRequestURI()).thenReturn("/logout");
+    when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
+        .thenReturn(new RegistrationStatusDto("ACTIVE"));
+    when(backendApiClient.get(USERS_ME, UserDto.class)).thenThrow(noRoleRefusal());
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then
+    verify(chain).doFilter(request, response);
+    verify(response, never()).sendRedirect(anyString());
+  }
+
+  @Test
+  void noRole_cachedVerdict_routesWithoutAskingTheBackendAgain() throws Exception {
+    // Given - a session that already knows, stamped just now. The verdict is cached precisely so
+    // the next navigation costs no round trip; without it every click of a role-less member would
+    // repeat the same two refusals.
+    when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("NO_ROLE");
+    when(session.getAttribute(APPROVAL_CHECKED_AT_FLAG)).thenReturn(freshStamp());
+
+    // When
+    filter.doFilterInternal(request, response, chain);
+
+    // Then
+    verify(response).sendRedirect("/pending-approval");
+    verify(chain, never()).doFilter(request, response);
+    verify(backendApiClient, never()).get(REGISTRATION_STATUS, RegistrationStatusDto.class);
+    verify(backendApiClient, never()).get(USERS_ME, UserDto.class);
+  }
+
+  /**
+   * The refusal the backend answers every {@code /api/v1} call with once the caller holds no role
+   * at all (REQ-SEC-053): a 403 carrying the {@code NO_ROLE} problem code, not a 401 and not an
+   * unmarked 403.
+   *
+   * @return a fresh exception instance shaped like the relayed RFC-7807 problem
+   */
+  private static BackendServiceException noRoleRefusal() {
+    return new BackendServiceException(
+        "no role", null, 403, "NO_ROLE", null, List.of(), "Your account holds no role.");
+  }
+
+  /**
+   * Turns the mocked session into a map-backed one, so an attribute written during the filter run
+   * is readable later in that same run. The role-less routing depends on exactly that: {@code
+   * syncRoles} records its verdict as a session attribute and {@code doFilterInternal} reads it
+   * back to decide whether to redirect, which a plain {@code mock(HttpSession.class)} - where
+   * {@code setAttribute} is silently discarded - would never let happen.
+   *
+   * @return the live backing map, for asserting what the filter wrote
+   */
+  private Map<String, Object> statefulSession() {
+    Map<String, Object> attributes = new HashMap<>();
+    when(session.getAttribute(anyString())).thenAnswer(call -> attributes.get(call.getArgument(0)));
+    doAnswer(
+            call -> {
+              attributes.put(call.getArgument(0), call.getArgument(1));
+              return null;
+            })
+        .when(session)
+        .setAttribute(anyString(), any());
+    doAnswer(
+            call -> {
+              attributes.remove(call.getArgument(0));
+              return null;
+            })
+        .when(session)
+        .removeAttribute(anyString());
+    return attributes;
   }
 
   /** An epoch-millis stamp young enough that neither refresh interval has elapsed. */
