@@ -18,6 +18,11 @@ group = "de.greluc.krt.profit.basetool"
 
 version = "0.0.1-SNAPSHOT"
 
+// Force :test-support to be evaluated before this project. With org.gradle.configureondemand=true
+// it would otherwise be configured lazily, mid-configuration of this one, and Spotless cannot
+// register its afterEvaluate hook that late.
+evaluationDependsOn(":test-support")
+
 description = "backend"
 
 java {
@@ -101,6 +106,10 @@ dependencies {
   // local `check`.
   spotbugsPlugins(libs.findsecbugs.plugin)
 
+  // The endpoint-enumeration engine behind AnonymousSurfaceSweep* (#1804), shared with the other
+  // module's sweep so a defect in it cannot blind both guards at once. Test-scoped: nothing from
+  // that module reaches a runtime classpath, an image or an SBOM.
+  testImplementation(project(":test-support"))
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("org.springframework.boot:spring-boot-test-autoconfigure")
   testImplementation("org.springframework.security:spring-security-test")

@@ -13,3 +13,8 @@ include("ingest")
 // Keycloak 26 server SPIs (compileOnly) and emitting Java-21 bytecode so the
 // Keycloak runtime JVM can load it. See keycloak-spi/build.gradle.kts.
 include("keycloak-spi")
+
+// Test-only helper library shared by the backend and frontend anonymous-surface sweeps
+// (#1804). Not a Spring Boot app and not shipped: nothing depends on it at runtime.
+// See test-support/build.gradle.kts.
+include("test-support")

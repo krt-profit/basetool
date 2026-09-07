@@ -23,10 +23,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
+import de.greluc.krt.profit.basetool.testsupport.web.Call;
+import de.greluc.krt.profit.basetool.testsupport.web.EndpointEnumeration;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 import org.assertj.core.api.Assertions;
@@ -44,8 +44,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
  * The sweep REQ-SEC-052 is written against: <b>no mapping answers a caller who is not a member</b>.
@@ -86,9 +84,6 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  */
 @SpringBootTest
 class AnonymousSurfaceSweepTest {
-
-  /** A well-formed id that matches nothing. Authorisation is decided before the lookup. */
-  private static final String NIL_UUID = "00000000-0000-4000-8000-000000000000";
 
   /**
    * The mappings REQ-SEC-052 serves without a token, with the status each must answer.
@@ -161,18 +156,6 @@ class AnonymousSurfaceSweepTest {
 
   @Autowired private WebApplicationContext context;
 
-  /**
-   * The MVC mapping registry, named explicitly.
-   *
-   * <p>By type alone this is ambiguous: Actuator contributes a second {@code
-   * RequestMappingHandlerMapping} ({@code controllerEndpointHandlerMapping}) and the context fails
-   * to inject. The application's own mappings are the subject here — the actuator tree is gated by
-   * the management-port configuration, which this application-connector context does not model.
-   */
-  @Autowired
-  @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
-  private RequestMappingHandlerMapping handlerMapping;
-
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -181,88 +164,24 @@ class AnonymousSurfaceSweepTest {
   }
 
   /**
-   * One (verb, path) pair to issue, expanded from a {@link RequestMappingInfo}.
+   * Every call this sweep issues: what the dispatcher knows, minus the subtrees it does not ask
+   * about.
    *
-   * @param method the HTTP verb
-   * @param path the concrete path, with every variable substituted
-   */
-  private record Call(HttpMethod method, String path) {
-
-    @Override
-    public String toString() {
-      return method.name() + " " + path;
-    }
-  }
-
-  /**
-   * Expands every mapping the dispatcher knows into concrete (verb, path) calls.
-   *
-   * <p>A mapping with no declared verb (rare, but legal) is issued as {@code GET}: it answers every
-   * verb, so the read is the one that would leak.
+   * <p>The enumeration itself is shared with the other sweep ({@link EndpointEnumeration}, #1804).
+   * Both guards are worth having for one reason - they ask the dispatcher rather than a list
+   * somebody remembered to write - so a defect in that engine would blind both at once, and it now
+   * lives in one place with tests of its own. What stays here is what is this sweep's own question:
+   * {@link #NOT_SWEPT}.
    *
    * @return every call to sweep, in a stable order
    */
   private List<Call> allCalls() {
-    Set<Call> calls = new LinkedHashSet<>();
-    for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
-      Set<String> patterns = new TreeSet<>();
-      if (info.getPathPatternsCondition() != null) {
-        info.getPathPatternsCondition()
-            .getPatterns()
-            .forEach(p -> patterns.add(p.getPatternString()));
-      }
-      Set<HttpMethod> verbs = new LinkedHashSet<>();
-      info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
-      if (verbs.isEmpty()) {
-        verbs.add(HttpMethod.GET);
-      }
-      for (String pattern : patterns) {
-        String path = substituteVariables(pattern);
-        if (path == null || NOT_SWEPT.stream().anyMatch(p -> isUnder(path, p))) {
-          continue;
-        }
-        for (HttpMethod verb : verbs) {
-          calls.add(new Call(verb, path));
-        }
-      }
-    }
-    List<Call> ordered = new ArrayList<>(calls);
-    ordered.sort((a, b) -> a.toString().compareTo(b.toString()));
-    return ordered;
-  }
-
-  /**
-   * Replaces every {@code {name}} segment with a value the binder accepts.
-   *
-   * <p>A nil UUID for anything whose name reads like an id, {@code x} otherwise. A pattern carrying
-   * a wildcard ({@code **}) or a regex constraint is skipped: it has no single concrete spelling,
-   * and guessing one would assert a path the application never routes.
-   *
-   * @param pattern the mapping's path pattern
-   * @return the concrete path, or {@code null} when the pattern cannot be made concrete
-   */
-  private static String substituteVariables(String pattern) {
-    if (pattern.contains("**") || pattern.contains(":")) {
-      return null;
-    }
-    StringBuilder out = new StringBuilder();
-    int i = 0;
-    while (i < pattern.length()) {
-      char c = pattern.charAt(i);
-      if (c != '{') {
-        out.append(c);
-        i++;
-        continue;
-      }
-      int close = pattern.indexOf('}', i);
-      if (close < 0) {
-        return null;
-      }
-      String name = pattern.substring(i + 1, close).toLowerCase(Locale.ROOT);
-      out.append(name.endsWith("id") || name.equals("uuid") ? NIL_UUID : "x");
-      i = close + 1;
-    }
-    return out.toString();
+    return EndpointEnumeration.mappings(context).stream()
+        .filter(
+            call ->
+                NOT_SWEPT.stream()
+                    .noneMatch(root -> EndpointEnumeration.isUnder(call.path(), root)))
+        .toList();
   }
 
   /**
@@ -497,18 +416,5 @@ class AnonymousSurfaceSweepTest {
       }
     }
     Assertions.assertThat(served).as(because).isEmpty();
-  }
-
-  /**
-   * Whether a mapping path lies at or under an excluded root, comparing whole path segments.
-   *
-   * @param path the substituted mapping path, e.g. {@code /actuator/health} or {@code
-   *     /v3/api-docs.yaml}
-   * @param root an entry of {@link #NOT_SWEPT}, without a trailing slash
-   * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
-   *     that merely shares its opening characters
-   */
-  private static boolean isUnder(String path, String root) {
-    return path.equals(root) || path.startsWith(root + "/");
   }
 }

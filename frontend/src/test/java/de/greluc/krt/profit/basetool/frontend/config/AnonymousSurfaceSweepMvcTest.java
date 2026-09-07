@@ -22,18 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.config;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
+import de.greluc.krt.profit.basetool.testsupport.web.Call;
+import de.greluc.krt.profit.basetool.testsupport.web.EndpointEnumeration;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.TreeSet;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -43,8 +41,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
  * The frontend half of REQ-SEC-052: <b>no page renders for a visitor without a session</b>.
@@ -75,9 +71,6 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  */
 @SpringBootTest
 class AnonymousSurfaceSweepMvcTest {
-
-  /** A well-formed id that matches nothing. */
-  private static final String NIL_UUID = "00000000-0000-4000-8000-000000000000";
 
   /**
    * The paths REQ-SEC-052 serves without a session.
@@ -139,10 +132,6 @@ class AnonymousSurfaceSweepMvcTest {
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
       clientRegistrationRepository;
 
-  @Autowired
-  @Qualifier("requestMappingHandlerMapping")
-  private RequestMappingHandlerMapping handlerMapping;
-
   private MockMvc mockMvc;
 
   @BeforeEach
@@ -151,81 +140,24 @@ class AnonymousSurfaceSweepMvcTest {
   }
 
   /**
-   * One (verb, path) pair to issue.
+   * Every call this sweep issues: what the dispatcher knows, minus the subtrees it does not ask
+   * about.
    *
-   * @param method the HTTP verb
-   * @param path the concrete path, with every variable substituted
-   */
-  private record Call(HttpMethod method, String path) {
-
-    @Override
-    public String toString() {
-      return method.name() + " " + path;
-    }
-  }
-
-  /**
-   * Expands every mapping into concrete calls, in a stable order.
+   * <p>The enumeration itself is shared with the other sweep ({@link EndpointEnumeration}, #1804).
+   * Both guards are worth having for one reason - they ask the dispatcher rather than a list
+   * somebody remembered to write - so a defect in that engine would blind both at once, and it now
+   * lives in one place with tests of its own. What stays here is what is this sweep's own question:
+   * {@link #NOT_SWEPT}.
    *
-   * @return the calls to sweep
+   * @return every call to sweep, in a stable order
    */
   private List<Call> allCalls() {
-    Set<Call> calls = new LinkedHashSet<>();
-    for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
-      Set<String> patterns = new TreeSet<>();
-      if (info.getPathPatternsCondition() != null) {
-        info.getPathPatternsCondition()
-            .getPatterns()
-            .forEach(pattern -> patterns.add(pattern.getPatternString()));
-      }
-      Set<HttpMethod> verbs = new LinkedHashSet<>();
-      info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
-      if (verbs.isEmpty()) {
-        verbs.add(HttpMethod.GET);
-      }
-      for (String pattern : patterns) {
-        String path = substituteVariables(pattern);
-        if (path == null || NOT_SWEPT.stream().anyMatch(p -> isUnder(path, p))) {
-          continue;
-        }
-        for (HttpMethod verb : verbs) {
-          calls.add(new Call(verb, path));
-        }
-      }
-    }
-    List<Call> ordered = new ArrayList<>(calls);
-    ordered.sort((a, b) -> a.toString().compareTo(b.toString()));
-    return ordered;
-  }
-
-  /**
-   * Replaces every {@code {name}} segment with a value the binder accepts.
-   *
-   * @param pattern the mapping's path pattern
-   * @return the concrete path, or {@code null} when it cannot be made concrete
-   */
-  private static String substituteVariables(String pattern) {
-    if (pattern.contains("**") || pattern.contains(":")) {
-      return null;
-    }
-    StringBuilder out = new StringBuilder();
-    int i = 0;
-    while (i < pattern.length()) {
-      char c = pattern.charAt(i);
-      if (c != '{') {
-        out.append(c);
-        i++;
-        continue;
-      }
-      int close = pattern.indexOf('}', i);
-      if (close < 0) {
-        return null;
-      }
-      String name = pattern.substring(i + 1, close).toLowerCase(Locale.ROOT);
-      out.append(name.endsWith("id") || name.equals("uuid") ? NIL_UUID : "x");
-      i = close + 1;
-    }
-    return out.toString();
+    return EndpointEnumeration.mappings(context).stream()
+        .filter(
+            call ->
+                NOT_SWEPT.stream()
+                    .noneMatch(root -> EndpointEnumeration.isUnder(call.path(), root)))
+        .toList();
   }
 
   /**
@@ -357,17 +289,5 @@ class AnonymousSurfaceSweepMvcTest {
                 + " so the page can re-authenticate in place. A 2xx is data served without a"
                 + " session; a 403 means the CSRF filter answered before the gate did.")
         .isEmpty();
-  }
-
-  /**
-   * Whether a mapping path lies at or under an excluded root, comparing whole path segments.
-   *
-   * @param path the substituted mapping path
-   * @param root an entry of {@link #NOT_SWEPT}, without a trailing slash
-   * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
-   *     that merely shares its opening characters
-   */
-  private static boolean isUnder(String path, String root) {
-    return path.equals(root) || path.startsWith(root + "/");
   }
 }
