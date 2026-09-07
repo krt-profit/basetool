@@ -12,12 +12,16 @@ COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY versions.properties .
 COPY gradle.properties .
-# settings.gradle.kts includes all four modules, so Gradle configuration needs every module's
-# build script present even when only :ingest is built.
+# settings.gradle.kts includes all five modules, so Gradle configuration needs every
+# module's build script present even when only :ingest is built. A module added to
+# settings.gradle.kts without a COPY here fails at SETTINGS evaluation, before any task
+# runs: "Configuring project ':x' without an existing directory is not allowed". Only the
+# build script is copied - no sources, so this costs nothing.
 COPY backend/build.gradle.kts backend/
 COPY frontend/build.gradle.kts frontend/
 COPY ingest/build.gradle.kts ingest/
 COPY keycloak-spi/build.gradle.kts keycloak-spi/
+COPY test-support/build.gradle.kts test-support/
 
 # Cache the dependency layer. A failure here fails the build (no `|| true` mask).
 RUN ./gradlew :ingest:dependencies --no-daemon
