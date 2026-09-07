@@ -2999,6 +2999,9 @@ it is anonymous access in the brief's sense.
 
 **Enforced by:** `AnonymousSurfaceSweepTest` (three passes over every mapping, plus `HEAD`) ·
 `AnonymousSurfaceSweepMvcTest` (the frontend, navigation and background shapes) ·
+`EndpointEnumerationTest` (the enumeration both sweeps ask the dispatcher with, shared since #1804 —
+a defect there would turn both guards green at once, so it is tested on its own rather than only
+through them) ·
 `ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
 `HomeControllerMvcTest#anonymousRootRendersTheLandingPageWithoutDataOrSession` ·
