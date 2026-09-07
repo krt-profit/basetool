@@ -266,8 +266,13 @@ public class MissionParticipantService {
         mission.getId(),
         mission.getName(),
         finalUserId,
+        // `external`, not `guest`: ADR-0159 decision D4 renamed the tier, and the audit log was
+        // the last place still writing the old word. Rows written before this release keep it --
+        // the viewer renders `details` verbatim and nothing queries the column, so both spellings
+        // are simply readable, and back-dating an audit payload to a vocabulary that did not exist
+        // when the row was written is not a correction.
         AuditDetails.of("participant", participant.getId())
-            .with("type", finalUserId != null ? "user" : "guest"));
+            .with("type", finalUserId != null ? "user" : "external"));
     // NOTE: no explicit missionRepository.save(mission) here.
     // The collection is @OptimisticLock(excluded = true) so Hibernate's dirty-check
     // on commit persists the new participant (via cascade) without bumping the parent
@@ -742,11 +747,13 @@ public class MissionParticipantService {
         mission.getId(),
         mission.getName(),
         userId,
+        // `external` for the same reason as MISSION_PARTICIPANT_ADDED above; `cleared` is the
+        // party lead being removed rather than a kind of person.
         AuditDetails.of(
             "kind",
             userId != null
                 ? "user"
-                : (guestName != null && !guestName.isBlank() ? "guest" : "cleared")));
+                : (guestName != null && !guestName.isBlank() ? "external" : "cleared")));
     return saved;
   }
 

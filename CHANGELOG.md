@@ -2,14 +2,6 @@
 
 ## [Unreleased]
 
-### Fixed
-
-- **Benachrichtigungsregeln, die eine Rolle in abweichender Schreibweise gespeichert hatten,
-  erreichten niemanden.** Die Empfängersuche vergleicht den Rollen-Code exakt, gespeichert wurde
-  aber die Schreibweise des Absenders — eine Regel mit `Admin` statt `ADMIN` benachrichtigte
-  stillschweigend keinen einzigen Empfänger. Die Migration zieht alle betroffenen Regeln auf die
-  Schreibweise des Rollenkatalogs nach; neue Regeln werden beim Speichern kanonisiert.
-
 ### Security
 
 - **Das Basetool ist ab jetzt nur noch für Mitglieder.** Ohne Anmeldung siehst du die Startseite und die Rechtsseiten — sonst nichts. Einsätze, Operationen, die Auftragswarteschlange und die Spieldaten-Kataloge brauchen einen Login; jeder Link dorthin führt zur Anmeldung und danach zurück auf die gewünschte Seite.
@@ -28,9 +20,22 @@
 
 ### Changed
 
+- **Das Audit-Protokoll schreibt bei Teilnehmern jetzt „external" statt „guest".** Die Stufe heißt
+  seit der Umstellung auf Mitglieder-only „Extern"; das Protokoll war die letzte Stelle mit dem
+  alten Wort. Ältere Einträge behalten bewusst ihre ursprüngliche Schreibweise — wer im Protokoll
+  nach einer Stufe sucht, muss beide Begriffe kennen.
+
 - **„Gast" heißt jetzt „Extern".** Wer keinen Account hat, kann weiterhin an einem Einsatz teilnehmen — die Einsatzleitung trägt die Person ein und pflegt ihre Zeile. Die Selbstanmeldung ohne Konto entfällt.
 
 - **Bei Einsätzen heißt „öffentlich" jetzt „organisationsweit".** Gemeint war immer „jedes Mitglied der Organisation", nie „jeder".
+
+### Fixed
+
+- **Benachrichtigungsregeln, die eine Rolle in abweichender Schreibweise gespeichert hatten,
+  erreichten niemanden.** Die Empfängersuche vergleicht den Rollen-Code exakt, gespeichert wurde
+  aber die Schreibweise des Absenders — eine Regel mit `Admin` statt `ADMIN` benachrichtigte
+  stillschweigend keinen einzigen Empfänger. Die Migration zieht alle betroffenen Regeln auf die
+  Schreibweise des Rollenkatalogs nach; neue Regeln werden beim Speichern kanonisiert.
 
 ## [v1.6.22](https://github.com/krt-profit/basetool/releases/tag/v1.6.22) - 2026-09-06
 
