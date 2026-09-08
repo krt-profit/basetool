@@ -1,68 +1,632 @@
 > **Doc type:** Operator runbook — **the owner runs every step; nothing here is automated and
 > nothing here ships with the image.** Written 2026-09-06 as WP-K2 of
 > [`MEMBERS_ONLY_PLAN.md`](MEMBERS_ONLY_PLAN.md); the owner took all twelve items on 2026-09-05
-> (decision D11), the two originally marked optional included.
+> (decision D11), the two originally marked optional included. Rewritten 2026-09-08 from a decision
+> list into an executable procedure, against the Keycloak **26.7** sources the deployment pins.
 > **Requirement:** [REQ-SEC-052, REQ-SEC-053](specs/security-and-access.md) ·
 > **ADR:** [0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
 # Keycloak hardening runbook (WP-K2)
 
-Twelve changes to the production realm, each independent of the code and of each other. Run them
-**after** the members-only release is promoted, **one at a time**, in the Admin Console or through
-`kcadm` under the production account.
+Twelve changes to the production realm `iri`. Each states the exact change, the Admin Console path,
+the equivalent `kcadm` command, **how to verify it took**, the one line that undoes it, and what
+breaks if it is wrong.
 
 > [!important] This is the owner's list, not Claude's
 > Every step below is a **write** against the production Keycloak. The repository's production-host
 > rule forbids an agent from running any of them, with or without approval, and there is no
-> emergency exception. What this document is for is the opposite: each step states the exact change,
-> what it breaks if it is wrong, and the one line that undoes it — so the person running it does not
-> have to re-derive any of that at the console.
-
-**Verify the realm's roles read-only first.** Before step 1, confirm what the realm actually holds:
-`kcadm get roles -r iri --fields name`. If a `Guest` role exists there it is a leftover — the
-sanitized production reference does not carry one — and deleting it is a thirteenth step. The
-application no longer maps it either way (`V239`), so this is tidiness, not a dependency.
+> emergency exception. This document exists so the person running them does not have to re-derive
+> anything at the console.
 
 ---
 
-## The twelve steps
+## 0. Before you start
 
-| #  |                                                                                                                                                  Change                                                                                                                                                  |                                                                                                                                                Why                                                                                                                                                |                                                                                                                            Rollback                                                                                                                             |
-|----|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1  | `editUsernameAllowed: true` → `false`                                                                                                                                                                                                                                                                    | A username is the identity the app's roster, the audit log and the approval queue are read by. Letting a member change it silently re-labels their history.                                                                                                                                       | Set it back to `true`. No data is touched either way.                                                                                                                                                                                                           |
-| 2  | `resetPasswordAllowed` — **decide on Keycloak's own SMTP**, not the backend's                                                                                                                                                                                                                            | The realm's `smtpServer` block *is* configured; the backend's mail is off. Those are different senders, and the decision has been taken on the wrong one before. Send a test mail from the realm before enabling.                                                                                 | Set it back. A member who started a reset simply cannot finish it.                                                                                                                                                                                              |
-| 3  | `sslRequired: none` → `external`                                                                                                                                                                                                                                                                         | The realm currently accepts a plaintext token exchange from any address. `external` requires TLS for everything but loopback, which is what the deployment already does.                                                                                                                          | `none`. Do this one first if anything else that touches the realm goes wrong — a wrong value here locks the console out over a non-TLS hop.                                                                                                                     |
-| 4  | `eventsEnabled` and `adminEventsEnabled` → on, `eventsExpiration` 30 d, the admin-events expiration set alike. **Do not** enable `adminEventsDetailsEnabled`.                                                                                                                                            | Today there is no login-failure, token-error or client-disable event anywhere — the "detect" half of the security ladder is blind on the token endpoint. The details flag is left off deliberately: it records request bodies, which is the one place a credential could land in the event store. | Switch both off. The stored events remain until they expire.                                                                                                                                                                                                    |
-| 5  | Clear the `/*` `redirectUris` and `webOrigins` on `backend-service` and `basetool-ingest-gateway`                                                                                                                                                                                                        | Both are service-account-only clients: they never perform a browser redirect, so a wildcard there is a standing offer nobody needs.                                                                                                                                                               | Re-add `/*`. Neither client uses the field, so nothing observable changes in either direction — which is exactly why it was never noticed.                                                                                                                      |
-| 6  | `basetool-frontend`: set `pkce.code.challenge.method=S256`                                                                                                                                                                                                                                               | It is a public client without PKCE. An intercepted authorization code is redeemable without it.                                                                                                                                                                                                   | Clear the attribute. **Test the web login immediately after**: a client that advertises PKCE while the adapter does not send a verifier fails at the token exchange, not at the redirect, so the symptom is a login that gets all the way back and then errors. |
-| 7  | `basetool-frontend`: drop the stale `http://backend:11261` redirect URI and web origin                                                                                                                                                                                                                   | An internal Docker hostname on a browser client's redirect list. It cannot be reached from a browser, so it grants nothing today; it is a leftover that would become a real redirect target the day that name resolves.                                                                           | Re-add both strings verbatim.                                                                                                                                                                                                                                   |
-| 8  | `basetool-sc-extractor`: `fullScopeAllowed: true` → `false`, with an explicit role scope                                                                                                                                                                                                                 | The extractor is a public client on members' desktops. With full scope its tokens carry every realm role the holder has, including `Admin`. Model it on `basetool-android`, which already runs narrowed.                                                                                          | Set `fullScopeAllowed` back to `true`. **Check the extractor still ingests** before considering the step done: a scope that is too narrow fails at the ingest gateway's audience check, not at login.                                                           |
-| 9  | Remove `extractor-ingest` and `extractor-ingest-only` from the realm's **default** client scopes; assign each only where it is needed — `basetool-frontend` and `basetool-sc-extractor` keep `extractor-ingest`, only the extractor gets `extractor-ingest-only`, and `grafana` loses `extractor-ingest` | These two scopes stamp the backend and ingest audiences onto **every** client in the realm, including `grafana`. An audience claim is what a resource server trusts; handing it to every client makes the audience check decorative.                                                              | Re-add both to the realm defaults. Verify one token per affected client after the change — a missing audience is refused by the resource server with a `401` that reads like an expired token.                                                                  |
-| 10 | Drop `offline_access` from `default-roles-iri`                                                                                                                                                                                                                                                           | Every account can currently mint an offline token, which outlives every session policy in the realm.                                                                                                                                                                                              | Re-add the role to the composite. **Check the Android app's refresh first**: if it relies on an offline token rather than a refresh token, this step signs every installation out.                                                                              |
-| 11 | Require OTP for holders of `Admin`: a conditional subflow (role condition → OTP `REQUIRED`) in the **browser** flow **and** bound as `postBrokerLoginFlowAlias` on the `discord` IdP                                                                                                                     | The browser flow alone is half the gate: an admin who signs in through Discord never traverses it. This is the item most likely to be done incompletely, and the incomplete version looks finished.                                                                                               | Set the subflow's requirement to `DISABLED` and unbind the post-broker flow. Keep a second admin session open while doing this — an OTP flow that is wrong locks the console.                                                                                   |
-| 12 | Review `rememberMe` and the 30 d / 180 d SSO windows against the session policy the tool assumes                                                                                                                                                                                                         | Not a defect, a decision that has never been made explicitly. The frontend's own session is 720 h; the realm's windows are what actually decide how long a stolen browser stays useful.                                                                                                           | Restore the previous values, which the export in `docs/keycloak/realm-config.reference.json` records.                                                                                                                                                           |
+### 0.1 What this was written against
+
+Production pins `quay.io/keycloak/keycloak:26.7` by digest (`docker-compose.yml`). Every field name,
+menu label and endpoint below was read out of the **26.7.0 sources**, not from memory:
+
+|                                                                                              Claim                                                                                              |                                                         Source                                                          |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Console labels (*Edit username*, *Forgot password*, *Require SSL*, *Save events*, *Include representation*, *Expiration*, *Full scope allowed*, *Default roles*, *Require PKCE*, *PKCE Method*) | `js/apps/admin-ui/…/messages_en.properties` @ 26.7.0                                                                    |
+| `Require SSL` modes                                                                                                                                                                             | [Server Admin Guide § Configuring SSL for a realm](https://www.keycloak.org/docs/26.7.0/server_admin/#_ssl_modes)       |
+| Event settings and `kcadm` event syntax                                                                                                                                                         | Server Admin Guide § *Auditing user events* / *Auditing admin events* / *Configuring event logging for a realm*         |
+| `Condition - User Role` fields                                                                                                                                                                  | [§ Conditions in conditional flows](https://www.keycloak.org/docs/26.7.0/server_admin/#conditions-in-conditional-flows) |
+| `Post login flow`                                                                                                                                                                               | [§ Post login flow](https://www.keycloak.org/docs/26.7.0/server_admin/#_identity_broker_post_login_flow)                |
+| Realm **default** client scopes apply to *newly created* clients only                                                                                                                           | [§ Realm default client scopes](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_linking)              |
+| `Full scope allowed` lives on the `<client>-dedicated` scope's *Scope* tab                                                                                                                      | [§ Dedicated client scope](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_dedicated)                 |
+| Client-scope and events endpoints                                                                                                                                                               | `RealmAdminResource.java`, `ClientResource.java`, `RealmEventsConfigRepresentation.java` @ 26.7.0                       |
+| `kcadm` command syntax                                                                                                                                                                          | [§ Admin CLI](https://www.keycloak.org/docs/26.7.0/server_admin/#admin-cli)                                             |
+
+If the realm is upgraded past 26.7, re-check the three items marked **⚠ version-sensitive** below
+before running them.
+
+### 0.2 Three things the previous version of this runbook got wrong
+
+Found while writing the commands out. Each would have looked like a completed step.
+
+1. **`adminEventsExpiration` is not part of the events config.** ⚠ version-sensitive
+   `RealmEventsConfigRepresentation` @ 26.7.0 carries `eventsEnabled`, `eventsExpiration`,
+   `eventsListeners`, `enabledEventTypes`, `adminEventsEnabled`, `adminEventsDetailsEnabled` — and
+   **no** admin-events expiration. That value is a **realm attribute**
+   (`RealmAttributes.ADMIN_EVENTS_EXPIRATION = "adminEventsExpiration"`), written through
+   `realms/iri`. `kcadm update events/config -s adminEventsExpiration=…` is accepted and does
+   nothing. Step 4 now sets it in the right place.
+
+2. **Removing a scope from the realm defaults changes nothing for existing clients.** The guide is
+   explicit: realm default client scopes "define sets of client scopes that are automatically linked
+   to **newly created clients**". `grafana`, `basetool-frontend`, `basetool-ingest-gateway` and
+   `basetool-sc-extractor` already carry `extractor-ingest`; clearing the realm default leaves every
+   one of them exactly as it is. Step 9 is now two halves, and the second is the one that matters.
+
+3. **`eventsExpiration` is seconds over the API and a picker in the console.** The console renders
+   *Expiration* with `units={["minute","hour","day"]}`; the REST field is a time-to-live **in
+   seconds**. 30 days is `2592000`. A bare `30` means thirty seconds.
+
+### 0.3 The identity you run this as
+
+**Not your admin account.** `kcadm config credentials` offers `--user/--password`,
+`--client/--secret` and `--client/--keystore`, and none of them can carry a second factor — so after
+step 11 an admin account with OTP **cannot authenticate to kcadm at all**, and the failure reads
+`invalid_grant` / *"Invalid user credentials"*, which looks like a wrong password. The realm is
+`bruteForceProtected` with `failureFactor: 5`, so retrying makes it worse.
+
+Use the short-lived provisioning identity instead — the procedure, the two required
+`realm-management` roles (`manage-clients` **and** `manage-realm`; each verified necessary in both
+directions against 26.7) and the removal step are in
+[`docs/keycloak/README.md` → *Why a service account and not the admin user*](keycloak/README.md).
+Create it before step 1, delete it after step 12.
+
+> [!warning] Verify the provisioner can reach the authentication endpoints **before** step 11
+> `manage-realm` is what the flow endpoints check. Confirm it with a read rather than discovering it
+> half-way through building a flow:
+>
+> ```bash
+> docker exec keycloak /opt/keycloak/bin/kcadm.sh get authentication/flows -r iri --fields alias
+> ```
+>
+> A `403` here means the role assignment did not take; fix that before touching step 11.
+
+### 0.4 Open a session
+
+Production Keycloak serves **HTTPS only, on 18443** (`--http-enabled=false`) with the shared
+self-signed keystore, so kcadm needs a truststore first. Both facts were verified against a 26.7
+container started with the production command line (2026-08-17); `KC_HOSTNAME_STRICT=true` does not
+interfere.
+
+```bash
+docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
+    --trustpass - /run/secrets/keystore.p12
+
+docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server https://localhost:18443 --realm iri --client basetool-provisioner
+```
+
+Then a **read-only smoke test**, so a URL, truststore or permission problem surfaces on a command
+that changes nothing:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri \
+    --fields realm,sslRequired,editUsernameAllowed,resetPasswordAllowed
+```
+
+The service-account token carries the realm's 300 s access-token lifespan and the
+client-credentials grant issues no refresh token, so a step run after a long pause may need
+`config credentials` again. `kcadm.config` holds the truststore password and a token in cleartext
+inside the container — `docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config` when done.
+
+### 0.5 Capture the current state — this is the rollback basis
+
+**Do not use `docs/keycloak/realm-config.reference.json` as the picture of production.** It was
+regenerated on **2026-08-17**, it is sanitized, and it predates `basetool-android` — the client the
+app signs in with does not appear in it at all. It is a reference for *shape*, not for *current
+values*.
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri            > kc-realm.before.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri  > kc-events.before.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+    --fields clientId,id,publicClient,serviceAccountsEnabled,fullScopeAllowed,redirectUris,webOrigins,defaultClientScopes,attributes \
+                                                                          > kc-clients.before.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get default-default-client-scopes -r iri \
+                                                                          > kc-default-scopes.before.json
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/composites -r iri \
+                                                                          > kc-default-roles.before.json
+```
+
+**Every "Rollback" line below assumes these five files exist.** Steps 5, 7 and 9 restore *lists*,
+and a list you did not write down first cannot be restored from this document.
+
+Also confirm the leftover the plan flagged:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles -r iri --fields name
+```
+
+The sanitized reference carries no `Guest` realm role. If production has one it is a leftover; the
+application stopped mapping it in `V239`, so deleting it is tidiness, not a dependency — and it is a
+thirteenth step, not part of the twelve.
+
+### 0.6 The order, and the two fixed points
+
+Run them **one at a time**, verifying each before starting the next. Within that, two are not free
+to move:
+
+- **Step 3 (Require SSL) goes first.** It is protective, it is the one whose *failure* mode locks the
+  console over a non-TLS hop, and doing it first means everything after it travels encrypted.
+- **Step 11 (OTP for `Admin`) goes last.** It is the riskiest, and it is the one that takes your
+  admin account away from kcadm (§ 0.3). Nothing after it would be runnable the same way.
+
+The other ten are independent of each other and of the code. Steps 5–9 touch clients, so a login
+test belongs after each of them rather than at the end.
+
+---
+
+## Step 3 — `Require SSL`: `none` → `external`
+
+**Run this one first.**
+
+|           |                                                                                       |
+|-----------|---------------------------------------------------------------------------------------|
+| **Now**   | `sslRequired: "none"` — the realm accepts a plaintext token exchange from any address |
+| **After** | `sslRequired: "external"` — TLS required except from loopback and private ranges      |
+
+**Console:** *Realm settings* → *General* tab → **Require SSL** → **External requests** → *Save*.
+
+**CLI:**
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri -s sslRequired=external
+```
+
+**Verify:**
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri --fields sslRequired
+```
+
+**Rollback:** `… update realms/iri -s sslRequired=none`
+
+**If it goes wrong:** *External requests* permits `localhost`, `127.0.0.1`, `10.x`, `192.168.x`,
+`172.16.x` and IPv6 link-local/unique-local without TLS — which is exactly the hop kcadm uses from
+inside the container, so **this step does not cut off your own session**. `ALL` would; do not use it.
+Everything member-facing already arrives over TLS from the edge.
+
+---
+
+## Step 1 — `Edit username`: on → off
+
+|           |                              |
+|-----------|------------------------------|
+| **Now**   | `editUsernameAllowed: true`  |
+| **After** | `editUsernameAllowed: false` |
+
+A username is the identity the roster, the audit log and the approval queue are read by. Letting a
+member change it silently re-labels their own history.
+
+**Console:** *Realm settings* → *Login* tab → **Edit username** → off.
+
+**CLI:**
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri -s editUsernameAllowed=false
+```
+
+**Verify:** `… get realms/iri --fields editUsernameAllowed` → `false`.
+
+**Rollback:** `… -s editUsernameAllowed=true`. No data is touched either way.
+
+---
+
+## Step 2 — `Forgot password`: decide on **Keycloak's own** SMTP
+
+|         |                                                                                    |
+|---------|------------------------------------------------------------------------------------|
+| **Now** | `resetPasswordAllowed: true`, and the realm's `smtpServer` block **is** configured |
+
+This is a decision, not a mechanical change, and it has been taken on the wrong sender before: the
+**backend's** mail is off, the **realm's** is configured, and only the realm's is used for a
+password reset.
+
+**Test the sender before deciding:** *Realm settings* → *Email* tab → **Test connection**. The guide
+notes that *Forgot password* requires `Host` and `From` on the Email tab to be set for Keycloak to
+send the reset mail at all.
+
+- Mail arrives → leave `Forgot password` **on**. Nothing to do.
+- Mail does not arrive → turn it **off** until the sender works. A member who starts a reset they
+  cannot finish is worse than a link that is not offered.
+
+**Console:** *Realm settings* → *Login* tab → **Forgot password**.
+
+**CLI:** `… update realms/iri -s resetPasswordAllowed=false` (or `true`).
+
+**Verify:** `… get realms/iri --fields resetPasswordAllowed`.
+
+---
+
+## Step 4 — Turn on events ⚠ version-sensitive
+
+|           |                                                                                                   |
+|-----------|---------------------------------------------------------------------------------------------------|
+| **Now**   | `eventsEnabled: false`, `adminEventsEnabled: false`, no expirations set                           |
+| **After** | both on, user events expiring after 30 d, admin events likewise, **`Include representation` off** |
+
+Today there is no login-failure, token-error or client-disable event anywhere: the *detect* half of
+the security ladder is blind on the token endpoint.
+
+**Console:**
+- *Realm settings* → *Events* tab → *User events settings* → **Save events** on → **Expiration**
+`30 days` → *Save*.
+- *Realm settings* → *Events* tab → *Admin events settings* → **Save events** on → leave
+**Include representation** **off** → **Expiration** `30 days` → *Save*.
+
+**CLI — note the two different endpoints:**
+
+```bash
+# user + admin events: the events-config resource
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update events/config -r iri \
+    -s eventsEnabled=true -s eventsExpiration=2592000 \
+    -s adminEventsEnabled=true -s adminEventsDetailsEnabled=false
+
+# admin-events expiration: a REALM ATTRIBUTE, not part of the resource above
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update realms/iri \
+    -s 'attributes.adminEventsExpiration=2592000'
+```
+
+**Verify both, separately** — this is the step whose half-done state looks finished:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri --fields attributes \
+    | grep adminEventsExpiration
+```
+
+**Rollback:** `… update events/config -r iri -s eventsEnabled=false -s adminEventsEnabled=false`.
+Stored events remain until they expire.
+
+**Why `Include representation` stays off:** it stores the JSON body of every admin REST call, which
+is the one place in the event store where a credential could land.
+
+**Expiration is seconds.** `2592000` = 30 d. `30` would be thirty seconds, and the console's day
+picker hides the unit — which is why the verification above reads the raw value back.
+
+---
+
+## Step 5 — Clear the redirect/origin lists on the two service-account clients
+
+`backend-service` and `basetool-ingest-gateway` are service-account-only: they never perform a
+browser redirect, so **every** entry on those two lists is a standing offer nobody needs — not only
+the `/*`.
+
+As of the (stale) reference, `backend-service` carried four redirect URIs including `/*` and
+`http://backend:11261/*`, and four web origins. **Read the live values from
+`kc-clients.before.json`** and clear both lists entirely.
+
+**Console:** *Clients* → the client → *Settings* → **Valid redirect URIs** / **Web origins** →
+remove every row → *Save*.
+
+**CLI:**
+
+```bash
+id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+     -q clientId=backend-service --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri \
+    -s 'redirectUris=[]' -s 'webOrigins=[]'
+```
+
+Repeat for `basetool-ingest-gateway`.
+
+**Verify:** `… get clients/$id -r iri --fields clientId,redirectUris,webOrigins` → both empty.
+
+**Rollback:** re-set both lists from `kc-clients.before.json`, verbatim.
+
+**If it goes wrong:** nothing observable changes in either direction, because neither client uses the
+fields — which is exactly why the wildcards were never noticed. Do **not** take the silence as
+evidence you edited the right client; check `clientId` in the verify output.
+
+---
+
+## Step 6 — `basetool-frontend`: require PKCE with `S256` ⚠ version-sensitive
+
+`basetool-frontend` is a **public** client (`publicClient: true`) with no PKCE attribute set. An
+intercepted authorization code is redeemable without it.
+
+**Console (26.7):** *Clients* → `basetool-frontend` → *Settings* → **Capability config** →
+**Require PKCE** on → **PKCE Method** → `S256` → *Save*. Both controls write the same client
+attribute; the switch is "attribute non-empty" and the select is its value.
+
+**CLI:**
+
+```bash
+id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+     -q clientId=basetool-frontend --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri \
+    -s 'attributes."pkce.code.challenge.method"=S256'
+```
+
+**Verify:** `… get clients/$id -r iri --fields clientId,attributes | grep pkce`
+
+**Rollback:** set the attribute to the empty string.
+
+**Test the web login immediately after.** A client that advertises PKCE while its adapter sends no
+verifier fails **at the token exchange, not at the redirect** — so the symptom is a login that gets
+all the way back to the app and then errors, which does not look like a Keycloak change. Spring
+Security's OAuth2 client sends the verifier for public clients, so this is expected to pass; test it
+anyway, because the cost of being wrong is every member locked out of the web tool.
+
+---
+
+## Step 7 — `basetool-frontend`: drop the stale `http://backend:11261` entries
+
+An internal Docker hostname on a **browser** client's redirect list. A browser cannot reach it, so it
+grants nothing today; it is a leftover that becomes a real redirect target the day that name
+resolves in a browser's network.
+
+**Console:** *Clients* → `basetool-frontend` → *Settings* → remove `http://backend:11261/*` from
+**Valid redirect URIs** and `http://backend:11261` from **Web origins** → *Save*.
+
+Leave the production entries (`https://<the real host>/*`, `…/login/oauth2/code/keycloak`) alone.
+The reference also shows a duplicated production entry and `http://frontend:18081/*`; the duplicate
+is cosmetic and the compose-internal frontend origin is used by the local stack, not by production —
+decide those on the live list, not on this sentence.
+
+**Verify:** `… get clients/$id -r iri --fields redirectUris,webOrigins` — read the whole list and
+confirm the production login URI is still there.
+
+**Rollback:** re-add both strings verbatim from `kc-clients.before.json`.
+
+---
+
+## Step 8 — `basetool-sc-extractor`: `fullScopeAllowed` → `false`, with an explicit scope
+
+The extractor is a **public** client on members' desktops with `fullScopeAllowed: true`: its tokens
+carry every realm role the holder has, `Admin` included.
+
+**Console:** *Clients* → `basetool-sc-extractor` → *Client scopes* tab →
+**`basetool-sc-extractor-dedicated`** → *Scope* tab → **Full scope allowed** off. Then assign, on
+that same *Scope* tab, only the realm roles the extractor actually needs.
+
+**CLI:**
+
+```bash
+id=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+     -q clientId=basetool-sc-extractor --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/$id -r iri -s fullScopeAllowed=false
+```
+
+**Model it on `basetool-android`**, which already runs narrowed — but read that client's scope
+mappings from the **live realm**, not from the reference export, which predates it:
+
+```bash
+aid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+      -q clientId=basetool-android --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$aid/scope-mappings/realm -r iri
+```
+
+**Verify:** `… get clients/$id -r iri --fields clientId,fullScopeAllowed` → `false`.
+
+**Rollback:** `-s fullScopeAllowed=true`.
+
+**Check the extractor still ingests before calling this done.** A scope that is too narrow fails at
+the ingest gateway's **audience check**, not at login — so the member signs in successfully and the
+upload fails afterwards.
+
+---
+
+## Step 9 — Take the two audience scopes off everything that does not need them
+
+`extractor-ingest` and `extractor-ingest-only` are realm **default** client scopes, so they stamp the
+backend and ingest audiences onto clients that have no business carrying them — `grafana` among them.
+An audience claim is what a resource server trusts; handing it to every client makes the audience
+check decorative.
+
+**This step is two halves, and the second is the one that changes anything today.**
+
+### 9a — the realm defaults (affects *newly created* clients only)
+
+**Console:** *Client scopes* (left menu) → for `extractor-ingest` and `extractor-ingest-only` set
+**Assigned type** to *None*.
+
+**CLI:**
+
+```bash
+sid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-scopes -r iri \
+      -q name=extractor-ingest --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh delete default-default-client-scopes/$sid -r iri
+```
+
+Repeat for `extractor-ingest-only`.
+
+**Verify:** `… get default-default-client-scopes -r iri` — neither name present.
+
+### 9b — the clients that already carry them
+
+Removing the realm default leaves every existing client exactly as it was. Work from
+`kc-clients.before.json`; as of the reference the assignment was:
+
+|          Client           | `extractor-ingest` | `extractor-ingest-only` |                 Keep?                 |
+|---------------------------|--------------------|-------------------------|---------------------------------------|
+| `basetool-sc-extractor`   | yes                | yes                     | **both**                              |
+| `basetool-frontend`       | yes                | no                      | **`extractor-ingest`**                |
+| `basetool-ingest-gateway` | yes                | yes                     | decide against its own audience needs |
+| `grafana`                 | yes                | no                      | **remove**                            |
+
+**Console:** *Clients* → the client → *Client scopes* tab → remove the scope from the assigned list.
+
+**CLI:**
+
+```bash
+gid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+      -q clientId=grafana --fields id --format csv --noquotes)
+docker exec keycloak /opt/keycloak/bin/kcadm.sh delete clients/$gid/default-client-scopes/$sid -r iri
+```
+
+**Verify — one token per affected client**, not just the config:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$gid/default-client-scopes -r iri
+```
+
+and then an actual login through Grafana.
+
+**Rollback:** these two paths answer `PUT` but not `GET`, so they need `-n` (no-merge, documented
+as exactly this case) or `update` fails trying to read the current value first:
+
+```bash
+# realm half
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update default-default-client-scopes/$sid -r iri -n
+# one client
+docker exec keycloak /opt/keycloak/bin/kcadm.sh update clients/<id>/default-client-scopes/$sid -r iri -n
+```
+
+**If it goes wrong:** a missing audience is refused by the resource server with a **401 that reads
+like an expired token**. If Grafana logins break right after this step, this step is why.
+
+---
+
+## Step 10 — Drop `offline_access` from `default-roles-iri`
+
+Every account can currently mint an offline token, which outlives every session policy in the realm.
+The composite holds `offline_access`, `uma_authorization`, `KRT Member` and two `account` client
+roles.
+
+**Console:** *Realm settings* → *User registration* tab → **Default roles** → remove
+`offline_access`.
+
+**CLI:**
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh remove-roles -r iri \
+    --rname default-roles-iri --rolename offline_access
+```
+
+**Verify:**
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get roles/default-roles-iri/composites -r iri \
+    --fields name
+```
+
+**Rollback:** `… add-roles -r iri --rname default-roles-iri --rolename offline_access`
+
+> [!danger] Check the Android app's refresh **before** running this
+> If the app relied on an **offline** token rather than an ordinary refresh token, this step signs
+> every installation out. It should not: ADR-0131 / REQ-SEC-030 bind the app to a refresh-token-only
+> DPoP policy, and the provisioning script explicitly withholds `offline_access` from the client
+> (`delete clients/<uuid>/optional-client-scopes/<id> — offline_access withheld`). Confirm that is
+> still true on the live client before you remove the realm default:
+>
+> ```bash
+> docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients/$aid/optional-client-scopes -r iri
+> ```
+>
+> `offline_access` must **not** be in that list. Then open the app once after the change.
+
+---
+
+## Step 12 — Decide the session windows
+
+Not a defect: a decision that has never been made explicitly. Current values, in seconds:
+
+|              Setting              |    Now     |       |
+|-----------------------------------|------------|-------|
+| `ssoSessionIdleTimeout`           | `2592000`  | 30 d  |
+| `ssoSessionMaxLifespan`           | `15552000` | 180 d |
+| `ssoSessionIdleTimeoutRememberMe` | `2592000`  | 30 d  |
+| `ssoSessionMaxLifespanRememberMe` | `15552000` | 180 d |
+| `rememberMe`                      | `true`     |       |
+
+The frontend's own session is 720 h; the realm's windows are what actually decide how long a stolen
+browser stays useful. A 180-day maximum means a device compromised in March still holds a session in
+September.
+
+**Console:** *Realm settings* → *Sessions* tab (**SSO Session Idle**, **SSO Session Max**, and the
+two *Remember me* variants).
+
+**CLI:** `… update realms/iri -s ssoSessionMaxLifespan=<seconds>` etc.
+
+**Verify:** `… get realms/iri --fields ssoSessionIdleTimeout,ssoSessionMaxLifespan,ssoSessionIdleTimeoutRememberMe,ssoSessionMaxLifespanRememberMe,rememberMe`
+
+**Rollback:** the four numbers above.
+
+**If it goes wrong:** shortening these logs members out sooner than they expect, which is a support
+question and not an outage. The Android app refreshes against the same windows — a max lifespan
+below the app's usage gap means a member reopening the app after that long must sign in again.
+
+---
+
+## Step 11 — Require OTP for holders of `Admin` — **run this last**
+
+Two halves, and the incomplete version looks finished: the browser flow alone is half the gate,
+because an admin who signs in **through Discord** never traverses it. The realm's `discord` provider
+currently has `postBrokerLoginFlowAlias: null`.
+
+### 11a — the browser flow
+
+**Console:** *Authentication* → *Flows* → the row menu on **browser** → **Duplicate** (never edit a
+built-in flow in place). Then, inside the copy's `forms` sub-flow:
+
+1. **Add sub-flow** — not *Add step*. Name it e.g. `Admin OTP` and set its requirement to
+   **Conditional**.
+2. Inside it, **Add condition** → **Condition - User Role**. Two fields: *Alias* (a name for the
+   execution, e.g. `is-admin`) and *User role* — `Admin`. A **client** role would be written
+   `clientname.rolename`; `Admin` is a realm role, so the bare name is right.
+3. Inside the same sub-flow, **Add step** → **OTP Form**, requirement **Required**.
+4. On the flow's own page: the action menu → **Bind flow** → the **Choose binding type** dialog →
+   **Browser Flow** → *Save*.
+
+A *Conditional* sub-flow acts as *Required* when all its conditions evaluate true, and is treated as
+*Disabled* otherwise — which is what makes this gate admins and nobody else.
+
+### 11b — the Discord identity provider
+
+**Console:** *Identity providers* → `discord` → **Post login flow** → select the flow from 11a →
+*Save*.
+
+**Verify — both paths, with a real admin account:**
+1. Sign in with username + password → OTP is demanded.
+2. Sign in through Discord → OTP is demanded.
+3. Sign in as a **non-admin** member both ways → no OTP.
+
+**Rollback:** set the sub-flow's requirement to **Disabled** and unbind the post-login flow
+(*Identity providers* → `discord` → **Post login flow** → *None*).
+
+> [!danger] Keep a second admin session open in another browser while you do this
+> An OTP flow that is wrong locks the console, and the console is where you undo it. Do not close
+> the working session until step 11's verification has passed in a *third* place — a private window.
+>
+> And note § 0.3: after this step your admin account can no longer authenticate to kcadm. That is
+> the intended outcome, and it is why this step is last.
 
 ---
 
 ## After the twelve
 
-Re-export the sanitized realm and commit it:
+1. **Delete the provisioning identity.** *Clients* → `basetool-provisioner` → delete. It exists to be
+   used for minutes, not to sit in the realm holding `manage-realm`.
+2. **Remove the kcadm session file:**
+   `docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config` — it holds the truststore
+   password and a token in cleartext.
+3. **Re-export and commit the sanitized realm**, so this state is version-controlled rather than
+   living only in the console:
 
-```bash
-python scripts/sanitize-realm-export.py <export.json> docs/keycloak/realm-config.reference.json
-```
+   ```bash
+   python scripts/sanitize-realm-export.py <export.json> docs/keycloak/realm-config.reference.json
+   ```
 
-The sanitizer keeps `authenticationFlows`, `authenticatorConfig` and `requiredActions` since WP-K1,
-so step 11's flow is version-controlled rather than living only in the console — which is the whole
-reason that change was made to the sanitizer.
+   The sanitizer keeps `authenticationFlows`, `authenticatorConfig` and `requiredActions` since
+   WP-K1 — which is the whole reason that change was made, and what puts step 11's flow under
+   review.
 
-Then close the open finding in [`docs/keycloak/README.md`](keycloak/README.md), which records
-`fullScopeAllowed: true` on the frontend and the extractor. Step 8 closes the extractor half. The
-frontend half is **not** in this list: it is a public browser client whose scope is the member's own
-roles, and narrowing it is ADR-0001's confidential-client migration rather than a hardening step.
+4. **Close the open finding in [`docs/keycloak/README.md`](keycloak/README.md)**, which records
+   `fullScopeAllowed: true` on the frontend and the extractor. Step 8 closes the extractor half. The
+   frontend half is deliberately **not** on this list: it is a public browser client whose scope is
+   the member's own roles, and narrowing it is ADR-0001's confidential-client migration, not a
+   hardening step.
 
 > [!note] Nothing here is required for the members-only release to be correct
-> The release stands on its own — REQ-SEC-052 and REQ-SEC-053 are enforced in the application, and
+> The release stands on its own — REQ-SEC-052 and REQ-SEC-053 are enforced in the application and
 > the sweeps assert them. These twelve reduce the blast radius *around* it: what an intercepted code
 > is worth, what a token carries, and whether anyone can see it happen.
 
