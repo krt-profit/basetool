@@ -424,7 +424,7 @@ if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
 # sub-list -- is reachable at all. That is the same choice `live-sync` made, and it is available
 # here for the same reason: the app touches four of that controller's eleven paths.
 if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
-# Phase U -- the squadron-wide list. Admitted 2026-09-08, and the comment above used to name /all
+# Phase Y -- the squadron-wide list. Admitted 2026-09-08, and the comment above used to name /all
 # as the example of what stays out; that was written when the app read only its own runs. It reads
 # the unit's now (app REQ-APP-REF-014), so every card can name its owner -- which is the whole
 # point of the line and is meaningless while every row belongs to the caller.
@@ -2467,6 +2467,55 @@ The last two rows are the assertions that matter: they prove `settings` went in 
 that `/hangar` stayed one. Pinned in `ApiVhostAnonymousSurfaceTest` before this table was written.
 
 ---
+
+## Phase Y — the squadron-wide refinery list
+
+**Applied 2026-09-08.** One path, and it is the only one this phase carries.
+
+|      Screen      |                Path                 |
+|------------------|-------------------------------------|
+| Raffinerie-Liste | `/api/v1/refinery-orders/all` (GET) |
+
+### Why it was out, and why that stopped being right
+
+The Raffinerie block admits each path by name and the comment beside it used `/all` as the example
+of what stays out. That was correct when the app read only the caller's own runs: it touched three
+of this controller's eleven paths, and a fourth would have been surface bought for nothing.
+
+Design round 16 asks every card to name its owner — which is meaningless while every row belongs to
+the reader. The app reads the unit's list now (`REQ-APP-REF-014` in the app repo), so the path
+became one the screen cannot work without.
+
+> [!important] This admits no data the same audience did not already have
+> The **web** has defaulted to this endpoint since the feature existed and keeps `/my-orders` behind
+> its „Meine Aufträge" toggle. `isAuthenticated()` at the boundary, per-row org scoping in the
+> service — the same shape as `/my-orders`, which has been admitted all along. What changed is which
+> client can reach it, not who may read what.
+
+### It shipped before it was admitted, and that is the lesson
+
+The app's v0.2.8 went out reading `/all`. Production answered `404`, the screen rendered „Signal
+Lost", and the Raffinerie was unusable on that build until this phase was pasted. The endpoint had
+been verified against the local test stack — which has **no vhost in front of it**, so the
+verification could not have caught it, and the device walk that preceded the release could not
+either.
+
+**Check the path against this file before making the app depend on it**, not before releasing:
+
+```bash
+grep -n "<the path>" docs/API_VHOST_ROLLOUT_RUNBOOK.md
+```
+
+No hit means production answers `404` however green everything else is.
+
+### Verification
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' https://api.profit-base.online/api/v1/refinery-orders/all
+```
+
+Measured after the paste: **401** — admitted and authentication-required, where it answered `404`
+before. `/my-orders` still `401`, `app/version-policy` still `200`.
 
 ## Phase G — flip the audience enforcement (D5, release gate)
 
