@@ -182,8 +182,13 @@ class OperationPayoutServiceTest {
       assertTrue(operationPayoutService.getOperationPayouts(OPERATION_ID).isEmpty());
     }
 
+    /**
+     * An UNSAVED participant with neither user nor guest name is skipped, because participantKey()
+     * has nothing to key it by. A persisted one is not -- see {@link
+     * #participantOfADeletedAccount_isListedAndSortsLast()}.
+     */
     @Test
-    void participantWithoutUserOrGuestName_isSkipped() {
+    void participantWithoutUserOrGuestNameOrId_isSkipped() {
       Mission m = newMission(T0, T0_PLUS_60M);
       MissionParticipant ghost = new MissionParticipant();
       ghost.setMission(m);
@@ -196,6 +201,59 @@ class OperationPayoutServiceTest {
       assertTrue(
           operationPayoutService.getOperationPayouts(OPERATION_ID).isEmpty(),
           "participants with neither user nor guestName must not appear");
+    }
+
+    @Test
+    void participantOfADeletedAccount_isListedAndSortsLast() {
+      // PRODUCTION DEFECT, 2026-09-08. `participantWithoutUserOrGuestName_isSkipped` above passes
+      // only because its fixture participant has no id: participantKey() then returns null and the
+      // row really is skipped. A PERSISTED participant has one, so the third branch fires and the
+      // row is keyed "deleted_<id>" -- with a null participantName, which OperationPayoutDto
+      // documents as the contract value the clients draw their deleted-user placeholder from.
+      //
+      // Sorting that list with String.CASE_INSENSITIVE_ORDER alone threw NPE, so ONE deleted
+      // account 500'd the whole payouts endpoint for every caller. The Operation screen builds its
+      // head from this read, so both clients showed an empty screen and no cause.
+      Mission m = newMission(T0, T0_PLUS_60M);
+      addUserParticipant(m, "alice", T0, T0_PLUS_60M, PayoutPreference.PAYOUT);
+      MissionParticipant deleted = new MissionParticipant();
+      deleted.setId(UUID.randomUUID());
+      deleted.setMission(m);
+      deleted.setStartTime(T0);
+      deleted.setEndTime(T0_PLUS_60M);
+      deleted.setPayoutPreference(PayoutPreference.PAYOUT);
+      m.getParticipants().add(deleted);
+      stubOperation(Set.of(m));
+
+      List<OperationPayoutDto> result = operationPayoutService.getOperationPayouts(OPERATION_ID);
+
+      assertEquals(2, result.size(), "a deleted account keeps its slice; it is not dropped");
+      assertEquals("alice", result.get(0).participantName());
+      OperationPayoutDto ghost = result.get(1);
+      assertNull(
+          ghost.participantName(),
+          "null is the DTO's contract for a deleted account, not something to fill in");
+      assertTrue(
+          ghost.participantId().startsWith("deleted_"),
+          "the row keeps a stable identity so settled shares do not redistribute");
+    }
+
+    @Test
+    void payoutsOfSeveralDeletedAccounts_doNotThrow() {
+      // Two of them, because nullsLast must also compare null against null.
+      Mission m = newMission(T0, T0_PLUS_60M);
+      for (int i = 0; i < 2; i++) {
+        MissionParticipant deleted = new MissionParticipant();
+        deleted.setId(UUID.randomUUID());
+        deleted.setMission(m);
+        deleted.setStartTime(T0);
+        deleted.setEndTime(T0_PLUS_60M);
+        deleted.setPayoutPreference(PayoutPreference.PAYOUT);
+        m.getParticipants().add(deleted);
+      }
+      stubOperation(Set.of(m));
+
+      assertEquals(2, operationPayoutService.getOperationPayouts(OPERATION_ID).size());
     }
 
     @Test

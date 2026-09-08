@@ -288,8 +288,19 @@ public class OperationPayoutService {
               paidOutByName));
     }
 
+    // nullsLast, because a null name is a CONTRACT value here and not an accident:
+    // OperationPayoutDto documents participantName as null exactly when the account behind the row
+    // was hard-deleted (REQ-DATA-008), which is how the clients know to draw their deleted-user
+    // placeholder. String.CASE_INSENSITIVE_ORDER throws on null, so sorting with it alone took the
+    // whole endpoint down with a 500 for every caller of an operation that contained one such
+    // participant -- and since the Operation screen builds its head from this read, that blanked
+    // the entire screen in both clients (found in production, 2026-09-08).
+    //
+    // Deleted rows sort to the end rather than the front: they are the ones nobody can act on.
     result.sort(
-        Comparator.comparing(OperationPayoutDto::participantName, String.CASE_INSENSITIVE_ORDER));
+        Comparator.comparing(
+            OperationPayoutDto::participantName,
+            Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
     return result;
   }
 

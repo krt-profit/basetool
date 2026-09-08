@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Eine Operation mit einem gelöschten Mitglied ließ sich gar nicht mehr öffnen.** Die
+  Auszahlungsübersicht antwortete mit einem Serverfehler, und weil der Kopf der Operation aus
+  genau diesen Daten gebaut wird, blieb der ganze Bildschirm leer — im Webtool wie in der App.
+  Ursache war die Sortierung der Auszahlungszeilen: eine gelöschte Person hat bewusst keinen
+  Namen, und darauf war die Sortierung nicht vorbereitet. Gelöschte Zeilen stehen jetzt am Ende
+  der Liste.
+
 ## [v1.7.3](https://github.com/krt-profit/basetool/releases/tag/v1.7.3) - 2026-09-07
 
 ## [v1.7.2](https://github.com/krt-profit/basetool/releases/tag/v1.7.2) - 2026-09-07

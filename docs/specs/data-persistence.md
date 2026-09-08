@@ -398,6 +398,20 @@ payout breakdown entirely, and the percentages and aUEC of an **already-settled 
 operation silently recomputed whenever some unrelated member was deleted, redistributing expenses
 the deleted member had advanced onto everyone else.
 
+> [!danger] A null `participantName` is a **contract value** — every comparison over it must be
+> null-safe
+> Giving the row a key put it back into the payout breakdown, and its name is `null` by design:
+> `OperationPayoutDto` documents that as the signal the clients render their deleted-user
+> placeholder from. `OperationPayoutService` then sorted the rows with
+> `String.CASE_INSENSITIVE_ORDER`, which throws on null — so **one** deleted account inside an
+> operation returned `500` from `GET /operations/{id}/payouts` for every caller. The Operation
+> detail builds its head from that read, so both the web and the app showed an empty screen naming
+> no cause (found in production, 2026-09-08; fixed with `Comparator.nullsLast`, deleted rows last).
+>
+> The rule this leaves behind is not "avoid the null" — filling it in would break the placeholder
+> the render sites depend on. It is that a nullable-by-contract field must never be handed to a
+> comparator, collator or `Map.Entry` sort that assumes otherwise.
+
 **Audit.** The deletion records `USER_DELETED` (domain `ROLE`) unconditionally as the marker for an
 operation that mutates several audited areas at once, plus the per-area summary events
 `INVENTORY_PURGED_ON_USER_DELETION`, `PERSONAL_DATA_PURGED_ON_USER_DELETION` and
