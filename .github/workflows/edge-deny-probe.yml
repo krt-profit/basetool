@@ -437,11 +437,18 @@ jobs:
           probe POST /api/v1/bank/admin/wipe-reset 404
           probe PATCH "/api/v1/bank/accounts/$nil/approval-tiers" 404
 
-          # The four participant writes are the exception on this whole list: canAccessParticipant
-          # resolves the row BEFORE it judges the caller, because a guest sign-up is editable by
-          # the anonymous creator holding its capability token (REQ-SEC-018). An unknown row is
-          # therefore 404 to everybody, and a 401 here would mean that rule changed.
-          probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 404
+          # The four participant writes USED to be the exception on this whole list:
+          # canAccessParticipant resolved the row BEFORE it judged the caller, because a guest
+          # sign-up was editable by the anonymous creator holding its capability token
+          # (REQ-SEC-018), so an unknown row answered 404 to everybody. Both halves are gone --
+          # V239 dropped the token hash column and REQ-SEC-052 the anonymous caller -- so the
+          # request no longer reaches the lookup and the entry point answers 401. The backend has
+          # been pinned on that since 2026-09-06
+          # (ApiVhostAnonymousSurfaceTest.shouldRefuseAnonymousParticipationWritesOnAnAbsentRow);
+          # this row kept the old expectation and only production could tell, which it did the
+          # morning the block was pasted. There is no anonymous-but-legitimate caller left on this
+          # list.
+          probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 401
 
           # Still refused, and that is the point: the every-member inventory list is on no
           # allow-list line at all.
