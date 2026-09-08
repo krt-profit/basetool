@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Überwachung achtet jetzt auch auf die primäre Sicherungsschicht von Redis.** Bisher gab es
+  nur einen Alarm für den Schnappschuss (RDB), nicht aber für das laufend geschriebene Journal
+  (AOF) — obwohl dieses die eigentliche Absicherung der Sitzungen ist. Neu schlagen zwei Alarme an,
+  wenn ein Schnappschuss fehlschlägt oder das Journal nicht mehr auf die Platte kommt.
+
 ### Fixed
 
 - **Eine Operation mit einem gelöschten Mitglied ließ sich gar nicht mehr öffnen.** Die
@@ -10,6 +17,12 @@
   Ursache war die Sortierung der Auszahlungszeilen: eine gelöschte Person hat bewusst keinen
   Namen, und darauf war die Sortierung nicht vorbereitet. Gelöschte Zeilen stehen jetzt am Ende
   der Liste.
+
+- **Nächtlicher Fehlalarm „Redis RDB snapshot older than 1h" behoben.** Redis schreibt einen
+  Schnappschuss nur, wenn sich etwas geändert hat — in ruhigen Nachtstunden also gar nicht, worauf
+  der Alarm die Untätigkeit als Ausfall meldete (zweimal in der Nacht zum 08.09., obwohl jeder
+  Speichervorgang erfolgreich war). Er verlangt jetzt zusätzlich, dass überhaupt ungesicherte
+  Änderungen anstehen. Keine Auswirkung auf die Oberfläche.
 
 ## [v1.7.3](https://github.com/krt-profit/basetool/releases/tag/v1.7.3) - 2026-09-07
 

@@ -141,6 +141,7 @@
       "id": 4,
       "type": "stat",
       "title": "RDB Last Save Age",
+      "description": "Seconds since the last completed RDB snapshot. Read it together with \"RDB Pending Changes\": `--save \"60 1\"` only snapshots when at least one key changed, so on a quiet night this age climbs past an hour with nothing wrong. Age alone is not a fault — age WITH pending changes is (RedisRdbStale).",
       "gridPos": {
         "h": 8,
         "w": 6,
@@ -292,6 +293,84 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "RDB Pending Changes",
+      "description": "Keys changed since the last completed RDB snapshot (INFO rdb_changes_since_last_save). Redis resets it only on a SUCCESSFUL save and restores it when a fork fails, so a steady non-zero value beside a growing \"RDB Last Save Age\" is the actual broken-snapshot signal. Zero means the store is idle and has nothing to save.",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "redis_rdb_changes_since_last_save",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Persistence Status (1 = ok)",
+      "description": "The two INFO status fields the persistence alerts read: rdb_last_bgsave_status (RedisRdbSaveFailing) and aof_last_write_status (RedisAofWriteFailing). The exporter maps ok to 1 and err to 0. AOF is the primary durability layer, RDB the fast-restart snapshot.",
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 16
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "redis_rdb_last_bgsave_status",
+          "legendFormat": "RDB bgsave",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "redis_aof_last_write_status",
+          "legendFormat": "AOF write",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
           "min": 0,
           "max": 1
         },

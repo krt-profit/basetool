@@ -123,14 +123,58 @@ groups:
           summary: "PostgreSQL connections >80% ({{ $labels.database }})"
           description: "PostgreSQL {{ $labels.database }} is using more than 80% of its 100 connection slots."
 
+      # Redis RDB durability. (2026-09-08) The rule was `(time() - redis_rdb_last_save_timestamp_seconds) > 3600`
+      # with no guard, which alerts on IDLENESS, not on failure: `--save "60 1"` (ADR-0079) only
+      # snapshots when at least one key changed in 60 s, so a quiet night with zero session writes
+      # ages the timestamp past an hour with nothing whatsoever wrong. It paged twice that night —
+      # 02:05-02:40Z and 04:19-04:24Z — and the redis log across both windows shows every BGSAVE
+      # succeeding ("DB saved on disk", CoW 0 MB, zero errors); the two gaps are simply 00:55->02:39
+      # and 03:09->04:22 with no writes to snapshot. Both "resolved" on the next member's session
+      # write, not on any repair.
+      #
+      # `redis_rdb_changes_since_last_save > 0` is what separates the two: Redis only resets that
+      # counter on a SUCCESSFUL save (a failed fork restores it), so pending-and-unsaved for an hour
+      # is a real broken-snapshot signal, while pending == 0 is an idle store with nothing at risk.
+      # An hour of staleness is not itself a durability problem — AOF (appendfsync everysec) is the
+      # primary layer — so the guard costs no coverage. RedisRdbSaveFailing below catches a failing
+      # fork directly, and in 5 minutes rather than 70.
       - alert: RedisRdbStale
-        expr: (time() - redis_rdb_last_save_timestamp_seconds) > 3600
+        expr: >-
+          (time() - redis_rdb_last_save_timestamp_seconds) > 3600
+          and redis_rdb_changes_since_last_save > 0
         for: 10m
         labels:
           severity: critical
         annotations:
-          summary: "Redis RDB snapshot older than 1h"
-          description: "The last Redis RDB save was more than an hour ago. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart and usually means write activity has stalled or the snapshot fork is failing — check the redis logs."
+          summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
+          description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/iri/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+
+      # The direct signal the stale-snapshot rule above only ever reached by inference: Redis reports
+      # `rdb_last_bgsave_status:err` in INFO the moment a fork or write fails (the exporter maps ok/err
+      # to 1/0). Fires in 5 minutes and independently of write volume, so a broken fork is caught even
+      # on an idle store where RedisRdbStale correctly stays silent.
+      - alert: RedisRdbSaveFailing
+        expr: redis_rdb_last_bgsave_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis background save is failing"
+          description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/iri/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+
+      # AOF is the PRIMARY durability layer (ADR-0079, ~1 fsync/s, ~1 s worst-case loss), and until
+      # 2026-09-08 nothing alerted on it at all — the rule file watched only the secondary RDB layer.
+      # `aof_last_write_status:err` means the append itself is failing, so writes acknowledged to the
+      # frontend are not reaching disk and a crash drops sessions Redis has already confirmed.
+      # Guarded on `redis_aof_enabled` so the rule stays inert if AOF is ever turned off deliberately.
+      - alert: RedisAofWriteFailing
+        expr: redis_aof_last_write_status == 0 and redis_aof_enabled == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis AOF writes are failing"
+          description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600
@@ -361,8 +405,10 @@ groups:
 
       # (#1041 item 13) Redis memory approaching maxmemory — the real leading indicator. Under the
       # noeviction policy RedisEvictions never fires, so this ratio is the ONLY warning before Redis
-      # starts rejecting new writes (failed logins / session writes) at the 192mb ceiling. Guard on
-      # redis_memory_max_bytes > 0 so it stays inert if maxmemory is ever unset again (no divide-by-zero).
+      # starts rejecting new writes (failed logins / session writes) at the 384mb ceiling — raised from
+      # 192mb by ADR-0085 for the 5000-account session index, though the 192mb figure survived in this
+      # comment and in REQ-OPS-018 until 2026-09-08. Guard on redis_memory_max_bytes > 0 so it stays
+      # inert if maxmemory is ever unset again (no divide-by-zero).
       - alert: RedisMemoryHigh
         expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85 and redis_memory_max_bytes > 0
         for: 10m
@@ -370,7 +416,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis memory >85% of maxmemory"
-          description: "Redis has used more than 85% of its 192mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
+          description: "Redis has used more than 85% of its 384mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
 
       # Redis rejected new connections — the maxclients limit was reached (a connection leak or a
       # client storm). New Spring Session reads/writes then fail, so this is a pre-outage signal.
