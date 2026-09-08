@@ -455,6 +455,7 @@ same field.
 | `GET /api/v1/users/search`                              | `query:string`, `page:integer`, `size:integer`                                                                                         |
 | `GET /api/v1/live-sync/stream`                          | `topics:string`                                                                                                                        |
 | `GET /api/v1/refinery-orders/my-orders`                 | `status:array`, `page:integer`, `size:integer`                                                                                         |
+| `GET /api/v1/refinery-orders/all`                       | `status:array`, `page:integer`, `size:integer`                                                                                         |
 | `GET /api/v1/material-exchange/offers`                  | `page:integer`, `size:integer`                                                                                                         |
 | `GET /api/v1/material-requests`                         | `page:integer`, `size:integer`                                                                                                         |
 | `GET /api/v1/material-exchange/releasable-items`        | `q:string`, `kind:string`                                                                                                              |

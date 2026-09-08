@@ -1490,6 +1490,30 @@ class ExternalContractTest {
               // request for
               // OPEN + IN_PROGRESS, split on the device.
               .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
+          // The squadron-wide list, admitted at the edge on 2026-09-08 (runbook phase U). Same
+          // envelope and same row as `/my-orders` -- the app switches between them without a
+          // second mapping -- plus `owner`, which is the whole reason it reads this one: a card
+          // that does not name its owner is useless the moment foreign runs are on screen.
+          new ContractOperation(
+                  "/api/v1/refinery-orders/all",
+                  "get",
+                  Set.of(
+                      "content",
+                      "totalElements",
+                      "totalPages",
+                      "id",
+                      "owner",
+                      "status",
+                      "location",
+                      "refiningMethod",
+                      "startedAt",
+                      "durationMinutes",
+                      "endsAt",
+                      "goods",
+                      "oreSales",
+                      "profit",
+                      "version"))
+              .addressedBy(Set.of("status:array", "page:integer", "size:integer")),
           new ContractOperation(
               "/api/v1/refinery-orders/{id}",
               "get",

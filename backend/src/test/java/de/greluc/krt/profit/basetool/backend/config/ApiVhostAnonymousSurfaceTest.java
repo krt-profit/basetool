@@ -298,6 +298,7 @@ class ApiVhostAnonymousSurfaceTest {
   @ValueSource(
       strings = {
         "/api/v1/refinery-orders/my-orders",
+        "/api/v1/refinery-orders/all",
         "/api/v1/refinery-orders/00000000-0000-4000-8000-00000000cafe"
       })
   @WithAnonymousUser

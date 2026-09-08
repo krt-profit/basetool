@@ -419,11 +419,21 @@ if ($uri = "/api/v1/promotion/eligibility/my") { set $krt_api_allowed 1; }
 # still be able to learn that it is too old. It answers 200 without a token BY DESIGN; a 401 here
 # is the broken state, not the hardened one.
 if ($uri = "/api/v1/app/version-policy") { set $krt_api_allowed 1; }
-# Phase 4: Raffinerie. `refinery-orders` is NOT in the read-only family list, so the booking POST
-# is admitted by being named and nothing else under the stem -- not /all, not /users/<id>, not the
-# create -- is reachable at all. That is the same choice `live-sync` made, and it is available here
-# for the same reason: the app touches three of that controller's eleven paths.
+# Phase 4: Raffinerie. `refinery-orders` is NOT in the read-only family list, so every admitted
+# path under the stem is named individually and nothing else -- not /users/<id>, not the mission
+# sub-list -- is reachable at all. That is the same choice `live-sync` made, and it is available
+# here for the same reason: the app touches four of that controller's eleven paths.
 if ($uri = "/api/v1/refinery-orders/my-orders") { set $krt_api_allowed 1; }
+# Phase U -- the squadron-wide list. Admitted 2026-09-08, and the comment above used to name /all
+# as the example of what stays out; that was written when the app read only its own runs. It reads
+# the unit's now (app REQ-APP-REF-014), so every card can name its owner -- which is the whole
+# point of the line and is meaningless while every row belongs to the caller.
+#
+# This opens NO data the same audience did not already have: the WEB defaults to this very endpoint
+# and keeps /my-orders behind its "Meine Auftraege" toggle, so a member has been able to read the
+# unit's runs in a browser all along. `isAuthenticated()` at the boundary, per-row org scoping in
+# the service, exactly as /my-orders.
+if ($uri = "/api/v1/refinery-orders/all") { set $krt_api_allowed 1; }
 # Phase M - the app can now record a run itself (app REQ-APP-REF-009). The bare stem is the create
 # POST; `refinery-orders` is NOT in the read-only family, so naming it opens the verbs the backend
 # serves there - which for the stem is exactly the create POST. Every GET this controller offers
@@ -1518,7 +1528,7 @@ it.
 | Live-Sync   | `/api/v1/live-sync/stream`                                             | GET (SSE)    |
 | Live-Sync   | `/api/v1/live-sync/changed`                                            | POST         |
 | App-Gate    | `/api/v1/app/version-policy`                                           | GET          |
-| Raffinerie  | `/api/v1/refinery-orders/my-orders`, `/<uuid>`                         | GET          |
+| Raffinerie  | `/api/v1/refinery-orders/my-orders`, `/all`, `/<uuid>`                 | GET          |
 | Raffinerie  | `/api/v1/refinery-orders/<uuid>/store`                                 | POST         |
 | Börse       | `/api/v1/material-exchange/offers`, `/material-requests`               | GET, POST    |
 | Börse       | `/api/v1/material-exchange/releasable-items`                           | GET          |
@@ -1540,6 +1550,7 @@ two endpoints rather than a surface with an admin half hiding in it.
 | `POST /api/v1/live-sync/changed`                 | **401**          |
 | `GET /api/v1/app/version-policy`                 | **200**          |
 | `GET /api/v1/refinery-orders/my-orders`          | **401**          |
+| `GET /api/v1/refinery-orders/all`                | **401**          |
 | `GET /api/v1/material-exchange/offers`           | **401**          |
 | `GET /api/v1/material-requests`                  | **401**          |
 | `GET /api/v1/material-exchange/releasable-items` | **401**          |
@@ -1583,7 +1594,7 @@ Phase I yet, doing this once covers both.
    allow-list matched:
 
    ```powershell
-   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy','/api/v1/refinery-orders/my-orders','/api/v1/material-exchange/offers','/api/v1/material-requests','/api/v1/material-exchange/releasable-items') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
+   foreach ($p in '/api/v1/live-sync/stream?topics=inventory','/api/v1/live-sync/changed','/api/v1/promotion/evaluations/my','/api/v1/promotion/eligibility/my','/api/v1/app/version-policy','/api/v1/refinery-orders/my-orders','/api/v1/refinery-orders/all','/api/v1/material-exchange/offers','/api/v1/material-requests','/api/v1/material-exchange/releasable-items') { '{0,-52} {1}' -f $p, (curl.exe -s -o NUL -w '%{http_code}' "https://api.profit-base.online$p") }
    ```
 
    Expected: `401` for everything except **`version-policy`, which must answer `200`** — it is
