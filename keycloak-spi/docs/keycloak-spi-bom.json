@@ -1,0 +1,35 @@
+{
+  "bomFormat" : "CycloneDX",
+  "specVersion" : "1.6",
+  "serialNumber" : "urn:uuid:80520f8f-76fc-4e92-a842-529464a1f576",
+  "version" : 1,
+  "metadata" : {
+    "timestamp" : "2026-09-08T09:19:16Z",
+    "tools" : {
+      "components" : [
+        {
+          "type" : "application",
+          "author" : "CycloneDX",
+          "name" : "cyclonedx-gradle-plugin",
+          "version" : "3.4.1"
+        }
+      ]
+    },
+    "component" : {
+      "type" : "library",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@0.0.1-SNAPSHOT?project_path=%3Akeycloak-spi",
+      "group" : "de.greluc.krt.profit.basetool",
+      "name" : "keycloak-spi",
+      "version" : "0.0.1-SNAPSHOT",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@0.0.1-SNAPSHOT?project_path=%3Akeycloak-spi",
+      "modified" : false,
+      "externalReferences" : [
+        {
+          "type" : "vcs",
+          "url" : "https://github.com/krt-profit/basetool.git"
+        }
+      ]
+    }
+  },
+  "dependencies" : [ ]
+}

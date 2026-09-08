@@ -8,13 +8,13 @@ name: Release · Publish
 #   2. Creates the `vX.Y.Z` tag at the merge commit -- ONCE, on a commit that
 #      already carries the tidied changelog + fresh SBOM, so the tag never has to
 #      be moved.
-#   3. Attests SLSA build provenance for the four SBOM files, binding their
+#   3. Attests SLSA build provenance for the eight SBOM files, binding their
 #      hashes to this run and the release commit in GitHub's attestation store
 #      (REQ-OPS-023, ADR-0145) -- before they are uploaded, so there is no
 #      window in which a published asset has no provenance.
 #   4. Publishes the GitHub Release: body = the freshly cut CHANGELOG section in
 #      the release-notes skill's German rubric style, plus links to the signed
-#      multi-arch GHCR images and the four SBOM files attached as assets.
+#      multi-arch GHCR images and the eight SBOM files attached as assets.
 #
 # The tag push is what drives release-images.yml to build/sign/push the images.
 # IMPORTANT: a tag created with the default GITHUB_TOKEN does NOT trigger other
@@ -111,7 +111,7 @@ jobs:
 
       # Build provenance for the files this job is about to publish.
       #
-      # The container images have carried provenance for a while; the four
+      # The container images have carried provenance for a while; the
       # CycloneDX SBOMs attached to the GitHub Release carried none. That is the
       # asymmetry this closes. A release asset is a bare file on a URL: someone
       # downloading `backend-bom.json` to audit what the release ships has no
@@ -142,6 +142,10 @@ jobs:
             backend/docs/backend-bom.xml
             frontend/docs/frontend-bom.json
             frontend/docs/frontend-bom.xml
+            ingest/docs/ingest-bom.json
+            ingest/docs/ingest-bom.xml
+            keycloak-spi/docs/keycloak-spi-bom.json
+            keycloak-spi/docs/keycloak-spi-bom.xml
 
       - name: Create or update the GitHub Release
         env:
@@ -150,9 +154,15 @@ jobs:
           NOTES: ${{ steps.notes.outputs.path }}
         run: |
           set -euo pipefail
+          # One pair per shipped artifact. A release whose asset list is shorter
+          # than this reads as "these are the components" while silently omitting
+          # a deployed one, so the set is asserted by
+          # .github/scripts/check_sbom_coverage.py on every PR.
           assets=(
             backend/docs/backend-bom.json backend/docs/backend-bom.xml
             frontend/docs/frontend-bom.json frontend/docs/frontend-bom.xml
+            ingest/docs/ingest-bom.json ingest/docs/ingest-bom.xml
+            keycloak-spi/docs/keycloak-spi-bom.json keycloak-spi/docs/keycloak-spi-bom.xml
           )
           # Idempotent: re-running on the same tag updates the release in place.
           if gh release view "${TAG}" >/dev/null 2>&1; then

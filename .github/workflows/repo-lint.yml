@@ -8,6 +8,9 @@ name: Repo Lint
 #                   over every embedded `run:` script (catches workflow-syntax
 #                   and shell bugs before they burn a CI run to discover them).
 #   - hadolint   -> the three multi-stage production Dockerfiles.
+#   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
+#                   SBOM end to end: plugin, committed file, regenerated at
+#                   release time, attested and attached to the Release.
 #
 # Each linter runs from its pinned release binary (shellcheck ships
 # preinstalled on the runner), so no third-party action enters the supply
@@ -135,6 +138,26 @@ jobs:
 
       - name: Check PID-1 reaping invariant
         run: python3 .github/scripts/check_pid1_reaping.py
+
+  sbom-coverage:
+    name: sbom-coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # REQ-OPS-025. The published SBOM set is read as "these are the components of this release",
+      # so a module missing from it does not read as missing -- it reads as absent from the product.
+      # It had drifted both possible ways by v1.7.3, and neither drift failed anything: `ingest`
+      # had a committed BOM that no release workflow regenerated, so it aged from 2026-07-11 and
+      # shipped 126 stale component versions while never being attached to a Release at all; and
+      # `keycloak-spi`, whose provider JAR promote.yml pushes to the production Keycloak, had no
+      # SBOM whatsoever. Four lists in four files had to agree by hand, and did not. This asserts
+      # them against settings.gradle.kts instead, so a new module fails here until somebody decides
+      # whether it ships -- the decision both drifts skipped.
+      - name: Check SBOM coverage of every shipped module
+        run: python3 .github/scripts/check_sbom_coverage.py
 
   monitoring-image-pins:
     name: monitoring-image-pins

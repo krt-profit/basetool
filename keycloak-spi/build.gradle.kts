@@ -1,6 +1,9 @@
+import org.cyclonedx.Version
+
 plugins {
   java
   checkstyle
+  alias(libs.plugins.cyclonedx.bom)
   id("com.diffplug.spotless")
 }
 
@@ -21,6 +24,29 @@ java {
 // bytecode via `--release 21`, so the JAR is loadable by the runtime. Bump this
 // in lockstep with the Keycloak image's JDK if a future Keycloak upgrades it.
 tasks.withType<JavaCompile>().configureEach { options.release.set(21) }
+
+// This JAR is shipped -- promote.yml pushes the `basetool-keycloak-spi` bundle to production
+// alongside the three app images -- so it carries an SBOM like every other shipped module
+// (REQ-OPS-025). Same output convention as backend/frontend/ingest: `docs/<module>-bom.{json,xml}`,
+// committed, refreshed by release-prepare.yml and attached to the GitHub Release.
+tasks.cyclonedxBom {
+  schemaVersion.set(Version.VERSION_16)
+  jsonOutput.set(file("docs/${project.name}-bom.json"))
+  xmlOutput.set(file("docs/${project.name}-bom.xml"))
+  includeBomSerialNumber = true
+  includeLicenseText = true
+  includeBuildSystem = true
+}
+
+// Restrict the SBOM to the shipped runtime classpath, exactly as the other three modules do. Here
+// that classpath is EMPTY by design and the resulting component list is short on purpose: every
+// Keycloak SPI dependency is `compileOnly` because the Keycloak runtime provides it, and the JAR
+// bundles no third-party code at all. An empty list is the honest answer to "what does this add to
+// the Keycloak JVM?" -- and it turns into a tripwire the day someone writes `implementation`,
+// because the component would then appear in the released BOM.
+tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
+  includeConfigs.set(listOf("^runtimeClasspath$"))
+}
 
 // Byte Buddy (Mockito's backend) does not yet officially support the repo's JDK 25 toolchain; the
 // flag lets it proceed (the same compatibility knob Byte Buddy itself recommends). The backend/

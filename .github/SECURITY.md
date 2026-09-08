@@ -198,8 +198,9 @@ before reporting a finding against it:
   `basetool-config` and `basetool-keycloak-spi`.
 
 - **SBOM** — an SPDX SBOM is attached as an OCI attestation; CycloneDX
-  SBOMs are also generated locally via `./gradlew cyclonedxBom` and
-  shipped under `<module>/docs/`. The four CycloneDX files attached to a
+  SBOMs are also generated per shipped module (backend, frontend, ingest,
+  keycloak-spi — REQ-OPS-025) via `./gradlew cyclonedxBom` and
+  shipped under `<module>/docs/`. The eight CycloneDX files attached to a
   GitHub Release carry their own build provenance — verify a downloaded
   one before you trust what it lists:
 

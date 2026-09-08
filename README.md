@@ -148,6 +148,7 @@ ArchUnit rules in `backend`/`frontend` `ArchitectureTest.java` enforce architect
 ./gradlew :backend:checkstyleMain :backend:spotbugsMain     # backend lint only
 ./gradlew spotlessApply                                     # auto-format sources — run before every push
 ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom      # SBOM on demand into <module>/docs/
+./gradlew :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom   # the other two shipped modules (REQ-OPS-025)
 ```
 
 Checkstyle runs with `maxWarnings = 0` and Spotless is wired into `check` — any unformatted file or new Checkstyle warning fails CI. The frontend additionally runs strict asset linters (`:frontend:lintCss`, `:frontend:lintJs`, `:frontend:lintHtml`) that are not covered by Spotless/Prettier; run `spotlessApply` **and** those before pushing changes under `src/main/resources/static/**` or `templates/**`.

@@ -12,8 +12,10 @@ name: Release · Prepare
 #      `[Unreleased]` (cut_release.py). This is a pure text transform, so -- unlike
 #      `git tag --contains` reconciliation -- it needs no tag to exist yet, which
 #      is exactly what lets us prepare the changelog BEFORE the tag is created.
-#   3. Regenerate the CycloneDX SBOMs, dropping pure serial-number / timestamp
-#      churn (bom_unchanged.py, issue #416).
+#   3. Regenerate the CycloneDX SBOMs of every SHIPPED module -- backend,
+#      frontend, ingest and keycloak-spi -- dropping pure serial-number /
+#      timestamp churn (bom_unchanged.py, issue #416). The module list is
+#      enforced by .github/scripts/check_sbom_coverage.py, not by memory.
 #   4. Commit the result on a `release/vX.Y.Z` branch and open a PR to main.
 #
 # Merging that PR is what actually releases: release-publish.yml then tags the
@@ -112,13 +114,21 @@ jobs:
           TAG: ${{ steps.ver.outputs.tag }}
         run: python3 .github/scripts/cut_release.py "${TAG}"
 
+      # Every module that ships an artifact, not only the two Spring Boot web
+      # apps. `ingest` had the plugin and a committed BOM but was missing from
+      # this line, so its file aged in place for two months and reached v1.7.3
+      # naming 126 stale component versions -- a scanner reading it would clear
+      # CVEs the shipped image actually carries. `keycloak-spi` had no SBOM at
+      # all while promote.yml pushes its bundle to production.
       - name: Regenerate CycloneDX SBOMs
-        run: ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom --stacktrace
+        run: >-
+          ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
+          :ingest:cyclonedxBom :keycloak-spi:cyclonedxBom --stacktrace
 
       - name: Drop SBOM churn that is only serial-number / timestamp rotation
         run: |
           set -euo pipefail
-          for module in backend frontend; do
+          for module in backend frontend ingest keycloak-spi; do
             json="${module}/docs/${module}-bom.json"
             xml="${module}/docs/${module}-bom.xml"
             old="$(mktemp)"
@@ -153,7 +163,8 @@ jobs:
           set -euo pipefail
           # Commit only the known release artifacts -- never an incidental change
           # such as the gradlew mode bit flipped by `chmod +x` in an earlier step.
-          mapfile -t files < <(git diff --name-only HEAD -- CHANGELOG.md backend/docs frontend/docs)
+          paths=(CHANGELOG.md backend/docs frontend/docs ingest/docs keycloak-spi/docs)
+          mapfile -t files < <(git diff --name-only HEAD -- "${paths[@]}")
           if [ "${#files[@]}" -eq 0 ]; then
             echo "::error::nothing to release: no CHANGELOG/SBOM changes were produced for ${TAG}"
             exit 1
