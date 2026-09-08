@@ -11,6 +11,13 @@
 
 ### Fixed
 
+- **Eine Operation mit einem gelöschten Mitglied ließ sich gar nicht mehr öffnen.** Die
+  Auszahlungsübersicht antwortete mit einem Serverfehler, und weil der Kopf der Operation aus
+  genau diesen Daten gebaut wird, blieb der ganze Bildschirm leer — im Webtool wie in der App.
+  Ursache war die Sortierung der Auszahlungszeilen: eine gelöschte Person hat bewusst keinen
+  Namen, und darauf war die Sortierung nicht vorbereitet. Gelöschte Zeilen stehen jetzt am Ende
+  der Liste.
+
 - **Nächtlicher Fehlalarm „Redis RDB snapshot older than 1h" behoben.** Redis schreibt einen
   Schnappschuss nur, wenn sich etwas geändert hat — in ruhigen Nachtstunden also gar nicht, worauf
   der Alarm die Untätigkeit als Ausfall meldete (zweimal in der Nacht zum 08.09., obwohl jeder
