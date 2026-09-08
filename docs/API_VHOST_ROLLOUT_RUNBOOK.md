@@ -1403,35 +1403,35 @@ merge order, so the block can be reviewed against this list rather than diffed b
 
 Anonymously, from outside the host — the same shape as Phase H's check:
 
-|                     Path                     |                                  Without a token                                  |
-|----------------------------------------------|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| `/api/v1/personal-inventory`                 | **401**                                                                           |
-| `/api/v1/personal-inventory/<uuid>`          | **401**                                                                           |
-| `/api/v1/uex/locations/search`               | **401**                                                                           |
-| `/api/v1/personal-blueprints`                | **401**                                                                           |
-| `/api/v1/personal-blueprints/<uuid>`         | **401**                                                                           |
-| `/api/v1/personal-blueprints/craftability`   | **401**                                                                           |
-| `/api/v1/blueprints/products/search`         | **401**                                                                           |
-| `/api/v1/hangar/ships`                       | **401**                                                                           |
-| `/api/v1/hangar/ships/<uuid>`                | **401**                                                                           |
-| `/api/v1/ship-types`                         | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
-| `/api/v1/locations/home-locations`           | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
-| `/api/v1/inventory/<uuid>/book-out`          | **401**                                                                           |
-| `/api/v1/users/search`                       | **401**                                                                           |
-| `/api/v1/materials/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
-| `/api/v1/locations/search`                   | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
-| `POST /api/v1/inventory/all`                 | **404** — the every-member list is not on the allow-list at all                   |
-| `/api/v1/orders/<uuid>/assignees/<uuid>`     | **401**                                                                           |
-| `/api/v1/orders/<uuid>/status`               | **401**                                                                           | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
-| `/api/v1/missions/<uuid>/join`               | **401**                                                                           |
-| `…/participants/<uuid>/check-in/slim`        | **404** — the guard resolves the row before it judges the caller, see REQ-SEC-037 |
-| `/api/v1/finance-entries`                    | **401**                                                                           |
-| `/api/v1/operations/<uuid>/payouts/paid-out` | **401**                                                                           |
-| `…/bank/accounts/<uuid>/settings`            | **401**                                                                           |
-| `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                           |
-| `POST /api/v1/bank/deposits`                 | **404** at the time of phase I; **401** since phase O admitted it                 |
-| `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                     |
-| `POST /api/v1/hangar/import/fleetview`       | **404** at the time of phase 4; **401** since phase X admitted it                 |
+|                     Path                     |                                                      Without a token                                                       |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `/api/v1/personal-inventory`                 | **401**                                                                                                                    |
+| `/api/v1/personal-inventory/<uuid>`          | **401**                                                                                                                    |
+| `/api/v1/uex/locations/search`               | **401**                                                                                                                    |
+| `/api/v1/personal-blueprints`                | **401**                                                                                                                    |
+| `/api/v1/personal-blueprints/<uuid>`         | **401**                                                                                                                    |
+| `/api/v1/personal-blueprints/craftability`   | **401**                                                                                                                    |
+| `/api/v1/blueprints/products/search`         | **401**                                                                                                                    |
+| `/api/v1/hangar/ships`                       | **401**                                                                                                                    |
+| `/api/v1/hangar/ships/<uuid>`                | **401**                                                                                                                    |
+| `/api/v1/ship-types`                         | **401**                                                                                                                    | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/locations/home-locations`           | **401**                                                                                                                    | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/inventory/<uuid>/book-out`          | **401**                                                                                                                    |
+| `/api/v1/users/search`                       | **401**                                                                                                                    |
+| `/api/v1/materials/search`                   | **401**                                                                                                                    | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/locations/search`                   | **401**                                                                                                                    | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `POST /api/v1/inventory/all`                 | **404** — the every-member list is not on the allow-list at all                                                            |
+| `/api/v1/orders/<uuid>/assignees/<uuid>`     | **401**                                                                                                                    |
+| `/api/v1/orders/<uuid>/status`               | **401**                                                                                                                    | REQ-SEC-052: the backend refuses an anonymous caller on every admitted path |
+| `/api/v1/missions/<uuid>/join`               | **401**                                                                                                                    |
+| `…/participants/<uuid>/check-in/slim`        | **404** while the guard resolved the row before judging the caller; **401** since REQ-SEC-052 removed the anonymous caller |
+| `/api/v1/finance-entries`                    | **401**                                                                                                                    |
+| `/api/v1/operations/<uuid>/payouts/paid-out` | **401**                                                                                                                    |
+| `…/bank/accounts/<uuid>/settings`            | **401**                                                                                                                    |
+| `…/bank/accounts/<uuid>/balance-target`      | **401**                                                                                                                    |
+| `POST /api/v1/bank/deposits`                 | **404** at the time of phase I; **401** since phase O admitted it                                                          |
+| `POST /api/v1/orders`                        | **405** — the public request form stays refused on this vhost                                                              |
+| `POST /api/v1/hangar/import/fleetview`       | **404** at the time of phase 4; **401** since phase X admitted it                                                          |
 
 A **405** on any row listed **401** would be the read-only guard swallowing a write the phase is
 supposed to open: `/personal-inventory` and `/personal-blueprints` must NOT be in the guard's family
