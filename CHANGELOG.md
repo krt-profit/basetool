@@ -4,6 +4,10 @@
 
 ### Changed
 
+- **Der API-Zugang lässt jetzt die staffelweite Raffinerie-Liste durch.** Die Android-App zeigt seit 0.2.8 die Aufträge der ganzen Einheit statt nur der eigenen — den Weg dorthin (`GET /api/v1/refinery-orders/all`) wies der Zugang bisher ab, weshalb die Raffinerie in der App gar nicht mehr lud. **Keine neue Datenfreigabe:** das Webtool benutzt genau diesen Endpunkt seit jeher als Standardansicht, die Zeilen werden weiterhin serverseitig auf die eigene Einheit begrenzt, und anonym antwortet er wie zuvor mit 401. Wirksam wird es mit dem nächsten Einspielen am Zugang (Runbook-Phase U).
+
+### Changed
+
 - **Die Überwachung achtet jetzt auch auf die primäre Sicherungsschicht von Redis.** Bisher gab es
   nur einen Alarm für den Schnappschuss (RDB), nicht aber für das laufend geschriebene Journal
   (AOF) — obwohl dieses die eigentliche Absicherung der Sitzungen ist. Neu schlagen zwei Alarme an,

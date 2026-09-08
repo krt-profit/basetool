@@ -121,6 +121,9 @@ class ApiCacheControlFilterTest {
         "/api/v1/inventory/aggregated",
         "/api/v1/hangar/my-ships",
         "/api/v1/refinery-orders/my-orders",
+        // Admitted 2026-09-08. Somebody else's refinery run is exactly as private as your own, so
+        // it belongs in the never-stored family and not merely in the allow-list.
+        "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility/my"
       })
   void memberFinancialAndPersonalFamilies_areNeverStored(String uri) throws Exception {
