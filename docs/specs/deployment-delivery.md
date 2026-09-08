@@ -467,13 +467,18 @@ throwaway cache (Redis is session-store only, ADR-0074):
 
 - **Durable persistence — RDB + AOF.** `--appendonly yes --appendfsync everysec` makes AOF the
   primary durability layer (~1 fsync/s regardless of write volume; ~1 s worst-case loss on a crash),
-  and `--save "60 1"` keeps a compact RDB snapshot for fast restart and to keep the `RedisRdbStale`
-  probe green. On restart Redis loads the AOF. Both files live on the `/var/iri/redis` bind mount and
-  are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
+  and `--save "60 1"` keeps a compact RDB snapshot for fast restart. On restart Redis loads the AOF.
+  This bullet said the save cadence also existed "to keep the `RedisRdbStale` probe green" until
+  2026-09-08; **no cadence can do that**, because Redis snapshots only when a key changed, so an idle
+  store's save age climbs regardless — which is what made the unguarded probe page twice that night.
+  The probe was corrected instead (see the observability bullet below). Both files live on the
+  `/var/iri/redis` bind mount and are **excluded from off-site backups** (REQ-OPS-010 — sessions transparently re-login). The
   `appendfsync always` mode (one fsync per write, the pre-M-7 pathology) is deliberately **not** used.
-- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 192mb` sits below the 256 MB
+- **Bounded memory — explicit ceiling below the cgroup.** `--maxmemory 384mb` sits below the 512 MB
   container limit, leaving copy-on-write headroom for the RDB / AOF-rewrite forks and fragmentation,
-  so Redis manages the boundary itself instead of ceding it to the kernel OOM-killer.
+  so Redis manages the boundary itself instead of ceding it to the kernel OOM-killer. Raised from
+  `192mb` / 256 MB by ADR-0085 for the 5000-account session index; this requirement kept quoting the
+  pre-ADR-0085 pair until 2026-09-08, so its acceptance list contradicted the shipped compose file.
 - **Session-safe eviction — `noeviction`.** `--maxmemory-policy noeviction` is **mandatory**:
   evicting a session key is a silent logout, so at the ceiling Redis refuses **new** writes (a failed
   login) while every live session survives. An evicting policy (`allkeys-*` / `volatile-*`) is a
@@ -486,16 +491,28 @@ leading-indicator alert is functional (it self-guards on that being non-zero and
 maxmemory was unset), and `RedisEvictions` is a misconfiguration tripwire (any eviction under
 `noeviction` means the policy was wrongly changed) — both in the alert catalog (REQ-OBS-005).
 
+The **persistence** alerts distinguish a broken snapshot from an idle one. `RedisRdbStale` requires
+`redis_rdb_changes_since_last_save > 0` alongside the hour-old timestamp: Redis clears that counter
+only on a successful save and restores it when a fork fails, so pending-and-unsaved is a real
+failure while pending-zero is a quiet store. The failure modes the guard does not cover get their
+own direct rules — `RedisRdbSaveFailing` on `rdb_last_bgsave_status:err` (5 min, independent of write
+volume) and `RedisAofWriteFailing` on `aof_last_write_status:err`, which is the first alert this
+posture has ever had on the **primary** durability layer.
+
 **Acceptance**
 
 - [ ] Both redis command lines in `docker-compose.yml` set `--appendonly yes --appendfsync everysec`,
-  `--save "60 1"`, `--maxmemory 192mb`, and `--maxmemory-policy noeviction`; the prod override keeps
+  `--save "60 1"`, `--maxmemory 384mb`, and `--maxmemory-policy noeviction`; the prod override keeps
   `--aclfile` and the two lines carry identical persistence/memory flags.
-- [ ] `--maxmemory` (192mb) is strictly below the container memory limit (256M) so a snapshot /
+- [ ] `--maxmemory` (384mb) is strictly below the container memory limit (512M) so a snapshot /
   AOF-rewrite fork has copy-on-write headroom.
 - [ ] The eviction policy is `noeviction`; no `allkeys-*` / `volatile-*` policy is configured.
-- [ ] `RedisMemoryHigh`, `RedisEvictions`, and `RedisRdbStale` exist in `infrastructure.yml` and
-  their descriptions match this posture (192mb maxmemory, noeviction semantics, AOF-primary durability).
+- [ ] `RedisMemoryHigh`, `RedisEvictions`, `RedisRdbStale`, `RedisRdbSaveFailing` and
+  `RedisAofWriteFailing` exist in `infrastructure.yml` and their descriptions match this posture
+  (384mb maxmemory, noeviction semantics, AOF-primary durability).
+- [ ] `RedisRdbStale` carries the `and redis_rdb_changes_since_last_save > 0` guard, so an idle store
+  with an ageing snapshot does not page. Pinned by
+  `monitoring/prometheus/tests/redisrdbstale_idle_guard_test.yml`.
 
 **Enforced by:** `docker-compose.yml` (`x-redis` template + `redis` prod override) ·
 `monitoring/prometheus/alerts/infrastructure.yml` (Redis memory/persistence alerts) · **Decision:** ADR-0079

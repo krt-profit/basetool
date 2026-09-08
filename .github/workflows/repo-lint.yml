@@ -192,3 +192,36 @@ jobs:
 
       - name: Check provisioned Grafana dashboards
         run: python3 scripts/check-grafana-dashboards.py
+
+  prometheus-rules:
+    name: prometheus-rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The alert rules and their promtool unit tests had no gate of any kind until 2026-09-08 —
+      # the same hole the grafana-dashboards job above closed for the dashboards, one surface over.
+      # 18 test files existed and nothing ran them, so every one of them was a claim rather than a
+      # check: monitoring/README.md, REQ-OPS-018 and several ADRs all say a behaviour is "pinned by"
+      # a file under monitoring/prometheus/tests/, and none of those sentences was true in CI. The
+      # trigger was the RedisRdbStale false positive of 2026-09-08, whose fix ships with exactly
+      # such a test.
+      #
+      # promtool comes out of the pinned prometheus image rather than a release tarball, so the
+      # linter version matches the server that will load these rules. Note the --entrypoint: the
+      # image starts /bin/prometheus, which rejects `promtool` as "unexpected promtool". The globs
+      # are expanded INSIDE the container via `sh -c` — the runner's shell cannot expand a /work
+      # path and promtool would exit with "path does not exist".
+      - name: Check alert rule syntax
+        run: |
+          docker run --rm --entrypoint sh \
+            -v "$PWD/monitoring/prometheus:/work" -w /work \
+            prom/prometheus:v3.14.0 -c 'promtool check rules alerts/*.yml'
+
+      - name: Run alert rule unit tests
+        run: |
+          docker run --rm --entrypoint sh \
+            -v "$PWD/monitoring/prometheus:/work" -w /work \
+            prom/prometheus:v3.14.0 -c 'promtool test rules tests/*_test.yml'
