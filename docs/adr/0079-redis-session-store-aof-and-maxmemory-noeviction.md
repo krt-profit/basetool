@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-07
 - **Deciders:** @greluc
-- **Related:** spec REQ-OPS-018 · REQ-OPS-010 · REQ-OBS-005…011 · ADR-0072 · ADR-0074 (Redis is session-store only, not a cache)
+- **Related:** spec REQ-OPS-018 · REQ-OPS-010 · REQ-OBS-005…011 · ADR-0072 · ADR-0074 (Redis is session-store only, not a cache) · ADR-0085 (raised the ceiling to `maxmemory 384mb` / 512 MB cgroup for 5000 accounts — the `192mb` / 256 MB figures below are this ADR's original values and are superseded)
 
 ## Context
 
@@ -43,8 +43,16 @@ both the `redis` (prod) and `redis-dev` command lines:
 
 - `--appendonly yes --appendfsync everysec` — AOF as the primary durability layer (~1 fsync/s, ~1 s
   worst-case loss). On restart Redis prefers the AOF.
-- `--save "60 1"` — a compact, always-fresh RDB snapshot for fast restart and to keep the
-  `RedisRdbStale` probe green (replaces `--save "300 1 60 1000"`).
+- `--save "60 1"` — a compact, always-fresh RDB snapshot for fast restart (replaces
+  `--save "300 1 60 1000"`). **Corrected 2026-09-08:** this bullet also claimed the cadence existed
+  "to keep the `RedisRdbStale` probe green". That was never achievable, and it is the root of two
+  false pages on 2026-09-08 (02:05–02:40Z and 04:19–04:24Z) — Redis snapshots only when at least
+  one key changed, so on a quiet night there is nothing to save and the timestamp ages past the
+  probe's hour with every BGSAVE having succeeded. Tuning a save cadence cannot fix an alert that
+  measures idleness. `RedisRdbStale` now additionally requires
+  `redis_rdb_changes_since_last_save > 0`, and the failure it used to approximate is caught directly
+  by `RedisRdbSaveFailing` (`rdb_last_bgsave_status:err`). `--save "60 1"` itself is unchanged and
+  still correct for the fast-restart goal.
 - `--maxmemory 192mb` — below the 256 MB cgroup, leaving copy-on-write headroom for the RDB/AOF-rewrite
   forks and fragmentation.
 - `--maxmemory-policy noeviction` — **mandatory** for a session store: evicting a session key is a
@@ -66,6 +74,13 @@ indicator (it becomes functional once `maxmemory > 0`), and `RedisEvictions` is 
   config-only diff, auto-applied per REQ-OPS deployment rules).
 - The refresh token remains at rest in plaintext on the host bind mount (now in the AOF as well as the
   RDB) — no change to the existing accepted exposure; the dir never leaves the host (REQ-OPS-010).
+- **Amended 2026-09-08 — the posture is now observable on both layers.** As accepted, this ADR left
+  the **primary** durability layer (AOF) with no alert at all: the only persistence rule watched the
+  secondary RDB snapshot, and watched it by age. `RedisAofWriteFailing`
+  (`aof_last_write_status:err`) closes that hole, `RedisRdbSaveFailing`
+  (`rdb_last_bgsave_status:err`) replaces the age heuristic for the RDB half, and `RedisRdbStale` is
+  narrowed to unsaved-changes-past-the-hour. Pinned by
+  `monitoring/prometheus/tests/redisrdbstale_idle_guard_test.yml`.
 
 ## Alternatives considered
 

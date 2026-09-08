@@ -1,0 +1,150 @@
+# promtool unit test for the Redis persistence alerts (REQ-OPS-018, ADR-0079, 2026-09-08).
+#
+# Locks the `and redis_rdb_changes_since_last_save > 0` guard that was added after the unguarded
+# `(time() - redis_rdb_last_save_timestamp_seconds) > 3600` paged twice on the night of 2026-09-08
+# (02:05-02:40Z, 04:19-04:24Z) with nothing wrong. `--save "60 1"` snapshots only when at least one
+# key changed, so an idle session store simply has no save to make and the timestamp ages past an
+# hour on its own. The redis log across both windows showed every BGSAVE succeeding.
+#
+#   - SILENT for an idle store whose snapshot is hours old but has zero pending changes;
+#   - FIRES when changes are pending and unsaved past the hour (a genuinely failing snapshot fork);
+#   - SILENT when changes are pending but a save completed recently (the normal write path);
+#   - FIRES RedisRdbSaveFailing on rdb_last_bgsave_status:err even while the store is idle, which is
+#     the case the guard above deliberately hands over to it;
+#   - FIRES RedisAofWriteFailing on aof_last_write_status:err, and stays SILENT when AOF is off.
+#
+# The `and` matches on the full label set, so `redis_rdb_last_save_timestamp_seconds` and
+# `redis_rdb_changes_since_last_save` must carry identical labels — they do, both coming from the
+# one redis-exporter target. Every series below repeats that pair deliberately: dropping a label
+# from one of them silently empties the expression, which would read as "healthy".
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 test rules tests/redisrdbstale_idle_guard_test.yml
+
+rule_files:
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE regression. Save timestamp pinned at t=0 and evaluated two hours in, so the staleness half of
+  # the expression is true by a wide margin — but nothing has changed since that save. This is the
+  # exact shape of both 2026-09-08 pages and it must stay silent.
+  - name: silent - idle store, snapshot two hours old, zero pending changes
+    interval: 1m
+    input_series:
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+        values: "0x150"
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+        values: "0x150"
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: RedisRdbStale
+        exp_alerts: []
+
+  # The failure the rule exists for: writes keep arriving, the dirty counter keeps climbing because
+  # no save ever completes to reset it, and the last snapshot recedes past an hour.
+  - name: fires - pending changes unsaved past the hour
+    interval: 1m
+    input_series:
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+        values: "0x150"
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+        values: "1+3x149"
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: RedisRdbStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: redis-exporter:9121
+              job: redis
+            exp_annotations:
+              summary: "Redis has unsaved changes and no RDB snapshot for over 1h"
+              description: "Redis has held unsaved changes for more than an hour without completing an RDB snapshot, so the snapshot fork is failing or blocked. AOF (appendfsync everysec) is the primary durability layer, so this is not a data-loss signal on its own, but a stale RDB slows restart — check the redis log for save errors and the disk free space on /var/iri/redis. An idle store with no pending changes does NOT fire this: the save timestamp ageing on a quiet night is normal."
+
+  # Normal operation under load: the dirty counter is non-zero between snapshots, but a save landed
+  # minutes ago. Only the pair of conditions may fire, never the pending-changes half alone.
+  - name: silent - pending changes but a recent save
+    interval: 1m
+    input_series:
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+        values: "7000x150"
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+        values: "4x150"
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: RedisRdbStale
+        exp_alerts: []
+
+  # The coverage the guard hands over. An idle store whose fork is broken produces no pending changes
+  # and therefore no RedisRdbStale — the bgsave status is what has to catch it, and in 5 minutes.
+  - name: fires - bgsave status err on an otherwise idle store
+    interval: 1m
+    input_series:
+      - series: 'redis_rdb_last_bgsave_status{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+      - series: 'redis_rdb_last_save_timestamp_seconds{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+      - series: 'redis_rdb_changes_since_last_save{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisRdbSaveFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: redis-exporter:9121
+              job: redis
+            exp_annotations:
+              summary: "Redis background save is failing"
+              description: "The last Redis RDB background save failed (INFO rdb_last_bgsave_status:err). The snapshot half of the RDB+AOF posture (ADR-0079) is broken, so a restart falls back to the AOF alone and takes longer. Usual causes are no disk space or no write permission on the /var/iri/redis bind mount, or a fork refused for lack of memory — check the redis log and the host filesystem."
+      # ... and the idle store still does not page on staleness while that is happening.
+      - eval_time: 20m
+        alertname: RedisRdbStale
+        exp_alerts: []
+
+  # A healthy bgsave status must not fire it — the exporter maps ok to 1, not to absent.
+  - name: silent - bgsave status ok
+    interval: 1m
+    input_series:
+      - series: 'redis_rdb_last_bgsave_status{instance="redis-exporter:9121",job="redis"}'
+        values: "1x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisRdbSaveFailing
+        exp_alerts: []
+
+  # The primary durability layer, which had no alert at all before this change.
+  - name: fires - aof write status err while aof is enabled
+    interval: 1m
+    input_series:
+      - series: 'redis_aof_last_write_status{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+      - series: 'redis_aof_enabled{instance="redis-exporter:9121",job="redis"}'
+        values: "1x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisAofWriteFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              instance: redis-exporter:9121
+              job: redis
+            exp_annotations:
+              summary: "Redis AOF writes are failing"
+              description: "The last Redis AOF write failed (INFO aof_last_write_status:err) while AOF is enabled. AOF is the primary durability layer for the session store, so writes already acknowledged to the frontend are not reaching disk and a crash would log those members out. Check disk space and permissions on the /var/iri/redis bind mount and the redis log."
+
+  # With AOF deliberately off there is no AOF to fail; the status field is meaningless and must not page.
+  - name: silent - aof disabled
+    interval: 1m
+    input_series:
+      - series: 'redis_aof_last_write_status{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+      - series: 'redis_aof_enabled{instance="redis-exporter:9121",job="redis"}'
+        values: "0x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: RedisAofWriteFailing
+        exp_alerts: []
