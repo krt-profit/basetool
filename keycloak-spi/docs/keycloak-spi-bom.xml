@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom serialNumber="urn:uuid:80520f8f-76fc-4e92-a842-529464a1f576" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+  <metadata>
+    <timestamp>2026-09-08T09:19:16Z</timestamp>
+    <tools>
+      <components>
+        <component type="application">
+          <author>CycloneDX</author>
+          <name>cyclonedx-gradle-plugin</name>
+          <version>3.4.1</version>
+        </component>
+      </components>
+    </tools>
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@0.0.1-SNAPSHOT?project_path=%3Akeycloak-spi">
+      <group>de.greluc.krt.profit.basetool</group>
+      <name>keycloak-spi</name>
+      <version>0.0.1-SNAPSHOT</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@0.0.1-SNAPSHOT?project_path=%3Akeycloak-spi</purl>
+      <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/krt-profit/basetool.git</url>
+        </reference>
+      </externalReferences>
+    </component>
+  </metadata>
+</bom>

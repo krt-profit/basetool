@@ -2,7 +2,8 @@
 """Exit 0 when two CycloneDX JSON SBOMs are equal ignoring volatile fields.
 
 The cyclonedx-gradle plugin rotates ``serialNumber`` and ``metadata.timestamp``
-on every run (``includeBomSerialNumber = true`` in both modules' build scripts),
+on every run (``includeBomSerialNumber = true`` in every shipped module's build
+script -- backend, frontend, ingest and keycloak-spi, see REQ-OPS-025),
 so a regeneration that did *not* actually change the dependency graph still
 yields a textual diff. This helper strips exactly those two volatile fields and
 compares the rest, letting the release workflow tell a real component change

@@ -547,8 +547,9 @@ discarded — only a real dependency change is kept);
 `release-publish.yml` then
 - creates the `v1.4.3` tag **once**, at the merge commit (which already carries
 the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
-- publishes the GitHub Release (notes + image links + the four SBOM files as
-assets);
+- publishes the GitHub Release (notes + image links + the eight SBOM files as
+assets — one JSON + one XML per shipped module: backend, frontend, ingest and
+keycloak-spi, REQ-OPS-025);
 - and the tag push fires `release-images.yml`.
 
 **The tag run does not rebuild.** The tag sits on the merge commit that `main`

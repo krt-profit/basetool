@@ -808,8 +808,8 @@ coherent set**, provenance included. The attestation store is reached through `a
 and the `/repos/{owner}/{repo}/attestations` API, neither of which `packages: write` grants, so it
 is a second answer to "who built this digest?" with an independent trust root.
 
-For the release assets the gap was absolute rather than partial: the four SBOMs carried **no**
-provenance of any kind. A release asset is a bare file behind a URL, indistinguishable from one
+For the release assets the gap was absolute rather than partial: the SBOMs (four at the time,
+eight since REQ-OPS-025) carried **no** provenance of any kind. A release asset is a bare file behind a URL, indistinguishable from one
 uploaded by anyone who ever held `contents: write` — and an SBOM is exactly the artifact worth
 doctoring, because it is what a consumer reads *instead of* unpacking the image.
 
@@ -831,8 +831,9 @@ fail-closed, exactly as REQ-OPS-015 specifies.
 - [ ] `merge` (per module), `build-config` and `build-keycloak-spi` each attest the **manifest
   digest** they just signed — the subject is a digest, never a tag, so every tag pointing at that
   digest (including a later `:stable` promotion) is covered by one attestation.
-- [ ] `release-publish.yml` attests all four SBOM assets **before** `gh release create/upload`, so
-  no published asset is ever downloadable in an unattested window.
+- [ ] `release-publish.yml` attests **every** SBOM asset it uploads -- the set REQ-OPS-025 defines,
+  not a hardcoded count -- **before** `gh release create/upload`, so no published asset is ever
+  downloadable in an unattested window.
 - [ ] `push-to-registry` is `false` at every call site.
 - [ ] The attestation runs on a reuse run too (REQ-OPS-021), so every digest a release tag points
   at was attested by the run that applied the tag, not only by the run that built it.
@@ -916,6 +917,61 @@ that is not production — gating it would make the bypass routine and wear it o
 **Enforced by:** `.github/workflows/promote.yml` (`scan`) · `.github/workflows/release-images.yml`
 (the advisory twin, whose settings this gate mirrors) · **Runbook:** `docs/deployment.md` →
 *Promoting to production* · **Decision:** ADR-0155
+
+### REQ-OPS-025 — Every shipped module publishes a current SBOM
+
+Each Gradle module whose output reaches a consumer carries a CycloneDX SBOM that is **generated
+from the shipped runtime classpath, committed, regenerated at release time, attested and attached
+to the GitHub Release**. Today that is `backend`, `frontend`, `ingest` and `keycloak-spi` — four
+modules, eight files.
+
+The set is derived from `settings.gradle.kts` by `.github/scripts/check_sbom_coverage.py` and
+asserted on every pull request, rather than being four hand-maintained lists in four files that
+happen to agree. **A module that is not wired fails the check until somebody decides which it is**;
+one that genuinely ships nothing is entered in the script's `NOT_SHIPPED` map with the reason.
+`test-support` is the only such entry: a test-only helper library that no image carries, whose BOM
+would list JUnit and Mockito as components of the delivered product.
+
+**Why an assertion and not a habit.** By v1.7.3 the set had drifted in both directions available to
+it, and neither drift failed anything:
+
+- **`ingest`** had the plugin, the configuration and a committed BOM — and no release workflow named
+  it. Its file was last written on **2026-07-11** and reached v1.7.3 with **126 of its 180
+  components at the wrong version**. It was attached to no Release at any point. A stale SBOM is
+  worse than an absent one: it is what a scanner reads *instead of* the image, so it answers
+  „does this release carry CVE-X?“ with two-month-old evidence, confidently.
+- **`keycloak-spi`** had no SBOM at all, while `promote.yml` pushes its provider-JAR bundle into the
+  production Keycloak in lock-step with the app images — an artifact under REQ-OPS-023's provenance
+  umbrella with nothing describing its contents.
+
+`keycloak-spi`'s BOM lists **zero components**, and that is the correct answer rather than a broken
+generation: every Keycloak SPI dependency is `compileOnly` because the runtime provides it, so the
+JAR bundles no third-party code. It is published because „nothing bundled“ is a fact a consumer
+wants stated, and because the file turns into a tripwire the day an `implementation` dependency
+appears.
+
+**Not covered, deliberately.** `keycloak-theme` ships inside the `basetool-config` bundle and
+carries exactly one third-party component — the vendored Lato font (SIL OFL) — but no build system
+resolves it, so there is nothing to generate and a hand-written BOM would be a hand-maintained one.
+Recorded here rather than left to look like an oversight.
+
+**Acceptance**
+
+- [ ] Every module in `settings.gradle.kts` either applies `libs.plugins.cyclonedx.bom` and writes
+  `docs/<module>-bom.{json,xml}`, or appears in `NOT_SHIPPED` with a reason.
+- [ ] Each shipped module's `cyclonedxDirectBom` restricts `includeConfigs` to `^runtimeClasspath$`,
+  so the BOM describes what ships and not the build tooling.
+- [ ] `release-prepare.yml` regenerates every shipped module's BOM and stages every
+  `<module>/docs` path — a module missing from either list ages in place unnoticed.
+- [ ] `release-publish.yml` lists every BOM file **twice**: as an attestation subject and as a
+  release asset. Attested but unpublished is useless; published but unattested is the gap
+  REQ-OPS-023 closed.
+- [ ] `check_sbom_coverage.py` runs on every pull request via `repo-lint.yml` and fails on any of
+  the above.
+
+**Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
+(`sbom-coverage`) · `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
+· **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned)
 
 ## Out of scope
 

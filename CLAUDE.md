@@ -151,6 +151,8 @@ Always use the Gradle wrapper. **Never** use the IDE test runner or the harness 
 ./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
 ./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
 ./gradlew :frontend:cyclonedxBom                           # SBOM into frontend/docs/
+./gradlew :ingest:cyclonedxBom                             # SBOM into ingest/docs/
+./gradlew :keycloak-spi:cyclonedxBom                       # SBOM into keycloak-spi/docs/
 ./gradlew check                                            # full static analysis: Checkstyle (Google Java Style) + SpotBugs + tests
 ./gradlew :backend:checkstyleMain :backend:spotbugsMain    # backend lint only
 ./gradlew :frontend:checkstyleMain :frontend:spotbugsMain  # frontend lint only

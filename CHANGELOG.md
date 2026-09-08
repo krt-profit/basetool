@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Jedes ausgelieferte Modul liefert jetzt eine aktuelle Stückliste (SBOM) mit.** Bisher hingen
+  nur die von Backend und Frontend am Release. Die von `ingest` wurde seit dem 11.07. nicht mehr
+  erneuert — 126 der 180 Komponenten standen mit falscher Version darin — und `keycloak-spi` hatte
+  gar keine, obwohl sein Provider-JAR mit nach Produktion geht. Ein Release hat damit jetzt acht
+  statt vier Stücklisten, alle signiert.
+
 ## [v1.7.4](https://github.com/krt-profit/basetool/releases/tag/v1.7.4) - 2026-09-08
 
 ### Changed
