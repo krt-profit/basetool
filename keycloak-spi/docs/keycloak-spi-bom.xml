@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:80520f8f-76fc-4e92-a842-529464a1f576" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:33852bc3-eb02-4982-9cf1-7370199edfaf" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-09-08T09:19:16Z</timestamp>
+    <timestamp>2026-09-08T11:33:14Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -18,8 +18,11 @@
       <purl>pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@0.0.1-SNAPSHOT?project_path=%3Akeycloak-spi</purl>
       <modified>false</modified>
       <externalReferences>
+        <reference type="build-system">
+          <url>https://github.com/krt-profit/basetool/actions/runs/34221229212</url>
+        </reference>
         <reference type="vcs">
-          <url>https://github.com/krt-profit/basetool.git</url>
+          <url>https://github.com/krt-profit/basetool</url>
         </reference>
       </externalReferences>
     </component>

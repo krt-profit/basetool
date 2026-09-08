@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.5](https://github.com/krt-profit/basetool/releases/tag/v1.7.5) - 2026-09-08
+
 ### Changed
 
 - **Jedes ausgelieferte Modul liefert jetzt eine aktuelle Stückliste (SBOM) mit.** Bisher hingen
