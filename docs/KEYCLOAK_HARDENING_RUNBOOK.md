@@ -332,6 +332,22 @@ evidence you edited the right client; check `clientId` in the verify output.
 `basetool-frontend` is a **public** client (`publicClient: true`) with no PKCE attribute set. An
 intercepted authorization code is redeemable without it.
 
+> [!important] This step is the interim state, not the target — [ADR-0001](adr/0001-frontend-confidential-oauth2-client.md) is still pending
+> The frontend is public **today**, and that is the code's answer, not a plan's:
+> `frontend/src/main/resources/application.yml:142` registers the client with
+> `client-authentication-method: none`, and the realm has `publicClient: true` with no secret.
+> ADR-0001 (**Accepted — implementation pending**, 2026-05-20) decided to give it a client secret
+> and has not been carried out; reading the ADR as the state of the system is how an earlier version
+> of the knowledge base's client table came to call this client *confidential*.
+>
+> Spring Security sends PKCE automatically for a public client, so the login flow is already
+> PKCE-protected in practice — what this step adds is that the **realm requires** it, which closes
+> the downgrade: without the attribute an authorization request that simply omits the challenge is
+> accepted. What neither gives you is the second factor at the token endpoint that ADR-0001 wants,
+> so **audit finding M-6 stays open after this step**, and its runbook is
+> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Do not read
+> a green step 6 as M-6 closed.
+
 **Console (26.7):** *Clients* → `basetool-frontend` → *Settings* → **Capability config** →
 **Require PKCE** on → **PKCE Method** → `S256` → *Save*. Both controls write the same client
 attribute; the switch is "attribute non-empty" and the select is its value.
@@ -354,6 +370,62 @@ verifier fails **at the token exchange, not at the redirect** — so the symptom
 all the way back to the app and then errors, which does not look like a Keycloak change. Spring
 Security's OAuth2 client sends the verifier for public clients, so this is expected to pass; test it
 anyway, because the cost of being wrong is every member locked out of the web tool.
+
+### Does this apply to the other clients?
+
+It is the right question and the answer is not "yes, everywhere". PKCE protects the **authorization
+code** of a redirect-based flow, so it is worth exactly what that flow is worth on the client in
+question. Checked client by client against the code and the realm, 2026-09-08:
+
+|                    Client                    |      Public       |        Code flow        |      PKCE now      |           This step           |
+|----------------------------------------------|-------------------|-------------------------|--------------------|-------------------------------|
+| `basetool-frontend`                          | yes               | **yes** — the web login | none               | **required** — the step above |
+| `basetool-android`                           | yes               | **yes**                 | **`S256` already** | nothing to do                 |
+| `basetool-sc-extractor`                      | yes               | **enabled, and unused** | none               | **see the finding below**     |
+| `grafana`                                    | no — confidential | yes                     | none               | recommended, not required     |
+| `backend-service`, `basetool-ingest-gateway` | no                | no — service accounts   | —                  | not applicable                |
+
+**`basetool-android` is already done and must not be touched.**
+`scripts/provision-keycloak-mobile-client.py` sets `pkce.code.challenge.method = S256` when it
+creates the client and re-asserts it under `--verify-only`; the app sends `code_challenge_method=S256`
+on every authorization request. It is also the one client you **cannot** edit through
+`PUT clients/{id}` while its DPoP client policy is attached — Keycloak answers
+`Invalid client metadata: DPoP token is disabled`, from the console as much as from the script.
+Confirm rather than change:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+    -q clientId=basetool-android --fields clientId,attributes | grep pkce
+```
+
+**`grafana` is confidential**, so its client secret is the second factor a public client lacks.
+Keycloak's own help text puts it as "public clients … should always require PKCE … it is also
+recommended for confidential clients as an additional layer". Recommended is not required; if you
+set it, Grafana's OAuth client must send a verifier, so test a Grafana login immediately after.
+
+**`backend-service` and `basetool-ingest-gateway`** perform no browser redirect at all (step 5 is
+about clearing the redirect lists they never use). PKCE has nothing to protect there.
+
+> [!bug] Thirteenth item — the extractor has an authorization-code flow nobody uses
+> `basetool-sc-extractor` authenticates with the **device authorization grant** (RFC 8628) and by
+> design sends no PKCE: `DeviceGrantClient` says so in as many words — *"PKCE is not used because
+>
+>> the device-code itself is the proof-of-possession in this grant"* — and its `auth` package
+>> contains no authorization-code client at all.
+>
+> But the realm has `standardFlowEnabled: true` on that client, with
+> `redirectUris: ["http://localhost/*", "http://127.0.0.1/*"]` and no PKCE. So a public client
+> carries an open, wildcard-loopback authorization-code flow that **nothing in the product drives**
+> — the leftover of the flow the device grant replaced.
+>
+> Two ways to close it, and the choice is the owner's:
+> 1. **Turn the unused flow off** — `-s standardFlowEnabled=false`. Removes the surface rather than
+> hardening it, which is the better answer for something nothing uses. Verify a device-grant
+> login still works afterwards; it does not traverse this flow, but assert it rather than assume.
+> 2. **Require `S256`** on it, exactly as step 6 does for the frontend. Leaves the flow reachable.
+>
+> Not folded into the twelve because it is not one of them: decision D11 took a named list on
+> 2026-09-05 and this was not on it. It is written here because this is where the question arises.
 
 ---
 
