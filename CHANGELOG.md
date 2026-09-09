@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.6](https://github.com/krt-profit/basetool/releases/tag/v1.7.6) - 2026-09-09
+
 ### Added
 
 - **Doppelte Konten lassen sich jetzt auch nach der Freigabe zusammenführen.** Hatte ein Mitglied
