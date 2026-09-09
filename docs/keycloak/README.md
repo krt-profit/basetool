@@ -51,6 +51,21 @@ by August it had drifted far enough that two security documents contradicted the
 audit). A generated snapshot refreshes in seconds, so it stays true; it is also fuller than the old
 curated subset — more noise in exchange for no drift.
 
+**What the snapshot deliberately does not carry.** `DROP_SECTIONS` removes `users`, `components`,
+`keys`, `authenticationFlows`, `authenticatorConfig`, `requiredActions`, `scopeMappings`,
+`clientScopeMappings`, `groups` and `federatedUsers`. The three in the middle matter to a reader of
+the hardening runbook: **an authentication flow built by hand in the Console is not recorded here**,
+so the conditional-OTP sub-flow of WP-K2 step 11 exists in exactly one place. Keeping them would
+mean establishing first that `authenticatorConfig` carries nothing sensitive — this realm's
+`discord-guild-role-gate` has configuration of its own — which is a decision, not a flag flip.
+
+**Current snapshot: 2026-09-09**, taken mid-procedure during WP-K2. It therefore records an
+intermediate state: steps 1 and 3–10 of the hardening runbook are applied, step 11 is not, and steps
+2 and 12 are open decisions. It also contains `basetool-provisioner` — the short-lived provisioning
+client the procedure creates and deletes — which is an artifact of the export's timing and **not**
+part of the realm's intended shape. Regenerate once the procedure is finished and that client is
+gone.
+
 Current snapshot: **2026-08-17**. Still a sanitized reference, still **not** importable.
 
 The script strips or replaces the following — **never commit any of them**:
