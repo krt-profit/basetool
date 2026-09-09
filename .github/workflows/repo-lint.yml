@@ -8,6 +8,9 @@ name: Repo Lint
 #                   over every embedded `run:` script (catches workflow-syntax
 #                   and shell bugs before they burn a CI run to discover them).
 #   - hadolint   -> the three multi-stage production Dockerfiles.
+#   - probe-vs-allowlist -> the nightly edge probe and the vhost allow-list runbook
+#                   describe one surface from two sides; a refusal row for a path the
+#                   allow-list admits is a contradiction provable without production.
 #   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
 #                   SBOM end to end: plugin, committed file, regenerated at
 #                   release time, attested and attached to the Release.
@@ -138,6 +141,26 @@ jobs:
 
       - name: Check PID-1 reaping invariant
         run: python3 .github/scripts/check_pid1_reaping.py
+
+  probe-vs-allowlist:
+    name: probe-vs-allowlist
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Five times an admission was written into the runbook while the probe kept its old
+      # refusal row, and every time the nightly cron on main was the first to say so -- as a red
+      # run that reads like edge drift when it is really a stale table: bank/deposits (phase O),
+      # hangar/import/fleetview (phase X), the participant check-in (2026-09-08), and
+      # refinery-orders/all plus materials/{id} (2026-09-09). The existing probe-table conflict
+      # check catches one path given two codes in the SAME file; this catches one code in each of
+      # two files, which is the shape all five had. It needs no production access: 404 is the
+      # vhost's own refusal, so a 404 row on an admitted path is a contradiction between two
+      # files in this repository.
+      - name: Check the edge probe against the vhost allow-list
+        run: python3 .github/scripts/check_probe_against_allowlist.py
 
   sbom-coverage:
     name: sbom-coverage
