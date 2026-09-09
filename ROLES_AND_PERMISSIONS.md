@@ -619,6 +619,7 @@ to the global Officer role.
 | Write system setting (`PUT /settings/{key}`, `hasRole('ADMIN')`)                                                                                                                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Role/permission management, member attributes/rank, flag granting (`/admin/**`, `/users/*/...`, `hasRole('ADMIN')`)                                                                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | **Hard-delete a user account** (`DELETE /api/v1/users/{id}`, `hasRole('ADMIN')`) — irreversible, and only for an account already gone from Keycloak                                                                                        |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| **Consolidate a duplicate account** (`POST /api/v1/users/{id}/consolidate`, `hasRole('ADMIN')`) — the path names the account dissolved, the body the one kept                                                                              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 > **Hard-deleting a user is admin-only and irreversible** (REQ-DATA-008). It is refused for an
 > account still present in Keycloak — the guard re-verifies that against Keycloak itself rather than
@@ -627,6 +628,16 @@ to the global Officer role.
 > member's data (purged vs. reassigned vs. rendered as the deleted-user placeholder) is specified in
 > [`docs/specs/data-persistence.md`](docs/specs/data-persistence.md) under REQ-DATA-008; it records
 > `USER_DELETED` plus the per-area purge events (REQ-AUDIT-001).
+>
+> **Consolidating a duplicate is admin-only and also removes an account** (REQ-SEC-055). One member,
+> two accounts: everything the duplicate *owns* moves onto the account they keep, everything that
+> records who *did* something stays where it happened (REQ-SEC-046), the Discord identity is
+> re-linked in Keycloak, and the duplicate's row **and** its Keycloak user are removed. It refuses
+> rather than guesses: self-consolidation, the acting admin's own account, a target that is not
+> active, a target carrying a *different* Discord identity, two bank ledgers, or a stale version are
+> each a `409`. While the duplicate is still `PENDING` the approval queue's cheaper „Verknüpfen“
+> (REQ-SEC-026) does the same job in one click and without a belongings move — this action exists
+> because approving the row takes that one away.
 
 **No master data is anonymously readable** (REQ-SEC-052): the `permitAll` list in `SecurityConfig`
 names four backend paths and no catalogue is on it (§1.1). Every table is at least member-readable,

@@ -287,7 +287,15 @@ class UserRegistrationServiceTest {
       // leaves the pending identity intact for a clean retry.
       InOrder order = inOrder(keycloakService, userDeletionService);
       order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
-      order.verify(userDeletionService).deleteUser(USER_ID);
+      // #1827: the deletion runs with the presence probe WAIVED. It has to -- the throwaway
+      // Keycloak user is still there at this point, by the very ordering asserted here, so the
+      // enforced probe would refuse and roll the link back. Verifying the mode (and not just the
+      // call) is what stops the two designs silently contradicting each other again.
+      order
+          .verify(userDeletionService)
+          .deleteUser(
+              USER_ID,
+              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       order.verify(keycloakService).deleteUser(USER_ID);
       // The duplicate app_user is disposed FK-safely, its in-Keycloak guard cleared first.
       assertFalse(pending.isInKeycloak());
@@ -325,7 +333,10 @@ class UserRegistrationServiceTest {
       // linked onto the target, the throwaway user deleted, and the LINKED audit recorded.
       verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
       verify(keycloakService).deleteUser(USER_ID);
-      verify(userDeletionService).deleteUser(USER_ID);
+      verify(userDeletionService)
+          .deleteUser(
+              USER_ID,
+              UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
       assertEquals(SNOWFLAKE, result.getDiscordUserId());
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());

@@ -211,6 +211,61 @@ class UserDeletionServiceTest {
     verify(personalBlueprintRepository, never()).deleteAllByOwnerUserId(any());
   }
 
+  /**
+   * #1827: a consolidation orchestrator removes the Keycloak user itself, and does so
+   * <em>after</em> the database half so a rolled-back transaction leaves it intact for a clean
+   * retry (REQ-SEC-026, ADR-0111). Under the enforced probe those two designs contradict each other
+   * and the orchestrator always loses -- which is exactly how the queue's link action came to throw
+   * on every run from #1460 onward. The waiver is what lets the documented ordering stand.
+   */
+  @Test
+  void deleteUser_waived_proceedsEvenWhileTheKeycloakUserIsStillThere() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
+
+    userDeletionService.deleteUser(
+        userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+
+    verify(userRepository).delete(user);
+    // The probe is not merely tolerated, it is not asked: the caller has the answer already, and
+    // an Admin-API round trip per consolidation would be a call whose result cannot change
+    // anything.
+    verify(keycloakService, never()).userExists(any());
+  }
+
+  /**
+   * The waiver must stay a caller's explicit promise, never the default. The admin-facing form is
+   * the one an operator reaches, and it keeps refusing an account Keycloak still knows.
+   */
+  @Test
+  void deleteUser_defaultForm_stillEnforcesTheProbe() {
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(keycloakService.userExists(userId)).thenReturn(true);
+
+    assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
+
+    verify(userRepository, never()).delete(any());
+  }
+
+  /**
+   * Waiving the Keycloak probe does not waive the cached flag. A caller that has not yet marked the
+   * row absent is not in the middle of disposing of it, so the first guard still applies.
+   */
+  @Test
+  void deleteUser_waived_stillRefusesWhileTheStoredFlagSaysInKeycloak() {
+    user.setInKeycloak(true);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            userDeletionService.deleteUser(
+                userId,
+                UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER));
+
+    verify(userRepository, never()).delete(any());
+  }
+
   @Test
   void deleteUser_removesTheStrayRowOfAConfiguredGatewayServiceAccount() {
     // The one row for which the two Keycloak views disagree by construction: an unfiltered

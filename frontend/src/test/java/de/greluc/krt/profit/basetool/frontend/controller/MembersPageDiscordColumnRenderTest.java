@@ -107,6 +107,47 @@ class MembersPageDiscordColumnRenderTest {
   }
 
   /**
+   * REQ-SEC-055 / #1828: the consolidate action is the only remedy left once a duplicate has been
+   * approved, so it must be on <em>every</em> member row rather than gated the way the delete
+   * button is. The delete only appears for a row the sync believes Keycloak no longer holds; a
+   * duplicate an admin has just noticed is still very much in Keycloak, and gating consolidation
+   * the same way would hide it exactly when it is needed.
+   */
+  @Test
+  void memberList_offersConsolidateOnEveryRow_andRendersTheDialog() throws Exception {
+    UserDto present = user("AlicePresent", Boolean.FALSE);
+    UserDto duplicate = user("AliceDuplicate", Boolean.TRUE);
+    PageResponse<UserDto> page =
+        new PageResponse<>(List.of(present, duplicate), 0, 20, 2, 1, List.of("username,asc"));
+
+    when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
+        .thenReturn(page);
+    when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/members")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(countOccurrences(html, "data-trigger=\"members-consolidate\""))
+        .as("one consolidate action per member row")
+        .isEqualTo(2);
+    assertThat(html)
+        .as("the dialog and its server-searched account picker are rendered")
+        .contains("id=\"consolidate-modal\"")
+        .contains("id=\"consolidate-target\"")
+        .contains("data-krt-combobox=\"remote-users\"");
+    assertThat(html)
+        .as("the row carries the optimistic-lock version the action echoes back")
+        .contains("data-user-version=");
+  }
+
+  /**
    * Builds a minimal member DTO for the list render, setting only the fields the row template reads
    * plus the {@code discordLinked} indicator under test.
    *

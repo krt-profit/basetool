@@ -3138,6 +3138,79 @@ the roster sync had to be fixed in the same change:
 `V239__drop_guest_role_and_guest_edit_token.sql` · **ADR:**
 [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md)
 
+### REQ-SEC-055 — A duplicate account stays consolidatable after it has been approved
+
+A member who already has an account and signs in via Discord lands in the approval queue as a
+seemingly-new registration whenever their Discord handle differs from their in-app name — the
+collision precheck (`REQ-SEC-022`) is fail-open on purpose. The queue carries the remedy: „Verknüpfen“
+(`REQ-SEC-026`) moves the Discord identity onto the existing account and disposes of a registration
+that cannot yet own anything.
+
+**Approving the duplicate used to take that remedy away.** The queue serves `PENDING` and `REJECTED`
+only — `ACTIVE` is refused with `400` so a small admin queue cannot degrade into a member dump
+(ADR-0140) — and `linkRegistrationToExistingAccount` guards on `PENDING` in the service as well, so
+the action was gone rather than merely hidden. `decide(...)` refuses every non-`PENDING` row by
+design, and `REOPENED` (`REQ-SEC-034`) covers only `REJECTED`. What was left for an admin who noticed
+one click too late was an eight-step hand-over across the Keycloak admin console and the member
+administration, every step of it a production write. This is the same shape ADR-0140 already closed
+once for rejections.
+
+`POST /api/v1/users/{id}/consolidate` (ADMIN) is the remedy, surfaced as an action on **every** row
+of the member administration. It is the queue's link plus the belongings move, because an approved
+duplicate — unlike a pending one — has been able to accumulate data.
+
+**The path names the account that is dissolved and the body the one that survives**, the opposite way
+round from `POST /admin/registrations/{id}/merge`. Deliberate: the admin acts on the duplicate's row
+in the member list, so the URL names the row they clicked.
+
+It composes rather than reimplements. `UserAccountMergeService#merge` (`REQ-SEC-046`) decides which
+rows follow the member and which stay with the act, and refuses two bank ledgers rather than guessing;
+`KeycloakService` moves the federated identity and removes the duplicate's realm user;
+`UserDeletionService` purges the emptied row. The orchestrator is **non-transactional**, mirroring
+`REQ-SEC-026`: the Keycloak writes cannot roll back with the database, so the identity is linked
+first, the database half commits through a self-proxied method, and the duplicate's Keycloak user is
+deleted **last** — a rolled-back database half then leaves it intact for a clean re-read on retry.
+
+**The ordering inside the transaction is not free choice.** `app_user.discord_user_id` is UNIQUE
+(V172), so the duplicate's row must be gone before the survivor can claim the snowflake: belongings
+move, the duplicate is purged, and only then is the survivor stamped. Same reason the `PENDING` path
+deletes the throwaway row first and stamps the survivor second.
+
+**Guards refuse rather than guess.** Self-consolidation; the acting admin's own account (the purge
+reassigns shared aggregates to „some other admin“, and that fallback must not be reasoning about the
+row being removed); a target that is not `ACTIVE`; a target carrying a **different** Discord identity
+— the *same* one is the ordinary half-finished case, where someone linked the survivor before
+disposing of the duplicate, and is allowed; two bank ledgers (`REQ-SEC-046`); and a stale
+optimistic-lock version. Each is a `409`.
+
+**Acceptance**
+
+- [x] An ADMIN can consolidate a duplicate into an existing account from `/members`, choosing the
+  survivor through the server-searched `remote-users` picker; the action is on every row, not only on
+  rows the sync believes Keycloak no longer holds.
+- [x] What the duplicate owns lands on the survivor; what records an act stays where it happened.
+- [x] The Discord identity moves onto the survivor in Keycloak and onto its `discord_user_id`; a
+  duplicate with no Discord identity consolidates the same way, minus the identity move.
+- [x] Both the duplicate's Keycloak user and its `app_user` row are gone afterwards, the Keycloak
+  user **last**, and a retry after a database failure completes instead of throwing on a row that is
+  no longer there.
+- [x] Self / own-account / non-active target / different-identity target / stale version are each
+  refused with `409` before anything is written.
+- [x] A `LINKED` `UserApprovalEvent` is recorded against the survivor, and `merge` records its own
+  `USER_MERGED` audit event (`REQ-AUDIT-001`). No PII in either.
+- [x] The roster updates in place via `krtFetch`, with no full-page reload (`REQ-FE-001`), and the
+  three message bundles carry every new string.
+
+**Enforced by:** `AccountConsolidationServiceTest` (ordering, the retry case, and every guard) ·
+`UserDeletionServiceTest` (the waived presence check, and that the admin-facing form still enforces
+it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
+`MembersPageDiscordColumnRenderTest` (the action on every row + the dialog) · `DtoOpenApiContractTest`
+· `MessageBundleConsistencyTest` · **Code:** `AccountConsolidationService`,
+`UserController#consolidateAccount`, `ConsolidateAccountRequest` (backend + frontend),
+`UserDeletionService.KeycloakPresenceCheck`, `MemberManagementController#consolidateMemberAjax`,
+`members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
+[ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
