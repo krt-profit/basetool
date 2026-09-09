@@ -106,6 +106,12 @@
                     <td>
                         <div class="flex-gap-xs">
                             <a th:href="@{/members/{id}/edit(id=${user.id}, source='members')}" class="btn btn-ghost btn-icon" th:title="#{members.edit}" th:aria-label="#{members.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></a>
+                            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
+                                    class="btn btn-ghost btn-icon"
+                                    th:data-user-id="${user.id}"
+                                    th:data-user-version="${user.version}"
+                                    data-trigger="members-consolidate"
+                                    th:title="#{members.consolidate.hint}" th:aria-label="#{members.consolidate}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg></button>
                             <button th:if="${!user.inKeycloak}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                                     class="btn btn-quiet-danger btn-icon"
                                     th:data-user-id="${user.id}"
@@ -118,6 +124,28 @@
         </table>
         </div>
         
+        <!-- Consolidate-a-duplicate modal (no native dialogs, REQ-UI). The remedy for a member who
+             ended up with two accounts once the duplicate has already been approved: the approval
+             queue's own link action is gone by then, because that queue serves PENDING/REJECTED
+             only (ADR-0140) and the action guards on PENDING in the service too. Same
+             server-searched account picker as the queue's dialogs -- they differ in what moves, not
+             in how the account is chosen. -->
+        <div id="consolidate-modal" class="modal krtm-display-none-z-index-3100-25fb">
+            <div class="modal-content hud-box krtm-max-width-520px-acb4">
+                <h2 class="mt-0" th:text="#{members.consolidate.modal.title}">Konten zusammenführen</h2>
+                <label for="consolidate-target" th:text="#{members.consolidate.modal.targetLabel}">Konto, das bleibt</label>
+                <select id="consolidate-target" data-krt-combobox="remote-users"
+                        th:attr="data-combobox-placeholder=#{members.consolidate.modal.targetPlaceholder}">
+                    <option value="" th:text="#{members.consolidate.modal.targetPlaceholder}">-- Konto wählen --</option>
+                </select>
+                <p class="reg-when mt-2" th:text="#{members.consolidate.modal.hint}"></p>
+                <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
+                    <button type="button" class="btn btn-ghost" id="consolidate-cancel" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="button" class="btn btn--cta" id="consolidate-confirm" th:text="#{members.consolidate}">Zusammenführen</button>
+                </div>
+            </div>
+        </div>
+
         <div th:replace="~{fragments/pagination :: pagination(pageResponse=${usersPage}, baseUrl='/members')}"></div>
         
         <p th:if="${users == null && error == null}" th:text="#{members.empty}">Keine Mitglieder gefunden.</p>
@@ -198,6 +226,9 @@
     const MSG_DELETE_ERROR = "[[#{error.user.delete}]]";
     const MSG_SYNC_SUCCESS = "[[#{members.sync.success}]]";
     const MSG_SYNC_ERROR = "[[#{members.sync.error}]]";
+    const MSG_CONSOLIDATE_SUCCESS = "[[#{success.user.consolidate}]]";
+    const MSG_CONSOLIDATE_ERROR = "[[#{error.user.consolidate}]]";
+    const MSG_CONSOLIDATE_NO_TARGET = "[[#{error.user.consolidate.no_target}]]";
 
     // Re-render the current (filtered/paginated) member list so a deleted row drops out and the
     // pagination + SK column stay coherent. The URL already carries the active filter (kept in
@@ -248,6 +279,76 @@
         });
     }
 
+    // --- Consolidate a duplicate account (REQ-SEC-055, #1828) ----------------------------------
+    // The admin acts on the DUPLICATE's row and picks the account that survives, which is why the
+    // row id goes into the URL and the picked one into the body. Everything the duplicate owns
+    // moves, its Discord identity is re-linked, and its row disappears -- so the whole roster
+    // fragment is re-swapped rather than one row patched.
+    const consolidateModal = document.getElementById('consolidate-modal');
+    let consolidateSource = null;
+
+    function consolidatePicker() {
+        return document.getElementById('consolidate-target');
+    }
+
+    function openConsolidate(el) {
+        if (!consolidateModal) return;
+        consolidateSource = {
+            id: el.getAttribute('data-user-id'),
+            version: el.getAttribute('data-user-version')
+        };
+        const picker = consolidatePicker();
+        if (picker) {
+            picker.value = '';
+            if (picker.krtComboboxReset) picker.krtComboboxReset();
+        }
+        consolidateModal.style.display = 'flex';
+    }
+
+    function closeConsolidate() {
+        if (!consolidateModal) return;
+        consolidateModal.style.display = 'none';
+        consolidateSource = null;
+    }
+
+    const consolidateCancelBtn = document.getElementById('consolidate-cancel');
+    if (consolidateCancelBtn) {
+        consolidateCancelBtn.addEventListener('click', closeConsolidate);
+    }
+
+    const consolidateConfirmBtn = document.getElementById('consolidate-confirm');
+    if (consolidateConfirmBtn) {
+        consolidateConfirmBtn.addEventListener('click', function () {
+            if (!consolidateSource) return;
+            const picker = consolidatePicker();
+            const targetUserId = picker && picker.value ? picker.value : '';
+            if (!targetUserId) {
+                if (window.showFrontendErrorToast) {
+                    window.showFrontendErrorToast(MSG_CONSOLIDATE_NO_TARGET);
+                }
+                return;
+            }
+            const source = consolidateSource;
+            window.krtFetch.write({
+                method: 'POST',
+                url: '/members/' + encodeURIComponent(source.id) + '/consolidate',
+                payload: {
+                    targetUserId: targetUserId,
+                    version: source.version == null || source.version === '' ? null : Number(source.version)
+                },
+                toast: false,
+                errorMessage: MSG_CONSOLIDATE_ERROR,
+                onSuccess: function () {
+                    if (window.showFrontendSuccessToast) {
+                        window.showFrontendSuccessToast(MSG_CONSOLIDATE_SUCCESS);
+                    }
+                    closeConsolidate();
+                    refreshMembersResults();
+                }
+            });
+        });
+    }
+
     // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
     // The matching data-trigger attribute is set on the delete button above; using the
     // global event-delegation helper keeps the wiring working when Thymeleaf re-renders
@@ -258,6 +359,9 @@
         });
         window.krtEvents.on('click', 'members-sync', function () {
             syncMembersNow();
+        });
+        window.krtEvents.on('click', 'members-consolidate', function (el) {
+            openConsolidate(el);
         });
     }
 </script>

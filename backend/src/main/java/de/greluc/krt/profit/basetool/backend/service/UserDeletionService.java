@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,12 +60,13 @@ import org.springframework.web.client.RestClientException;
  * surface of {@code UserService}.
  *
  * <p>The single write, {@link #deleteUser(UUID)}, only ever runs for an ex-member already removed
- * from Keycloak; it purges the account-owned data, reassigns the shared aggregates that must
- * outlive the member to a fallback admin, unlinks the nullable back-references, clears the
- * Discord-approval audit trail, and snapshots the bank responsible-holder change around the delete.
- * The identity seam it needs (who is the calling admin) is borrowed from {@link
- * UserService#getCurrentUser()} rather than reimplemented, keeping the JWT-subject resolution in
- * its single canonical place.
+ * from Keycloak -- or, through {@link #deleteUser(UUID, KeycloakPresenceCheck)}, for one whose
+ * Keycloak user the calling orchestrator removes itself (#1827); it purges the account-owned data,
+ * reassigns the shared aggregates that must outlive the member to a fallback admin, unlinks the
+ * nullable back-references, clears the Discord-approval audit trail, and snapshots the bank
+ * responsible-holder change around the delete. The identity seam it needs (who is the calling
+ * admin) is borrowed from {@link UserService#getCurrentUser()} rather than reimplemented, keeping
+ * the JWT-subject resolution in its single canonical place.
  */
 @Service
 @RequiredArgsConstructor
@@ -73,6 +75,35 @@ public class UserDeletionService {
 
   /** Keycloak's generated username for a client's service account: {@code service-account-<id>}. */
   private static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
+
+  /**
+   * Whether {@link #deleteUser(UUID, KeycloakPresenceCheck)} must verify against Keycloak that the
+   * account is really gone before purging it.
+   *
+   * <p>Two callers, two truths. An administrator deleting a departed member has only the cached
+   * {@code in_keycloak} flag to go on, and a swallowed sync error can leave that stale — so the
+   * probe is the thing standing between a stale flag and an irreversible purge. A consolidation
+   * orchestrator, by contrast, removes the Keycloak user itself and does so <em>after</em> the
+   * database half for retry safety, so for it the probe reports a presence the caller is in the
+   * middle of ending.
+   *
+   * <p>Spelled as an enum rather than a boolean so neither can be passed by accident: the waiving
+   * constant states in its own name what the caller is promising to do.
+   */
+  public enum KeycloakPresenceCheck {
+
+    /**
+     * Verify against Keycloak that the account is gone. The default, and every admin-facing path.
+     */
+    ENFORCED,
+
+    /**
+     * Skip the probe: the caller removes the Keycloak user as part of this same operation. Only
+     * legitimate for an orchestrator that has already moved the account's identity away and will
+     * delete its Keycloak user once this transaction commits.
+     */
+    WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER
+  }
 
   private final IngestGatewayProperties ingestGatewayProperties;
   private final UserRepository userRepository;
@@ -174,6 +205,38 @@ public class UserDeletionService {
    */
   @Transactional
   public void deleteUser(UUID userId) {
+    deleteUser(userId, KeycloakPresenceCheck.ENFORCED);
+  }
+
+  /**
+   * Deletes {@code userId} as {@link #deleteUser(UUID)} does, but lets a caller that removes the
+   * Keycloak user itself waive the presence probe.
+   *
+   * <p>The probe exists for the <em>admin-initiated</em> deletion of an account believed to be
+   * gone, where the only evidence is a cached flag a swallowed sync error can leave stale. A
+   * consolidation orchestrator is a different caller: it has just read that Keycloak user, moved
+   * its identity away, and will delete it moments later — and it deletes the Keycloak user
+   * <em>last</em> on purpose, so a rolled-back database half leaves it intact for a clean retry
+   * (REQ-SEC-026, ADR-0111). Under {@link KeycloakPresenceCheck#ENFORCED} those two designs are in
+   * direct contradiction and the second always loses: the probe finds the throwaway user present
+   * and refuses, which is how the queue's link action came to fail every time from #1460 onward
+   * (#1827).
+   *
+   * <p>Teaching the guard about that caller is deliberately preferred over reordering the
+   * orchestrator. Reordering would work — {@code readDiscordLink} maps a 404 to empty and the local
+   * {@code discord_user_id} fallback exists precisely for the already-deleted case — but it would
+   * contradict an acceptance bullet of REQ-SEC-026 and trade away documented retry semantics to
+   * route around a guard rather than to inform it.
+   *
+   * @param userId user to delete
+   * @param presenceCheck whether the Keycloak presence probe applies; {@link
+   *     KeycloakPresenceCheck#ENFORCED} for every admin-facing deletion
+   * @throws NoSuchElementException when the user id is unknown
+   * @throws IllegalStateException as {@link #deleteUser(UUID)}, except that the Keycloak probe is
+   *     skipped under {@link KeycloakPresenceCheck#WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER}
+   */
+  @Transactional
+  public void deleteUser(UUID userId, @NotNull KeycloakPresenceCheck presenceCheck) {
     User user =
         userRepository
             .findById(userId)
@@ -189,7 +252,13 @@ public class UserDeletionService {
     // against Keycloak itself. Fail-closed by construction: userExists only reports absence on a
     // clean 404 and otherwise propagates, so an unreachable Keycloak aborts the deletion instead of
     // letting it proceed on a stale flag.
-    if (keycloakService.userExists(userId) && !isConfiguredGatewayServiceAccount(userId)) {
+    //
+    // Waived only for a caller that removes the Keycloak user as part of the same operation, where
+    // the probe would be asking about a user the caller is itself disposing of (see the overload's
+    // Javadoc and #1827).
+    if (presenceCheck == KeycloakPresenceCheck.ENFORCED
+        && keycloakService.userExists(userId)
+        && !isConfiguredGatewayServiceAccount(userId)) {
       throw new IllegalStateException(
           "Cannot delete user that is still in Keycloak (stored flag was stale)");
     }

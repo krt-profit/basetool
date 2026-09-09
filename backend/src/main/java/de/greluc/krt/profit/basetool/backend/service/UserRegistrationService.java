@@ -497,13 +497,15 @@ public class UserRegistrationService {
   /**
    * The transactional database half of {@link #linkRegistrationToExistingAccount}, invoked through
    * the self-proxy so its {@link Transactional} boundary actually applies (a plain self-invocation
-   * would bypass the proxy). Deletes the throwaway {@code app_user} <em>first</em> — freeing the
-   * unique {@code discord_user_id} before the target claims it — via the FK-safe {@link
-   * UserDeletionService#deleteUser}, after clearing its {@code inKeycloak} flag (its Keycloak user
-   * was already removed in the orchestrator, and the deletion service refuses a still-in-Keycloak
-   * account). It then stamps the surviving target account's {@code discord_user_id} (+ guild
-   * nickname) and writes the {@link ApprovalDecision#LINKED} audit row. On a retry where the
-   * throwaway row is already gone, the delete step is simply skipped.
+   * would bypass the proxy). Deletes the throwaway {@code app_user} <em>first</em> -- freeing the
+   * unique {@code discord_user_id} before the target claims it -- via the FK-safe {@link
+   * UserDeletionService#deleteUser(UUID, UserDeletionService.KeycloakPresenceCheck)}, after
+   * clearing its {@code inKeycloak} flag. Its Keycloak user is <em>not</em> gone yet -- the
+   * orchestrator removes it after this commits, for retry safety -- so the deletion service's live
+   * presence probe is waived here explicitly. Leaving it enforced made this method throw on every
+   * run from #1460 until #1827. It then stamps the surviving target account's {@code
+   * discord_user_id} (+ guild nickname) and writes the {@link ApprovalDecision#LINKED} audit row.
+   * On a retry where the throwaway row is already gone, the delete step is simply skipped.
    *
    * @param pendingId the throwaway pending registration to delete (may already be gone on a retry)
    * @param targetUserId the surviving account to stamp with the Discord link
@@ -530,7 +532,14 @@ public class UserRegistrationService {
               // claims the snowflake below.
               pending.setInKeycloak(false);
               userRepository.saveAndFlush(pending);
-              userDeletionService.deleteUser(pendingId);
+              // The throwaway Keycloak user is still there: the orchestrator removes it AFTER this
+              // transaction commits, which is what makes a retry safe. So the deletion service's
+              // live presence probe would refuse -- it is asking about a user this very operation
+              // is disposing of. Waived explicitly rather than reordered (#1827).
+              userDeletionService.deleteUser(
+                  pendingId,
+                  UserDeletionService.KeycloakPresenceCheck
+                      .WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
             });
 
     User target =

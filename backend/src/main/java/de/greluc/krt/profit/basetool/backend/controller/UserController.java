@@ -23,18 +23,21 @@ import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
+import de.greluc.krt.profit.basetool.backend.model.dto.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserSyncResultDto;
+import de.greluc.krt.profit.basetool.backend.service.AccountConsolidationService;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.service.UserDeletionService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
+import de.greluc.krt.profit.basetool.backend.web.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import java.time.LocalDate;
 import java.util.List;
@@ -89,6 +92,10 @@ public class UserController {
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final UserSyncService userSyncService;
+
+  /** The consolidate action's orchestrator (REQ-SEC-055): duplicate in, survivor out. */
+  private final AccountConsolidationService accountConsolidationService;
+
   private final TaskMetrics taskMetrics;
 
   /**
@@ -644,6 +651,40 @@ public class UserController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public void deleteUser(@PathVariable @NotNull UUID id) {
     userDeletionService.deleteUser(id);
+  }
+
+  /**
+   * ADMIN-only: folds the duplicate account named in the path into the account the member keeps
+   * (REQ-SEC-055, #1828).
+   *
+   * <p>The remedy for a member who ended up with two accounts once the duplicate has already been
+   * <em>approved</em>. While it sits in the approval queue the cheaper action applies -- {@code
+   * POST /admin/registrations/{id}/link} moves the Discord identity and discards a registration
+   * that cannot yet own anything (REQ-SEC-026). Approving it removes the row from that queue, and
+   * the link action guards on {@code PENDING} in the service too, so nothing on that surface
+   * reaches it any more. This endpoint does both halves: what the duplicate owns moves onto the
+   * survivor (REQ-SEC-046 decides which rows follow the member and which stay with the act), its
+   * Discord identity is re-linked in Keycloak, and both the duplicate's row and its Keycloak user
+   * are removed.
+   *
+   * <p><strong>The path names the account that is dissolved</strong>, the body the one that
+   * survives -- the opposite way round from the queue's merge endpoint, because here the admin acts
+   * on the duplicate's row in the member list and the URL should name the row they clicked.
+   *
+   * @param id the duplicate account to dissolve
+   * @param adminUserId the acting admin, recorded as the audit actor
+   * @param body the surviving account's id and the duplicate's optimistic-lock version
+   * @return the surviving account, carrying the moved Discord link
+   */
+  @PostMapping("/{id}/consolidate")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public UserDto consolidateAccount(
+      @PathVariable @NotNull UUID id,
+      @CurrentUserId UUID adminUserId,
+      @RequestBody @jakarta.validation.Valid ConsolidateAccountRequest body) {
+    return userMapper.toDto(
+        accountConsolidationService.consolidate(
+            id, body.targetUserId(), body.version(), adminUserId));
   }
 
   /** Body for {@link #updateUserAttributes}. */

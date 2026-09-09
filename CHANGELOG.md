@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Doppelte Konten lassen sich jetzt auch nach der Freigabe zusammenführen.** Hatte ein Mitglied
+  zwei Konten und war das zweite schon freigegeben, war die Aktion „Verknüpfen“ aus der
+  Freigabe-Warteschlange verschwunden und nur noch Handarbeit in Keycloak half. In der
+  Mitgliederverwaltung gibt es dazu jetzt **Zusammenführen**: Bestände, Einheiten und die
+  Discord-Anmeldung wandern auf das Konto, das bleibt, das doppelte wird entfernt. Wer was getan hat,
+  bleibt stehen.
+
+### Fixed
+
+- **„Verknüpfen“ in der Freigabe-Warteschlange funktionierte seit Ende Juli überhaupt nicht.** Eine
+  Absicherung des Löschens (kein Konto löschen, das es in Keycloak noch gibt) und der Ablauf des
+  Verknüpfens (das Wegwerf-Konto in Keycloak bewusst zuletzt entfernen) widersprachen sich, sodass
+  jeder Versuch abbrach. Beides bleibt erhalten; das Verknüpfen sagt der Absicherung jetzt
+  ausdrücklich, dass es das Keycloak-Konto selbst entfernt.
+
 ## [v1.7.5](https://github.com/krt-profit/basetool/releases/tag/v1.7.5) - 2026-09-08
 
 ### Changed

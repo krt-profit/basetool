@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
+import de.greluc.krt.profit.basetool.frontend.model.dto.ConsolidateAccountRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitKind;
@@ -45,6 +46,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -60,6 +62,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -630,6 +633,42 @@ public class MemberManagementController {
       return relayBackendError("AJAX member sync failed", e);
     } catch (Exception e) {
       log.error("AJAX member sync failed", e);
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body(Map.of("code", "INTERNAL_ERROR"));
+    }
+  }
+
+  /**
+   * AJAX handler for the "Konten zusammenführen" action (ADMIN, REQ-SEC-055, #1828): folds the
+   * duplicate account named in the path into the account chosen in the dialog and answers with JSON
+   * so the roster re-swaps in place (REQ-FE-001) -- the duplicate's row disappears and the
+   * survivor's Discord column fills in, both without a reload.
+   *
+   * <p>A backend refusal is relayed with its status and {@code {code, detail}} rather than
+   * swallowed, because every one of them is something the admin has to read and decide on: a stale
+   * version, a target that is not active, a target carrying a different Discord identity, or two
+   * bank ledgers that cannot be merged without an accounting decision.
+   *
+   * @param id the duplicate account to dissolve
+   * @param body the surviving account's id and the duplicate's optimistic-lock version
+   * @return {@code 200} with the surviving account, or the relayed backend error status
+   */
+  @PostMapping("/{id}/consolidate")
+  @ResponseBody
+  @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+  public ResponseEntity<Object> consolidateMemberAjax(
+      @PathVariable @NotNull UUID id,
+      @Nullable @RequestBody(required = false) ConsolidateAccountRequest body) {
+    try {
+      UserDto survivor =
+          backendApiClient.post("/api/v1/users/" + id + "/consolidate", body, UserDto.class);
+      // One row leaves and another changes, so the whole roster fragment is republished (#1235).
+      liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
+      return ResponseEntity.ok(survivor);
+    } catch (BackendServiceException e) {
+      return relayBackendError("AJAX member consolidate failed", e);
+    } catch (Exception e) {
+      log.error("AJAX member consolidate failed", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(Map.of("code", "INTERNAL_ERROR"));
     }
