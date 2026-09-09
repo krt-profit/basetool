@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.7](https://github.com/krt-profit/basetool/releases/tag/v1.7.7) - 2026-09-09
+
 ### Fixed
 
 - **Eine Discord-Kennung kann nicht mehr an zwei Konten gleichzeitig hängen.** Beim Zusammenführen
