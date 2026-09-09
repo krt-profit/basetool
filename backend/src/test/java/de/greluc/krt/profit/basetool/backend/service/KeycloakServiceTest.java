@@ -598,6 +598,67 @@ class KeycloakServiceTest {
   }
 
   /**
+   * REQ-SEC-026: {@code unlinkDiscordIdentity} detaches the {@code discord} federated identity via
+   * {@code DELETE /users/{id}/federated-identity/discord}. It exists so the snowflake is never on
+   * two Keycloak users at once — Keycloak permits that and then throws {@code
+   * IllegalStateException} on every login resolving it.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void unlinkDiscordIdentity_deletesTheFederatedIdentity() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000d5");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(new MockResponse().setResponseCode(204));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+      service.unlinkDiscordIdentity(pending);
+
+      server.takeRequest(); // token
+      RecordedRequest delete = server.takeRequest();
+      assertEquals("DELETE", delete.getMethod());
+      assertTrue(
+          delete.getPath().endsWith("/users/" + pending + "/federated-identity/discord"),
+          "must DELETE the user's discord federated-identity endpoint");
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
+   * A {@code 404} on the detach is success, not a failure: the user is gone, or carries no Discord
+   * link. Either way there is nothing to detach, which is the state the caller wants — and a link
+   * flow that threw here would be unretryable after its own partial failure.
+   *
+   * @throws Exception if the mock server cannot be started or stopped.
+   */
+  @Test
+  void unlinkDiscordIdentity_notFound_isSuccess() throws Exception {
+    when(sslBundles.getBundle("keycloak-trust"))
+        .thenThrow(new NoSuchSslBundleException("keycloak-trust", "no such bundle"));
+    MockWebServer server = new MockWebServer();
+    server.start();
+    try {
+      KeycloakSyncProperties properties = writeProperties(server);
+      UUID pending = UUID.fromString("00000000-0000-0000-0000-0000000000d6");
+      server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
+      server.enqueue(new MockResponse().setResponseCode(404));
+
+      KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
+
+      assertDoesNotThrow(() -> service.unlinkDiscordIdentity(pending));
+    } finally {
+      server.shutdown();
+    }
+  }
+
+  /**
    * REQ-SEC-026: {@code linkDiscordIdentity} attaches the {@code discord} federated identity to the
    * target user via {@code POST /users/{id}/federated-identity/discord}, carrying the snowflake in
    * the body. On a 204 it must not throw, and the request must target the right endpoint.

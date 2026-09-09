@@ -439,6 +439,21 @@ public class UserRegistrationService {
     // throwaway user LAST — after the DB is consistent — is what makes a retry safe: if the DB
     // merge fails and rolls back, the pending Keycloak user still exists, so the next attempt reads
     // its identity cleanly. The delete is itself idempotent (a 404 for an already-gone user = ok).
+    // Take the identity OFF the throwaway before putting it on the target. Keycloak permits one
+    // Discord snowflake on two users -- FEDERATED_IDENTITY is keyed on (user, provider), its index
+    // on FEDERATED_USER_ID is not unique, and the Admin API checks only the target -- and the state
+    // it permits is not benign: getUserByFederatedIdentity throws IllegalStateException with two
+    // holders, so every later Discord login of that member fails outright. Linking first and
+    // deleting the throwaway last created exactly that state for the duration of the two calls
+    // below, and permanently whenever the DB half rolled back.
+    //
+    // The retry safety the old order was written for is unaffected, because it never rested on the
+    // LINK surviving -- it rests on the throwaway USER surviving, which it still does, and on the
+    // local discord_user_id fallback in resolveDiscordLink, which the rolled-back DB half leaves
+    // intact. A failure between the two calls leaves the identity on nobody: the member's next
+    // Discord login lands as a fresh pending registration, which is visible and resolvable, rather
+    // than as a 500 nobody can read.
+    keycloakService.unlinkDiscordIdentity(pendingId);
     keycloakService.linkDiscordIdentity(targetUserId, link.userId(), link.userName());
     User result =
         selfProvider

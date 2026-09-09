@@ -281,11 +281,16 @@ class UserRegistrationServiceTest {
           userRegistrationService.linkRegistrationToExistingAccount(
               USER_ID, TARGET_ID, 0L, ADMIN_ID);
 
-      // Keycloak side-effects: the identity is read from Keycloak, moved onto the target, and the
-      // throwaway user deleted. The throwaway Keycloak user MUST be deleted LAST — after the DB
-      // merge (which itself FK-safely disposes the duplicate app_user) — so a rolled-back DB half
-      // leaves the pending identity intact for a clean retry.
+      // Keycloak side-effects: the identity is read from Keycloak, taken off the throwaway, moved
+      // onto the target, and the throwaway user deleted. The throwaway Keycloak user MUST be
+      // deleted LAST — after the DB merge (which itself FK-safely disposes the duplicate app_user)
+      // — so a rolled-back DB half leaves the pending identity intact for a clean retry.
       InOrder order = inOrder(keycloakService, userDeletionService);
+      // The unlink comes FIRST, and that ordering is the whole point: Keycloak lets one Discord
+      // snowflake sit on two users and then throws IllegalStateException on every login that
+      // resolves it, so the identity must never be on both at once. Asserted as an order, not as a
+      // call — an unlink after the link would restore exactly the state it exists to prevent.
+      order.verify(keycloakService).unlinkDiscordIdentity(USER_ID);
       order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "conrad7247");
       // #1827: the deletion runs with the presence probe WAIVED. It has to -- the throwaway
       // Keycloak user is still there at this point, by the very ordering asserted here, so the
