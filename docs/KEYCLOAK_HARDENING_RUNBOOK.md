@@ -89,13 +89,35 @@ as 26.7 writes them:
    random secret is generated for you). Copy the **Client Secret** — that is the value
    `kcadm config credentials` prompts for in § 0.4.
 4. ***Service account roles*** tab → **Assign role** → **Filter by clients** → `realm-management`
-   → tick **`manage-clients`** and **`manage-realm`** → **Assign**.
+   → tick the **four** roles below → **Assign**.
 
-**Both roles, and no more.** Each was verified individually necessary against 26.7 and in both
-directions: with `manage-clients` alone the client-policy endpoints answer **403**, with
-`manage-realm` alone the client endpoints answer **403**. Editing its own role mappings would need
-`manage-users`, which it deliberately does not get — so the identity cannot widen its own reach.
+**Which roles, and which step demands each.** The Admin API checks a different permission per
+resource, so "an admin role" is not a thing you can assign here — each row was read off the endpoint
+the step calls, at 26.7.0:
 
+|              Role               |                   Needed by                   |                                                                                 The check                                                                                  |
+|---------------------------------|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `manage-realm`                  | steps 1, 2, 3, 4 (the attribute), 10, 11a, 12 | `RealmAdminResource#updateRealm` → `requireManageRealm`; `AuthenticationManagementResource` → `requireManageRealm`; `RoleContainerResource` → `auth.roles().requireManage` |
+| `manage-clients`                | steps 5, 6, 7, 8, 9                           | `ClientResource` → `auth.clients().requireManage`; `RealmAdminResource#removeDefaultDefaultClientScope` → `auth.clients().requireManageClientScopes`                       |
+| **`manage-events`**             | **step 4**                                    | `RealmAdminResource#updateRealmEventsConfig` → `requireManageEvents` — **not** `manage-realm`, which is why step 4 answers `403` without it                                |
+| **`manage-identity-providers`** | **step 11b**                                  | `IdentityProviderResource#update` → `requireManageIdentityProviders` — binding the post-login flow onto `discord` is an identity-provider write, not a realm write         |
+
+Add **`view-events`** as well if you want § 0.5's `get events/config` capture to succeed: the read is
+gated on `requireViewEvents` separately from the write.
+
+**And no more than those.** Editing its own role mappings would need `manage-users`, which it
+deliberately does not get — so the identity cannot widen its own reach. `realm-admin` would cover
+everything in one tick and is exactly what this list exists to avoid: it also carries `manage-users`,
+which turns a procedure credential into one that can mint and elevate accounts.
+
+> [!bug] This list was two roles until 2026-09-09, and step 4 was the first to fail
+> The earlier version carried `manage-clients` + `manage-realm`, inherited from
+> `docs/keycloak/README.md`, where they were verified for a **different** procedure — the mobile
+> client, which touches clients and client policies and nothing else. This runbook goes further:
+> events config and the identity provider are separate permissions in Keycloak's Admin API, and
+> neither is implied by `manage-realm`. Reported from the production console on step 4
+> (`HTTP 403 Forbidden` on `update events/config`).
+>
 > [!warning] Do **not** turn *Full scope allowed* off on this client
 > Keycloak's own service-account procedure ends by pointing at the dedicated client scope's *Scope*
 > tab and recommending that switch be **off** in production. That advice is for long-lived clients
@@ -106,15 +128,11 @@ directions: with `manage-clients` alone the client-policy endpoints answer **403
 > half-way through the procedure** — on a step that looked fine a minute earlier. This client is
 > deleted at the end; that is what bounds it, not the scope switch.
 >
-> [!warning] Verify the provisioner can reach the authentication endpoints **before** step 11
-> `manage-realm` is what the flow endpoints check. Confirm it with a read rather than discovering it
-> half-way through building a flow:
->
-> ```bash
-> docker exec keycloak /opt/keycloak/bin/kcadm.sh get authentication/flows -r iri --fields alias
-> ```
->
-> A `403` here means the role assignment did not take; fix that before touching step 11.
+> [!warning] The role assignment is verified in § 0.4, not here
+> `manage-realm` is what the authentication-flow endpoints check, and a missing assignment is worth
+> catching before step 11 rather than half-way through building a flow. But every check is a kcadm
+> read, and kcadm has no session until § 0.4 opens one — so the verification lives there, at the end
+> of that section. Finish creating the client here; verify it there.
 
 The same identity, its two roles and the reasoning are also in
 [`docs/keycloak/README.md`](keycloak/README.md), where it was written for the mobile-client
@@ -136,6 +154,16 @@ docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
     --server https://localhost:18443 --realm iri --client basetool-provisioner
 ```
 
+> [!important] `No server specified. Use --server, or 'kcadm.sh config credentials'.`
+> That message does **not** mean a flag is missing. It is what kcadm says for **every** command
+> when no session exists — including reads that carry no `--server` because they are not supposed
+> to. Seeing it means the two commands above have not run (or the container was **recreated**: the
+> session file lives inside it and survives a restart but not a recreate). Run them, then repeat
+> whatever you were doing.
+>
+> It is the first thing a reader of this runbook hits if they try any `kcadm` line before this
+> section, and it sends them looking for a URL problem they do not have.
+
 Then a **read-only smoke test**, so a URL, truststore or permission problem surfaces on a command
 that changes nothing:
 
@@ -143,6 +171,29 @@ that changes nothing:
 docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/iri \
     --fields realm,sslRequired,editUsernameAllowed,resetPasswordAllowed
 ```
+
+**Then verify every role actually took** — this is the check § 0.3 defers to, and it is one read per
+role. The realm read above proves only `view-realm`; each of the four is gated separately, so a
+missing one shows up on its own step and nowhere earlier:
+
+```bash
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get authentication/flows -r iri --fields alias
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri --fields clientId
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get events/config -r iri
+docker exec keycloak /opt/keycloak/bin/kcadm.sh get identity-provider/instances -r iri --fields alias
+```
+
+All four must return data. A **403** names the missing role — in order: `manage-realm`,
+`manage-clients`, `view-events` (and with it `manage-events`, which step 4 writes with), and
+`view-identity-providers`/`manage-identity-providers`. Fix the assignment in § 0.3 **now**: the
+alternative is discovering it as a failed write half-way through a step, which is where it was found
+the first time.
+
+> [!note] A read passing does not prove the matching write passes
+> `view-events` and `manage-events` are different roles, as are the identity-provider pair. These
+> four reads catch a role that was never assigned, which is the common failure; they cannot catch
+> assigning only the `view-` half. Assign the four `manage-` roles from the table in § 0.3 and treat
+> the reads as a smoke test, not as proof.
 
 The service-account token carries the realm's 300 s access-token lifespan and the
 client-credentials grant issues no refresh token, so a step run after a long pause may need
@@ -410,26 +461,55 @@ It is the right question and the answer is not "yes, everywhere". PKCE protects 
 code** of a redirect-based flow, so it is worth exactly what that flow is worth on the client in
 question. Checked client by client against the code and the realm, 2026-09-08:
 
-|                    Client                    |      Public       |        Code flow        |      PKCE now      |           This step           |
-|----------------------------------------------|-------------------|-------------------------|--------------------|-------------------------------|
-| `basetool-frontend`                          | yes               | **yes** — the web login | none               | **required** — the step above |
-| `basetool-android`                           | yes               | **yes**                 | **`S256` already** | nothing to do                 |
-| `basetool-sc-extractor`                      | yes               | **enabled, and unused** | none               | **see the finding below**     |
-| `grafana`                                    | no — confidential | yes                     | none               | recommended, not required     |
-| `backend-service`, `basetool-ingest-gateway` | no                | no — service accounts   | —                  | not applicable                |
+|                    Client                    |      Public       |        Code flow        |                    PKCE now                    |           This step           |
+|----------------------------------------------|-------------------|-------------------------|------------------------------------------------|-------------------------------|
+| `basetool-frontend`                          | yes               | **yes** — the web login | none                                           | **required** — the step above |
+| `basetool-android`                           | yes               | **yes**                 | **`S256`** — verified on production 2026-09-09 | nothing to do                 |
+| `basetool-sc-extractor`                      | yes               | **enabled, and unused** | none                                           | **see the finding below**     |
+| `grafana`                                    | no — confidential | yes                     | none                                           | recommended, not required     |
+| `backend-service`, `basetool-ingest-gateway` | no                | no — service accounts   | —                                              | not applicable                |
 
-**`basetool-android` is already done and must not be touched.**
-`scripts/provision-keycloak-mobile-client.py` sets `pkce.code.challenge.method = S256` when it
-creates the client and re-asserts it under `--verify-only`; the app sends `code_challenge_method=S256`
-on every authorization request. It is also the one client you **cannot** edit through
-`PUT clients/{id}` while its DPoP client policy is attached — Keycloak answers
-`Invalid client metadata: DPoP token is disabled`, from the console as much as from the script.
-Confirm rather than change:
+**`basetool-android` is sound, and the check is the script, not a hand-written read.**
+`scripts/provision-keycloak-mobile-client.py` sets `pkce.code.challenge.method = S256` at creation
+and re-asserts it under `--verify-only`, and the app sends `code_challenge_method=S256` on every
+authorization request. Confirmed against **production** on 2026-09-09: the attribute is there, along
+with the other seven the script writes.
+
+Check it with the script rather than with a `get clients` line. It reads the full representation and
+asserts nine things — the two DPoP-critical attributes, the marker role without which the policy
+matches nothing, the realm-role scope, withheld `offline_access`, redirect wildcards — where a
+hand-written read asserts one and can get that one wrong:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
-    -q clientId=basetool-android --fields clientId,attributes | grep pkce
+python3 scripts/provision-keycloak-mobile-client.py --realm iri --verify-only --profile prod
 ```
+
+`python3 …` and not `./…`: the file is not executable in the production checkout. It writes nothing,
+and it shells out to `kcadm` inside the container, so it must run **on the production host** and it
+uses the session § 0.4 opened. A clean answer is one line: *"the client and its refresh-only DPoP
+policy are in the intended state"*.
+
+> [!bug] `--fields attributes` reports `{ }` for a client that has eleven of them
+> `--fields` is a **projection**, and a nested object needs the parenthesis-star form. `--fields
+> clientId,publicClient,attributes` answers `"attributes" : { }` — which reads like "this client has
+>
+>> no attributes" and is nothing of the sort. `--fields 'clientId,publicClient,attributes(*)'` returns
+>> them.
+>
+> This runbook asserted a production defect on the strength of that empty object (2026-09-09) and
+> was about to send an operator into a write that detaches and re-attaches the DPoP policy, for a
+> problem that did not exist. `--verify-only` is what caught it.
+>
+> **The general rule, and it bit twice in one session: a kcadm answer narrowed by `--fields` is a
+> statement about the projection, and a `-q` that the endpoint does not implement is no statement at
+> all.** Neither failure announces itself. When an answer is going to decide something, read the
+> object whole.
+
+**If it ever does come back short**, the obvious fix does not work: `PUT clients/{id}` — which is
+what setting a client attribute is, from kcadm and from the Console alike — is refused while this
+client's DPoP policy is attached, with `Invalid client metadata: DPoP token is disabled`. The
+supported route is the same script without `--verify-only` (`--dry-run` first), which detaches the
+policy, writes the client and re-attaches it.
 
 **`grafana` is confidential**, so its client secret is the second factor a public client lacks.
 Keycloak's own help text puts it as "public clients … should always require PKCE … it is also
@@ -537,9 +617,23 @@ check decorative.
 
 ```bash
 sid=$(docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-scopes -r iri \
-      -q name=extractor-ingest --fields id --format csv --noquotes)
+      --fields id,name --format csv --noquotes | awk -F, '$2=="extractor-ingest"{print $1}')
+echo "[$sid]"   # exactly one uuid, or stop here
 docker exec keycloak /opt/keycloak/bin/kcadm.sh delete default-default-client-scopes/$sid -r iri
 ```
+
+> [!warning] `-q` does not filter this endpoint, and says nothing when it does not
+> `-q` adds a **query parameter to the request**, so it filters only where the Admin API
+> implements that parameter. `GET /clients` implements `clientId`, which is why `-q clientId=…`
+> works elsewhere in this runbook. `GET /client-scopes` implements **no** `name` parameter, so
+> `-q name=extractor-ingest` is accepted, ignored, and returns **every** scope in the realm — 17
+> of them. The variable then holds a list and kcadm fails on the next command with `Unmatched
+> arguments from index 2: '<uuid>', '<uuid>', …`, which reads like a quoting bug rather than a
+> filter that never ran. Reported from the production console, 2026-09-09.
+>
+> Hence the filter above is client-side and keyed on an **exact** name: a substring match would
+> also take `extractor-ingest-only`, a different scope with a different disposition below. And
+> hence the `echo` — resolve, look, then delete.
 
 Repeat for `extractor-ingest-only`.
 
@@ -649,6 +743,14 @@ September.
 **Console:** *Realm settings* → *Sessions* tab (**SSO Session Idle**, **SSO Session Max**, and the
 two *Remember me* variants).
 
+> [!important] The realm is not the only place these numbers live
+> `basetool-android` carries its **own** overrides — `client.session.idle.timeout: 2592000` and
+> `client.session.max.lifespan: 15552000`, the same 30 d / 180 d, written by its provisioning script
+> and read off production on 2026-09-09. Shortening the realm here leaves those two standing, and
+> they are what that client's sessions actually use. If the decision is "sessions get shorter", it
+> has two homes: this tab, and a provisioning-script run for the app. Change the realm first, then
+> re-run the script's `--verify-only` — it clamps its values against the realm bounds and says so.
+
 **CLI:** `… update realms/iri -s ssoSessionMaxLifespan=<seconds>` etc.
 
 **Verify:** `… get realms/iri --fields ssoSessionIdleTimeout,ssoSessionMaxLifespan,ssoSessionIdleTimeoutRememberMe,ssoSessionMaxLifespanRememberMe,rememberMe`
@@ -739,9 +841,24 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
    python scripts/sanitize-realm-export.py <export.json> docs/keycloak/realm-config.reference.json
    ```
 
-   The sanitizer keeps `authenticationFlows`, `authenticatorConfig` and `requiredActions` since
-   WP-K1 — which is the whole reason that change was made, and what puts step 11's flow under
-   review.
+   > [!bug] It does **not** version-control step 11's flow, and this runbook said it did
+   > The sentence here used to read *"the sanitizer keeps `authenticationFlows`, `authenticatorConfig`
+   >
+   >> and `requiredActions` since WP-K1"*. It does not: all three are in `DROP_SECTIONS` in
+   >> `scripts/sanitize-realm-export.py`, and that file has two commits, neither of which is the
+   >> change the sentence describes. Verified 2026-09-09 while regenerating the reference — the run
+   >> reports `dropped:authenticationFlows: 28`.
+   >
+   > So **step 11's flow lives only in the Admin Console**, and nothing in this repository records
+   > its shape. That is the one step whose outcome is a structure rather than a value, and it is the
+   > one the re-export does not capture.
+   >
+   > Keeping the three sections is not a one-line change to make in passing: `authenticatorConfig`
+   > is where an authenticator's own configuration lives, and this realm's `discord-guild-role-gate`
+   > has config of its own. Whether any of it is sensitive has to be established before the section
+   > is committed, not assumed — which is presumably why it was dropped in the first place. Until
+   > somebody does that, write step 11's flow down by hand: the sub-flow name, its requirement, the
+   > condition's `User role`, the OTP step's requirement, and the binding.
 
 4. **Close the open finding in [`docs/keycloak/README.md`](keycloak/README.md)**, which records
    `fullScopeAllowed: true` on the frontend and the extractor. Step 8 closes the extractor half. The
