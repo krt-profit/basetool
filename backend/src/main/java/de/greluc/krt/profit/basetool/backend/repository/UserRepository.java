@@ -455,6 +455,21 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   Set<UUID> findIdsWithDiscordLink();
 
   /**
+   * Returns the id of the user currently holding {@code discordUserId}, or empty when the snowflake
+   * is unclaimed. Consulted before either reconciliation path writes the link, because {@code
+   * discord_user_id} is UNIQUE (V172) and a blind write against a snowflake another row already
+   * holds does not merely lose the column -- it fails the whole per-user reconciliation (#1826).
+   *
+   * <p>A scalar id projection on purpose: the caller only needs to know <em>whether</em> and
+   * <em>which row</em>, never the snowflake, which is unbounded personal data (REQ-OBS-004).
+   *
+   * @param discordUserId the Discord snowflake to look up; never {@code null}
+   * @return the holding user's id, or {@link Optional#empty()} when nobody holds it
+   */
+  @Query("SELECT u.id FROM User u WHERE u.discordUserId = :discordUserId")
+  Optional<UUID> findIdByDiscordUserId(@NotNull @Param("discordUserId") String discordUserId);
+
+  /**
    * Returns every user carrying the {@code ADMIN} role (case-insensitive match), ordered by
    * username.
    */

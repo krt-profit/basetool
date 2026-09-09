@@ -768,6 +768,18 @@ roster-page failure. Only a clean `404` on a single role's member read (a benign
 vanished after the `GET /roles` listing named it) is swallowed — that role contributes no members and
 the run continues.
 
+**The reconciled set is what the fetch reported, never what reconciled successfully.** The run
+swallows a per-user `syncUser` failure so one bad row cannot abort the roster -- correct, and it must
+not also cost that row its presence. `UserSyncService` therefore collects each fetched id **before**
+attempting to reconcile it, and hands that set to `markMissingUsers`. Collecting the ids only on
+success made a transient failure indistinguishable from an upstream deletion, and soft-deleted a
+member who was present and enabled in the realm; because `in_keycloak` is read as presence by the
+member administration, an admin was then offered the hard-delete action on an active member's row
+(#1825, found in production 2026-09-09 -- the delete itself was still refused by REQ-DATA-008's
+fail-closed probe, so the cost was misdirection rather than data loss). Every such failure is counted
+(`basetool_user_sync_failures_total`, untagged per REQ-OBS-011) and alerted
+(`UserSyncPerUserFailure`), because a row that throws once throws every run and never self-heals.
+
 **Acceptance** (`KeycloakServiceTest`): with a page size of 2 and three users across two pages,
 `fetchUsers` returns all three, the first request binds `first=0&max=2`, and the second advances to
 `first=2`; with realm role `ADMIN` listing user A, A's DTO carries `ADMIN` resolved from
@@ -777,9 +789,16 @@ on a role's member read keeps the roster with that role simply absent; and a `40
 listing (a service account missing `view-realm`) yields an empty result and increments the
 `basetool_keycloak_sync_fetch_failures_total` counter.
 
-**Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService.fetchAllUsers`,
-`KeycloakService.fetchRealmRoleNames`, `KeycloakService.fetchRoleMemberships`,
-`KeycloakService.logFetchFailure`, `KeycloakSyncProperties.pageSize`, `UserSyncTask`
+**Acceptance** (`UserSyncServiceTest`): a user whose `syncUser` throws is still carried in the set
+handed to `markMissingUsers`; a user the fetch never reported is not; the returned count stays the
+number of users that reconciled successfully; and each failure increments
+`basetool_user_sync_failures_total`.
+
+**Enforced by:** `KeycloakServiceTest` · `UserSyncServiceTest` · **Code:**
+`KeycloakService.fetchAllUsers`, `KeycloakService.fetchRealmRoleNames`,
+`KeycloakService.fetchRoleMemberships`, `KeycloakService.logFetchFailure`,
+`KeycloakSyncProperties.pageSize`, `UserSyncService.syncFromKeycloak`,
+`UserReconciliationService.markMissingUsers`, `UserSyncTask` · **Issues:** #1825
 
 ### REQ-SEC-015 — Bereich/OL leadership grants officer-equivalent reach, never admin rights
 

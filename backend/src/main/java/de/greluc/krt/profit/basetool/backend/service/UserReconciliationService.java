@@ -260,8 +260,7 @@ public class UserReconciliationService {
 
     // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
     // discordUserId / viaDiscord were resolved up-front (see the subject-only lookup above).
-    if (viaDiscord && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
-      user.setDiscordUserId(discordUserId);
+    if (viaDiscord && applyDiscordLink(user, discordUserId)) {
       changed = true;
     }
 
@@ -417,8 +416,7 @@ public class UserReconciliationService {
     String discordUserId = dto.discordUserId();
     if (discordUserId != null
         && !discordUserId.isBlank()
-        && !Objects.equals(user.getDiscordUserId(), discordUserId)) {
-      user.setDiscordUserId(discordUserId);
+        && applyDiscordLink(user, discordUserId)) {
       changed = true;
     }
 
@@ -453,6 +451,48 @@ public class UserReconciliationService {
   }
 
   /**
+   * Writes the Discord snowflake onto {@code user} unless a <em>different</em> account already
+   * holds it, in which case the write is skipped, counted and logged.
+   *
+   * <p>{@code app_user.discord_user_id} is UNIQUE (V172), so a blind write against a snowflake
+   * another row holds does not merely lose the column: it fails the flush and takes the entire
+   * per-user reconciliation with it. That is not a proportionate outcome for a display-only field
+   * -- {@code REQ-SEC-019} exposes only the boolean fact of the link -- and it is how a member
+   * ended up soft-deleted while present in Keycloak (#1826, and #1825 for the second half of that).
+   *
+   * <p>Skipping keeps the collision visible rather than papering over it: the counter stays
+   * non-zero on every run until a human consolidates the two accounts, and the log names both
+   * {@code app_user} ids and never the snowflake or a handle (REQ-OBS-004). Once the duplicate row
+   * is gone the next run writes the link normally, with no manual repair.
+   *
+   * <p>Shared by both write paths on purpose. They differ in where the snowflake comes from -- the
+   * token claim at login, the Admin-API federated-identity read in the scheduled pass -- and not at
+   * all in what may be done with it.
+   *
+   * @param user the managed row to link; never {@code null}
+   * @param discordUserId the snowflake to write; never {@code null} or blank
+   * @return {@code true} when the link was written and the caller must persist, {@code false} when
+   *     it was already present or another account holds it
+   */
+  private boolean applyDiscordLink(@NotNull User user, @NotNull String discordUserId) {
+    if (Objects.equals(user.getDiscordUserId(), discordUserId)) {
+      return false;
+    }
+    Optional<UUID> holder = userRepository.findIdByDiscordUserId(discordUserId);
+    if (holder.isPresent() && !holder.get().equals(user.getId())) {
+      meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).increment();
+      log.warn(
+          "Discord link not written for user {}: account {} already holds the same identity."
+              + " Consolidate the two accounts; the link follows once the duplicate row is gone.",
+          user.getId(),
+          holder.get());
+      return false;
+    }
+    user.setDiscordUserId(discordUserId);
+    return true;
+  }
+
+  /**
    * Flags every local user whose id is NOT in {@code currentIds} as missing (soft-delete: kept as a
    * row for FK integrity, but excluded from active lists). Called by {@link UserSyncTask} after the
    * full Keycloak sync run; an empty {@code currentIds} short-circuits without marking anyone so a
@@ -461,6 +501,12 @@ public class UserReconciliationService {
    * <p>Returns the affected-row count rather than {@code void} so the caller can report how many
    * accounts vanished upstream in this run: soft-deleting members is a consequential write, and it
    * used to happen with no number attached anywhere (the count was discarded at the JPA level).
+   *
+   * <p><strong>{@code currentIds} means present, not reconciled.</strong> The caller must pass
+   * every id the Keycloak fetch reported, including users whose own {@link
+   * #syncUser(KeycloakUserDto)} threw. Passing only the successfully-synced subset makes a
+   * transient per-user failure indistinguishable from an upstream deletion, which soft-deletes a
+   * member who is present and enabled in the realm (#1825, REQ-SEC-043).
    *
    * @param currentIds the set of user ids currently present in Keycloak
    * @return the number of users newly flagged as missing; {@code 0} when {@code currentIds} is

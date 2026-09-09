@@ -145,6 +145,32 @@ public final class MetricNames {
    */
   public static final String USER_CALLSIGN_COLLISIONS = "basetool.user.callsign.collisions";
 
+  /**
+   * Counter {@code basetool_user_sync_failures_total} (untagged). Bumped once per user whose
+   * reconciliation threw during a Keycloak sync run. The batch deliberately swallows such a failure
+   * so one bad row cannot abort the roster, which left the condition with no signal at all beyond a
+   * log line.
+   *
+   * <p>Access-control-relevant: a user that never reconciles keeps whatever roles the local row
+   * last carried, and until #1825 was additionally soft-deleted as though Keycloak had dropped
+   * them. Untagged for the same reason the callsign counter is: the only natural label would be the
+   * account id, which is unbounded (REQ-OBS-011).
+   */
+  public static final String USER_SYNC_FAILURES = "basetool.user.sync.failures";
+
+  /**
+   * Counter {@code basetool_user_discord_link_collisions_total} (untagged). Bumped when a
+   * reconciliation would have written a Discord snowflake that a <em>different</em> {@code
+   * app_user} row already holds, and skipped the write instead of failing the unique constraint
+   * (#1826).
+   *
+   * <p>Normally flat zero. A non-zero value means one Discord identity is reachable from two
+   * accounts -- the duplicate-account situation the admin queue's link action resolves -- and it
+   * stays non-zero on every run until a human consolidates them, which is exactly the intent.
+   * Untagged: a snowflake is unbounded and personal data (REQ-OBS-004, REQ-OBS-011).
+   */
+  public static final String USER_DISCORD_LINK_COLLISIONS = "basetool.user.discord.link.collisions";
+
   // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
 
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */
