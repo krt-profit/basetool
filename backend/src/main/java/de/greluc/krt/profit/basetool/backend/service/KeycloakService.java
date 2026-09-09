@@ -54,11 +54,11 @@ import org.springframework.web.client.RestClientResponseException;
 
 /**
  * Client for the Keycloak Admin REST API. The bulk of it is the read-only scheduled user sync;
- * {@link #linkDiscordIdentity} and {@link #deleteUser} are the only writes — the narrow
- * account-linking path (REQ-SEC-026) that attaches a Discord federated identity to an existing
- * account and removes the throwaway Discord user. Those writes require the service account to hold
- * the {@code manage-users} realm-management role on top of the {@code view-users}/{@code
- * view-realm} the sync needs.
+ * {@link #linkDiscordIdentity}, {@link #unlinkDiscordIdentity} and {@link #deleteUser} are the only
+ * writes — the narrow account-linking path (REQ-SEC-026) that attaches a Discord federated identity
+ * to an existing account and removes the throwaway Discord user. Those writes require the service
+ * account to hold the {@code manage-users} realm-management role on top of the {@code
+ * view-users}/{@code view-realm} the sync needs.
  *
  * <p>Obtains an admin access token via the {@code client_credentials} grant against the realm's
  * {@code openid-connect/token} endpoint, then pages through {@code /admin/realms/{realm}/users} and
@@ -771,6 +771,47 @@ public class KeycloakService {
       }
       throw new ExternalServiceException(
           "Keycloak user " + keycloakUserId + " is already linked to a different Discord account");
+    }
+  }
+
+  /**
+   * Detaches the {@code discord} federated identity from a Keycloak user via {@code DELETE
+   * /users/{id}/federated-identity/discord}, requiring the same {@code manage-users}
+   * realm-management role as {@link #linkDiscordIdentity}.
+   *
+   * <p><strong>Why this exists: Keycloak does not enforce that one Discord identity belongs to one
+   * user.</strong> {@code FEDERATED_IDENTITY} is keyed on (user, provider) — which stops one user
+   * holding two Discord accounts, not two users holding one — the index on {@code
+   * FEDERATED_USER_ID} is not unique, and {@code addFederatedIdentity} checks only whether the
+   * <em>target</em> user is already linked. Nothing refuses the second link (read at Keycloak
+   * 26.7.0, the pinned version). What does happen is worse than a refusal: with two holders, {@code
+   * getUserByFederatedIdentity} throws {@code IllegalStateException("More results found ...")}, so
+   * every later Discord login of that member fails outright. The identity therefore has to be taken
+   * off the old holder <em>before</em> it is put on the new one.
+   *
+   * <p>Idempotent: a {@code 404} — the user is gone, or carries no Discord link — is success. There
+   * is nothing to detach in either case, which is exactly the state the caller wants.
+   *
+   * @param keycloakUserId the Keycloak user to detach the identity from
+   * @throws ExternalServiceException when the admin URL is unconfigured
+   */
+  public void unlinkDiscordIdentity(@NotNull UUID keycloakUserId) {
+    requireAdminUrl();
+    String token = getAccessToken();
+    try {
+      adminClient()
+          .delete()
+          .uri(
+              "/admin/realms/{realm}/users/{id}/federated-identity/{provider}",
+              properties.getRealm(),
+              keycloakUserId,
+              DISCORD_IDP_ALIAS)
+          .header(HttpHeaders.AUTHORIZATION, BEARER_PREFIX + token)
+          .retrieve()
+          .toBodilessEntity();
+    } catch (HttpClientErrorException.NotFound notFound) {
+      log.debug(
+          "Keycloak user {} has no discord link to detach; treating as success", keycloakUserId);
     }
   }
 

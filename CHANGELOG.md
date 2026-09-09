@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Eine Discord-Kennung kann nicht mehr an zwei Konten gleichzeitig hängen.** Beim Zusammenführen
+  wurde sie erst dem Zielkonto angehängt und dem alten erst am Ende weggenommen — dazwischen hielten
+  beide dieselbe Kennung, und Keycloak beantwortet jede Discord-Anmeldung in diesem Zustand mit einem
+  Serverfehler. Brach der Vorgang dazwischen ab, blieb es dabei. Die Kennung wird jetzt zuerst
+  gelöst und dann gesetzt.
+
 ## [v1.7.6](https://github.com/krt-profit/basetool/releases/tag/v1.7.6) - 2026-09-09
 
 ### Added
