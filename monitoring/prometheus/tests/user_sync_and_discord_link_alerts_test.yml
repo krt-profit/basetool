@@ -1,0 +1,81 @@
+# promtool unit test for the two identity-reconciliation alerts added with #1825 / #1826.
+#
+# Both watch counters that are normally flat zero, so the interesting property is not "does a big
+# number fire" but "does the rule stay silent while the counter is absent or flat, and fire on the
+# first real increment". A counter Micrometer has never incremented does not exist as a series at
+# all, which is the steady state on a healthy deployment - `increase()` over a missing series
+# yields no samples and must not produce an alert.
+#
+#   - UserSyncPerUserFailure: SILENT while flat, FIRES on a single per-user reconciliation failure.
+#   - UserDiscordLinkCollision: SILENT while flat, FIRES while a duplicate identity persists, and
+#     keeps firing across runs (it is a state, not an event) until a human consolidates.
+#
+# Run locally (no promtool on the host - use an ephemeral container, see monitoring/README.md).
+# NOTE the --entrypoint: the image's entrypoint is /bin/prometheus, so passing `promtool` as the
+# first argument fails with "unexpected promtool".
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" \
+#     prom/prometheus:v3.14.0 test rules /cfg/tests/user_sync_and_discord_link_alerts_test.yml
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The healthy steady state: the sync runs, nothing throws, the counter never moves. A flat series
+  # must not fire - otherwise the alert pages about every successful run.
+  - name: silent - user sync runs clean, failure counter flat at zero
+    interval: 1m
+    input_series:
+      - series: "basetool_user_sync_failures_total"
+        values: "0+0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: UserSyncPerUserFailure
+        exp_alerts: []
+
+  # One account threw during the daily run and was skipped. It keeps the roles its local row last
+  # carried and stops tracking Keycloak, so it must be surfaced past the 5m `for`.
+  - name: fires - a single per-user reconciliation failure
+    interval: 1m
+    input_series:
+      - series: "basetool_user_sync_failures_total"
+        values: "0+0x30 1+0x90"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: UserSyncPerUserFailure
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "User sync could not reconcile 1 account(s) in the last hour"
+              description: "One or more users threw during the Keycloak->local reconciliation and were skipped. They keep the roles their local row last carried until a later run succeeds, and any Keycloak-side change to them has not landed. The backend log names the account id and the cause (never a handle); a repeating id is a permanent failure, not a hiccup. A duplicate Discord identity is the known cause -- check UserDiscordLinkCollision alongside this."
+
+  # No duplicate identities anywhere: the collision counter never moves.
+  - name: silent - no Discord identity is held twice
+    interval: 1m
+    input_series:
+      - series: "basetool_user_discord_link_collisions_total"
+        values: "0+0x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: UserDiscordLinkCollision
+        exp_alerts: []
+
+  # One member ended up with two accounts. The link write is skipped on every run, so the counter
+  # climbs once per run and the alert keeps firing until the accounts are consolidated - deliberate:
+  # the condition does not self-heal and the reminder is the point.
+  - name: fires - one Discord identity held by two accounts, run after run
+    interval: 1m
+    input_series:
+      - series: "basetool_user_discord_link_collisions_total"
+        values: "0+0x20 1+0x40 2+0x60"
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: UserDiscordLinkCollision
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Discord identity held by two accounts: 1 skipped link write(s) in the last hour"
+              description: "One Discord identity is reachable from two app_user rows, so the link could not be written to the second. One member has two accounts -- consolidate them from the member administration (the duplicate folds into the survivor, belongings and Discord identity move, the duplicate is removed). The alert repeats every run until then. The backend log names both account ids, never the snowflake."

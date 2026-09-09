@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -67,13 +69,23 @@ public class UserSyncService {
   private final BankHolderReconciliationService bankHolderReconciliationService;
 
   /**
+   * Records {@link MetricNames#USER_SYNC_FAILURES}. Until #1825 a per-user reconciliation failure
+   * existed only as a log line, so the condition that soft-deleted a present member had no signal
+   * an alert could watch.
+   */
+  private final MeterRegistry meterRegistry;
+
+  /**
    * Fetches the current Keycloak user list and reconciles it into the local table.
    *
-   * <p>Failures on individual users are logged and swallowed so a single bad row does not abort the
-   * batch. After the loop, {@link UserReconciliationService#markMissingUsers(java.util.Set)} flags
-   * every local user whose Keycloak id did not appear in this run. An empty Keycloak fetch is a
-   * no-op skip (never a wipe). A batch-level failure (e.g. {@code markMissingUsers} hitting a DB
-   * error) propagates to the caller: the scheduled path wraps this in the failure-swallowing {@code
+   * <p>Failures on individual users are logged, counted ({@link MetricNames#USER_SYNC_FAILURES})
+   * and swallowed so a single bad row does not abort the batch -- but such a user is still counted
+   * as <em>present</em>. After the loop, {@link
+   * UserReconciliationService#markMissingUsers(java.util.Collection)} flags every local user whose
+   * Keycloak id did not appear in the <em>fetch</em>, which is the only thing that answers "does
+   * this account still exist upstream". An empty Keycloak fetch is a no-op skip (never a wipe). A
+   * batch-level failure (e.g. {@code markMissingUsers} hitting a DB error) propagates to the
+   * caller: the scheduled path wraps this in the failure-swallowing {@code
    * TaskMetrics.recordCounting} so the scheduler thread survives; the manual endpoint wraps it in
    * {@code recordCountingRethrow} so the admin sees the failure as an RFC 7807 error rather than a
    * silent success.
@@ -96,13 +108,24 @@ public class UserSyncService {
     }
 
     int count = 0;
-    Set<UUID> keycloakUserIds = new HashSet<>();
+    int failed = 0;
+    // Presence, not success. These ids are what Keycloak just reported it holds, and presence is
+    // the only thing markMissingUsers is entitled to reason about: a local row is flagged as gone
+    // because the directory stopped listing it, never because reconciling it happened to throw.
+    // Collecting the ids *after* a successful syncUser conflated the two, so a single failing user
+    // was soft-deleted while present and enabled upstream -- and the member administration, which
+    // reads the flag as presence, then offered an admin the hard-delete action on an active member
+    // (#1825). The completeness prerequisite of REQ-SEC-043 is unchanged and still carries the
+    // guarantee at the other end: an empty fetch is a skip, never a wipe.
+    Set<UUID> presentInKeycloak = new HashSet<>();
     for (KeycloakUserDto user : users) {
+      presentInKeycloak.add(user.id());
       try {
         userReconciliationService.syncUser(user);
-        keycloakUserIds.add(user.id());
         count++;
       } catch (Exception e) {
+        failed++;
+        meterRegistry.counter(MetricNames.USER_SYNC_FAILURES).increment();
         // Audit finding M-4 (2026-05-20): Keycloak {@code username} can be email-shaped (caught by
         // PiiMasker) or a real-name handle (not caught). Log the JWT-sub UUID instead — sufficient
         // to correlate with the user row on the next sync run, and free of PII.
@@ -114,7 +137,12 @@ public class UserSyncService {
     // (upstream deletion, a realm misconfiguration) left no trace whatsoever. Report it: INFO for
     // the ordinary trickle of leavers, WARN once a single run flags more than
     // MISSING_USERS_WARN_THRESHOLD accounts. Counts only — no handles (REQ-OBS-004).
-    int flaggedMissing = userReconciliationService.markMissingUsers(keycloakUserIds);
+    if (failed > 0) {
+      // One line per run beside the individual stack traces: those say what broke, this says how
+      // much of the roster did not reconcile. Counts only, never ids or handles (REQ-OBS-004).
+      log.warn("User sync could not reconcile {} of {} fetched users.", failed, users.size());
+    }
+    int flaggedMissing = userReconciliationService.markMissingUsers(presentInKeycloak);
     if (flaggedMissing > MISSING_USERS_WARN_THRESHOLD) {
       log.warn(
           "User sync flagged {} local users as no longer present in Keycloak in a single run.",

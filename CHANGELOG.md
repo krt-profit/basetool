@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Ein aktives Mitglied wurde als „nicht in Keycloak“ geführt, wenn sein Abgleich einmal
+  fehlschlug.** Der Abgleich verbuchte einen Fehler bei einem einzelnen Konto wie eine Löschung in
+  Keycloak — in der Mitgliederverwaltung erschien daraufhin der Löschknopf neben einem aktiven
+  Mitglied (gelöscht wurde nie etwas, die Sicherung dahinter hat gehalten). Der Abgleich merkt sich
+  jetzt, wen Keycloak gemeldet hat, statt wen er erfolgreich verarbeiten konnte; fehlgeschlagene
+  Konten werden gezählt und schlagen Alarm.
+
+- **Zwei Konten mit derselben Discord-Anmeldung legen den Abgleich nicht mehr lahm.** Hatte ein
+  Mitglied versehentlich zwei Konten, wollte der Abgleich dieselbe Discord-Kennung auf beide
+  schreiben und brach beim zweiten komplett ab. Die Verknüpfung wird jetzt übersprungen, gezählt und
+  gemeldet; sobald das doppelte Konto entfernt ist, trägt sie sich beim nächsten Abgleich von selbst
+  nach.
+
 ## [v1.7.5](https://github.com/krt-profit/basetool/releases/tag/v1.7.5) - 2026-09-08
 
 ### Changed

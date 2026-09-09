@@ -569,6 +569,55 @@ class UserReconciliationServiceTest {
       org.junit.jupiter.api.Assertions.assertNull(result.getDiscordGuildNickname());
     }
 
+    /**
+     * #1826: {@code app_user.discord_user_id} is UNIQUE (V172), so writing a snowflake another row
+     * already holds does not merely lose the column -- it fails the flush and takes the whole
+     * per-user reconciliation with it. The link is display-only (REQ-SEC-019 exposes a boolean), so
+     * the proportionate answer is to skip the write, count it and let a human consolidate the two
+     * accounts.
+     */
+    @Test
+    void discordLogin_whenAnotherAccountHoldsTheSnowflake_skipsTheLinkAndCountsIt() {
+      User existing = newUser(USER_ID, "discorduser");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>());
+      UUID otherAccount = UUID.fromString("11111111-2222-3333-4444-555555555555");
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(userRepository.findIdByDiscordUserId(DISCORD_ID)).thenReturn(Optional.of(otherAccount));
+
+      userReconciliationService.syncUser(discordJwt(true, List.of()));
+
+      org.junit.jupiter.api.Assertions.assertNull(
+          existing.getDiscordUserId(),
+          "the link belongs to the other account until it is resolved");
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count(),
+          "the collision is counted so an alert can watch it");
+    }
+
+    /**
+     * The unclaimed case still writes, so the guard above narrows the write rather than disabling
+     * it -- and once the duplicate row is gone the very next run links normally, with no manual
+     * repair.
+     */
+    @Test
+    void discordLogin_whenTheSnowflakeIsUnclaimed_writesTheLink() {
+      User existing = newUser(USER_ID, "discorduser");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>());
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(userRepository.findIdByDiscordUserId(DISCORD_ID)).thenReturn(Optional.empty());
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(discordJwt(true, List.of()));
+
+      assertEquals(DISCORD_ID, existing.getDiscordUserId());
+      assertEquals(0.0, meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count());
+    }
+
     private Jwt discordJwt(boolean withDiscord, List<String> realmRoles) {
       Jwt.Builder builder =
           Jwt.withTokenValue("t")
@@ -787,6 +836,34 @@ class UserReconciliationServiceTest {
 
   @Nested
   class SyncKeycloakUserTests {
+
+    /**
+     * #1826, the scheduled half. The Admin-API back-fill is where the collision actually bites in
+     * production: it runs for every roster user without a local link, so once one Discord identity
+     * is reachable from two Keycloak users it retries the same failing write every single night.
+     * Skipping keeps the rest of that user's reconciliation intact -- which matters more than the
+     * icon, because a thrown reconciliation used to take the account out of the roster entirely
+     * (#1825).
+     */
+    @Test
+    void scheduledBackfill_whenAnotherAccountHoldsTheSnowflake_skipsTheLinkAndCountsIt() {
+      UUID otherAccount = UUID.fromString("11111111-2222-3333-4444-555555555555");
+      User existing = newUser(USER_ID, "alice");
+      existing.setVersion(1L);
+      existing.setRoles(new HashSet<>());
+      KeycloakUserDto dto =
+          new KeycloakUserDto(
+              USER_ID, "alice", "alice@example.com", true, Set.of(), "123456789012345678");
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+      when(userRepository.findIdByDiscordUserId("123456789012345678"))
+          .thenReturn(Optional.of(otherAccount));
+
+      userReconciliationService.syncUser(dto);
+
+      org.junit.jupiter.api.Assertions.assertNull(existing.getDiscordUserId());
+      assertEquals(1.0, meterRegistry.counter(MetricNames.USER_DISCORD_LINK_COLLISIONS).count());
+    }
 
     @Test
     void returnsEarly_whenDtoIdIsNull() {
