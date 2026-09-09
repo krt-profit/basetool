@@ -34,13 +34,18 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.dto.KeycloakUserDto;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -59,7 +64,22 @@ class UserSyncServiceTest {
 
   @Mock private BankHolderReconciliationService bankHolderReconciliationService;
 
-  @InjectMocks private UserSyncService userSyncService;
+  /** A real registry: a mock cannot record a counter, and the failure assertions read one back. */
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  private UserSyncService userSyncService;
+
+  @BeforeEach
+  void setUp() {
+    // Constructed by hand rather than @InjectMocks: the registry above is deliberately a real
+    // SimpleMeterRegistry and not a @Mock, and @InjectMocks does not wire a plain field.
+    userSyncService =
+        new UserSyncService(
+            keycloakService,
+            userReconciliationService,
+            bankHolderReconciliationService,
+            meterRegistry);
+  }
 
   @Test
   void syncFromKeycloak_fetchesUpsertsReconcilesAndReturnsTheSyncedCount() {
@@ -107,6 +127,70 @@ class UserSyncServiceTest {
     verify(userReconciliationService).syncUser(user2);
     verify(userReconciliationService).markMissingUsers(anySet());
     verify(bankHolderReconciliationService).reconcileAll();
+  }
+
+  /**
+   * #1825: the set handed to {@code markMissingUsers} answers "who does Keycloak still hold", so it
+   * must carry the user whose own reconciliation threw. Collecting the ids only on success made a
+   * transient per-user failure indistinguishable from an upstream deletion, and soft-deleted a
+   * member who was present and enabled in the realm — with the member administration, which reads
+   * {@code in_keycloak} as presence, then offering an admin the hard-delete action on that row.
+   */
+  @Test
+  void syncFromKeycloak_aUserWhoseSyncThrew_isStillCountedAsPresentInKeycloak() {
+    KeycloakUserDto failing = user("failing");
+    KeycloakUserDto healthy = user("healthy");
+    when(keycloakService.fetchUsers(anyCollection(), anySet()))
+        .thenReturn(List.of(failing, healthy));
+    doThrow(new RuntimeException("constraint violation"))
+        .when(userReconciliationService)
+        .syncUser(failing);
+
+    userSyncService.syncFromKeycloak();
+
+    ArgumentCaptor<Set<UUID>> present = ArgumentCaptor.captor();
+    verify(userReconciliationService).markMissingUsers(present.capture());
+    assertTrue(
+        present.getValue().contains(failing.id()),
+        "the failing user is present in Keycloak and must not be flagged as missing");
+    assertTrue(present.getValue().contains(healthy.id()));
+  }
+
+  /**
+   * The failure must leave a signal an alert can watch ({@code UserSyncPerUserFailure}). Before
+   * #1825 it existed only as a log line, so the condition that soft-deleted a present member had no
+   * metric behind it at all.
+   */
+  @Test
+  void syncFromKeycloak_countsEveryPerUserFailure() {
+    KeycloakUserDto failing = user("failing");
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(failing));
+    doThrow(new RuntimeException("boom")).when(userReconciliationService).syncUser(failing);
+
+    userSyncService.syncFromKeycloak();
+
+    assertEquals(
+        1.0, meterRegistry.counter(MetricNames.USER_SYNC_FAILURES).count(), "failures counted");
+  }
+
+  /**
+   * A user Keycloak genuinely stopped listing must still be flagged — the fix above widens what
+   * counts as present, and must not widen it to everything.
+   */
+  @Test
+  void syncFromKeycloak_aUserAbsentFromTheFetch_isNotInThePresentSet() {
+    KeycloakUserDto stillThere = user("stillThere");
+    UUID departed = UUID.randomUUID();
+    when(keycloakService.fetchUsers(anyCollection(), anySet())).thenReturn(List.of(stillThere));
+
+    userSyncService.syncFromKeycloak();
+
+    ArgumentCaptor<Set<UUID>> present = ArgumentCaptor.captor();
+    verify(userReconciliationService).markMissingUsers(present.capture());
+    assertTrue(present.getValue().contains(stillThere.id()));
+    assertTrue(
+        !present.getValue().contains(departed),
+        "a user the fetch never reported must not be counted as present");
   }
 
   @Test

@@ -34,6 +34,40 @@ groups:
           summary: "Callsign collision at login: {{ $value }} in the last hour"
           description: "A login presented an unknown subject while another account holds the same callsign, so a NEW pending registration was created and nothing was inherited. Check the admin registration queue: the affected row carries the duplicate-callsign marker, and the remedy is an explicit merge, never an approval that leaves two accounts for one member. The backend log names both account ids (never the callsign itself)."
 
+      # #1825: one user's reconciliation threw during a Keycloak sync run. The batch swallows it so
+      # a single bad row cannot abort the roster -- correct, and it left the condition with no signal
+      # beyond a log line nobody watches. A user that never reconciles keeps whatever roles the local
+      # row last carried, which is access-control-relevant (REQ-OBS-011).
+      #
+      # Warning on a 1h window rather than critical: one transient failure self-heals on the next
+      # run. What must not stay invisible is a failure that repeats, because that one never self-
+      # heals -- the same row throws every time, and the account silently stops tracking Keycloak.
+      - alert: UserSyncPerUserFailure
+        expr: increase(basetool_user_sync_failures_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User sync could not reconcile {{ $value }} account(s) in the last hour"
+          description: "One or more users threw during the Keycloak->local reconciliation and were skipped. They keep the roles their local row last carried until a later run succeeds, and any Keycloak-side change to them has not landed. The backend log names the account id and the cause (never a handle); a repeating id is a permanent failure, not a hiccup. A duplicate Discord identity is the known cause -- check UserDiscordLinkCollision alongside this."
+
+      # #1826: a reconciliation wanted to write a Discord snowflake that a DIFFERENT app_user row
+      # already holds. The write is skipped rather than left to fail the unique constraint, because
+      # failing it took the whole per-user reconciliation down with it (see UserSyncPerUserFailure).
+      #
+      # This is a state, not an event: it stays non-zero on every run until a human consolidates the
+      # two accounts, which is the intent. Warning -- nothing is corrupted and no access is widened,
+      # but one member is split across two accounts and the Discord indicator on the surviving one
+      # stays empty until it is resolved.
+      - alert: UserDiscordLinkCollision
+        expr: increase(basetool_user_discord_link_collisions_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Discord identity held by two accounts: {{ $value }} skipped link write(s) in the last hour"
+          description: "One Discord identity is reachable from two app_user rows, so the link could not be written to the second. One member has two accounts -- consolidate them from the member administration (the duplicate folds into the survivor, belongings and Discord identity move, the duplicate is removed). The alert repeats every run until then. The backend log names both account ids, never the snowflake."
+
       # REQ-ORDERS-033: an ordered-item line's blueprint no longer produces the ordered item, so the
       # order is showing a FOREIGN recipe's materials as its demand. People collect and book against
       # those numbers, so this is wrong-data-in-production, not a cosmetic drift. Warning rather than

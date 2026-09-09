@@ -50,6 +50,18 @@ all credential-only users coexist.
   token claim on any login (`syncUser(Jwt)`) and from the Admin-API federated-identity read on the
   scheduled sync (`syncUser(KeycloakUserDto)`). Both paths only **set** the link, never clear it on a
   missing value (a best-effort lookup returns `null` on failure, which must not wipe a real link).
+- [x] **A snowflake another account already holds is never written.** `app_user.discord_user_id` is
+  UNIQUE (V172), so a blind write against a claimed snowflake fails the flush and takes the whole
+  per-user reconciliation with it -- which is how a member ended up soft-deleted while present in
+  Keycloak (#1826, and REQ-SEC-043 for the second half of that). Both write paths consult
+  `UserRepository.findIdByDiscordUserId` first and **skip** the write when a different row holds it,
+  counting the collision (`basetool_user_discord_link_collisions_total`, untagged -- a snowflake is
+  unbounded personal data per REQ-OBS-004) and logging both `app_user` ids and neither the snowflake
+  nor a handle. Skipping is proportionate: the link is display-only (REQ-SEC-019 exposes a boolean),
+  so a stale-empty column costs an icon while a thrown reconciliation costs the member their roster
+  presence. The collision is a *state* -- it recurs every run until an admin consolidates the two
+  accounts -- so `UserDiscordLinkCollision` alerts for as long as it stands, and the link lands
+  normally on the first run after the duplicate row is gone, with no manual repair.
 - [x] The `discord_user_id` claim is sourced from the federated link by `DiscordFederatedIdentityMapper`,
   so it is present for accounts linked **after** creation and on **every** login method — not only for
   accounts that registered via Discord (ADR-0036, fixes the missing member-list indicator).
@@ -65,7 +77,7 @@ all credential-only users coexist.
   linking (REQ-SEC-022). That comparison never links and never inherits, so the no-silent-inheritance
   guarantee is preserved — and strengthened.
 
-**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · `UserServiceSyncTest` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724 · **Decision:** ADR-0036
+**Enforced by:** `BackendApplicationTests` (schema validate) · `UserServiceDiscordSyncTest` (subject-only recognition: a Discord login never consults `findByUsername`) · `UserServiceSyncTest` (scheduled sync back-fills the Discord link, and leaves it untouched on a `null`) · `UserReconciliationServiceTest` (a snowflake held by another account is skipped and counted on both write paths; an unclaimed one is still written) · `KeycloakServiceTest` (the Admin-API sync attaches the `discord` federated id, ignores other IdPs) · `DiscordFederatedIdentityMapperTest` (claim derived from the federated link) · **Code:** `User`, `V172__add_discord_user_id_to_app_user.sql`, `UserService.syncUser`, `UserReconciliationService.applyDiscordLink`, `UserRepository.findIdByDiscordUserId`, `KeycloakService.fetchUsers`, `DiscordFederatedIdentityMapper` · **Issues:** #721, #724, #1826 · **Decision:** ADR-0036
 
 ### REQ-SEC-019 — Discord-link indicator in member management (admin-only, no raw id)
 
