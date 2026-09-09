@@ -27,17 +27,19 @@ breaks if it is wrong.
 Production pins `quay.io/keycloak/keycloak:26.7` by digest (`docker-compose.yml`). Every field name,
 menu label and endpoint below was read out of the **26.7.0 sources**, not from memory:
 
-|                                                                                              Claim                                                                                              |                                                         Source                                                          |
-|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Console labels (*Edit username*, *Forgot password*, *Require SSL*, *Save events*, *Include representation*, *Expiration*, *Full scope allowed*, *Default roles*, *Require PKCE*, *PKCE Method*) | `js/apps/admin-ui/…/messages_en.properties` @ 26.7.0                                                                    |
-| `Require SSL` modes                                                                                                                                                                             | [Server Admin Guide § Configuring SSL for a realm](https://www.keycloak.org/docs/26.7.0/server_admin/#_ssl_modes)       |
-| Event settings and `kcadm` event syntax                                                                                                                                                         | Server Admin Guide § *Auditing user events* / *Auditing admin events* / *Configuring event logging for a realm*         |
-| `Condition - User Role` fields                                                                                                                                                                  | [§ Conditions in conditional flows](https://www.keycloak.org/docs/26.7.0/server_admin/#conditions-in-conditional-flows) |
-| `Post login flow`                                                                                                                                                                               | [§ Post login flow](https://www.keycloak.org/docs/26.7.0/server_admin/#_identity_broker_post_login_flow)                |
-| Realm **default** client scopes apply to *newly created* clients only                                                                                                                           | [§ Realm default client scopes](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_linking)              |
-| `Full scope allowed` lives on the `<client>-dedicated` scope's *Scope* tab                                                                                                                      | [§ Dedicated client scope](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_dedicated)                 |
-| Client-scope and events endpoints                                                                                                                                                               | `RealmAdminResource.java`, `ClientResource.java`, `RealmEventsConfigRepresentation.java` @ 26.7.0                       |
-| `kcadm` command syntax                                                                                                                                                                          | [§ Admin CLI](https://www.keycloak.org/docs/26.7.0/server_admin/#admin-cli)                                             |
+|                                                                                              Claim                                                                                              |                                                                                                                         Source                                                                                                                          |
+|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Console labels (*Edit username*, *Forgot password*, *Require SSL*, *Save events*, *Include representation*, *Expiration*, *Full scope allowed*, *Default roles*, *Require PKCE*, *PKCE Method*) | `js/apps/admin-ui/…/messages_en.properties` @ 26.7.0                                                                                                                                                                                                    |
+| `Require SSL` modes                                                                                                                                                                             | [Server Admin Guide § Configuring SSL for a realm](https://www.keycloak.org/docs/26.7.0/server_admin/#_ssl_modes)                                                                                                                                       |
+| Event settings and `kcadm` event syntax                                                                                                                                                         | Server Admin Guide § *Auditing user events* / *Auditing admin events* / *Configuring event logging for a realm*                                                                                                                                         |
+| `Condition - User Role` fields                                                                                                                                                                  | [§ Conditions in conditional flows](https://www.keycloak.org/docs/26.7.0/server_admin/#conditions-in-conditional-flows)                                                                                                                                 |
+| `Post login flow`                                                                                                                                                                               | [§ Post login flow](https://www.keycloak.org/docs/26.7.0/server_admin/#_identity_broker_post_login_flow)                                                                                                                                                |
+| Realm **default** client scopes apply to *newly created* clients only                                                                                                                           | [§ Realm default client scopes](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_linking)                                                                                                                                              |
+| `Full scope allowed` lives on the `<client>-dedicated` scope's *Scope* tab                                                                                                                      | [§ Dedicated client scope](https://www.keycloak.org/docs/26.7.0/server_admin/#_client_scopes_dedicated)                                                                                                                                                 |
+| Client-scope and events endpoints                                                                                                                                                               | `RealmAdminResource.java`, `ClientResource.java`, `RealmEventsConfigRepresentation.java` @ 26.7.0                                                                                                                                                       |
+| `kcadm` command syntax                                                                                                                                                                          | [§ Admin CLI](https://www.keycloak.org/docs/26.7.0/server_admin/#admin-cli)                                                                                                                                                                             |
+| Creating the provisioning client (§ 0.3): the wizard, the service-account switch, the Credentials tab                                                                                           | § *Creating an OpenID Connect client* · [§ Using a service account](https://www.keycloak.org/docs/26.7.0/server_admin/#_service_accounts) · [§ Confidential client credentials](https://www.keycloak.org/docs/26.7.0/server_admin/#_client-credentials) |
+| A client the wizard creates carries `fullScopeAllowed = true`                                                                                                                                   | `RepresentationToModel#defaultFullScopeAllowed` @ 26.7.0 (`isNew && !consentRequired`)                                                                                                                                                                  |
 
 If the realm is upgraded past 26.7, re-check the three items marked **⚠ version-sensitive** below
 before running them.
@@ -64,20 +66,46 @@ Found while writing the commands out. Each would have looked like a completed st
    *Expiration* with `units={["minute","hour","day"]}`; the REST field is a time-to-live **in
    seconds**. 30 days is `2592000`. A bare `30` means thirty seconds.
 
-### 0.3 The identity you run this as
+### 0.3 The identity you run this as — create it first
 
 **Not your admin account.** `kcadm config credentials` offers `--user/--password`,
 `--client/--secret` and `--client/--keystore`, and none of them can carry a second factor — so after
 step 11 an admin account with OTP **cannot authenticate to kcadm at all**, and the failure reads
 `invalid_grant` / *"Invalid user credentials"*, which looks like a wrong password. The realm is
-`bruteForceProtected` with `failureFactor: 5`, so retrying makes it worse.
+`bruteForceProtected` with `failureFactor: 5`, so retrying walks the account into a lockout instead.
 
-Use the short-lived provisioning identity instead — the procedure, the two required
-`realm-management` roles (`manage-clients` **and** `manage-realm`; each verified necessary in both
-directions against 26.7) and the removal step are in
-[`docs/keycloak/README.md` → *Why a service account and not the admin user*](keycloak/README.md).
-Create it before step 1, delete it after step 12.
+Use a **short-lived provisioning client with a service account**, created for this procedure and
+deleted at the end of it (§ *After the twelve*, step 1). Four steps in the Admin Console — labels
+as 26.7 writes them:
 
+1. ***Clients*** → **Create client**. Leave *Client type* on **OpenID Connect**, set *Client ID* to
+   `basetool-provisioner`, **Save**.
+2. On the *Settings* tab, under **Capability config**: set **Client authentication** to **On** (this
+   is what makes it confidential), and under **Authentication flow** leave **only** *Service account
+   roles* ticked — clear **Standard flow**, **Direct access grants**, **Implicit flow** and
+   **OAuth 2.0 Device Authorization Grant**. It is not a login client and must not be able to act as
+   one. **Save**.
+3. ***Credentials*** tab. *Client Authenticator* stays on **Client ID and Secret** (the default; a
+   random secret is generated for you). Copy the **Client Secret** — that is the value
+   `kcadm config credentials` prompts for in § 0.4.
+4. ***Service account roles*** tab → **Assign role** → **Filter by clients** → `realm-management`
+   → tick **`manage-clients`** and **`manage-realm`** → **Assign**.
+
+**Both roles, and no more.** Each was verified individually necessary against 26.7 and in both
+directions: with `manage-clients` alone the client-policy endpoints answer **403**, with
+`manage-realm` alone the client endpoints answer **403**. Editing its own role mappings would need
+`manage-users`, which it deliberately does not get — so the identity cannot widen its own reach.
+
+> [!warning] Do **not** turn *Full scope allowed* off on this client
+> Keycloak's own service-account procedure ends by pointing at the dedicated client scope's *Scope*
+> tab and recommending that switch be **off** in production. That advice is for long-lived clients
+> and is wrong here: a client the wizard creates carries `fullScopeAllowed = true`
+> (`RepresentationToModel#defaultFullScopeAllowed`: `isNew && !consentRequired`), which is exactly
+> what lets the two roles above reach the token without any scope work. Turning it off without
+> adding matching role scope mappings silently empties the token, and the symptom is a **403
+> half-way through the procedure** — on a step that looked fine a minute earlier. This client is
+> deleted at the end; that is what bounds it, not the scope switch.
+>
 > [!warning] Verify the provisioner can reach the authentication endpoints **before** step 11
 > `manage-realm` is what the flow endpoints check. Confirm it with a read rather than discovering it
 > half-way through building a flow:
@@ -87,6 +115,11 @@ Create it before step 1, delete it after step 12.
 > ```
 >
 > A `403` here means the role assignment did not take; fix that before touching step 11.
+
+The same identity, its two roles and the reasoning are also in
+[`docs/keycloak/README.md`](keycloak/README.md), where it was written for the mobile-client
+provisioning runbook. It is repeated here rather than linked because a runbook that sends you to
+another document for the credential you cannot start without is not a runbook.
 
 ### 0.4 Open a session
 
@@ -675,11 +708,30 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
 
 ## After the twelve
 
-1. **Delete the provisioning identity.** *Clients* → `basetool-provisioner` → delete. It exists to be
-   used for minutes, not to sit in the realm holding `manage-realm`.
+1. **Delete the provisioning identity** created in § 0.3. ***Clients*** → `basetool-provisioner`
+   → the client's action menu → **Delete**, and confirm. Deleting the client removes its service
+   account and the role assignments with it; there is no second cleanup.
+
+   It exists to be used for minutes, not to sit in the realm holding `manage-realm` — a credential
+   that outlives its procedure is one nobody is watching. If you would rather keep it for a planned
+   second pass, **disable** it instead (*Settings* → *Enabled* → Off): a disabled client cannot
+   obtain a token, so the standing grant is inert until you re-enable it. Delete it when the pass is
+   done either way.
+
+   **Verify it is gone**, rather than assuming the click landed — the read must come back empty:
+
+   ```bash
+   docker exec keycloak /opt/keycloak/bin/kcadm.sh get clients -r iri \
+       -q clientId=basetool-provisioner --fields clientId
+   ```
+
+   This is also the point at which your own kcadm session stops working, which is the intended
+   outcome and not a fault.
+
 2. **Remove the kcadm session file:**
    `docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config` — it holds the truststore
    password and a token in cleartext.
+
 3. **Re-export and commit the sanitized realm**, so this state is version-controlled rather than
    living only in the console:
 
