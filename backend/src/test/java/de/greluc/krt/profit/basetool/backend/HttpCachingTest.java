@@ -110,6 +110,13 @@ class HttpCachingTest {
    *
    * <p>The cost is real and accepted: this family no longer benefits from conditional requests and
    * transfers its body every time.
+   *
+   * <p><b>Since the §8.3 narrowing, the filter no longer runs on this family at all</b> — {@code
+   * StreamAwareShallowEtagHeaderFilter} skips every {@code NoStoreApiScopes} path, so the response
+   * is not buffered on its way out. Every assertion below is unchanged and still passes, which is
+   * the point of leaving them here: the buffer was the only thing removed. If a future change made
+   * this family eligible for an ETag again, the {@code doesNotExist("ETag")} line would fail here
+   * before anyone noticed the header on a member's device.
    */
   @Test
   void protectedSensitiveEndpoint_emitsNoEtagAndStillDeniesAnUnauthenticatedReplay()
@@ -127,5 +134,33 @@ class HttpCachingTest {
     mockMvc
         .perform(get("/api/v1/users").header("If-None-Match", "\"fabricated-etag\""))
         .andExpect(status().is4xxClientError());
+  }
+
+  /**
+   * The body of an unbuffered family still arrives, in full.
+   *
+   * <p>The one way §8.3's narrowing could have gone wrong. Skipping {@code ShallowEtagHeaderFilter}
+   * means the response is no longer wrapped in a {@code ContentCachingResponseWrapper} and copied
+   * back afterwards — the same mechanism whose write-back, when it silently did not run, swallowed
+   * every SSE frame in #1653. Asserting a real JSON array here is what separates "not buffered"
+   * from "not delivered".
+   */
+  @Test
+  void unbufferedSensitiveFamily_stillDeliversItsBody() throws Exception {
+    SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
+
+    String body =
+        mockMvc
+            .perform(get("/api/v1/users").with(jwt().authorities(member)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Deliberately shape-agnostic: what matters is that bytes arrived at all, not whether this
+    // family answers with an array or a page envelope -- pinning that here would make an unrelated
+    // DTO change fail a caching test.
+    org.assertj.core.api.Assertions.assertThat(body).isNotBlank();
+    org.assertj.core.api.Assertions.assertThat(body.charAt(0)).isIn('[', '{');
   }
 }

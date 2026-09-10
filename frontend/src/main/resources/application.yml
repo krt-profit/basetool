@@ -166,6 +166,25 @@ app:
     response-timeout: 5s
     read-timeout: 3s
     write-timeout: 3s
+    # The wire protocol and encoding of the frontend->backend hop (ADR-0161 8.1 / 8.5,
+    # REQ-API-011). Written out with their defaults rather than left implicit, because both are
+    # meant to be flipped from the environment during a measurement and an operator has to be able
+    # to see that they exist. Env overrides: APP_HTTP_BACKEND_PROTOCOL, APP_HTTP_CODEC,
+    # APP_HTTP_MAX_CONCURRENT_STREAMS.
+    #
+    # backend-protocol: H2 offers HTTP/2 by ALPN and falls back to HTTP/1.1 on a plain-http URL;
+    #   HTTP11 restores the pre-2026-09-10 behaviour byte for byte. The SSE relay ignores this and
+    #   stays on HTTP/1.1 either way -- see WebClientConfig#connector for why.
+    # max-concurrent-streams: how many streams ride one backend connection before the pool opens
+    #   another. 20 mirrors Tomcat 11.0.25's maxConcurrentStreamExecution, which is NOT advertised
+    #   in the SETTINGS frame: past it the server queues rather than dispatches, so a client that
+    #   let the pool collapse onto one connection would cap backend concurrency at twenty.
+    # codec: CBOR asks for `application/cbor, application/json`; JSON asks for JSON alone. Only the
+    #   response direction negotiates -- request bodies stay JSON, and RFC 7807 problems stay
+    #   problem+json regardless (REQ-API-011).
+    backend-protocol: ${APP_HTTP_BACKEND_PROTOCOL:H2}
+    max-concurrent-streams: ${APP_HTTP_MAX_CONCURRENT_STREAMS:20}
+    codec: ${APP_HTTP_CODEC:CBOR}
   livesync:
     # Cross-replica live-sync fan-out (REQ-FE-015, ADR-0094). Reuses the Redis the frontend already
     # runs for Spring Session: the changed relay publishes to a pub/sub channel and every instance

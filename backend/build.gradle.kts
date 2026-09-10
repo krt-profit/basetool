@@ -40,6 +40,13 @@ repositories { mavenCentral() }
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  // CBOR on the frontend<->backend hop (ADR-0161 §8.5). No version: the Spring Boot BOM already
+  // manages tools.jackson:jackson-bom, and pinning a second one here is how the two Jackson 3
+  // module sets drift apart. Its only job is to be PRESENT -- Spring Framework 7 detects
+  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR converter
+  // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
+  // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
+  implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   implementation("org.springframework.boot:spring-boot-starter-data-jpa")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
@@ -235,7 +242,21 @@ val logSafeMirrorSources =
     "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
   )
 
+// Where the CI step drops the previous release's openapi.json for the second half of
+// REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The property is ALWAYS handed to the test
+// JVM; ExternalContractTest#theContractTypesMatchThePreviousRelease skips when the file is not
+// there, which is every local run. Declared as an OPTIONAL input so the file appearing or changing
+// re-runs the suite instead of serving an up-to-date result that was computed without it.
+val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
+
 tasks.named<Test>("test") {
+  inputs
+    .file(contractBaseline)
+    .optional(true)
+    .withPropertyName("contractBaseline")
+    .withPathSensitivity(PathSensitivity.NONE)
+  systemProperty("contract.baseline", contractBaseline.get().asFile.absolutePath)
+
   inputs
     .files(
       rootProject.file(

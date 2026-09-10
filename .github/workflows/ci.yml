@@ -40,12 +40,37 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # `./gradlew build` runs `assemble` + `check`, and `check` pulls in the
-      # JUnit suite, Checkstyle (Google style) and the SpotBugs `spotbugsMain`
-      # task that the root build script wires into `check`. JaCoCo report
-      # generation is `finalizedBy` the Test task and runs even when tests
-      # fail. `--continue` keeps the build going so lint reports still get
-      # generated when tests fail and vice versa.
+      # The previous release's committed API document, for the half of REQ-API-009's schema diff
+      # that compares against a released artefact rather than against a recorded intent
+      # (ADR-0136, ADR-0161 8.4 -> ExternalContractTest#theContractTypesMatchThePreviousRelease).
+      #
+      # Deliberately NOT `fetch-depth: 0` on the checkout: one tag is wanted, not the history, and
+      # a full clone of this repository costs far more than the guard is worth. A single
+      # `--depth=1` tag fetch is enough to `git show` one file out of it.
+      #
+      # Every failure mode here is non-fatal on purpose. No release tag yet, a tag that predates
+      # the document, a network hiccup -- each leaves the file absent, and the test then SKIPS with
+      # a message saying so while the frozen record in the same class still runs. A guard that
+      # broke every CI run over a missing baseline would be removed within a week, and the frozen
+      # record is what covers a developer machine anyway.
+      - name: Fetch the previous release's API contract
+        continue-on-error: true
+        run: |
+          set -u
+          mkdir -p backend/build/contract-baseline
+          tag=$(git ls-remote --tags --refs --sort=-v:refname origin 'v*' \
+                | head -1 | sed 's#.*refs/tags/##')
+          if [ -z "$tag" ]; then
+            echo "no release tag on origin yet; the schema diff will skip"
+            exit 0
+          fi
+          echo "baseline tag: $tag"
+          git fetch --depth=1 origin "refs/tags/$tag:refs/tags/$tag"
+          git show "$tag:backend/src/main/resources/api/openapi.json" \
+            > backend/build/contract-baseline/openapi.json \
+            || { echo "$tag carries no openapi.json; the schema diff will skip"; \
+                 rm -f backend/build/contract-baseline/openapi.json; }
+
       - name: Build, run tests and lint
         run: ./gradlew build --continue --stacktrace
 

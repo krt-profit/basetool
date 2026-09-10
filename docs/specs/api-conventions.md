@@ -623,7 +623,21 @@ a subset of this set, and the two move together.
   Nullable enums are deliberately not frozen: a strict client coerces an unknown one to `null`, so
   an objective loses its kind badge rather than its screen, and freezing them would make the guard
   fire on harmless additions until it means nothing. Verified by adding a constant: three failures.
-- [ ] Type and nullability changes are caught. **Open** — needs a schema diff of the contract
+- [x] Type and nullability changes are caught — **closed by ADR-0161 §8.4** (2026-09-10). 1,479
+  properties across 253 schemas, reached from the contract set by the same transitive walk the enum
+  guard uses, each recorded as its JSON type, its format and whether the schema requires it.
+  <br>**"Nullability" here means `required`, and there is nothing else it could mean**: this
+  document carries no `nullable` keyword and no `["string","null"]` union — springdoc emits neither
+  at OpenAPI 3.1 — so membership of a schema's `required` list is the entire signal, and a property
+  leaving it is a field an installed build reads unconditionally and now gets `null` for.
+  <br>Two guards, because they fail on different things.
+  `theContractTypesAndNullabilityAreFrozen` compares against a committed record
+  (`backend/src/test/resources/api/frozen-contract-types.txt`) and runs everywhere, including
+  locally; a pull request could in principle edit the record and the document together.
+  `theContractTypesMatchThePreviousRelease` compares against the previous release tag's own
+  `openapi.json`, which no pull request can edit — ADR-0136's wording taken literally — and skips
+  when CI has not fetched a baseline. Verified by flipping one property from optional to required
+  (the first fails, naming the field) and by running the second against `v1.7.7`.
 - [x] A sunset can actually retire old builds — **closed by REQ-API-010** (2026-08-24). The gate
   the first `/api/v2` was waiting on now exists: the server names a floor and the app refuses to run
   below it. What that unblocks is narrower than "old builds are gone", and the difference matters
@@ -632,6 +646,66 @@ a subset of this set, and the two move together.
 
 **Enforced by:** `ExternalContractTest` (backend) ·
 **Related:** ADR-0136, ADR-0135, ADR-0003, REQ-API-001, REQ-API-007, REQ-SEC-027
+
+---
+
+### REQ-API-011 — JSON is the contract; CBOR is a second encoding of it
+
+Every `/api/**` response is available as **JSON** and, to a caller that asks for it, as **CBOR**
+(`application/cbor`, RFC 8949). Same object model, same DTOs, same field names, same Bean Validation,
+same RFC 7807 handling — only the bytes differ. The choice is content negotiation and nothing else:
+a caller that sends `Accept: application/json`, or no `Accept` at all, is served exactly what it was
+served before CBOR existed.
+
+**JSON remains the contract.** `openapi.json` documents one representation, the frozen contract set
+of REQ-API-009 is expressed in it, and the shipped clients — the Android app and the SC extractor —
+ask for it. CBOR is an encoding of the same document, not a second API, and nothing may be reachable
+in one and not the other.
+
+Three consequences that are load-bearing rather than incidental:
+
+- **RFC 7807 problems are always JSON.** `GlobalExceptionHandler` presets
+  `application/problem+json` on the response, and Spring skips content negotiation entirely for a
+  preset concrete content type. This is what keeps the stable machine-readable `code` readable by a
+  client that asked for CBOR — REQ-API-004's guarantee does not become conditional on an `Accept`
+  header.
+- **Request bodies stay JSON.** Only the response direction negotiates. Spring registers the JSON
+  encoder ahead of the CBOR one, so a write goes out as JSON without being told to — pinned by a
+  test, because it is a framework ordering rather than a decision in this repository, and a write
+  path that silently turned binary would meet every `consumes = APPLICATION_JSON_VALUE` endpoint as
+  a 415.
+- **`Vary` names `Accept`.** Two representations at one URL, on families an intermediary is
+  permitted to store (`no-cache, must-revalidate`), means a cache keyed on the URL alone could hand
+  a CBOR body to a JSON client. `ApiCacheControlFilter` emits `Vary: Accept, Accept-Encoding`.
+
+**Configuration, not a table.** Which encoding the frontend asks for is `app.http.codec`
+(`CBOR` → `Accept: application/cbor, application/json`; `JSON` → the pre-2026-09-10 header). The
+backend serves whatever is asked for either way — there is no server-side switch, because a
+representation that exists for one caller and not another is a contract that depends on
+configuration.
+
+**Not compressed.** `application/cbor` is deliberately absent from `server.compression.mime-types`,
+so a CBOR response is not gzipped where the JSON one is. That is the trade ADR-0161 §8.5 is about —
+bytes for CPU on an internal Docker hop where ADR-0085 measured bandwidth not to be the constraint —
+and it means a payload-size regression is the plausible way this turns out to be a bad idea. Watch
+both when the profiling that gates §8.5 finally runs.
+
+**Acceptance**
+
+- [x] A caller asking for CBOR gets CBOR, and it decodes to the same document as the JSON
+  (`ApiCborNegotiationTest`).
+- [x] A caller that does not ask for it is unaffected, byte for byte.
+- [x] An RFC 7807 problem stays `application/problem+json` under a CBOR `Accept`.
+- [x] A write still goes out as JSON with CBOR enabled (`WebClientCborNegotiationTest`).
+- [x] `Vary` names `Accept` as well as `Accept-Encoding` (`ApiCacheControlFilterTest`).
+- [x] `openapi.json` is unchanged by the second representation, so the generated Android models are
+  too — springdoc already emits `*/*` for these responses.
+- [ ] The serialization cost is actually measured. **Open** — ADR-0161 §8.5 makes this its own
+  precondition, and `app.http.codec=JSON` is the way back while it is pending.
+
+**Enforced by:** `ApiCborNegotiationTest`, `ApiCacheControlFilterTest` (backend) ·
+`WebClientCborNegotiationTest` (frontend) ·
+**Related:** REQ-API-004, REQ-API-007, REQ-API-009, REQ-SEC-031, ADR-0161
 
 ---
 

@@ -12,12 +12,18 @@ pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
 node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencycheck" }
+# Generates the frontend's wire models from the committed `openapi.json` (ADR-0161 §8.2). Held at
+# the SAME version the Android app's `core/contract` runs, deliberately: the two generate from one
+# document, and a version skew between them would produce two different readings of one contract --
+# which is the class of drift this whole item exists to remove.
+openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenerator" }
 
 [versions]
 
 # Held at 4.1.1 on purpose: the only newer build refreshVersions sees is a 4.2.0 MILESTONE.
 # The marker below stays so the next sweep does not have to re-derive that -- clear it when
 # 4.2.0 goes GA, not before.
+openapiGenerator = "7.25.0"
 springBoot = "4.1.1"
 ##      ⬆ = "4.2.0-M1"
 springDependencyManagement = "1.1.7"

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import de.greluc.krt.profit.basetool.backend.filter.NoStoreApiScopes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -60,6 +61,30 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * filter has already wrapped — a coupling that was evidently not holding here and that nothing in
  * our own code controls. Not wrapping a stream at all has no such condition, and an ETag over a
  * response with no end was never meaningful anyway.
+ *
+ * <h2>The second exemption: responses that can never carry an ETag</h2>
+ *
+ * <p>The streaming paths were a correctness fix. {@link NoStoreApiScopes} is a cost fix, and it
+ * rests on a fact rather than a judgement: {@link ShallowEtagHeaderFilter#isEligibleForEtag}
+ * returns {@code false} as soon as the response carries {@code Cache-Control: no-store}, and {@code
+ * ApiCacheControlFilter} sets exactly that on those fourteen families — from {@code
+ * HIGHEST_PRECEDENCE + 20}, ahead of this filter's write-back. <b>So on those paths no ETag is
+ * generated today either.</b> What still happens is the whole point: the response is buffered into
+ * a {@code ContentCachingResponseWrapper} on the way out and copied back afterwards, in full, in
+ * memory — for a header the framework has already decided not to emit.
+ *
+ * <p>That makes this exemption free of behavioural risk in a way the alternatives are not. Not one
+ * response header changes: the families that lose the buffer had no ETag to lose. Skipping the
+ * <em>catalogue</em> paths would have been the larger saving — the materials matrix that tipped the
+ * buffer at 16 MB revalidates rather than {@code no-store}s, so it does get an ETag — and it was
+ * deliberately not taken here, because that ETag is inert only for as long as no client sends
+ * {@code If-None-Match}. That is a property of today's clients, not of the response, and removing
+ * it would quietly foreclose the mobile read cache in {@code docs/WIRE_PROTOCOL_EVALUATION.md}
+ * §8.3.
+ *
+ * <p>The list is not copied here. Both filters read {@link NoStoreApiScopes}, so a family added to
+ * one is added to the other — ADR-0135's argument about a second copy of a rule, applied to a rule
+ * about caching rather than authorisation.
  */
 public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter {
 
@@ -83,8 +108,15 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
    * client its stream and exposes nothing, and a stricter normalisation belongs in both filters at
    * once rather than in this one alone.
    *
+   * <p>Two reasons to bypass, and they are not the same reason. A streaming path <b>must</b> escape
+   * the buffer or its bytes are dropped (#1653). A {@link NoStoreApiScopes} path <b>gains
+   * nothing</b> from it, because {@code Cache-Control: no-store} already makes the response
+   * ineligible for an ETag — the buffer is paid for and then thrown away. Both are answered here so
+   * a caller sees one decision rather than two half-filters.
+   *
    * @param request the request
-   * @return {@code true} for a Server-Sent-Event endpoint
+   * @return {@code true} for a Server-Sent-Event endpoint, or for a family whose response can never
+   *     carry an ETag
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
@@ -93,6 +125,9 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
       return false;
     }
     PathContainer path = PathContainer.parsePath(uri);
-    return STREAMING_PATHS.stream().anyMatch(pattern -> pattern.matches(path));
+    if (STREAMING_PATHS.stream().anyMatch(pattern -> pattern.matches(path))) {
+      return true;
+    }
+    return NoStoreApiScopes.matches(uri);
   }
 }

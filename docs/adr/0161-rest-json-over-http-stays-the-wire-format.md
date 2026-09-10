@@ -94,7 +94,10 @@ preserve every contract above. In priority order, each as its own change with it
    stream paths, while **no** first-party client sends `If-None-Match`: `BackendApiClient` never does,
    and the Android client installs no HTTP cache by deliberate security decision. On the `no-store`
    families `ApiCacheControlFilter` says outright that nothing relies on conditional requests — and
-   they are buffered and hashed anyway.
+   they are buffered anyway. (**Not hashed**: Spring's `isEligibleForEtag` already returns `false`
+   once `Cache-Control` carries `no-store`, so the MD5 was never being paid on those paths and the
+   buffer is the whole of the cost. Corrected on implementation; `HttpCachingTest` had said as much
+   since REQ-SEC-031.)
 
    **Scope this to the backend bean.** The frontend has its own `EtagConfig` registering Spring's
    `ShallowEtagHeaderFilter` on `/*`, and *that* one serves browsers, which do send `If-None-Match`.
@@ -112,7 +115,42 @@ preserve every contract above. In priority order, each as its own change with it
    ~870 constraints, same RFC 7807 handling, same filters, same metrics — only the bytes change, and
    content negotiation makes it revertable per endpoint.
 
-Items 1–4 are proposals in this ADR, not work done by it. **No runtime behaviour was changed.**
+### All five shipped with this ADR, and three of them were wrong on the way
+
+The list above is kept in the voice it was written in, because the reasoning is what makes each item
+reviewable. It is no longer a plan: items 1–5 were implemented in the same pull request, and what
+that proved is recorded in each section's **Outcome** paragraph in
+[`docs/WIRE_PROTOCOL_EVALUATION.md`](../WIRE_PROTOCOL_EVALUATION.md).
+
+**Runtime behaviour changed.** Two settings are new, both defaulting to the new behaviour and both
+reversible without a redeploy:
+
+|                Key                | Default |                                    What it does                                     |
+|-----------------------------------|---------|-------------------------------------------------------------------------------------|
+| `app.http.backend-protocol`       | `H2`    | offers HTTP/2 by ALPN on frontend→backend; `HTTP11` restores the previous behaviour |
+| `app.http.max-concurrent-streams` | `20`    | streams per backend connection before the pool opens another                        |
+| `app.http.codec`                  | `CBOR`  | asks for `application/cbor` first; `JSON` restores the previous `Accept` header     |
+
+The SSE relay is unaffected by all three and stays on HTTP/1.1.
+
+Three corrections the implementation forced, each of which would have made the change look
+successful while delivering nothing or less than nothing:
+
+1. **Reactor Netty's HTTP/2 pool does not multiplex by default.** `Http2AllocationStrategy` defaults
+   `strictConnectionReuse` to `false`, so it keeps opening one connection per concurrent call.
+   Measured on a real handshake: forty concurrent calls, forty sockets, `h2` negotiated. The flag is
+   the change; the protocol is only its prerequisite.
+2. **Tomcat 11.0.25 executes at most twenty streams per connection**, not the 200 its reference page
+   documents, and it never advertises that limit to a client. Left alone, an HTTP/2 pool that
+   collapsed onto one connection would have turned a hundred concurrent calls into twenty executing
+   ones.
+3. **The inert ETag was already not being hashed.** Spring refuses to generate one for a `no-store`
+   response, so item 3's fourteen families were paying for the buffer alone — which is also what
+   makes removing it change no response header at all.
+
+**What is still owed** is measurement, and only measurement: a before/after load test for item 1,
+`http_server_requests` for item 3, and the profiling that item 5 makes its own precondition. Each of
+the three flags exists so those can be run against production and reverted from configuration.
 
 ## Consequences
 
@@ -122,7 +160,12 @@ grounds that the first is already largely bought by gzip, the second and third a
 `openapi.json` generator we already run, and the fourth does not reach the browser, which is where both
 streaming needs live.
 
-**We accept that the frontend↔backend DTO mirror stays hand-maintained until item 2 ships**, and that
+**We accept that the frontend↔backend DTO mirror stays hand-maintained until the item-2 epic
+replaces it.** The generator now runs and `GeneratedDtoAgreementTest` compares its 411 models to the
+mirrors field by field, so drift fails the build — but the mirrors are still the types the code
+uses, and two drifts that predate the guard are frozen with their reasons rather than fixed here
+(`PromotionTopicDto` is missing `owningSquadron`; `RefineryOrderListDto` recomputes `endsAt` instead
+of reading it). Originally written as: the mirror stays hand-maintained until item 2 ships, and that
 four contract tests over a 1.87 MB spec keep carrying the load a schema compiler would have carried.
 
 **The evaluation is written down so it need not be re-litigated from scratch.**

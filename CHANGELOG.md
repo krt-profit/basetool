@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Seiten laden schneller, weil Anzeige und Backend jetzt über HTTP/2 sprechen.** Bisher hat die
+  Anzeige jeden Aufruf über eine eigene Verbindung geschickt; jetzt teilen sich viele Aufrufe
+  wenige. Sichtbar wird das vor allem dort, wo eine Seite mehrere Daten gleichzeitig holt —
+  Einsatzdetails, Hangar, Materialmatrix. Umschaltbar über `APP_HTTP_BACKEND_PROTOCOL=HTTP11`.
+- **Die Daten zwischen Anzeige und Backend gehen in einem kompakteren Format über die Leitung
+  (CBOR).** Inhaltlich identisch, nur weniger Rechenaufwand beim Lesen. Umschaltbar über
+  `APP_HTTP_CODEC=JSON`. Fehlermeldungen bleiben unverändert, und Apps und Extractor merken nichts
+  davon.
+
+### Fixed
+
+- **Bank-, Mitglieder-, Lager- und Benachrichtigungsantworten werden nicht mehr unnötig komplett im
+  Speicher zwischengelagert.** Für diese Bereiche wurde eine Zwischenspeicherung berechnet, die
+  danach ohnehin verworfen wurde. Keine Antwort ändert sich, das Backend braucht dafür nur weniger
+  Speicher.
+
 ## [v1.7.7](https://github.com/krt-profit/basetool/releases/tag/v1.7.7) - 2026-09-09
 
 ### Fixed

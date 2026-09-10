@@ -35,6 +35,8 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.netty.channel.ChannelOption;
+import io.netty.handler.ssl.ApplicationProtocolConfig;
+import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
@@ -76,6 +78,8 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.HttpProtocol;
+import reactor.netty.http.client.Http2AllocationStrategy;
 import reactor.netty.http.client.HttpClient;
 
 /** Spring configuration for Web Client. */
@@ -211,8 +215,61 @@ public class WebClientConfig {
    * M-13 deliberately allowed. The fallback (default JVM trust store) keeps hostname verification
    * enabled — that path validates against a well-known CA pool where the hostname check is the only
    * thing tying the cert to the target host.
+   *
+   * <h3>Wire protocol (ADR-0161 §8.1)</h3>
+   *
+   * <p>Both applications have set {@code server.http2.enabled: true} since they were written, and
+   * until 2026-09-10 this client never took the offer: the {@code SslContext} advertised no ALPN
+   * protocol and the {@code HttpClient} named none, so Reactor Netty spoke HTTP/1.1 to a server
+   * that had been offering HTTP/2 all along. {@code app.http.backend-protocol} now decides, and
+   * defaults to {@code H2}.
+   *
+   * <p><b>Streaming stays on HTTP/1.1, deliberately.</b> The SSE relay holds one connection per
+   * viewing browser for as long as the page is open; multiplexing a thousand of those onto a
+   * handful of connections puts every viewer behind the same flow-control window and the same
+   * server-side execution limit. There is no win to collect either — the pool ceiling this change
+   * removes is a ceiling on *concurrent requests*, and a stream is not one.
+   *
+   * <h3>Why the pool is re-derived rather than carried over</h3>
+   *
+   * <p>Under HTTP/1.1 a pooled connection carries one request at a time, so {@code
+   * maxConnections(100)} was a ceiling on concurrent calls and was deliberately aligned with the
+   * {@code backendApi} Resilience4j bulkhead at 100. Under HTTP/2 that stops being true:
+   * connections multiplex, so the same 100 would bound *connections* and the concurrency ceiling
+   * would move somewhere else entirely — and where it moves is not obvious.
+   *
+   * <p><b>It moves onto a Tomcat setting that is never advertised to us.</b> Read out of the
+   * embedded Tomcat actually on the classpath (11.0.25, {@code Http2Protocol}): {@code
+   * maxConcurrentStreams} defaults to {@code 100} and {@code maxConcurrentStreamExecution} to
+   * {@code 20}. Only the first is sent in the SETTINGS frame. The second is a server-side
+   * thread-allocation limit per connection: beyond twenty streams, {@code Http2UpgradeHandler}
+   * stops dispatching and queues the rest. So a client that let the pool collapse onto one or two
+   * connections — which is exactly what an unconfigured HTTP/2 pool does — would have turned a
+   * hundred concurrent calls into twenty executing ones and eighty waiting, and called it a
+   * modernisation.
+   *
+   * <p>Hence the explicit {@link Http2AllocationStrategy}: {@code maxConcurrentStreams} is pinned
+   * to {@code app.http.max-concurrent-streams} (default 20, mirroring that Tomcat limit) so the
+   * pool opens a further connection rather than over-subscribing one, and {@code maxConnections}
+   * stays at 100 so the aggregate cannot be worse than HTTP/1.1 was. The bulkhead's 100 remains the
+   * real gate on concurrency; what changes is that those 100 calls now ride ~5 connections instead
+   * of 100, which is the saving.
+   *
+   * <p><b>And {@code strictConnectionReuse(true)}, without which there is no saving at all.</b>
+   * Reactor Netty defaults it to {@code false}: while the pool still has a connection permit, it
+   * opens a new connection in preference to putting another stream on an open one. So "enable
+   * HTTP/2" on its own negotiates h2 and then reproduces the HTTP/1.1 connection count exactly,
+   * which is the one outcome that would have looked like a success on every dashboard. The flag is
+   * what makes multiplexing the pool's actual behaviour rather than its theoretical capability.
+   *
+   * <p>{@code pendingAcquireTimeout} keeps its 5 s alignment with the {@code TimeLimiter} and
+   * simply stops mattering as often: acquiring a free stream on an open connection is not a wait.
    */
   private ReactorClientHttpConnector connector(boolean streaming) {
+    // The SSE relay never negotiates HTTP/2 (see the Javadoc); everything else follows the
+    // property.
+    boolean http2 =
+        !streaming && httpProperties.backendProtocol() == AppHttpProperties.BackendProtocol.H2;
     try {
       SslContextBuilder builder = SslContextBuilder.forClient();
       java.util.List<String> profiles = java.util.Arrays.asList(environment.getActiveProfiles());
@@ -238,6 +295,21 @@ public class WebClientConfig {
           // pinnedTrust stays false so hostname verification remains enabled
           // on this fallback path.
         }
+      }
+      if (http2) {
+        // Without this the negotiation cannot happen at all: Reactor Netty asks the SslContext what
+        // to advertise, and a context built with no applicationProtocolConfig advertises nothing,
+        // so the server answers HTTP/1.1 and the `.protocol(H2, HTTP11)` below silently buys
+        // nothing. NO_ADVERTISE / ACCEPT is the pair Netty documents for a client: offer both, and
+        // accept whichever the server picks rather than failing the handshake over it.
+        builder =
+            builder.applicationProtocolConfig(
+                new ApplicationProtocolConfig(
+                    ApplicationProtocolConfig.Protocol.ALPN,
+                    ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                    ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                    ApplicationProtocolNames.HTTP_2,
+                    ApplicationProtocolNames.HTTP_1_1));
       }
       SslContext sslContext = builder.build();
       boolean disableHostnameVerification = pinnedTrust;
@@ -279,15 +351,37 @@ public class WebClientConfig {
         // caller's real patience instead of the backend later running a query for a request the
         // frontend already abandoned. metrics(true) exposes reactor.netty.connection.provider.* for
         // pool observability. Idle/life timeouts unchanged.
-        provider =
+        reactor.netty.resources.ConnectionProvider.Builder pool =
             reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
                 .maxConnections(100)
                 .maxIdleTime(java.time.Duration.ofSeconds(20))
                 .maxLifeTime(java.time.Duration.ofSeconds(60))
                 .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
                 .evictInBackground(java.time.Duration.ofSeconds(10))
-                .metrics(true)
-                .build();
+                .metrics(true);
+        if (http2) {
+          // Order matters and is not obvious: ConnectionProvider.Builder#maxConnections NULLS any
+          // allocation strategy set before it, so this must come after the call above or the whole
+          // strategy is silently dropped. maxConnections is repeated inside the strategy because
+          // that, and not the builder field, is what the H2 pool reads.
+          //
+          // strictConnectionReuse(true) is the line without which none of this does anything.
+          // Reactor Netty's H2 pool defaults it to FALSE, which means: while a permit is available,
+          // prefer opening a NEW connection over adding a stream to an open one. Negotiating HTTP/2
+          // and leaving that default in place gives forty concurrent calls forty sockets carrying
+          // one stream each -- the HTTP/1.1 shape, at HTTP/2's framing cost, with the pool metrics
+          // reporting the same numbers as before. Measured, not assumed:
+          // WebClientHttp2NegotiationTest counts distinct peer addresses on a real handshake and
+          // saw exactly 40 before this flag was set and 2 after.
+          pool =
+              pool.allocationStrategy(
+                  Http2AllocationStrategy.builder()
+                      .maxConnections(100)
+                      .maxConcurrentStreams(httpProperties.maxConcurrentStreams())
+                      .strictConnectionReuse(true)
+                      .build());
+        }
+        provider = pool.build();
       }
 
       HttpClient httpClient =
@@ -307,6 +401,13 @@ public class WebClientConfig {
               .option(
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
                   Math.toIntExact(httpProperties.connectTimeout().toMillis()));
+      if (http2) {
+        // Both, never H2 alone. Reactor Netty removes H2 from a multi-protocol config when the URL
+        // turns out to be plain `http://` and only errors out when H2 is the sole entry -- which is
+        // what lets the `test` profile keep pointing at http://backend:11261 without a second
+        // code path. HttpClientConnect#removeIncompatibleProtocol is the exact behaviour relied on.
+        httpClient = httpClient.protocol(HttpProtocol.H2, HttpProtocol.HTTP11);
+      }
       if (streaming) {
         // SSE relay: a long-lived response delivering sparse events. A response / read timeout
         // would sever the stream between events, so neither is applied (the backend heartbeat
@@ -579,9 +680,31 @@ public class WebClientConfig {
         .filter(
             resilienceFilter(
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
-        .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
+        .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
         .build();
+  }
+
+  /**
+   * The {@code Accept} list for backend reads (ADR-0161 §8.5).
+   *
+   * <p>CBOR first, JSON second, and the order is the negotiation: Spring picks the first acceptable
+   * type it has a converter for, so the backend answers the same objects in half the parse cost
+   * while everything that presets its own content type — RFC 7807 problems, PDF exports — skips
+   * negotiation entirely and is decoded by the JSON half or its own converter.
+   *
+   * <p>Only the response direction changes. Request bodies keep going out as JSON without being
+   * told to, because Spring registers the JSON encoder ahead of the CBOR one and {@code bodyValue}
+   * takes the first writer that can handle the type. That is worth knowing rather than relying on
+   * silently, which is why {@code WebClientCborNegotiationTest} asserts it.
+   *
+   * @return the media types this client accepts from the backend, most preferred first.
+   */
+  private java.util.List<MediaType> backendAcceptTypes() {
+    if (httpProperties.codec() == AppHttpProperties.BackendCodec.CBOR) {
+      return java.util.List.of(MediaType.APPLICATION_CBOR, MediaType.APPLICATION_JSON);
+    }
+    return java.util.List.of(MediaType.APPLICATION_JSON);
   }
 
   /**

@@ -395,6 +395,13 @@ subprojects {
         // (see `.github/workflows/ci.yml`), so without an explicit pin the spotless
         // task fails 767 files with `google-java-format(java.lang.NoSuchMethodError)`.
         // The catalog pins a JDK-25-compatible google-java-format (>= 1.35.0).
+        // Generated sources are excluded, not formatted. `frontend` adds the openapi-generator's
+        // output to its test source set (ADR-0161 8.2), which puts it in `allJava` and therefore in
+        // Spotless's default target -- and a formatter that rewrites generated code turns every
+        // regeneration into a diff and every generator upgrade into a formatting failure nobody in
+        // this repository can fix. Same reasoning the root block already applies to `openapi.json`
+        // and the SBOMs.
+        targetExclude("**/build/generated/**")
         googleJavaFormat(libs.versions.googleJavaFormat.get()).reflowLongStrings()
         removeUnusedImports()
         // GPLv3 file header, enforced on every Java source (main + test + e2e).

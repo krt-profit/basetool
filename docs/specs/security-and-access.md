@@ -1588,6 +1588,19 @@ The scope MUST be matched against the **decoded** path (REQ-SEC-029), so an enco
 `/api/v1/%62ank/accounts` cannot fall back into the weaker directive. The list is maintained in code
 rather than configuration: which data is sensitive is a property of the domain, not of a deployment.
 
+**The list has a second reader since 2026-09-10** (ADR-0161 §8.3), and therefore lives in its own
+type, `NoStoreApiScopes`, rather than privately inside `ApiCacheControlFilter`.
+`StreamAwareShallowEtagHeaderFilter` skips these families too, because Spring's `isEligibleForEtag`
+already refuses to generate an ETag once `Cache-Control` carries `no-store` — so those responses
+were being buffered in full, in memory, for a header the framework had already decided not to emit.
+Skipping them changes no response header at all.
+
+What this adds to REQ-SEC-031 is an obligation in the other direction: **a family added to the list
+now also leaves the ETag buffer, and a family removed from it re-enters one.** A second copy of the
+list would let the two drift — ADR-0135's argument about a second copy of an authorisation rule,
+applied to a rule about caching — so there is exactly one, and a test asserts that both filters
+answer from it identically for seventeen paths.
+
 **Acceptance**
 
 - [x] Every listed family answers with `private, no-store`, including the notification SSE stream.
@@ -1597,9 +1610,19 @@ rather than configuration: which data is sensitive is a property of the domain, 
 - [x] An encoded spelling of a sensitive path still gets `no-store`.
 - [x] Other `/api/**` GETs are unchanged (the shared listings keep `must-revalidate`), and non-API
   paths and writes are untouched.
-- [x] `Vary: Accept-Encoding` is still set on the sensitive families.
+- [x] `Vary: Accept, Accept-Encoding` is set on the sensitive families. `Accept` joined it when
+  §8.5 gave every `/api` path a second encoding (REQ-API-011): two representations at one URL means
+  a cache keyed on the URL alone could hand a CBOR body to a JSON client. It buys nothing on *these*
+  families — `no-store` keeps them out of every store to begin with — and is asserted here anyway,
+  because a filter that emitted the header on one bucket and not the other would be a difference
+  nobody chose.
+- [x] The ETag filter skips exactly the same families, and no response header changes when it does
+  (`StreamAwareShallowEtagHeaderFilterTest`, which asserts the premise against Spring's own filter
+  rather than against a reading of its source).
 
-**Enforced by:** `ApiCacheControlFilterTest` · **Code:** `ApiCacheControlFilter`
+**Enforced by:** `ApiCacheControlFilterTest`, `NoStoreApiScopesTest`,
+`StreamAwareShallowEtagHeaderFilterTest` ·
+**Code:** `ApiCacheControlFilter`, `NoStoreApiScopes`, `StreamAwareShallowEtagHeaderFilter`
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 

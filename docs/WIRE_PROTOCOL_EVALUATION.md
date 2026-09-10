@@ -2,6 +2,12 @@
 > is [ADR-0161](adr/0161-rest-json-over-http-stays-the-wire-format.md); the living rules stay in
 > [`docs/specs/api-conventions.md`](specs/api-conventions.md).
 > **Date:** 2026-09-10 · **Owner area:** API · BE · FE · SEC · OBS
+>
+> **Amended the same day, once.** §8.1–§8.5 were implemented, and each now ends in an **Outcome**
+> paragraph. Three of the five proposals were wrong about something and are corrected next to the
+> claim they replace — see the callout at the head of §8. Nothing else in the analysis was
+> rewritten: the argument for the refusal is what it was, and a document that quietly improved its
+> own predictions after the fact would be worth less than one that records where they missed.
 
 # Wire-protocol evaluation — gRPC and the alternatives
 
@@ -389,8 +395,29 @@ Items 1, 2, 7 and 8 are not mitigable by careful engineering. They are consequen
 ## 8. What to do instead — ranked by value per unit of risk
 
 Everything below preserves every contract in §7, needs no client change, and is individually
-revertable. **None of it was implemented in this analysis** — each item is a proposal with its own
-verification requirement.
+revertable.
+
+> [!important] §8.1 to §8.5 were implemented on 2026-09-10, in this pull request
+> The section was written as five proposals and is kept in that voice, because the reasoning is
+> what makes each one reviewable. What changed is that each now ends in an **Outcome** paragraph
+> saying what shipping it actually proved — and three of the five proposals turned out to be
+> wrong about something.
+>
+> The three, in order of how badly they would have misled someone who trusted them:
+>
+> 1. **§8.1's sketch would have negotiated HTTP/2 and saved nothing.** Reactor Netty's HTTP/2 pool
+>    defaults `strictConnectionReuse` to `false`, so it keeps opening one connection per concurrent
+>    call. Forty concurrent calls, measured: forty sockets. The flag is the change; the protocol is
+>    the prerequisite.
+> 2. **§8.1's Tomcat numbers were wrong**, and the correct ones point the other way. The embedded
+>    Tomcat is 11.0.25 and its code says `maxConcurrentStreams = 100`, `maxConcurrentStreamExecution
+>    = 20` — not 200/200 as the reference page states. The second is never advertised to a client,
+>    so an unconfigured H2 pool would have turned a hundred concurrent calls into twenty executing.
+> 3. **§8.3 overstated the cost.** Spring already refuses to generate an ETag for a `no-store`
+>    response, so those families were being buffered but never hashed. The buffer is real; the MD5
+>    was already not being paid.
+>
+> Each is corrected in place below, next to the claim it replaces, rather than only here.
 
 ### 8.1 Enable HTTP/2 on the frontend→backend hop  ·  *highest value, lowest risk*
 
@@ -431,6 +458,19 @@ HttpClient.create(provider).protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
   per-connection concurrency; the documented default is **200** for both
   ([Tomcat 11 HTTP/2 reference](https://tomcat.apache.org/tomcat-11.0-doc/config/http2.html)) — confirm
   against the exact Tomcat version in the image before sizing anything on it.
+
+  > [!warning] Confirmed, and the reference page is wrong for the version we ship
+  > Read out of the bytecode of the embedded Tomcat actually on the classpath, **11.0.25**:
+  > `maxConcurrentStreams = 100` and **`maxConcurrentStreamExecution = 20`**. The second is the
+  > dangerous one and it is **never sent in the SETTINGS frame** — it is a server-side
+  > thread-allocation limit, and past twenty streams `Http2UpgradeHandler` stops dispatching and
+  > queues the rest of that connection's work.
+  >
+  > So a client that let its pool collapse onto one or two connections would have turned a hundred
+  > concurrent calls into twenty executing ones and eighty waiting, on a change sold as a
+  > modernisation. This paragraph asked for the numbers to be confirmed rather than assumed; they
+  > were, and confirming them changed the design.
+
 - **The SSE relay is the risk case.** Long-lived streams multiplexed onto few connections behave
   differently under flow control than one-per-connection. Consider keeping the streaming connector on
   HTTP/1.1 initially — it is a separate connector already, so this is a one-line divergence.
@@ -451,6 +491,42 @@ HttpClient.create(provider).protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
 > look better than it is. **Read the endpoint's auth gate and the `Granted Authorities` DEBUG line
 > first**; reach for the transport only after those are clean.
 
+**Outcome (2026-09-10).** Shipped, and the sketch above was not enough on its own.
+
+The ALPN config and `.protocol(H2, HTTP11)` are exactly right and exactly insufficient: with them
+alone, `WebClientHttp2NegotiationTest` — a real TLS handshake against a Reactor Netty HTTP/2 server
+using the committed test material — reported `h2` negotiated **and forty distinct sockets for forty
+concurrent calls**. Reactor Netty's `Http2AllocationStrategy` defaults `strictConnectionReuse` to
+`false`, which means "while a connection permit is available, open a new connection rather than add
+a stream to an open one". HTTP/2 at HTTP/1.1's connection count, at HTTP/2's framing cost, with the
+pool metrics reading the same as before. **That is the failure mode this whole section was written
+to avoid, and it would have looked like a success.**
+
+What shipped is therefore an explicit `Http2AllocationStrategy` — `strictConnectionReuse(true)`,
+`maxConcurrentStreams` pinned to `app.http.max-concurrent-streams` (default **20**, mirroring the
+Tomcat limit above so the pool opens another connection instead of over-subscribing one), and
+`maxConnections(100)` so the aggregate can never be worse than HTTP/1.1 was. The same test now
+measures two sockets for those forty calls, and a control case on the SSE client measures more than
+eight, so the number means something.
+
+Three further decisions, each narrower than the paragraph that asked for it:
+
+- **The SSE relay stays on HTTP/1.1**, as suggested. Multiplexing a thousand long-lived viewer
+  streams onto a handful of connections puts every viewer behind one flow-control window and one
+  twenty-stream execution limit, and the ceiling being removed is a ceiling on *concurrent
+  requests* — which a stream is not. Asserted, not assumed: the same test drives both clients
+  against the same server and reads the protocol off the server's `SslHandler`.
+- **The pool sizing is re-derived, not carried over.** Under HTTP/2 `maxConnections` bounds
+  connections rather than in-flight calls, so the deliberate 1:1 alignment with the `backendApi`
+  bulkhead no longer holds; the bulkhead's `maxConcurrentCalls: 100` is now the only gate on
+  concurrency, and it is unchanged. `pendingAcquireTimeout` keeps its 5 s alignment with the
+  `TimeLimiter` and simply stops mattering as often.
+- **`app.http.backend-protocol=HTTP11` puts it back**, byte for byte, without a redeploy — which is
+  what makes the load test this section asks for something that can safely be run on production.
+
+**Still owed:** the load test itself. It is the one requirement above that cannot be met from a
+repository, and nothing here substitutes for it.
+
 ### 8.2 Generate the frontend's mirror DTOs from `openapi.json`  ·  *the maintainability win, without the protocol*
 
 261 hand-maintained mirror DTOs and four contract tests over a 1.87 MB spec exist to detect drift that a
@@ -464,12 +540,62 @@ generics and the Jackson 2 → 3 migration in flight (96 `com.fasterxml.jackson`
 imports in the backend) both need a decision; and the four contract tests should be *kept* initially,
 proving the generator agrees with them before anything is deleted.
 
+**Outcome (2026-09-10).** The generator is wired and its output is checked against the mirrors;
+nothing in `main` imports a generated type yet.
+
+`openapi-generator 7.25.0` — the same version the app's `core/contract` runs, deliberately — emits
+**411 Java models** from this document, and they compile. They land in the **test** source set: in
+`main` they would ship 261 unused classes in the jar and put generated code under Checkstyle's
+Javadoc gate, which is the caveat above answered by placement rather than by configuration. Two
+traps were worth the hour they cost: models-only generation still imports an `ApiClient` it never
+emits, for a `toUrlQueryString()` helper nothing calls (`supportUrlQuery=false` removes both), and
+the generator takes its spec as a URI **string**, so Gradle never sees the file and the task's cache
+key would not have included the contract at all.
+
+`GeneratedDtoAgreementTest` then compares the two sets field by field. It needs two lists, and both
+are written down rather than inferred: **sixteen aliases**, where a mirror and its schema simply
+carry different names (`PromotionTopicDto` against `PromotionTopicResponse`, and fourteen more —
+each established by an identical property set, not by the name), and **ten frontend-only types** that
+mirror nothing at all. Without the alias list, fifteen real mirrors would have been skipped as
+"frontend-only" and the guard would have covered the easy 94 % while missing promotion and personal
+inventory, the two youngest families.
+
+> [!bug] The first run found two live instances of the drift this item was proposed to prevent
+> Neither is fixed here — each needs a decision belonging to the area it touches, not to the change
+> that introduced the guard — and both are frozen in `KNOWN_DRIFT` with the date and the reason, so
+> anything **new** fails.
+>
+> - **`PromotionTopicDto` is missing `owningSquadron`.** The backend sends it; the mirror does not
+>   declare it; Spring Boot disables `FAIL_ON_UNKNOWN_PROPERTIES`, so it is dropped in silence and
+>   the promotion UI cannot render a topic's owning squadron even though the data arrives. This is
+>   the failure mode in its pure form.
+> - **`RefineryOrderListDto` is missing `endsAt`** — and *recomputes* it, in `getEndsAt()`, as
+>   `startedAt + durationMinutes`. Not a dropped field so much as a second implementation of one,
+>   which would diverge silently the day the server's answer stops being that sum.
+
+The swap itself stays an epic, and the reason is now concrete rather than estimated: the generator
+emits classes with getters where the mirrors are records, `List` where they use `Set`, and
+`OffsetDateTime` where they use `Instant`. Every accessor call site moves, and the Javadoc that
+explains *why* a field exists — `MissionDto`'s slimming note is the clearest example — is not
+reproducible from a schema.
+
 ### 8.3 Stop paying for an ETag nobody uses  ·  *a live, unnoticed cost*
 
 **Finding.** `StreamAwareShallowEtagHeaderFilter` extends `ShallowEtagHeaderFilter`, which **buffers the
 entire response in memory and MD5-hashes it** to compute a shallow ETag. It exempts exactly two paths
 (`/api/v1/notifications/stream`, `/api/v1/live-sync/stream`). Every other `/api/**` response is buffered
 and hashed — including the materials matrix that *"tipped the buffer"* at 16 MB.
+
+> [!note] Half of that sentence is wrong, and the half that survives is the expensive half
+> Spring's `isEligibleForEtag` returns `false` as soon as the response carries `Cache-Control:
+> no-store`, and `ApiCacheControlFilter` sets exactly that on fourteen path families from
+> `HIGHEST_PRECEDENCE + 20` — ahead of this filter's write-back. So those families were **buffered
+> but never hashed**: the MD5 was already not being paid, and `HttpCachingTest` had said so since
+> REQ-SEC-031 (*"deliberately emits no ETag for them at all"*).
+>
+> The buffer is the real cost and it is unconditional: `ConditionalContentCachingResponseWrapper`
+> wraps the response on the way out and `copyBodyToResponse()` copies it back, in full, in memory,
+> for a header the framework has already decided not to emit.
 
 **No first-party client can ever benefit.** `BackendApiClient` never sends `If-None-Match` (the only
 conditional GETs in the repo are the *outbound* `UexClient` / `ScWikiClient` integrations against
@@ -482,11 +608,10 @@ So every `/api/**` response pays a full buffer plus an MD5 for a revalidation th
 the **backend's** CPU, which is where that filter runs.
 
 > [!warning] There are **two** ETag filters, and only one of them is inert
-> An earlier draft of this section put the cost on *"the frontend's CPU — the worst throttle in the
->
->> stack"*. That conflates two filters. `StreamAwareShallowEtagHeaderFilter` is a **backend** bean on
->> `/api/**`; the frontend has its own `EtagConfig`, which registers Spring's plain
->> `ShallowEtagHeaderFilter` on **`/*`** at `HIGHEST_PRECEDENCE + 10`.
+> An earlier draft of this section charged the cost to the frontend's CPU, calling it the worst
+> throttle in the stack. That conflates two filters. `StreamAwareShallowEtagHeaderFilter` is a
+> **backend** bean on `/api/**`; the frontend has its own `EtagConfig`, which registers Spring's
+> plain `ShallowEtagHeaderFilter` on **`/*`** at `HIGHEST_PRECEDENCE + 10`.
 >
 > The distinction decides what may be touched. On the frontend's filter the client is a **browser**,
 > browsers do send `If-None-Match`, and those 304s are real — **removing it would be a regression, not
@@ -512,6 +637,36 @@ the **backend's** CPU, which is where that filter runs.
 Keep `HttpCachingTest` green either way; it encodes the intended behaviour, including that a fabricated
 `If-None-Match` must never short-circuit authorization.
 
+**Outcome (2026-09-10).** Option 2, scoped to the `no-store` families and nothing else.
+
+The correction above is what makes this the safe option rather than merely the cheap one: on those
+fourteen families **no response header changes at all**, because there was no ETag to lose. What is
+removed is the buffer, and only the buffer. The premise is asserted against Spring itself rather
+than read out of its source — `StreamAwareShallowEtagHeaderFilterTest` runs the *plain*
+`ShallowEtagHeaderFilter` over a `no-store` response and asserts no ETag appears, so a future Spring
+that changed this fails the build here instead of quietly starting to cost 304s.
+
+**The catalogue paths were deliberately not taken**, although they are the larger saving — the
+materials matrix revalidates rather than `no-store`s, so it *does* get an ETag. That ETag is inert
+only for as long as no client sends `If-None-Match`, which is a fact about today's clients and not
+about the response; removing it would quietly foreclose option 3.
+
+The fourteen families now live in one place, `NoStoreApiScopes`, read by both filters. A copied list
+would have passed every case and diverged the first time a family was added to one of them —
+ADR-0135's argument about a second copy of an authorisation rule, applied to a rule about caching.
+The invariant is asserted directly: for seventeen paths, `no-store` written by one filter must mean
+"skip the buffer" in the other, in both directions.
+
+One side effect worth recording rather than discovering later: eleven of the fourteen families are
+`/**` patterns, which match a literal `.` segment, where the two streaming exemptions are **exact**
+patterns and do not. So `/api/v1/notifications/./stream` is now recognised and
+`/api/v1/live-sync/./stream` still is not. The asymmetry is pinned by a test so that whoever
+reconciles the two lists knows it is there.
+
+**Still owed:** the measurement in option 1. Narrowing was chosen over measuring because this
+particular narrowing is header-neutral by construction, which makes it the rare case where shipping
+first costs nothing — but how much CPU and heap it returns is still unknown.
+
 ### 8.4 Take protobuf's *evolution discipline* without protobuf  ·  *closes an admitted gap*
 
 [ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md) already names its own weakness:
@@ -528,6 +683,42 @@ not a migration.
 (`docs/specs/api-conventions.md`). Whoever ships it ticks that box; it should not become a second
 entry for one piece of work.
 
+**Outcome (2026-09-10).** Both halves shipped, and the box is ticked.
+
+The comparison covers **1,479 properties across 253 schemas**, reached from the 226 contract
+operations by exactly `walkSchema`'s traversal — transitive and cycle-guarded, because a client
+parses the whole payload and a type four levels down inside a participant's job type breaks it as
+surely as one on the root object. Each entry is one line: the JSON type, the format, and whether the
+schema lists the property as required.
+
+> [!important] "Nullability" in this document means `required`, and nothing else
+> `openapi.json` carries **no** `nullable` keyword and **no** `["string","null"]` type union —
+> springdoc emits neither at OpenAPI 3.1. Checked: zero occurrences of either across 1.87 MB. So a
+> schema's `required` list is the entire nullability signal the contract has, and freezing
+> membership of it is what turns "a field stopped being required" into a build failure rather than
+> a null on a member's phone.
+
+Two guards, because they fail on different things:
+
+- **`theContractTypesAndNullabilityAreFrozen`** compares against
+  `backend/src/test/resources/api/frozen-contract-types.txt`, a committed record of what somebody
+  wrote down and reviewed. It runs everywhere, including on a developer machine. Its weakness is
+  that a pull request can edit the record and the document together, which is what a careless "make
+  the build pass" looks like. A data file rather than the `Map.ofEntries` literal the enum guard
+  uses: at 1,479 entries the literal would be longer than the test around it, and a contract change
+  is far easier to review as a sorted data diff.
+- **`theContractTypesMatchThePreviousRelease`** compares against the previous release tag's own
+  `openapi.json`, which no pull request can edit. This is ADR-0136's wording taken literally. Its
+  weakness is the mirror image — it needs a baseline, so it **skips** when there is none. CI fetches
+  the tag (`--depth=1`, one tag, not the history) and passes `-Dcontract.baseline`; every failure
+  mode of that step is non-fatal, because a guard that broke CI over a missing baseline would be
+  removed within a week.
+
+Both were verified by breaking them: flipping one property from optional to required in the frozen
+record fails the first with the exact field named, and the second runs green against `v1.7.7`'s
+document — confirming, incidentally, that nothing in the contract has changed shape since that
+release.
+
 ### 8.5 Optional, measure-first: a binary JSON codec on seam 4
 
 If §8.1 and §8.3 land and frontend CPU is *still* the constraint, the cheap next step is **not** gRPC but
@@ -538,6 +729,49 @@ metrics — only the bytes change, and content negotiation makes it revertable p
 This is the honest "modern binary format" option for this codebase: it collects most of the
 serialization win and none of the §7 regressions. It should still be gated on a measurement showing
 serialization is a real share of the cost, which no evidence available here establishes.
+
+**Outcome (2026-09-10).** CBOR shipped on seam 4, behind `app.http.codec`, and the implementation is
+one dependency.
+
+Spring Framework 7 detects `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers
+both the servlet converter and the reactive codecs itself, so adding
+`tools.jackson.dataformat:jackson-dataformat-cbor` to both modules *is* the wiring. The frontend then
+asks for `application/cbor, application/json`, in that order, and everything else follows from
+content negotiation. CBOR rather than Smile because it is an IANA-registered media type (RFC 8949)
+that an outside reader recognises, where Smile is Jackson's own.
+
+Four things had to be shown not to move, and each is asserted rather than reasoned about:
+
+- **A JSON caller is completely unaffected.** The Android app and the extractor send `Accept:
+  application/json` and are shipped builds that cannot be redeployed with the server. Negotiation is
+  what keeps this invisible to them.
+- **RFC 7807 problems stay JSON even under a CBOR `Accept`.** `GlobalExceptionHandler` presets
+  `application/problem+json`, and Spring skips negotiation entirely for a preset concrete content
+  type. Had that not held, the frontend would have stopped reading the stable machine-readable
+  `code` that `krt-fetch.js` routes reload-vs-toast on — a transport change surfacing as a UI bug.
+- **Request bodies stay JSON.** Spring registers the JSON encoder ahead of the CBOR one, so
+  `bodyValue` keeps writing JSON without being told to. That is a property of a framework ordering,
+  not of anything in this repository, so it is pinned by a test: a write path that silently turned
+  binary would reach every `consumes = APPLICATION_JSON_VALUE` endpoint as a 415.
+- **`openapi.json` does not change**, and therefore neither do the Android models. springdoc already
+  emits `*/*` for these responses; verified by regenerating and diffing.
+
+> [!warning] One bug this would have introduced, caught before it shipped
+> `/api/**` now has **two representations at one URL**, and `ApiCacheControlFilter` named only
+> `Accept-Encoding` in `Vary`. On the `no-cache, must-revalidate` families — which an intermediary
+> is explicitly permitted to store — a cache keyed on the URL alone could hand a CBOR body to a
+> JSON client, which is a parse failure on a client that did nothing wrong. `Vary: Accept` now goes
+> out alongside it.
+
+Deliberately **not** done: `application/cbor` is absent from `server.compression.mime-types`, so a
+CBOR response is not gzipped where the JSON one was. That is the trade §8.5 is about — bytes for CPU
+on an internal Docker hop where ADR-0085 shows bandwidth is not the constraint — but it means a
+measurement has to watch both, and a payload-size regression is the plausible way this could turn
+out to be a bad idea.
+
+**Still owed:** the measurement this section makes a precondition. Both of its prerequisites (§8.1
+and §8.3) now exist, so the profiling it asks for is finally possible; `app.http.codec=JSON` is the
+way back while it is pending.
 
 ### 8.6 Explicitly *not* recommended
 
@@ -566,14 +800,41 @@ The recommendation is conditional on measured facts, so here is what would chang
 Note what is **not** on that list: user growth. At 200 concurrent users on an 8-vCPU host averaging
 3.2 %, growth alone will not make the transport the bottleneck.
 
-## 10. Open questions for the owner
+## 10. Open questions for the owner — answered 2026-09-10
+
+All four were put to @greluc and all four were decided. Kept with their answers rather than deleted,
+because the answer to the first one is the reason the rest of this document reads the way it does.
 
 1. **§8.1 (HTTP/2 on seam 4)** — proceed? It touches TLS/ALPN and pool sizing on the busiest hop, so it
    wants its own PR, a load test and probably its own ADR.
+   → **Proceed, in this PR, behind a flag defaulting to on**, with the verification moved from
+   production to the test environment. That is what surfaced the `strictConnectionReuse` default and
+   the real Tomcat limits; on production, both would have shown up as "no improvement" with no
+   indication why. The load test is still owed.
 2. **§8.3 (ETag)** — measure first, or narrow `shouldNotFilter` straight away? The narrowing is small and
    provably inert on the `no-store` families.
+   → **Narrow, and only the `no-store` families.** The large catalogues stay filtered: their ETag is
+   inert because of what today's clients happen to do, not because of what the response is.
 3. **§8.2 (frontend DTO generation)** — worth an epic? It is the largest maintainability win identified,
    and it is orthogonal to everything else here.
+   → **Wire the generator and check the mirrors against it now; leave the swap to its own epic.**
+   The check found two live drifts on its first run, which is a decent argument that the epic is
+   worth scheduling rather than merely worth having.
 4. **§8.4 (openapi.json schema diff in CI)** — this closes a gap ADR-0136 documents about itself; should
    it become a requirement under REQ-API-009?
+   → **Yes, and both forms of it.** REQ-API-009's last open acceptance box is now ticked; the frozen
+   record and the previous-release diff cover each other's blind spot.
+
+### What is still open
+
+Three things, all of them measurements, and none of them obtainable from a repository:
+
+|                                   What                                    | Which section |                            Why it could not be done here                             |
+|---------------------------------------------------------------------------|---------------|--------------------------------------------------------------------------------------|
+| A before/after load test of mission detail and the materials matrix, p95  | §8.1          | needs production-shaped load; `app.http.backend-protocol=HTTP11` is the way back     |
+| `http_server_requests` before/after on the matrix and a large list        | §8.3          | the narrowing is header-neutral, so how much it returns is still unknown             |
+| Profiling that says whether serialization is a real share of frontend CPU | §8.5          | its two prerequisites now exist, so this is finally answerable; `codec=JSON` reverts |
+
+Until the third one is answered, §8.5 is a capability rather than a justified change — which is
+exactly what its own "measure first" clause says, and the flag is there so that stays true.
 
