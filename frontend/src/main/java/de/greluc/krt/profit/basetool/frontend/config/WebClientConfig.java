@@ -264,6 +264,22 @@ public class WebClientConfig {
    *
    * <p>{@code pendingAcquireTimeout} keeps its 5 s alignment with the {@code TimeLimiter} and
    * simply stops mattering as often: acquiring a free stream on an open connection is not a wait.
+   *
+   * <h3>And why HTTP/2 drops the channel-level read timeout</h3>
+   *
+   * <p>The same collapse from a hundred connections to two turns a harmless timeout into an outage.
+   * A channel-level {@link ReadTimeoutHandler} bounds silence on a <em>connection</em>; under
+   * HTTP/1.1 that fired on an idle pooled connection and cost one spare out of a hundred. Under
+   * HTTP/2 the one or two connections that carry everything are idle between bursts by design, so
+   * the timeout closes the connection the application is riding and the next request fails with
+   * {@code PrematureCloseException}.
+   *
+   * <p>It cost five E2E write flows and 169 log lines before it was found, and the failure did not
+   * look like a transport problem from the outside: {@code krtFetch} falls back to a full page
+   * reload on a failed call, so the symptom was "the page reloaded" on five unrelated screens. The
+   * per-request bound is unaffected — {@code responseTimeout} arms a read timeout when the request
+   * is sent and disarms it when the response completes, which is the HTTP/2-correct unit, and the
+   * {@code backendApi} TimeLimiter closes the outer bound at 5 s.
    */
   private ReactorClientHttpConnector connector(boolean streaming) {
     // The SSE relay never negotiates HTTP/2 (see the Javadoc); everything else follows the
@@ -429,19 +445,46 @@ public class WebClientConfig {
         // stream.
         // The in-memory codec limit is unaffected: it bounds the decompressed body, not the wire
         // size.
-        httpClient =
-            httpClient
-                .compress(true)
-                .responseTimeout(httpProperties.responseTimeout())
-                .doOnConnected(
-                    conn ->
-                        conn.addHandlerLast(
-                                new ReadTimeoutHandler(
-                                    httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
-                            .addHandlerLast(
-                                new WriteTimeoutHandler(
-                                    httpProperties.writeTimeout().toMillis(),
-                                    TimeUnit.MILLISECONDS)));
+        httpClient = httpClient.compress(true).responseTimeout(httpProperties.responseTimeout());
+        if (http2) {
+          // NO channel-level ReadTimeoutHandler under HTTP/2, and this is not a nicety.
+          //
+          // That handler bounds silence on a CONNECTION, which was the right unit when a connection
+          // carried one request at a time: under HTTP/1.1 it fired on an idle pooled connection,
+          // closed it, and cost a spare out of a hundred. Under HTTP/2 with strict connection reuse
+          // one or two connections carry everything and are idle between bursts by design -- so the
+          // 3 s timeout fires on the connection the whole application is riding, closes it, and the
+          // next request in flight dies with `PrematureCloseException: Connection prematurely
+          // closed BEFORE response`. `maxIdleTime(20s)` never gets a say because 3 s comes first.
+          //
+          // Observed, not theorised: the first E2E run after HTTP/2 landed carried 169 of exactly
+          // that pair in the frontend log, and five write flows failed because krtFetch fell back
+          // to a full page reload on the failed call. The log lines have no correlation id, which
+          // is the tell -- the timeout fired with no request in flight.
+          //
+          // What still bounds a call: `responseTimeout` (Reactor Netty adds a ReadTimeoutHandler
+          // when the request is sent and removes it when the response is complete -- per REQUEST,
+          // and HTTP/2-aware), and the `backendApi` Resilience4j TimeLimiter at 5 s. The write
+          // timeout is kept because it arms per write promise rather than on idle, so multiplexing
+          // does not change what it means.
+          httpClient =
+              httpClient.doOnConnected(
+                  conn ->
+                      conn.addHandlerLast(
+                          new WriteTimeoutHandler(
+                              httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
+        } else {
+          httpClient =
+              httpClient.doOnConnected(
+                  conn ->
+                      conn.addHandlerLast(
+                              new ReadTimeoutHandler(
+                                  httpProperties.readTimeout().toMillis(), TimeUnit.MILLISECONDS))
+                          .addHandlerLast(
+                              new WriteTimeoutHandler(
+                                  httpProperties.writeTimeout().toMillis(),
+                                  TimeUnit.MILLISECONDS)));
+        }
       }
       return new ReactorClientHttpConnector(httpClient);
     } catch (Exception e) {

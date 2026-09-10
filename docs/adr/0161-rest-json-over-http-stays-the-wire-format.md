@@ -133,8 +133,8 @@ reversible without a redeploy:
 
 The SSE relay is unaffected by all three and stays on HTTP/1.1.
 
-Three corrections the implementation forced, each of which would have made the change look
-successful while delivering nothing or less than nothing:
+Four corrections the implementation forced. The first three would have made the change look
+successful while delivering nothing; the fourth made it look like five unrelated UI bugs:
 
 1. **Reactor Netty's HTTP/2 pool does not multiplex by default.** `Http2AllocationStrategy` defaults
    `strictConnectionReuse` to `false`, so it keeps opening one connection per concurrent call.
@@ -147,6 +147,13 @@ successful while delivering nothing or less than nothing:
 3. **The inert ETag was already not being hashed.** Spring refuses to generate one for a `no-store`
    response, so item 3's fourteen families were paying for the buffer alone — which is also what
    makes removing it change no response header at all.
+4. **A per-connection read timeout becomes an outage under multiplexing.** The connector armed a
+   channel-level `ReadTimeoutHandler` through `doOnConnected`. Harmless while a hundred connections
+   each carried one request; under HTTP/2 it closed the one connection everything was riding, during
+   an idle gap, and the next request in flight died with `PrematureCloseException`. Found by the E2E
+   suite, not by reasoning: five write flows failed on `window.__krtNoReload` because `krtFetch`
+   falls back to a page reload. Not armed under HTTP/2 any more; `responseTimeout` is the
+   per-request, protocol-correct bound and is unchanged.
 
 **What is still owed** is measurement, and only measurement: a before/after load test for item 1,
 `http_server_requests` for item 3, and the profiling that item 5 makes its own precondition. Each of

@@ -417,6 +417,14 @@ revertable.
 >    response, so those families were being buffered but never hashed. The buffer is real; the MD5
 >    was already not being paid.
 >
+> And a fourth, found after the first implementation shipped rather than while writing it:
+>
+> 4. **A per-connection read timeout becomes an outage under multiplexing.** §8.1's own "watch this"
+>    note predicted the channel-level `ReadTimeoutHandler` would show up as *handshake cost after a
+>    lull*. It showed up as `PrematureCloseException` on five E2E write flows, because the connection
+>    it closed in idle was the one connection everything was riding. The prediction that it mattered
+>    was right; the prediction that it would degrade gradually was not.
+>
 > Each is corrected in place below, next to the claim it replaces, rather than only here.
 
 ### 8.1 Enable HTTP/2 on the frontend→backend hop  ·  *highest value, lowest risk*
@@ -545,12 +553,38 @@ Three further decisions, each narrower than the paragraph that asked for it:
 above shows the connection count moved in the intended direction; it says nothing about latency,
 which is the number the brief actually constrains.
 
-One thing to watch while it runs, flagged as a question rather than a claim because it was not
-measured: the connector adds a channel-level `ReadTimeoutHandler` through `doOnConnected`, and under
-HTTP/2 far fewer connections carry far more of the traffic — so if idle connections are being closed
-and re-handshaked between bursts, it will show up as TLS handshake cost after a lull rather than as
-an error. `responseTimeout` is per-request and H2-aware, so the per-call bound is unaffected either
-way.
+> [!bug] That question had an answer, and the guess about its shape was wrong
+> The paragraph here used to flag the channel-level `ReadTimeoutHandler` as something to *watch*
+> during the load test, and predicted it would surface as **TLS handshake cost after a lull rather
+> than as an error**. It surfaced as an error, and the E2E suite found it before any load test could.
+>
+> The mechanism is the same collapse that makes HTTP/2 worth having. A channel-level read timeout
+> bounds silence on a **connection**. Under HTTP/1.1 that fired on an idle pooled connection and
+> cost one spare out of a hundred. Under HTTP/2 with strict connection reuse, one or two connections
+> carry everything and are idle between bursts *by design* — so the 3 s timeout closed the
+> connection the application was riding, and whatever was in flight died with
+> `PrematureCloseException: Connection prematurely closed BEFORE response`. `maxIdleTime(20s)` never
+> got a say, because 3 s comes first.
+>
+> **169 such log lines and five failed E2E write flows**, on three browsers, deterministically. And
+> it did not look like a transport problem from the outside: `krtFetch` falls back to a full page
+> reload when a call fails, so the symptom was *"the page reloaded"* on five unrelated screens, each
+> failing its `window.__krtNoReload` assertion. None of the 169 lines carried a correlation id —
+> which is the tell that the timeout fired with **no request in flight**.
+>
+> **Fixed by not arming it under HTTP/2.** The per-request bound is unaffected: `responseTimeout`
+> adds a read timeout when the request is sent and removes it when the response completes, which is
+> the HTTP/2-correct unit, and the `backendApi` TimeLimiter closes the outer bound at 5 s. The
+> *write* timeout is kept, because it arms per write promise rather than on idle. Pinned by
+> `WebClientHttp2IdleConnectionTest`, which asserts that the **same socket** serves a call before and
+> after an idle window longer than the read timeout — not merely that the second call succeeds,
+> because a silently replaced connection would satisfy that and leave the race intact. Verified by
+> restoring the old behaviour: two peer addresses instead of one.
+>
+> **The lesson is about the shape of the guess, not the guess itself.** Flagging the handler was
+> right. Predicting it would degrade *gradually*, as cost, was the error — a connection that carries
+> everything does not degrade when it dies, it fails. Under multiplexing, "one of many" resources
+> quietly becomes "the one", and every per-connection bound has to be re-read in that light.
 
 ### 8.2 Generate the frontend's mirror DTOs from `openapi.json`  ·  *the maintainability win, without the protocol*
 
