@@ -698,6 +698,13 @@ public class WebClientConfig {
    * takes the first writer that can handle the type. That is worth knowing rather than relying on
    * silently, which is why {@code WebClientCborNegotiationTest} asserts it.
    *
+   * <p>Read by <b>all three</b> request/response clients — the main one, the anonymous
+   * terms-document client and the live-sync subscribe probe. One seam, one setting: a client left
+   * on a hardcoded {@code Accept} would be a path {@code app.http.codec} silently does not reach,
+   * and the reason for the exception would have to be re-derived by whoever found it. The SSE relay
+   * is the one client that does not read this, because it asks for {@code text/event-stream} and
+   * negotiates nothing.
+   *
    * @return the media types this client accepts from the backend, most preferred first.
    */
   private java.util.List<MediaType> backendAcceptTypes() {
@@ -748,7 +755,7 @@ public class WebClientConfig {
         .filter(
             resilienceFilter(
                 "backendApi", cbRegistry, retryRegistry, timeLimiterRegistry, bulkheadRegistry))
-        .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
+        .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
         .build();
   }
@@ -827,7 +834,7 @@ public class WebClientConfig {
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())
-        .defaultHeaders(headers -> headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON)))
+        .defaultHeaders(headers -> headers.setAccept(backendAcceptTypes()))
         .baseUrl(backendProperties.backendUrl())
         .build();
   }

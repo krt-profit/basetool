@@ -524,8 +524,33 @@ Three further decisions, each narrower than the paragraph that asked for it:
 - **`app.http.backend-protocol=HTTP11` puts it back**, byte for byte, without a redeploy — which is
   what makes the load test this section asks for something that can safely be run on production.
 
-**Still owed:** the load test itself. It is the one requirement above that cannot be met from a
-repository, and nothing here substitutes for it.
+> [!tip] Confirmed against the real stack, not only against a test double
+> The unit-level test drives the production connector against a Reactor Netty server, which leaves
+> one thing unproven: whether **Tomcat** offers `h2` by ALPN with the keystore this project actually
+> serves. It does. Measured on the local test stack (`docker-compose.test.yml`, committed test TLS,
+> images built from this branch):
+>
+> |                    Probe                     |                                  Result                                   |
+> |----------------------------------------------|---------------------------------------------------------------------------|
+> | `curl --http2` → backend                     | `http_version=2`, `200`                                                   |
+> | `Accept: application/cbor`                   | `200`, `content-type: application/cbor`, 117 B vs 125 B as JSON           |
+> | Response headers                             | `vary: Accept`, `vary: Accept-Encoding`, an `ETag` on a revalidate family |
+> | 120 concurrent page loads, HTTP/2            | **2** established frontend→backend connections                            |
+> | The same, `APP_HTTP_BACKEND_PROTOCOL=HTTP11` | **7**                                                                     |
+>
+> The last two are the same control the unit test runs, one layer up, and the flag demonstrably
+> works from the container's environment — which is what the load test below depends on.
+
+**Still owed:** the load test itself — p95 on the two shapes, under production-like load. The table
+above shows the connection count moved in the intended direction; it says nothing about latency,
+which is the number the brief actually constrains.
+
+One thing to watch while it runs, flagged as a question rather than a claim because it was not
+measured: the connector adds a channel-level `ReadTimeoutHandler` through `doOnConnected`, and under
+HTTP/2 far fewer connections carry far more of the traffic — so if idle connections are being closed
+and re-handshaked between bursts, it will show up as TLS handshake cost after a lull rather than as
+an error. `responseTimeout` is per-request and H2-aware, so the per-call bound is unaffected either
+way.
 
 ### 8.2 Generate the frontend's mirror DTOs from `openapi.json`  ·  *the maintainability win, without the protocol*
 
