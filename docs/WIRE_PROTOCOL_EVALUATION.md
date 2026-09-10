@@ -424,6 +424,10 @@ revertable.
 >    lull*. It showed up as `PrematureCloseException` on five E2E write flows, because the connection
 >    it closed in idle was the one connection everything was riding. The prediction that it mattered
 >    was right; the prediction that it would degrade gradually was not.
+> 5. **§8.5's central claim — "same object model, only the bytes change" — is false out of the box.**
+>    Jackson writes a `UUID` as sixteen raw bytes on any format that can hold binary, so all 209
+>    `string/uuid` properties of the frozen contract stop being strings under CBOR. It reached CI,
+>    and the unit test that should have caught it compared two **empty** arrays.
 >
 > Each is corrected in place below, next to the claim it replaces, rather than only here.
 
@@ -821,6 +825,31 @@ Four things had to be shown not to move, and each is asserted rather than reason
 > is explicitly permitted to store — a cache keyed on the URL alone could hand a CBOR body to a
 > JSON client, which is a parse failure on a client that did nothing wrong. `Vary: Accept` now goes
 > out alongside it.
+>
+> [!bug] "Only the bytes change" was the claim, and it was wrong — by 209 properties
+> Jackson's `UUIDSerializer` asks the generator `canWriteBinaryNatively()` and writes the **sixteen
+> raw bytes** when the answer is yes. JSON answers no and emits
+> `"00000000-0000-0000-0000-000000000001"`. CBOR answers yes. Anything that then treats the value as
+> text renders `AAAAAAAAAAAAAAAAAAAAAQ==` — base64 of those bytes — and that is what appeared in a
+> `<select>` value, in picker option ids and in table row keys, failing five end-to-end write flows
+> on all three browsers.
+>
+> **Every unit test stayed green, and the one that should not have was vacuous.** The negotiation
+> test compares the decoded trees of `/api/v1/job-types`, whose `JobTypeDto` does carry a
+> `string/uuid` — but that list is empty in the test context, so it compared two empty arrays and
+> passed. A document comparison proves nothing about a document with nothing in it. It now aborts
+> loudly instead, and the real guarantee moved to `CborJsonFidelityTest`, which encodes one value
+> carrying every type whose wire form could diverge and needs no seeded data at all.
+>
+> **Fixed at the encoder** (`CborFidelityConfig`), because 209 frozen contract properties are
+> `type: string, format: uuid` and a representation that silently stops being a string on one
+> encoding is precisely the in-place shape change REQ-API-009 exists to forbid. A UUID costs 36
+> bytes as text against 16 as binary; paying those 20 is what keeps one contract instead of two.
+>
+> One further divergence is **recorded rather than fixed**: a `BigDecimal` comes back as a decimal
+> node from CBOR and as a double from JSON — same value, different scale. That is CBOR being *more*
+> faithful, and every consumer binds to a declared type rather than reading the tree. Stated in the
+> test so the next reader meets it as a known difference.
 
 Deliberately **not** done: `application/cbor` is absent from `server.compression.mime-types`, so a
 CBOR response is not gzipped where the JSON one was. That is the trade §8.5 is about — bytes for CPU

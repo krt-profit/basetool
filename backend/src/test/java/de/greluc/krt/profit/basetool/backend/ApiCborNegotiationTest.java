@@ -106,6 +106,20 @@ class ApiCborNegotiationTest {
     // document -- a byte comparison could only ever show they differ, which is not the point.
     JsonNode fromCbor = CBOR.readTree(cbor);
     JsonNode fromJson = tools.jackson.databind.json.JsonMapper.builder().build().readTree(json);
+
+    // This case USED TO BE VACUOUS and it cost five E2E write flows to find out. `JobTypeDto`
+    // carries a `string/uuid` id, so this comparison should have caught UUIDs turning into CBOR
+    // binary -- but the list is empty in the test context, so it compared two empty arrays and
+    // passed. The floor is the whole lesson: a document comparison proves nothing about a document
+    // with nothing in it. The type-level guarantee lives in CborJsonFidelityTest, which does not
+    // depend on seeded data at all.
+    JsonNode rows = fromJson.has("content") ? fromJson.get("content") : fromJson;
+    if (rows.isEmpty()) {
+      // Not a silent skip: say so, so that a reader knows which half of this class is live.
+      org.junit.jupiter.api.Assumptions.abort(
+          "no job types seeded, so this comparison would be vacuous — the type-level guarantee is"
+              + " CborJsonFidelityTest, which needs no data");
+    }
     assertThat(fromCbor).isEqualTo(fromJson);
   }
 

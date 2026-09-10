@@ -133,8 +133,8 @@ reversible without a redeploy:
 
 The SSE relay is unaffected by all three and stays on HTTP/1.1.
 
-Four corrections the implementation forced. The first three would have made the change look
-successful while delivering nothing; the fourth made it look like five unrelated UI bugs:
+Five corrections the implementation forced. The first three would have made the change look
+successful while delivering nothing; the last two made it look like unrelated UI bugs:
 
 1. **Reactor Netty's HTTP/2 pool does not multiplex by default.** `Http2AllocationStrategy` defaults
    `strictConnectionReuse` to `false`, so it keeps opening one connection per concurrent call.
@@ -154,6 +154,13 @@ successful while delivering nothing; the fourth made it look like five unrelated
    suite, not by reasoning: five write flows failed on `window.__krtNoReload` because `krtFetch`
    falls back to a page reload. Not armed under HTTP/2 any more; `responseTimeout` is the
    per-request, protocol-correct bound and is unchanged.
+5. **Item 5's own premise was false.** "Same object model, only the bytes change" does not hold:
+   Jackson writes a `UUID` as sixteen raw bytes on any format that can carry binary, so all 209
+   `string/uuid` properties of the frozen contract stopped being strings under CBOR and rendered
+   into the DOM as base64. Fixed at the encoder (`CborFidelityConfig`) rather than at each reader,
+   because REQ-API-009 forbids exactly this kind of in-place shape change. The unit test that should
+   have caught it compared two empty arrays — it now aborts loudly, and `CborJsonFidelityTest`
+   carries the guarantee without depending on seeded data.
 
 **What is still owed** is measurement, and only measurement: a before/after load test for item 1,
 `http_server_requests` for item 3, and the profiling that item 5 makes its own precondition. Each of

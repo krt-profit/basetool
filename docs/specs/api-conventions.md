@@ -653,9 +653,23 @@ a subset of this set, and the two move together.
 
 Every `/api/**` response is available as **JSON** and, to a caller that asks for it, as **CBOR**
 (`application/cbor`, RFC 8949). Same object model, same DTOs, same field names, same Bean Validation,
-same RFC 7807 handling — only the bytes differ. The choice is content negotiation and nothing else:
-a caller that sends `Accept: application/json`, or no `Accept` at all, is served exactly what it was
-served before CBOR existed.
+same RFC 7807 handling — only the bytes differ.
+
+> [!important] "Only the bytes differ" is a requirement, not an observation — it is false by default
+> Jackson's `UUIDSerializer` asks the generator `canWriteBinaryNatively()` and writes sixteen raw
+> bytes when the answer is yes. JSON answers no and emits a string; CBOR answers yes. Left alone,
+> **all 209 `string/uuid` properties of the frozen contract stop being strings** under the second
+> encoding, and anything that treats an id as text renders base64. That is exactly the in-place shape
+> change REQ-API-009 forbids, so `CborFidelityConfig` overrides the serializer and
+> `CborJsonFidelityTest` states the requirement over a value carrying every type whose wire form
+> could diverge.
+>
+> One known, accepted difference: a `BigDecimal` decodes to a decimal node from CBOR and to a double
+> from JSON — same value, different scale, CBOR the more faithful of the two. It changes nothing for
+> a caller that binds to a declared type, which is every caller, and it is pinned by name so it stays
+> a known difference rather than becoming a surprise in a ledger. The choice is content negotiation and nothing else:
+> a caller that sends `Accept: application/json`, or no `Accept` at all, is served exactly what it was
+> served before CBOR existed.
 
 **JSON remains the contract.** `openapi.json` documents one representation, the frozen contract set
 of REQ-API-009 is expressed in it, and the shipped clients — the Android app and the SC extractor —
@@ -693,7 +707,11 @@ both when the profiling that gates §8.5 finally runs.
 **Acceptance**
 
 - [x] A caller asking for CBOR gets CBOR, and it decodes to the same document as the JSON
-  (`ApiCborNegotiationTest`).
+  (`ApiCborNegotiationTest` — which **aborts** rather than passing when the endpoint it samples has
+  no rows, because that is how the UUID divergence below survived a green build).
+- [x] **A UUID is a string in both encodings**, and every other type whose wire form could diverge is
+  compared explicitly (`CborJsonFidelityTest`, which needs no seeded data). Verified by the failure
+  it was written for: five E2E write flows and ids rendering as `AAAAAAAAAAAAAAAAAAAAAQ==`.
 - [x] A caller that does not ask for it is unaffected, byte for byte.
 - [x] An RFC 7807 problem stays `application/problem+json` under a CBOR `Accept`.
 - [x] A write still goes out as JSON with CBOR enabled (`WebClientCborNegotiationTest`).
