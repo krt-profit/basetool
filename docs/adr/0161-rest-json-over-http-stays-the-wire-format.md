@@ -74,7 +74,8 @@ and HTTP probes, which `CLAUDE.md` obliges us to keep in sync in the same PR.
 
 **We will keep REST/JSON over HTTP as the wire format on all six seams. gRPC is rejected as a
 migration — for the browser seams by construction, for the frontend→backend seam on cost/benefit, and
-for the two shipped-client seams as unshippable while no minimum-version gate exists.**
+for the two shipped-client seams because the clients gain almost nothing and the coordination cost is
+real.**
 
 Instead we will pursue the transport and tooling improvements that address the *measured* problems and
 preserve every contract above. In priority order, each as its own change with its own verification:
@@ -88,16 +89,24 @@ preserve every contract above. In priority order, each as its own change with it
 2. **Generate the frontend's 261 mirror DTOs from the committed `openapi.json`**, with the generator the
    Android module already runs. This is gRPC's headline maintainability benefit — drift as a compile
    error rather than a test failure — at a small fraction of the cost and with no wire change.
-3. **Stop paying for an ETag nobody can use.** `StreamAwareShallowEtagHeaderFilter` buffers and MD5-hashes
-   every `/api/**` response except two stream paths, while **no** first-party client sends
-   `If-None-Match`: `BackendApiClient` never does, and the Android client installs no HTTP cache by
-   deliberate security decision. On the `no-store` families `ApiCacheControlFilter` says outright that
-   nothing relies on conditional requests — and they are buffered and hashed anyway, on the container
-   whose CPU is the tightest in the stack.
+3. **Stop paying for an ETag nobody can use — the backend one.**
+   `StreamAwareShallowEtagHeaderFilter` buffers and MD5-hashes every `/api/**` response except two
+   stream paths, while **no** first-party client sends `If-None-Match`: `BackendApiClient` never does,
+   and the Android client installs no HTTP cache by deliberate security decision. On the `no-store`
+   families `ApiCacheControlFilter` says outright that nothing relies on conditional requests — and
+   they are buffered and hashed anyway.
+
+   **Scope this to the backend bean.** The frontend has its own `EtagConfig` registering Spring's
+   `ShallowEtagHeaderFilter` on `/*`, and *that* one serves browsers, which do send `If-None-Match`.
+   Removing it would be a regression. §8.3 spells the difference out, because "remove the ETag filter"
+   is exactly the instruction a reader would carry out on the wrong bean.
+
 4. **Add an `openapi.json` schema diff against the previous release tag in CI**, closing the gap
    ADR-0136 documents about itself (`ExternalContractTest` *"does not compare types, nullability or enum
    values"*). This is the evolution discipline protobuf field numbers would have provided, as a test
-   rather than a migration.
+   rather than a migration. It is **`REQ-API-009`'s own open acceptance box** — *"Type and nullability
+   changes are caught. Open"* — not a new item; whoever ships it ticks that box.
+
 5. **Only if frontend CPU is still the constraint after 1 and 3**, and only on evidence: a Jackson binary
    backend (CBOR or Smile) negotiated by `Content-Type` on the frontend→backend seam. Same records, same
    ~870 constraints, same RFC 7807 handling, same filters, same metrics — only the bytes change, and
@@ -125,9 +134,11 @@ or the deployment leaving one host. User growth alone is deliberately **not** a 
 
 **This ADR is explicit about what it could not verify**, so nobody mistakes an assumption for a
 measurement: there was no production profiler run (so the frontend's CPU split is unknown), no benchmark
-of JSON vs. protobuf on this workload, no production access, and the knowledge-base vault was
-unavailable in the session that produced it (owner-approved to proceed code-only). Every estimate in the
-analysis is marked as one.
+of JSON vs. protobuf on this workload, and no production access. The knowledge-base vault was
+unavailable in the session that produced it (owner-approved to proceed code-only); it has since
+been read and updated, and `40 Decisions/Decisions.md` now carries this decision, its four
+findings and the two corrections that review produced. Every estimate in the analysis is marked
+as one.
 
 **Item 1 carries real risk and must not be waved through.** Under HTTP/2 a `ConnectionProvider`'s
 `maxConnections` bounds connections rather than in-flight calls, so the 100/1000 pool sizings and the
@@ -146,12 +157,22 @@ mission-detail and the materials matrix, and `http_client_requests_seconds` p95 
   exactly in the difference between them, which is ADR-0135's own reason for refusing a second path.
   The maintainability prize is obtainable without touching the wire (decision item 2), and the premise
   does not hold on one host at 3.2 % average CPU.
-- **gRPC everywhere, including Android and ingest.** Adds two clients that cannot be redeployed with the
-  server. ADR-0136 notes the minimum-app-version gate does not exist yet, so *nothing today can tell an
-  old build to stop* — which makes a protocol change on those seams unshippable, independent of its
-  merits. The Android client already has HTTP/2 via OkHttp and already generates its DTOs, so the win
-  there is near zero; the extractor's value is in its DPoP/rate-limit/payload filters, and DPoP binds to
-  the HTTP method and URI.
+- **gRPC everywhere, including Android and ingest.** Adds two clients that cannot be redeployed with
+  the server. The coordination this needs now exists — `REQ-API-010` closed it on 2026-08-24: the
+  server names a floor in `GET /api/v1/app/version-policy` and the app refuses to run below it. So the
+  honest objection is not "unshippable" but "expensive for nothing": the floor is a **staged**
+  migration's prerequisite, not a free pass, and every member below it is locked out until they update.
+  The win it would buy is near zero anyway — the Android client already has HTTP/2 via OkHttp and
+  already generates its DTOs from the same `openapi.json`; the extractor's value is in its
+  DPoP/rate-limit/payload filters, and DPoP binds to the HTTP method and URI.
+
+  > [!note] ADR-0136 says the gate does not exist. That was true when it was written
+  > Its *"nothing today can tell an old build to stop"* is dated, and an earlier draft of this ADR
+  > carried it forward as the current state — the same mistake as reading ADR-0001 as a description of
+  > the frontend client. The living answer is `docs/specs/api-conventions.md`, whose acceptance box
+  > reads *"A sunset can actually retire old builds — **closed by REQ-API-010**"*. The floor is set to
+  > `0` today, so it gates nothing yet; it is a configuration value away from doing so.
+
 - **gRPC-Web / Connect RPC for the browser.** Would require turning a server-rendered, CSP-hardened
   Thymeleaf + fragment-swap frontend into a SPA: ADR-0012, ADR-0013, ADR-0069, ADR-0093, ADR-0125 and
   ADR-0130 all undone, plus REQ-FE-001…010, 110 templates, 43 k lines of JS and 94 E2E tests. That is a

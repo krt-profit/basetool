@@ -52,9 +52,11 @@ them:
 3. **No production access.** Per the production-host approval gate in `CLAUDE.md`, nothing was read
    from the live host. Current p95 latency, real request mix and actual payload sizes in flight are
    therefore unknown to this document; only what the repository records is used.
-4. **The knowledge base was unavailable** in this session (the vault is not beside the repos and is
-   not reachable as a repository). The owner approved proceeding code-only. Anything the vault records
-   about past protocol incidents or rejected experiments is consequently not reflected here.
+4. **The knowledge base was unavailable** in the session that wrote this (the vault was not beside
+   the repos). The owner approved proceeding code-only, so nothing it records about past protocol
+   incidents or rejected experiments shaped the analysis below. **It was read on 2026-09-10 during
+   review** and holds nothing that contradicts this document; the decision and its findings are now
+   recorded there (`40 Decisions/Decisions.md`).
 
 ## 2. The system as it actually is — six wire seams
 
@@ -315,16 +317,16 @@ because `SunEC` is in `java.base` — adding gRPC would add the jlink modules th
 
 ### 6.2 What it would cost — and this is the part that decides it
 
-|                      Cost                       |                                                         Magnitude in this repository                                                          |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| Endpoints to re-express as services             | **533** mapping annotations across **83** controllers                                                                                         |
-| Client call sites to rewrite                    | **585** `backendApiClient.*` calls                                                                                                            |
-| DTO/schema definitions to author                | **401** backend DTOs (+ 49 MapStruct mappers whose target types change)                                                                       |
-| Validation constraints to re-author             | **~870** Jakarta constraints + 170 `@Valid` sites + 2 custom validators → protobuf options / CEL                                              |
-| Cross-cutting filters needing interceptor twins | **14** backend servlet filters + 1 interceptor (+ 15 on the frontend)                                                                         |
-| Tests at risk                                   | **7 278** `@Test` methods, **94** E2E tests                                                                                                   |
-| Specs / ADRs to amend                           | REQ-API-001…009, REQ-SEC-011/023/027/030/031/032/033/037/044, REQ-OBS-005…012 — and ADRs 0012, 0132, 0135, 0136, 0144 at minimum              |
-| Monitoring to rebuild                           | every dashboard panel and alert keyed on `http_server_requests_seconds` / `http_client_requests_seconds`, plus the `blackbox-http` probe jobs |
+|                      Cost                       |                                                                       Magnitude in this repository                                                                        |
+|-------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Endpoints to re-express as services             | **533** mapping annotations across **83** controllers                                                                                                                     |
+| Client call sites to rewrite                    | **585** `backendApiClient.*` calls                                                                                                                                        |
+| DTO/schema definitions to author                | **401** backend DTOs (+ 49 MapStruct mappers whose target types change)                                                                                                   |
+| Validation constraints to re-author             | **~870** Jakarta constraints + 170 `@Valid` sites + 2 custom validators → protobuf options / CEL                                                                          |
+| Cross-cutting filters needing interceptor twins | **14** backend servlet filters — 13 project classes plus Spring's `ForwardedHeaderFilter`, registered in `ForwardedHeaderConfig` — + 1 interceptor (+ 15 on the frontend) |
+| Tests at risk                                   | **7 278** `@Test` methods, **94** E2E tests                                                                                                                               |
+| Specs / ADRs to amend                           | REQ-API-001…009, REQ-SEC-011/023/027/030/031/032/033/037/044, REQ-OBS-005…012 — and ADRs 0012, 0132, 0135, 0136, 0144 at minimum                                          |
+| Monitoring to rebuild                           | every dashboard panel and alert keyed on `http_server_requests_seconds` / `http_client_requests_seconds`, plus the `blackbox-http` probe jobs                             |
 
 ## 7. The regression ledger — what would actually break
 
@@ -375,8 +377,12 @@ the list that makes the answer a no rather than a "maybe later".
    sender-constraint would have to be re-derived.**
 10. **A shipped client could break in the field.** The Android APK and the extractor MSI cannot be
     redeployed with the server; [ADR-0136](adr/0136-external-contract-set-for-shipped-clients.md) exists
-    for that reason and notes the min-version gate (plan item A5) does not exist yet — so today *nothing
-    can tell an old build to stop*. **A protocol change on seams 5–6 is unshippable until A5 exists.**
+    for that reason. Its own text says the min-version gate *"does not exist yet"* — **that sentence is
+    dated**: `REQ-API-010` closed it on 2026-08-24 (`GET /api/v1/app/version-policy`; the app's
+    `UpdateGate` refuses to run below the floor), and `docs/specs/api-conventions.md` records the
+    closure. The floor is `0` today, so it gates nothing *yet*. **So a protocol change on seams 5–6 is
+    not impossible — it is a staged migration behind a floor that locks every un-updated member out
+    until they act. That is a price, not a blocker, and §8 buys the same wins without it.**
 
 Items 1, 2, 7 and 8 are not mitigable by careful engineering. They are consequences of the format.
 
@@ -434,6 +440,17 @@ HttpClient.create(provider).protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
   `http_client_requests_seconds` p95 does not regress. A "modern transport" that regresses p95 fails the
   brief exactly as a format migration would.
 
+> [!warning] “Disable HTTP/2” is already a known wrong answer here — from the knowledge base
+> The vault records six CI cycles lost to exactly that theory: a seed call `403`ed, and the
+> investigation went through re-minting tokens, backoff retries and **disabling HTTP/2** before the
+> cause turned out to be a seed running as the wrong user. The reason it was so attractive is
+> structural and has not changed: `CorrelationIdFilter` sets the userId MDC **after** the security
+> chain, so a request logged inside the chain reads `anonymous` even when authenticated.
+>
+> Once this hop actually speaks HTTP/2, the same transport theory becomes available again and will
+> look better than it is. **Read the endpoint's auth gate and the `Granted Authorities` DEBUG line
+> first**; reach for the transport only after those are clean.
+
 ### 8.2 Generate the frontend's mirror DTOs from `openapi.json`  ·  *the maintainability win, without the protocol*
 
 261 hand-maintained mirror DTOs and four contract tests over a 1.87 MB spec exist to detect drift that a
@@ -461,13 +478,33 @@ third-party APIs). The Android client installs **no HTTP cache, deliberately** (
 that on the `no-store` families *"nothing relies on conditional requests"* — while the ETag filter
 buffers and hashes them anyway.
 
-So on the frontend's CPU — the worst throttle in the stack — every API response pays a full buffer plus
-an MD5 for a revalidation that cannot happen. **Options, in order of preference:**
+So every `/api/**` response pays a full buffer plus an MD5 for a revalidation that cannot happen — on
+the **backend's** CPU, which is where that filter runs.
+
+> [!warning] There are **two** ETag filters, and only one of them is inert
+> An earlier draft of this section put the cost on *"the frontend's CPU — the worst throttle in the
+>
+>> stack"*. That conflates two filters. `StreamAwareShallowEtagHeaderFilter` is a **backend** bean on
+>> `/api/**`; the frontend has its own `EtagConfig`, which registers Spring's plain
+>> `ShallowEtagHeaderFilter` on **`/*`** at `HIGHEST_PRECEDENCE + 10`.
+>
+> The distinction decides what may be touched. On the frontend's filter the client is a **browser**,
+> browsers do send `If-None-Match`, and those 304s are real — **removing it would be a regression, not
+> a saving.** Only the backend's is provably inert, because its only callers are `BackendApiClient`
+> and the Android client, and neither sends a conditional request.
+>
+> The irony is that the frontend *is* the throttled container (1 506 s / 7 d, ADR-0085) and it *does*
+> buffer every response including HTML — so if buffering cost is ever measured, measure it there too.
+> But that is a separate question with the opposite answer, and it is why this section names the bean
+> rather than saying "the ETag filter".
+
+**Options, in order of preference:**
 
 1. Measure it first (`http_server_requests` before/after on the matrix and a large list) — the fix is
    only worth shipping if the cost is real.
-2. Extend `shouldNotFilter` to skip the `no-store` families and the known-large catalogue paths, where
-   the ETag is *provably* inert. Cheapest, most defensible.
+2. Extend `StreamAwareShallowEtagHeaderFilter#shouldNotFilter` — the **backend** bean, not the
+   frontend's — to skip the `no-store` families and the known-large catalogue paths, where the ETag is
+   *provably* inert. Cheapest, most defensible.
 3. Or make the value real: have the Android client store the ETag next to its own read cache and send
    `If-None-Match` on catalogue reads. Genuinely valuable on mobile data — but it stores server metadata
    on the device and therefore needs the privacy-gate review, not a drive-by.
@@ -485,6 +522,11 @@ names the answer: *"a schema diff of the contract subset against the previous re
 That is the guarantee protobuf field numbers would have provided, obtainable by diffing the committed
 `openapi.json` in CI. It protects the two clients that genuinely cannot be redeployed, and it is a test,
 not a migration.
+
+**This is not a new proposal.** It is `REQ-API-009`'s own open acceptance box, verbatim:
+*"Type and nullability changes are caught. **Open** — needs a schema diff of the contract"*
+(`docs/specs/api-conventions.md`). Whoever ships it ticks that box; it should not become a second
+entry for one piece of work.
 
 ### 8.5 Optional, measure-first: a binary JSON codec on seam 4
 
