@@ -69,6 +69,17 @@ class WebClientHttp2NegotiationTest {
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
+  /**
+   * The route that holds its response open, so that concurrent calls overlap for certain.
+   *
+   * <p>Without a leading slash in the comparison below because Reactor Netty reports {@code path()}
+   * without one; the {@code endsWith} on the raw URI is the belt to that braces.
+   */
+  private static final String SLOW_PATH = "slow";
+
+  /** How long {@link #SLOW_PATH} holds a response. Long enough to dominate scheduling jitter. */
+  private static final Duration HOLD = Duration.ofMillis(400);
+
   /** The ALPN protocol the server saw on the connection that carried the last request. */
   private final AtomicReference<String> negotiated = new AtomicReference<>("none");
 
@@ -109,7 +120,16 @@ class WebClientHttp2NegotiationTest {
                         negotiated.set(applicationProtocol(connection.channel()));
                         peers.add(connection.channel().remoteAddress());
                       });
-                  return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
+                  // `/slow` holds the response open long enough that calls fired together are
+                  // genuinely in flight together. Without it a fast local server answers each call
+                  // before the next is issued, the pool never needs a second connection, and the
+                  // stream cap the concurrency case exists to pin is never reached -- so the case
+                  // would pass at any setting, which is worse than not having it.
+                  Mono<String> body = Mono.just("ok");
+                  if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
+                    body = body.delayElement(HOLD);
+                  }
+                  return response.header("Content-Type", "text/plain").sendString(body);
                 })
             .bindNow();
   }
@@ -147,53 +167,73 @@ class WebClientHttp2NegotiationTest {
   @Test
   @DisplayName("forty concurrent calls ride a handful of connections, not forty")
   void concurrentCallsAreMultiplexed() {
-    // The saving itself. Under HTTP/1.1 each in-flight call holds one pooled connection, which is
-    // why `frontend-pool` was raised to 100 and aligned with the bulkhead. Under HTTP/2 with
-    // maxConcurrentStreams pinned to 20 (Tomcat 11.0.25 executes no more than that per connection)
-    // forty concurrent calls need two or three -- and crucially NOT one, which is what an
-    // unconfigured H2 pool would have used while eighty per cent of the work queued server-side.
-    Flux.range(0, 40)
-        .flatMap(
-            i ->
-                liveSyncAuthWebClient
-                    .get()
-                    .uri(uri())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .subscribeOn(reactor.core.scheduler.Schedulers.parallel()),
-            40)
-        .blockLast(Duration.ofSeconds(30));
+    // The saving itself, and BOTH of its halves, pinned by one number.
+    //
+    // Under HTTP/1.1 each in-flight call holds one pooled connection, which is why `frontend-pool`
+    // was raised to 100 and aligned with the bulkhead. Under HTTP/2 forty overlapping calls at
+    // `app.http.max-concurrent-streams` = 20 need exactly ceil(40 / 20) = 2 connections, and the
+    // window below is that arithmetic plus room for one straggler.
+    //
+    // A one-sided "few enough" bound would have been satisfied by both failure modes this change
+    // exists to prevent:
+    //   * drop strictConnectionReuse -> 40 sockets, one stream each. Caught by the upper bound.
+    //   * raise maxConcurrentStreams past 40 -> ONE socket carrying all forty, of which Tomcat
+    //     11.0.25 executes twenty and queues the rest, invisibly. Caught by the LOWER bound, which
+    //     is the half a "<= 8" assertion could never make.
+    fire(liveSyncAuthWebClient);
 
     assertThat(negotiated.get()).isEqualTo("h2");
     assertThat(peers)
-        .as("40 concurrent calls at 20 streams per connection, one socket per peer address")
-        .hasSizeLessThanOrEqualTo(8);
+        .as("40 overlapping calls at 20 streams per connection, one socket per peer address")
+        .hasSizeBetween(2, 3);
   }
 
   @Test
   @DisplayName("the same load on HTTP/1.1 needs a socket per call, which is the cost being removed")
   void theHttp11PathStillNeedsAConnectionPerCall() {
-    // The control. Without it "eight or fewer sockets" is a number with nothing to compare it to,
-    // and a regression that quietly dropped back to HTTP/1.1 would still satisfy the case above on
-    // a fast enough machine, because sequential reuse also keeps the socket count low. The SSE
-    // client is the same connector code with http2 = false, so this measures the protocol and not
-    // a second configuration.
-    Flux.range(0, 40)
-        .flatMap(
-            i ->
-                sseWebClient
-                    .get()
-                    .uri(uri())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .subscribeOn(reactor.core.scheduler.Schedulers.parallel()),
-            40)
-        .blockLast(Duration.ofSeconds(30));
+    // The control, on the same slow route and the same forty calls. Without it the window above is
+    // a number with nothing to compare it to, and a regression that quietly dropped back to
+    // HTTP/1.1 would still satisfy it on a fast enough machine, because sequential reuse also keeps
+    // the socket count low. The SSE client is the same connector code with http2 = false, so this
+    // measures the protocol and not a second configuration.
+    fire(sseWebClient);
 
     assertThat(negotiated.get()).isNotEqualTo("h2");
     assertThat(peers)
         .as("HTTP/1.1 carries one call per socket while it is in flight")
         .hasSizeGreaterThan(8);
+  }
+
+  /**
+   * Fires forty calls at the slow route at once and waits for the last of them.
+   *
+   * <p>{@code flatMap} with a concurrency of 40 plus {@code subscribeOn(parallel())} is what makes
+   * them overlap rather than queue behind one another; the route's own delay is what keeps them
+   * overlapping long enough for the pool to have to decide how many connections it needs.
+   *
+   * @param client the client under test
+   */
+  private void fire(WebClient client) {
+    Flux.range(0, 40)
+        .flatMap(
+            i ->
+                client
+                    .get()
+                    .uri(slowUri())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .subscribeOn(reactor.core.scheduler.Schedulers.parallel()),
+            40)
+        .blockLast(Duration.ofSeconds(30));
+  }
+
+  /**
+   * The absolute URI of the route that holds its response.
+   *
+   * @return the slow probe URI on the ephemeral port the server bound
+   */
+  private java.net.URI slowUri() {
+    return java.net.URI.create("https://127.0.0.1:" + server.port() + "/" + SLOW_PATH);
   }
 
   /**
