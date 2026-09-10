@@ -819,6 +819,16 @@ x-frontend: &frontend-template
     # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
     BACKEND_URL: https://backend:11261
+    # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
+    # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
+    # named here does not reach the container, whatever the host .env says. Both defaults ship ON,
+    # so these are the rollback levers -- an operator meeting an HTTP/2 or CBOR regression sets
+    # APP_HTTP_BACKEND_PROTOCOL=HTTP11 or APP_HTTP_CODEC=JSON in /var/iri/.env and recreates the
+    # service. Until this line existed the container never saw either, and the only escape hatch was
+    # smuggling -Dapp.http.* through IRI_EXTRA_JAVA_OPTS, which no document mentions.
+    APP_HTTP_BACKEND_PROTOCOL: ${APP_HTTP_BACKEND_PROTOCOL:-H2}
+    APP_HTTP_MAX_CONCURRENT_STREAMS: ${APP_HTTP_MAX_CONCURRENT_STREAMS:-20}
+    APP_HTTP_CODEC: ${APP_HTTP_CODEC:-CBOR}
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the

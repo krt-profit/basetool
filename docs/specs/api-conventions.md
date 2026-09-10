@@ -649,6 +649,54 @@ a subset of this set, and the two move together.
 
 ---
 
+### REQ-API-010 — The server states which app builds it still serves
+
+A frozen contract (REQ-API-009) keeps a shipped build working. It cannot make one **stop**: when an
+operation is genuinely retired, or a defect makes a build unsafe to keep using, something has to
+tell the device. Nothing did — the sunset checkbox of REQ-API-009 sat open for exactly this reason,
+and it is why the first `/api/v2` was blocked on a gate that did not exist.
+
+`GET /api/v1/app/version-policy` answers three values: `minimumVersionCode` (the oldest build still
+served; `0` means no floor), `latestVersionCode` (the newest published, or `0` when unknown) and
+`releasesUrl`. The app compares its own `versionCode` against the floor and, below it, shows the
+non-dismissible „Update erforderlich" screen of design chapter 14.
+
+**Three properties, each of which is the requirement rather than an implementation note.**
+
+- **Anonymous** (owner decision, 2026-08-24). The API vhost opens no anonymous paths as a matter of
+  stance (plan Q8); this and `GET /api/v1/terms/document` are the two exceptions REQ-SEC-052
+  enumerates. A version gate that answers only after a
+  successful login is silent in the one case it exists for: when the break is in the auth flow, the
+  old build cannot log in, and it would show an authentication error where the design calls for an
+  update wall — telling the member their credentials are wrong, which they are not. It publishes
+  three integers and a public release URL; no caller identity goes in and none comes out. It is
+  enumerated in REQ-SEC-052 — which is where the public surface is now a list rather than a
+  policy — and its status is pinned by a test.
+- **The floor and the newest build are two numbers.** Collapsing them makes every release a forced
+  one, because the app could no longer tell "your build is no longer served" from "a newer build
+  exists" — and it only has a wall for the first.
+- **The default floor is `0`.** A server nobody has configured must not refuse every installed
+  build. Locking members out is the expensive direction of a wrong default; serving an old build
+  for one more day is the cheap one.
+
+Configuration (`app.android.*`), not a table: raising the floor is what an operator does at the
+moment a contract breaks, and it has to work without a migration, an admin screen or a deploy.
+
+The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
+is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
+`minimumVersionCode` would leave the build that most needs the answer, the one already too old,
+reading "no floor" and carrying on against a contract that no longer exists.
+
+**The CTA is a deviation from the design.** Chapter 14 points its button at a store listing;
+distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
+instead. Recorded here rather than left as a silent difference between design and build.
+
+**Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
+`ApiVhostAnonymousSurfaceTest` (backend) ·
+**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67
+
+---
+
 ### REQ-API-011 — JSON is the contract; CBOR is a second encoding of it
 
 Every `/api/**` response is available as **JSON** and, to a caller that asks for it, as **CBOR**
@@ -698,11 +746,23 @@ backend serves whatever is asked for either way — there is no server-side swit
 representation that exists for one caller and not another is a contract that depends on
 configuration.
 
-**Not compressed.** `application/cbor` is deliberately absent from `server.compression.mime-types`,
-so a CBOR response is not gzipped where the JSON one is. That is the trade ADR-0161 §8.5 is about —
-bytes for CPU on an internal Docker hop where ADR-0085 measured bandwidth not to be the constraint —
-and it means a payload-size regression is the plausible way this turns out to be a bad idea. Watch
-both when the profiling that gates §8.5 finally runs.
+**Compressed, like the JSON it stands beside.** `application/cbor` is on
+`server.compression.mime-types`. The first revision of this requirement left it off and argued that
+skipping gzip was the point — bytes for CPU on an internal hop. **That was wrong on the numbers.**
+Measured on a representative document from this repository: 1 873 986 B raw against 80 285 B
+gzipped, a **23x** ratio. CBOR does not dictionary-compress field names, so raw CBOR lands near raw
+JSON — several times *more* bytes than the gzipped JSON it replaced, on the one hop the change
+exists to make cheaper, and on the catalogue whose 16 MB tipped a buffer. Compressing both keeps the
+byte axis at parity and leaves CBOR's actual claim, a cheaper parse, as the only variable the
+still-owed measurement has to weigh.
+
+**Requests are refused, not merely un-negotiated.** The CBOR converter is registered write-only
+(`CborFidelityConfig`). `JacksonCborHttpMessageConverter` inherits `canRead`, so simply adding the
+dependency also made the backend *accept* `Content-Type: application/cbor` on the 229 of 233 write
+mappings that declare no `consumes` — parsed by a mapper that never sees `JacksonConfig`'s
+customizer, since that is a `JsonMapperBuilderCustomizer` and reaches the `JsonMapper` alone. Such a
+body would skip `NormalizedStringDeserializer` entirely: no trim, no NFC normalisation, no
+`MAX_FREE_TEXT_LENGTH`. A CBOR request body now answers `415` through the ordinary RFC 7807 path.
 
 **Acceptance**
 
@@ -716,6 +776,10 @@ both when the profiling that gates §8.5 finally runs.
 - [x] An RFC 7807 problem stays `application/problem+json` under a CBOR `Accept`.
 - [x] A write still goes out as JSON with CBOR enabled (`WebClientCborNegotiationTest`).
 - [x] `Vary` names `Accept` as well as `Accept-Encoding` (`ApiCacheControlFilterTest`).
+- [x] A CBOR **request body** is refused with `415`, so only the response direction negotiates
+  (`ApiCborNegotiationTest`, `CborJsonFidelityTest`).
+- [x] The rollback lever reaches a deployed container: `APP_HTTP_CODEC` is named in the frontend's
+  compose environment, which is a closed allow-list with no `env_file`.
 - [x] `openapi.json` is unchanged by the second representation, so the generated Android models are
   too — springdoc already emits `*/*` for these responses.
 - [ ] The serialization cost is actually measured. **Open** — ADR-0161 §8.5 makes this its own
@@ -727,48 +791,3 @@ both when the profiling that gates §8.5 finally runs.
 
 ---
 
-### REQ-API-010 — The server states which app builds it still serves
-
-A frozen contract (REQ-API-009) keeps a shipped build working. It cannot make one **stop**: when an
-operation is genuinely retired, or a defect makes a build unsafe to keep using, something has to
-tell the device. Nothing did — the sunset checkbox of REQ-API-009 sat open for exactly this reason,
-and it is why the first `/api/v2` was blocked on a gate that did not exist.
-
-`GET /api/v1/app/version-policy` answers three values: `minimumVersionCode` (the oldest build still
-served; `0` means no floor), `latestVersionCode` (the newest published, or `0` when unknown) and
-`releasesUrl`. The app compares its own `versionCode` against the floor and, below it, shows the
-non-dismissible „Update erforderlich" screen of design chapter 14.
-
-**Three properties, each of which is the requirement rather than an implementation note.**
-
-- **Anonymous** (owner decision, 2026-08-24). The API vhost opens no anonymous paths as a matter of
-  stance (plan Q8); this and `GET /api/v1/terms/document` are the two exceptions REQ-SEC-052
-  enumerates. A version gate that answers only after a
-  successful login is silent in the one case it exists for: when the break is in the auth flow, the
-  old build cannot log in, and it would show an authentication error where the design calls for an
-  update wall — telling the member their credentials are wrong, which they are not. It publishes
-  three integers and a public release URL; no caller identity goes in and none comes out. It is
-  enumerated in REQ-SEC-052 — which is where the public surface is now a list rather than a
-  policy — and its status is pinned by a test.
-- **The floor and the newest build are two numbers.** Collapsing them makes every release a forced
-  one, because the app could no longer tell "your build is no longer served" from "a newer build
-  exists" — and it only has a wall for the first.
-- **The default floor is `0`.** A server nobody has configured must not refuse every installed
-  build. Locking members out is the expensive direction of a wrong default; serving an old build
-  for one more day is the cheap one.
-
-Configuration (`app.android.*`), not a table: raising the floor is what an operator does at the
-moment a contract breaks, and it has to work without a migration, an admin screen or a deploy.
-
-The operation is itself in the frozen set, for an inverted reason worth stating — every other entry
-is frozen so a shipped app keeps working, this one so a shipped app can be told to stop. A renamed
-`minimumVersionCode` would leave the build that most needs the answer, the one already too old,
-reading "no floor" and carrying on against a contract that no longer exists.
-
-**The CTA is a deviation from the design.** Chapter 14 points its button at a store listing;
-distribution is GitHub Releases plus Obtainium (plan Q1), so `releasesUrl` names the release page
-instead. Recorded here rather than left as a silent difference between design and build.
-
-**Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
-`ApiVhostAnonymousSurfaceTest` (backend) ·
-**Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67

@@ -21,8 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.netty.channel.Channel;
-import io.netty.handler.ssl.SslHandler;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Set;
@@ -117,7 +115,8 @@ class WebClientHttp2NegotiationTest {
                 (request, response) -> {
                   request.withConnection(
                       connection -> {
-                        negotiated.set(applicationProtocol(connection.channel()));
+                        negotiated.set(
+                            WebClientTestSupport.applicationProtocol(connection.channel()));
                         peers.add(connection.channel().remoteAddress());
                       });
                   // `/slow` holds the response open long enough that calls fired together are
@@ -262,26 +261,5 @@ class WebClientHttp2NegotiationTest {
    */
   private java.net.URI uri() {
     return java.net.URI.create("https://127.0.0.1:" + server.port() + "/probe");
-  }
-
-  /**
-   * Reads the negotiated ALPN protocol off whichever channel in the chain carries the TLS handler.
-   *
-   * <p>Under HTTP/2 the handler is invoked on a stream channel and the {@code SslHandler} lives on
-   * its parent; under HTTP/1.1 both are the same channel. Walking up rather than branching on the
-   * protocol keeps the reader out of the answer.
-   *
-   * @param channel the channel the request arrived on
-   * @return the ALPN protocol, or {@code "none"} when the engine reports none
-   */
-  private static String applicationProtocol(Channel channel) {
-    for (Channel current = channel; current != null; current = current.parent()) {
-      SslHandler handler = current.pipeline().get(SslHandler.class);
-      if (handler != null) {
-        String protocol = handler.applicationProtocol();
-        return protocol == null || protocol.isEmpty() ? "none" : protocol;
-      }
-    }
-    return "none";
   }
 }

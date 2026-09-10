@@ -133,6 +133,10 @@ class GeneratedDtoAgreementTest {
    * fixed here: each needs a decision that belongs to the area it touches, not to the change that
    * introduced the guard. Removing an entry is the fix; adding one needs the same justification.
    *
+   * <p><b>They are recorded outside this constant as well</b>, so a test literal is not the only
+   * place they exist: {@code docs/WIRE_PROTOCOL_EVALUATION.md} §8.2 names both with their
+   * consequences, and ADR-0161's consequences section carries them into the decision record.
+   *
    * <ul>
    *   <li>{@code RefineryOrderListDto} / {@code endsAt} — the backend sends it and the mirror
    *       <em>recomputes</em> it, in {@code getEndsAt()}, as {@code startedAt + durationMinutes}.
@@ -203,9 +207,21 @@ class GeneratedDtoAgreementTest {
     // FRONTEND_ONLY. The ceiling is what makes that a visible decision rather than a one-line diff
     // nobody reads, and the KNOWN_DRIFT floor keeps the two open findings from being quietly
     // dropped instead of resolved.
-    assertThat(FRONTEND_ONLY).hasSize(10);
-    assertThat(ALIASES).hasSize(16);
-    assertThat(KNOWN_DRIFT).hasSize(2);
+    assertThat(FRONTEND_ONLY)
+        .as(
+            "frontend-only types. A genuine new view model raises this AND gets a reason beside its"
+                + " name; a backend type that stopped existing does NOT belong here")
+        .hasSize(10);
+    assertThat(ALIASES)
+        .as(
+            "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"
+                + " each one is established by an identical property set rather than by the name")
+        .hasSize(16);
+    assertThat(KNOWN_DRIFT)
+        .as(
+            "pre-existing drifts, frozen with their reasons. This number goes DOWN when one is"
+                + " fixed; it goes up only with the same justification the two entries carry")
+        .hasSize(2);
   }
 
   /**

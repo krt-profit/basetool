@@ -988,15 +988,6 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a 405 from Spring MVC to a localized RFC&nbsp;7807 response with code {@code
-   * METHOD_NOT_ALLOWED} (e.g. {@code POST} to an endpoint that only declares {@code GET}). Logs the
-   * supported methods so reverse-proxy misrouting is easy to spot.
-   *
-   * @param ex Spring's method-not-supported exception
-   * @param request servlet request for instance URI + access-log enrichment
-   * @return RFC 7807 problem-detail response
-   */
-  /**
    * Answers a request body in a media type no converter will read.
    *
    * <p>Reachable since the API gained a second encoding (REQ-API-011, ADR-0161 §8.5). CBOR
@@ -1032,6 +1023,15 @@ public class GlobalExceptionHandler {
     return toEntity(pd);
   }
 
+  /**
+   * Maps a 405 from Spring MVC to a localized RFC&nbsp;7807 response with code {@code
+   * METHOD_NOT_ALLOWED} (e.g. {@code POST} to an endpoint that only declares {@code GET}). Logs the
+   * supported methods so reverse-proxy misrouting is easy to spot.
+   *
+   * @param ex Spring's method-not-supported exception
+   * @param request servlet request for instance URI + access-log enrichment
+   * @return RFC 7807 problem-detail response
+   */
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMethodNotSupported(
       HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {

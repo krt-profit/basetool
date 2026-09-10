@@ -720,8 +720,8 @@ ADR-0135's argument about a second copy of an authorisation rule, applied to a r
 The invariant is asserted directly: for seventeen paths, `no-store` written by one filter must mean
 "skip the buffer" in the other, in both directions.
 
-One side effect worth recording rather than discovering later: eleven of the fourteen families are
-`/**` patterns, which match a literal `.` segment, where the two streaming exemptions are **exact**
+One side effect worth recording rather than discovering later: all fourteen families are `/**`
+patterns, which match a literal `.` segment, where the two streaming exemptions are **exact**
 patterns and do not. So `/api/v1/notifications/./stream` is now recognised and
 `/api/v1/live-sync/./stream` still is not. The asymmetry is pinned by a test so that whoever
 reconciles the two lists knows it is there.
@@ -850,12 +850,28 @@ Four things had to be shown not to move, and each is asserted rather than reason
 > node from CBOR and as a double from JSON — same value, different scale. That is CBOR being *more*
 > faithful, and every consumer binds to a declared type rather than reading the tree. Stated in the
 > test so the next reader meets it as a known difference.
+>
+> [!bug] Leaving CBOR out of the compression list was a measured mistake, corrected
+> This paragraph used to argue that skipping gzip for `application/cbor` <em>was</em> the trade —
+> bytes for CPU on an internal hop. The numbers say otherwise. Measured on a representative document
+> from this repository: **1 873 986 B raw against 80 285 B gzipped, a 23x ratio.** CBOR does not
+> dictionary-compress field names, so raw CBOR lands near raw JSON — i.e. several times *more* bytes
+> than the gzipped JSON it replaced, on the hop this change exists to make cheaper, and on the very
+> catalogue whose 16 MB this document elsewhere says "tipped the buffer".
+>
+> `application/cbor` is on `server.compression.mime-types` now. Both encodings gzip, the byte axis
+> is at parity, and CBOR's actual claim — a cheaper parse — is the only variable the still-owed
+> measurement has to weigh. Which is what it should have been from the start.
 
-Deliberately **not** done: `application/cbor` is absent from `server.compression.mime-types`, so a
-CBOR response is not gzipped where the JSON one was. That is the trade §8.5 is about — bytes for CPU
-on an internal Docker hop where ADR-0085 shows bandwidth is not the constraint — but it means a
-measurement has to watch both, and a payload-size regression is the plausible way this could turn
-out to be a bad idea.
+Two further things the second encoding needed and did not have. **Its converter is write-only**:
+`JacksonCborHttpMessageConverter` inherits `canRead`, so adding the dependency also made the backend
+*accept* CBOR request bodies on 229 of 233 write mappings — parsed by a mapper that never sees
+`JacksonConfig`'s read-side rules, because those arrive through a `JsonMapperBuilderCustomizer` that
+by Boot's contract reaches the `JsonMapper` alone. This section always said only the response
+direction negotiates; now something enforces it, and a CBOR body answers `415`. **And the rollback
+lever reaches a container**: the frontend's compose `environment:` is a closed allow-list with no
+`env_file`, so `APP_HTTP_CODEC` in an operator's `.env` was read by nothing at all until it was
+named there.
 
 **Still owed:** the measurement this section makes a precondition. Both of its prerequisites (§8.1
 and §8.3) now exist, so the profiling it asks for is finally possible; `app.http.codec=JSON` is the

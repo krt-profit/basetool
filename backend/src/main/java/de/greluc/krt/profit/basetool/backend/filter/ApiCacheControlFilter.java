@@ -98,7 +98,7 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
    * @return {@link #NO_STORE} for a sensitive family, {@link #REVALIDATE} otherwise.
    */
   private static String cacheControlFor(String uri) {
-    return NoStoreApiScopes.matches(uri) ? NO_STORE : REVALIDATE;
+    return NoStoreApiScopes.matches(PathContainer.parsePath(uri)) ? NO_STORE : REVALIDATE;
   }
 
   @Override

@@ -38,8 +38,14 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * family added here but not there keeps paying for a buffer nobody can use, and a family added
  * there but not here is <em>downgraded</em> from {@code no-store} to a storable directive.
  *
- * <p><b>The list is load-bearing, not advisory.</b> Adding a sensitive GET family means adding it
- * here; {@link ApiCacheControlFilter} explains what a missing entry costs.
+ * <p><b>The list is load-bearing, not advisory</b> (REQ-SEC-031), and a missing entry costs more
+ * than an opt-out. {@link ApiCacheControlFilter} runs at {@code HIGHEST_PRECEDENCE + 20}, ahead of
+ * the Spring Security chain, so it sets {@code Cache-Control} before {@code
+ * CacheControlHeadersWriter} would — and that writer only acts when the header is unset. A
+ * sensitive family missing from this list is therefore actively <em>downgraded</em> from the
+ * framework's default {@code no-store} to the storable {@code must-revalidate}, rather than merely
+ * failing to opt in. Since 2026-09-10 it also decides whether the response pays for an ETag buffer
+ * it can never use. Adding a sensitive GET family means adding it here.
  *
  * <ul>
  *   <li>{@code bank} and {@code org-units/bank} — account balances, bookings and the ledger. Both
@@ -101,10 +107,21 @@ public final class NoStoreApiScopes {
    * @return {@code true} when the path belongs to a family whose body must not be stored.
    */
   public static boolean matches(@Nullable String uri) {
-    if (uri == null) {
-      return false;
-    }
-    PathContainer path = PathContainer.parsePath(uri);
+    return uri != null && matches(PathContainer.parsePath(uri));
+  }
+
+  /**
+   * The same question, asked with an already-parsed path.
+   *
+   * <p>Both callers are filters that parse the request URI for their own patterns anyway, and
+   * handing the string across made them parse it a second time on every request. An overload rather
+   * than a replacement because {@link ApiCacheControlFilter} has a string in hand at the point it
+   * asks.
+   *
+   * @param path the parsed request path
+   * @return {@code true} when the path belongs to a family whose body must not be stored.
+   */
+  public static boolean matches(PathContainer path) {
     for (PathPattern scope : SCOPES) {
       if (scope.matches(path)) {
         return true;

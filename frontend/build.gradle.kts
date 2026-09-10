@@ -55,16 +55,26 @@ val generatedContract = layout.buildDirectory.dir("generated/openapi")
 
 openApiGenerate {
   generatorName.set("java")
-  // A file: URI, not a path. The generator parses this as a URI and a Windows path fails its
-  // validation on the drive-letter colon ("Illegal character in opaque part at index 2") -- the
-  // same trap the Android module documents.
+  // A RegularFile, NOT a `file:` URI string. The extension's `set(String)` overload runs the value
+  // through `isRemoteUri()`, and `file:///D:/...` matches -- so it assigned `remoteInputSpec` and
+  // NULLED `inputSpec`, which the plugin says out loud on every run: "Using remoteInputSpec may
+  // result in stale build caches if the remote content changes." That discarded `inputSpec`'s
+  // tracked `@InputFile @PathSensitive(RELATIVE)` and left a machine-absolute string in a
+  // @CacheableTask key, so a CI entry, the main checkout, every worktree copy and the Docker image
+  // build were four distinct keys and regenerated 411 models from scratch in each.
+  //
+  // The `RegularFile` overload keeps the file tracked and the key relocatable, and it sidesteps the
+  // Windows drive-letter trap the URI form was reaching for in the first place -- that trap is what
+  // `isRemoteUri()`'s own regex documents itself as avoiding.
   inputSpec.set(
-    rootProject.layout.projectDirectory
-      .file("backend/src/main/resources/api/openapi.json")
-      .asFile
-      .toURI()
-      .toString()
+    rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json")
   )
+  // Without this the generator writes the new tree and LEAVES the old files. Rename or drop a
+  // backend schema and the stale class still compiles, `scan(GENERATED_PACKAGE)` still finds it,
+  // and the branch in GeneratedDtoAgreementTest that reads "no schema of this name in
+  // openapi.json" never fires -- green on every machine with a warm `frontend/build`, red only on
+  // a clean CI workspace. That is the inverse of what a drift gate should do.
+  cleanupOutput.set(true)
   outputDir.set(generatedContract)
   modelPackage.set("de.greluc.krt.profit.basetool.frontend.contract.model")
   apiPackage.set("de.greluc.krt.profit.basetool.frontend.contract.api")
@@ -77,6 +87,17 @@ openApiGenerate {
   configOptions.set(
     mapOf(
       "library" to "native",
+      // Jackson 2 annotations, and that is a CONSTRAINT ON THE EPIC rather than a detail. All 411
+      // generated files import `com.fasterxml.jackson.annotation.*`; openapi-generator 7.25 offers
+      // no Jackson 3 option. Spring 7 binds with `tools.jackson`, which ignores those annotations
+      // entirely -- so the "replace the mirrors with generated types" step this generation exists
+      // to prepare CANNOT be taken on this output as it stands: every @JsonProperty-renamed field
+      // and every @JsonCreator/@JsonInclude behaviour would misbind at runtime. That is fine for
+      // what the output is used for TODAY, which is a reflective name-by-name comparison in
+      // GeneratedDtoAgreementTest, and it is the first thing the epic has to solve.
+      //
+      // It also makes the Jackson 2 dependency below load-bearing for `compileTestJava`: closing
+      // issue #294 by deleting it now breaks 411 files. See the note beside that dependency.
       "serializationLibrary" to "jackson",
       // Jakarta, not javax: this module is on Spring Boot 4 / Jakarta EE 10.
       "useJakartaEe" to "true",
@@ -192,6 +213,11 @@ dependencies {
   // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
   // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
   // and the bridge is migrated — tracked in https://github.com/krt-profit/basetool/issues/294.
+  //
+  // SINCE ADR-0161 8.2 these two are ALSO load-bearing for `compileTestJava`: openapi-generator
+  // emits `com.fasterxml.jackson.annotation.*` into all 411 generated models (7.25 has no Jackson 3
+  // option), so deleting them to close #294 breaks the test source set. Closing #294 now means
+  // solving the generator's serialization library first.
   implementation("com.fasterxml.jackson.core:jackson-databind")
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
@@ -402,6 +428,15 @@ tasks.named<Test>("test") {
   inputs
     .files(logSafeMirrorSources.map { rootProject.file(it) })
     .withPropertyName("logSafeMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // The committed test TLS material (ADR-0139). The two HTTP/2 tests handshake against it through
+  // `TestTls`, which walks up to the repository root to find it -- so it is off this task's
+  // classpath and, like the four files above, invisible to Gradle. Rotating the material would
+  // otherwise leave those tests UP-TO-DATE against a keystore that no longer exists.
+  inputs
+    .file(rootProject.file("docker/test-tls/basetool-test-keystore.p12"))
+    .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // In-module but still off this task's classpath: `E2eAudienceEnforcementParityTest` lives in

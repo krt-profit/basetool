@@ -173,11 +173,42 @@ class StreamAwareShallowEtagHeaderFilterTest {
         .isEqualTo(noStore);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE"})
+  @DisplayName("a write to a no-store family is still filtered, matching the directive's own scope")
+  void writesToNoStoreFamiliesAreStillFiltered(String method) {
+    // The invariant `theTwoFiltersAgreeOnEveryFamily` certifies is GET-scoped, because
+    // ApiCacheControlFilter writes `no-store` on GET alone -- and until this case existed every
+    // agreement case used a GET, so a bypass that answered for ALL methods could not have failed
+    // one. Bypassing a write was harmless for the ETag (isEligibleForEtag is GET-gated) and still
+    // wrong: it made the exemption wider than the reason for it, and it took Content-Length off
+    // write responses nobody had reasoned about.
+    MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/v1/bank/accounts");
+    request.setRequestURI("/api/v1/bank/accounts");
+
+    assertThat(filter.shouldNotFilter(request)).isFalse();
+  }
+
+  @Test
+  @DisplayName("a non-API path never pays the fourteen-pattern scan")
+  void nonApiPathsAreNotScanned() {
+    // This filter is registered on `/*`, so actuator probes, /v3/api-docs and swagger-ui reach it.
+    // The /api scope is checked before the families for that reason; the assertion is the same
+    // either way, and the case exists so the guard is not deleted as redundant.
+    assertThat(filter.shouldNotFilter(get("/actuator/health"))).isFalse();
+    assertThat(filter.shouldNotFilter(get("/v3/api-docs"))).isFalse();
+  }
+
   @Test
   @DisplayName("the exempt list is the shared one, not a copy that can drift")
   void theExemptListIsTheSharedOne() {
-    // The floor, so the agreement above cannot be satisfied by an empty list on both sides.
-    assertThat(NoStoreApiScopes.size()).isEqualTo(14);
+    // A floor, not a count. The exact size is asserted once, in NoStoreApiScopesTest, where the
+    // failure message can say what to do about it -- adding a fifteenth family is a one-line change
+    // the class Javadoc explicitly encourages, and it should redden ONE test that names itself,
+    // not two in two packages that name neither.
+    assertThat(NoStoreApiScopes.size())
+        .as("the shared list must not be empty, or the agreement above is vacuous")
+        .isGreaterThanOrEqualTo(14);
   }
 
   @Test
@@ -198,7 +229,7 @@ class StreamAwareShallowEtagHeaderFilterTest {
   void theNoStoreListNarrowsTheUnnormalisedHole() {
     // Not a second fix, a side effect worth recording: `/api/v1/notifications/**` ends in `/**`
     // and therefore matches a literal `.` segment, where the exact streaming pattern above does
-    // not. So eleven of the fourteen families -- notifications among them -- lost the hole the
+    // not. So all fourteen families -- notifications among them -- lost the hole the
     // case above still documents, and the two live-sync endpoints did not. If the two lists are
     // ever reconciled, this is the asymmetry to reconcile.
     assertThat(filter.shouldNotFilter(get("/api/v1/notifications/./stream"))).isTrue();

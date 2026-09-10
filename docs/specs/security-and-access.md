@@ -1566,7 +1566,8 @@ exactly the families the public API vhost added, and exactly the data the rule e
 `HIGHEST_PRECEDENCE + 20`, ahead of the Spring Security chain, and sets `Cache-Control` before
 `CacheControlHeadersWriter` would — and that writer only acts when the header is unset. So a
 sensitive family absent from the list loses the framework's own default `no-store`. Adding a
-sensitive GET family means adding it to `NO_STORE_SCOPES` in the same change.
+sensitive GET family means adding it to `NoStoreApiScopes` in the same change — which since
+2026-09-10 also takes it out of the ETag buffer, because both filters read that one list.
 
 The Materialbörse (`/api/v1/material-exchange/**`, `/api/v1/material-requests/**`) is deliberately
 excluded: it is an org-wide shared board whose handles are the same public callsign tuple the public

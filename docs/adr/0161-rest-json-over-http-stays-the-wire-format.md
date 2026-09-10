@@ -84,7 +84,7 @@ preserve every contract above. In priority order, each as its own change with it
    `WebClientConfig` builds its `SslContext` with no `applicationProtocolConfig` and never calls
    `.protocol(HttpProtocol.H2)` — so Reactor Netty runs **HTTP/1.1** against a server that has offered
    HTTP/2 all along. This captures the multiplexing benefit that is gRPC's most valuable property, and
-   it removes the documented connection-pool ceiling (*"~25 concurrent users can exhaust a 50-slot
+   it removes the documented connection-pool ceiling (recorded as *"~25 concurrent users can exhaust a 50-slot
    pool"*, against a 200-concurrent-user target) without touching one DTO, endpoint or test contract.
 2. **Generate the frontend's 261 mirror DTOs from the committed `openapi.json`**, with the generator the
    Android module already runs. This is gRPC's headline maintainability benefit — drift as a compile
@@ -111,7 +111,8 @@ preserve every contract above. In priority order, each as its own change with it
    changes are caught. Open"* — not a new item; whoever ships it ticks that box.
 
 5. **Only if frontend CPU is still the constraint after 1 and 3**, and only on evidence: a Jackson binary
-   backend (CBOR or Smile) negotiated by `Content-Type` on the frontend→backend seam. Same records, same
+   backend (CBOR or Smile) negotiated by `Accept` on the frontend→backend seam — the RESPONSE
+   direction; `Content-Type` is the one that stays JSON (REQ-API-011). Same records, same
    ~870 constraints, same RFC 7807 handling, same filters, same metrics — only the bytes change, and
    content negotiation makes it revertable per endpoint.
 

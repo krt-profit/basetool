@@ -112,7 +112,7 @@ class NoStoreApiScopesTest {
   void nullUriIsFalse() {
     // Both callers hand this whatever getRequestURI() returned. Answering rather than throwing is
     // what lets each of them treat "unknown" as "apply the ordinary path".
-    assertThat(NoStoreApiScopes.matches(null)).isFalse();
+    assertThat(NoStoreApiScopes.matches((String) null)).isFalse();
   }
 
   @Test
@@ -120,6 +120,14 @@ class NoStoreApiScopesTest {
   void theListHasAFloor() {
     // Without this, deleting every pattern would leave both filters green: one would stop writing
     // `no-store` and the other would stop skipping, and no case above would notice.
-    assertThat(NoStoreApiScopes.size()).isEqualTo(14);
+    //
+    // The one place the exact count lives, deliberately. If you have just ADDED a family, this is
+    // the number to raise -- and adding the path to `sensitiveFamiliesMatch` above is the half that
+    // actually proves it works.
+    assertThat(NoStoreApiScopes.size())
+        .as(
+            "the number of no-store families. Raise it here when you add one, and add the path to"
+                + " sensitiveFamiliesMatch in the same change")
+        .isEqualTo(14);
   }
 }

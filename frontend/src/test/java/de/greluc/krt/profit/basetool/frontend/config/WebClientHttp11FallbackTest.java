@@ -21,18 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.netty.channel.Channel;
-import io.netty.handler.ssl.SslHandler;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.DisposableServer;
@@ -49,16 +43,12 @@ import reactor.netty.http.server.HttpServer;
  * client that negotiates {@code h2} in {@link WebClientHttp2NegotiationTest} negotiates nothing
  * against a server that is still offering it.
  *
- * <p>A separate class rather than a nested one because the property has to be set before the
- * context is built, and that means a second context.
+ * <p><b>No Spring context.</b> This used to fork a whole second one for a single assertion, because
+ * the property has to be set before the context is built. Constructing {@link WebClientConfig}
+ * directly through {@link WebClientTestSupport} says the same thing in one object, and it is what
+ * the sibling CBOR test was already doing.
  */
-@SpringBootTest(properties = "app.http.backend-protocol=HTTP11")
 class WebClientHttp11FallbackTest {
-
-  /** The request/response client, which the property is expected to hold on HTTP/1.1. */
-  @Autowired private WebClient liveSyncAuthWebClient;
-
-  @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   /** The ALPN protocol the server saw. */
   private final AtomicReference<String> negotiated = new AtomicReference<>("none");
@@ -81,7 +71,9 @@ class WebClientHttp11FallbackTest {
             .handle(
                 (request, response) -> {
                   request.withConnection(
-                      connection -> negotiated.set(applicationProtocol(connection.channel())));
+                      connection ->
+                          negotiated.set(
+                              WebClientTestSupport.applicationProtocol(connection.channel())));
                   return response.header("Content-Type", "text/plain").sendString(Mono.just("ok"));
                 })
             .bindNow();
@@ -97,8 +89,13 @@ class WebClientHttp11FallbackTest {
   @Test
   @DisplayName("the property holds the request client on HTTP/1.1 against a server offering h2")
   void theFlagTurnsHttp2Off() {
+    WebClient client =
+        WebClientTestSupport.config(
+                AppHttpProperties.BackendProtocol.HTTP11, AppHttpProperties.BackendCodec.CBOR)
+            .liveSyncAuthWebClient();
+
     String body =
-        liveSyncAuthWebClient
+        client
             .get()
             .uri(java.net.URI.create("https://127.0.0.1:" + server.port() + "/probe"))
             .retrieve()
@@ -110,22 +107,5 @@ class WebClientHttp11FallbackTest {
     // The server here is the same HTTP/2-capable one the other class uses, so a failure means the
     // property was ignored rather than that the peer could not speak it.
     assertThat(negotiated.get()).isNotEqualTo("h2");
-  }
-
-  /**
-   * Reads the negotiated ALPN protocol off whichever channel in the chain carries the TLS handler.
-   *
-   * @param channel the channel the request arrived on
-   * @return the ALPN protocol, or {@code "none"} when the engine reports none
-   */
-  private static String applicationProtocol(Channel channel) {
-    for (Channel current = channel; current != null; current = current.parent()) {
-      SslHandler handler = current.pipeline().get(SslHandler.class);
-      if (handler != null) {
-        String protocol = handler.applicationProtocol();
-        return protocol == null || protocol.isEmpty() ? "none" : protocol;
-      }
-    }
-    return "none";
   }
 }

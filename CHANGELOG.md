@@ -4,14 +4,13 @@
 
 ### Changed
 
-- **Die Seiten laden schneller, weil Anzeige und Backend jetzt über HTTP/2 sprechen.** Bisher hat die
-  Anzeige jeden Aufruf über eine eigene Verbindung geschickt; jetzt teilen sich viele Aufrufe
-  wenige. Sichtbar wird das vor allem dort, wo eine Seite mehrere Daten gleichzeitig holt —
-  Einsatzdetails, Hangar, Materialmatrix. Umschaltbar über `APP_HTTP_BACKEND_PROTOCOL=HTTP11`.
-- **Die Daten zwischen Anzeige und Backend gehen in einem kompakteren Format über die Leitung
-  (CBOR).** Inhaltlich identisch, nur weniger Rechenaufwand beim Lesen. Umschaltbar über
-  `APP_HTTP_CODEC=JSON`. Fehlermeldungen bleiben unverändert, und Apps und Extractor merken nichts
-  davon.
+- **Seiten mit vielen gleichzeitigen Abfragen laden schneller.** Anzeige und Backend sprechen jetzt
+  HTTP/2, teilen sich also wenige Verbindungen statt für jeden Aufruf eine eigene aufzumachen.
+  Umschaltbar über `APP_HTTP_BACKEND_PROTOCOL=HTTP11`, feinjustierbar über
+  `APP_HTTP_MAX_CONCURRENT_STREAMS`.
+- **Antworten zwischen Anzeige und Backend werden günstiger gelesen (CBOR).** Inhaltlich identisch,
+  nur weniger Rechenaufwand beim Auswerten. Umschaltbar über `APP_HTTP_CODEC=JSON`; Apps und
+  Extractor sind nicht betroffen.
 
 ### Fixed
 

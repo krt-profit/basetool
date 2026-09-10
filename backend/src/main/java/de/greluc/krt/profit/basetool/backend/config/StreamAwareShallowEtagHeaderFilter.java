@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.filter.NoStoreApiScopes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.server.PathContainer;
 import org.springframework.web.filter.ShallowEtagHeaderFilter;
 import org.springframework.web.util.pattern.PathPattern;
@@ -73,14 +74,20 @@ import org.springframework.web.util.pattern.PathPatternParser;
  * a {@code ContentCachingResponseWrapper} on the way out and copied back afterwards, in full, in
  * memory — for a header the framework has already decided not to emit.
  *
- * <p>That makes this exemption free of behavioural risk in a way the alternatives are not. Not one
- * response header changes: the families that lose the buffer had no ETag to lose. Skipping the
- * <em>catalogue</em> paths would have been the larger saving — the materials matrix that tipped the
- * buffer at 16 MB revalidates rather than {@code no-store}s, so it does get an ETag — and it was
- * deliberately not taken here, because that ETag is inert only for as long as no client sends
- * {@code If-None-Match}. That is a property of today's clients, not of the response, and removing
- * it would quietly foreclose the mobile read cache in {@code docs/WIRE_PROTOCOL_EVALUATION.md}
- * §8.3.
+ * <p>That makes this exemption nearly free of behavioural risk, and the "nearly" is worth stating
+ * precisely rather than rounding away. No <em>caching</em> header changes: the families that lose
+ * the buffer had no ETag to lose. <b>{@code Content-Length} can.</b> {@code
+ * ContentCachingResponseWrapper.copyBodyToResponse} sets an exact length from the buffered bytes,
+ * so every one of these responses used to carry one; without the wrapper a body past Tomcat's
+ * output buffer commits mid-write and ships chunked instead. That is a legal and unremarkable
+ * response either way, and it is the price of not buffering — but it is a difference, and both new
+ * tests use {@code MockHttpServletResponse}, which never commits mid-write and therefore cannot
+ * observe it. Skipping the <em>catalogue</em> paths would have been the larger saving — the
+ * materials matrix that tipped the buffer at 16 MB revalidates rather than {@code no-store}s, so it
+ * does get an ETag — and it was deliberately not taken here, because that ETag is inert only for as
+ * long as no client sends {@code If-None-Match}. That is a property of today's clients, not of the
+ * response, and removing it would quietly foreclose the mobile read cache in {@code
+ * docs/WIRE_PROTOCOL_EVALUATION.md} §8.3.
  *
  * <p>The list is not copied here. Both filters read {@link NoStoreApiScopes}, so a family added to
  * one is added to the other — ADR-0135's argument about a second copy of a rule, applied to a rule
@@ -88,11 +95,18 @@ import org.springframework.web.util.pattern.PathPatternParser;
  */
 public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter {
 
+  /** The only surface the no-store question can be about, checked before the fourteen patterns. */
+  private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
+
   /**
    * The streaming endpoints, matched exactly.
    *
-   * <p>Exact patterns rather than a prefix: the notification family carries ordinary reads that
-   * benefit from an ETag, and only its {@code /stream} member must escape the buffer.
+   * <p>Exact patterns rather than a prefix, and the original reason has since been overtaken: the
+   * notification family carried ordinary reads that benefited from an ETag, so only its {@code
+   * /stream} member had to escape the buffer. Since the {@code NoStoreApiScopes} exemption below,
+   * the whole family bypasses this filter anyway. The exactness is kept because these two entries
+   * are about a <em>correctness</em> failure (#1653) rather than about cost, and narrowing them to
+   * a prefix would silently re-scope a guard whose blast radius is a dead push channel.
    */
   private static final List<PathPattern> STREAMING_PATHS =
       List.of(
@@ -128,6 +142,13 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
     if (STREAMING_PATHS.stream().anyMatch(pattern -> pattern.matches(path))) {
       return true;
     }
-    return NoStoreApiScopes.matches(uri);
+    // GET only, and the /api scope first. Both narrow this to exactly what the directive it follows
+    // covers: ApiCacheControlFilter writes `no-store` on GET alone, so answering for every method
+    // here made the bypass wider than the reason for it -- and this filter is registered on `/*`,
+    // so an actuator probe, /v3/api-docs and swagger-ui were paying a fourteen-pattern scan for a
+    // question that can only ever be about /api.
+    return HttpMethod.GET.matches(request.getMethod())
+        && API_SCOPE.matches(path)
+        && NoStoreApiScopes.matches(path);
   }
 }

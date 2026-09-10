@@ -20,10 +20,12 @@ openapi-generator = { id = "org.openapi.generator", version.ref = "openapiGenera
 
 [versions]
 
+# Pinned to the SAME version the Android app's `core/contract` runs (ADR-0161 8.2): the two
+# generate from one document, and a skew between them would produce two readings of one contract.
+openapiGenerator = "7.25.0"
 # Held at 4.1.1 on purpose: the only newer build refreshVersions sees is a 4.2.0 MILESTONE.
 # The marker below stays so the next sweep does not have to re-derive that -- clear it when
 # 4.2.0 goes GA, not before.
-openapiGenerator = "7.25.0"
 springBoot = "4.1.1"
 ##      ⬆ = "4.2.0-M1"
 springDependencyManagement = "1.1.7"

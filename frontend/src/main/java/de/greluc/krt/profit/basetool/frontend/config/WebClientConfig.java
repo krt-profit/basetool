@@ -282,6 +282,24 @@ public class WebClientConfig {
    * {@code backendApi} TimeLimiter closes the outer bound at 5 s.
    */
   private ReactorClientHttpConnector connector(boolean streaming) {
+    return connector(streaming, "frontend-pool");
+  }
+
+  /**
+   * Builds a connector with a named connection pool.
+   *
+   * <p>The name is a parameter because it is the metric label. {@code metrics(true)} publishes
+   * {@code reactor.netty.connection.provider.*} tagged with it, and this method is called three
+   * times for non-streaming clients — so a single hardcoded name meant three independent providers
+   * reporting into one series, which is precisely the pool observability the flag is bought for. It
+   * also meant {@code WebClientHttp2NegotiationTest} measured multiplexing on the probe's pool
+   * rather than the one carrying {@code ParallelPageLoader}'s fan-out.
+   *
+   * @param streaming whether this connector serves the SSE relay
+   * @param poolName the connection provider's name, which is also its metric tag
+   * @return the configured connector
+   */
+  private ReactorClientHttpConnector connector(boolean streaming, String poolName) {
     // The SSE relay never negotiates HTTP/2 (see the Javadoc); everything else follows the
     // property.
     boolean http2 =
@@ -349,7 +367,7 @@ public class WebClientConfig {
         // 1000 ceiling is hit. metrics(true) exposes reactor.netty.connection.provider.* so pool
         // saturation -- the silent 1001st-viewer drop -- is visible on the dashboard and alertable.
         provider =
-            reactor.netty.resources.ConnectionProvider.builder("frontend-sse-pool")
+            reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(1000)
                 .maxIdleTime(java.time.Duration.ofSeconds(30))
                 .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
@@ -368,7 +386,7 @@ public class WebClientConfig {
         // frontend already abandoned. metrics(true) exposes reactor.netty.connection.provider.* for
         // pool observability. Idle/life timeouts unchanged.
         reactor.netty.resources.ConnectionProvider.Builder pool =
-            reactor.netty.resources.ConnectionProvider.builder("frontend-pool")
+            reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(100)
                 .maxIdleTime(java.time.Duration.ofSeconds(20))
                 .maxLifeTime(java.time.Duration.ofSeconds(60))
@@ -389,10 +407,23 @@ public class WebClientConfig {
           // reporting the same numbers as before. Measured, not assumed:
           // WebClientHttp2NegotiationTest counts distinct peer addresses on a real handshake and
           // saw exactly 40 before this flag was set and 2 after.
+          // maxConnections(5), not 100. Under HTTP/2 an allocation permit is a CONNECTION and each
+          // then carries up to maxConcurrentStreams, so `Http2AllocationStrategy.permitMaximum()`
+          // returning 100 would have meant a ceiling of 100 x 20 = 2000 concurrent calls where
+          // HTTP/1.1 had 100. For the two bulkheaded clients that is invisible -- `backendApi` caps
+          // them at 100 either way -- but `liveSyncAuthWebClient` deliberately carries no
+          // Resilience4j chain, so its ceiling really would have moved from 100 to 2000. On a
+          // frontend redeploy every open /ws/sync socket fires a subscribe-authorization probe at
+          // once, and 2000 of them reach a Tomcat that executes 20 streams per connection.
+          //
+          // 5 x 20 = 100 restores exactly the ceiling that was there before, and keeps the
+          // Javadoc's claim above -- "the bulkhead's 100 remains the real gate" -- true for the one
+          // bean the bulkhead does not cover.
           pool =
               pool.allocationStrategy(
                   Http2AllocationStrategy.builder()
-                      .maxConnections(100)
+                      .maxConnections(
+                          Math.max(1, 100 / Math.max(1, httpProperties.maxConcurrentStreams())))
                       .maxConcurrentStreams(httpProperties.maxConcurrentStreams())
                       .strictConnectionReuse(true)
                       .build());
@@ -691,7 +722,8 @@ public class WebClientConfig {
   /**
    * Authenticated WebClient against the backend: {@value #MAX_IN_MEMORY_BYTES}-byte max in-memory
    * codec, Resilience4j chain (timeout, retry, circuit breaker, bulkhead), correlation-id
-   * propagation, OAuth2 bearer relay, defaults to {@code Accept: application/json}.
+   * propagation, OAuth2 bearer relay, and the {@code Accept} list {@link #backendAcceptTypes()}
+   * derives from {@code app.http.codec} — CBOR first and JSON second by default (REQ-API-011).
    */
   @Bean
   public WebClient webClient(
@@ -712,7 +744,7 @@ public class WebClientConfig {
 
     return WebClient.builder()
         .exchangeStrategies(strategies)
-        .clientConnector(connector(false))
+        .clientConnector(connector(false, "frontend-pool"))
         .observationRegistry(observationRegistry)
         .apply(oauth2Client.oauth2Configuration())
         .filter(webClientLoggingFilter.correlationIdPropagation())
@@ -789,7 +821,7 @@ public class WebClientConfig {
 
     return WebClient.builder()
         .exchangeStrategies(strategies)
-        .clientConnector(connector(false))
+        .clientConnector(connector(false, "frontend-terms-pool"))
         .observationRegistry(observationRegistry)
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
@@ -839,7 +871,7 @@ public class WebClientConfig {
   @Bean
   public WebClient sseWebClient() {
     return WebClient.builder()
-        .clientConnector(connector(true))
+        .clientConnector(connector(true, "frontend-sse-pool"))
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(activeSquadronRelayFilter.relayActiveSquadron())
         .filter(userLocaleRelayFilter.relayUserLocale())
@@ -873,7 +905,7 @@ public class WebClientConfig {
   @Bean
   public WebClient liveSyncAuthWebClient() {
     return WebClient.builder()
-        .clientConnector(connector(false))
+        .clientConnector(connector(false, "frontend-livesync-probe-pool"))
         .filter(webClientLoggingFilter.correlationIdPropagation())
         .filter(userLocaleRelayFilter.relayUserLocale())
         .filter(clientIpRelayFilter.relayClientIp())

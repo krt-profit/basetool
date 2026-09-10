@@ -2888,6 +2888,57 @@ class ExternalContractTest {
    */
   private static void walkSchema(
       JsonNode schemas, String name, Set<String> visited, Map<String, Set<String>> found) {
+    walkProperties(
+        schemas,
+        name,
+        visited,
+        (owner, property, value, required) -> {
+          String target = schemaName(value);
+          JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
+          if (enumNode != null && required) {
+            Set<String> constants = new TreeSet<>();
+            enumNode.forEach(entry -> constants.add(entry.asString()));
+            found.put(owner + "." + property, constants);
+          }
+        });
+  }
+
+  /** What a traversal does with one property of one schema. */
+  @FunctionalInterface
+  private interface PropertyVisitor {
+
+    /**
+     * Called once per property of every schema the walk reaches.
+     *
+     * @param owner the schema the property belongs to
+     * @param property the property name
+     * @param value the property's schema node
+     * @param required whether the owning schema lists it as required
+     */
+    void visit(String owner, String property, JsonNode value, boolean required);
+  }
+
+  /**
+   * The one traversal both frozen records are built from.
+   *
+   * <p>The enum guard and the type record used to carry a near-verbatim copy each, which meant
+   * every fix to the walk had to be found twice and applied twice \u2014 and the {@code
+   * additionalProperties} gap proves the point: it was fixed in the type record and would have
+   * stayed open in the enum one, where a required enum used as a map's VALUE type is exactly as
+   * fatal to a strict parser.
+   *
+   * <p>Transitive and cycle-guarded by the caller's {@code visited} set, because a client parses
+   * the whole payload: a type four levels down inside a participant's job type breaks it as surely
+   * as one on the root object. Descends through an array's {@code items} and a map's {@code
+   * additionalProperties} as well as a plain {@code $ref}.
+   *
+   * @param schemas the document's {@code components.schemas} node
+   * @param name the schema to walk; {@code null} and already-visited names are no-ops
+   * @param visited the shared cycle guard
+   * @param visitor what to do with each property
+   */
+  private static void walkProperties(
+      JsonNode schemas, String name, Set<String> visited, PropertyVisitor visitor) {
     if (name == null || !visited.add(name)) {
       return;
     }
@@ -2906,18 +2957,16 @@ class ExternalContractTest {
     }
     for (Map.Entry<String, JsonNode> property : properties.properties()) {
       JsonNode value = property.getValue();
+      visitor.visit(name, property.getKey(), value, required.contains(property.getKey()));
       if ("array".equals(value.path("type").asString(""))) {
-        walkSchema(schemas, schemaName(value.path("items")), visited, found);
+        walkProperties(schemas, schemaName(value.path("items")), visited, visitor);
         continue;
       }
-      String target = schemaName(value);
-      JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
-      if (enumNode != null && required.contains(property.getKey())) {
-        Set<String> constants = new TreeSet<>();
-        enumNode.forEach(entry -> constants.add(entry.asString()));
-        found.put(name + "." + property.getKey(), constants);
+      if (value.path("additionalProperties").isObject()) {
+        walkProperties(schemas, schemaName(value.path("additionalProperties")), visited, visitor);
+        continue;
       }
-      walkSchema(schemas, target, visited, found);
+      walkProperties(schemas, schemaName(value), visited, visitor);
     }
   }
 
@@ -3190,33 +3239,12 @@ class ExternalContractTest {
    */
   private static void walkSignatures(
       JsonNode schemas, String name, Set<String> visited, Map<String, String> found) {
-    if (name == null || !visited.add(name)) {
-      return;
-    }
-    JsonNode schema = schemas.get(name);
-    if (schema == null) {
-      return;
-    }
-    Set<String> required = new TreeSet<>();
-    JsonNode requiredNode = schema.get("required");
-    if (requiredNode != null) {
-      requiredNode.forEach(entry -> required.add(entry.asString()));
-    }
-    JsonNode properties = schema.get("properties");
-    if (properties == null) {
-      return;
-    }
-    for (Map.Entry<String, JsonNode> property : properties.properties()) {
-      JsonNode value = property.getValue();
-      found.put(
-          name + "." + property.getKey(),
-          signature(value) + (required.contains(property.getKey()) ? "!" : ""));
-      if ("array".equals(value.path("type").asString(""))) {
-        walkSignatures(schemas, schemaName(value.path("items")), visited, found);
-        continue;
-      }
-      walkSignatures(schemas, schemaName(value), visited, found);
-    }
+    walkProperties(
+        schemas,
+        name,
+        visited,
+        (owner, property, value, required) ->
+            found.put(owner + "." + property, signature(value) + (required ? "!" : "")));
   }
 
   /**

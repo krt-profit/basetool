@@ -54,8 +54,9 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 # `frontend/scripts/` and the `.prettierrc.json` / `.prettierignore` / lint tool
 # configs) that are deliberately not part of the Docker context (only
 # `frontend/build.gradle.kts` and `frontend/src/` are copied). `generateApiTypes`
-# additionally reads the BACKEND module's `openapi.json`, which is never in the
-# frontend context at all.
+# additionally reads the BACKEND module's `openapi.json` -- which IS in the context
+# since ADR-0161 8.2 (see the COPY below, added for `openApiGenerate`), but only
+# that one file, and this task needs the Node toolchain it is excluded for anyway.
 # A node task whose declared input files are absent fails configuration
 # validation outright, so every Node-based `check` task must be excluded here,
 # not just the Java ones — when you add one to `check`, add it to this list in

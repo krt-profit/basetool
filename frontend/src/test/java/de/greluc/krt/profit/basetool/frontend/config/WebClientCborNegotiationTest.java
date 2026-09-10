@@ -21,17 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.logging.ActiveSquadronRelayFilter;
-import de.greluc.krt.profit.basetool.frontend.logging.ClientIpRelayFilter;
-import de.greluc.krt.profit.basetool.frontend.logging.UserLocaleRelayFilter;
-import de.greluc.krt.profit.basetool.frontend.logging.WebClientLoggingFilter;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
-import io.micrometer.observation.ObservationRegistry;
 import java.time.Duration;
 import java.util.Map;
 import okhttp3.mockwebserver.MockResponse;
@@ -41,10 +35,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.ssl.SslBundles;
-import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -129,7 +120,12 @@ class WebClientCborNegotiationTest {
   }
 
   /**
-   * Builds the real {@code webClient} bean with light doubles, exactly as the SSE relay guard does.
+   * Builds the real {@code webClient} bean for a given codec.
+   *
+   * <p>The collaborator doubles live in {@link WebClientTestSupport} rather than here: {@code
+   * WebClientConfig} takes nine constructor arguments, and a second hand-maintained copy of them
+   * meant every future collaborator forced an edit in two places, with a compile error as the only
+   * warning.
    *
    * <p>Real Resilience4j registries rather than mocks: the bean wraps every exchange in the {@code
    * backendApi} chain, and a mocked registry would have to reproduce four operators to get one
@@ -139,46 +135,15 @@ class WebClientCborNegotiationTest {
    * @return the built client
    */
   private static WebClient buildBackendClient(AppHttpProperties.BackendCodec codec) {
-    ExchangeFilterFunction passthrough = (request, next) -> next.exchange(request);
-
-    WebClientLoggingFilter logging = mock(WebClientLoggingFilter.class);
-    when(logging.correlationIdPropagation()).thenReturn(passthrough);
-    when(logging.callLogging()).thenReturn(passthrough);
-    ActiveSquadronRelayFilter squadron = mock(ActiveSquadronRelayFilter.class);
-    when(squadron.relayActiveSquadron()).thenReturn(passthrough);
-    UserLocaleRelayFilter locale = mock(UserLocaleRelayFilter.class);
-    when(locale.relayUserLocale()).thenReturn(passthrough);
-
-    Environment environment = mock(Environment.class);
-    when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
-
-    WebClientConfig config =
-        new WebClientConfig(
-            new AppBackendProperties("https://backend:11261"),
-            new AppHttpProperties(
-                Duration.ofSeconds(3),
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(10),
-                Duration.ofSeconds(10),
-                AppHttpProperties.BackendProtocol.H2,
-                20,
-                codec),
-            logging,
-            squadron,
-            locale,
-            new ClientIpRelayFilter(),
-            environment,
-            mock(SslBundles.class),
-            ObservationRegistry.NOOP);
-
-    return config.webClient(
-        mock(OAuth2AuthorizedClientManager.class),
-        CircuitBreakerRegistry.ofDefaults(),
-        RetryRegistry.ofDefaults(),
-        TimeLimiterRegistry.of(
-            io.github.resilience4j.timelimiter.TimeLimiterConfig.custom()
-                .timeoutDuration(Duration.ofSeconds(20))
-                .build()),
-        BulkheadRegistry.ofDefaults());
+    return WebClientTestSupport.config(AppHttpProperties.BackendProtocol.H2, codec)
+        .webClient(
+            mock(OAuth2AuthorizedClientManager.class),
+            CircuitBreakerRegistry.ofDefaults(),
+            RetryRegistry.ofDefaults(),
+            TimeLimiterRegistry.of(
+                io.github.resilience4j.timelimiter.TimeLimiterConfig.custom()
+                    .timeoutDuration(Duration.ofSeconds(20))
+                    .build()),
+            BulkheadRegistry.ofDefaults());
   }
 }

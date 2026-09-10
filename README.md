@@ -280,7 +280,7 @@ If you only need the stack to *start* (health checks, a UI smoke test that does 
 - **`scripts`** — server-side operations layer (deploy, cleanup, migration guard) plus their systemd/logrotate units.
 - **`docs` / `config` / `docker` / `design`** — specs & ADRs, static-analysis config, the maintenance page, and brand font sources.
 
-The frontend hand-mirrors the backend's DTOs as its own records (no shared module); `FrontendDtoContractTest` is the drift gate, diffing them against `openapi.json`.
+The frontend hand-mirrors the backend's DTOs as its own records (no shared module). Two gates watch for drift: `FrontendDtoContractTest` diffs them against `openapi.json`, and since ADR-0161 §8.2 `GeneratedDtoAgreementTest` compares them field by field against 411 models `openapi-generator` emits from the same document into the test source set. Nothing in `main` imports a generated type yet — replacing the mirrors is a separate epic.
 
 ### Configuration (common env vars)
 
