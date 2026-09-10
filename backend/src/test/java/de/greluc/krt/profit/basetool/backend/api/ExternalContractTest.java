@@ -3063,11 +3063,33 @@ class ExternalContractTest {
       }
     }
 
+    // A field the release HAD and the document no longer has. Looping over `now` alone could never
+    // see one, which made this half blind to exactly the change class it exists for: measured
+    // against real history with v1.6.0 as the baseline, `MissionParticipantDto.guestEditToken` was
+    // removed and went unreported while two type changes were caught.
+    //
+    // The Javadoc used to send the reader to theContractResponsesKeepTheirFields for removals. That
+    // test asserts hand-listed field sets, and a name nobody listed -- guestEditToken appears zero
+    // times in this file -- is not in them. So a removal was caught only by the frozen record,
+    // which
+    // this pull request CAN edit, and the "no such hole" claim above was false for the one thing
+    // this comparison is the second opinion on.
+    Set<String> gone = new TreeSet<>(was.keySet());
+    gone.removeAll(now.keySet());
+
     assertThat(changed)
         .as(
             "a field changed shape since the last release, and there are builds in the field that"
                 + " read it. This is the diff ADR-0136 asks for, against an artefact this pull"
                 + " request cannot edit")
+        .isEmpty();
+
+    assertThat(gone)
+        .as(
+            "a field the last release served is gone from the document. An installed build reads it"
+                + " unconditionally and will now get null \u2014 the break the freeze exists for."
+                + " If the operation was retired deliberately, the app build that stops reading it"
+                + " ships FIRST")
         .isEmpty();
   }
 
@@ -3090,8 +3112,72 @@ class ExternalContractTest {
         walkSignatures(schemas, root, visited, found);
       }
       walkSignatures(schemas, requestSchemaName(document, operation), visited, found);
+      recordInlineBodies(document, operation, found);
     }
     return found;
+  }
+
+  /**
+   * Freezes the body shapes that resolve to no named schema at all.
+   *
+   * <p>Two gaps closed together, because they are the same gap seen from the two ends of a request.
+   *
+   * <p><b>Multipart requests.</b> {@code requestSchemaName} reads only {@code application/json}, so
+   * {@code POST /api/v1/personal-blueprints/import/preview} — a contract operation whose body is
+   * {@code multipart/form-data} with {@code required: ["file"]} — resolved to {@code null} and
+   * every guard over it became a no-op. Renaming the part to {@code csv} would 400 every shipped
+   * Android build's blueprint import with the whole suite green.
+   *
+   * <p><b>Inline responses.</b> A 2xx schema that is an inline array of primitives, such as {@code
+   * GET /api/v1/material-exchange/released-item-ids} answering {@code array<string/uuid>}, names no
+   * schema either, so its element type could flip unnoticed.
+   *
+   * <p>Keyed by operation and media type rather than by schema name, because these shapes have no
+   * name to be keyed by — which is precisely why they were invisible.
+   *
+   * @param document the parsed API document
+   * @param operation the contract operation
+   * @param found the accumulator
+   */
+  private static void recordInlineBodies(
+      JsonNode document, ContractOperation operation, Map<String, String> found) {
+    JsonNode node = document.path("paths").path(operation.path()).path(operation.method());
+    String key = operation.method().toUpperCase(java.util.Locale.ROOT) + " " + operation.path();
+
+    for (Map.Entry<String, JsonNode> media :
+        node.path("requestBody").path("content").properties()) {
+      JsonNode schema = media.getValue().path("schema");
+      found.put(key + " request[" + media.getKey() + "]", signature(schema));
+      for (String required : requiredNames(schema)) {
+        found.put(key + " request[" + media.getKey() + "].required." + required, "required");
+      }
+    }
+
+    for (Map.Entry<String, JsonNode> response : node.path("responses").properties()) {
+      if (!response.getKey().startsWith("2")) {
+        continue;
+      }
+      for (Map.Entry<String, JsonNode> media : response.getValue().path("content").properties()) {
+        found.put(
+            key + " response[" + response.getKey() + "][" + media.getKey() + "]",
+            signature(media.getValue().path("schema")));
+      }
+    }
+  }
+
+  /**
+   * The {@code required} entries an inline schema declares.
+   *
+   * @param schema the schema node
+   * @return the required property names, sorted; empty when the node declares none
+   */
+  private static Set<String> requiredNames(JsonNode schema) {
+    Set<String> names = new TreeSet<>();
+    JsonNode required = schema.path("required");
+    if (required.isArray()) {
+      required.forEach(entry -> names.add(entry.asString()));
+    }
+    return names;
   }
 
   /**
@@ -3150,8 +3236,20 @@ class ExternalContractTest {
       String itemRef = schemaName(items);
       return "array<" + (itemRef != null ? "$" + itemRef : signature(items)) + ">";
     }
+    JsonNode additional = node.path("additionalProperties");
+    if (additional.isObject()) {
+      // A map, and its VALUE type is the half that breaks a client. Frozen as `object` this was a
+      // guard with a hole big enough to drive the Freigabe-Limits response through:
+      // `BankApprovalLimitsDto.roleLimits` is `{"type":"object","additionalProperties":{"type":
+      // "number"}}` and is frozen for all seven bank-account settings operations. Change that value
+      // to a string or a $ref and the signature stayed `object` -- changed, gone and added all
+      // empty, build green, and a shipped build parsing Map<String, BigDecimal> fails the whole
+      // response.
+      String value = schemaName(additional);
+      return "map<" + (value != null ? "$" + value : signature(additional)) + ">";
+    }
     if (type.isEmpty()) {
-      return node.has("properties") || node.has("additionalProperties") ? "object" : "any";
+      return node.has("properties") ? "object" : "any";
     }
     String format = node.path("format").asString("");
     return format.isEmpty() ? type : type + "/" + format;

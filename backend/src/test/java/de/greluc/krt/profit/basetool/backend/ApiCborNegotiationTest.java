@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -124,6 +126,50 @@ class ApiCborNegotiationTest {
   }
 
   @Test
+  @DisplayName("a caller that sends NO Accept header at all still gets JSON")
+  void callersWithoutAnAcceptHeaderGetJson() throws Exception {
+    // The case the shipped clients actually exercise. OkHttp/Retrofit -- the Android app -- sends
+    // no
+    // Accept header, which Spring reads as `*/*`, and the answer is then decided purely by
+    // converter registration order. That order holds today, but it is an unpinned framework
+    // internal and it is the one regression `jsonCallersAreUnaffected` was written for: asserting
+    // an EXPLICIT `Accept: application/json` proves nothing about a client that sends none.
+    mockMvc
+        .perform(get("/api/v1/job-types"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    HttpHeaders.CONTENT_TYPE,
+                    org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)));
+  }
+
+  @Test
+  @DisplayName("a CBOR request body is refused, because only responses negotiate")
+  void cborRequestBodiesAreRefused() throws Exception {
+    // ADR-0161 8.5 and REQ-API-011 both say only the RESPONSE direction negotiates, and until
+    // CborFidelityConfig made the converter write-only nothing enforced it: the converter inherits
+    // canRead, so 229 of 233 write mappings would have accepted `Content-Type: application/cbor`
+    // and parsed it with a mapper that never saw JacksonConfig's read-side rules -- no
+    // NormalizedStringDeserializer, no FAIL_ON_NULL_FOR_PRIMITIVES=false.
+    //
+    // KRT_MEMBER, not the class's bare @WithMockUser: `POST /api/v1/missions` is gated on
+    // isMemberOrAbove(), so a ROLE_USER principal is refused 403 by the security chain and the
+    // request never reaches content negotiation at all. The point is to be refused for the RIGHT
+    // reason, which is what 415 says and 403 does not.
+    SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/missions")
+                .with(jwt().authorities(member))
+                .contentType(MediaType.APPLICATION_CBOR)
+                .content(new byte[] {(byte) 0xa0}))
+        .andExpect(status().isUnsupportedMediaType());
+  }
+
+  @Test
   @DisplayName("a caller that does not ask for CBOR is completely unaffected")
   void jsonCallersAreUnaffected() throws Exception {
     // The Android app and the extractor send `Accept: application/json` and are shipped builds
@@ -143,14 +189,28 @@ class ApiCborNegotiationTest {
   @DisplayName("an RFC 7807 problem stays JSON even when the caller asked for CBOR")
   void problemsStayJsonUnderACborAccept() throws Exception {
     // Not a courtesy: GlobalExceptionHandler presets `application/problem+json` on the response,
-    // and Spring skips Accept negotiation entirely for a preset concrete content type. If that
-    // ever changed, the frontend would stop being able to read the stable machine-readable `code`
-    // that krt-fetch.js routes reload-vs-toast on -- a failure that would look like a UI bug.
+    // and Spring skips Accept negotiation entirely for a preset concrete content type. If that ever
+    // changed, the frontend would stop being able to read the stable machine-readable `code` that
+    // krt-fetch.js routes reload-vs-toast on -- a transport change surfacing as a UI bug.
+    //
+    // A VALIDATION failure, not a missing id, and KRT_MEMBER rather than the class's bare
+    // @WithMockUser. Both matter. `GET /api/v1/missions/{id}` is gated on canSeeMission(#id), which
+    // refuses an id that does not exist with 403 FROM THE SECURITY CHAIN -- so that request never
+    // reaches GlobalExceptionHandler at all, and an `is4xxClientError()` assertion on it would stay
+    // green no matter what the handler did. `POST /api/v1/missions` is gated on isMemberOrAbove()
+    // alone, so an empty body reaches the handler and comes back as a problem the application
+    // built.
+    SimpleGrantedAuthority member = new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
+
     mockMvc
         .perform(
-            get("/api/v1/missions/00000000-0000-4000-8000-000000000000")
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/missions")
+                .with(jwt().authorities(member))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
                 .accept(MediaType.APPLICATION_CBOR))
-        .andExpect(status().is4xxClientError())
+        .andExpect(status().isBadRequest())
         .andExpect(
             header()
                 .string(

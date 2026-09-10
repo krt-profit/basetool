@@ -220,6 +220,41 @@ class CborJsonFidelityTest {
     assertThat(node.stringValue()).isEqualTo("00000000-0000-0000-0000-000000000001");
   }
 
+  @Test
+  @DisplayName("the registered CBOR converter refuses to read, so only responses negotiate")
+  void theCborConverterIsWriteOnly() {
+    // Stated at the converter rather than only through an endpoint, because "229 of 233 write
+    // mappings accept it" is a property of the converter and not of any one route. Adding the CBOR
+    // dependency made the backend a second PARSER as well as a second encoder, and that parser does
+    // not carry JacksonConfig's read-side rules -- they arrive through a
+    // JsonMapperBuilderCustomizer
+    // that by Boot's contract reaches the JsonMapper alone.
+    HttpMessageConverter<?> cbor = converterOf(JacksonCborHttpMessageConverter.class);
+
+    assertThat(cbor.canWrite(WireSample.class, MediaType.APPLICATION_CBOR))
+        .as("responses must still negotiate CBOR")
+        .isTrue();
+    assertThat(cbor.canRead(WireSample.class, MediaType.APPLICATION_CBOR))
+        .as("a CBOR request body must be refused, which Spring turns into 415")
+        .isFalse();
+  }
+
+  /**
+   * Finds the converter Spring actually registered.
+   *
+   * @param type the converter class to find
+   * @return the registered instance
+   */
+  private HttpMessageConverter<?> converterOf(Class<?> type) {
+    for (HttpMessageConverter<?> converter : handlerAdapter.getMessageConverters()) {
+      if (type.isInstance(converter)) {
+        return converter;
+      }
+    }
+    throw new AssertionError(
+        "no " + type.getSimpleName() + " registered — the second encoding is not wired at all");
+  }
+
   /**
    * Writes a value with the converter Spring actually registered, and returns the bytes.
    *

@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.ResolvableType;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.converter.cbor.JacksonCborHttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -53,6 +56,28 @@ import tools.jackson.dataformat.cbor.CBORMapper;
  * consumer binds it to a declared type rather than reading the tree. It is recorded in {@code
  * CborJsonFidelityTest} rather than papered over, so a future reader meets it as a known difference
  * instead of a surprise.
+ *
+ * <h2>And the converter is write-only</h2>
+ *
+ * <p>ADR-0161 &sect;8.5 and REQ-API-011 both say only the <em>response</em> direction negotiates.
+ * Nothing enforced that: {@code JacksonCborHttpMessageConverter} inherits {@code canRead}, so
+ * adding the dependency also made the backend <b>accept</b> {@code Content-Type: application/cbor}
+ * request bodies, on 229 of 233 write mappings, since only four declare {@code consumes}.
+ *
+ * <p>That is not a second encoding of one contract, it is a second <em>parser</em>, and it does not
+ * carry the project's read-side rules. {@code JacksonConfig} installs those through a {@code
+ * JsonMapperBuilderCustomizer}, which by Boot's contract reaches the {@code JsonMapper} alone; a
+ * {@code CBORMapper} never sees it, and the module is registered inline rather than service-loaded
+ * so {@code findModules} does not find it either. A body posted as CBOR would therefore skip {@code
+ * NormalizedStringDeserializer} entirely, with no trim, no NFC normalisation and no {@code
+ * StringNormalization.MAX_FREE_TEXT_LENGTH} rejection, so an over-long free-text field reaches the
+ * database as a column overflow instead of a validation error and the stored text never compares
+ * equal to the same value posted as JSON. {@code FAIL_ON_NULL_FOR_PRIMITIVES = false} is missing
+ * too, so an omitted boolean answers 400 instead of defaulting.
+ *
+ * <p>Refusing to read is the fix that matches what the requirement already claims, and it removes
+ * the whole class rather than re-deriving each rule for a second mapper. A caller that posts CBOR
+ * gets {@code 415}, which is the honest answer.
  */
 @Configuration
 public class CborFidelityConfig implements WebMvcConfigurer {
@@ -68,7 +93,7 @@ public class CborFidelityConfig implements WebMvcConfigurer {
    */
   @Override
   public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
-    builder.withCborConverter(new JacksonCborHttpMessageConverter(faithfulCborMapper()));
+    builder.withCborConverter(new WriteOnlyCborConverter(faithfulCborMapper()));
   }
 
   /**
@@ -80,6 +105,38 @@ public class CborFidelityConfig implements WebMvcConfigurer {
     SimpleModule module = new SimpleModule("cbor-uuid-as-string");
     module.addSerializer(UUID.class, new UuidAsStringSerializer());
     return CBORMapper.builder().addModule(module).build();
+  }
+
+  /**
+   * The CBOR converter, with reading removed.
+   *
+   * <p>{@code canRead} is the single point: the {@code Class} overload delegates to the {@code
+   * ResolvableType} one, so refusing there refuses every path. Spring then answers a {@code
+   * Content-Type: application/cbor} body with {@code 415 Unsupported Media Type} instead of routing
+   * it into a mapper that does not carry the project's read-side rules.
+   */
+  private static final class WriteOnlyCborConverter extends JacksonCborHttpMessageConverter {
+
+    /**
+     * Builds the converter over the faithful mapper.
+     *
+     * @param mapper the CBOR mapper to write with.
+     */
+    WriteOnlyCborConverter(CBORMapper mapper) {
+      super(mapper);
+    }
+
+    /**
+     * Always refuses to read.
+     *
+     * @param type the target type, unused.
+     * @param mediaType the request's content type, unused.
+     * @return {@code false}, always.
+     */
+    @Override
+    public boolean canRead(ResolvableType type, @Nullable MediaType mediaType) {
+      return false;
+    }
   }
 
   /**

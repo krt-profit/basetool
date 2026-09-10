@@ -125,6 +125,8 @@ public class GlobalExceptionHandler {
   public static final String CODE_DATA_INTEGRITY = "DATA_INTEGRITY_VIOLATION";
   public static final String CODE_NOT_FOUND = "NOT_FOUND";
   public static final String CODE_METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED";
+
+  public static final String CODE_UNSUPPORTED_MEDIA_TYPE = "UNSUPPORTED_MEDIA_TYPE";
   public static final String CODE_INTERNAL_ERROR = "INTERNAL_ERROR";
 
   private static final String MDC_CORRELATION_ID = "correlationId";
@@ -994,6 +996,42 @@ public class GlobalExceptionHandler {
    * @param request servlet request for instance URI + access-log enrichment
    * @return RFC 7807 problem-detail response
    */
+  /**
+   * Answers a request body in a media type no converter will read.
+   *
+   * <p>Reachable since the API gained a second encoding (REQ-API-011, ADR-0161 §8.5). CBOR
+   * negotiates on the <b>response</b> side only, so the CBOR converter is deliberately write-only
+   * ({@code CborFidelityConfig}) and a {@code Content-Type: application/cbor} body is refused. Left
+   * unhandled that refusal arrived here as an "Unexpected error" and became a <b>500</b>, which
+   * tells a caller its own request was fine and the server broke — the opposite of the truth, and
+   * unactionable.
+   *
+   * <p>The {@code Accept} header is untouched by this: a caller may still ask for a CBOR
+   * <em>response</em> while sending JSON, which is exactly what the frontend does.
+   *
+   * @param ex the refusal, carrying the offending content type and the supported ones.
+   * @param request the request, for the {@code instance} URI and the correlation id.
+   * @return a {@code 415} RFC 7807 problem naming the type that was refused.
+   */
+  @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ProblemDetail> handleMediaTypeNotSupported(
+      org.springframework.web.HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+    ProblemDetail pd =
+        problem(
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+            tr("problem.unsupported_media_type.title"),
+            tr("problem.unsupported_media_type.detail", String.valueOf(ex.getContentType())),
+            request,
+            "unsupported-media-type",
+            CODE_UNSUPPORTED_MEDIA_TYPE);
+    logProblem(
+        request,
+        pd,
+        "Unsupported media type",
+        Map.of("supportedMediaTypes", String.valueOf(ex.getSupportedMediaTypes())));
+    return toEntity(pd);
+  }
+
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMethodNotSupported(
       HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {

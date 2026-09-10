@@ -243,19 +243,33 @@ val logSafeMirrorSources =
   )
 
 // Where the CI step drops the previous release's openapi.json for the second half of
-// REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The property is ALWAYS handed to the test
-// JVM; ExternalContractTest#theContractTypesMatchThePreviousRelease skips when the file is not
-// there, which is every local run. Declared as an OPTIONAL input so the file appearing or changing
-// re-runs the suite instead of serving an up-to-date result that was computed without it.
+// REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The path is ALWAYS handed to the test JVM;
+// ExternalContractTest#theContractTypesMatchThePreviousRelease skips when the file is not there,
+// which is every local run.
+//
+// `inputs.files(...)`, NOT `inputs.file(...).optional(true)`. `optional` only permits an absent
+// PROVIDER VALUE, and `layout.buildDirectory.file(...)` always has one -- so Gradle still validated
+// the path and failed the task outright with "Input file does not exist" on every machine without a
+// baseline. That is `:backend:test`, `test`, `check` and `build` all failing before a single test
+// runs, which is the exact opposite of the skip this wiring exists for. A FileCollection tolerates
+// missing entries, and it is the idiom the cross-module parity inputs below already use.
 val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
 
 tasks.named<Test>("test") {
   inputs
-    .file(contractBaseline)
-    .optional(true)
+    .files(contractBaseline)
     .withPropertyName("contractBaseline")
     .withPathSensitivity(PathSensitivity.NONE)
-  systemProperty("contract.baseline", contractBaseline.get().asFile.absolutePath)
+  // Through an argument provider rather than `systemProperty`, because a system property is an
+  // @Input: an absolute, machine-specific path in the cache key would defeat the
+  // PathSensitivity.NONE chosen one line above and make the task non-relocatable. The provider
+  // carries no input annotation, so the PATH contributes nothing to the key while the file's
+  // CONTENT still does.
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Dcontract.baseline=" + contractBaseline.get().asFile.absolutePath)
+    }
+  )
 
   inputs
     .files(
