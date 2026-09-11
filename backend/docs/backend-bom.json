@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:afa5e2e9-2f5a-4518-b87a-ff0e522e0ad2",
+  "serialNumber" : "urn:uuid:715598f9-fa6b-4fa0-8a65-f6aa5859323f",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-09-09T08:05:15Z",
+    "timestamp" : "2026-09-11T20:44:49Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/34327101781"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/34645739559"
         },
         {
           "type" : "vcs",
@@ -13557,6 +13557,63 @@
     },
     {
       "type" : "library",
+      "bom-ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.5?type=jar",
+      "group" : "tools.jackson.dataformat",
+      "name" : "jackson-dataformat-cbor",
+      "version" : "3.1.5",
+      "description" : "Support for reading and writing Concise Binary Object Representation ([CBOR](https://www.rfc-editor.org/info/rfc7049) encoded data using Jackson abstractions (streaming API, data binding, tree model)",
+      "hashes" : [
+        {
+          "alg" : "MD5",
+          "content" : "e28508b6d6a44339f3d0188b96e037d6"
+        },
+        {
+          "alg" : "SHA-1",
+          "content" : "a3e7fe5445d7b120e07fa97fc6f934f2669492ae"
+        },
+        {
+          "alg" : "SHA-256",
+          "content" : "467da894a96a699035920bba0d462041ab64c6cb6fbe3215ae8e0db49e058a83"
+        },
+        {
+          "alg" : "SHA-512",
+          "content" : "a134a77ee39937580f8d64cd07cd0045e6d74bc3bce7d92055f5394f335f65d74fd7acffa72070c7f9971f073ce875651204453290d9ee416e5167e56204ee62"
+        },
+        {
+          "alg" : "SHA3-256",
+          "content" : "15c52052a0a5825a46a9019ba0f5bde4ff72c2e6e376a767d6088f4a8c3d7dd0"
+        },
+        {
+          "alg" : "SHA3-512",
+          "content" : "dab707dc68797d234ac95a92d4ea69ecfb66dc8439aa4bc13d8cef25b37aa11d5fa9fe240c873139febec7cae6546901d3dcbacb2bca39df028c5e4bdd644446"
+        },
+        {
+          "alg" : "SHA-384",
+          "content" : "fb3b7ffea8b719158987e4a120f1083242e611b552a32b070ecd65e4c70e2dc0d3edfa1c6323ba5df7a1e7de17bbf428"
+        },
+        {
+          "alg" : "SHA3-384",
+          "content" : "75c2699ebf03b5fb83e7af2d136555d40ea92b2b5726f89b21ce74e212c05285c800eb791e6213fc2a45a6d159ba11e0"
+        }
+      ],
+      "licenses" : [
+        {
+          "license" : {
+            "id" : "Apache-2.0"
+          }
+        }
+      ],
+      "purl" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.5?type=jar",
+      "modified" : false,
+      "properties" : [
+        {
+          "name" : "cdx:maven:package:test",
+          "value" : "false"
+        }
+      ]
+    },
+    {
+      "type" : "library",
       "bom-ref" : "pkg:maven/tools.jackson/jackson-bom@3.1.5?type=pom",
       "publisher" : "FasterXML",
       "group" : "tools.jackson",
@@ -13749,7 +13806,8 @@
         "pkg:maven/org.springframework.boot/spring-boot-starter-security@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-validation@4.1.1?type=jar",
         "pkg:maven/org.springframework.boot/spring-boot-starter-web@4.1.1?type=jar",
-        "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.1?type=jar"
+        "pkg:maven/org.springframework.boot/spring-boot-starter-webflux@4.1.1?type=jar",
+        "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.5?type=jar"
       ]
     },
     {
@@ -15145,6 +15203,14 @@
       "dependsOn" : [
         "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.21?type=jar",
         "pkg:maven/tools.jackson.core/jackson-core@3.1.5?type=jar",
+        "pkg:maven/tools.jackson/jackson-bom@3.1.5?type=pom"
+      ]
+    },
+    {
+      "ref" : "pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.5?type=jar",
+      "dependsOn" : [
+        "pkg:maven/tools.jackson.core/jackson-core@3.1.5?type=jar",
+        "pkg:maven/tools.jackson.core/jackson-databind@3.1.5?type=jar",
         "pkg:maven/tools.jackson/jackson-bom@3.1.5?type=pom"
       ]
     },
