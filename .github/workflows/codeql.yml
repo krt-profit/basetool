@@ -99,6 +99,22 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
+          # OFF because it was starving a different workflow. CodeQL's dependency cache is written
+          # under a key that embeds a per-run hash, so nothing is ever restored from it - it only
+          # ever grows. On 2026-09-10 a single pull request produced NINE of them at 804 MiB each:
+          # 7.2 GB of the repository's 9.86 GB against GitHub's 10 GB per-repository cap.
+          #
+          # Past that cap GitHub evicts least-recently-used entries, and the NVD dataset that
+          # `dependency-check.yml` caches is read by exactly one workflow, which makes it the
+          # least-recently-used large entry and therefore the first evicted. Losing it forces a
+          # 31-38 minute cold rebuild on EVERY dependency-check run, and a run killed at the job
+          # ceiling never reaches its `actions/cache` post step - so it saves nothing and the next
+          # run is cold again. Five consecutive runs died that way on 2026-09-10/11.
+          #
+          # The Java dependencies are already cached by `gradle/actions/setup-gradle` above, so this
+          # second copy bought nothing even in principle. Re-enable only with a key that is actually
+          # reused, and only with headroom under the cap.
+          dependency-caching: false
           config: |
             paths-ignore:
               - '**/build/**'
