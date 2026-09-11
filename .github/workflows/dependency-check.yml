@@ -65,12 +65,24 @@ jobs:
   owasp:
     name: OWASP Dependency-Check
     runs-on: ubuntu-latest
-    # Back to 60 on 2026-09-05. This was raised to 120 the day before on a WRONG diagnosis: the
-    # runs that kept dying at the ceiling were read as slow cold starts, so they were given more
-    # room. They were not slow, they were stalled - the extra hour changed nothing except how long
-    # a stuck run burned a runner. A COLD scan finishes in 8-14 minutes (run 31309086034 on `main`,
-    # 8m29s; run 33845554721 on a PR, 13m48s) and a warm one in under a minute, so 60 is ample
-    # headroom and the ceiling is a backstop, not a budget.
+    # 150 since 2026-09-11, and the history matters because this number has been wrong in both
+    # directions. It was raised to 120 on 2026-09-04 on a WRONG diagnosis - runs dying at the
+    # ceiling were read as slow cold starts when they were stalled on unbounded outbound HTTP reads
+    # - and returned to 60 the next day once those reads were bounded (see `setReadTimeout` /
+    # `setConnectionTimeout` in the root `build.gradle.kts`). That reasoning was right at the time.
+    #
+    # What changed is the COLD path itself. The 8-14 minutes this comment used to claim (run
+    # 31309086034 on `main`, 8m29s; run 33845554721 on a PR, 13m48s, both 2026-09-04) no longer
+    # holds: NVD passed 389 984 CVEs, and the measured cold rebuild is now 31-38 minutes - run
+    # 34472560988 reached its verdict in 38m25s, and five runs on 2026-09-10/11 were killed at 60
+    # with no verdict at all. The ceiling had become a budget, which is what it is not supposed to
+    # be.
+    #
+    # A cold rebuild should be rare: it only happens when the NVD cache is missing, which on
+    # 2026-09-10 was caused by CodeQL's per-run dependency caches evicting it under GitHub's 10 GB
+    # cap (fixed in `codeql.yml`). A WARM run is still under a minute, so this number is only ever
+    # reached by the once-per-eviction rebuild. If warm runs start approaching it, that is a real
+    # signal and not something to raise again.
     #
     # The stalls were unbounded outbound HTTP reads inside dependency-check; they are fixed where
     # they belong, by `setReadTimeout` / `setConnectionTimeout` in the root `build.gradle.kts` (see
