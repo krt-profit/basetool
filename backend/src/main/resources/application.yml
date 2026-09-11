@@ -53,7 +53,15 @@ server:
   compression:
     enabled: true
     min-response-size: 1024
-    mime-types: application/json,application/problem+json,text/html,text/plain,text/css,application/javascript,application/xml,image/svg+xml
+    # `application/cbor` is on this list deliberately (ADR-0161 8.5). Without it Tomcat refuses to
+    # compress the second encoding, and since the frontend asks for CBOR first by default the heavy
+    # read payloads would have gone out RAW where the JSON they replaced went out gzipped. Measured
+    # on a representative document from this repo: 1 873 986 B raw against 80 285 B gzipped, a 23x
+    # ratio. CBOR does not dictionary-compress field names, so raw CBOR lands near raw JSON -- i.e.
+    # several times MORE bytes than the gzipped JSON it replaced, on the very hop the change exists
+    # to make cheaper. Compressing both keeps the byte axis at parity and leaves CBOR's actual claim,
+    # a cheaper parse, as the only variable.
+    mime-types: application/json,application/problem+json,application/cbor,text/html,text/plain,text/css,application/javascript,application/xml,image/svg+xml
 
 spring:
   servlet:

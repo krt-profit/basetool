@@ -54,8 +54,9 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 # `frontend/scripts/` and the `.prettierrc.json` / `.prettierignore` / lint tool
 # configs) that are deliberately not part of the Docker context (only
 # `frontend/build.gradle.kts` and `frontend/src/` are copied). `generateApiTypes`
-# additionally reads the BACKEND module's `openapi.json`, which is never in the
-# frontend context at all.
+# additionally reads the BACKEND module's `openapi.json` -- which IS in the context
+# since ADR-0161 8.2 (see the COPY below, added for `openApiGenerate`), but only
+# that one file, and this task needs the Node toolchain it is excluded for anyway.
 # A node task whose declared input files are absent fails configuration
 # validation outright, so every Node-based `check` task must be excluded here,
 # not just the Java ones — when you add one to `check`, add it to this list in
@@ -72,6 +73,18 @@ COPY frontend/src/ frontend/src/
 # source set references `Call` from that module, so without these the image build fails
 # to compile tests it will never run. Only `src/main` - its own tests are not needed.
 COPY test-support/src/main/ test-support/src/main/
+# And the backend's committed API document, for the same reason one directory over. The frontend's
+# TEST source set generates its wire models from it (ADR-0161 8.2, GeneratedDtoAgreementTest), so
+# `openApiGenerate` runs as a dependency of the `compileTestJava` this image never needs -- and
+# without the file the task fails validation before it starts, with "Input file does not exist".
+# One file, not the backend's sources: the frontend does not compile against the backend, it
+# mirrors its contract.
+#
+# The alternative was to exclude the task below and let the generated source root be empty. Not
+# taken: a generator that silently produces nothing is exactly the vacuous-guard shape the test
+# reading its output exists to avoid, and an image build that diverges from `./gradlew build` is
+# how a task stops being exercised anywhere.
+COPY backend/src/main/resources/api/openapi.json backend/src/main/resources/api/openapi.json
 # `${APP_VERSION:+...}` only expands when the build-arg was set and non-empty,
 # so a `docker build` without `--build-arg APP_VERSION=...` still works and the
 # Gradle fallback in `frontend/build.gradle.kts` kicks in.

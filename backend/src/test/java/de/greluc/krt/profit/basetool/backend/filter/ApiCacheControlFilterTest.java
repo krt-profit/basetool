@@ -61,6 +61,18 @@ class ApiCacheControlFilterTest {
         "no-cache, must-revalidate", run("GET", "/api/v1/missions").getHeader(CACHE_CONTROL));
   }
 
+  @Test
+  void apiGet_variesOnAcceptAsWellAsEncoding() throws Exception {
+    // ADR-0161 8.5 gave every /api path a second representation: the same URL answers CBOR or JSON
+    // depending on Accept. `no-cache, must-revalidate` permits an intermediary to STORE the body,
+    // so a cache keyed on the URL alone could hand a CBOR body to a JSON client -- which is a
+    // parse failure on a client that did nothing wrong. Accept-Encoding was already named; Accept
+    // had to join it in the same change that introduced the second representation.
+    org.junit.jupiter.api.Assertions.assertIterableEquals(
+        java.util.List.of("Accept", "Accept-Encoding"),
+        run("GET", "/api/v1/missions").getHeaders("Vary"));
+  }
+
   /**
    * A percent-encoded API path still gets the headers.
    *
@@ -154,7 +166,12 @@ class ApiCacheControlFilterTest {
 
   @Test
   void sensitiveFamiliesStillCarryTheVaryHeader() throws Exception {
-    assertEquals("Accept-Encoding", run("GET", "/api/v1/bank/accounts").getHeader("Vary"));
+    // Both names, on the stricter family too. `no-store` already keeps these bodies out of every
+    // store, so Vary buys nothing here -- it is asserted anyway because a filter that emitted the
+    // header on one bucket and not the other would be a difference nobody chose.
+    org.junit.jupiter.api.Assertions.assertIterableEquals(
+        java.util.List.of("Accept", "Accept-Encoding"),
+        run("GET", "/api/v1/bank/accounts").getHeaders("Vary"));
   }
 
   @Test

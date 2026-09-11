@@ -623,7 +623,21 @@ a subset of this set, and the two move together.
   Nullable enums are deliberately not frozen: a strict client coerces an unknown one to `null`, so
   an objective loses its kind badge rather than its screen, and freezing them would make the guard
   fire on harmless additions until it means nothing. Verified by adding a constant: three failures.
-- [ ] Type and nullability changes are caught. **Open** — needs a schema diff of the contract
+- [x] Type and nullability changes are caught — **closed by ADR-0161 §8.4** (2026-09-10). 1,479
+  properties across 253 schemas, reached from the contract set by the same transitive walk the enum
+  guard uses, each recorded as its JSON type, its format and whether the schema requires it.
+  <br>**"Nullability" here means `required`, and there is nothing else it could mean**: this
+  document carries no `nullable` keyword and no `["string","null"]` union — springdoc emits neither
+  at OpenAPI 3.1 — so membership of a schema's `required` list is the entire signal, and a property
+  leaving it is a field an installed build reads unconditionally and now gets `null` for.
+  <br>Two guards, because they fail on different things.
+  `theContractTypesAndNullabilityAreFrozen` compares against a committed record
+  (`backend/src/test/resources/api/frozen-contract-types.txt`) and runs everywhere, including
+  locally; a pull request could in principle edit the record and the document together.
+  `theContractTypesMatchThePreviousRelease` compares against the previous release tag's own
+  `openapi.json`, which no pull request can edit — ADR-0136's wording taken literally — and skips
+  when CI has not fetched a baseline. Verified by flipping one property from optional to required
+  (the first fails, naming the field) and by running the second against `v1.7.7`.
 - [x] A sunset can actually retire old builds — **closed by REQ-API-010** (2026-08-24). The gate
   the first `/api/v2` was waiting on now exists: the server names a floor and the app refuses to run
   below it. What that unblocks is narrower than "old builds are gone", and the difference matters
@@ -680,3 +694,100 @@ instead. Recorded here rather than left as a silent difference between design an
 **Enforced by:** `AppVersionPolicyControllerTest`, `ExternalContractTest`,
 `ApiVhostAnonymousSurfaceTest` (backend) ·
 **Related:** REQ-API-009, REQ-SEC-037, ADR-0136, app issue krt-profit/basetool-android#67
+
+---
+
+### REQ-API-011 — JSON is the contract; CBOR is a second encoding of it
+
+Every `/api/**` response is available as **JSON** and, to a caller that asks for it, as **CBOR**
+(`application/cbor`, RFC 8949). Same object model, same DTOs, same field names, same Bean Validation,
+same RFC 7807 handling — only the bytes differ.
+
+> [!important] "Only the bytes differ" is a requirement, not an observation — it is false by default
+> Jackson's `UUIDSerializer` asks the generator `canWriteBinaryNatively()` and writes sixteen raw
+> bytes when the answer is yes. JSON answers no and emits a string; CBOR answers yes. Left alone,
+> **all 209 `string/uuid` properties of the frozen contract stop being strings** under the second
+> encoding, and anything that treats an id as text renders base64. That is exactly the in-place shape
+> change REQ-API-009 forbids, so `CborFidelityConfig` overrides the serializer and
+> `CborJsonFidelityTest` states the requirement over a value carrying every type whose wire form
+> could diverge.
+>
+> One known, accepted difference: a `BigDecimal` decodes to a decimal node from CBOR and to a double
+> from JSON — same value, different scale, CBOR the more faithful of the two. It changes nothing for
+> a caller that binds to a declared type, which is every caller, and it is pinned by name so it stays
+> a known difference rather than becoming a surprise in a ledger. The choice is content negotiation and nothing else:
+> a caller that sends `Accept: application/json`, or no `Accept` at all, is served exactly what it was
+> served before CBOR existed.
+
+**JSON remains the contract.** `openapi.json` documents one representation, the frozen contract set
+of REQ-API-009 is expressed in it, and the shipped clients — the Android app and the SC extractor —
+ask for it. CBOR is an encoding of the same document, not a second API, and nothing may be reachable
+in one and not the other.
+
+Three consequences that are load-bearing rather than incidental:
+
+- **RFC 7807 problems are always JSON.** `GlobalExceptionHandler` presets
+  `application/problem+json` on the response, and Spring skips content negotiation entirely for a
+  preset concrete content type. This is what keeps the stable machine-readable `code` readable by a
+  client that asked for CBOR — REQ-API-004's guarantee does not become conditional on an `Accept`
+  header.
+- **Request bodies stay JSON.** Only the response direction negotiates. Spring registers the JSON
+  encoder ahead of the CBOR one, so a write goes out as JSON without being told to — pinned by a
+  test, because it is a framework ordering rather than a decision in this repository, and a write
+  path that silently turned binary would meet every `consumes = APPLICATION_JSON_VALUE` endpoint as
+  a 415.
+- **`Vary` names `Accept`.** Two representations at one URL, on families an intermediary is
+  permitted to store (`no-cache, must-revalidate`), means a cache keyed on the URL alone could hand
+  a CBOR body to a JSON client. `ApiCacheControlFilter` emits `Vary: Accept, Accept-Encoding`.
+
+**Configuration, not a table.** Which encoding the frontend asks for is `app.http.codec`
+(`CBOR` → `Accept: application/cbor, application/json`; `JSON` → the pre-2026-09-10 header). The
+backend serves whatever is asked for either way — there is no server-side switch, because a
+representation that exists for one caller and not another is a contract that depends on
+configuration.
+
+**Compressed, like the JSON it stands beside.** `application/cbor` is on
+`server.compression.mime-types`. The first revision of this requirement left it off and argued that
+skipping gzip was the point — bytes for CPU on an internal hop. **That was wrong on the numbers.**
+Measured on a representative document from this repository: 1 873 986 B raw against 80 285 B
+gzipped, a **23x** ratio. CBOR does not dictionary-compress field names, so raw CBOR lands near raw
+JSON — several times *more* bytes than the gzipped JSON it replaced, on the one hop the change
+exists to make cheaper, and on the catalogue whose 16 MB tipped a buffer. Compressing both keeps the
+byte axis at parity and leaves CBOR's actual claim, a cheaper parse, as the only variable the
+still-owed measurement has to weigh.
+
+**Requests are refused, not merely un-negotiated.** The CBOR converter is registered write-only
+(`CborFidelityConfig`). `JacksonCborHttpMessageConverter` inherits `canRead`, so simply adding the
+dependency also made the backend *accept* `Content-Type: application/cbor` on the 229 of 233 write
+mappings that declare no `consumes` — parsed by a mapper that never sees `JacksonConfig`'s
+customizer, since that is a `JsonMapperBuilderCustomizer` and reaches the `JsonMapper` alone. Such a
+body would skip `NormalizedStringDeserializer` entirely: no trim, no NFC normalisation, no
+`MAX_FREE_TEXT_LENGTH`. A CBOR request body now answers `415` through the ordinary RFC 7807 path.
+
+**Acceptance**
+
+- [x] A caller asking for CBOR gets CBOR, and it decodes to the same document as the JSON
+  (`ApiCborNegotiationTest` — which **aborts** rather than passing when the endpoint it samples has
+  no rows, because that is how the UUID divergence below survived a green build).
+- [x] **A UUID is a string in both encodings**, and every other type whose wire form could diverge is
+  compared explicitly (`CborJsonFidelityTest`, which needs no seeded data). Verified by the failure
+  it was written for: five E2E write flows and ids rendering as `AAAAAAAAAAAAAAAAAAAAAQ==`.
+- [x] A caller that does not ask for it is unaffected, byte for byte.
+- [x] An RFC 7807 problem stays `application/problem+json` under a CBOR `Accept`.
+- [x] A write still goes out as JSON with CBOR enabled (`WebClientCborNegotiationTest`).
+- [x] `Vary` names `Accept` as well as `Accept-Encoding` (`ApiCacheControlFilterTest`).
+- [x] A CBOR **request body** is refused with `415`, so only the response direction negotiates
+  (`ApiCborNegotiationTest`, `CborJsonFidelityTest`).
+- [x] The rollback lever reaches a deployed container: `APP_HTTP_CODEC` is named in the frontend's
+  compose environment, which is a closed allow-list with no `env_file`.
+- [x] `openapi.json` is unchanged by the second representation, so the generated Android models are
+  too — springdoc already emits `*/*` for these responses.
+- [ ] The serialization cost is actually measured. **Open** — ADR-0161 §8.5 makes this its own
+  precondition, and `app.http.codec=JSON` is the way back while it is pending.
+
+**Enforced by:** `ApiCborNegotiationTest`, `ApiCacheControlFilterTest` (backend) ·
+`WebClientCborNegotiationTest` (frontend) ·
+**Related:** REQ-API-004, REQ-API-007, REQ-API-009, REQ-SEC-031, ADR-0161
+
+---
+

@@ -23,5 +23,8 @@
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "js-yaml": "^4.3.2"
   }
 }

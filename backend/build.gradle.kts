@@ -40,6 +40,13 @@ repositories { mavenCentral() }
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  // CBOR on the frontend<->backend hop (ADR-0161 §8.5). No version: the Spring Boot BOM already
+  // manages tools.jackson:jackson-bom, and pinning a second one here is how the two Jackson 3
+  // module sets drift apart. Its only job is to be PRESENT -- Spring Framework 7 detects
+  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR converter
+  // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
+  // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
+  implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   implementation("org.springframework.boot:spring-boot-starter-data-jpa")
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
@@ -235,7 +242,35 @@ val logSafeMirrorSources =
     "ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/logging/LogSafeTest.java",
   )
 
+// Where the CI step drops the previous release's openapi.json for the second half of
+// REQ-API-009's schema diff (ADR-0136, ADR-0161 8.4). The path is ALWAYS handed to the test JVM;
+// ExternalContractTest#theContractTypesMatchThePreviousRelease skips when the file is not there,
+// which is every local run.
+//
+// `inputs.files(...)`, NOT `inputs.file(...).optional(true)`. `optional` only permits an absent
+// PROVIDER VALUE, and `layout.buildDirectory.file(...)` always has one -- so Gradle still validated
+// the path and failed the task outright with "Input file does not exist" on every machine without a
+// baseline. That is `:backend:test`, `test`, `check` and `build` all failing before a single test
+// runs, which is the exact opposite of the skip this wiring exists for. A FileCollection tolerates
+// missing entries, and it is the idiom the cross-module parity inputs below already use.
+val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
+
 tasks.named<Test>("test") {
+  inputs
+    .files(contractBaseline)
+    .withPropertyName("contractBaseline")
+    .withPathSensitivity(PathSensitivity.NONE)
+  // Through an argument provider rather than `systemProperty`, because a system property is an
+  // @Input: an absolute, machine-specific path in the cache key would defeat the
+  // PathSensitivity.NONE chosen one line above and make the task non-relocatable. The provider
+  // carries no input annotation, so the PATH contributes nothing to the key while the file's
+  // CONTENT still does.
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Dcontract.baseline=" + contractBaseline.get().asFile.absolutePath)
+    }
+  )
+
   inputs
     .files(
       rootProject.file(

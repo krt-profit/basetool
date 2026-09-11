@@ -17,6 +17,10 @@ plugins {
   // below), so neither the developer machine nor the CI runner needs a
   // pre-installed Node — consistent with the "only the Gradle wrapper" rule.
   alias(libs.plugins.node.gradle)
+  // Generates the wire models from the backend's committed OpenAPI document (ADR-0161 §8.2).
+  // Nothing in `main` consumes them yet -- see the `openApiGenerate` block below for what they are
+  // for today and what would have to happen for them to replace the hand-written mirrors.
+  alias(libs.plugins.openapi.generator)
 }
 
 // Force :test-support to be evaluated before this project. With org.gradle.configureondemand=true
@@ -25,6 +29,108 @@ plugins {
 evaluationDependsOn(":test-support")
 
 description = "frontend"
+
+// ---------------------------------------------------------------------------
+// Generated wire models (ADR-0161 §8.2)
+//
+// 261 hand-maintained records under `model/dto` mirror the backend's response shapes, and four
+// contract tests exist to notice when they stop matching. A generator makes the mismatch
+// impossible instead of detectable -- that is the maintainability win gRPC was asked for, and it
+// needs no protocol change to collect.
+//
+// WHAT THIS DOES TODAY, AND WHAT IT DOES NOT. The generator runs, its output compiles, and
+// `GeneratedDtoAgreementTest` compares it field by field against the hand-written mirrors. Nothing
+// in `main` imports a generated type. That ordering is deliberate and is what §8.2 asks for:
+// "the contract tests should be KEPT initially, proving the generator agrees with them before
+// anything is deleted". The swap is an epic of its own, and it is not a small one -- the generator
+// emits classes with getters where the mirrors are records, `List` where they use `Set`, and
+// `OffsetDateTime`/`String` where they use `Instant`, so every accessor call site moves and the
+// Javadoc that explains WHY fields exist (see MissionDto's slimming note) is not reproducible from
+// a schema.
+//
+// The output goes to the TEST source set. In `main` it would ship 261 unused classes in the jar
+// and put generated code under Checkstyle's Javadoc gate; in `test` it is compiled, reflected over
+// and otherwise inert.
+val generatedContract = layout.buildDirectory.dir("generated/openapi")
+
+openApiGenerate {
+  generatorName.set("java")
+  // A RegularFile, NOT a `file:` URI string. The extension's `set(String)` overload runs the value
+  // through `isRemoteUri()`, and `file:///D:/...` matches -- so it assigned `remoteInputSpec` and
+  // NULLED `inputSpec`, which the plugin says out loud on every run: "Using remoteInputSpec may
+  // result in stale build caches if the remote content changes." That discarded `inputSpec`'s
+  // tracked `@InputFile @PathSensitive(RELATIVE)` and left a machine-absolute string in a
+  // @CacheableTask key, so a CI entry, the main checkout, every worktree copy and the Docker image
+  // build were four distinct keys and regenerated 411 models from scratch in each.
+  //
+  // The `RegularFile` overload keeps the file tracked and the key relocatable, and it sidesteps the
+  // Windows drive-letter trap the URI form was reaching for in the first place -- that trap is what
+  // `isRemoteUri()`'s own regex documents itself as avoiding.
+  inputSpec.set(
+    rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json")
+  )
+  // Without this the generator writes the new tree and LEAVES the old files. Rename or drop a
+  // backend schema and the stale class still compiles, `scan(GENERATED_PACKAGE)` still finds it,
+  // and the branch in GeneratedDtoAgreementTest that reads "no schema of this name in
+  // openapi.json" never fires -- green on every machine with a warm `frontend/build`, red only on
+  // a clean CI workspace. That is the inverse of what a drift gate should do.
+  cleanupOutput.set(true)
+  outputDir.set(generatedContract)
+  modelPackage.set("de.greluc.krt.profit.basetool.frontend.contract.model")
+  apiPackage.set("de.greluc.krt.profit.basetool.frontend.contract.api")
+  packageName.set("de.greluc.krt.profit.basetool.frontend.contract")
+  // MODELS ONLY. The generator can emit API interfaces too and they are deliberately not taken:
+  // BackendApiClient classifies failures by the backend's stable problem `code`, folds some
+  // refusals into successes, single-flights through Caffeine and page-walks catalogues -- none of
+  // which a generated client does. What the generation is for is the TYPE of the payload.
+  globalProperties.set(mapOf("models" to "", "modelDocs" to "false", "modelTests" to "false"))
+  configOptions.set(
+    mapOf(
+      "library" to "native",
+      // Jackson 2 annotations, and that is a CONSTRAINT ON THE EPIC rather than a detail. All 411
+      // generated files import `com.fasterxml.jackson.annotation.*`; openapi-generator 7.25 offers
+      // no Jackson 3 option. Spring 7 binds with `tools.jackson`, which ignores those annotations
+      // entirely -- so the "replace the mirrors with generated types" step this generation exists
+      // to prepare CANNOT be taken on this output as it stands: every @JsonProperty-renamed field
+      // and every @JsonCreator/@JsonInclude behaviour would misbind at runtime. That is fine for
+      // what the output is used for TODAY, which is a reflective name-by-name comparison in
+      // GeneratedDtoAgreementTest, and it is the first thing the epic has to solve.
+      //
+      // It also makes the Jackson 2 dependency below load-bearing for `compileTestJava`: closing
+      // issue #294 by deleting it now breaks 411 files. See the note beside that dependency.
+      "serializationLibrary" to "jackson",
+      // Jakarta, not javax: this module is on Spring Boot 4 / Jakarta EE 10.
+      "useJakartaEe" to "true",
+      // JsonNullable would pull org.openapitools:jackson-databind-nullable onto the classpath for
+      // a distinction the mirrors do not make either -- they use a plain null.
+      "openApiNullable" to "false",
+      // Without this every regeneration rewrites 261 files with a new timestamp, which turns an
+      // up-to-date check into a diff.
+      "hideGenerationTimestamp" to "true",
+      // Off, or every model imports the ApiClient that a models-only generation never emits, for a
+      // `toUrlQueryString()` helper nothing here calls. The generation compiles without it and
+      // fails outright with it, which is the whole of the reason.
+      "supportUrlQuery" to "false",
+      "sourceFolder" to "src/main/java",
+    )
+  )
+}
+
+// The generator takes its spec as a URI STRING, so Gradle never sees the file and the task's cache
+// key would not include the contract at all. On a developer machine that is invisible because a
+// local build regenerates anyway; on CI it serves a FROM-CACHE result that predates a contract
+// change and the comparison below passes against a stale generation. Declaring the file as an
+// input is what makes the cache key honest. (Learned the expensive way in the Android module.)
+tasks.openApiGenerate.configure {
+  inputs
+    .file(rootProject.layout.projectDirectory.file("backend/src/main/resources/api/openapi.json"))
+    .withPropertyName("openapiSpecFile")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+sourceSets.named("test") { java.srcDir(generatedContract.map { it.dir("src/main/java") }) }
+
+tasks.named<JavaCompile>("compileTestJava") { dependsOn(tasks.openApiGenerate) }
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
@@ -91,6 +197,13 @@ springBoot {
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-webflux")
+  // CBOR on the frontend<->backend hop (ADR-0161 §8.5). No version: the Spring Boot BOM already
+  // manages tools.jackson:jackson-bom, and pinning a second one here is how the two Jackson 3
+  // module sets drift apart. Its only job is to be PRESENT -- Spring Framework 7 detects
+  // `tools.jackson.dataformat.cbor.CBORMapper` on the classpath and registers the CBOR converter
+  // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
+  // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
+  implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
   // Jackson 2 — kept ONLY for ThymeleafJavaScriptSerializerConfig, the JS-inlining bridge that must
   // track Thymeleaf's own Jackson version. Every other frontend class is on Jackson 3
   // (tools.jackson).
@@ -100,6 +213,11 @@ dependencies {
   // table, and it needs the JSR-310 module so [[${dto}]] inline expressions can render java.time.*
   // fields (Instant/OffsetDateTime/LocalDateTime). Drop both deps once Thymeleaf supports Jackson 3
   // and the bridge is migrated — tracked in https://github.com/krt-profit/basetool/issues/294.
+  //
+  // SINCE ADR-0161 8.2 these two are ALSO load-bearing for `compileTestJava`: openapi-generator
+  // emits `com.fasterxml.jackson.annotation.*` into all 411 generated models (7.25 has no Jackson 3
+  // option), so deleting them to close #294 breaks the test source set. Closing #294 now means
+  // solving the generator's serialization library first.
   implementation("com.fasterxml.jackson.core:jackson-databind")
   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
   implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
@@ -310,6 +428,15 @@ tasks.named<Test>("test") {
   inputs
     .files(logSafeMirrorSources.map { rootProject.file(it) })
     .withPropertyName("logSafeMirrorSources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+
+  // The committed test TLS material (ADR-0139). The two HTTP/2 tests handshake against it through
+  // `TestTls`, which walks up to the repository root to find it -- so it is off this task's
+  // classpath and, like the four files above, invisible to Gradle. Rotating the material would
+  // otherwise leave those tests UP-TO-DATE against a keystore that no longer exists.
+  inputs
+    .file(rootProject.file("docker/test-tls/basetool-test-keystore.p12"))
+    .withPropertyName("testTlsKeystore")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 
   // In-module but still off this task's classpath: `E2eAudienceEnforcementParityTest` lives in

@@ -24,8 +24,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Stream;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
@@ -49,7 +47,12 @@ import org.springframework.web.util.pattern.PathPatternParser;
  *
  * <p>{@code no-store} makes the ETag on these paths inert rather than contradictory — a client that
  * honours it keeps no copy, so it never sends {@code If-None-Match} and never gets a 304. Nothing
- * relies on conditional requests for these families.
+ * relies on conditional requests for these families. Spring agrees: {@code
+ * ShallowEtagHeaderFilter#isEligibleForEtag} refuses to generate an ETag once {@code Cache-Control}
+ * carries {@code no-store}, so on these families the header genuinely does not exist. That is why
+ * {@link NoStoreApiScopes} — the list this filter used to own privately — now also drives {@code
+ * StreamAwareShallowEtagHeaderFilter}: a response that provably cannot carry an ETag has no reason
+ * to be buffered for one.
  *
  * <p>The {@code /api} scope is a parsed {@link PathPattern} matched against the decoded path rather
  * than a raw {@code getRequestURI().startsWith("/api/")} test: {@code getRequestURI()} is the raw
@@ -65,60 +68,8 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
   /**
-   * The families whose GET bodies must not be stored by anyone.
-   *
-   * <p>Deliberately a short, explicit list rather than a configuration key: which data is sensitive
-   * is a property of the domain, not of a deployment, and a header this load-bearing should not be
-   * switchable by an env var nobody reviews. Extending it is a one-line change.
-   *
-   * <ul>
-   *   <li>{@code bank} and {@code org-units/bank} — account balances, bookings and the ledger. Both
-   *       spellings, because they are <em>different</em> surfaces: {@code /api/v1/bank/**} is the
-   *       bank-employee one, while the member-facing account a client actually reads lives under
-   *       {@code /api/v1/org-units/bank/**} and its transaction rows carry a {@code holderHandle};
-   *   <li>{@code users} and {@code me} — member records, the only PII the API serves;
-   *   <li>{@code notifications} — one member's personal feed, including the SSE stream;
-   *   <li>{@code finance-entries} (both the standalone write family and the per-mission read) and
-   *       {@code operations} — the mission/operation payout ledgers and their rollups;
-   *   <li>{@code personal-inventory}, {@code personal-blueprints}, {@code inventory}, {@code
-   *       hangar} and {@code refinery-orders} — a member's own holdings and the org stock/fleet
-   *       they name members in;
-   *   <li>{@code promotion} — a member's own evaluation and eligibility record.
-   * </ul>
-   *
-   * <p>The Materialbörse ({@code material-exchange} / {@code material-requests}) is deliberately
-   * <em>not</em> here: it is an org-wide shared board, and the handles it carries are the same
-   * public callsign tuple the public mission roster already serves, so it belongs in the revalidate
-   * bucket with the other shared listings.
-   *
-   * <p><b>This list is load-bearing, not advisory</b> (REQ-SEC-031). Because this filter runs at
-   * {@code HIGHEST_PRECEDENCE + 20} — ahead of the Spring Security chain — it sets {@code
-   * Cache-Control} before {@code CacheControlHeadersWriter} would, and that writer only acts when
-   * the header is unset. So a sensitive family missing from this list does not merely fail to opt
-   * in: it is actively <em>downgraded</em> from the framework's default {@code no-store} to the
-   * storable {@code must-revalidate}. Adding a sensitive GET family means adding it here.
-   */
-  private static final List<PathPattern> NO_STORE_SCOPES =
-      Stream.of(
-              "/api/v1/bank/**",
-              "/api/v1/org-units/bank/**",
-              "/api/v1/users/**",
-              "/api/v1/me/**",
-              "/api/v1/notifications/**",
-              "/api/v1/finance-entries/**",
-              "/api/v1/missions/*/finance-entries/**",
-              "/api/v1/operations/**",
-              "/api/v1/personal-inventory/**",
-              "/api/v1/personal-blueprints/**",
-              "/api/v1/inventory/**",
-              "/api/v1/hangar/**",
-              "/api/v1/refinery-orders/**",
-              "/api/v1/promotion/**")
-          .map(PathPatternParser.defaultInstance::parse)
-          .toList();
-
-  /**
-   * Header value for the families above: no intermediary, disk cache or proxy may keep the body.
+   * Header value for a {@link NoStoreApiScopes} family: no intermediary, disk cache or proxy may
+   * keep the body.
    */
   private static final String NO_STORE = "private, no-store";
 
@@ -147,13 +98,7 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
    * @return {@link #NO_STORE} for a sensitive family, {@link #REVALIDATE} otherwise.
    */
   private static String cacheControlFor(String uri) {
-    PathContainer path = PathContainer.parsePath(uri);
-    for (PathPattern scope : NO_STORE_SCOPES) {
-      if (scope.matches(path)) {
-        return NO_STORE;
-      }
-    }
-    return REVALIDATE;
+    return NoStoreApiScopes.matches(PathContainer.parsePath(uri)) ? NO_STORE : REVALIDATE;
   }
 
   @Override
@@ -161,6 +106,11 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     response.setHeader("Cache-Control", cacheControlFor(request.getRequestURI()));
+    // Accept joined Accept-Encoding when the API gained a second representation (ADR-0161 8.5):
+    // the same path now answers CBOR or JSON depending on what the caller asked for, and a cache
+    // keyed only on the URL would hand a CBOR body to a JSON client. The revalidate families are
+    // the ones this protects -- the no-store families are not stored anywhere to begin with.
+    response.addHeader("Vary", "Accept");
     response.addHeader("Vary", "Accept-Encoding");
     filterChain.doFilter(request, response);
   }

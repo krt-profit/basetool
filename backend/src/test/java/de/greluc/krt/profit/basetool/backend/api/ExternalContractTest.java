@@ -33,6 +33,7 @@ import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -2887,6 +2888,57 @@ class ExternalContractTest {
    */
   private static void walkSchema(
       JsonNode schemas, String name, Set<String> visited, Map<String, Set<String>> found) {
+    walkProperties(
+        schemas,
+        name,
+        visited,
+        (owner, property, value, required) -> {
+          String target = schemaName(value);
+          JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
+          if (enumNode != null && required) {
+            Set<String> constants = new TreeSet<>();
+            enumNode.forEach(entry -> constants.add(entry.asString()));
+            found.put(owner + "." + property, constants);
+          }
+        });
+  }
+
+  /** What a traversal does with one property of one schema. */
+  @FunctionalInterface
+  private interface PropertyVisitor {
+
+    /**
+     * Called once per property of every schema the walk reaches.
+     *
+     * @param owner the schema the property belongs to
+     * @param property the property name
+     * @param value the property's schema node
+     * @param required whether the owning schema lists it as required
+     */
+    void visit(String owner, String property, JsonNode value, boolean required);
+  }
+
+  /**
+   * The one traversal both frozen records are built from.
+   *
+   * <p>The enum guard and the type record used to carry a near-verbatim copy each, which meant
+   * every fix to the walk had to be found twice and applied twice \u2014 and the {@code
+   * additionalProperties} gap proves the point: it was fixed in the type record and would have
+   * stayed open in the enum one, where a required enum used as a map's VALUE type is exactly as
+   * fatal to a strict parser.
+   *
+   * <p>Transitive and cycle-guarded by the caller's {@code visited} set, because a client parses
+   * the whole payload: a type four levels down inside a participant's job type breaks it as surely
+   * as one on the root object. Descends through an array's {@code items} and a map's {@code
+   * additionalProperties} as well as a plain {@code $ref}.
+   *
+   * @param schemas the document's {@code components.schemas} node
+   * @param name the schema to walk; {@code null} and already-visited names are no-ops
+   * @param visited the shared cycle guard
+   * @param visitor what to do with each property
+   */
+  private static void walkProperties(
+      JsonNode schemas, String name, Set<String> visited, PropertyVisitor visitor) {
     if (name == null || !visited.add(name)) {
       return;
     }
@@ -2905,18 +2957,16 @@ class ExternalContractTest {
     }
     for (Map.Entry<String, JsonNode> property : properties.properties()) {
       JsonNode value = property.getValue();
+      visitor.visit(name, property.getKey(), value, required.contains(property.getKey()));
       if ("array".equals(value.path("type").asString(""))) {
-        walkSchema(schemas, schemaName(value.path("items")), visited, found);
+        walkProperties(schemas, schemaName(value.path("items")), visited, visitor);
         continue;
       }
-      String target = schemaName(value);
-      JsonNode enumNode = target != null ? schemas.path(target).get("enum") : value.get("enum");
-      if (enumNode != null && required.contains(property.getKey())) {
-        Set<String> constants = new TreeSet<>();
-        enumNode.forEach(entry -> constants.add(entry.asString()));
-        found.put(name + "." + property.getKey(), constants);
+      if (value.path("additionalProperties").isObject()) {
+        walkProperties(schemas, schemaName(value.path("additionalProperties")), visited, visitor);
+        continue;
       }
-      walkSchema(schemas, target, visited, found);
+      walkProperties(schemas, schemaName(value), visited, visitor);
     }
   }
 
@@ -2929,6 +2979,337 @@ class ExternalContractTest {
   private static String schemaName(JsonNode node) {
     JsonNode ref = node == null ? null : node.get("$ref");
     return ref == null ? null : ref.asString().substring(ref.asString().lastIndexOf('/') + 1);
+  }
+
+  /**
+   * Where the frozen type/nullability record lives, on the test classpath.
+   *
+   * <p>Beside {@code openapi.json} rather than under {@code src/test/java}, because it is data: a
+   * contract change is reviewed as a sorted diff of this file, and a 1,479-entry Java literal would
+   * be longer than the test that reads it.
+   */
+  private static final String FROZEN_TYPES_RESOURCE = "/api/frozen-contract-types.txt";
+
+  /**
+   * System property naming a previous release's {@code openapi.json} to diff against.
+   *
+   * <p>Set by CI, absent locally. See {@link #theContractTypesMatchThePreviousRelease()} for why
+   * both halves of §8.4 exist rather than one.
+   */
+  private static final String BASELINE_PROPERTY = "contract.baseline";
+
+  /**
+   * REQ-API-009's last open acceptance box: type and nullability changes are caught.
+   *
+   * <p>ADR-0136 states the gap in its own words — {@code ExternalContractTest} <em>"does not
+   * compare types, nullability or enum values. A field that turns from string to object, or an enum
+   * that loses a constant, passes it and still breaks an old build."</em> The enum half was closed
+   * by {@link #theContractRequiredEnumsAreFrozen()}. This is the rest of it, and it closes the box.
+   *
+   * <p>The reachability is {@code walkSchema}'s, deliberately: from every contract operation's
+   * response and request schemas, transitively, cycle-guarded by a shared visited set. A client
+   * parses the whole payload, so a type four levels down inside a participant's job type breaks it
+   * exactly as one on the root object does.
+   *
+   * <p><b>Nullability here means {@code required}.</b> The document carries no {@code nullable}
+   * keyword and no {@code ["string","null"]} union — springdoc emits neither at OpenAPI 3.1 — so a
+   * schema's {@code required} list is the entire signal, and a property leaving it is a field that
+   * may now be absent on a build that assumed it never would be.
+   *
+   * @throws IOException if the committed document or the frozen record cannot be read
+   */
+  @Test
+  @DisplayName("no frozen field changed its type, its format, or whether it is required")
+  void theContractTypesAndNullabilityAreFrozen() throws IOException {
+    Map<String, String> actual = contractSignatures(openapi());
+    Map<String, String> frozen = readFrozenTypes();
+
+    assertThat(frozen)
+        .as("the frozen record is empty or unreadable, which would make this case vacuous")
+        .hasSizeGreaterThan(500);
+
+    Map<String, String> changed = new TreeMap<>();
+    for (Map.Entry<String, String> entry : actual.entrySet()) {
+      String was = frozen.get(entry.getKey());
+      if (was != null && !was.equals(entry.getValue())) {
+        changed.put(entry.getKey(), was + " -> " + entry.getValue());
+      }
+    }
+    Set<String> gone = new TreeSet<>(frozen.keySet());
+    gone.removeAll(actual.keySet());
+    Set<String> added = new TreeSet<>(actual.keySet());
+    added.removeAll(frozen.keySet());
+
+    assertThat(changed)
+        .as(
+            "a frozen contract field changed its type, its format, or whether it is required. A"
+                + " shipped Android build cannot be redeployed with the server: string -> object"
+                + " fails the parse, and required -> optional turns a field an installed build"
+                + " reads unconditionally into a null. Ship an app build that accepts the new"
+                + " shape FIRST, then update "
+                + FROZEN_TYPES_RESOURCE)
+        .isEmpty();
+
+    assertThat(gone)
+        .as(
+            "a frozen contract field is gone from the document. If the operation was retired,"
+                + " remove its entries from "
+                + FROZEN_TYPES_RESOURCE
+                + " in the same change; if it was not, this is the break the guard exists for")
+        .isEmpty();
+
+    assertThat(added)
+        .as(
+            "the contract grew fields that are not frozen. Additions are safe for a shipped"
+                + " client, but an unfrozen field is an unguarded one — append them to "
+                + FROZEN_TYPES_RESOURCE)
+        .isEmpty();
+  }
+
+  /**
+   * The same comparison, against the previous release rather than against a recorded intent.
+   *
+   * <p>Two halves, because they fail on different things. The frozen record above catches a change
+   * against what somebody wrote down and reviewed; it stays green if the record and the document
+   * are edited together in one PR, which is exactly what a careless "make the build pass" looks
+   * like. This one has no such hole: the baseline is a released artefact nobody in the pull request
+   * can edit. It is also the literal wording of ADR-0136 — <em>"a schema diff of the contract
+   * subset against the previous release tag"</em>.
+   *
+   * <p>Its weakness is the mirror image: it needs a baseline, so it <b>skips</b> when the file is
+   * absent. That is why it is not the only half. CI writes {@code
+   * build/contract-baseline/openapi.json} from the previous release tag and passes {@code
+   * -Dcontract.baseline}; a developer machine has neither and runs the frozen record instead.
+   *
+   * <p>Only properties present in <em>both</em> documents are compared. A field added since the
+   * release is not a break for a client that never knew it, and a removed one is already the
+   * subject of {@link #theContractResponsesKeepTheirFields()}.
+   *
+   * @throws IOException if either document cannot be read
+   */
+  @Test
+  @DisplayName("no field a released build reads changed shape since that release")
+  void theContractTypesMatchThePreviousRelease() throws IOException {
+    String baseline = System.getProperty(BASELINE_PROPERTY);
+    Assumptions.assumeTrue(
+        baseline != null && Files.isReadable(Path.of(baseline)),
+        "no -Dcontract.baseline pointing at a readable previous-release openapi.json; the frozen"
+            + " record in theContractTypesAndNullabilityAreFrozen covers this run");
+
+    JsonNode previous = new ObjectMapper().readTree(Files.readString(Path.of(baseline)));
+    Map<String, String> was = contractSignatures(previous);
+    Map<String, String> now = contractSignatures(openapi());
+
+    assertThat(was)
+        .as("the baseline document yielded no contract signatures, so this case proves nothing")
+        .isNotEmpty();
+
+    Map<String, String> changed = new TreeMap<>();
+    for (Map.Entry<String, String> entry : now.entrySet()) {
+      String before = was.get(entry.getKey());
+      if (before != null && !before.equals(entry.getValue())) {
+        changed.put(entry.getKey(), before + " -> " + entry.getValue());
+      }
+    }
+
+    // A field the release HAD and the document no longer has. Looping over `now` alone could never
+    // see one, which made this half blind to exactly the change class it exists for: measured
+    // against real history with v1.6.0 as the baseline, `MissionParticipantDto.guestEditToken` was
+    // removed and went unreported while two type changes were caught.
+    //
+    // The Javadoc used to send the reader to theContractResponsesKeepTheirFields for removals. That
+    // test asserts hand-listed field sets, and a name nobody listed -- guestEditToken appears zero
+    // times in this file -- is not in them. So a removal was caught only by the frozen record,
+    // which
+    // this pull request CAN edit, and the "no such hole" claim above was false for the one thing
+    // this comparison is the second opinion on.
+    Set<String> gone = new TreeSet<>(was.keySet());
+    gone.removeAll(now.keySet());
+
+    assertThat(changed)
+        .as(
+            "a field changed shape since the last release, and there are builds in the field that"
+                + " read it. This is the diff ADR-0136 asks for, against an artefact this pull"
+                + " request cannot edit")
+        .isEmpty();
+
+    assertThat(gone)
+        .as(
+            "a field the last release served is gone from the document. An installed build reads it"
+                + " unconditionally and will now get null \u2014 the break the freeze exists for."
+                + " If the operation was retired deliberately, the app build that stops reading it"
+                + " ships FIRST")
+        .isEmpty();
+  }
+
+  /**
+   * Records the type, format and required-ness of every property reachable from the contract set.
+   *
+   * @param document the parsed API document
+   * @return {@code Schema.property} to its signature, sorted
+   */
+  private static Map<String, String> contractSignatures(JsonNode document) {
+    JsonNode schemas = document.path("components").path("schemas");
+    Map<String, String> found = new TreeMap<>();
+    Set<String> visited = new TreeSet<>();
+    for (ContractOperation operation : CONTRACT) {
+      if (document.path("paths").path(operation.path()).path(operation.method()).isMissingNode()) {
+        // A baseline predating an operation simply has nothing to say about it.
+        continue;
+      }
+      for (String root : responseSchemaNames(document, operation)) {
+        walkSignatures(schemas, root, visited, found);
+      }
+      walkSignatures(schemas, requestSchemaName(document, operation), visited, found);
+      recordInlineBodies(document, operation, found);
+    }
+    return found;
+  }
+
+  /**
+   * Freezes the body shapes that resolve to no named schema at all.
+   *
+   * <p>Two gaps closed together, because they are the same gap seen from the two ends of a request.
+   *
+   * <p><b>Multipart requests.</b> {@code requestSchemaName} reads only {@code application/json}, so
+   * {@code POST /api/v1/personal-blueprints/import/preview} — a contract operation whose body is
+   * {@code multipart/form-data} with {@code required: ["file"]} — resolved to {@code null} and
+   * every guard over it became a no-op. Renaming the part to {@code csv} would 400 every shipped
+   * Android build's blueprint import with the whole suite green.
+   *
+   * <p><b>Inline responses.</b> A 2xx schema that is an inline array of primitives, such as {@code
+   * GET /api/v1/material-exchange/released-item-ids} answering {@code array<string/uuid>}, names no
+   * schema either, so its element type could flip unnoticed.
+   *
+   * <p>Keyed by operation and media type rather than by schema name, because these shapes have no
+   * name to be keyed by — which is precisely why they were invisible.
+   *
+   * @param document the parsed API document
+   * @param operation the contract operation
+   * @param found the accumulator
+   */
+  private static void recordInlineBodies(
+      JsonNode document, ContractOperation operation, Map<String, String> found) {
+    JsonNode node = document.path("paths").path(operation.path()).path(operation.method());
+    String key = operation.method().toUpperCase(java.util.Locale.ROOT) + " " + operation.path();
+
+    for (Map.Entry<String, JsonNode> media :
+        node.path("requestBody").path("content").properties()) {
+      JsonNode schema = media.getValue().path("schema");
+      found.put(key + " request[" + media.getKey() + "]", signature(schema));
+      for (String required : requiredNames(schema)) {
+        found.put(key + " request[" + media.getKey() + "].required." + required, "required");
+      }
+    }
+
+    for (Map.Entry<String, JsonNode> response : node.path("responses").properties()) {
+      if (!response.getKey().startsWith("2")) {
+        continue;
+      }
+      for (Map.Entry<String, JsonNode> media : response.getValue().path("content").properties()) {
+        found.put(
+            key + " response[" + response.getKey() + "][" + media.getKey() + "]",
+            signature(media.getValue().path("schema")));
+      }
+    }
+  }
+
+  /**
+   * The {@code required} entries an inline schema declares.
+   *
+   * @param schema the schema node
+   * @return the required property names, sorted; empty when the node declares none
+   */
+  private static Set<String> requiredNames(JsonNode schema) {
+    Set<String> names = new TreeSet<>();
+    JsonNode required = schema.path("required");
+    if (required.isArray()) {
+      required.forEach(entry -> names.add(entry.asString()));
+    }
+    return names;
+  }
+
+  /**
+   * Adds one signature per property of {@code name}, then follows every reference it makes.
+   *
+   * @param schemas the document's {@code components.schemas} node
+   * @param name the schema to record; {@code null} and already-visited names are no-ops
+   * @param visited the shared cycle guard
+   * @param found the accumulator
+   */
+  private static void walkSignatures(
+      JsonNode schemas, String name, Set<String> visited, Map<String, String> found) {
+    walkProperties(
+        schemas,
+        name,
+        visited,
+        (owner, property, value, required) ->
+            found.put(owner + "." + property, signature(value) + (required ? "!" : "")));
+  }
+
+  /**
+   * The one-line shape of a property node.
+   *
+   * @param node the property's schema node
+   * @return {@code $Ref}, {@code array<...>}, {@code type/format} or {@code type}
+   */
+  private static String signature(JsonNode node) {
+    String ref = schemaName(node);
+    if (ref != null) {
+      return "$" + ref;
+    }
+    String type = node.path("type").asString("");
+    if ("array".equals(type)) {
+      JsonNode items = node.path("items");
+      String itemRef = schemaName(items);
+      return "array<" + (itemRef != null ? "$" + itemRef : signature(items)) + ">";
+    }
+    JsonNode additional = node.path("additionalProperties");
+    if (additional.isObject()) {
+      // A map, and its VALUE type is the half that breaks a client. Frozen as `object` this was a
+      // guard with a hole big enough to drive the Freigabe-Limits response through:
+      // `BankApprovalLimitsDto.roleLimits` is `{"type":"object","additionalProperties":{"type":
+      // "number"}}` and is frozen for all seven bank-account settings operations. Change that value
+      // to a string or a $ref and the signature stayed `object` -- changed, gone and added all
+      // empty, build green, and a shipped build parsing Map<String, BigDecimal> fails the whole
+      // response.
+      String value = schemaName(additional);
+      return "map<" + (value != null ? "$" + value : signature(additional)) + ">";
+    }
+    if (type.isEmpty()) {
+      return node.has("properties") ? "object" : "any";
+    }
+    String format = node.path("format").asString("");
+    return format.isEmpty() ? type : type + "/" + format;
+  }
+
+  /**
+   * Reads the committed type record off the test classpath.
+   *
+   * @return {@code Schema.property} to signature, comments and blank lines dropped
+   * @throws IOException if the resource is missing or unreadable
+   */
+  private static Map<String, String> readFrozenTypes() throws IOException {
+    Map<String, String> frozen = new TreeMap<>();
+    try (java.io.InputStream in =
+        ExternalContractTest.class.getResourceAsStream(FROZEN_TYPES_RESOURCE)) {
+      if (in == null) {
+        throw new IOException("missing test resource " + FROZEN_TYPES_RESOURCE);
+      }
+      for (String line :
+          new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\\R")) {
+        String trimmed = line.trim();
+        if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+          continue;
+        }
+        int split = trimmed.indexOf('=');
+        if (split < 0) {
+          throw new IOException("malformed line in " + FROZEN_TYPES_RESOURCE + ": " + trimmed);
+        }
+        frozen.put(trimmed.substring(0, split), trimmed.substring(split + 1));
+      }
+    }
+    return frozen;
   }
 
   @Test

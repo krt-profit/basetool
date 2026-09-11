@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Seiten mit vielen gleichzeitigen Abfragen laden schneller.** Anzeige und Backend sprechen jetzt
+  HTTP/2, teilen sich also wenige Verbindungen statt für jeden Aufruf eine eigene aufzumachen.
+  Umschaltbar über `APP_HTTP_BACKEND_PROTOCOL=HTTP11`, feinjustierbar über
+  `APP_HTTP_MAX_CONCURRENT_STREAMS`.
+- **Antworten zwischen Anzeige und Backend werden günstiger gelesen (CBOR).** Inhaltlich identisch,
+  nur weniger Rechenaufwand beim Auswerten. Umschaltbar über `APP_HTTP_CODEC=JSON`; Apps und
+  Extractor sind nicht betroffen.
+
+### Fixed
+
+- **Bank-, Mitglieder-, Lager- und Benachrichtigungsantworten werden nicht mehr unnötig komplett im
+  Speicher zwischengelagert.** Für diese Bereiche wurde eine Zwischenspeicherung berechnet, die
+  danach ohnehin verworfen wurde. Keine Antwort ändert sich, das Backend braucht dafür nur weniger
+  Speicher.
+
 ## [v1.7.7](https://github.com/krt-profit/basetool/releases/tag/v1.7.7) - 2026-09-09
 
 ### Fixed
