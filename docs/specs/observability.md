@@ -1115,7 +1115,18 @@ transaction per pass) rather than per-scrape.
   trade of coverage for signal. Everything not named there is alerted, so a newly added
   `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
   omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in
-  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`. Item-order production
+  `monitoring/prometheus/tests/audit_domain_silence_alerts_test.yml`. **All three silence rules
+  carry `keep_firing_for: 15m`** (since 2026-09-11): `for:` delays a fire and never a resolve, so the
+  nightly backup quiesce — `scripts/backup.sh` stops `frontend backend ingest` at 04:15 host-local
+  for the `pg_dump`, REQ-OPS-009 — emptied the `and on() (up == 1)` conjunction for about a minute,
+  resolved all three on the spot and re-fired them a full `for:` later. That produced a RESOLVED and
+  a FIRING notification **every night** for as long as the underlying silence lasted, and no
+  Alertmanager `repeat_interval` suppresses it because neither mail is a repeat. The hold was chosen
+  over relaxing the guard to `max_over_time(up[15m]) == 1`, which would also let the alert newly fire
+  *during* a real outage — the one case the guard exists to prevent; a sustained outage still
+  resolves the alert once the hold expires. Both the hold and its limit are pinned in
+  `monitoring/prometheus/tests/audit_silence_quiesce_flap_test.yml`, which samples at 1 m because a
+  one-minute gap cannot be expressed on that other file's hourly grid. Item-order production
   bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
   `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
   counts (REQ-ORDERS-025).

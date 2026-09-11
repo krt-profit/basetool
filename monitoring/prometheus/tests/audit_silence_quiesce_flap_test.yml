@@ -1,0 +1,127 @@
+# promtool unit tests for the nightly-quiesce flap on the three audit-silence alerts
+# (REQ-OBS-011 / REQ-AUDIT-001 / REQ-OPS-009).
+#
+# The bug these pin: `for:` delays a FIRE and never a RESOLVE. `scripts/backup.sh` stops
+# `frontend backend ingest` at 04:15 host-local for the `pg_dump`, so `up{job="basetool-backend"}`
+# reads 0 for about a minute and the `and on() (up == 1)` conjunction empties. All three alerts
+# resolved on the spot, mailed RESOLVED, re-entered `pending` when the writers returned, and mailed
+# FIRING again exactly `for:` later — a pair every night, which no Alertmanager `repeat_interval`
+# suppresses because neither mail is a repeat. `keep_firing_for: 15m` holds the firing state across
+# the gap.
+#
+# Sampling notes, and why this file does NOT share the 1h grid of
+# `audit_domain_silence_alerts_test.yml`: a one-minute gap cannot be expressed on an hourly grid at
+# all, so this file samples and evaluates at **1m**. That is affordable here because the silence
+# condition does not need a fully populated 14d window — `increase()` over a FLAT counter is 0
+# whatever the window holds, as long as it holds two samples. So a few hundred flat minutes make the
+# condition true, the `for:` elapses, and the flap can be exercised in under seven simulated hours
+# instead of two simulated weeks. The other file keeps the long horizons; this one keeps the
+# resolution.
+#
+# Run locally from the repo root (no promtool on the host — use an ephemeral container; -w /work
+# makes the `../alerts` path below resolve). The tag is pinned and kept honest by
+# scripts/check-monitoring-image-pins.sh:
+#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/audit_silence_quiesce_flap_test.yml'
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # THE regression. The backend disappears for two minutes in the middle of a long silence — the
+  # nightly quiesce. The alert must stay firing, because a maintenance stop is not evidence that the
+  # audit wiring recovered. Without `keep_firing_for` this expectation is empty: the alert resolves
+  # at the first evaluation inside the gap.
+  - name: keeps firing - a two-minute quiesce must not resolve AuditDomainSilenceAnomaly
+    interval: 1m
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "5x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x200 0x1 1x197"
+    alert_rule_test:
+      # Firing well before the gap: the condition holds from the second sample and `for: 1h` elapses
+      # at t=61m.
+      - eval_time: 200m
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: JOB_ORDER
+            exp_annotations:
+              summary: "Audit domain silent 14d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+      # Inside the gap - still firing.
+      - eval_time: 202m
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: JOB_ORDER
+            exp_annotations:
+              summary: "Audit domain silent 14d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+      # After the writers are back - still the SAME alert, never re-pended, so no second FIRING mail.
+      - eval_time: 210m
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              domain: JOB_ORDER
+            exp_annotations:
+              summary: "Audit domain silent 14d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+
+  # The guard must still guard. A real outage lasts longer than the hold, and once it expires the
+  # alert resolves exactly as before — `keep_firing_for` buys a grace period, not an exemption. If
+  # this ever goes green with a longer outage, the fix has turned into a mute.
+  - name: resolves - a sustained outage still suppresses AuditDomainSilenceAnomaly
+    interval: 1m
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "5x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x200 0x60 1x138"
+    alert_rule_test:
+      # 20 minutes into the outage, past the 15m hold.
+      - eval_time: 221m
+        alertname: AuditDomainSilenceAnomaly
+        exp_alerts: []
+
+  # The same flap hit the all-domain rule, which has the shorter `for: 30m`.
+  - name: keeps firing - a two-minute quiesce must not resolve AuditSilenceAnomaly
+    interval: 1m
+    input_series:
+      - series: 'basetool_audit_events_total{job="basetool-backend", instance="backend:11261", domain="JOB_ORDER"}'
+        values: "5x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x200 0x1 1x197"
+    alert_rule_test:
+      - eval_time: 202m
+        alertname: AuditSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No audit events recorded in 5d while backend is up"
+              description: "The backend has been up but recorded zero audit events for 5 days — possible audit-logging regression (REQ-AUDIT-001)."
+
+  # And the bank rule, which keeps its own counter.
+  - name: keeps firing - a two-minute quiesce must not resolve BankAuditSilenceAnomaly
+    interval: 1m
+    input_series:
+      - series: 'basetool_bank_audit_events_total{job="basetool-backend", instance="backend:11261"}'
+        values: "5x400"
+      - series: 'up{job="basetool-backend", instance="backend:11261"}'
+        values: "1x200 0x1 1x197"
+    alert_rule_test:
+      - eval_time: 202m
+        alertname: BankAuditSilenceAnomaly
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "No bank audit events recorded in 60d while backend is up"
+              description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
