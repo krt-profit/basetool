@@ -566,16 +566,23 @@ dependencyCheck {
   setConnectionTimeout(java.time.Duration.ofSeconds(30))
   setReadTimeout(java.time.Duration.ofSeconds(120))
   nvd.validForHours = 168
-  // Bump retries above the default of 10 so a transient 429 burst does not
-  // abort the in-progress H2 update; the corruption-on-abort failure mode
-  // referenced above only triggers once retries are exhausted while writes
-  // are pending.
-  nvd.maxRetryCount = 20
+  // Retries are deliberately NOT set here: the inherited default is what this wants. The previous
+  // `nvd.maxRetryCount = 20` carried the comment "bump retries above the default of 10", and that
+  // default is wrong - `dependencycheck.properties` inside dependency-check-core 13.0.0 ships
+  // `nvd.api.max.retry.count=30`, and the Gradle plugin declares no convention of its own
+  // (`ConfiguredTask` only forwards a non-null value). So the setting LOWERED the retry budget from
+  // 30 to 20 while claiming to raise it, weakening exactly the 429-burst tolerance it was written
+  // for. Dropping the line restores 30.
   val resolvedNvdApiKey = (project.findProperty("nvdApiKey") as String?)?.takeIf { it.isNotBlank() }
   if (resolvedNvdApiKey != null) {
     nvd.apiKey = resolvedNvdApiKey
-    // ~30 req/min, comfortably inside NVD's authenticated 50/30-s budget.
-    nvd.delay = 2000
+    // 0 is the shipped default, and it does NOT mean unthrottled: the client enforces NVD's own
+    // authenticated budget itself - `nvd.api.requestsperthirtysecondswithapikey=50`, documented in
+    // dependency-check-core as "the client used will not let you exceed these values", i.e. one
+    // request per 600 ms. The previous 2000 was a second throttle stacked on that one. NVD held
+    // 389 984 CVEs on 2026-09-11, which is 195 requests at the 2000-per-page maximum, so the extra
+    // sleep cost ~6.5 minutes of a cold rebuild where the limiter alone spends ~2.
+    nvd.delay = 0
   } else {
     // Public NVD limit is 5 req/30 s; 16 s between calls keeps us at
     // ~3.75 req/30 s with headroom for runner-pool contention on the same
