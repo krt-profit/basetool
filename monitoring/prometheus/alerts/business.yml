@@ -926,6 +926,21 @@ groups:
       - alert: AuditSilenceAnomaly
         expr: (sum(increase(basetool_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
+        # `for:` delays a FIRE and never a RESOLVE, and that asymmetry cost two mails every night.
+        # `scripts/backup.sh` stops frontend, backend and ingest at 04:15 host-local for the
+        # `pg_dump` (REQ-OPS-009), so `up{job="basetool-backend"}` reads 0 for about a minute and the
+        # `and on()` conjunction empties. The alert resolved instantly, mailed RESOLVED, re-entered
+        # `pending` the moment the writers came back, and mailed FIRING again exactly `for:` later —
+        # measured on 2026-09-11 as RESOLVED 04:17:25 and FIRING 05:17:24. That pair repeats for as
+        # long as the underlying silence lasts and NO Alertmanager `repeat_interval` suppresses it,
+        # because neither mail is a repeat.
+        #
+        # `keep_firing_for` is the right lever rather than widening the guard. Relaxing the guard
+        # itself (`max_over_time(up[15m]) == 1`) would also let the alert NEWLY FIRE during a real
+        # outage, which is the one thing the guard exists to prevent. This leaves the firing
+        # condition untouched and only holds the firing state across a gap shorter than 15m, so a
+        # genuine outage still resolves the alert — just 15 minutes later.
+        keep_firing_for: 15m
         labels:
           severity: warning
         annotations:
@@ -939,6 +954,8 @@ groups:
       - alert: BankAuditSilenceAnomaly
         expr: (sum(increase(basetool_bank_audit_events_total[60d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
+        # Same nightly-quiesce flap as AuditSilenceAnomaly above, same lever — see the comment there.
+        keep_firing_for: 15m
         labels:
           severity: warning
         annotations:
@@ -976,6 +993,10 @@ groups:
       - alert: AuditDomainSilenceAnomaly
         expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
+        # Same nightly-quiesce flap as AuditSilenceAnomaly above, same lever — see the comment there.
+        # This is the alert the 2026-09-11 mails came from: `for: 1h` makes the re-fire land a full
+        # hour after the RESOLVED, which reads like a second, unrelated incident.
+        keep_firing_for: 15m
         labels:
           severity: warning
         annotations:
