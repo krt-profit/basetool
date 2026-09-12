@@ -1007,8 +1007,19 @@ finding L3.
 [`discord-integration.md`](discord-integration.md); this requirement continues the series at the
 next free number.)
 
-Every public proxy host behind nginx-proxy-manager carries a **version-controlled** per-IP safety
-net at the edge: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
+> [!important] Since ADR-0162 the whole edge is version-controlled, not just this snippet
+> The word "version-controlled" in this requirement was written when it was the exception: the
+> limiter lived in `docker/maintenance/nginx/`, while Force SSL, HSTS, Block-Common-Exploits and the
+> API allow-list lived in Nginx Proxy Manager's SQLite database and in a runbook block pasted into a
+> web form. The edge is now native nginx configured entirely from `docker/edge/` in this repository,
+> validated by `nginx -t` in CI (`scripts/check-edge-nginx.sh`) and applied by the deploy reconcile.
+> The values below are unchanged and were carried across verbatim; read "the custom snippets the
+>
+>> repo injects into NPM" as `docker/edge/conf.d/00-maps.conf` (the zones) and
+>> `docker/edge/include/limits.conf` (their application).
+
+Every public vhost at the edge carries a **version-controlled** per-IP safety
+net: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
 IPv6 client's `/64` network prefix), delivered through the custom snippets the
 repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,

@@ -1453,6 +1453,18 @@ services:
           - ingest
 
   npm:
+    # SUPERSEDED by the `edge` service below (ADR-0162), and deliberately kept.
+    # The `rollback` profile means `docker compose --profile prod up -d` no longer
+    # starts it — the two would fight over :80/:443 — while the definition, the
+    # /var/iri/npm data and the Let's Encrypt material stay exactly as they are.
+    # Going back is one command:
+    #
+    #   docker compose --profile prod stop edge acme
+    #   docker compose --profile rollback up -d npm
+    #
+    # Remove this service only after the new edge has held for longer than feels
+    # necessary, and in its own change.
+    profiles: ["rollback"]
     # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
     # do not move back to `:latest` (silent upstream changes are a supply-chain risk
     # and break reproducibility). Consider appending @sha256:<digest> as well.
@@ -1564,7 +1576,159 @@ services:
 # opposite case — nothing backs a developer machine's throwaway stack up, and what it needs instead
 # is isolation between worktrees plus a teardown that actually tears down. Compose prefixes these
 # with the project name, so each project gets its own and `down --volumes` removes them.
+  # ===========================================================================
+  # edge — the public reverse proxy (ADR-0162)
+  #
+  # Replaces `npm` above, which stays defined under the `rollback` profile as the
+  # documented way back. Everything this container serves is configured from
+  # docker/edge/ in this repository: no admin UI, no SQLite, no generated files.
+  #
+  # The hardening is the point of the swap, so each line is load-bearing:
+  #   user 101:101        the image is the unprivileged build; the master runs as
+  #                       uid 101 too, not just the workers
+  #   cap_drop [ALL]      with NO cap_add. nginx listens on 8080/8443 INSIDE and
+  #                       the host publishes 80/443 onto them, so not even
+  #                       NET_BIND_SERVICE is needed. NPM needed seven.
+  #   read_only true      impossible with NPM, whose boot sed-edits its own
+  #                       configuration and pip-installs certbot plugins
+  #   no egress           its five networks are `internal: true`; ACME lives in
+  #                       its own container, so nothing here needs the internet
+  # ===========================================================================
+  edge:
+    profiles: ["prod"]
+    image: nginxinc/nginx-unprivileged:1.29.3-alpine@sha256:5aea7cc516b419e3526f47dd1531be31a56a046cfe44754d94f9383e13e2ee99
+    container_name: edge
+    restart: unless-stopped
+    logging: *default-logging
+    user: "101:101"
+    ports:
+      - "80:8080"      # HTTP: ACME challenge + 308 to HTTPS
+      - "443:8443"     # HTTPS: every vhost, selected by SNI
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      # nginx writes nowhere else. `noexec,nosuid` because nothing here is ever
+      # meant to be executed or to gain privileges.
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/cache/nginx:rw,noexec,nosuid,size=64m
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+          cpus: '1.0'
+          pids: 512
+    healthcheck:
+      # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
+      # gate could never fire for the edge. /healthz is loopback-only and answers
+      # from the default :8080 server, which proves nginx is accepting and
+      # routing rather than merely running.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      # Configuration, mounted piece by piece rather than as one /etc/nginx: the
+      # image's own mime.types has to stay visible underneath.
+      - ./docker/edge/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/edge/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/edge/include:/etc/nginx/include:ro
+      # Certificates, written by the acme container. READ-ONLY here: the process
+      # facing the internet can read the key it serves and change nothing.
+      - edge-certs:/etc/nginx/certs:ro
+      # The ACME webroot, written by the acme container and served by the :8080
+      # default server. Also read-only.
+      - edge-acme-webroot:/var/www/acme:ro
+      # The public half of the shared keystore, so upstream TLS can be VERIFIED
+      # rather than merely encrypted — NPM never verified anything. Same file
+      # Prometheus already validates the apps against.
+      - ${IRI_UPSTREAM_CA_HOST_PATH:-/var/iri/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
+      - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
+    networks:
+      - net-proxy-frontend
+      - net-proxy-keycloak
+      - net-proxy-ingest
+      - net-proxy-grafana
+      - net-proxy-api
+
+  # ===========================================================================
+  # acme — certificate issuance and renewal, deliberately NOT in the edge
+  #
+  # This split is the structural half of ADR-0162. NPM's CVE-2026-40519 is an
+  # authenticated RCE that interpolates stored DNS-provider credentials into a
+  # shell command, and it is reachable because the process that terminates TLS is
+  # also the process that holds the ACME credentials and runs renewal hooks.
+  # Here they are two containers: this one may reach the internet and holds the
+  # account key; the edge holds neither and cannot egress at all.
+  #
+  # HTTP-01 over the shared webroot, so there is no DNS API token anywhere —
+  # nothing to interpolate even in principle.
+  #
+  # nginx re-reads certificates only on reload, so a renewal is applied by
+  # deploy.sh's reconcile, which force-recreates the edge when the certificate
+  # fingerprint changes. That is the same mechanism the monitoring configs use
+  # and needs no docker socket in this container.
+  # ===========================================================================
+  acme:
+    profiles: ["prod"]
+    image: goacme/lego:v4.27.0@sha256:f16d0c44fe9b75faffb0ed882e34dad001c0f0c4de9a215bf03ec009d8acec47
+    container_name: acme
+    restart: unless-stopped
+    logging: *default-logging
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        DOMAINS="-d profit-base.online -d keycloak.profit-base.online -d ingest.profit-base.online -d grafana.profit-base.online -d api.profit-base.online"
+        while true; do
+          if [ -d /data/certificates ] && [ -n "$$(ls -A /data/certificates 2>/dev/null)" ]; then
+            lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} renew --days 30 ||               echo "acme: renew failed, will retry on the next pass" >&2
+          else
+            lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} run ||               echo "acme: initial issuance failed, will retry on the next pass" >&2
+          fi
+          # Publish the material the edge consumes, under a stable per-host layout
+          # it can mount read-only.
+          for c in /data/certificates/*.crt; do
+            [ -e "$$c" ] || continue
+            h="$$(basename "$$c" .crt)"
+            case "$$h" in *.issuer) continue;; esac
+            mkdir -p "/certs/$$h"
+            cp "$$c" "/certs/$$h/fullchain.pem"
+            cp "/data/certificates/$$h.key" "/certs/$$h/privkey.pem"
+          done
+          sleep 43200
+        done
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set in .env}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.5'
+          pids: 128
+    volumes:
+      - edge-acme-state:/data
+      - edge-acme-webroot:/webroot
+      - edge-certs:/certs
+    networks:
+      # The ONLY network with egress in this pair — lego has to reach the ACME
+      # directory. It is not on any net-proxy-* network, so a compromise here
+      # reaches no application.
+      - net-acme-egress
+
 volumes:
+  # Edge (ADR-0162). `edge-certs` is written by acme and mounted READ-ONLY by the
+  # edge; `edge-acme-webroot` carries the HTTP-01 challenge tokens the same way;
+  # `edge-acme-state` holds the ACME account key and never leaves the acme
+  # container.
+  edge-certs:
+  edge-acme-webroot:
+  edge-acme-state:
   db-backend-dev-data:
   db-keycloak-dev-data:
   redis-dev-data:
@@ -1596,7 +1760,45 @@ networks:
       config:
         - subnet: 172.28.2.0/24
           gateway: 172.28.2.1
+
+  # The acme container's only network. It has egress (lego must reach the ACME
+  # directory) and exactly one member, so a compromise there reaches no
+  # application: it is on none of the net-proxy-* networks and none of the data
+  # networks.
+  net-acme-egress:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.14.0/24
+          gateway: 172.28.14.1
   net-proxy-frontend:
+    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
+    # than `internal: true`.
+    #
+    # `internal: true` was the obvious choice and it is WRONG here: it removes the
+    # inbound DNAT along with the outbound NAT, so a published port stops
+    # answering. Measured, not assumed — a container on an internal network with
+    # `-p 18097:80` stayed up and served nothing, while the identical container on
+    # a normal network answered 200.
+    #
+    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
+    # production host every one of these bridges currently carries exactly one
+    # rule of the form
+    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
+    # and that rule is the whole of the edge's path to the internet. Without it an
+    # outbound packet leaves with a private source address and dies at the first
+    # upstream hop: no return path, so no second stage to fetch and no channel to
+    # exfiltrate over.
+    #
+    # The upstreams are untouched. None of them egresses through a net-proxy-*
+    # bridge — each sits on three to seven networks and keeps a masqueraded one —
+    # whereas the edge is on these five and nothing else.
+    #
+    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # clean-slate recreate covers that, and it means a brief full-stack outage, so
+    # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     driver: bridge
     # Dual-stack (ADR-0112): the published :443 is bound on [::]:443 too, but with an
     # IPv4-only container Docker installs no ip6tables DNAT, so the userland docker-proxy
@@ -1615,6 +1817,33 @@ networks:
         - subnet: fd00:28:3::/64
           gateway: fd00:28:3::1
   net-proxy-keycloak:
+    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
+    # than `internal: true`.
+    #
+    # `internal: true` was the obvious choice and it is WRONG here: it removes the
+    # inbound DNAT along with the outbound NAT, so a published port stops
+    # answering. Measured, not assumed — a container on an internal network with
+    # `-p 18097:80` stayed up and served nothing, while the identical container on
+    # a normal network answered 200.
+    #
+    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
+    # production host every one of these bridges currently carries exactly one
+    # rule of the form
+    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
+    # and that rule is the whole of the edge's path to the internet. Without it an
+    # outbound packet leaves with a private source address and dies at the first
+    # upstream hop: no return path, so no second stage to fetch and no channel to
+    # exfiltrate over.
+    #
+    # The upstreams are untouched. None of them egresses through a net-proxy-*
+    # bridge — each sits on three to seven networks and keeps a masqueraded one —
+    # whereas the edge is on these five and nothing else.
+    #
+    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # clean-slate recreate covers that, and it means a brief full-stack outage, so
+    # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     driver: bridge
     ipam:
       config:
@@ -1636,6 +1865,33 @@ networks:
   # Ingest gateway (epic #639): proxy → ingest (the only new internet-facing edge),
   # ingest → backend, ingest → redis. backend stays OFF net-proxy-ingest.
   net-proxy-ingest:
+    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
+    # than `internal: true`.
+    #
+    # `internal: true` was the obvious choice and it is WRONG here: it removes the
+    # inbound DNAT along with the outbound NAT, so a published port stops
+    # answering. Measured, not assumed — a container on an internal network with
+    # `-p 18097:80` stayed up and served nothing, while the identical container on
+    # a normal network answered 200.
+    #
+    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
+    # production host every one of these bridges currently carries exactly one
+    # rule of the form
+    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
+    # and that rule is the whole of the edge's path to the internet. Without it an
+    # outbound packet leaves with a private source address and dies at the first
+    # upstream hop: no return path, so no second stage to fetch and no channel to
+    # exfiltrate over.
+    #
+    # The upstreams are untouched. None of them egresses through a net-proxy-*
+    # bridge — each sits on three to seven networks and keeps a masqueraded one —
+    # whereas the edge is on these five and nothing else.
+    #
+    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # clean-slate recreate covers that, and it means a brief full-stack outage, so
+    # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     driver: bridge
     ipam:
       config:
@@ -1687,6 +1943,33 @@ networks:
   # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
   # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
   net-proxy-grafana:
+    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
+    # than `internal: true`.
+    #
+    # `internal: true` was the obvious choice and it is WRONG here: it removes the
+    # inbound DNAT along with the outbound NAT, so a published port stops
+    # answering. Measured, not assumed — a container on an internal network with
+    # `-p 18097:80` stayed up and served nothing, while the identical container on
+    # a normal network answered 200.
+    #
+    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
+    # production host every one of these bridges currently carries exactly one
+    # rule of the form
+    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
+    # and that rule is the whole of the edge's path to the internet. Without it an
+    # outbound packet leaves with a private source address and dies at the first
+    # upstream hop: no return path, so no second stage to fetch and no channel to
+    # exfiltrate over.
+    #
+    # The upstreams are untouched. None of them egresses through a net-proxy-*
+    # bridge — each sits on three to seven networks and keeps a masqueraded one —
+    # whereas the edge is on these five and nothing else.
+    #
+    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # clean-slate recreate covers that, and it means a brief full-stack outage, so
+    # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     name: net-proxy-grafana
     driver: bridge
     ipam:
@@ -1717,6 +2000,33 @@ networks:
   # bridge nor recreate one that still has endpoints, and silently strands container name
   # resolution (#974). Apply it in a maintenance window.
   net-proxy-api:
+    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
+    # than `internal: true`.
+    #
+    # `internal: true` was the obvious choice and it is WRONG here: it removes the
+    # inbound DNAT along with the outbound NAT, so a published port stops
+    # answering. Measured, not assumed — a container on an internal network with
+    # `-p 18097:80` stayed up and served nothing, while the identical container on
+    # a normal network answered 200.
+    #
+    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
+    # production host every one of these bridges currently carries exactly one
+    # rule of the form
+    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
+    # and that rule is the whole of the edge's path to the internet. Without it an
+    # outbound packet leaves with a private source address and dies at the first
+    # upstream hop: no return path, so no second stage to fetch and no channel to
+    # exfiltrate over.
+    #
+    # The upstreams are untouched. None of them egresses through a net-proxy-*
+    # bridge — each sits on three to seven networks and keeps a masqueraded one —
+    # whereas the edge is on these five and nothing else.
+    #
+    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # clean-slate recreate covers that, and it means a brief full-stack outage, so
+    # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
     driver: bridge
     enable_ipv6: true
     ipam:
