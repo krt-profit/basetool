@@ -90,11 +90,11 @@ live NPM configuration on 2026-09-12:
 
 ```bash
 docker run --rm \
-  -v /var/iri/npm/letsencrypt/live:/seed:ro \
+  -v /var/iri/npm/letsencrypt:/seed:ro \
   -v code_edge-certs:/certs \
   alpine:3 sh -c '
     set -eu
-    seed() { mkdir -p "/certs/$2"; cp -L "/seed/$1/fullchain.pem" "/certs/$2/fullchain.pem"; cp -L "/seed/$1/privkey.pem" "/certs/$2/privkey.pem"; }
+    seed() { mkdir -p "/certs/$2"; cp -L "/seed/live/$1/fullchain.pem" "/certs/$2/fullchain.pem"; cp -L "/seed/live/$1/privkey.pem" "/certs/$2/privkey.pem"; }
     seed npm-3 profit-base.online
     seed npm-4 keycloak.profit-base.online
     seed npm-5 ingest.profit-base.online
@@ -104,8 +104,15 @@ docker run --rm \
   '
 ```
 
-`cp -L` matters: Let's Encrypt's `live/` entries are symlinks into `archive/`, and a copied symlink
-would dangle inside the volume.
+> [!warning] Mount `letsencrypt`, not `letsencrypt/live` — and that is not a detail
+> Every file under `live/` is a **symlink into `../../archive/`**, verified on the host:
+> `fullchain.pem -> ../../archive/npm-3/fullchain2.pem`. Mounting only `live/` leaves the targets
+> outside the container, so the `cp -L` below fails with "No such file or directory" — at the one
+> moment when NPM is already stopped and nginx cannot start without the certificates. Mounting the
+> parent resolves them.
+
+`cp -L` matters for the same reason: a copied symlink would dangle inside the volume, and nginx
+would refuse to start on a certificate it cannot read.
 
 ## 4. Bring the edge up
 
