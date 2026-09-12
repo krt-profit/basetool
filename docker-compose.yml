@@ -1709,7 +1709,15 @@ services:
         # /sbin:/bin, so the bare name is not found. With the `|| echo` tail that
         # failure is swallowed and the container keeps running — it would have sat
         # there for sixty days looking healthy and never issuing a certificate.
-        DOMAINS="-d profit-base.online -d keycloak.profit-base.online -d ingest.profit-base.online -d grafana.profit-base.online -d api.profit-base.online"
+        # ONE list of hosts, and scripts/check-edge-nginx.sh asserts it matches the
+        # `ssl_certificate` paths under docker/edge. A vhost the edge reads but acme
+        # does not carry keeps whatever seeded it and expires without a word.
+        ACME_HOSTS="profit-base.online keycloak.profit-base.online ingest.profit-base.online grafana.profit-base.online api.profit-base.online"
+        # lego names the certificate after the FIRST -d and puts every other host in
+        # its SAN list, so one file covers all of them.
+        PRIMARY="$${ACME_HOSTS%% *}"
+        DOMAINS=""
+        for h in $${ACME_HOSTS}; do DOMAINS="$${DOMAINS} -d $$h"; done
         while true; do
           if [ -d /data/certificates ] && [ -n "$$(ls -A /data/certificates 2>/dev/null)" ]; then
             /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} renew --days 30 ||               echo "acme: renew failed, will retry on the next pass" >&2
@@ -1717,23 +1725,51 @@ services:
             /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} run ||               echo "acme: initial issuance failed, will retry on the next pass" >&2
           fi
           # Publish the material the edge consumes, under a stable per-host layout
-          # it can mount read-only.
-          for c in /data/certificates/*.crt; do
-            [ -e "$$c" ] || continue
-            h="$$(basename "$$c" .crt)"
-            case "$$h" in *.issuer) continue;; esac
-            mkdir -p "/certs/$$h"
-            cp "$$c" "/certs/$$h/fullchain.pem"
-            cp "/data/certificates/$$h.key" "/certs/$$h/privkey.pem"
-          done
-          # lego runs as root and writes the key 0600 root-owned. The edge runs as
-          # uid 101 and its MASTER reads the certificate at startup, so without this
-          # it cannot open the key and exits immediately — which reads as a
-          # three-second health-check failure and a rollback, not as a permission
-          # problem. Ownership, not mode: the key stays unreadable to everyone else.
-          chown -R 101:101 /certs
-          find /certs -name 'privkey.pem' -exec chmod 0600 {} +
-          find /certs -name 'fullchain.pem' -exec chmod 0644 {} +
+          # it can mount read-only. Driven by ACME_HOSTS, not by the certificate
+          # FILES: lego writes a SINGLE multi-SAN certificate for the whole -d list,
+          # so iterating /data/certificates/*.crt produced exactly one host
+          # directory and left the other four vhosts on whatever seeded them, to
+          # expire in silence. Every host gets that one pair.
+          if [ -f "/data/certificates/$${PRIMARY}.crt" ]; then
+            # The DIRECTORIES stay root-owned, deliberately. `cap_drop: [ALL]` takes
+            # CAP_DAC_OVERRIDE away, so root in this container obeys the permission
+            # bits like anyone else: against a 101-owned 0755 directory it holds only
+            # r-x, cannot unlink the previous file, and `cp` fails with
+            #   cp: can't create '/certs/<host>/fullchain.pem': File exists
+            # after which `set -eu` ends the script and the container restart-loops.
+            # A `chown -R 101:101 /certs` here caused exactly that on 2026-09-12 by
+            # handing the directories away on its own first pass. Only the FILES go
+            # to uid 101 — they are all the edge ever opens.
+            # Write a temporary file beside the target and rename it into place.
+            # Three reasons, in order of how much they hurt when skipped:
+            #   1. `mv` within one directory is rename(2) — atomic. The edge opens
+            #      these on every reload, and a half-copied certificate is a failed
+            #      start, not a retry.
+            #   2. The temporary file is created root-owned, so `chmod` works.
+            #      cap_drop: [ALL] also removes CAP_FOWNER, and root may not chmod a
+            #      file it does not own: mode BEFORE ownership, never the reverse.
+            #   3. The rename needs write permission on the DIRECTORY only, which is
+            #      why the directories stay root-owned above.
+            publish() {
+              cp "$$1" "$$2.new"
+              chmod "$$3" "$$2.new"
+              # lego runs as root and writes the key 0600 root-owned. The edge runs
+              # as uid 101 and its MASTER opens both at startup, so without this it
+              # cannot read the key and exits immediately — which surfaces as a
+              # three-second health-check failure and a rollback, never as a
+              # permission error. Ownership, not mode: the key stays unreadable to
+              # everyone else.
+              chown 101:101 "$$2.new"
+              mv -f "$$2.new" "$$2"
+            }
+            chown 0:0 /certs
+            for h in $${ACME_HOSTS}; do
+              mkdir -p "/certs/$$h"
+              chown 0:0 "/certs/$$h"
+              publish "/data/certificates/$${PRIMARY}.crt" "/certs/$$h/fullchain.pem" 0644
+              publish "/data/certificates/$${PRIMARY}.key" "/certs/$$h/privkey.pem"   0600
+            done
+          fi
           sleep 43200
         done
     environment:

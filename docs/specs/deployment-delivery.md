@@ -315,7 +315,15 @@ proxy: `security_opt: no-new-privileges:true`, `cap_drop: [ALL]` with an explici
 `cap_add` allow-list, and a `pids` ceiling. The intent is defence-in-depth against a
 container-escape or in-container compromise — a service that cannot escalate privileges and holds no
 capabilities it does not need is a far smaller blast radius, and it matters most on the two
-internet-reachable edges (`npm`, `ingest`).
+internet-reachable edges (`edge`, `ingest`).
+
+> [!important] `cap_drop: [ALL]` changes what *root inside the container* may do
+> Dropping every capability also drops `DAC_OVERRIDE` and `FOWNER`, and a root process without them
+> is not a privileged one: it obeys the file permission bits like any other user, and it may not
+> `chmod` a file it does not own. Any container that runs as uid 0 under this baseline and touches
+> files owned by another uid has to be written accordingly — set the mode before handing ownership
+> away, and keep the directory it writes in. `acme` broke twice on exactly this
+> (ADR-0162, REQ-OPS-026).
 
 The capability add-back set is **per service**, defined by what each image's entrypoint actually
 needs:
@@ -327,23 +335,33 @@ needs:
   drop to their service user via gosu, so they keep exactly `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
   `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
   not a setuid binary.
-- **`npm`** keeps its empirically-verified s6-overlay set (`NET_BIND_SERVICE`, `CHOWN`, `SETUID`,
-  `SETGID`, `FOWNER`, `DAC_OVERRIDE`, `KILL`).
+- **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
+  capabilities at all — an empty add-back on the one service most exposed to the internet.
+- **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
+  to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
+  nothing and holds no inbound surface.
+- **`npm`** is retained only as the rollback path (`profiles: ["rollback"]`, ADR-0162) and keeps its
+  empirically-verified s6-overlay set (`NET_BIND_SERVICE`, `CHOWN`, `SETUID`, `SETGID`, `FOWNER`,
+  `DAC_OVERRIDE`, `KILL`) for as long as it exists.
 
 Because the add-back set is not upstream-documented for the third-party images, it **must be
 re-verified on every image bump** of that service before the bump is promoted (a clean boot, its
 healthcheck passing, and — for `npm` — a working `nginx -s reload`). The deploy health-gate is the
 safety net: a wrong cap set fails the container at start and is rolled back rather than shipped. A
-read-only root filesystem is explicitly **out** of this baseline (the `npm` s6 prepare step and the
-JVM/DB working dirs write across the filesystem).
+read-only root filesystem is **not** part of the shared baseline — the JVM and DB working dirs write
+across the filesystem — but it is required of `edge` specifically (`read_only: true` plus tmpfs for
+nginx's temp paths and its pid file), because that service exists to face the internet.
 
 **Acceptance**
 
 - [ ] Every `prod`-profile service in `docker-compose.yml` (backend, frontend, ingest, keycloak,
-  redis, db-backend, db-keycloak, npm) sets `no-new-privileges:true`, `cap_drop: [ALL]` with an
-  explicit (possibly empty) `cap_add`, and a `pids` ceiling.
-- [ ] `backend`/`frontend`/`ingest`/`keycloak` carry no `cap_add`; `postgres`/`redis` carry only the
-  chown + privilege-drop set; `npm` carries only its verified s6 set.
+  redis, db-backend, db-keycloak, edge, acme, and npm while it remains as the rollback path) sets
+  `no-new-privileges:true`, `cap_drop: [ALL]` with an explicit (possibly empty) `cap_add`, and a
+  `pids` ceiling.
+- [ ] `backend`/`frontend`/`ingest`/`keycloak`/`edge` carry no `cap_add`; `acme` carries only
+  `CHOWN`; `postgres`/`redis` carry only the chown + privilege-drop set; `npm` carries only its
+  verified s6 set.
+- [ ] `edge` additionally runs `read_only: true`.
 - [ ] An image bump for any of these services is only promoted after its capability set has been
   re-verified against the new image (boot + healthcheck [+ `nginx -s reload` for npm]).
 
@@ -972,6 +990,43 @@ Recorded here rather than left to look like an oversight.
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
 (`sbom-coverage`) · `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
 · **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned)
+
+### REQ-OPS-026 — A renewed certificate is not delivered until the edge can open it
+
+The ACME client and the edge are separate containers by design (ADR-0162), which means the renewal
+only reaches the internet once a **handover** succeeds: `acme` writes into the shared `edge-certs`
+volume, and `edge` opens what it finds there as uid 101. The issuance is the easy half. The handover
+is the half that fails silently, because lego reports success either way and the edge keeps serving
+the certificate it loaded at startup.
+
+Three properties make the handover correct, and each of them has failed in production:
+
+- **Every host the edge reads a certificate for is published.** lego issues **one** multi-SAN
+  certificate for its whole `-d` list, so the publishing step is driven by the host list, never by
+  the certificate files it produced. Driving it by files writes exactly one directory and leaves
+  every other vhost on whatever seeded it.
+- **The files are readable by the edge's uid.** Mode is set before ownership is handed over
+  (REQ-OPS-014: `cap_drop: [ALL]` removes `FOWNER`), and the directories stay owned by the writing
+  process so it can still replace the files on the next pass.
+- **A certificate is replaced atomically.** The edge opens these files on every reload; a
+  half-written one is a container that does not start, not a retry.
+
+The certificates the cutover seeds from the previous proxy are valid for weeks, which is exactly why
+a broken handover is invisible: nothing is observably wrong until they expire.
+
+**Acceptance**
+
+- [ ] The set of hosts `acme` publishes equals the set of hosts the edge names in an
+  `ssl_certificate` directive — asserted statically, not by inspection.
+- [ ] The publishing step runs twice in a row against a volume that already holds certificates, under
+  the container's real capability set, and succeeds both times.
+- [ ] Every published file can be opened by the edge's uid, verified in the edge's own image.
+- [ ] No temporary file is left behind by a publishing pass.
+
+**Enforced by:** `scripts/check-acme-publish.sh` (runs the step extracted from `docker-compose.yml`,
+not a copy of it) · `scripts/check-edge-nginx.sh` (host-list agreement) ·
+`.github/workflows/repo-lint.yml` · **Related:** REQ-OPS-014 (the capability baseline that shapes
+it), ADR-0162 (why the two containers are separate)
 
 ## Out of scope
 

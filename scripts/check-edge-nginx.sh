@@ -35,15 +35,35 @@ IMAGE="nginxinc/nginx-unprivileged:1.29.3-alpine"
 [[ -d "${EDGE_DIR}" ]] || { echo "FAIL: ${EDGE_DIR} does not exist"; exit 1; }
 command -v openssl >/dev/null || { echo "FAIL: openssl not on PATH"; exit 1; }
 
-# The hostnames the configuration names. Kept in one place so a new vhost fails
-# loudly here rather than at deploy time with a missing certificate.
-HOSTS=(
-  profit-base.online
-  keycloak.profit-base.online
-  ingest.profit-base.online
-  grafana.profit-base.online
-  api.profit-base.online
+# The hostnames the configuration names, DERIVED from the `ssl_certificate` paths
+# rather than restated here: a hand-kept copy is a second source of truth, and it
+# drifts the moment a vhost is added. `ssl_certificate_key` cannot match — the
+# pattern demands whitespace directly after the directive name.
+mapfile -t HOSTS < <(
+  grep -rhoE 'ssl_certificate[[:space:]]+/etc/nginx/certs/[^/]+/' "${EDGE_DIR}" \
+    | sed -E 's#.*/etc/nginx/certs/([^/]+)/#\1#' \
+    | sort -u
 )
+(( ${#HOSTS[@]} > 0 )) \
+  || { echo "FAIL: no ssl_certificate path under ${EDGE_DIR} — the pattern or the layout changed"; exit 1; }
+
+# acme issues ONE multi-SAN certificate and publishes it into a directory per host
+# named in its ACME_HOSTS list, while the edge reads a per-host path. A vhost that
+# is in the nginx configuration but not in that list therefore keeps whatever
+# seeded it and expires without a word — the shape that shipped on 2026-09-12,
+# where four of the five hosts would never have been renewed. Assert they agree.
+ACME_LIST="$(sed -n 's/^[[:space:]]*ACME_HOSTS="\([^"]*\)".*/\1/p' "${REPO_ROOT}/docker-compose.yml")"
+[[ -n "${ACME_LIST}" ]] \
+  || { echo "FAIL: no ACME_HOSTS assignment in docker-compose.yml — the acme service or its name changed"; exit 1; }
+# shellcheck disable=SC2086  # deliberate word splitting: ACME_HOSTS is space-separated
+acme_hosts="$(printf '%s\n' ${ACME_LIST} | sort -u)"
+conf_hosts="$(printf '%s\n' "${HOSTS[@]}")"
+if [[ "${acme_hosts}" != "${conf_hosts}" ]]; then
+  echo "FAIL: the hosts the edge reads certificates for and the hosts acme publishes disagree"
+  diff <(printf '%s\n' "${conf_hosts}") <(printf '%s\n' "${acme_hosts}") | sed 's/^/  /' || true
+  echo "  '<' = read by nginx but not published by acme, '>' = published but unused"
+  exit 1
+fi
 
 CERT_DIR="$(mktemp -d)"
 trap 'rm -rf "${CERT_DIR}"' EXIT

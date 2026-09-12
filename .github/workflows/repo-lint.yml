@@ -286,3 +286,14 @@ jobs:
       # configuration that always warns cannot quietly become normal.
       - name: Check edge nginx configuration
         run: scripts/check-edge-nginx.sh
+
+      # The other half of the edge: acme writes the certificates, the edge reads
+      # them, and nothing until now checked that the handover works. It broke
+      # twice - once publishing only the first of five hosts, once handing the
+      # directories to uid 101 so its own next pass could no longer replace the
+      # files - and both times only on a host that already had certificates, which
+      # is every host after the cutover. This runs the publishing step EXTRACTED
+      # from docker-compose.yml under the container's real capabilities, twice,
+      # and then opens every file as uid 101 in the real edge image.
+      - name: Check acme certificate publishing
+        run: scripts/check-acme-publish.sh

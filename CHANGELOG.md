@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die automatische Zertifikatserneuerung des Edge-Proxys funktioniert jetzt tatsächlich.** Der
+  ACME-Dienst konnte die erneuerten Zertifikate nicht ablegen und legte sie zudem nur für einen der
+  fünf Hostnamen an — die übrigen vier wären mit den bei der Umstellung übernommenen Zertifikaten
+  stehengeblieben und Anfang Dezember abgelaufen. Für Mitglieder ändert sich nichts; ohne die
+  Korrektur wären die Seiten nach Ablauf nicht mehr erreichbar gewesen.
+
 ## [v1.7.14](https://github.com/krt-profit/basetool/releases/tag/v1.7.14) - 2026-09-12
 
 ## [v1.7.13](https://github.com/krt-profit/basetool/releases/tag/v1.7.13) - 2026-09-12
