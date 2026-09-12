@@ -1175,6 +1175,44 @@ scenario_check_only_noop_verifies() {
 # non-zero and report the failure, but must NOT write a deploy-failure metric
 # (a dry-run must not trip DeployFailed).
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# The config apply mirrors an EXPLICIT list of directories, not the whole
+# bundle. On 2026-09-12 docker/edge was added to the bundle image and not to
+# that list, so the edge proxy's whole configuration reached the staging area
+# and stopped there — the host never got it, the container mounted an empty
+# directory and died with "open() /etc/nginx/edge/nginx.conf failed", and four
+# applies rolled back cleanly without once naming the missing mirror.
+#
+# This asserts the mirror, not the bundle: a directory that ships but is never
+# copied is the failure this scenario exists to catch.
+# ---------------------------------------------------------------------------
+scenario_config_mirrors_edge() {
+  echo "Scenario: the promoted bundle's docker/edge is mirrored onto the host"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  local bundle="${tmp}/bundle"
+  mkdir -p "${bundle}/docker/edge/conf.d" "${bundle}/docker/edge/include"
+  echo "# dummy compose file" > "${bundle}/docker-compose.yml"
+  echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
+  echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
+  echo "# include" > "${bundle}/docker/edge/include/proxy.conf"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}"     "FAKE_CONFIG_BUNDLE=${bundle}"     "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  assert_exit 0 "$rc" "a config-only change applies"
+  if [[ -f "${T_COMPOSE_DIR}/docker/edge/nginx.conf" ]]; then
+    record 1 "docker/edge/nginx.conf reached the host as a FILE"
+  else
+    record 0 "docker/edge/nginx.conf did not reach the host (mirror_dir list not extended?)"
+  fi
+  if [[ -f "${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"      && -f "${T_COMPOSE_DIR}/docker/edge/include/proxy.conf" ]]; then
+    record 1 "the conf.d and include trees came with it"
+  else
+    record 0 "conf.d / include were not mirrored"
+  fi
+}
+
 scenario_check_only_verify_fail() {
   echo "Scenario: --check-only with a bad signature exits non-zero, writes no metric"
   local tmp rc=0
@@ -1196,6 +1234,7 @@ scenario_check_only_verify_fail() {
   rm -rf "${tmp}"
 }
 
+scenario_config_mirrors_edge
 scenario_token_expiry_metric
 scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected

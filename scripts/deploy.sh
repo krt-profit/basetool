@@ -460,6 +460,19 @@ apply_config_tree() {
     install -d "${dst}/docker"
     mirror_dir "${src}/docker/maintenance" "${dst}/docker/maintenance"
   fi
+  # The edge proxy's configuration (ADR-0162). This list is EXPLICIT, not a
+  # wildcard over the bundle, so a directory added to docker/config/Dockerfile
+  # reaches the staging area and stops there — silently. That is exactly what
+  # happened on 2026-09-12: the bundle carried docker/edge, the stage held a
+  # correct copy, the host never got one, and the edge mounted an empty directory
+  # and died with
+  #   [emerg] open() "/etc/nginx/edge/nginx.conf" failed (2: No such file or directory)
+  # through four applies, each of which rolled back cleanly and said nothing about
+  # a missing mirror. Anything added to the bundle has to be added HERE too.
+  if [[ -d "${src}/docker/edge" ]]; then
+    install -d "${dst}/docker"
+    mirror_dir "${src}/docker/edge" "${dst}/docker/edge"
+  fi
   if [[ -d "${src}/keycloak-theme" ]]; then
     mirror_dir "${src}/keycloak-theme" "${dst}/keycloak-theme"
   fi
