@@ -1619,7 +1619,27 @@ services:
           memory: 192M
           cpus: '1.0'
           pids: 512
-    command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/edge/nginx.conf"]
+    # Not nginx directly: the per-vhost blocks carry host names that differ per
+    # environment, and there is ONE promoted bundle for all of them. The script
+    # substitutes them from the variables below, writes the result into the
+    # tmpfs, and then `exec`s nginx — so nginx is still PID 1's child and signal
+    # handling is unchanged.
+    command: ["/bin/sh", "/etc/nginx/edge/render-and-run.sh"]
+    environment:
+      # The five vhost names. No defaults on purpose: an unset one would render
+      # `server_name ;`, and the script refuses to start rather than serve a
+      # half-configured edge. They live in the host `.env`, which is per-host and
+      # never travels in the bundle.
+      #
+      # The certificate directory is DERIVED from each name
+      # (`/etc/nginx/certs/<host>/`), so `acme` on production and a seeded
+      # certificate on a test host produce the same layout and this file needs no
+      # second variable per vhost.
+      EDGE_HOST_FRONTEND: ${EDGE_HOST_FRONTEND:-}
+      EDGE_HOST_KEYCLOAK: ${EDGE_HOST_KEYCLOAK:-}
+      EDGE_HOST_INGEST: ${EDGE_HOST_INGEST:-}
+      EDGE_HOST_GRAFANA: ${EDGE_HOST_GRAFANA:-}
+      EDGE_HOST_API: ${EDGE_HOST_API:-}
     healthcheck:
       # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
       # gate could never fire for the edge. /healthz is loopback-only and answers
@@ -1703,16 +1723,33 @@ services:
         # dev` — and with it every E2E run and every local test stack — fail with
         # "ACME_EMAIL must be set in .env". The requirement is real, it just belongs
         # to the container that needs it rather than to parsing the file.
+        # This check comes FIRST, ahead of the ACME_EMAIL guard below, and the
+        # order is not cosmetic: an environment that manages no certificates has
+        # no reason to carry an ACME contact address either, so the guard would
+        # fire, the container would exit, and `restart: unless-stopped` would
+        # turn that into a restart loop — which reads as a crash in every
+        # dashboard we have.
+        if [ -z "$${ACME_HOSTS:-}" ]; then
+          echo "acme: ACME_HOSTS is empty — no certificates are managed on this host"
+          while true; do sleep 86400; done
+        fi
         : "$${ACME_EMAIL:?ACME_EMAIL must be set in .env for the acme container}"
         # /lego, not `lego`: the image ships the binary at the filesystem root and
         # its PATH is the stock /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:
         # /sbin:/bin, so the bare name is not found. With the `|| echo` tail that
         # failure is swallowed and the container keeps running — it would have sat
         # there for sixty days looking healthy and never issuing a certificate.
-        # ONE list of hosts, and scripts/check-edge-nginx.sh asserts it matches the
-        # `ssl_certificate` paths under docker/edge. A vhost the edge reads but acme
-        # does not carry keeps whatever seeded it and expires without a word.
-        ACME_HOSTS="profit-base.online keycloak.profit-base.online ingest.profit-base.online grafana.profit-base.online api.profit-base.online"
+        # The host list comes from the host `.env`, the same place the edge's
+        # vhost names come from, and scripts/check-edge-nginx.sh asserts the two
+        # sides name the same vhosts. A vhost the edge reads but acme does not
+        # carry keeps whatever seeded it and expires without a word.
+        #
+        # EMPTY is a valid and meaningful setting: an environment whose
+        # certificate is provided rather than issued — a test host behind a proxy,
+        # where HTTP-01 cannot reach anything — sets nothing and this container
+        # idles. It idles rather than exiting because `restart: unless-stopped`
+        # turns a clean exit into a restart loop, which is indistinguishable from
+        # a crash in every dashboard we have.
         # lego names the certificate after the FIRST -d and puts every other host in
         # its SAN list, so one file covers all of them.
         PRIMARY="$${ACME_HOSTS%% *}"
@@ -1774,6 +1811,10 @@ services:
         done
     environment:
       ACME_EMAIL: ${ACME_EMAIL:-}
+      # Empty means this environment manages no certificates (see the command
+      # above). The same five names the edge serves, in the same order — the
+      # first is the certificate's CN, the rest its SANs.
+      ACME_HOSTS: ${ACME_HOSTS:-}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]

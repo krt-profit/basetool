@@ -3,10 +3,10 @@ server {
   listen 8443 ssl;
   listen [::]:8443 ssl;
   http2 on;
-  server_name profit-base.online;
+  server_name ${EDGE_HOST_FRONTEND};
 
-  ssl_certificate     /etc/nginx/certs/profit-base.online/fullchain.pem;
-  ssl_certificate_key /etc/nginx/certs/profit-base.online/privkey.pem;
+  ssl_certificate     /etc/nginx/certs/${EDGE_HOST_FRONTEND}/fullchain.pem;
+  ssl_certificate_key /etc/nginx/certs/${EDGE_HOST_FRONTEND}/privkey.pem;
   include /etc/nginx/edge/include/ssl.conf;
 
   add_header Strict-Transport-Security $hsts_header always;
