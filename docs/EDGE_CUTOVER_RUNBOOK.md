@@ -180,6 +180,27 @@ docker compose --profile prod logs acme | tail -30
 When it succeeds, `deploy.sh`'s reconcile notices the changed fingerprint on its next tick and
 recreates the edge to load them. Nothing to do by hand.
 
+> [!warning] "Issued" is not "published" — check the volume, not the log
+> On 2026-09-12 lego issued a perfectly good certificate and the log said so, while the step that
+> copies it into the per-host layout the edge mounts failed on every pass. The container
+> restart-looped, the edge went on serving the seeded material, and the log's last useful line was
+> still `renewal is not needed`. Two defects, both invisible from the issuance side: the copy
+> iterated the certificate *files* (lego writes **one** multi-SAN certificate, so only the first
+> host got a directory), and an earlier `chown -R 101:101 /certs` had handed the directories to uid
+> 101, after which root — without `CAP_DAC_OVERRIDE`, since `cap_drop: [ALL]` — could no longer
+> replace the files it had written.
+>
+> Both are gated in CI now (`scripts/check-acme-publish.sh`). On the host, confirm what the edge
+> will actually open rather than what lego reported:
+>
+> ```bash
+> docker inspect acme --format '{{.State.Status}} restarts={{.RestartCount}}'   # expect: running restarts=0
+> docker run --rm -v code_edge-certs:/c:ro alpine:3 sh -c 'ls -ln /c/*/ | head -20'
+> ```
+>
+> Every one of the five host directories must carry a `fullchain.pem` and a `privkey.pem` owned by
+> `101:101`, with a timestamp from the acme run rather than from the seeding.
+
 ---
 
 ## Rollback
