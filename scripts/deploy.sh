@@ -637,7 +637,12 @@ reconcile_edge() {
     else
       log "  edge: WARN could not snapshot the config baseline (will re-apply next tick)"
     fi
-    [[ -n "${fp_now}" ]] && printf '%s\n' "${fp_now}" > "${fp_file}" 2>/dev/null || true
+    # An explicit `if`, not `A && B || C`: with the `|| true` tail that idiom runs
+    # C when A is merely false, which reads as an error path and is not one
+    # (SC2015).
+    if [[ -n "${fp_now}" ]]; then
+      printf '%s\n' "${fp_now}" > "${fp_file}" 2>/dev/null || true
+    fi
   else
     log "  edge: WARN recreate failed (non-gating) — will retry next tick"
   fi

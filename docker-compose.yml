@@ -1681,6 +1681,16 @@ services:
     command:
       - |
         set -eu
+        # Checked HERE, by the shell, and not with a compose-level required-variable
+        # marker in the environment below. (This comment deliberately spells out no
+        # dollar-brace form: compose interpolates the whole block scalar, COMMENTS
+        # INCLUDED, so a literal one here fails the file for every profile.)
+        # Compose interpolates every variable when it LOADS the file, regardless of
+        # which profile is active, so a `:?` on a prod-only service made `--profile
+        # dev` — and with it every E2E run and every local test stack — fail with
+        # "ACME_EMAIL must be set in .env". The requirement is real, it just belongs
+        # to the container that needs it rather than to parsing the file.
+        : "$${ACME_EMAIL:?ACME_EMAIL must be set in .env for the acme container}"
         DOMAINS="-d profit-base.online -d keycloak.profit-base.online -d ingest.profit-base.online -d grafana.profit-base.online -d api.profit-base.online"
         while true; do
           if [ -d /data/certificates ] && [ -n "$$(ls -A /data/certificates 2>/dev/null)" ]; then
@@ -1701,7 +1711,7 @@ services:
           sleep 43200
         done
     environment:
-      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
