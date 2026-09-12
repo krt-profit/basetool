@@ -53,18 +53,30 @@ Expect **seven** files under `conf.d/` (the maps plus six server blocks) and **s
 `include/`. If the directory is absent, the bundle predates the change — promote again and do not
 continue.
 
-## 2. Stop NPM
+## 2. Seed the certificates — BEFORE stopping anything
 
-It holds `:80` and `:443`; the edge cannot bind them while it runs. NPM is no longer in the `prod`
-profile, so `up -d` neither starts nor stops it — this is deliberate and manual.
+Do this first. It touches only a new volume, so the site keeps serving and the outage window shrinks
+to the recreate itself.
+
+## 3. Stop NPM
+
+It holds `:80` and `:443`, and — more importantly — it is attached to the `net-proxy-*` networks.
+The clean recreate tears those down to apply `internal: true`, and Docker refuses:
+
+```
+error while removing network: network code_net-proxy-keycloak has active endpoints (name:"npm")
+```
+
+That is not hypothetical. On 2026-09-12 the first automated deploy of this change hit exactly it,
+every network creation failed, the apply died in three seconds and `deploy.sh` rolled back cleanly —
+the site never went down. **The deploy cannot stop NPM itself**, because NPM is no longer in the
+profile it manages. Until this command is run, every tick will fail and roll back the same way.
 
 ```bash
 cd /var/iri/code && docker compose --profile rollback stop npm
 ```
 
-**The site is down from here until step 4.**
-
-## 3. Seed the certificates
+**The site is down from here until the next deploy tick applies the new stack.**
 
 `lego` will issue its own on first run, but nginx has to start before it can serve the challenge.
 The certificates NPM already holds are valid, so copy them in.
@@ -100,7 +112,8 @@ docker run --rm \
     seed npm-5 ingest.profit-base.online
     seed npm-7 grafana.profit-base.online
     seed npm-8 api.profit-base.online
-    ls -R /certs
+    chown -R 101:101 /certs
+    ls -lR /certs
   '
 ```
 
@@ -110,6 +123,12 @@ docker run --rm \
 > outside the container, so the `cp -L` below fails with "No such file or directory" — at the one
 > moment when NPM is already stopped and nginx cannot start without the certificates. Mounting the
 > parent resolves them.
+>
+> [!warning] `chown 101:101` is not cosmetic
+> Let's Encrypt writes `privkey.pem` as `0600 root`. The edge runs as **uid 101** and its master
+> process opens the certificate at startup, so without the chown it cannot read the key and exits
+> at once — which surfaces as a three-second health-check failure and an automatic rollback, not
+> as a permission error. The `acme` container does the same thing after every renewal.
 
 `cp -L` matters for the same reason: a copied symlink would dangle inside the volume, and nginx
 would refuse to start on a certificate it cannot read.
