@@ -86,14 +86,17 @@ docker run --rm --user 0:0 --network none \
   --entrypoint sh \
   "${IMAGE}" -c '
 set -eu
-cp -r /edge/. /etc/nginx/
+# Mirrors the runtime layout exactly: ONE directory at /etc/nginx/edge, and the
+# main config selected with -c. Anything else would validate a shape the
+# container never runs.
+cp -r /edge /etc/nginx/edge
 cp -r /certs /etc/nginx/certs
 mv /etc/nginx/certs/upstream-ca.crt /etc/nginx/upstream-ca.crt
 mkdir -p /var/www/acme /usr/share/nginx/html/maintenance /tmp/nginx
 # nginx does not open these at parse time, but the roots must exist.
 : > /usr/share/nginx/html/maintenance/maintenance.html
 : > /usr/share/nginx/html/maintenance/maintenance.json
-nginx -t -c /etc/nginx/nginx.conf
+nginx -t -c /etc/nginx/edge/nginx.conf
 ' 2>&1 | tee "${CERT_DIR}/nginx-t.out"
 
 # `nginx -t` exits 0 on a warning, and a configuration that always warns is one

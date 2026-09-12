@@ -1619,6 +1619,7 @@ services:
           memory: 192M
           cpus: '1.0'
           pids: 512
+    command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/edge/nginx.conf"]
     healthcheck:
       # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
       # gate could never fire for the edge. /healthz is loopback-only and answers
@@ -1630,11 +1631,20 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      # Configuration, mounted piece by piece rather than as one /etc/nginx: the
-      # image's own mime.types has to stay visible underneath.
-      - ./docker/edge/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/edge/conf.d:/etc/nginx/conf.d:ro
-      - ./docker/edge/include:/etc/nginx/include:ro
+      # ONE DIRECTORY mount, and deliberately not three file mounts.
+      #
+      # Docker creates a missing bind-mount source as a DIRECTORY, as root. On
+      # 2026-09-12 an apply ran before the config had landed, so
+      # docker/edge/nginx.conf became a root-owned directory inside a tree owned
+      # by `deploy` — which the rollback's rsync then could not remove, and every
+      # later apply died with "Are you trying to mount a directory onto a file".
+      # A stale placeholder like that is unrecoverable without a manual rm.
+      #
+      # A directory mount cannot produce that shape, and it drops the inode
+      # pinning that single-file mounts carry as well. The main config is selected
+      # with -c rather than by path, so /etc/nginx keeps the image's own
+      # mime.types underneath.
+      - ./docker/edge:/etc/nginx/edge:ro
       # Certificates, written by the acme container. READ-ONLY here: the process
       # facing the internet can read the key it serves and change nothing.
       - edge-certs:/etc/nginx/certs:ro
