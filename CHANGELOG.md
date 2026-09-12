@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.9](https://github.com/krt-profit/basetool/releases/tag/v1.7.9) - 2026-09-12
+
 ### Changed
 
 - **Der Edge-Proxy ist jetzt reines nginx statt Nginx Proxy Manager.** Für Mitglieder ändert sich
