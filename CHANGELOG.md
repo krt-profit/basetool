@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sicherheitsaktualisierungen von Keycloak und PostgreSQL werden nicht mehr blockiert.** Die
+  Sperre, die einen echten Versionssprung dieser Dienste der Handsteuerung vorbehält, griff auch
+  bei einem lediglich neu gebauten Basis-Image — die Testumgebung stand deshalb sieben Tage still.
+  Für Mitglieder ändert sich nichts.
+
 ### Security
 
 - **Eine Entwicklungs-Abhängigkeit mit einer ReDoS-Schwachstelle wurde angehoben** (`colord`,

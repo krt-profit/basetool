@@ -1236,6 +1236,60 @@ scenario_config_mirrors_edge() {
   fi
 }
 
+# Writes a compose file carrying the stateful-infra image pins the carve-out
+# reads. $1 = destination file, $2 = keycloak tag, $3 = keycloak digest.
+write_infra_compose() {
+  cat > "$1" <<EOF
+# dummy compose file — only the infra image pins below are ever parsed
+services:
+  db-backend:
+    image: postgres:18-alpine@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  keycloak:
+    image: quay.io/keycloak/keycloak:$2@sha256:$3
+EOF
+}
+
+scenario_infra_digest_refresh_is_not_gated() {
+  echo "Scenario: a same-tag digest refresh applies; a tag change is still gated"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  local bundle="${tmp}/bundle"
+  mkdir -p "${bundle}"
+
+  # 1. Keycloak 26.7 rebuilt — same tag, new digest. A security refresh, and the
+  #    exact shape that froze the testing host for seven days.
+  write_infra_compose "${T_COMPOSE_DIR}/docker-compose.yml" 26.7 \
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  write_infra_compose "${bundle}/docker-compose.yml" 26.7 \
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  assert_exit 0 "$rc" "a digest-only infra refresh completes"
+  assert_excludes "CARVE-OUT" "it is not treated as a stateful upgrade"
+  assert_excludes "operator-gated" "and it is not skipped"
+
+  # 2. Keycloak 26.7 -> 26.8. A version change, which IS the choreographed
+  #    upgrade this gate exists for.
+  rc=0
+  setup_host "${tmp}/two"
+  mkdir -p "${tmp}/bundle2"
+  write_infra_compose "${T_COMPOSE_DIR}/docker-compose.yml" 26.7 \
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  write_infra_compose "${tmp}/bundle2/docker-compose.yml" 26.8 \
+    cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${tmp}/bundle2" \
+    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  assert_contains "CARVE-OUT" "a tag change is still refused"
+  assert_no_docker "up -d" "and nothing is applied"
+
+  rm -rf "${tmp}"
+}
+
 scenario_edge_reloads_a_renewed_certificate() {
   echo "Scenario: a renewed certificate recreates the edge, an unchanged one does not"
   local tmp rc=0
@@ -1319,6 +1373,7 @@ scenario_check_only_verify_fail() {
 
 scenario_config_mirrors_edge
 scenario_edge_reloads_a_renewed_certificate
+scenario_infra_digest_refresh_is_not_gated
 scenario_token_expiry_metric
 scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected
