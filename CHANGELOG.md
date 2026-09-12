@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.17](https://github.com/krt-profit/basetool/releases/tag/v1.7.17) - 2026-09-12
+
 ### Added
 
 - **Eine scheiternde Zertifikatserneuerung meldet sich jetzt selbst.** Bisher wäre ein Fehlschlag
