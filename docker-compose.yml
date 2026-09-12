@@ -1647,6 +1647,9 @@ services:
       - ${IRI_UPSTREAM_CA_HOST_PATH:-/var/iri/monitoring/certs/basetool-ca.crt}:/etc/nginx/upstream-ca.crt:ro
       - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
     networks:
+      # Listed first: this is the leg the published ports land on. The other five
+      # are `internal: true` and carry upstream traffic only.
+      - net-edge-ingress
       - net-proxy-frontend
       - net-proxy-keycloak
       - net-proxy-ingest
@@ -1775,6 +1778,37 @@ networks:
   # directory) and exactly one member, so a compromise there reaches no
   # application: it is on none of the net-proxy-* networks and none of the data
   # networks.
+
+  # The edge's INGRESS bridge, and the only non-internal network it touches
+  # (ADR-0162). It exists so the published :80/:443 have a DNAT target, because
+  # the five net-proxy-* networks are `internal: true` and an internal network
+  # carries no DNAT.
+  #
+  # It carries no egress either: masquerading is off, so an outbound packet leaves
+  # with a private source and dies at the first hop. Inbound DNAT is unaffected —
+  # verified on this exact shape.
+  #
+  # DUAL-STACK, and that is ADR-0112 rather than completeness. The published :443
+  # is bound on [::]:443 too; with an IPv4-only container Docker installs no
+  # ip6tables DNAT and the userland docker-proxy relays every IPv6 client through
+  # the bridge gateway, so nginx sees ONE address for all of them and the per-IP
+  # limiter collapses into a single bucket — the 2026-07-20 outage. The real IPv6
+  # subnet makes Docker install the kernel DNAT so the client address survives.
+  # The property moved here with the published ports; net-proxy-frontend no longer
+  # carries ingress and no longer needs it.
+  #
+  # Exactly one member: the edge. It adds no lateral reach.
+  net-edge-ingress:
+    driver: bridge
+    enable_ipv6: true
+    driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+    ipam:
+      config:
+        - subnet: 172.28.15.0/24
+          gateway: 172.28.15.1
+        - subnet: fd00:28:15::/64
+          gateway: fd00:28:15::1
   net-acme-egress:
     driver: bridge
     ipam:
@@ -1782,33 +1816,28 @@ networks:
         - subnet: 172.28.14.0/24
           gateway: 172.28.14.1
   net-proxy-frontend:
-    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
-    # than `internal: true`.
+    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
+    # nothing on this bridge can reach the internet — and the edge, which is on the
+    # five net-proxy-* networks and nothing else except the ingress bridge below,
+    # therefore has no outbound path at all. It does not need one: ACME runs in its
+    # own container.
     #
-    # `internal: true` was the obvious choice and it is WRONG here: it removes the
-    # inbound DNAT along with the outbound NAT, so a published port stops
-    # answering. Measured, not assumed — a container on an internal network with
-    # `-p 18097:80` stayed up and served nothing, while the identical container on
-    # a normal network answered 200.
+    # This only works BECAUSE the published ports moved to net-edge-ingress.
+    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
+    # container that publishes a port on an internal network stays up and serves
+    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
+    # used here. Attached to an internal network plus a non-internal ingress
+    # bridge, the same container answers 200 and still reaches its upstreams over
+    # the internal side.
     #
-    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
-    # production host every one of these bridges currently carries exactly one
-    # rule of the form
-    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
-    # and that rule is the whole of the edge's path to the internet. Without it an
-    # outbound packet leaves with a private source address and dies at the first
-    # upstream hop: no return path, so no second stage to fetch and no channel to
-    # exfiltrate over.
+    # The upstreams are untouched: none of them egresses through a net-proxy-*
+    # bridge, each sitting on three to seven networks and keeping a masqueraded
+    # one.
     #
-    # The upstreams are untouched. None of them egresses through a net-proxy-*
-    # bridge — each sits on three to seven networks and keeps a masqueraded one —
-    # whereas the edge is on these five and nothing else.
-    #
-    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # Adding `internal` requires the network to be RECREATED; deploy.sh's gated
     # clean-slate recreate covers that, and it means a brief full-stack outage, so
     # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "false"
+    internal: true
     driver: bridge
     # Dual-stack (ADR-0112): the published :443 is bound on [::]:443 too, but with an
     # IPv4-only container Docker installs no ip6tables DNAT, so the userland docker-proxy
@@ -1827,33 +1856,28 @@ networks:
         - subnet: fd00:28:3::/64
           gateway: fd00:28:3::1
   net-proxy-keycloak:
-    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
-    # than `internal: true`.
+    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
+    # nothing on this bridge can reach the internet — and the edge, which is on the
+    # five net-proxy-* networks and nothing else except the ingress bridge below,
+    # therefore has no outbound path at all. It does not need one: ACME runs in its
+    # own container.
     #
-    # `internal: true` was the obvious choice and it is WRONG here: it removes the
-    # inbound DNAT along with the outbound NAT, so a published port stops
-    # answering. Measured, not assumed — a container on an internal network with
-    # `-p 18097:80` stayed up and served nothing, while the identical container on
-    # a normal network answered 200.
+    # This only works BECAUSE the published ports moved to net-edge-ingress.
+    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
+    # container that publishes a port on an internal network stays up and serves
+    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
+    # used here. Attached to an internal network plus a non-internal ingress
+    # bridge, the same container answers 200 and still reaches its upstreams over
+    # the internal side.
     #
-    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
-    # production host every one of these bridges currently carries exactly one
-    # rule of the form
-    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
-    # and that rule is the whole of the edge's path to the internet. Without it an
-    # outbound packet leaves with a private source address and dies at the first
-    # upstream hop: no return path, so no second stage to fetch and no channel to
-    # exfiltrate over.
+    # The upstreams are untouched: none of them egresses through a net-proxy-*
+    # bridge, each sitting on three to seven networks and keeping a masqueraded
+    # one.
     #
-    # The upstreams are untouched. None of them egresses through a net-proxy-*
-    # bridge — each sits on three to seven networks and keeps a masqueraded one —
-    # whereas the edge is on these five and nothing else.
-    #
-    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # Adding `internal` requires the network to be RECREATED; deploy.sh's gated
     # clean-slate recreate covers that, and it means a brief full-stack outage, so
     # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "false"
+    internal: true
     driver: bridge
     ipam:
       config:
@@ -1875,33 +1899,28 @@ networks:
   # Ingest gateway (epic #639): proxy → ingest (the only new internet-facing edge),
   # ingest → backend, ingest → redis. backend stays OFF net-proxy-ingest.
   net-proxy-ingest:
-    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
-    # than `internal: true`.
+    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
+    # nothing on this bridge can reach the internet — and the edge, which is on the
+    # five net-proxy-* networks and nothing else except the ingress bridge below,
+    # therefore has no outbound path at all. It does not need one: ACME runs in its
+    # own container.
     #
-    # `internal: true` was the obvious choice and it is WRONG here: it removes the
-    # inbound DNAT along with the outbound NAT, so a published port stops
-    # answering. Measured, not assumed — a container on an internal network with
-    # `-p 18097:80` stayed up and served nothing, while the identical container on
-    # a normal network answered 200.
+    # This only works BECAUSE the published ports moved to net-edge-ingress.
+    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
+    # container that publishes a port on an internal network stays up and serves
+    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
+    # used here. Attached to an internal network plus a non-internal ingress
+    # bridge, the same container answers 200 and still reaches its upstreams over
+    # the internal side.
     #
-    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
-    # production host every one of these bridges currently carries exactly one
-    # rule of the form
-    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
-    # and that rule is the whole of the edge's path to the internet. Without it an
-    # outbound packet leaves with a private source address and dies at the first
-    # upstream hop: no return path, so no second stage to fetch and no channel to
-    # exfiltrate over.
+    # The upstreams are untouched: none of them egresses through a net-proxy-*
+    # bridge, each sitting on three to seven networks and keeping a masqueraded
+    # one.
     #
-    # The upstreams are untouched. None of them egresses through a net-proxy-*
-    # bridge — each sits on three to seven networks and keeps a masqueraded one —
-    # whereas the edge is on these five and nothing else.
-    #
-    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # Adding `internal` requires the network to be RECREATED; deploy.sh's gated
     # clean-slate recreate covers that, and it means a brief full-stack outage, so
     # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "false"
+    internal: true
     driver: bridge
     ipam:
       config:
@@ -1953,33 +1972,28 @@ networks:
   # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
   # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
   net-proxy-grafana:
-    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
-    # than `internal: true`.
+    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
+    # nothing on this bridge can reach the internet — and the edge, which is on the
+    # five net-proxy-* networks and nothing else except the ingress bridge below,
+    # therefore has no outbound path at all. It does not need one: ACME runs in its
+    # own container.
     #
-    # `internal: true` was the obvious choice and it is WRONG here: it removes the
-    # inbound DNAT along with the outbound NAT, so a published port stops
-    # answering. Measured, not assumed — a container on an internal network with
-    # `-p 18097:80` stayed up and served nothing, while the identical container on
-    # a normal network answered 200.
+    # This only works BECAUSE the published ports moved to net-edge-ingress.
+    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
+    # container that publishes a port on an internal network stays up and serves
+    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
+    # used here. Attached to an internal network plus a non-internal ingress
+    # bridge, the same container answers 200 and still reaches its upstreams over
+    # the internal side.
     #
-    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
-    # production host every one of these bridges currently carries exactly one
-    # rule of the form
-    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
-    # and that rule is the whole of the edge's path to the internet. Without it an
-    # outbound packet leaves with a private source address and dies at the first
-    # upstream hop: no return path, so no second stage to fetch and no channel to
-    # exfiltrate over.
+    # The upstreams are untouched: none of them egresses through a net-proxy-*
+    # bridge, each sitting on three to seven networks and keeping a masqueraded
+    # one.
     #
-    # The upstreams are untouched. None of them egresses through a net-proxy-*
-    # bridge — each sits on three to seven networks and keeps a masqueraded one —
-    # whereas the edge is on these five and nothing else.
-    #
-    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # Adding `internal` requires the network to be RECREATED; deploy.sh's gated
     # clean-slate recreate covers that, and it means a brief full-stack outage, so
     # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "false"
+    internal: true
     name: net-proxy-grafana
     driver: bridge
     ipam:
@@ -2010,33 +2024,28 @@ networks:
   # bridge nor recreate one that still has endpoints, and silently strands container name
   # resolution (#974). Apply it in a maintenance window.
   net-proxy-api:
-    # NO EGRESS for the edge (ADR-0162), and this is the switch that does it rather
-    # than `internal: true`.
+    # NO EGRESS (ADR-0162). `internal: true` removes the gateway and the NAT, so
+    # nothing on this bridge can reach the internet — and the edge, which is on the
+    # five net-proxy-* networks and nothing else except the ingress bridge below,
+    # therefore has no outbound path at all. It does not need one: ACME runs in its
+    # own container.
     #
-    # `internal: true` was the obvious choice and it is WRONG here: it removes the
-    # inbound DNAT along with the outbound NAT, so a published port stops
-    # answering. Measured, not assumed — a container on an internal network with
-    # `-p 18097:80` stayed up and served nothing, while the identical container on
-    # a normal network answered 200.
+    # This only works BECAUSE the published ports moved to net-edge-ingress.
+    # `internal: true` removes the inbound DNAT along with the outbound NAT, so a
+    # container that publishes a port on an internal network stays up and serves
+    # NOTHING — measured, twice: on the docker CLI and on the exact compose shape
+    # used here. Attached to an internal network plus a non-internal ingress
+    # bridge, the same container answers 200 and still reaches its upstreams over
+    # the internal side.
     #
-    # Disabling masquerading keeps the DNAT and removes only the SNAT. On the
-    # production host every one of these bridges currently carries exactly one
-    # rule of the form
-    #     -A POSTROUTING -s 172.28.3.0/24 ! -o br-… -j MASQUERADE
-    # and that rule is the whole of the edge's path to the internet. Without it an
-    # outbound packet leaves with a private source address and dies at the first
-    # upstream hop: no return path, so no second stage to fetch and no channel to
-    # exfiltrate over.
+    # The upstreams are untouched: none of them egresses through a net-proxy-*
+    # bridge, each sitting on three to seven networks and keeping a masqueraded
+    # one.
     #
-    # The upstreams are untouched. None of them egresses through a net-proxy-*
-    # bridge — each sits on three to seven networks and keeps a masqueraded one —
-    # whereas the edge is on these five and nothing else.
-    #
-    # Changing driver_opts requires the network to be RECREATED; deploy.sh's gated
+    # Adding `internal` requires the network to be RECREATED; deploy.sh's gated
     # clean-slate recreate covers that, and it means a brief full-stack outage, so
     # apply it in a maintenance window exactly like the ADR-0112 IPv6 change.
-    driver_opts:
-      com.docker.network.bridge.enable_ip_masquerade: "false"
+    internal: true
     driver: bridge
     enable_ipv6: true
     ipam:

@@ -64,9 +64,18 @@ into a separate container.**
    writes certificates into a volume that nginx mounts **read-only**. The internet-facing process
    never holds an ACME credential and never executes a renewal hook — structurally removing the
    class that CVE-2026-40519 lives in.
-4. **The edge gets no outbound network path.** With ACME separated, nginx needs no egress, so its
-   proxy networks are marked `internal: true`. A compromised edge cannot fetch a second stage or
-   call home.
+4. **The edge gets no outbound network path.** With ACME separated, nginx needs no egress, so the
+   five `net-proxy-*` networks are marked `internal: true` — no gateway, no NAT. A compromised edge
+   cannot fetch a second stage or call home.
+
+   That works only because the published ports move to a sixth network, **`net-edge-ingress`**.
+   `internal: true` removes the inbound DNAT along with the outbound NAT, so a container publishing
+   a port on an internal network stays up and serves **nothing** — measured twice, on the docker CLI
+   and on this exact compose shape. The ingress bridge carries no egress either (masquerading off),
+   has exactly one member, and is **dual-stack**: the IPv6 DNAT that ADR-0112 exists for moves with
+   the published ports, or an IPv6 client is relayed through the userland proxy again and the per-IP
+   limiter collapses into one bucket.
+
 5. **The container runs unprivileged.** `nginx` listens on 8080/8443 *inside* and the host publishes
    80 and 443 onto them, so not even `NET_BIND_SERVICE` is required: `cap_drop: [ALL]` with no
    `cap_add`, `user: 101:101`, `read_only: true` with tmpfs for the writable paths, and a real
@@ -106,10 +115,11 @@ carries the Prometheus alert rules, which are a directory mount and reconcile on
   reports through the existing scheduled-task metric shape, and a stale certificate alerts.
 - **The vhost skeletons are ours to write.** NPM generated them; roughly 300 lines of `server`
   blocks now live in the repository. That is a one-time cost and a permanent readability gain.
-- **`internal: true` must be proven, not assumed.** Published-port ingress and Docker's embedded
-  resolver both have to keep working on a network with no egress, and OCSP stapling — which wants
-  outbound — is switched off rather than left to fail silently. Verified in the test stack before it
-  ships.
+- **`internal: true` cost a network.** The first attempt put it on the five upstream bridges alone
+  and would have taken the site offline: an internal network carries no DNAT, so the published ports
+  answer nothing. The fix is the separate ingress bridge above. OCSP stapling — which wants
+  outbound — is switched off rather than left to fail silently, and Docker's embedded resolver keeps
+  answering on an internal network, which the upstream lookups depend on.
 
 **Why not Caddy.** Two reasons, both from the sibling homelab's measurements rather than from
 documentation. Rate limiting is **not in Caddy**: `REQ-SEC-023` would depend on `mholt/caddy-ratelimit`
