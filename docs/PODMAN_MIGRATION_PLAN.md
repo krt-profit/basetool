@@ -183,11 +183,28 @@ link-local IPv6. It is not an inference from the firewall rules either: every li
 proxy access log carries the same single client address. The testing edge already sees one bucket
 for every request, under Docker, today.
 
-So **this measurement moves in full to Phase 5**, on the new production host while it is idle and
-reachable from the public internet. Consequence for sequencing: Phases 2–4 build on an assumption
-that is only confirmed in Phase 5. That is stated here rather than hidden — if §3.1 fails there, the
-work of Phases 2–4 is written off. It is still the right order, because the alternative is to build
-the new host first and rehearse nothing.
+That closes the *production-shaped* rehearsal: traffic arriving the way real traffic arrives cannot
+carry a distinct client address there. **It does not close the measurement itself**, and the first
+version of this section overstated it.
+
+What pasta has to be shown to do is preserve *whatever* source address reaches the host. The testing
+VM's DMZ interface `eth0` has a global IPv6 address and a working v6 default route, and its guest
+firewall admits the two management networks **in full** — so a client on the owner's LAN connecting
+directly to that interface arrives with its own address, proxied by nothing. That is exactly the
+property under test.
+
+So §3.1 splits:
+
+- **The mechanism** — does pasta hand the container the client's real address? — is measurable on the
+  testing host by connecting to `eth0` directly from a LAN client, for IPv4 and, if the management
+  network carries v6, for IPv6 too. To be confirmed by one experiment in Phase 1 rather than assumed
+  here.
+- **The behaviour under production-shaped traffic** — the `/64` bucket key, 429-not-503 under load —
+  moves to Phase 5, on the new host while it is idle.
+
+Corroborating but not sufficient: the PVE operator migrated a different VM in the same estate to
+rootless Podman on 2026-09-11 and reports pasta preserving the source address there. Another host's
+result on another network shape informs the risk; it does not discharge the measurement.
 
 ### 3.2 Can the edge bind :80 and :443 rootless, and at what cost?
 
@@ -237,6 +254,32 @@ so `sudo` cannot work at all. It is set from the noVNC console (`sudo passwd sys
 user). Until then the host is read-only to us.
 
 **The rate limiter cannot be rehearsed there** — §3.1.
+
+**Two gaps between testing and production, both of which shape the phases:**
+
+- **The testing stack runs 8 containers, not 22 — there is no monitoring plane there at all** (no
+  Prometheus, Grafana or Loki). Phase 4 rebuilds container observability, and it cannot be rehearsed
+  on a host that has none. Either the monitoring stack comes up on testing first, or Phase 4 has no
+  rehearsal ground and moves to Phase 5 with §3.1.
+- **Docker 26.1.5 / Compose 2.26.1** on testing. If "the same state" is to mean anything, that is a
+  second divergence beside the distribution one.
+
+**Four things the PVE operator hit migrating another VM in this estate to rootless Podman on
+2026-09-11**, recorded so we do not rediscover them:
+
+1. Rootless cannot bind ports below 1024; they set `net.ipv4.ip_unprivileged_port_start=80` via
+   `/etc/sysctl.d/`. An nftables redirect is the alternative — more moving parts for the same effect.
+   On a single-purpose VM the blast radius is nil; on the production host it is a deliberate decision
+   (§3.2).
+2. `pasta` is the default from Podman 5 and preserved the real source address for them.
+3. **Quadlet 5.4 does not know `Memory=`** — it has to be `PodmanArgs=--memory=...`. `REQ-OPS-020`'s
+   measured limits go through that spelling.
+4. `pasta` logs `epoll_ctl` errors on connection teardown that look like a fault and are not. It
+   fills the journal, which matters for a log pipeline with alerting on it.
+
+**Other host facts:** AppArmor is active (one more variable than a host without it); `subuid`/`subgid`
+exist only for `sysadm`, so a rootless service user needs its own range; the VM's disk is marked
+`backup=0`, so ZFS snapshots are the only net — there is no vzdump copy behind them.
 
 ### The trap this plan has to clear first
 
