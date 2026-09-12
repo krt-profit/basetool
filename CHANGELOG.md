@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Eine scheiternde Zertifikatserneuerung meldet sich jetzt selbst.** Bisher wäre ein Fehlschlag
+  erst zwei Wochen vor Ablauf aufgefallen; jetzt gibt es nach zwei erfolglosen Anläufen eine
+  Warnung. Betrifft nur den Betrieb, nicht die Nutzung.
+
 ## [v1.7.16](https://github.com/krt-profit/basetool/releases/tag/v1.7.16) - 2026-09-12
 
 ## [v1.7.15](https://github.com/krt-profit/basetool/releases/tag/v1.7.15) - 2026-09-12

@@ -1848,6 +1848,13 @@ therefore alerts on:
   `BlackboxConfigReloadFailed` (critical) fire when the running config diverges from the deployed
   one. The blackbox exporter's own metrics are scraped by a dedicated `blackbox-exporter` job (its
   `/metrics`, distinct from the `/probe` posture/liveness jobs).
+- **An alert rule that is never EVALUATED.** The Loki ruler loads a rule file and **skips** any
+  group it cannot parse: the remaining alerts in that group never evaluate, and the only trace is a
+  line in the ruler's own startup log. No gauge moves, no scrape fails, and the alerts read exactly
+  like alerts that are simply not firing. Nothing validated these files until 2026-09-12;
+  `scripts/check-loki-rules.sh` now parses every file and every `expr` as LogQL in CI, and the first
+  rule written after it failed that check on a `": "` inside an unquoted YAML scalar. The Prometheus
+  side has had `promtool test rules` all along — this closes the same hole on the log side.
 - **A config that never LANDED in the running process.** The gauges above only catch a reload that
   was *attempted and failed*; a config that was **never applied to the process** leaves
   `*_config_last_reload_successful == 1` (the last load, at startup, was fine) while the running
@@ -2074,7 +2081,8 @@ groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/in
 (container guards, incl. `ContainerPidsHigh` + the `changes()`-based `ContainerRestartLoop`) ·
 `monitoring/alertmanager/alertmanager.yml.tmpl` (route grouping + the five root-cause `inhibit_rules`) ·
 `monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`
-and `containerrestartloop_changes_test.yml`) · `docker-compose.monitoring.yml` (cadvisor
+and `containerrestartloop_changes_test.yml`) · `scripts/check-loki-rules.sh` (every Loki rule
+file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) · `docker-compose.monitoring.yml` (cadvisor
 `process` metric group enabling `container_threads`/`container_processes`) ·
 `monitoring/prometheus/prometheus.yml` (the `blackbox-exporter` self-metrics scrape job) ·
 `scripts/deploy.sh` (`reconcile_monitoring_reload(s)` self-healing force-recreate + the
