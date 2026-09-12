@@ -577,6 +577,77 @@ write_monitoring_reconcile_state_metric() {
 # make it loud: a per-tick WARN plus the self-standing basetool_monitoring_reconcile_disabled gauge
 # (=1), which backs the MonitoringReconcileDisabled alert. A host with no monitoring stack running
 # stays silent — nothing scrapes the textfile there anyway.
+# Reconcile the EDGE proxy against what is on disk (ADR-0162).
+#
+# Two independent sources of drift, and neither one is caught by `up -d`:
+#
+#   1. Configuration. docker/edge/nginx.conf is a SINGLE-FILE bind mount, so it is
+#      pinned to the inode it was created with: rsync writes a new inode and the
+#      container keeps reading the old one until it is recreated. conf.d/ and
+#      include/ are directory mounts and therefore immune to that, but nginx still
+#      only reads them at start. Either way the answer is a recreate, never a
+#      SIGHUP — the same reasoning as reconcile_monitoring_reload above.
+#
+#   2. Certificates. The acme container renews into the edge-certs volume and has
+#      no way to signal the edge — deliberately, because signalling would mean
+#      handing it the docker socket, and the whole point of the split is that the
+#      internet-facing process and the credential-holding process share nothing.
+#      So the renewal is applied here, by fingerprinting the certificates and
+#      recreating when the fingerprint moves. A renewal lands within one tick.
+#
+# Best-effort and non-gating, exactly like the monitoring reconcile: a failed
+# recreate logs and is retried on the next tick, and it never fails a deploy.
+reconcile_edge() {
+  local src="${COMPOSE_DIR}/docker/edge"
+  local snap="${EDGE_STATE_DIR}/config"
+  local fp_file="${EDGE_STATE_DIR}/certs.sha256"
+  local drift="" fp_now="" fp_old="" vol="" vol_mp=""
+
+  # Nothing on disk for the edge (an older bundle, or the rollback profile is in
+  # use) -> nothing to reconcile.
+  [[ -d "${src}" ]] || return 0
+
+  diff -rq "${snap}" "${src}" >/dev/null 2>&1 || drift="config"
+
+  # The volume is named by the compose project, so find it rather than guessing
+  # the prefix. Reading the mountpoint needs no container and no socket inside the
+  # edge.
+  vol="$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '(^|_)edge-certs$' | head -n1 || true)"
+  if [[ -n "${vol}" ]]; then
+    vol_mp="$(docker volume inspect "${vol}" --format '{{.Mountpoint}}' 2>/dev/null || true)"
+  fi
+  if [[ -n "${vol_mp}" && -d "${vol_mp}" ]]; then
+    fp_now="$(find "${vol_mp}" -name 'fullchain.pem' -type f -exec sha256sum {} + 2>/dev/null \
+                | awk '{print $1}' | sort | sha256sum | cut -d' ' -f1)"
+    [[ -f "${fp_file}" ]] && fp_old="$(cat "${fp_file}" 2>/dev/null || true)"
+    if [[ -n "${fp_now}" && "${fp_now}" != "${fp_old}" ]]; then
+      drift="${drift:+${drift} + }certificates"
+    fi
+  fi
+
+  [[ -n "${drift}" ]] || return 0
+
+  log "  edge: ${drift} differs from the last applied state -> recreating edge (re-resolves the bind-mount inode and re-reads the certificates)"
+  if docker compose --profile prod --project-directory "${COMPOSE_DIR}" \
+       -f "${COMPOSE_DIR}/docker-compose.yml" up -d --force-recreate --no-deps edge >/dev/null 2>&1; then
+    install -d -m 0755 "${EDGE_STATE_DIR}" 2>/dev/null || true
+    rm -rf "${snap}"
+    if cp -R "${src}" "${snap}" 2>/dev/null; then
+      date +%s > "${EDGE_STATE_DIR}/applied" 2>/dev/null || true
+    else
+      log "  edge: WARN could not snapshot the config baseline (will re-apply next tick)"
+    fi
+    # An explicit `if`, not `A && B || C`: with the `|| true` tail that idiom runs
+    # C when A is merely false, which reads as an error path and is not one
+    # (SC2015).
+    if [[ -n "${fp_now}" ]]; then
+      printf '%s\n' "${fp_now}" > "${fp_file}" 2>/dev/null || true
+    fi
+  else
+    log "  edge: WARN recreate failed (non-gating) — will retry next tick"
+  fi
+}
+
 reconcile_monitoring_reloads() {
   if [[ "${IRI_MONITORING_ENABLED:-false}" != "true" ]]; then
     if docker ps --filter "label=com.docker.compose.project=iri-monitoring" --format '{{.Names}}' 2>/dev/null | grep -q .; then
@@ -764,6 +835,10 @@ CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 # missed/lost/rolled-back config apply self-heals instead of leaving the running process on a stale
 # config (a SIGHUP cannot: the single-file mounts are inode-pinned — see reconcile_monitoring_reload).
 MON_RELOAD_STATE_DIR="${STATE_DIR}/monitoring-reload"
+# Per-component applied state for the edge proxy (ADR-0162): a snapshot of the
+# config subtree it was last recreated for, and the fingerprint of the
+# certificates it was last started with.
+EDGE_STATE_DIR="${STATE_DIR}/edge"
 # Set true when the promoted compose changes the `networks:` topology (a re-pinned
 # subnet, a net added/removed); forces a clean down+up instead of an in-place `up`
 # on apply AND on rollback, so the change never strands name resolution (#974).
@@ -1135,6 +1210,10 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
       # on a quiet host until the next real deploy — the 2026-07-11 ingest TargetDown. Cheap and
       # non-gating: a per-service content diff, a force-recreate only on actual drift.
       reconcile_monitoring_reloads
+      # Same reasoning one layer over: the edge's config is a bind mount and its
+      # certificates are renewed out-of-band, so a quiet host would otherwise run
+      # a stale edge until the next real deploy.
+      reconcile_edge
       exit 0
     fi
     NOOP=true
@@ -1514,6 +1593,11 @@ if docker compose \
       log "WARN: monitoring stack apply failed — app deploy stays successful (non-gating)"
     fi
   fi
+
+  # OUTSIDE the monitoring gate on purpose: the edge belongs to the application
+  # stack, so IRI_MONITORING_ENABLED must not decide whether its configuration
+  # reaches the running container.
+  reconcile_edge
 
   # Best-effort prune of dangling images older than 30 days. Restricted via
   # `until=720h` to avoid wiping the just-pulled images we may still need to

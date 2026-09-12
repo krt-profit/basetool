@@ -222,7 +222,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm-access\"} |~ \" 5[0-9][0-9] \" [5m]))",
+          "expr": "sum(rate({app=~\"edge|npm-access\"} |~ \" 5[0-9][0-9] \" [5m]))",
           "refId": "A",
           "legendFormat": "5xx",
           "datasource": {
@@ -267,7 +267,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm-access\"} |~ \" 4[0-9][0-9] \" [5m]))",
+          "expr": "sum(rate({app=~\"edge|npm-access\"} |~ \" 4[0-9][0-9] \" [5m]))",
           "refId": "A",
           "legendFormat": "4xx",
           "datasource": {
@@ -312,7 +312,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm-access\"}[5m]))",
+          "expr": "sum(rate({app=~\"edge|npm-access\"}[5m]))",
           "refId": "A",
           "legendFormat": "requests",
           "datasource": {
@@ -370,7 +370,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=\"npm-error\"}[5m]))",
+          "expr": "sum(rate({app=~\"edge|npm-error\"}[5m]))",
           "refId": "A",
           "legendFormat": "errors",
           "datasource": {
@@ -407,7 +407,7 @@
       },
       "targets": [
         {
-          "expr": "{app=\"npm-access\"}",
+          "expr": "{app=~\"edge|npm-access\"}",
           "refId": "A",
           "datasource": {
             "type": "loki",

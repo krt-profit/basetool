@@ -31,5 +31,10 @@ FROM scratch
 COPY docker-compose.yml /config/docker-compose.yml
 COPY docker-compose.monitoring.yml /config/docker-compose.monitoring.yml
 COPY docker/maintenance /config/docker/maintenance
+# The edge proxy's whole configuration (ADR-0162). Without this line the compose
+# file references ./docker/edge/... on a host that has never seen it, and the
+# edge starts against an empty mount — the exact "it shipped and did nothing"
+# shape this bundle exists to prevent.
+COPY docker/edge /config/docker/edge
 COPY keycloak-theme /config/keycloak-theme
 COPY monitoring /config/monitoring

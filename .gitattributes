@@ -48,3 +48,9 @@ Dockerfile text eol=lf
 # FreeMarker inside the container; LF everywhere keeps the bundle byte-stable
 # regardless of which platform built it.
 *.ftl text eol=lf
+
+# The edge proxy's configuration is bind-mounted into a Linux container and read
+# by nginx (ADR-0162). A Windows checkout that produced CRLF would be mounted as
+# CRLF into a local test stack, so the line ending is pinned rather than left to
+# core.autocrlf — the same reasoning as the Keycloak templates above.
+docker/edge/** text eol=lf

@@ -184,7 +184,7 @@ groups:
           description: "auth.log shows a sudo failure. The only non-root account has no sudo, so a failure implies an unexpected actor — investigate."
 
       - alert: EdgeServerErrorSpike
-        expr: sum(rate({app="npm-access"} |~ " 5[0-9][0-9] " [5m])) > 1
+        expr: sum(rate({app=~"edge|npm-access"} |~ " 5[0-9][0-9] " [5m])) > 1
         for: 10m
         labels:
           severity: warning
@@ -196,13 +196,13 @@ groups:
       # server_proxy.conf snippet) or the backend Bucket4j limiter passing through the edge —
       # either way a sustained rate means someone is flooding or brute-forcing.
       - alert: EdgeRateLimitSpike
-        expr: sum(rate({app="npm-access"} |~ " 429 " [5m])) > 1
+        expr: sum(rate({app=~"edge|npm-access"} |~ " 429 " [5m])) > 1
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Edge rate limiter engaged"
-          description: "The NPM access logs show a sustained 429 rate — the edge per-IP limiter (or the backend rate limiter) is rejecting a flood. Check source IPs in the npm-access stream."
+          description: "The edge access log shows a sustained 429 rate — the per-IP limiter (or the backend rate limiter) is rejecting a flood. Check source IPs in the edge stream."
 
       # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
       # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)

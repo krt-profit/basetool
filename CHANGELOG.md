@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Edge-Proxy ist jetzt reines nginx statt Nginx Proxy Manager.** Für Mitglieder ändert sich
+  nichts an den Adressen oder am Verhalten; die gesamte Konfiguration liegt jetzt im Repository
+  statt in einer Datenbank auf dem Server, und die Zertifikatsverwaltung läuft in einem eigenen,
+  getrennten Dienst. Neue Pflichtvariable: `ACME_EMAIL` (Kontaktadresse für Let's Encrypt).
+
 ## [v1.7.8](https://github.com/krt-profit/basetool/releases/tag/v1.7.8) - 2026-09-11
 
 ### Changed

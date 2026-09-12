@@ -271,3 +271,18 @@ jobs:
           docker run --rm --entrypoint sh \
             -v "$PWD/monitoring/prometheus:/work" -w /work \
             prom/prometheus:v3.14.0 -c 'promtool test rules tests/*_test.yml'
+
+      # The edge proxy's configuration is a first-class artefact since ADR-0162. It
+      # used to live half in NPM's SQLite database and half in a runbook block that
+      # a human pasted into a web form, with - in that runbook's own words - "no
+      # reconcile job and no drift alarm for it". It is files now, and this is the
+      # gate that makes them reviewable rather than merely readable.
+      #
+      # `nginx -t` is not a syntax check: it parses every include, resolves every
+      # limit_req_zone reference by name, rejects an unknown directive and LOADS
+      # every certificate. The script mints throwaway certificates for exactly that
+      # reason - the real ones are written by the acme container on the production
+      # host and must never be in this repository. It also fails on a [warn], so a
+      # configuration that always warns cannot quietly become normal.
+      - name: Check edge nginx configuration
+        run: scripts/check-edge-nginx.sh

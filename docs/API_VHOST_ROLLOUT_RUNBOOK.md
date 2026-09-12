@@ -266,8 +266,24 @@ Request a **new Let's Encrypt certificate** for `api.profit-base.online`, then e
 
 ### D.3 Advanced (server-level custom config)
 
+> [!important] Since ADR-0162 this block is NO LONGER the source of truth
+> The allow-list lives in **`docker/edge/include/api-allowlist.conf`**, is validated by
+> `nginx -t` in CI (`scripts/check-edge-nginx.sh`) and is applied by the deploy reconcile. Change it
+> there — a PR with a diff and a gate — and nothing has to be pasted anywhere.
+>
+> The two copies were compared byte for byte before the move: 221 directive lines on each side,
+> sorted-multiset difference empty in both directions. The block below is kept because the prose
+> around it explains **why** each family was opened and in which phase, which the config file does
+> not repeat. It is documentation now, and if it ever disagrees with the file, **the file is right**.
+>
+> One thing did change in the move, deliberately: the five `X-Forwarded-*` / `Forwarded` overwrite
+> directives moved from this server-level block into `location /`. At server level they were dead —
+> nginx inherits `proxy_set_header` from an outer level only when the current level defines none,
+> and `location /` defines its own set through `proxy.conf`. The REQ-SEC-011 overwrite this block
+> describes therefore never took effect under NPM.
+
 The default-deny allow-list, the `X-Forwarded-*` overwrite and the `/actuator` deny, in one block.
-Paste it into the proxy host's **Advanced** field:
+For the historical NPM path, this was pasted into the proxy host's **Advanced** field:
 
 ```nginx
 # --- Default-deny allow-list (ADR-0135) --------------------------------------

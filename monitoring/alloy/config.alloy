@@ -321,7 +321,7 @@ discovery.relabel "containers" {
 	// `db-keycloak` / `postgres-exporter-keycloak`, which keep their existing streams.
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "backend|frontend|ingest|keycloak|npm|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
+		regex         = "backend|frontend|ingest|keycloak|npm|edge|acme|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
 		action        = "keep"
 	}
 	// (#1041 item 24) Map every monitoring-plane service to a bounded `mon-<service>` app label.
@@ -346,9 +346,17 @@ discovery.relabel "containers" {
 		replacement   = "postgres-keycloak"
 	}
 
+	// `edge` and `acme` joined this list with ADR-0162. The edge logs to the
+	// CONTAINER stream rather than to files, unlike NPM, which wrote
+	// /data/logs/proxy-host-<n>_{access,error}.log and was the one component whose
+	// logs needed a bind mount to reach Loki at all. Access and error lines now
+	// share one stream, which is what ADR-0095 already does for every other
+	// service. The npm_access / npm_error FILE streams above are deliberately kept:
+	// they are empty while the edge serves and light up again if the `rollback`
+	// profile is ever used.
 	rule {
 		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "(npm|redis)"
+		regex         = "(npm|edge|acme|redis)"
 		target_label  = "app"
 		replacement   = "$1"
 	}
