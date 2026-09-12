@@ -101,8 +101,8 @@ for line in body:
         out.append(line)
 
 script = "\n".join(out).replace("$$", "$")
-if "ACME_HOSTS=" not in script:
-    sys.exit("FAIL: the extracted script defines no ACME_HOSTS")
+if "ACME_HOSTS" not in script:
+    sys.exit("FAIL: the extracted script never mentions ACME_HOSTS")
 open(dst, "w", newline="\n", encoding="utf-8").write(script + "\n")
 print(f"==> extracted {len(out)} lines of the acme command")
 PY
@@ -116,7 +116,11 @@ sh -n "${WORK}/acme.sh" || { echo "FAIL: the extracted acme command is not valid
 chmod 0755 "${WORK}"
 chmod 0644 "${WORK}/acme.sh"
 
-HOSTS_LINE="$(sed -n 's/^[[:space:]]*ACME_HOSTS="\([^"]*\)".*/\1/p' "${COMPOSE_FILE}")"
+# ACME_HOSTS is an ENVIRONMENT variable now: the host list differs per environment
+# and lives in the host .env, not in the bundle. So this check supplies its own --
+# and deliberately not the production names, because a gate that only ever exercises
+# production's spelling would pass a script that hardcoded it.
+HOSTS_LINE="edge1.check.invalid edge2.check.invalid edge3.check.invalid"
 # shellcheck disable=SC2206  # deliberate word splitting: ACME_HOSTS is space-separated
 HOSTS=(${HOSTS_LINE})
 PRIMARY="${HOSTS[0]}"
@@ -147,7 +151,7 @@ chown -R ${EDGE_UID}:${EDGE_UID} /certs
 for pass in 1 2; do
   echo "==> publish pass ${pass}"
   if ! docker run --rm --cap-drop ALL --cap-add CHOWN \
-      -e ACME_EMAIL=check@example.invalid \
+      -e ACME_EMAIL=check@example.invalid -e "ACME_HOSTS=${HOSTS_LINE}" \
       -v "${VOL_DATA}:/data" -v "${VOL_CERTS}:/certs" \
       -v "$(if command -v cygpath >/dev/null 2>&1; then cygpath -m "${WORK}"; else printf '%s' "${WORK}"; fi):/in:ro" \
       "${IMAGE}" sh /in/acme.sh; then

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Der Edge-Proxy ist nicht mehr auf die Produktionsadressen festgelegt.** Die Hostnamen kommen
+  jetzt aus der Konfiguration des jeweiligen Servers, statt fest in den Dateien zu stehen — damit
+  kann dieselbe Auslieferung auch die Testumgebung bedienen. Für Mitglieder ändert sich nichts.
+  Neue Pflichtvariablen auf dem Server: `EDGE_HOST_FRONTEND`, `EDGE_HOST_KEYCLOAK`,
+  `EDGE_HOST_INGEST`, `EDGE_HOST_GRAFANA`, `EDGE_HOST_API`; dazu `ACME_HOSTS`, das leer bleiben
+  darf, wo Zertifikate nicht selbst beschafft werden.
+
 ### Fixed
 
 - **Sicherheitsaktualisierungen von Keycloak und PostgreSQL werden nicht mehr blockiert.** Die

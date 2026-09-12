@@ -35,35 +35,48 @@ IMAGE="nginxinc/nginx-unprivileged:1.29.3-alpine"
 [[ -d "${EDGE_DIR}" ]] || { echo "FAIL: ${EDGE_DIR} does not exist"; exit 1; }
 command -v openssl >/dev/null || { echo "FAIL: openssl not on PATH"; exit 1; }
 
-# The hostnames the configuration names, DERIVED from the `ssl_certificate` paths
-# rather than restated here: a hand-kept copy is a second source of truth, and it
-# drifts the moment a vhost is added. `ssl_certificate_key` cannot match — the
-# pattern demands whitespace directly after the directive name.
-mapfile -t HOSTS < <(
-  grep -rhoE 'ssl_certificate[[:space:]]+/etc/nginx/certs/[^/]+/' "${EDGE_DIR}" \
-    | sed -E 's#.*/etc/nginx/certs/([^/]+)/#\1#' \
-    | sort -u
+# The vhosts are DERIVED from the templates, and what is derived is now the
+# VARIABLE names rather than hostnames: the per-vhost blocks are rendered at
+# start-up from the host `.env`, because one promoted bundle serves every
+# environment and nginx has no variables in `server_name`. Restating a list here
+# would be a second source of truth, and it would be a production-specific one.
+mapfile -t EDGE_VARS < <(
+  # shellcheck disable=SC2016  # '${}' is a literal character set for tr, not an expansion
+  grep -rhoE '\$\{EDGE_HOST_[A-Z_]+\}' "${EDGE_DIR}"     | tr -d '${}'     | sort -u
 )
-(( ${#HOSTS[@]} > 0 )) \
-  || { echo "FAIL: no ssl_certificate path under ${EDGE_DIR} — the pattern or the layout changed"; exit 1; }
+(( ${#EDGE_VARS[@]} > 0 ))   || { echo "FAIL: no \${EDGE_HOST_*} reference under ${EDGE_DIR} — are the vhost templates still templates?"; exit 1; }
 
-# acme issues ONE multi-SAN certificate and publishes it into a directory per host
-# named in its ACME_HOSTS list, while the edge reads a per-host path. A vhost that
-# is in the nginx configuration but not in that list therefore keeps whatever
-# seeded it and expires without a word — the shape that shipped on 2026-09-12,
-# where four of the five hosts would never have been renewed. Assert they agree.
-ACME_LIST="$(sed -n 's/^[[:space:]]*ACME_HOSTS="\([^"]*\)".*/\1/p' "${REPO_ROOT}/docker-compose.yml")"
-[[ -n "${ACME_LIST}" ]] \
-  || { echo "FAIL: no ACME_HOSTS assignment in docker-compose.yml — the acme service or its name changed"; exit 1; }
-# shellcheck disable=SC2086  # deliberate word splitting: ACME_HOSTS is space-separated
-acme_hosts="$(printf '%s\n' ${ACME_LIST} | sort -u)"
-conf_hosts="$(printf '%s\n' "${HOSTS[@]}")"
-if [[ "${acme_hosts}" != "${conf_hosts}" ]]; then
-  echo "FAIL: the hosts the edge reads certificates for and the hosts acme publishes disagree"
-  diff <(printf '%s\n' "${conf_hosts}") <(printf '%s\n' "${acme_hosts}") | sed 's/^/  /' || true
-  echo "  '<' = read by nginx but not published by acme, '>' = published but unused"
+# Every variable the templates consume must be passed by the compose file.
+# Without this, adding a vhost renders `server_name ;`, which the container
+# refuses to start on — correctly, but at deploy time rather than here.
+missing=()
+for v in "${EDGE_VARS[@]}"; do
+  grep -qE "^[[:space:]]+${v}:" "${REPO_ROOT}/docker-compose.yml" || missing+=("${v}")
+done
+if (( ${#missing[@]} > 0 )); then
+  echo "FAIL: the edge templates use variables docker-compose.yml does not pass: ${missing[*]}"
   exit 1
 fi
+
+# acme issues ONE multi-SAN certificate and publishes it into a directory per
+# host, while the edge reads a per-host path derived from the same name. The two
+# lists used to be compared here as literals; they are both operator-supplied
+# now, so what this gate can still assert is that the two sides expect the same
+# NUMBER of vhosts — and `render-and-run.sh` refuses to start on an unset one.
+# The value-level agreement moved to where the values exist: the host `.env`.
+grep -qE '^[[:space:]]+ACME_HOSTS:' "${REPO_ROOT}/docker-compose.yml"   || { echo "FAIL: docker-compose.yml no longer passes ACME_HOSTS to the acme service"; exit 1; }
+
+# Synthetic names for the render. Deliberately NOT the production ones: a gate
+# that only ever validates production's spelling would pass a template that
+# hardcodes it.
+declare -A RENDER=()
+i=0
+for v in "${EDGE_VARS[@]}"; do
+  i=$((i + 1))
+  RENDER["${v}"]="vhost${i}.check.invalid"
+done
+mapfile -t HOSTS < <(printf '%s
+' "${RENDER[@]}" | sort -u)
 
 CERT_DIR="$(mktemp -d)"
 trap 'rm -rf "${CERT_DIR}"' EXIT
@@ -100,7 +113,12 @@ echo "==> validating ${EDGE_DIR} with ${IMAGE}"
 # On Linux there is no cygpath and the paths are already native.
 to_native() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
+# Pass the synthetic host names in, and render through the runtime own script.
+ENV_ARGS=()
+for v in "${EDGE_VARS[@]}"; do ENV_ARGS+=(-e "${v}=${RENDER[${v}]}"); done
+
 docker run --rm --user 0:0 --network none \
+  "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 \
   -v "$(to_native "${EDGE_DIR}"):/edge:ro" \
   -v "$(to_native "${CERT_DIR}"):/certs:ro" \
   --entrypoint sh \
@@ -116,7 +134,13 @@ mkdir -p /var/www/acme /usr/share/nginx/html/maintenance /tmp/nginx
 # nginx does not open these at parse time, but the roots must exist.
 : > /usr/share/nginx/html/maintenance/maintenance.html
 : > /usr/share/nginx/html/maintenance/maintenance.json
-nginx -t -c /etc/nginx/edge/nginx.conf
+# Render through the runtime script rather than a copy of its logic: a check
+# that renders differently validates a configuration nobody runs.
+sh /etc/nginx/edge/render-and-run.sh
+# -T, not -t. An `include` whose glob matches NOTHING is not an error in nginx,
+# so a plain -t passes a configuration with zero vhosts in it -- which is exactly
+# what this gate did the first time the render step was wired up wrongly.
+nginx -T -c /etc/nginx/edge/nginx.conf
 ' 2>&1 | tee "${CERT_DIR}/nginx-t.out"
 
 # `nginx -t` exits 0 on a warning, and a configuration that always warns is one
@@ -126,4 +150,12 @@ if grep -q '\[warn\]' "${CERT_DIR}/nginx-t.out"; then
   exit 1
 fi
 
-echo "==> edge configuration is valid"
+# The assertion that makes the dump worth taking: every synthetic host must appear
+# in the ASSEMBLED configuration. If the include path, the template suffix or the
+# render step breaks, nginx still reports "syntax is ok" -- and this does not.
+for h in "${HOSTS[@]}"; do
+  grep -qF "server_name ${h};" "${CERT_DIR}/nginx-t.out" \
+    || { echo "FAIL: ${h} is missing from the assembled configuration"; exit 1; }
+done
+
+echo "==> edge configuration is valid, ${#HOSTS[@]} vhosts rendered and present"

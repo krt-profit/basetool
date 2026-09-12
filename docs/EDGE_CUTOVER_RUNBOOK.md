@@ -19,13 +19,18 @@ Budget 15 minutes. Everything is reversible at every step; the way back is at th
 
 ## 0. Before you start
 
-`ACME_EMAIL` must be in the host `.env`. Without it the `acme` container exits immediately with
-`ACME_EMAIL must be set in .env for the acme container` — by design, and it is the only new required
-variable.
+Six variables must be in the host `.env`, and the edge **refuses to start** without the five host
+names — nginx has no variables in `server_name`, one promoted bundle serves every environment, and a
+missing name would render `server_name ;`.
 
 ```bash
-grep -c '^ACME_EMAIL=' /var/iri/code/.env      # expect: 1
+grep -cE '^(ACME_EMAIL|EDGE_HOST_(FRONTEND|KEYCLOAK|INGEST|GRAFANA|API))=' /var/iri/code/.env   # expect: 6
 ```
+
+`ACME_HOSTS` is the seventh and the only one that may be **empty**: an environment whose certificate
+is provided rather than issued — a test host behind a proxy, where HTTP-01 cannot reach anything —
+leaves it unset and the `acme` container idles instead of exiting. On production it carries the same
+five names, the first of which becomes the certificate's CN.
 
 The edge verifies its upstreams against the certificate exported from the shared keystore. It is
 already on the host for Prometheus; confirm rather than assume:
