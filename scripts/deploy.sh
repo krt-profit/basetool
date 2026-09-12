@@ -614,7 +614,7 @@ reconcile_edge() {
   local src="${COMPOSE_DIR}/docker/edge"
   local snap="${EDGE_STATE_DIR}/config"
   local fp_file="${EDGE_STATE_DIR}/certs.sha256"
-  local drift="" fp_now="" fp_old="" vol="" vol_mp=""
+  local drift="" fp_now="" fp_old="" fp_lines=""
 
   # Nothing on disk for the edge (an older bundle, or the rollback profile is in
   # use) -> nothing to reconcile.
@@ -622,18 +622,27 @@ reconcile_edge() {
 
   diff -rq "${snap}" "${src}" >/dev/null 2>&1 || drift="config"
 
-  # The volume is named by the compose project, so find it rather than guessing
-  # the prefix. Reading the mountpoint needs no container and no socket inside the
-  # edge.
-  vol="$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '(^|_)edge-certs$' | head -n1 || true)"
-  if [[ -n "${vol}" ]]; then
-    vol_mp="$(docker volume inspect "${vol}" --format '{{.Mountpoint}}' 2>/dev/null || true)"
+  # Read the certificates THROUGH the edge rather than from the volume's host
+  # path. That path lives under /var/lib/docker, which is 0710 root:root, and this
+  # script runs as `deploy` — so the earlier `[[ -d "${vol_mp}" ]]` was false on
+  # every single tick, this whole branch was skipped in silence, and certs.sha256
+  # was never written. A renewed certificate would therefore never have been
+  # loaded, however correctly acme published it. Found on 2026-09-12, after acme
+  # itself was fixed and the edge went on serving the material seeded from NPM.
+  # The edge already mounts the volume read-only, so `exec` needs neither a new
+  # container nor root.
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'edge'; then
+    fp_lines="$(docker exec edge sh -c \
+                  'find /etc/nginx/certs -name fullchain.pem -type f -exec sha256sum {} +' \
+                  2>/dev/null || true)"
   fi
-  if [[ -n "${vol_mp}" && -d "${vol_mp}" ]]; then
-    fp_now="$(find "${vol_mp}" -name 'fullchain.pem' -type f -exec sha256sum {} + 2>/dev/null \
-                | awk '{print $1}' | sort | sha256sum | cut -d' ' -f1)"
-    [[ -f "${fp_file}" ]] && fp_old="$(cat "${fp_file}" 2>/dev/null || true)"
-    if [[ -n "${fp_now}" && "${fp_now}" != "${fp_old}" ]]; then
+  # An empty read means "could not tell", never "no certificates": sha256sum of
+  # nothing is itself a valid hash, and folding that in would force-recreate the
+  # edge on every tick the exec happened to fail.
+  if [[ -n "${fp_lines}" ]]; then
+    fp_now="$(printf '%s\n' "${fp_lines}" | awk '{print $1}' | sort | sha256sum | cut -d' ' -f1)"
+    fp_old="$(cat "${fp_file}" 2>/dev/null || true)"
+    if [[ "${fp_now}" != "${fp_old}" ]]; then
       drift="${drift:+${drift} + }certificates"
     fi
   fi

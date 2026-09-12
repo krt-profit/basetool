@@ -11,6 +11,9 @@
   fünf Hostnamen an — die übrigen vier wären mit den bei der Umstellung übernommenen Zertifikaten
   stehengeblieben und Anfang Dezember abgelaufen. Für Mitglieder ändert sich nichts; ohne die
   Korrektur wären die Seiten nach Ablauf nicht mehr erreichbar gewesen.
+- **Ein erneuertes Zertifikat wird jetzt auch geladen.** Der Deploy prüfte zwar bei jedem Durchlauf,
+  ob sich die Zertifikate geändert haben, konnte die Prüfung aber nie durchführen und startete den
+  Proxy deshalb nie neu — ein neues Zertifikat wäre auf der Platte liegen geblieben.
 
 ## [v1.7.14](https://github.com/krt-profit/basetool/releases/tag/v1.7.14) - 2026-09-12
 
