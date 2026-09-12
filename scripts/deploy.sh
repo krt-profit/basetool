@@ -366,8 +366,22 @@ infra_image_pins() {
   # `|| true`: a compose file with no match makes grep exit 1, which under
   # `set -o pipefail` would abort the surrounding command substitution. An empty
   # result is the correct "no stateful-infra pins seen" answer here.
+  # The DIGEST is deliberately stripped, so what is compared is the TAG — the
+  # version. The carve-out exists for a stateful, choreographed upgrade (a PGDATA
+  # major migration, the Keycloak provider+keystore dance), and those come with a
+  # tag change. A same-tag digest refresh is a rebuilt base image, usually a
+  # security fix, and blocking it achieves the opposite of what this gate is for.
+  #
+  # Comparing the full reference did exactly that on the testing host: Keycloak
+  # 26.7 was rebuilt, the pin went 26.7@sha256:6efbadc0… -> 26.7@sha256:ff4257d0…,
+  # and the deploy refused to apply anything for SEVEN DAYS — 1901 consecutive
+  # skipped ticks from 2026-09-05 to 2026-09-12, with the host stuck on a compose
+  # file from 2026-08-21. Production carries `DeployConfigBlocked` and would have
+  # said so within minutes; the testing host runs no monitoring plane, so nobody
+  # was told. The gate was not wrong to exist, only wrong about what "changed"
+  # means.
   grep -Eo 'image:[[:space:]]*(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' "$1" \
-    | sed -E 's/image:[[:space:]]*//' | sort -u || true
+    | sed -E 's/image:[[:space:]]*//; s/@sha256:[0-9a-f]+$//' | sort -u || true
 }
 
 # Emit the compose top-level `networks:` block, comment- and blank-stripped, so a
