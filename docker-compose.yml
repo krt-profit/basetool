@@ -1704,12 +1704,17 @@ services:
         # "ACME_EMAIL must be set in .env". The requirement is real, it just belongs
         # to the container that needs it rather than to parsing the file.
         : "$${ACME_EMAIL:?ACME_EMAIL must be set in .env for the acme container}"
+        # /lego, not `lego`: the image ships the binary at the filesystem root and
+        # its PATH is the stock /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:
+        # /sbin:/bin, so the bare name is not found. With the `|| echo` tail that
+        # failure is swallowed and the container keeps running — it would have sat
+        # there for sixty days looking healthy and never issuing a certificate.
         DOMAINS="-d profit-base.online -d keycloak.profit-base.online -d ingest.profit-base.online -d grafana.profit-base.online -d api.profit-base.online"
         while true; do
           if [ -d /data/certificates ] && [ -n "$$(ls -A /data/certificates 2>/dev/null)" ]; then
-            lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} renew --days 30 ||               echo "acme: renew failed, will retry on the next pass" >&2
+            /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} renew --days 30 ||               echo "acme: renew failed, will retry on the next pass" >&2
           else
-            lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} run ||               echo "acme: initial issuance failed, will retry on the next pass" >&2
+            /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} run ||               echo "acme: initial issuance failed, will retry on the next pass" >&2
           fi
           # Publish the material the edge consumes, under a stable per-host layout
           # it can mount read-only.
@@ -1736,6 +1741,17 @@ services:
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
+    cap_add:
+      # CHOWN, and only CHOWN. lego writes the certificates as root; the edge
+      # reads them as uid 101 and its master opens them at startup, so ownership
+      # has to be handed over. With everything dropped, `chown` fails with
+      # "Operation not permitted", `set -eu` ends the script and the container
+      # enters a restart loop — which takes the whole deploy down through
+      # `up --wait`, and says nothing about capabilities while doing it.
+      #
+      # This container listens on nothing and holds no inbound surface; the edge
+      # keeps its zero.
+      - CHOWN
     deploy:
       resources:
         limits:
