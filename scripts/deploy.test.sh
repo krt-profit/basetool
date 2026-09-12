@@ -134,10 +134,30 @@ case "${1:-}" in
     # Top-level `docker ps --filter label=com.docker.compose.project=iri-monitoring
     # --format '{{.Names}}'` — model whether the monitoring compose project has running
     # containers via FAKE_MON_PS (a container name means "running"; empty/unset means none).
-    if [[ "$*" == *"com.docker.compose.project=iri-monitoring"* && -n "${FAKE_MON_PS:-}" ]]; then
-      printf '%s\n' "${FAKE_MON_PS}"
+    if [[ "$*" == *"com.docker.compose.project=iri-monitoring"* ]]; then
+      if [[ -n "${FAKE_MON_PS:-}" ]]; then
+        printf '%s\n' "${FAKE_MON_PS}"
+      fi
+    elif [[ "$*" != *"--filter"* ]]; then
+      # Bare `docker ps --format '{{.Names}}'` — reconcile_edge asking whether the
+      # edge is up before reading its certificates through it. FAKE_EDGE_PS holds
+      # the running names (empty/unset = the edge is not running). An explicit
+      # `if`, not `[[ … ]] && printf`: this stub runs under `set -e`, where a false
+      # test as the last command of a body exits the stub non-zero.
+      if [[ -n "${FAKE_EDGE_PS:-}" ]]; then
+        printf '%s\n' "${FAKE_EDGE_PS}"
+      fi
     fi
     exit 0
+    ;;
+  exec)
+    # `docker exec edge sh -c 'find … -exec sha256sum {} +'`. FAKE_EDGE_CERT_LINES
+    # holds the sha256sum output verbatim; FAKE_EDGE_EXEC_RC=1 models an exec that
+    # fails, which must read as "could not tell" rather than "no certificates".
+    if [[ -n "${FAKE_EDGE_CERT_LINES:-}" ]]; then
+      printf '%s\n' "${FAKE_EDGE_CERT_LINES}"
+    fi
+    exit "${FAKE_EDGE_EXEC_RC:-0}"
     ;;
   inspect)
     # inspect --format <fmt> <cid>; container ids are cid-<key>
@@ -351,7 +371,10 @@ assert_excludes() {
 # invocation containing the substring.
 assert_docker() {
   local needle="$1" desc="$2"
-  if grep -qF "$needle" "${T_DOCKER_LOG}"; then
+  # `--` before the pattern: a needle that starts with a dash (any compose flag,
+  # e.g. --force-recreate) is otherwise read by grep as an option, and the test
+  # fails with "unknown option" while the invocation it looks for is right there.
+  if grep -qF -- "$needle" "${T_DOCKER_LOG}"; then
     record 1 "$desc"
   else
     record 0 "$desc (no docker invocation matching: '${needle}')"
@@ -361,7 +384,7 @@ assert_docker() {
 # assert_no_docker <substring> <description> — fails if the stub recorded one.
 assert_no_docker() {
   local needle="$1" desc="$2"
-  if ! grep -qF "$needle" "${T_DOCKER_LOG}"; then
+  if ! grep -qF -- "$needle" "${T_DOCKER_LOG}"; then
     record 1 "$desc"
   else
     record 0 "$desc (unexpected docker invocation matching: '${needle}')"
@@ -1213,6 +1236,66 @@ scenario_config_mirrors_edge() {
   fi
 }
 
+scenario_edge_reloads_a_renewed_certificate() {
+  echo "Scenario: a renewed certificate recreates the edge, an unchanged one does not"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  # An edge config that is already in sync, so the ONLY thing that can produce
+  # drift here is the certificate fingerprint. Without this the config diff would
+  # recreate the edge on its own and the assertions below would prove nothing.
+  mkdir -p "${T_COMPOSE_DIR}/docker/edge/conf.d"
+  echo "worker_processes auto;" > "${T_COMPOSE_DIR}/docker/edge/nginx.conf"
+  echo "# vhost" > "${T_COMPOSE_DIR}/docker/edge/conf.d/10-frontend.conf"
+  mkdir -p "${T_STATE_DIR}/edge"
+  cp -R "${T_COMPOSE_DIR}/docker/edge" "${T_STATE_DIR}/edge/config"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  local seeded="aaaa1111  /etc/nginx/certs/profit-base.online/fullchain.pem"
+  local renewed="bbbb2222  /etc/nginx/certs/profit-base.online/fullchain.pem"
+
+  # 1. Nothing recorded yet — the material on the edge is new to us, so load it.
+  #    This is the assertion the old code could not pass: it read the certificates
+  #    from the volume's host path under /var/lib/docker, which the `deploy` user
+  #    cannot enter, so the fingerprint was never computed and never stored.
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
+  assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
+  assert_contains "certificates differs" "the certificate drift is named in the log"
+  assert_docker "--force-recreate --no-deps edge" "the edge is recreated to load them"
+  if [[ -s "${T_STATE_DIR}/edge/certs.sha256" ]]; then
+    record 1 "the fingerprint is persisted for the next tick"
+  else
+    record 0 "no fingerprint was written (the volume was never readable?)"
+  fi
+
+  # 2. Same certificates on the next tick — recreating the edge every five minutes
+  #    would be an outage on a schedule.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
+  assert_exit 0 "$rc" "an unchanged tick succeeds"
+  assert_no_docker "--force-recreate --no-deps edge" "an unchanged certificate recreates nothing"
+
+  # 3. acme renewed it.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
+  assert_exit 0 "$rc" "the renewal tick succeeds"
+  assert_docker "--force-recreate --no-deps edge" "a renewed certificate is loaded"
+
+  # 4. The exec failed. "Could not tell" must not read as "no certificates" —
+  #    sha256sum of an empty input is a valid hash, and folding it in would
+  #    force-recreate the edge on every tick the read happened to fail.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
+  assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
+  assert_no_docker "--force-recreate --no-deps edge" "an unreadable certificate recreates nothing"
+
+  rm -rf "${tmp}"
+}
+
 scenario_check_only_verify_fail() {
   echo "Scenario: --check-only with a bad signature exits non-zero, writes no metric"
   local tmp rc=0
@@ -1235,6 +1318,7 @@ scenario_check_only_verify_fail() {
 }
 
 scenario_config_mirrors_edge
+scenario_edge_reloads_a_renewed_certificate
 scenario_token_expiry_metric
 scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected

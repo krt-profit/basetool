@@ -1010,6 +1010,11 @@ Three properties make the handover correct, and each of them has failed in produ
   process so it can still replace the files on the next pass.
 - **A certificate is replaced atomically.** The edge opens these files on every reload; a
   half-written one is a container that does not start, not a retry.
+- **The running edge is made to load it.** nginx reads its certificates at startup, so a new file in
+  the volume changes nothing on its own. `reconcile_edge` fingerprints them every tick and
+  force-recreates the edge when they move — and it has to read them in a way the **deploy user**
+  can. The volume's host path is under `/var/lib/docker` (`0710 root:root`), unreadable to that
+  user, so the fingerprint is taken through the edge, which already mounts them read-only.
 
 The certificates the cutover seeds from the previous proxy are valid for weeks, which is exactly why
 a broken handover is invisible: nothing is observably wrong until they expire.
@@ -1022,9 +1027,13 @@ a broken handover is invisible: nothing is observably wrong until they expire.
   the container's real capability set, and succeeds both times.
 - [ ] Every published file can be opened by the edge's uid, verified in the edge's own image.
 - [ ] No temporary file is left behind by a publishing pass.
+- [ ] A certificate that changed on disk is loaded by the running edge without manual action;
+  one that did not change recreates nothing, and a fingerprint read that fails recreates nothing
+  either.
 
 **Enforced by:** `scripts/check-acme-publish.sh` (runs the step extracted from `docker-compose.yml`,
 not a copy of it) · `scripts/check-edge-nginx.sh` (host-list agreement) ·
+`scripts/deploy.test.sh` (`scenario_edge_reloads_a_renewed_certificate`) ·
 `.github/workflows/repo-lint.yml` · **Related:** REQ-OPS-014 (the capability baseline that shapes
 it), ADR-0162 (why the two containers are separate)
 
