@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Security
+
+- **Eine Entwicklungs-Abhängigkeit mit einer ReDoS-Schwachstelle wurde angehoben** (`colord`,
+  GHSA-2wm5-q62r-hmrv). Sie läuft nur beim Prüfen des eigenen CSS und war nie Teil der
+  ausgelieferten Anwendung; für Mitglieder ändert sich nichts.
+
 ## [v1.7.17](https://github.com/krt-profit/basetool/releases/tag/v1.7.17) - 2026-09-12
 
 ### Added
