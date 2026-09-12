@@ -154,5 +154,16 @@ Its gating unknown is whether rootless port forwarding preserves the client sour
 change makes it cheaper rather than more expensive: an edge already running as uid 101 with no
 capabilities, a read-only filesystem and no egress is the container that gains least from rootless.
 
-**If the migration is wrong, the way back is one command.** `docker compose up -d npm` with the
-service definition and data untouched.
+**Merging and promoting is not enough**, and the steps are in
+[`EDGE_CUTOVER_RUNBOOK.md`](../EDGE_CUTOVER_RUNBOOK.md). Two reasons: the network changes cannot be
+applied in place, so the stack is recreated; and nginx refuses to start without a certificate while
+`acme` cannot obtain one before something serves the HTTP-01 challenge. That circle is broken by
+seeding the certificates Let's Encrypt already issued for NPM — valid, and no network needed.
+
+`docker/edge/` is carried to the host by the `basetool-config` bundle. It had to be **added** to
+that image; without the line the compose file would reference a directory the host has never seen
+and the edge would start against an empty mount. That is the "it shipped and did nothing" shape this
+project keeps meeting, caught here before it shipped rather than after.
+
+**If the migration is wrong, the way back is one command.** `docker compose --profile rollback up -d
+npm` with the service definition and data untouched.
