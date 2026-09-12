@@ -8,7 +8,7 @@
 > **Status:** Phase 0 not started. **No host has been touched.**
 > **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md)
 > (Proposed) — the four owner choices and the alternatives that were rejected.
-> **Last updated:** 2026-09-12.
+> **Last updated:** 2026-09-12 (testing-host facts from the PVE operator; §3.1 moved to Phase 5).
 
 ---
 
@@ -175,8 +175,19 @@ The decisive one. `REQ-SEC-023`'s per-IP limiter and [ADR-0112](adr/0112-edge-pe
 limiter collapses into one bucket and the access log identifies nobody — the exact shape of the
 2026-07-20 outage.
 
-IPv4 is measurable on the testing host. **IPv6 is measurable there only if that host carries v6**;
-otherwise the measurement moves to Phase 5, on the new host while it is still idle.
+**Neither half can be measured on the testing host** — established with the PVE operator on
+2026-09-12, and it invalidates the first version of this plan. The guest firewall runs
+`policy_in: DROP` and admits exactly one source for application traffic, the reverse proxy in front
+of it; there is no public port forward, and the interface the traffic arrives on carries only
+link-local IPv6. It is not an inference from the firewall rules either: every line of that host's
+proxy access log carries the same single client address. The testing edge already sees one bucket
+for every request, under Docker, today.
+
+So **this measurement moves in full to Phase 5**, on the new production host while it is idle and
+reachable from the public internet. Consequence for sequencing: Phases 2–4 build on an assumption
+that is only confirmed in Phase 5. That is stated here rather than hidden — if §3.1 fails there, the
+work of Phases 2–4 is written off. It is still the right order, because the alternative is to build
+the new host first and rehearse nothing.
 
 ### 3.2 Can the edge bind :80 and :443 rootless, and at what cost?
 
@@ -211,26 +222,45 @@ vocabulary that keeps `REQ-OBS-006`'s cardinality bounds.
 
 ---
 
-## 4. Open — awaiting the PVE session
+## 4. The testing host — answered 2026-09-12
 
-Asked on 2026-09-12; not yet answered. These shape Phase 1 and 2 and are recorded here so the plan
-is not written over them.
+Established with the PVE operator. Verified in this repository where the finding touches it.
 
-1. **Access.** How to reach the testing host from the owner's workstation — host, user, key, jump
-   host or VPN. The owner has asked that this become self-service.
-2. **VM or LXC?** Rootless Podman inside an unprivileged LXC has its own constraints (cgroup
-   delegation, nested user namespaces). If it is an LXC, Phase 1 has to establish what it can still
-   prove about a bare-metal Hetzner host.
-3. **IPv6.** Whether the testing host has v6 at all — decides whether §3.1 can be answered in Phase 1
-   or has to wait for Phase 5.
-4. **Snapshots.** Whether the VM can be snapshotted and rolled back quickly, which is worth a great
-   deal across Phases 1–4.
-5. **Capacity** for a second short-lived Debian 13 VM, so a clean bootstrap can be rehearsed without
-   dismantling the testing environment.
-6. **Existing host state** — sysctls, AppArmor, cgroup delegation, subuid ranges, configuration
-   management.
+**It is a real VM, not an LXC** — so the rootless constraints it exercises are the ones a bare-metal
+host has. Debian 13, cgroup v2, ~107 GB free, and ZFS snapshots that roll back in seconds, which is
+worth a great deal across Phases 1–4. There is room for a second, short-lived VM, so a clean
+bootstrap can be rehearsed without dismantling the testing environment.
 
----
+**Access:** `ssh sysadm@10.9.0.12`, directly from the LAN, no VPN; the owner's desktop key is already
+deployed. One thing is missing and only the owner can supply it: `sysadm` has a **locked password**,
+so `sudo` cannot work at all. It is set from the noVNC console (`sudo passwd sysadm` as the console
+user). Until then the host is read-only to us.
+
+**The rate limiter cannot be rehearsed there** — §3.1.
+
+### The trap this plan has to clear first
+
+`deploy.sh` hardcodes `PROFILE=prod` (line 190), and ADR-0162 put `edge` and `acme` in the `prod`
+profile while moving `npm` to `rollback`. The edge's `server_name` directives are literal
+`profit-base.online` names with no substitution. **The testing host therefore swaps its own proxy on
+the next `:testing` promotion** — to an edge that matches none of its host names, beside an `acme`
+container that would try to obtain certificates for the production names from a host with no public
+route.
+
+Verified rather than assumed: the last `:testing` promotion was 2026-09-09 and the edge change
+reached `main` on 2026-09-12, so nothing has broken yet. It is armed, not sprung, and the deploy
+timer there runs every five minutes once it is.
+
+This is a defect introduced by ADR-0162 and it is **not** part of the Podman migration — it has to be
+closed first, on its own, or the rehearsal environment breaks the moment it is used.
+
+## 4b. Sequencing
+
+The PVE operator's advice, recorded because it is right: the edge moved from NPM to native nginx on
+2026-09-12, hours before this plan was written. Running an edge replacement and a runtime replacement
+concurrently makes every investigation twice as expensive, because a symptom has two plausible
+causes. Phase 0 is repository work and can start immediately; Phase 1 should wait until the new edge
+has been quiet for a few days.
 
 ## 5. What this plan does not cover
 
