@@ -297,3 +297,11 @@ jobs:
       # and then opens every file as uid 101 in the real edge image.
       - name: Check acme certificate publishing
         run: scripts/check-acme-publish.sh
+
+      # Nothing validated the Loki ruler's rules until now, and the ruler SKIPS a
+      # group it cannot parse - so a typo disables every alert in that group
+      # silently, leaving one line in the ruler's startup log as the only trace.
+      # The first rule added after this step was written failed it immediately: a
+      # ": " inside an unquoted YAML scalar.
+      - name: Check Loki alerting rules
+        run: scripts/check-loki-rules.sh

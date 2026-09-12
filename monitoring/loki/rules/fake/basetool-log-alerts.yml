@@ -204,6 +204,31 @@ groups:
           summary: "Edge rate limiter engaged"
           description: "The edge access log shows a sustained 429 rate — the per-IP limiter (or the backend rate limiter) is rejecting a flood. Check source IPs in the edge stream."
 
+      # A certificate renewal that keeps failing is otherwise silent for weeks (ADR-0162,
+      # REQ-OPS-026). The acme loop swallows a lego failure on purpose — it prints the marker below
+      # and retries on its next pass — so nothing crashes, nothing scrapes, and the only other signal
+      # is CertificateExpiringSoon at 14 days before expiry. Renewal starts 30 days out, so a failure
+      # that begins on day one of that window sits unseen for a fortnight.
+      #
+      # The loop sleeps 12h, so a single pass failing is a Let's Encrypt hiccup and not news. The
+      # threshold is >1 marker in 26h — two CONSECUTIVE passes — and the window is 26h rather than
+      # 24h so two passes exactly 12h apart cannot fall on either side of the boundary and be
+      # counted as one. A restart-looping acme prints far more than two, but that case belongs to
+      # ContainerRestartLoop (critical) and is not what this rule is for.
+      #
+      # warning, not critical: the certificates are valid for weeks at this point, there are ~60
+      # further retries before expiry, and CertificateExpiringSoon remains the hard backstop.
+      - alert: AcmeRenewalFailing
+        # Single-quoted: the line filter contains ": ", which an unquoted YAML scalar reads as a
+        # mapping and rejects.
+        expr: 'sum(count_over_time({app="acme"} |~ "acme: (renew|initial issuance) failed" [26h])) > 1'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ACME certificate renewal is failing"
+          description: "Two consecutive passes of the acme loop failed to obtain a certificate. The edge keeps serving the current one, which is still valid, but every vhost expires together — check `docker compose --profile prod logs acme` for lego's own error, and that the HTTP-01 challenge path through the edge still answers."
+
       # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
       # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)
       # — each event carries the auid, so it stays attributable; raise to critical once the config is
