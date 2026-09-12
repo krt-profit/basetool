@@ -109,6 +109,13 @@ PY
 
 sh -n "${WORK}/acme.sh" || { echo "FAIL: the extracted acme command is not valid POSIX shell"; exit 1; }
 
+# The container mounts this directory and runs as root WITHOUT CAP_DAC_OVERRIDE —
+# the very rule under test. `mktemp -d` gives 0700 owned by the invoking user, so
+# on a Linux runner that root cannot read its own input and the check fails with
+# `sh: can't open '/in/acme.sh': Permission denied`. Nothing secret is in here.
+chmod 0755 "${WORK}"
+chmod 0644 "${WORK}/acme.sh"
+
 HOSTS_LINE="$(sed -n 's/^[[:space:]]*ACME_HOSTS="\([^"]*\)".*/\1/p' "${COMPOSE_FILE}")"
 # shellcheck disable=SC2206  # deliberate word splitting: ACME_HOSTS is space-separated
 HOSTS=(${HOSTS_LINE})
