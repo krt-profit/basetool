@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.15](https://github.com/krt-profit/basetool/releases/tag/v1.7.15) - 2026-09-12
+
 ### Fixed
 
 - **Die automatische Zertifikatserneuerung des Edge-Proxys funktioniert jetzt tatsächlich.** Der
