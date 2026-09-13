@@ -218,9 +218,16 @@ public final class MetricNames {
   public static final String REASON_BAD_PROVENANCE = "bad_provenance";
 
   /**
-   * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}, the RFC 6750 bearer
+   * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}: the RFC 6750 bearer
    * error code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link
-   * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE} / {@link #AUTH_OTHER}).
+   * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE}), plus {@link #AUTH_NO_CREDENTIALS}
+   * for a request that presented no credential at all and {@link #AUTH_OTHER} for the remainder.
+   *
+   * <p>{@link #AUTH_NO_CREDENTIALS} was split out on 2026-09-13 because without it the counter was
+   * a single flat series: all 4&nbsp;927 of this gateway's 401s read {@link #AUTH_OTHER}, and the
+   * bulk of them are the deployment's own blackbox probe, which asserts liveness by expecting a 401
+   * on the root (REQ-OBS-018). Reading the counter's total as a security signal therefore measures
+   * the monitoring plane, not an attacker.
    *
    * <p>Exists because a {@code 401} was previously undiagnosable. It is logged at {@code DEBUG}
    * with nothing but the exception class — deliberately, since this is the only internet-facing
@@ -237,8 +244,14 @@ public final class MetricNames {
   public static final String INGEST_AUTH_FAILURES = "basetool.ingest.auth.failures";
 
   /**
-   * Bearer error: the token was rejected — malformed header, bad signature, wrong issuer, expired,
-   * or a failed audience check. By far the widest bucket, and the one an operator hits first.
+   * Bearer error: a token <em>was</em> presented and rejected — bad signature, wrong issuer,
+   * expired, or a failed audience check.
+   *
+   * <p>Corrected 2026-09-13: this said "by far the widest bucket, and the one an operator hits
+   * first". Production says the opposite — it stood at <b>zero</b> against 4&nbsp;927 failures,
+   * every one of which had presented no token at all. That is what makes it the series worth
+   * alerting on: it is quiet by default, so a rejected token stands out instead of being averaged
+   * into probe traffic.
    */
   public static final String AUTH_INVALID_TOKEN = "invalid_token";
 
@@ -248,7 +261,20 @@ public final class MetricNames {
   /** Bearer error: the token is valid but lacks a required scope. */
   public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
 
-  /** Bearer error: anything the resource server raised without an RFC 6750 code. */
+  /**
+   * No credential was presented at all — no {@code Authorization} header, so the chain rejected the
+   * request with a plain {@code InsufficientAuthenticationException} and there is no {@code
+   * OAuth2AuthenticationException} to carry a code. RFC 6750 §3.1 deliberately defines none for
+   * this case; the literal exists anyway because separating "brought nothing" from "brought
+   * something that failed" is the whole diagnostic value of the counter.
+   */
+  public static final String AUTH_NO_CREDENTIALS = "no_credentials";
+
+  /**
+   * Bearer error: anything the resource server raised without an RFC 6750 code that is also not the
+   * no-credential case. Rare once {@link #AUTH_NO_CREDENTIALS} is split out, and a sustained
+   * non-zero rate means an unenumerated failure mode.
+   */
   public static final String AUTH_OTHER = "other";
 
   /**

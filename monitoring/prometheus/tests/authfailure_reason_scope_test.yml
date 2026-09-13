@@ -1,0 +1,156 @@
+# promtool unit test for the retargeted auth-failure alerts (A8, REQ-OBS-018, ADR-0173).
+#
+# The property under test is the one the 2026-09-13 retarget exists for: this deployment's OWN
+# blackbox probes answer 401 by design on an authenticated path, and under the previous expression
+# — rate(basetool_http_error_total{code="UNAUTHENTICATED"}) — that probe traffic consumed about
+# three quarters of a "possible JWT brute force" threshold. A page whose baseline is the monitoring
+# plane is not a security signal.
+#
+# So the tests lock, in both directions:
+#   - probe-shaped traffic (reason="no_credentials") NEVER fires BackendAuthFailureSpike, however
+#     much of it there is, and
+#   - a rejected token (reason="invalid_token") fires it at a rate the old threshold would have
+#     buried, because that series is a true zero in the absence of an attacker.
+# BackendUnauthenticatedFlood keeps the volume half, and its floor is checked against the real
+# probe rate rather than a round number.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 promtool test rules tests/authfailure_reason_scope_test.yml
+
+rule_files:
+  - ../alerts/apps.yml
+
+evaluation_interval: 1m
+
+tests:
+  # The regression this whole change is about. 6/min of credential-less 401s is the measured
+  # production floor (three blackbox jobs at a 30s interval, REQ-OBS-018) — it must be invisible.
+  - name: silent - the deployment's own blackbox probes are not a brute force
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{reason="no_credentials", application="basetool-backend"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BackendAuthFailureSpike
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: BackendUnauthenticatedFlood
+        exp_alerts: []
+
+  # Ten times the probe floor still is not credential guessing — nobody presented a credential.
+  - name: silent - a scanner sweep stays off the brute-force alert
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{reason="no_credentials", application="basetool-backend"}'
+        values: "0+60x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BackendAuthFailureSpike
+        exp_alerts: []
+
+  # A presented-and-rejected token at 6/min: identical volume to the probe floor above, opposite
+  # meaning. Under the old volume expression the two were indistinguishable.
+  - name: fires - a rejected token at the same rate the probes run
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{reason="invalid_token", application="basetool-backend"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BackendAuthFailureSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+              reason: invalid_token
+            exp_annotations:
+              summary: "Rejected-token spike on backend (possible JWT brute force)"
+              description: "The backend is rejecting presented tokens at an elevated rate - possible credential/JWT guessing. This series is normally zero: a caller with no token at all counts as reason=no_credentials, not here. Split the whole picture with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope, no_credentials a request that presented nothing (the ordinary background - probes, scanners, pre-login navigation), other an unenumerated failure worth reading the DEBUG line for."
+
+  # The for: 10m is load-bearing — a single bad deploy presenting a stale token must not page.
+  - name: silent - eight minutes of rejected tokens has not elapsed the for-clause
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{reason="invalid_token", application="basetool-backend"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: BackendAuthFailureSpike
+        exp_alerts: []
+
+  # The volume half, kept so the retarget drops no coverage: 120/min of credential-less requests is
+  # twenty times the probe floor and means scanning or a looping client.
+  - name: fires - a sustained credential-less flood
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{reason="no_credentials", application="basetool-backend"}'
+        values: "0+120x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: BackendUnauthenticatedFlood
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+              reason: no_credentials
+            exp_annotations:
+              summary: "Sustained flood of credential-less requests on backend"
+              description: "The backend is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes. That is an order of magnitude above the blackbox-probe floor, so it is scanning or a misconfigured client looping - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
+
+  # The gateway's root is probed with http_2xx_or_401, so its 401 volume is a monitoring baseline
+  # too. Same split, same guarantee.
+  - name: silent - ingest probe traffic is not a brute force
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_auth_failures_total{reason="no_credentials", application="basetool-ingest"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: IngestAuthFailureSpike
+        exp_alerts: []
+
+  - name: fires - a rejected token on the ingest gateway
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_auth_failures_total{reason="invalid_token", application="basetool-ingest"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: IngestAuthFailureSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-ingest
+              reason: invalid_token
+            exp_annotations:
+              summary: "Rejected-token spike on ingest (possible JWT brute force)"
+              description: "The ingest gateway is rejecting presented tokens at an elevated rate. Normally zero - a credential-less request counts as reason=no_credentials. Split with sum by (reason) (rate(basetool_ingest_auth_failures_total[5m]))."
+
+  - name: silent then firing - the gateway's own volume alert clears the probe floor
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_auth_failures_total{reason="no_credentials", application="basetool-ingest"}'
+        values: "0+6x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: IngestUnauthenticatedFlood
+        exp_alerts: []
+
+  - name: fires - a credential-less flood on the gateway
+    interval: 1m
+    input_series:
+      - series: 'basetool_ingest_auth_failures_total{reason="no_credentials", application="basetool-ingest"}'
+        values: "0+120x60"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: IngestUnauthenticatedFlood
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-ingest
+              reason: no_credentials
+            exp_annotations:
+              summary: "Sustained flood of credential-less requests on ingest"
+              description: "The ingest gateway is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes - far above its blackbox-probe baseline. Scanning or a looping client, not credential guessing. Check basetool_bot_blocked_total and the per-IP rate limiter before widening anything."

@@ -29,6 +29,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
@@ -120,17 +122,30 @@ public class SecurityProblemResponseHandler
 
   /**
    * Maps an authentication failure to its RFC 6750 bearer error code, kept to the fixed set the
-   * spec defines so the metric label stays bounded (REQ-OBS-011).
+   * spec defines so the metric label stays bounded (REQ-OBS-011), plus one literal below that set
+   * for the request that presented no credential at all.
    *
    * <p>Only the code is taken, never {@code OAuth2Error#getDescription()} — Spring puts the raw
    * decode failure in there, which can echo fragments of the presented token.
+   *
+   * <p>A request with no {@code Authorization} header is rejected by {@code
+   * ExceptionTranslationFilter} with a plain {@link InsufficientAuthenticationException} (method
+   * security uses {@link AuthenticationCredentialsNotFoundException}), neither of which is an
+   * {@link OAuth2AuthenticationException}. Both used to collapse into {@link
+   * MetricNames#AUTH_OTHER} and, on production, so did everything else: 4&nbsp;927 of 4&nbsp;927
+   * failures sat on that one series. They now carry {@link MetricNames#AUTH_NO_CREDENTIALS}
+   * (REQ-OBS-018).
    *
    * @param authException the failure Spring Security raised
    * @return one of the bounded {@code MetricNames.AUTH_*} values
    */
   private static @NotNull String bearerErrorCode(@NotNull AuthenticationException authException) {
     if (!(authException instanceof OAuth2AuthenticationException oauth2Exception)) {
-      return MetricNames.AUTH_OTHER;
+      // Both spellings of "nothing was presented"; anything else genuinely is unclassified.
+      return authException instanceof InsufficientAuthenticationException
+              || authException instanceof AuthenticationCredentialsNotFoundException
+          ? MetricNames.AUTH_NO_CREDENTIALS
+          : MetricNames.AUTH_OTHER;
     }
     String code =
         oauth2Exception.getError() == null ? null : oauth2Exception.getError().getErrorCode();

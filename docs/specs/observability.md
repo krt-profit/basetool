@@ -2323,14 +2323,50 @@ registration ends up earlier, which is measured rather than assumed. `ApiClientM
 pins both edges, and every wrong variant fails it.
 
 **Why authentication failed.** `basetool_auth_failures_total{reason}` breaks the 401s down by the
-RFC 6750 bearer error code (`invalid_token` / `invalid_request` / `insufficient_scope` / `other`),
-counted in the one funnel every filter-level rejection passes through. `basetool_http_error_total`
-`{code="UNAUTHENTICATED"}` already had the volume and drives `BackendAuthFailureSpike`; what it
-could not say is whether a spike is a malformed header, an expired token, a wrong issuer or a failed
-audience check — a distinction that otherwise costs a log-level change on a surface anonymous
-scanners can reach, and that cost the ingest gateway an afternoon on 2026-08-03 (REQ-INGEST-011).
-Only the code is taken, never the `OAuth2Error` description: Spring embeds the raw decode failure
-there and it can quote fragments of the presented token (REQ-OBS-004).
+RFC 6750 bearer error code (`invalid_token` / `invalid_request` / `insufficient_scope`), plus
+`no_credentials` for a request that presented nothing at all and `other` for the remainder, counted
+in the one funnel every filter-level rejection passes through. `basetool_http_error_total`
+`{code="UNAUTHENTICATED"}` already had the volume; what it could not say is whether a spike is a
+malformed header, an expired token, a wrong issuer or a failed audience check — a distinction that
+otherwise costs a log-level change on a surface anonymous scanners can reach, and that cost the
+ingest gateway an afternoon on 2026-08-03 (REQ-INGEST-011). Only the code is taken, never the
+`OAuth2Error` description: Spring embeds the raw decode failure there and it can quote fragments of
+the presented token (REQ-OBS-004).
+
+> [!warning] Corrected 2026-09-13 — the RFC code set has no slot for the case that actually happens
+> As first shipped this counter answered nothing. A caller presenting no `Authorization` header
+> never reaches `BearerTokenAuthenticationFilter`'s failure path: `ExceptionTranslationFilter`
+> raises a plain `InsufficientAuthenticationException`, which is not an
+> `OAuth2AuthenticationException` and therefore carries no RFC code — RFC 6750 §3.1 says a resource
+> server SHOULD omit one for exactly this case — so it collapsed into `other`. Measured on
+> production: **6 618 of 6 618** backend 401s and **4 927 of 4 927** ingest 401s read `other`, with
+> `invalid_token` at a flat zero. `no_credentials` is the fix (ADR-0173), and it leaves `other`
+> meaning what it always claimed: an unenumerated failure worth investigating.
+
+**The 401 volume on these surfaces is a designed constant, not a signal.** Three blackbox jobs probe
+`https://api.profit-base.online/api/v1/terms/status` every 30 s and the ingest gateway's root is
+probed the same way, all expecting a 401 — that is the whole point of the `http_2xx_or_401` module
+(below). Of 601 401s sampled at the edge in one hour, **600 carried `Blackbox-Exporter/0.28.0`** and
+one was an outside scanner. The floor this puts under the backend's 401 rate is **~0.1/s**, and it
+rises with every probe target added.
+
+That floor is why `BackendAuthFailureSpike` no longer watches 401 volume. It watches
+`reason="invalid_token"` — a token that *was* presented and rejected, which a probe, a scanner and a
+pre-login navigation can never produce — so the series is a true zero and a `> 0.05/s` threshold is
+meaningful rather than a fraction of the monitoring plane's own traffic. `IngestAuthFailureSpike`
+does the same on `basetool_ingest_auth_failures_total`. The volume half lives on separately as
+`BackendUnauthenticatedFlood` (`reason="no_credentials"`, `> 1/s for 15m`), an order of magnitude
+above the floor, with `IngestUnauthenticatedFlood` its twin on the gateway. **Adding a blackbox target changes that floor and the number above must be
+re-measured in the same PR** (ADR-0173).
+
+> [!note] `uri="UNKNOWN"` on a rejected request is a known, open gap
+> Micrometer tags `http_server_requests` from the handler mapping, and a filter-chain rejection
+> never reaches the `DispatcherServlet` — so **no** 401 carries a path, on either module. Neither
+> does the access log: `RequestLoggingFilter` is ordered inside the security chain and never runs
+> for a rejected request, and the 401 itself is logged at `DEBUG` by design (REQ-OBS-001) to keep
+> scanner noise out of production. The path of a rejected request is therefore recoverable only from
+> the edge access log. ADR-0173 states this deliberately rather than closing it; closing it means
+> either a bounded surface label on the counter or re-ordering the logging filter.
 
 **Probes for a host that does not resolve yet.** The API vhost's liveness, IPv6 twin, `/actuator`
 edge deny, Force-SSL, HSTS and DNS A/AAAA probes are written, reviewed and deployed **staged** —
@@ -2358,6 +2394,13 @@ loosening the frontend's `http_2xx_hsts` assertion.
 - [x] An encoded path spelling cannot drop a request out of the attribution (REQ-SEC-029).
 - [x] Every 401 is counted under its RFC 6750 code, an unknown code collapses to `other`, and a 403
   is not counted as an authentication failure (`SecurityProblemResponseHandlerTest`).
+- [x] A request presenting no credential at all is counted as `no_credentials` — in both spellings,
+  `InsufficientAuthenticationException` and `AuthenticationCredentialsNotFoundException` — and never
+  as `other` or `invalid_token`, in the backend and the ingest gateway alike
+  (`SecurityProblemResponseHandlerTest` in both modules).
+- [x] The brute-force alerts fire on a rejected token and stay silent for credential-less traffic at
+  any volume, so the deployment's own blackbox probes cannot page it
+  (`tests/authfailure_reason_scope_test.yml`, both directions asserted).
 - [x] `ApiUnknownClient` fires on sustained `other` traffic, stays silent for known clients at any
   volume, and does not claim the `none` series (`tests/apiunknownclient_scope_test.yml`).
 - [x] The staged probes are enabled and `EdgeHstsHeaderMissing` is widened to
