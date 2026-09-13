@@ -34,6 +34,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Discord login** — optional social login gated (fail-closed) on guild membership and an in-guild role, with an admin approval queue for new sign-ups (approve, reject, or link a sign-up onto an existing account).
 - **Personal inventory & blueprints** — members maintain their own item list and unlocked crafting blueprints (importable from external extractors), with craftability and org-unit availability overviews.
 - **Org chart & structure** — an interactive hierarchy view (OL → Bereiche → Staffeln/SKs) plus admin structure maintenance.
+- **Installable on a phone or tablet home screen** — the web app ships a localised web app manifest and installs as a standalone app (iOS "Add to Home Screen", browser menu elsewhere). It carries **no service worker on purpose**: one caching navigations would copy member data into a store outside every path that clears it, so there is no offline mode. This is the mobile client for iPhone and iPad, which have no native app — see [ADR-0164](docs/adr/0164-an-installable-web-app-without-a-service-worker.md) and `REQ-UI-020`.
 - **i18n & Keycloak theme** — every user-visible string is translated (German default, English); a custom Keycloak theme carries the DAS KARTELL corporate design.
 
 The full permission model is in [ROLES_AND_PERMISSIONS.md](ROLES_AND_PERMISSIONS.md); per-feature behaviour is specified under [`docs/specs/`](docs/specs/INDEX.md).

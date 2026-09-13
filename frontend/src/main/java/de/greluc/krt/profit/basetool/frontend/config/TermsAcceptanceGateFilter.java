@@ -407,6 +407,12 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
         || path.startsWith("/logos/")
         || path.startsWith("/fonts/")
         || path.equals("/favicon.ico")
+        // The web app manifest (REQ-UI-020, ADR-0164). It is linked with
+        // crossorigin="use-credentials" so the browser sends KRT_LOCALE and the installed app
+        // carries the member's language — which also makes the fetch an AUTHENTICATED one, and
+        // therefore something this gate would otherwise redirect. A member who has not accepted
+        // the terms yet would then install an app whose manifest is the consent page.
+        || path.equals("/manifest.webmanifest")
         || path.endsWith(".map");
   }
 }

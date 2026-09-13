@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
+  über „Zum Home-Bildschirm“, auf Android und am Rechner über das Browsermenü; danach hat es ein
+  eigenes Symbol und startet ohne Adressleiste. Gedacht für iPhone- und iPad-Mitglieder, für die es
+  keine eigene App gibt. Ohne Netz funktioniert es nicht — bewusst, damit keine Mitgliederdaten auf
+  dem Gerät zwischengespeichert werden.
+
 ### Fixed
 
 - **Der Edge-Proxy kann jetzt so viele gleichzeitige Verbindungen bedienen, wie er soll.** Er war auf

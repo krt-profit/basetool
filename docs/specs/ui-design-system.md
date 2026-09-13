@@ -629,6 +629,71 @@ Binding details:
 every page template, `META-INF/resources/logos/basetool-*`,
 `keycloak-theme/krt-theme/login/login.ftl` · **Related:** REQ-UI-002, REQ-UI-018.
 
+### REQ-UI-020 — The web app is installable, and installs without a service worker
+
+The tool is installable to a phone or tablet home screen as a standalone app. This exists **for
+iPhone and iPad**: those members have no native client and cannot get one — the Android app's channel
+(a signed artifact from GitHub Releases) has no Apple equivalent a fan project can reach, so a
+home-screen web app is the whole mobile story on that platform. The analysis behind that sentence is
+`docs/APPLE_PLATFORM_FEASIBILITY.md` in the `basetool-android` repository; the decision is
+[ADR-0164](../adr/0164-an-installable-web-app-without-a-service-worker.md).
+
+Binding surface:
+
+|            Piece             |                                   What it is                                   |
+|------------------------------|--------------------------------------------------------------------------------|
+| `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json` |
+| `<link rel="manifest">`      | In `fragments/head.html`, **with `crossorigin="use-credentials"`**             |
+| `theme-color`                | `#141414` — the header fill, not the black page background                     |
+| `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship        |
+| `apple-mobile-web-app-title` | From `pwa.short_name`, so the home-screen label is localised and short         |
+| `apple-touch-icon`           | Already shipped by REQ-UI-019; the manifest reuses the same opaque 512 px tile |
+
+Binding details:
+
+- **No service worker, by decision.** A worker caching navigations would copy member data — balances,
+  rosters, stock — into a second store outside every path that clears the first, while the backend
+  marks those reads `no-store` (REQ-SEC-031) precisely so they are not copied. iOS needs no worker
+  for „Zum Home-Bildschirm". **The cost is accepted and stated:** Chromium requires a fetch-handling
+  worker before it offers its own install prompt, so on Android and desktop the app installs only
+  through the browser menu. Adding a worker later is an ADR, not a refactor.
+- **The manifest is a controller, not a file under `static/`.** Three of its properties belong to the
+  response rather than to a file: the localised strings, the media type Spring's resource handler
+  does not know, and `200`-never-`302`. The third is the same trap `/.well-known/assetlinks.json`
+  was written for, and both paths sit in the same `SecurityConfig` allow-list.
+- **`crossorigin="use-credentials"` is load-bearing.** A manifest is fetched *without* cookies by
+  default; the locale lives in `KRT_LOCALE`, so without the attribute every install is labelled in
+  the default language regardless of what the member reads the tool in. Because the fetch then
+  arrives authenticated, `/manifest.webmanifest` is also exempt in `TermsAcceptanceGateFilter` (or a
+  member who has not accepted the terms installs an app whose manifest is the consent page) and in
+  `BackendRoleSyncFilter` (or every manifest fetch spends a `/api/v1/users/me` round trip).
+- **`start_url` and `scope` are both `/`.** One entry point serves both states, because `/` already
+  answers with the landing page for a visitor and the dashboard for a member.
+- **The icon is never declared `maskable`.** Android crops a maskable icon to its own shape and
+  guarantees only the inner ~40 %; claiming it for artwork not drawn with that safe zone cuts into
+  the mark. A dedicated maskable asset is a request to the design system — see Open questions.
+- **`display: standalone`, and `orientation` is deliberately unset.** The layout is responsive;
+  locking orientation would make a tablet worse.
+- **Status bar `black`, not `black-translucent`.** Translucent draws the page under the status bar and
+  needs safe-area padding throughout the layout, which this requirement does not ship.
+
+**Acceptance**
+
+- [ ] `GET /manifest.webmanifest` answers `200` as `application/manifest+json` to an **anonymous**
+  request, with no redirect.
+- [ ] Its `name`, `short_name` and `description` come from the bundles and follow `KRT_LOCALE`.
+- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are `/`.
+- [ ] The single icon is the opaque 512 px tile and its `purpose` is `any`, never `maskable`.
+- [ ] `Cache-Control: private, max-age=3600` and `Vary: Cookie`, because the body is localised.
+- [ ] The rendered page carries the manifest link **with** `crossorigin="use-credentials"`, the
+  `theme-color` meta matching the controller's constant, and both standalone hints.
+- [ ] No service worker is registered anywhere in the frontend.
+
+**Enforced by:** `WebAppManifestControllerTest` · **Code:** `WebAppManifestController`,
+`fragments/head.html`, `SecurityConfig`, `TermsAcceptanceGateFilter`, `BackendRoleSyncFilter`,
+`RequestLoggingFilter`, `pwa.*` in the three message bundles · **Related:** REQ-UI-019 (the icon
+family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path table).
+
 ## Out of scope
 
 The brand assets themselves — their artwork, variants and rasters — are authored and versioned in

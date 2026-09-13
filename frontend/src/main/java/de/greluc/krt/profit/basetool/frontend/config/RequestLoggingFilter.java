@@ -187,6 +187,10 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
         || uri.endsWith(".ico")
         || uri.endsWith(".woff")
         || uri.endsWith(".woff2")
+        // The web app manifest (REQ-UI-020): a browser re-fetches it around every install and on
+        // its own schedule afterwards, and each hit would otherwise log a request line that says
+        // nothing — the same reason the asset extensions above are here.
+        || uri.endsWith(".webmanifest")
         || uri.contains("/images/")
         || uri.contains("/logos/")
         || uri.contains("/fonts/")

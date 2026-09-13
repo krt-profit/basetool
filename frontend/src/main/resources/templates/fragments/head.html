@@ -34,6 +34,39 @@
     <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
     <link rel="apple-touch-icon" th:href="@{/logos/basetool-appicon-512.png}">
     <!--
+      Installable web app (REQ-UI-020, ADR-0164). This block plus the `apple-touch-icon` above is
+      the whole iPhone/iPad story: Safari's "Zum Home-Bildschirm" needs no service worker, and this
+      app deliberately ships none — a worker caching navigations would copy member data into a
+      second store outside every path that wipes the first, which is the same reason the backend
+      marks those reads `no-store`. See WebAppManifestController.
+
+      `crossorigin="use-credentials"` is not decoration. A manifest is fetched WITHOUT cookies by
+      default, and the locale lives in the `KRT_LOCALE` cookie — so without this attribute the
+      manifest would always come back in the default language, and a member who reads the tool in
+      English would install a German-labelled app. The manifest answers anonymously either way
+      (SecurityConfig), so the attribute can never turn the fetch into a login redirect.
+
+      `theme-color` is the HEADER fill (--color-bg-dark-gray), not the black page background: on a
+      phone the status bar sits directly above that header, and matching it is what removes the
+      seam. It is a literal hex because a meta tag cannot read a CSS custom property; the value is
+      mirrored by WebAppManifestController.THEME_COLOR and the two are pinned together by
+      WebAppManifestControllerTest, so they cannot drift apart.
+
+      `apple-mobile-web-app-capable` is the legacy spelling of `mobile-web-app-capable`. Both ship:
+      iOS still honours the prefixed one, and dropping it would silently downgrade older iPhones
+      from a standalone window back to a Safari tab.
+
+      Status bar `black`, not `black-translucent`: translucent draws the page UNDER the status bar
+      and needs safe-area padding throughout the layout, which is a separate piece of work. Opaque
+      black matches the page background and needs none.
+    -->
+    <link rel="manifest" th:href="@{/manifest.webmanifest}" crossorigin="use-credentials">
+    <meta name="theme-color" content="#141414">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" th:content="#{pwa.short_name}">
+    <!--
       Preload the critical body font weight so the browser starts the request before stylesheet
       parsing. Without this hint, @font-face requests sit behind styles.css and a `font-display:
       swap` swap-in becomes visible. Lato-Regular is the dominant body weight; Light and Bold
