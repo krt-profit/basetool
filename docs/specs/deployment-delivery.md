@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-26.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
 
 # Deployment delivery & promotion
 
@@ -1036,6 +1036,53 @@ not a copy of it) · `scripts/check-edge-nginx.sh` (host-list agreement) ·
 `scripts/deploy.test.sh` (`scenario_edge_reloads_a_renewed_certificate`) ·
 `.github/workflows/repo-lint.yml` · **Related:** REQ-OPS-014 (the capability baseline that shapes
 it), ADR-0162 (why the two containers are separate)
+
+### REQ-OPS-027 — A label-gated check decides on its gate, never on event ordering
+
+A CI check gated on a pull-request **label** must reach the same verdict no matter in which order
+GitHub delivers the events that produced it. Concretely, for the E2E suite: if a PR carries the
+`e2e` label, the suite **executes** — whether the label was applied at creation alongside four
+others, added an hour later, or already present when the branch was pushed.
+
+The hazard is structural rather than a matter of care. GitHub evaluates `concurrency.group` when a
+run is **created** and `jobs.<id>.if` only afterwards, so **a run that will skip every job still
+claims the group, and under `cancel-in-progress` cancels the incumbent before skipping.** A single
+shared group therefore lets the gate be overruled by arrival order: `gh pr create` with several
+`--label` flags fires `opened` plus one `labeled` event per label inside a second, and whichever
+label lands last decides. Twice — PR #1537 and PR #1871 — that was not `e2e`, and the suite never
+executed while the cancelled siblings rendered as `fail` in `gh pr checks`.
+
+Both halves of that outcome are failures, and the second is not cosmetic:
+
+- **A silently skipped suite is indistinguishable from a passing one.** The `E2E flows` jobs are
+  not required checks, so the PR merges with no end-to-end coverage and nothing says so.
+- **A cancelled run reads as a failed one.** The board goes red for a reason that is not in the
+  diff, which is where the diagnosis time goes.
+
+The remedy is that the concurrency group is derived from **the gate's own verdict**: runs the gate
+admits share one group, where `cancel-in-progress` legitimately supersedes a stale suite; runs it
+rejects are isolated per run and neither cancel nor are cancelled. Because GitHub cannot share one
+expression between the two positions, the gate is duplicated into the group verbatim — and a
+duplicate that nothing checks is a duplicate that drifts, so the agreement is itself gated. A
+selector *looser* than its gate is the specific regression to prevent: it re-admits a skipping run
+to the shared group and restores the defect exactly.
+
+**Acceptance**
+
+- [ ] A `gh pr create` applying several labels including `e2e` in one invocation yields **exactly
+  one** E2E run that executes, whatever order the events arrive in. Every run whose gate is false
+  reports `skipped` and **none of them is cancelled**; a run that is cancelled must be one whose
+  gate was true, superseded by a newer qualifying run.
+- [ ] Applying `e2e` to an already-open PR starts the suite without waiting for a further push.
+- [ ] Toggling a label other than `e2e` on an `e2e`-labelled PR starts **no** suite.
+- [ ] A further push to an `e2e`-labelled PR supersedes the in-flight suite rather than running a
+  second one beside it.
+- [ ] `concurrency.group` contains `jobs.e2e.if` verbatim, and CI fails when it stops doing so; the
+  checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
+
+**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`) ·
+`.github/scripts/check_e2e_gate_mirror.py` · `.github/workflows/repo-lint.yml`
+(`e2e-gate-mirror`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
 
 ## Out of scope
 

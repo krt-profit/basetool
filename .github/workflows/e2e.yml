@@ -25,7 +25,34 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  # The group is claimed when the run is CREATED -- before the job gate below is evaluated. A run
+  # that goes on to skip every job therefore still cancels the incumbent on its way to skipping,
+  # and that is the whole bug: `gh pr create --label a --label b --label e2e` fires `opened` plus
+  # one `labeled` event per label inside a second, a single shared group made each cancel its
+  # predecessor, and the survivor was whichever label happened to land last -- usually not `e2e`,
+  # so its gate was false and it skipped. The heavy suite never executed, while `gh pr checks`
+  # renders the cancelled runs as `fail`, so the PR showed red checks with nothing behind them.
+  # Seen on #1537 and again on #1871: the same footgun the `labeled` trigger above exists to fix,
+  # reintroduced one layer down by the concurrency group.
+  #
+  # So the group separates the two populations. Every run whose gate will PASS shares `-suite`,
+  # where `cancel-in-progress` still does the job it exists for -- a new push supersedes the
+  # in-flight suite. Every run that will SKIP gets a group of its own, keyed on the per-run-unique
+  # `github.run_id`: it cancels nothing, nothing cancels it, and it reports `skipped` rather than
+  # the `fail`-coloured `cancelled`. Event ordering stops mattering, because of those five runs
+  # only the one carrying `e2e` can ever enter `-suite`.
+  #
+  # The selector is the job gate VERBATIM, and must stay that way: a selector LOOSER than the gate
+  # lets a skipping run back into `-suite` and restores the bug (a `labeled` event for an unrelated
+  # label on a PR that already carries `e2e` is exactly such a run). `check_e2e_gate_mirror.py`
+  # fails repo-lint if the two ever drift -- change one, change the other.
+  group: >-
+    e2e-${{ github.workflow }}-${{ github.ref }}-${{
+    (github.event_name != 'pull_request' ||
+    (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
+    (github.event.action != 'labeled' &&
+    contains(github.event.pull_request.labels.*.name, 'e2e')))
+    && 'suite' || format('noop-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -38,6 +65,10 @@ jobs:
     # itself, so toggling an unrelated label never spins up this heavy stack;
     # open/synchronize/reopened run whenever the label is currently present.
     # schedule / workflow_dispatch: always.
+    #
+    # This expression is mirrored verbatim into the `concurrency.group` selector above so that
+    # runs which will skip cannot cancel the run that will execute. Editing it here without
+    # editing it there fails the `e2e-gate-mirror` repo-lint job.
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
