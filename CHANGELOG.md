@@ -10,6 +10,12 @@
   keine eigene App gibt — und ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf
   dem Gerät liegen bleiben.
 
+- **Lager: Filter nach Standort.** „Mein Lager“ und das globale Lager lassen sich jetzt in
+  beiden Ansichten (Material und Items) auf einzelne Standorte einschränken. Zur Auswahl stehen
+  nur Standorte, an denen tatsächlich Bestand liegt. Die Auswahl bleibt wie die übrigen Filter
+  erhalten und zählt im Filter-Zähler mit; „Alle markieren“ erfasst genau den gefilterten
+  Bestand.
+
 ### Fixed
 
 - **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr

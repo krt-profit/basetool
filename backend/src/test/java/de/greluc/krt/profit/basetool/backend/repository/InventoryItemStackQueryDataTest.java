@@ -121,7 +121,18 @@ class InventoryItemStackQueryDataTest {
     UUID materialId = material.getId();
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findGlobalStacks(
-            true, List.of(materialId), null, false, null, false, null, true, null, Set.of());
+            true,
+            List.of(materialId),
+            false,
+            null,
+            null,
+            false,
+            null,
+            false,
+            null,
+            true,
+            null,
+            Set.of());
 
     assertThat(stacks)
         .as(
@@ -168,7 +179,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> stacks =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false, false);
+            user.getId(), false, null, false, null, null, false, null, false, null, false, false);
 
     assertThat(stacks)
         .as(
@@ -223,7 +234,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> personalOnly =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, true, false);
+            user.getId(), false, null, false, null, null, false, null, false, null, true, false);
     assertThat(personalOnly)
         .as("personalOnly=true must return only the caller's personal stock")
         .hasSize(1);
@@ -232,7 +243,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> nonPersonalOnly =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false, true);
+            user.getId(), false, null, false, null, null, false, null, false, null, false, true);
     assertThat(nonPersonalOnly)
         .as("nonPersonalOnly=true must return only the caller's shared (non-personal) stock")
         .hasSize(1);
@@ -241,7 +252,7 @@ class InventoryItemStackQueryDataTest {
 
     List<InventoryStackAggregate> all =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false, false);
+            user.getId(), false, null, false, null, null, false, null, false, null, false, false);
     assertThat(all)
         .as("both toggles false must return the personal and the shared stack")
         .hasSize(2);
@@ -300,7 +311,7 @@ class InventoryItemStackQueryDataTest {
     // group for the item row.
     List<InventoryStackAggregate> materialStacks =
         inventoryItemRepository.findUserStacks(
-            user.getId(), false, null, null, false, null, false, null, false, false);
+            user.getId(), false, null, false, null, null, false, null, false, null, false, false);
     assertThat(materialStacks)
         .as("the item row must not surface as a (null-material) stack in the material view")
         .hasSize(1);
@@ -309,7 +320,7 @@ class InventoryItemStackQueryDataTest {
     // The global material stacks carry no null-material group either (admin all-scope sweep).
     List<InventoryStackAggregate> globalStacks =
         inventoryItemRepository.findGlobalStacks(
-            false, null, null, false, null, false, null, true, null, Set.of());
+            false, null, false, null, null, false, null, false, null, true, null, Set.of());
     assertThat(globalStacks)
         .as("no global material stack may carry a null material with an item row present")
         .allSatisfy(stack -> assertThat(stack.material()).isNotNull());
@@ -317,14 +328,14 @@ class InventoryItemStackQueryDataTest {
     // The item stack siblings serve the game-item population, keyed without a quality dimension.
     List<InventoryItemStackAggregate> userItemStacks =
         inventoryItemRepository.findUserItemStacks(
-            user.getId(), false, null, false, null, false, false);
+            user.getId(), false, null, false, null, false, null, false, false);
     assertThat(userItemStacks).hasSize(1);
     assertThat(userItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
     assertThat(userItemStacks.get(0).totalAmount()).isEqualTo(3.0);
 
     List<InventoryItemStackAggregate> globalItemStacks =
         inventoryItemRepository.findGlobalItemStacks(
-            true, List.of(gameItem.getId()), false, null, true, null, Set.of());
+            true, List.of(gameItem.getId()), false, null, false, null, true, null, Set.of());
     assertThat(globalItemStacks).hasSize(1);
     assertThat(globalItemStacks.get(0).gameItem().getId()).isEqualTo(gameItem.getId());
   }
@@ -513,7 +524,7 @@ class InventoryItemStackQueryDataTest {
 
     List<UUID> ids =
         inventoryItemRepository.findUserEntryIds(
-            owner.getId(), false, null, null, false, null, false, null, false, false);
+            owner.getId(), false, null, false, null, null, false, null, false, null, false, false);
 
     assertThat(ids)
         .as(
@@ -566,17 +577,50 @@ class InventoryItemStackQueryDataTest {
 
     assertThat(
             inventoryItemRepository.findUserEntryIds(
-                owner.getId(), false, null, null, false, null, false, null, true, false))
+                owner.getId(),
+                false,
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                false,
+                null,
+                true,
+                false))
         .as("personalOnly=true returns only the private entry id")
         .containsExactly(personal.getId());
     assertThat(
             inventoryItemRepository.findUserEntryIds(
-                owner.getId(), false, null, null, false, null, false, null, false, true))
+                owner.getId(),
+                false,
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                false,
+                null,
+                false,
+                true))
         .as("nonPersonalOnly=true returns only the shared entry id")
         .containsExactly(shared.getId());
     assertThat(
             inventoryItemRepository.findUserEntryIds(
-                owner.getId(), false, null, null, false, null, false, null, false, false))
+                owner.getId(),
+                false,
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                false,
+                null,
+                false,
+                false))
         .as("both toggles false returns both entry ids")
         .containsExactlyInAnyOrder(personal.getId(), shared.getId());
   }
@@ -636,10 +680,217 @@ class InventoryItemStackQueryDataTest {
 
     List<UUID> ids =
         inventoryItemRepository.findUserItemEntryIds(
-            owner.getId(), false, null, false, null, false, false);
+            owner.getId(), false, null, false, null, false, null, false, false);
 
     assertThat(ids)
         .as("item select-all returns every own item entry id, excluding the material row")
         .containsExactlyInAnyOrder(itemEntryOne.getId(), itemEntryTwo.getId());
+  }
+
+  /**
+   * The Lager location filter (REQ-INV-040) narrows the owner's grouped view to the picked storage
+   * locations. Seeds the same material at two locations and asserts that filtering on one returns
+   * only that location's stack, that the unfiltered read still returns both, and that the gate flag
+   * is what decides: {@code hasLocations = false} must ignore a stale id list rather than narrow by
+   * it.
+   */
+  @Test
+  void findUserStacks_locationIds_narrowToThePickedLocation() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location hurston = new Location();
+    hurston.setName("Hurston-" + UUID.randomUUID());
+    locationRepository.save(hurston);
+
+    Location arccorp = new Location();
+    arccorp.setName("ArcCorp-" + UUID.randomUUID());
+    locationRepository.save(arccorp);
+
+    Material material = new Material();
+    material.setName("Quantanium-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    InventoryItem atHurston = new InventoryItem();
+    atHurston.setUser(user);
+    atHurston.setLocation(hurston);
+    atHurston.setMaterial(material);
+    atHurston.setQuality(800);
+    atHurston.setAmount(120.0);
+    atHurston.setPersonal(false);
+    inventoryItemRepository.save(atHurston);
+
+    InventoryItem atArcCorp = new InventoryItem();
+    atArcCorp.setUser(user);
+    atArcCorp.setLocation(arccorp);
+    atArcCorp.setMaterial(material);
+    atArcCorp.setQuality(800);
+    atArcCorp.setAmount(80.0);
+    atArcCorp.setPersonal(false);
+    inventoryItemRepository.save(atArcCorp);
+    entityManager.flush();
+
+    List<InventoryStackAggregate> filtered =
+        inventoryItemRepository.findUserStacks(
+            user.getId(),
+            false,
+            null,
+            true,
+            List.of(hurston.getId()),
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            false);
+
+    assertThat(filtered)
+        .as("the location filter keeps only the stacks sitting at the picked location")
+        .hasSize(1);
+    assertThat(filtered.get(0).location().getId()).isEqualTo(hurston.getId());
+    assertThat(filtered.get(0).totalAmount()).isEqualTo(120.0);
+
+    List<InventoryStackAggregate> unfiltered =
+        inventoryItemRepository.findUserStacks(
+            user.getId(), false, null, false, null, null, false, null, false, null, false, false);
+    assertThat(unfiltered).as("without the filter both location stacks are returned").hasSize(2);
+
+    List<InventoryStackAggregate> gateOff =
+        inventoryItemRepository.findUserStacks(
+            user.getId(),
+            false,
+            null,
+            false,
+            List.of(hurston.getId()),
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            false);
+    assertThat(gateOff)
+        .as("hasLocations = false ignores the id list entirely - the gate decides, not the list")
+        .hasSize(2);
+  }
+
+  /**
+   * The location filter is catalog-agnostic (REQ-INV-040): a game-item stack carries a location
+   * just like a material stack, so the item tree narrows the same way. This is the half that would
+   * break if the parameter were folded into the material-only rejection set of REQ-INV-029/031.
+   */
+  @Test
+  void findUserItemStacks_locationIds_narrowToThePickedLocation() {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(user);
+
+    Location hurston = new Location();
+    hurston.setName("Hurston-" + UUID.randomUUID());
+    locationRepository.save(hurston);
+
+    Location arccorp = new Location();
+    arccorp.setName("ArcCorp-" + UUID.randomUUID());
+    locationRepository.save(arccorp);
+
+    GameItem gameItem = new GameItem();
+    gameItem.setName("Quantum-Drive-" + UUID.randomUUID());
+    gameItemRepository.save(gameItem);
+
+    InventoryItem atHurston = new InventoryItem();
+    atHurston.setUser(user);
+    atHurston.setLocation(hurston);
+    atHurston.setGameItem(gameItem);
+    atHurston.setAmount(3.0);
+    atHurston.setPersonal(false);
+    inventoryItemRepository.save(atHurston);
+
+    InventoryItem atArcCorp = new InventoryItem();
+    atArcCorp.setUser(user);
+    atArcCorp.setLocation(arccorp);
+    atArcCorp.setGameItem(gameItem);
+    atArcCorp.setAmount(5.0);
+    atArcCorp.setPersonal(false);
+    inventoryItemRepository.save(atArcCorp);
+    entityManager.flush();
+
+    List<InventoryItemStackAggregate> filtered =
+        inventoryItemRepository.findUserItemStacks(
+            user.getId(), false, null, true, List.of(arccorp.getId()), false, null, false, false);
+
+    assertThat(filtered)
+        .as("item stacks narrow by location exactly like material stacks")
+        .hasSize(1);
+    assertThat(filtered.get(0).location().getId()).isEqualTo(arccorp.getId());
+    assertThat(filtered.get(0).totalAmount()).isEqualTo(5.0);
+  }
+
+  /**
+   * "Alle markieren" must resolve the very set the filtered table shows (REQ-INV-034), so the
+   * select-all id query honours the location filter too. Seeds two entries at two locations and
+   * asserts the filtered id set holds only the picked location's entry.
+   */
+  @Test
+  void findUserEntryIds_locationIds_matchTheFilteredStacks() {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    owner.setUsername("u-" + UUID.randomUUID());
+    userRepository.save(owner);
+
+    Location hurston = new Location();
+    hurston.setName("Hurston-" + UUID.randomUUID());
+    locationRepository.save(hurston);
+
+    Location arccorp = new Location();
+    arccorp.setName("ArcCorp-" + UUID.randomUUID());
+    locationRepository.save(arccorp);
+
+    Material material = new Material();
+    material.setName("Astatine-" + UUID.randomUUID());
+    material.setType(MaterialType.RAW);
+    materialRepository.save(material);
+
+    InventoryItem atHurston = new InventoryItem();
+    atHurston.setUser(owner);
+    atHurston.setLocation(hurston);
+    atHurston.setMaterial(material);
+    atHurston.setQuality(600);
+    atHurston.setAmount(10.0);
+    atHurston.setPersonal(false);
+    inventoryItemRepository.save(atHurston);
+
+    InventoryItem atArcCorp = new InventoryItem();
+    atArcCorp.setUser(owner);
+    atArcCorp.setLocation(arccorp);
+    atArcCorp.setMaterial(material);
+    atArcCorp.setQuality(600);
+    atArcCorp.setAmount(20.0);
+    atArcCorp.setPersonal(false);
+    inventoryItemRepository.save(atArcCorp);
+    entityManager.flush();
+
+    List<UUID> ids =
+        inventoryItemRepository.findUserEntryIds(
+            owner.getId(),
+            false,
+            null,
+            true,
+            List.of(arccorp.getId()),
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            false);
+
+    assertThat(ids)
+        .as("the select-all id set never reaches past the location filter the table shows")
+        .containsExactly(atArcCorp.getId());
   }
 }

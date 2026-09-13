@@ -119,6 +119,8 @@ class InventoryItemServiceAggregateTest {
           .findGlobalStacks(
               eq(false),
               isNull(),
+              eq(false),
+              isNull(),
               isNull(),
               eq(false),
               isNull(),
@@ -137,6 +139,8 @@ class InventoryItemServiceAggregateTest {
 
       verify(inventoryItemRepository)
           .findGlobalStacks(
+              eq(false),
+              isNull(),
               eq(false),
               isNull(),
               isNull(),
@@ -160,6 +164,8 @@ class InventoryItemServiceAggregateTest {
           .findGlobalStacks(
               eq(true),
               eq(List.of(matId)),
+              eq(false),
+              isNull(),
               isNull(),
               eq(false),
               isNull(),
@@ -176,10 +182,12 @@ class InventoryItemServiceAggregateTest {
       UUID missionId = UUID.randomUUID();
       stubFindGlobalStacks();
 
-      service.getAllAggregatedInventory(null, 500, List.of(jobId), List.of(missionId));
+      service.getAllAggregatedInventory(null, null, 500, List.of(jobId), List.of(missionId));
 
       verify(inventoryItemRepository)
           .findGlobalStacks(
+              eq(false),
+              isNull(),
               eq(false),
               isNull(),
               eq(500),
@@ -318,6 +326,8 @@ class InventoryItemServiceAggregateTest {
             inventoryItemRepository.findGlobalStacks(
                 anyBoolean(),
                 any(),
+                eq(false),
+                isNull(),
                 any(),
                 anyBoolean(),
                 any(),
@@ -337,6 +347,8 @@ class InventoryItemServiceAggregateTest {
     when(inventoryItemRepository.findGlobalStacks(
             anyBoolean(),
             any(),
+            eq(false),
+            isNull(),
             any(),
             anyBoolean(),
             any(),

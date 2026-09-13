@@ -186,6 +186,8 @@ class InventoryItemCatalogQueryDataTest {
         inventoryItemRepository.findGlobalByFilters(
             false,
             null,
+            false,
+            null,
             null,
             false,
             null,

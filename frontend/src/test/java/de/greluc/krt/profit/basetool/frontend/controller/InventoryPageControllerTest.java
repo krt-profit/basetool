@@ -316,7 +316,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
     String view =
-        controller.viewMyInventory(null, null, null, null, null, null, false, false, false, model);
+        controller.viewMyInventory(
+            null, null, null, null, null, null, null, false, false, false, model);
 
     assertEquals("inventory-my", view);
     assertTrue(model.containsAttribute("items"));
@@ -340,6 +341,7 @@ class InventoryPageControllerTest {
             List.of(materialId),
             500,
             List.of(jobOrderId),
+            null,
             null,
             null,
             false,
@@ -376,7 +378,8 @@ class InventoryPageControllerTest {
 
     // When
     String view =
-        controller.viewMyInventory(null, null, null, null, null, null, true, false, false, model);
+        controller.viewMyInventory(
+            null, null, null, null, null, null, null, true, false, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -402,7 +405,8 @@ class InventoryPageControllerTest {
 
     // When
     String view =
-        controller.viewMyInventory(null, null, null, null, null, null, false, true, false, model);
+        controller.viewMyInventory(
+            null, null, null, null, null, null, null, false, true, false, model);
 
     // Then
     assertEquals("inventory-my", view);
@@ -431,7 +435,8 @@ class InventoryPageControllerTest {
 
     // When
     String view =
-        controller.viewMyInventory(null, null, null, null, null, null, false, false, true, model);
+        controller.viewMyInventory(
+            null, null, null, null, null, null, null, false, false, true, model);
 
     // Then
     assertEquals("inventory-my :: inventoryTableFragment", view);
@@ -451,7 +456,7 @@ class InventoryPageControllerTest {
     // When (material view: no view param)
     List<UUID> ids =
         controller.myEntryIds(
-            null, List.of(materialId), 500, List.of(jobOrderId), null, null, false, false);
+            null, List.of(materialId), 500, List.of(jobOrderId), null, null, null, false, false);
 
     // Then
     assertEquals(List.of(entryA, entryB), ids);
@@ -477,7 +482,8 @@ class InventoryPageControllerTest {
 
     // When (items view)
     List<UUID> ids =
-        controller.myEntryIds("items", null, null, null, null, List.of(gameItemId), true, false);
+        controller.myEntryIds(
+            "items", null, null, null, null, List.of(gameItemId), null, true, false);
 
     // Then
     assertEquals(List.of(entry), ids);
@@ -497,7 +503,7 @@ class InventoryPageControllerTest {
 
     // When / Then: never null, so the select-all JS just selects nothing
     assertEquals(
-        List.of(), controller.myEntryIds(null, null, null, null, null, null, false, false));
+        List.of(), controller.myEntryIds(null, null, null, null, null, null, null, false, false));
   }
 
   @Test
@@ -509,7 +515,7 @@ class InventoryPageControllerTest {
 
     String view =
         controller.viewAllInventory(
-            null, List.of(UUID.randomUUID()), 100, null, null, null, false, model);
+            null, List.of(UUID.randomUUID()), 100, null, null, null, null, false, model);
 
     assertEquals("inventory-admin", view);
     assertTrue(model.containsAttribute("items"));
@@ -1070,5 +1076,139 @@ class InventoryPageControllerTest {
     java.util.Map<?, ?> body = (java.util.Map<?, ?>) response.getBody();
     assertNotNull(body);
     assertEquals("OPTIMISTIC_LOCK", body.get("code"));
+  }
+
+  /**
+   * REQ-INV-040: the location filter reaches the backend on the material view of "Mein Lager", is
+   * echoed into the model for the checked state, and its options are derived from the grouped
+   * result's stacks rather than from a location catalog lookup.
+   */
+  @Test
+  void viewMyInventory_locationFilter_forwardedToBackendAndOptionsComeFromTheStacks() {
+    Model model = new ConcurrentModel();
+    UUID locationId = UUID.randomUUID();
+    LocationReferenceDto location = new LocationReferenceDto(locationId, "Everus Harbor");
+    InventoryStackDto stack =
+        new InventoryStackDto(null, location, 700, false, null, 10.0, 700.0, 700, 1);
+    GroupedInventoryDto group =
+        new GroupedInventoryDto(null, null, 10.0, 700.0, 700, List.of(stack));
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(group));
+
+    String view =
+        controller.viewMyInventory(
+            null, null, null, null, null, null, List.of(locationId), false, false, false, model);
+
+    assertEquals("inventory-my", view);
+    assertEquals(List.of(locationId), model.getAttribute("selectedLocationIds"));
+    assertEquals(List.of(location), model.getAttribute("locations"));
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(urlCaptor.capture(), anyTypeRef());
+    String groupedUrl =
+        urlCaptor.getAllValues().stream()
+            .filter(u -> u.contains("/api/v1/inventory/my-inventory/grouped"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Personal grouped endpoint was not called"));
+    assertTrue(groupedUrl.contains("locationIds=" + locationId), "locationIds must be forwarded");
+  }
+
+  /**
+   * REQ-INV-040: the options must survive an active location filter. Deriving them from the
+   * filtered result would leave the dropdown holding only the locations already picked, so the user
+   * could never widen the selection again — the controller therefore re-reads the view unfiltered
+   * and the option list keeps the location that the filter excluded.
+   */
+  @Test
+  void viewMyInventory_locationOptions_areNotNarrowedByTheActiveLocationFilter() {
+    Model model = new ConcurrentModel();
+    UUID pickedId = UUID.randomUUID();
+    LocationReferenceDto picked = new LocationReferenceDto(pickedId, "Everus Harbor");
+    LocationReferenceDto other = new LocationReferenceDto(UUID.randomUUID(), "Area18");
+    GroupedInventoryDto filtered =
+        new GroupedInventoryDto(
+            null,
+            null,
+            10.0,
+            700.0,
+            700,
+            List.of(new InventoryStackDto(null, picked, 700, false, null, 10.0, 700.0, 700, 1)));
+    GroupedInventoryDto unfiltered =
+        new GroupedInventoryDto(
+            null,
+            null,
+            30.0,
+            700.0,
+            700,
+            List.of(
+                new InventoryStackDto(null, picked, 700, false, null, 10.0, 700.0, 700, 1),
+                new InventoryStackDto(null, other, 700, false, null, 20.0, 700.0, 700, 1)));
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            invocation -> {
+              String url = invocation.getArgument(0);
+              if (url.contains("/api/v1/inventory/my-inventory/grouped")) {
+                return url.contains("locationIds=") ? List.of(filtered) : List.of(unfiltered);
+              }
+              return List.of();
+            });
+
+    controller.viewMyInventory(
+        null, null, null, null, null, null, List.of(pickedId), false, false, false, model);
+
+    // Sorted by name, so the excluded "Area18" comes first — and it being present at all is the
+    // point: the filter must stay reversible.
+    assertEquals(List.of(other, picked), model.getAttribute("locations"));
+  }
+
+  /** REQ-INV-040: the shared "Globales Lager" relays the same filter. */
+  @Test
+  void viewAllInventory_locationFilter_forwardedToBackendAndModel() {
+    Model model = new ConcurrentModel();
+    UUID locationId = UUID.randomUUID();
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+
+    String view =
+        controller.viewAllInventory(
+            null, null, null, null, null, null, List.of(locationId), false, model);
+
+    assertEquals("inventory-admin", view);
+    assertEquals(List.of(locationId), model.getAttribute("selectedLocationIds"));
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.atLeastOnce())
+        .get(urlCaptor.capture(), anyTypeRef());
+    String groupedUrl =
+        urlCaptor.getAllValues().stream()
+            .filter(u -> u.contains("/api/v1/inventory/all/grouped"))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Global grouped endpoint was not called"));
+    assertTrue(groupedUrl.contains("locationIds=" + locationId), "locationIds must be forwarded");
+  }
+
+  /**
+   * REQ-INV-040 + REQ-INV-034: "Alle markieren" resolves the same set the filtered table shows, so
+   * the select-all proxy relays the location filter on both views. Without this the bulk selection
+   * would reach past the location the user is looking at.
+   */
+  @Test
+  void myEntryIds_locationFilter_forwardedOnBothViews() {
+    UUID locationId = UUID.randomUUID();
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+
+    controller.myEntryIds(null, null, null, null, null, null, List.of(locationId), false, false);
+    controller.myEntryIds("items", null, null, null, null, null, List.of(locationId), false, false);
+
+    org.mockito.ArgumentCaptor<String> urlCaptor =
+        org.mockito.ArgumentCaptor.forClass(String.class);
+    org.mockito.Mockito.verify(backendApiClient, org.mockito.Mockito.times(2))
+        .get(urlCaptor.capture(), anyTypeRef());
+    assertTrue(
+        urlCaptor.getAllValues().stream()
+            .allMatch(
+                u ->
+                    u.contains("/api/v1/inventory/my-inventory/entry-ids")
+                        && u.contains("locationIds=" + locationId)),
+        "both views must relay locationIds to the select-all endpoint");
   }
 }

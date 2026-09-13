@@ -195,9 +195,9 @@ public class InventoryItemService {
   }
 
   /**
-   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, Integer, List,
-   * List, boolean)} that returns both the caller's shared and personal stacks (no personal-only
-   * narrowing).
+   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer,
+   * List, List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
+   * personal-only narrowing) and no location narrowing.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -225,6 +225,7 @@ public class InventoryItemService {
    *
    * @param userId owner id
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -241,13 +242,21 @@ public class InventoryItemService {
       getMyAggregatedInventory(
           UUID userId,
           List<UUID> materialIds,
+          List<UUID> locationIds,
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds,
           boolean personalOnly,
           boolean nonPersonalOnly) {
     return inventoryAggregationService.getMyAggregatedInventory(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly, nonPersonalOnly);
+        userId,
+        materialIds,
+        locationIds,
+        minQuality,
+        jobOrderIds,
+        missionIds,
+        personalOnly,
+        nonPersonalOnly);
   }
 
   /**
@@ -260,6 +269,7 @@ public class InventoryItemService {
    *
    * @param userId owner id
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -271,18 +281,26 @@ public class InventoryItemService {
   public List<UUID> getMyEntryIds(
       UUID userId,
       List<UUID> materialIds,
+      List<UUID> locationIds,
       Integer minQuality,
       List<UUID> jobOrderIds,
       List<UUID> missionIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
     return inventoryAggregationService.getMyEntryIds(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, personalOnly, nonPersonalOnly);
+        userId,
+        materialIds,
+        locationIds,
+        minQuality,
+        jobOrderIds,
+        missionIds,
+        personalOnly,
+        nonPersonalOnly);
   }
 
   /**
-   * Convenience overload of {@link #getAllAggregatedInventory(List, Integer, List, List)} without
-   * job-order/mission filters.
+   * Convenience overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List)}
+   * without location, job-order and mission filters.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -298,6 +316,7 @@ public class InventoryItemService {
    * #getMyAggregatedInventory} but scopes to all users (admin/logistician view).
    *
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -306,11 +325,12 @@ public class InventoryItemService {
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(
           List<UUID> materialIds,
+          List<UUID> locationIds,
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
     return inventoryAggregationService.getAllAggregatedInventory(
-        materialIds, minQuality, jobOrderIds, missionIds);
+        materialIds, locationIds, minQuality, jobOrderIds, missionIds);
   }
 
   /**
@@ -386,6 +406,7 @@ public class InventoryItemService {
    * InventoryItem}.
    *
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -394,12 +415,13 @@ public class InventoryItemService {
    */
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds,
+      List<UUID> locationIds,
       Integer minQuality,
       List<UUID> jobOrderIds,
       List<UUID> missionIds,
       Pageable pageable) {
     return inventoryAggregationService.getAllInventory(
-        materialIds, minQuality, jobOrderIds, missionIds, pageable);
+        materialIds, locationIds, minQuality, jobOrderIds, missionIds, pageable);
   }
 
   /**

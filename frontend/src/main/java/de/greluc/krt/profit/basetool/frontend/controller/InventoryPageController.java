@@ -501,9 +501,10 @@ public class InventoryPageController {
    * game-item tree (REQ-INV-030, {@code view=items}): the items view relays {@code catalog=ITEM}
    * plus the {@code gameItemIds} / {@code jobOrderIds} / personal-flag filters (there is no quality
    * or mission dimension on item rows) and populates its gameItem filter only from items that
-   * currently have stock in the caller's scope — never the full catalog. In both views the Umbuchen
-   * modal's target-location picker searches locations server-side (remote-locations combobox), so
-   * no locations catalog is added to the model.
+   * currently have stock in the caller's scope — never the full catalog. The {@code locationIds}
+   * filter (REQ-INV-040) applies to <em>both</em> views and its options are built the same
+   * in-scope-only way. In both views the Umbuchen modal's target-location picker searches locations
+   * server-side (remote-locations combobox), so no locations catalog is added to the model.
    *
    * @param view {@code "items"} for the game-item view, anything else (or absent) for material
    * @param materialIds optional material id filter (multi; material view only)
@@ -511,6 +512,7 @@ public class InventoryPageController {
    * @param jobOrderIds optional job-order id filter (multi; both views)
    * @param missionIds optional mission id filter (multi; material view only)
    * @param gameItemIds optional game-item id filter (multi; items view only)
+   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
    * @param personalOnly when true, show only the caller's personal entries ({@code personal =
    *     true})
    * @param nonPersonalOnly when true, show only the caller's non-personal (shared) entries ({@code
@@ -528,6 +530,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
       @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
       @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
@@ -550,6 +553,7 @@ public class InventoryPageController {
             fetchGroupedItemInventory(
                 "/api/v1/inventory/my-inventory/grouped",
                 gameItemIds,
+                locationIds,
                 jobOrderIds,
                 personalOnly,
                 nonPersonalOnly);
@@ -571,9 +575,20 @@ public class InventoryPageController {
               gameItemIds,
               jobOrderIds,
               personalOnly || nonPersonalOnly));
+      model.addAttribute(
+          "locations",
+          resolveLocationFilterOptions(
+              groupedItems,
+              fragment,
+              anyItemFilterActive(
+                  gameItemIds, locationIds, jobOrderIds, personalOnly || nonPersonalOnly),
+              () ->
+                  fetchGroupedItemInventory(
+                      "/api/v1/inventory/my-inventory/grouped", null, null, null, false, false)));
       model.addAttribute("jobOrders", fetchActiveJobOrders());
       model.addAttribute("users", fetchUsers());
       model.addAttribute("selectedGameItemIds", gameItemIds);
+      model.addAttribute("selectedLocationIds", locationIds);
       model.addAttribute("selectedJobOrderIds", jobOrderIds);
       model.addAttribute("selectedPersonalOnly", personalOnly);
       model.addAttribute("selectedNonPersonalOnly", nonPersonalOnly);
@@ -587,35 +602,16 @@ public class InventoryPageController {
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
     try {
-      org.springframework.web.util.UriComponentsBuilder uriBuilder =
-          org.springframework.web.util.UriComponentsBuilder.fromPath(
-              "/api/v1/inventory/my-inventory/grouped");
-      if (materialIds != null && !materialIds.isEmpty()) {
-        for (UUID id : materialIds) {
-          uriBuilder.queryParam("materialIds", id.toString());
-        }
-      }
-      if (minQuality != null) {
-        uriBuilder.queryParam("minQuality", minQuality);
-      }
-      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
-        for (UUID id : jobOrderIds) {
-          uriBuilder.queryParam("jobOrderIds", id.toString());
-        }
-      }
-      if (missionIds != null && !missionIds.isEmpty()) {
-        for (UUID id : missionIds) {
-          uriBuilder.queryParam("missionIds", id.toString());
-        }
-      }
-      if (personalOnly) {
-        uriBuilder.queryParam("personalOnly", true);
-      }
-      if (nonPersonalOnly) {
-        uriBuilder.queryParam("nonPersonalOnly", true);
-      }
-      String url = uriBuilder.build().toUriString();
-      List<GroupedInventoryDto> res = backendApiClient.get(url, GROUPED_INVENTORY_LIST);
+      List<GroupedInventoryDto> res =
+          fetchGroupedMaterialInventory(
+              "/api/v1/inventory/my-inventory/grouped",
+              materialIds,
+              locationIds,
+              minQuality,
+              jobOrderIds,
+              missionIds,
+              personalOnly,
+              nonPersonalOnly);
       if (res != null) {
         groupedItems = res;
       }
@@ -630,11 +626,36 @@ public class InventoryPageController {
     model.addAttribute("materials", fetchMaterials());
     // The Umbuchen target-location picker (inventory-my.html) searches locations on demand
     // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
-    // preloaded here; the modal-opening JS seeds the row's current location itself.
+    // preloaded here; the modal-opening JS seeds the row's current location itself. The filter
+    // multi-select below is a different thing: it offers only the locations that actually hold
+    // stock in the caller's scope (REQ-INV-040), taken from the grouped result's own stack keys.
+    model.addAttribute(
+        "locations",
+        resolveLocationFilterOptions(
+            groupedItems,
+            fragment,
+            anyMaterialFilterActive(
+                materialIds,
+                locationIds,
+                minQuality,
+                jobOrderIds,
+                missionIds,
+                personalOnly || nonPersonalOnly),
+            () ->
+                fetchGroupedMaterialInventory(
+                    "/api/v1/inventory/my-inventory/grouped",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    false)));
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
     model.addAttribute("users", fetchUsers());
     model.addAttribute("selectedMaterialIds", materialIds);
+    model.addAttribute("selectedLocationIds", locationIds);
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
@@ -670,6 +691,9 @@ public class InventoryPageController {
    * @param jobOrderIds optional job-order id filter (multi; both views)
    * @param missionIds optional mission id filter (multi; material view only)
    * @param gameItemIds optional game-item id filter (multi; items view only)
+   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040) — the
+   *     select-all set must match the location-filtered table exactly, or "Alle markieren" would
+   *     reach past what the user can see
    * @param personalOnly when true, restrict to the caller's personal entries
    * @param nonPersonalOnly when true, restrict to the caller's shared entries (mutually exclusive
    *     with {@code personalOnly})
@@ -684,6 +708,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
       @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
       @RequestParam(required = false, defaultValue = "false") boolean personalOnly,
       @RequestParam(required = false, defaultValue = "false") boolean nonPersonalOnly) {
     org.springframework.web.util.UriComponentsBuilder uriBuilder =
@@ -691,36 +716,17 @@ public class InventoryPageController {
             "/api/v1/inventory/my-inventory/entry-ids");
     if (isItemsView(view)) {
       uriBuilder.queryParam("catalog", "ITEM");
-      if (gameItemIds != null && !gameItemIds.isEmpty()) {
-        for (UUID id : gameItemIds) {
-          uriBuilder.queryParam("gameItemIds", id.toString());
-        }
-      }
-      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
-        for (UUID id : jobOrderIds) {
-          uriBuilder.queryParam("jobOrderIds", id.toString());
-        }
-      }
+      appendIdParams(uriBuilder, "gameItemIds", gameItemIds);
+      appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
     } else {
-      if (materialIds != null && !materialIds.isEmpty()) {
-        for (UUID id : materialIds) {
-          uriBuilder.queryParam("materialIds", id.toString());
-        }
-      }
+      appendIdParams(uriBuilder, "materialIds", materialIds);
       if (minQuality != null) {
         uriBuilder.queryParam("minQuality", minQuality);
       }
-      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
-        for (UUID id : jobOrderIds) {
-          uriBuilder.queryParam("jobOrderIds", id.toString());
-        }
-      }
-      if (missionIds != null && !missionIds.isEmpty()) {
-        for (UUID id : missionIds) {
-          uriBuilder.queryParam("missionIds", id.toString());
-        }
-      }
+      appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
+      appendIdParams(uriBuilder, "missionIds", missionIds);
     }
+    appendIdParams(uriBuilder, "locationIds", locationIds);
     if (personalOnly) {
       uriBuilder.queryParam("personalOnly", true);
     }
@@ -733,13 +739,15 @@ public class InventoryPageController {
 
   /**
    * Fetches one grouped item-inventory result ({@code catalog=ITEM}, REQ-INV-030) from the given
-   * backend grouped endpoint, relaying the item view's filter dimensions (gameItems, job orders and
-   * — on {@code /my} — the personal flags). Quality and mission filters do not exist for item rows
-   * and are never sent.
+   * backend grouped endpoint, relaying the item view's filter dimensions (gameItems, locations, job
+   * orders and — on {@code /my} — the personal flags). Quality and mission filters do not exist for
+   * item rows and are never sent; the location filter does apply, because an item stack carries a
+   * location like a material stack does (REQ-INV-040).
    *
    * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
    *     …/all/grouped})
    * @param gameItemIds optional game-item filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
    * @param personalOnly relay {@code personalOnly=true} (only meaningful on {@code /my})
    * @param nonPersonalOnly relay {@code nonPersonalOnly=true} (only meaningful on {@code /my})
@@ -748,22 +756,16 @@ public class InventoryPageController {
   private List<GroupedInventoryDto> fetchGroupedItemInventory(
       @NotNull String basePath,
       List<UUID> gameItemIds,
+      List<UUID> locationIds,
       List<UUID> jobOrderIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
     org.springframework.web.util.UriComponentsBuilder uriBuilder =
         org.springframework.web.util.UriComponentsBuilder.fromPath(basePath)
             .queryParam("catalog", "ITEM");
-    if (gameItemIds != null && !gameItemIds.isEmpty()) {
-      for (UUID id : gameItemIds) {
-        uriBuilder.queryParam("gameItemIds", id.toString());
-      }
-    }
-    if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
-      for (UUID id : jobOrderIds) {
-        uriBuilder.queryParam("jobOrderIds", id.toString());
-      }
-    }
+    appendIdParams(uriBuilder, "gameItemIds", gameItemIds);
+    appendIdParams(uriBuilder, "locationIds", locationIds);
+    appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
     if (personalOnly) {
       uriBuilder.queryParam("personalOnly", true);
     }
@@ -771,6 +773,179 @@ public class InventoryPageController {
       uriBuilder.queryParam("nonPersonalOnly", true);
     }
     return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
+  }
+
+  /**
+   * Appends one repeated id query parameter per element, skipping a {@code null} or empty list so
+   * an inactive filter adds nothing to the URI. Ids are UUIDs, so no free text reaches the query
+   * string and the re-encoding trap of the {@code q=} search relays cannot apply here.
+   *
+   * @param uriBuilder the builder collecting the backend request URI
+   * @param name the query-parameter name to repeat
+   * @param ids the ids to append; {@code null} or empty appends nothing
+   */
+  private static void appendIdParams(
+      @NotNull org.springframework.web.util.UriComponentsBuilder uriBuilder,
+      @NotNull String name,
+      List<UUID> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return;
+    }
+    for (UUID id : ids) {
+      uriBuilder.queryParam(name, id.toString());
+    }
+  }
+
+  /**
+   * Fetches one grouped material-inventory result from the given backend grouped endpoint, relaying
+   * the material view's filter dimensions. Shared by both Lager pages' table read and by the
+   * unfiltered re-read that {@link #resolveLocationFilterOptions} needs, so the filter surface
+   * cannot drift between the two.
+   *
+   * @param basePath the backend grouped path ({@code …/my-inventory/grouped} or {@code
+   *     …/all/grouped})
+   * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
+   * @param minQuality optional quality floor
+   * @param jobOrderIds optional job-order filter
+   * @param missionIds optional mission filter
+   * @param personalOnly relay {@code personalOnly=true} (only meaningful on {@code /my})
+   * @param nonPersonalOnly relay {@code nonPersonalOnly=true} (only meaningful on {@code /my})
+   * @return the grouped result as returned by the backend, may be {@code null}
+   */
+  private List<GroupedInventoryDto> fetchGroupedMaterialInventory(
+      @NotNull String basePath,
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalOnly,
+      boolean nonPersonalOnly) {
+    org.springframework.web.util.UriComponentsBuilder uriBuilder =
+        org.springframework.web.util.UriComponentsBuilder.fromPath(basePath);
+    appendIdParams(uriBuilder, "materialIds", materialIds);
+    appendIdParams(uriBuilder, "locationIds", locationIds);
+    if (minQuality != null) {
+      uriBuilder.queryParam("minQuality", minQuality);
+    }
+    appendIdParams(uriBuilder, "jobOrderIds", jobOrderIds);
+    appendIdParams(uriBuilder, "missionIds", missionIds);
+    if (personalOnly) {
+      uriBuilder.queryParam("personalOnly", true);
+    }
+    if (nonPersonalOnly) {
+      uriBuilder.queryParam("nonPersonalOnly", true);
+    }
+    return backendApiClient.get(uriBuilder.build().toUriString(), GROUPED_INVENTORY_LIST);
+  }
+
+  /**
+   * Whether any material-view filter dimension is currently narrowing the grouped result. Drives
+   * the one extra unfiltered read behind the location filter options (REQ-INV-040).
+   *
+   * @param materialIds the active material filter, if any
+   * @param locationIds the active location filter, if any
+   * @param minQuality the active quality floor, if any
+   * @param jobOrderIds the active job-order filter, if any
+   * @param missionIds the active mission filter, if any
+   * @param personalFlagActive whether a personal/non-personal narrowing flag is set
+   * @return {@code true} when at least one dimension narrows the result
+   */
+  private static boolean anyMaterialFilterActive(
+      List<UUID> materialIds,
+      List<UUID> locationIds,
+      Integer minQuality,
+      List<UUID> jobOrderIds,
+      List<UUID> missionIds,
+      boolean personalFlagActive) {
+    return notEmpty(materialIds)
+        || notEmpty(locationIds)
+        || minQuality != null
+        || notEmpty(jobOrderIds)
+        || notEmpty(missionIds)
+        || personalFlagActive;
+  }
+
+  /**
+   * Item-view sibling of {@link #anyMaterialFilterActive} — the item tree has no quality floor and
+   * no mission dimension (REQ-INV-031).
+   *
+   * @param gameItemIds the active game-item filter, if any
+   * @param locationIds the active location filter, if any
+   * @param jobOrderIds the active job-order filter, if any
+   * @param personalFlagActive whether a personal/non-personal narrowing flag is set
+   * @return {@code true} when at least one dimension narrows the result
+   */
+  private static boolean anyItemFilterActive(
+      List<UUID> gameItemIds,
+      List<UUID> locationIds,
+      List<UUID> jobOrderIds,
+      boolean personalFlagActive) {
+    return notEmpty(gameItemIds)
+        || notEmpty(locationIds)
+        || notEmpty(jobOrderIds)
+        || personalFlagActive;
+  }
+
+  /**
+   * Whether an id filter list actually narrows anything — a {@code null} or empty list does not.
+   *
+   * @param ids the filter list to test
+   * @return {@code true} when the list holds at least one id
+   */
+  private static boolean notEmpty(List<UUID> ids) {
+    return ids != null && !ids.isEmpty();
+  }
+
+  /**
+   * Resolves a Lager page's location filter options (REQ-INV-040) — only the locations that
+   * currently carry stock in the viewer's scope, never the location catalog. The catalog is the
+   * whole universe, which is why every location <em>picker</em> on these pages searches server-side
+   * instead of rendering a list; a filter multi-select cannot search, so it is built from the
+   * grouped result's own stack keys, exactly like the gameItem options of REQ-INV-030.
+   *
+   * <p>When a filter is active the displayed groups are a narrowed subset, so one extra unfiltered
+   * grouped call restores the full option list. That matters most for the location filter itself:
+   * deriving the options from a location-filtered result would leave the dropdown holding only the
+   * locations already picked, and the user could never widen the selection again. Fragment renders
+   * need no options (the filter form lives outside the swapped container), and a failed lookup
+   * degrades to the displayed groups' locations.
+   *
+   * @param groupedItems the (possibly filtered) grouped result already fetched for the table
+   * @param fragment whether this render is the table-fragment swap (options unused there)
+   * @param anyFilterActive whether any filter dimension is narrowing the fetched result
+   * @param unfilteredFetch supplies the unfiltered grouped result for this page and view
+   * @return the distinct in-scope locations to offer, ordered by name
+   */
+  private List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>
+      resolveLocationFilterOptions(
+          @NotNull List<GroupedInventoryDto> groupedItems,
+          boolean fragment,
+          boolean anyFilterActive,
+          @NotNull java.util.function.Supplier<List<GroupedInventoryDto>> unfilteredFetch) {
+    List<GroupedInventoryDto> source = groupedItems;
+    if (!fragment && anyFilterActive) {
+      try {
+        List<GroupedInventoryDto> unfiltered = unfilteredFetch.get();
+        if (unfiltered != null) {
+          source = unfiltered;
+        }
+      } catch (Exception e) {
+        log.warn("Failed to fetch unfiltered groups for the location filter options", e);
+      }
+    }
+    return source.stream()
+        .filter(group -> group.stacks() != null)
+        .flatMap(group -> group.stacks().stream())
+        .map(de.greluc.krt.profit.basetool.frontend.model.dto.InventoryStackDto::location)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .sorted(
+            java.util.Comparator.comparing(
+                de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto::name,
+                java.util.Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+        .toList();
   }
 
   /**
@@ -806,7 +981,7 @@ public class InventoryPageController {
     if (!fragment && anyFilterActive) {
       try {
         List<GroupedInventoryDto> unfiltered =
-            fetchGroupedItemInventory(basePath, null, null, false, false);
+            fetchGroupedItemInventory(basePath, null, null, null, false, false);
         if (unfiltered != null) {
           source = unfiltered;
         }
@@ -835,6 +1010,7 @@ public class InventoryPageController {
    * @param jobOrderIds optional job-order id filter (multi; both views)
    * @param missionIds optional mission id filter (multi; material view only)
    * @param gameItemIds optional game-item id filter (multi; items view only)
+   * @param locationIds optional storage-location id filter (multi; both views, REQ-INV-040)
    * @param fragment when true, return the table fragment
    * @return either the full {@code inventory-admin} view or its fragment
    */
@@ -846,6 +1022,7 @@ public class InventoryPageController {
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
       @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
       @RequestParam(required = false, defaultValue = "false") boolean fragment,
       Model model) {
     if (!model.containsAttribute("inventoryForm")) {
@@ -864,7 +1041,12 @@ public class InventoryPageController {
       try {
         List<GroupedInventoryDto> res =
             fetchGroupedItemInventory(
-                "/api/v1/inventory/all/grouped", gameItemIds, jobOrderIds, false, false);
+                "/api/v1/inventory/all/grouped",
+                gameItemIds,
+                locationIds,
+                jobOrderIds,
+                false,
+                false);
         if (res != null) {
           groupedItems = res;
         }
@@ -883,8 +1065,18 @@ public class InventoryPageController {
               gameItemIds,
               jobOrderIds,
               false));
+      model.addAttribute(
+          "locations",
+          resolveLocationFilterOptions(
+              groupedItems,
+              fragment,
+              anyItemFilterActive(gameItemIds, locationIds, jobOrderIds, false),
+              () ->
+                  fetchGroupedItemInventory(
+                      "/api/v1/inventory/all/grouped", null, null, null, false, false)));
       model.addAttribute("jobOrders", fetchActiveJobOrders());
       model.addAttribute("selectedGameItemIds", gameItemIds);
+      model.addAttribute("selectedLocationIds", locationIds);
       model.addAttribute("selectedJobOrderIds", jobOrderIds);
       model.addAttribute("authUserId", currentAuthName());
       model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
@@ -896,29 +1088,16 @@ public class InventoryPageController {
 
     List<GroupedInventoryDto> groupedItems = new ArrayList<>();
     try {
-      org.springframework.web.util.UriComponentsBuilder uriBuilder =
-          org.springframework.web.util.UriComponentsBuilder.fromPath(
-              "/api/v1/inventory/all/grouped");
-      if (materialIds != null && !materialIds.isEmpty()) {
-        for (UUID id : materialIds) {
-          uriBuilder.queryParam("materialIds", id.toString());
-        }
-      }
-      if (minQuality != null) {
-        uriBuilder.queryParam("minQuality", minQuality);
-      }
-      if (jobOrderIds != null && !jobOrderIds.isEmpty()) {
-        for (UUID id : jobOrderIds) {
-          uriBuilder.queryParam("jobOrderIds", id.toString());
-        }
-      }
-      if (missionIds != null && !missionIds.isEmpty()) {
-        for (UUID id : missionIds) {
-          uriBuilder.queryParam("missionIds", id.toString());
-        }
-      }
-      String url = uriBuilder.build().toUriString();
-      List<GroupedInventoryDto> res = backendApiClient.get(url, GROUPED_INVENTORY_LIST);
+      List<GroupedInventoryDto> res =
+          fetchGroupedMaterialInventory(
+              "/api/v1/inventory/all/grouped",
+              materialIds,
+              locationIds,
+              minQuality,
+              jobOrderIds,
+              missionIds,
+              false,
+              false);
       if (res != null) {
         groupedItems = res;
       }
@@ -930,7 +1109,18 @@ public class InventoryPageController {
     model.addAttribute("groupedItems", groupedItems);
     model.addAttribute("items", new ArrayList<>());
     model.addAttribute("materials", fetchMaterials());
+    model.addAttribute(
+        "locations",
+        resolveLocationFilterOptions(
+            groupedItems,
+            fragment,
+            anyMaterialFilterActive(
+                materialIds, locationIds, minQuality, jobOrderIds, missionIds, false),
+            () ->
+                fetchGroupedMaterialInventory(
+                    "/api/v1/inventory/all/grouped", null, null, null, null, null, false, false)));
     model.addAttribute("selectedMaterialIds", materialIds);
+    model.addAttribute("selectedLocationIds", locationIds);
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);

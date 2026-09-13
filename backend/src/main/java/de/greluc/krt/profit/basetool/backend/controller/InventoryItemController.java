@@ -285,6 +285,9 @@ public class InventoryItemController {
    *     materialIds} with 400 (REQ-INV-029/031); {@code MATERIAL} rejects {@code gameItemIds} the
    *     same way — a catalog-mismatched filter is a contract error, never silently ignored
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
+   * @param locationIds optional storage-location filter (REQ-INV-040). Valid for <em>both</em>
+   *     catalogs — a location is part of the material and the item stack key alike — so unlike
+   *     {@code minQuality} / {@code missionIds} / {@code materialIds} it is never catalog-rejected
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -294,6 +297,7 @@ public class InventoryItemController {
           @AuthenticationPrincipal Jwt jwt,
           @RequestParam(required = false) List<UUID> materialIds,
           @RequestParam(required = false) List<UUID> gameItemIds,
+          @RequestParam(required = false) List<UUID> locationIds,
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
           @RequestParam(required = false) List<UUID> missionIds,
@@ -305,6 +309,7 @@ public class InventoryItemController {
       return inventoryAggregationService.getMyAggregatedItemInventory(
           userService.getUserIdFromJwt(jwt),
           gameItemIds,
+          locationIds,
           jobOrderIds,
           personalOnly,
           nonPersonalOnly);
@@ -313,6 +318,7 @@ public class InventoryItemController {
     return inventoryItemService.getMyAggregatedInventory(
         userService.getUserIdFromJwt(jwt),
         materialIds,
+        locationIds,
         minQuality,
         jobOrderIds,
         missionIds,
@@ -334,6 +340,7 @@ public class InventoryItemController {
    * @param jwt the caller's token, resolved to the owning user id
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
+   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
    * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
    * @param jobOrderIds optional job-order filter (both catalogs)
    * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
@@ -349,6 +356,7 @@ public class InventoryItemController {
       @AuthenticationPrincipal Jwt jwt,
       @RequestParam(required = false) List<UUID> materialIds,
       @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
@@ -360,6 +368,7 @@ public class InventoryItemController {
       return inventoryAggregationService.getMyItemEntryIds(
           userService.getUserIdFromJwt(jwt),
           gameItemIds,
+          locationIds,
           jobOrderIds,
           personalOnly,
           nonPersonalOnly);
@@ -368,6 +377,7 @@ public class InventoryItemController {
     return inventoryItemService.getMyEntryIds(
         userService.getUserIdFromJwt(jwt),
         materialIds,
+        locationIds,
         minQuality,
         jobOrderIds,
         missionIds,
@@ -384,6 +394,7 @@ public class InventoryItemController {
    *
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
+   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
    * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
    * @param jobOrderIds optional job-order filter (both catalogs)
    * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
@@ -398,6 +409,7 @@ public class InventoryItemController {
   public PageResponse<InventoryItemDto> getAllInventory(
       @RequestParam(required = false) List<UUID> materialIds,
       @RequestParam(required = false) List<UUID> gameItemIds,
+      @RequestParam(required = false) List<UUID> locationIds,
       @RequestParam(required = false) Integer minQuality,
       @RequestParam(required = false) List<UUID> jobOrderIds,
       @RequestParam(required = false) List<UUID> missionIds,
@@ -415,7 +427,8 @@ public class InventoryItemController {
               ITEM_FLAT_SORT_FIELDS,
               "gameItem.name");
       return PageResponse.of(
-          inventoryAggregationService.getAllItemInventory(gameItemIds, jobOrderIds, pageable));
+          inventoryAggregationService.getAllItemInventory(
+              gameItemIds, locationIds, jobOrderIds, pageable));
     }
     rejectItemOnlyFilters(gameItemIds);
     Pageable pageable =
@@ -427,7 +440,7 @@ public class InventoryItemController {
             "quality");
     Page<InventoryItemDto> p =
         inventoryItemService.getAllInventory(
-            materialIds, minQuality, jobOrderIds, missionIds, pageable);
+            materialIds, locationIds, minQuality, jobOrderIds, missionIds, pageable);
     return PageResponse.of(p);
   }
 
@@ -458,6 +471,7 @@ public class InventoryItemController {
    *
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
+   * @param locationIds optional storage-location filter (both catalogs, REQ-INV-040)
    * @param minQuality optional quality floor; rejected for {@code catalog=ITEM}
    * @param jobOrderIds optional job-order filter (both catalogs)
    * @param missionIds optional mission filter; rejected for {@code catalog=ITEM}
@@ -470,17 +484,19 @@ public class InventoryItemController {
       getAllGroupedInventory(
           @RequestParam(required = false) List<UUID> materialIds,
           @RequestParam(required = false) List<UUID> gameItemIds,
+          @RequestParam(required = false) List<UUID> locationIds,
           @RequestParam(required = false) Integer minQuality,
           @RequestParam(required = false) List<UUID> jobOrderIds,
           @RequestParam(required = false) List<UUID> missionIds,
           @RequestParam(required = false, defaultValue = "MATERIAL") InventoryCatalog catalog) {
     if (catalog == InventoryCatalog.ITEM) {
       rejectMaterialOnlyFilters(minQuality, missionIds, materialIds);
-      return inventoryAggregationService.getAllAggregatedItemInventory(gameItemIds, jobOrderIds);
+      return inventoryAggregationService.getAllAggregatedItemInventory(
+          gameItemIds, locationIds, jobOrderIds);
     }
     rejectItemOnlyFilters(gameItemIds);
     return inventoryItemService.getAllAggregatedInventory(
-        materialIds, minQuality, jobOrderIds, missionIds);
+        materialIds, locationIds, minQuality, jobOrderIds, missionIds);
   }
 
   /**
