@@ -369,6 +369,31 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
+   * Takes a screenshot, and reports rather than throws when the browser will not produce one.
+   *
+   * <p>The audit's assertion is the measurement; the picture is what lets a reader check the
+   * measurement against something. Losing the picture costs review convenience, losing the
+   * measurement costs the audit — so the two may not share a failure.
+   *
+   * @param page the page to photograph
+   * @param options where and how to write the PNG
+   * @param where {@code WxH /path}, for the printed line
+   */
+  private static void screenshotSafely(Page page, Page.ScreenshotOptions options, String where) {
+    try {
+      page.screenshot(options);
+    } catch (RuntimeException e) {
+      String reason = String.valueOf(e.getMessage()).replaceAll("\s+", " ").trim();
+      if (reason.length() > MAX_REASON_CHARS) {
+        reason = reason.substring(0, MAX_REASON_CHARS) + "…";
+      }
+      System.out.printf(
+          "[touch-layout] %-34s NO SCREENSHOT (measurement kept) — %s: %s%n",
+          where, e.getClass().getSimpleName(), reason);
+    }
+  }
+
+  /**
    * Finds the first detail link a list page renders under its own path.
    *
    * <p>Matches {@code <listPath>/<id>} where the id looks like a UUID or a number — the two shapes
@@ -470,10 +495,18 @@ class TouchClassLayoutE2eTest {
             page.evaluate(PROBE_JS, Map.of("slack", SLACK_PX, "deviceWidth", width));
 
     String slug = path.equals("/") ? "dashboard" : path.replaceAll("^/", "").replace('/', '-');
-    page.screenshot(
+    // The screenshot is EVIDENCE, the measurement above is the assertion — so a screenshot that
+    // cannot be taken may not discard a measurement that already succeeded. It did exactly that:
+    // `probe` is computed first, then this call threw, and `measureSafely` turned the whole page
+    // into "could not be measured" with every finding it had just computed thrown away. A browser
+    // refusing to rasterise a very long page (WebKit caps its surface where Chromium stitches) is
+    // not an app defect and must not read like one, but it must not be silent either.
+    screenshotSafely(
+        page,
         new Page.ScreenshotOptions()
             .setPath(ARTIFACTS.resolve(deviceLabel + "__" + slug + ".png"))
-            .setFullPage(true));
+            .setFullPage(true),
+        deviceLabel + " " + path);
 
     // Photograph every modal too, on the touch classes.
     //
@@ -495,12 +528,14 @@ class TouchClassLayoutE2eTest {
                         + " o.style.display = 'flex'; return o.id || ('modal-' + i); }",
                     i));
         if (!id.isEmpty()) {
-          page.screenshot(
+          screenshotSafely(
+              page,
               new Page.ScreenshotOptions()
                   .setPath(
                       ARTIFACTS
                           .resolve("modals")
-                          .resolve(deviceLabel + "__" + slug + "__" + id + ".png")));
+                          .resolve(deviceLabel + "__" + slug + "__" + id + ".png")),
+              deviceLabel + " " + path + " > " + id);
         }
         page.evaluate(
             "(i) => { const o = document.querySelectorAll('.krt-modal-overlay')[i]; if (!o) return;"
