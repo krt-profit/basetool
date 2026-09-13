@@ -72,6 +72,11 @@
 - **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
   Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
   und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
+- **Auch die Sortierknöpfe unter Beförderung → Themen waren zu klein** — 29x18px, viermal auf der
+  Seite. Sie waren dem Test entgangen, weil sie erst ab zwei Themen überhaupt erscheinen.
+- **Eine unsinnige Sprachangabe in der Adresse führte auf die Fehlerseite.** Ein `?lang=`-Wert, den
+  der Server nicht lesen kann, beendete den Seitenaufruf mit einem Fehler, statt ihn einfach zu
+  übergehen. Betraf jede Seite, auch das Web-App-Manifest.
 
 ### Changed
 
@@ -86,7 +91,10 @@
   Anwendungen scheiterten beim Start an „issuer does not match“, was wie ein Fehler der Anwendung
   aussieht. Der zweite Wert wird jetzt aus dem ersten abgeleitet, und eine CI-Prüfung hält das so.
   `IRI_KEYCLOAK_ISSUER_URI` bleibt als Ausnahme für abweichende Aufbauten und wird normalerweise
-  nicht gesetzt (ADR-0167).
+  nicht gesetzt. **Dieselbe Einstellung verschiebt auch Grafanas Anmeldung mit** — deren drei
+  Keycloak-Adressen standen bisher einzeln im Monitoring-Stack. Nur die vier Prüf-Adressen in
+  `monitoring/prometheus/prometheus.yml` bleiben Handarbeit, weil diese Datei nicht ersetzt wird;
+  die CI-Prüfung meldet es, wenn sie zurückbleiben (ADR-0167).
 
 - **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
   sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
@@ -96,6 +104,14 @@
 - **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
   Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
   Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
+
+- **Betrieb: die Keycloak-Adresse entfällt, und eine bestehende Serverkonfiguration muss angepasst
+  werden.** Weil die Anmeldung unter die Basetool-Adresse gezogen ist, hat Keycloak keinen eigenen
+  Hostnamen mehr: `EDGE_HOST_KEYCLOAK` ist ersatzlos gestrichen (mit v1.7.18 noch als Pflichtvariable
+  eingeführt), `ACME_HOSTS` verliert denselben Eintrag, und `IRI_KEYCLOAK_HOSTNAME` enthält jetzt den
+  vollständigen Pfad mit `/auth`. Wer `IRI_KEYCLOAK_HOST_ALIAS` gesetzt hat, richtet ihn auf die
+  Web-Adresse. Die Reihenfolge steht in `docs/deployment.md`; wird sie übersprungen, startet die
+  Auslieferung nicht durch. Für Mitglieder ändert sich dadurch nichts.
 
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 

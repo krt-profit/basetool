@@ -291,6 +291,28 @@ class WebAppManifestControllerTest {
   }
 
   @Test
+  @DisplayName("an unparseable ?lang= cannot turn the always-200 endpoint into a 500")
+  void survivesAnUnparseableLangParameter() throws Exception {
+    // `?lang=` is NOT this controller's parameter — it is LocaleChangeInterceptor's, registered for
+    // every path in LocaleConfig — so all the care this controller takes over `?locale=` above runs
+    // AFTER it and cannot help. With `ignoreInvalidLocale` left at its default false,
+    // StringUtils.parseLocale throws before the handler is entered, GlobalExceptionHandler's
+    // catch-all renders the 500 page, and the endpoint that blackbox probes with
+    // `valid_status_codes: [200]` behind EdgePublicSurfaceNot200 pages the on-call for a query
+    // parameter anyone can type.
+    //
+    // The values are the ones that actually throw rather than merely resolving oddly: a lone
+    // punctuation mark, a tag with an empty subtag, and one with an illegal separator.
+    for (String requested : List.of("!", "de_", "de__DE", "a b")) {
+      mockMvc
+          .perform(get(MANIFEST_PATH).param("lang", requested))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.lang").value("de"))
+          .andExpect(jsonPath("$.name").value("Profit Basetool"));
+    }
+  }
+
+  @Test
   @DisplayName("is publicly cacheable, because the body is a pure function of its URL")
   void cachedPublicly() throws Exception {
     // The locale is in the URL and nothing is read from the session, so there is no cookie to vary

@@ -809,12 +809,6 @@ tr.is-inert td {
     margin-bottom: 12px;
 }
 
-.bank-filterbar .bank-filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
 .bank-filterbar label {
     font-size: 0.6rem;
     text-transform: uppercase;

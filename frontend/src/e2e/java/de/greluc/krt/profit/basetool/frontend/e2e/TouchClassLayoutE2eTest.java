@@ -206,6 +206,33 @@ class TouchClassLayoutE2eTest {
   private static final String SCREENSHOT_ENGINE = "chromium";
 
   /**
+   * The engine this run drives, as {@code e2e.browser}.
+   *
+   * <p>Read once instead of at each of the three call sites that used to inline the property and
+   * its default, which is how they can drift.
+   */
+  private static final String ENGINE = System.getProperty("e2e.browser", "chromium");
+
+  /**
+   * Whether this engine accepts {@code isMobile}.
+   *
+   * <p><b>Firefox does not.</b> Playwright's own documentation says so for both {@code newContext}
+   * and {@code newPage} — "Defaults to false and is not supported in Firefox" — and its Firefox
+   * backend throws rather than ignoring it. Gating on the width alone made the phone class the one
+   * context Firefox refuses to open, and the {@code browser x device} matrix then gave that its own
+   * job: {@code firefox / 375x812} could not get past its first {@code newContext}, while the four
+   * wider Firefox jobs passed because {@code width <= 768} was false for them and the option was
+   * never set. With {@code fail-fast: false} that is a permanently red E2E gate that looks like a
+   * flake.
+   *
+   * <p>What is lost on Firefox is the mobile-device emulation (the meta viewport being honoured);
+   * {@code setHasTouch(true)} and the viewport size still apply, so the touch-class media queries
+   * and every geometry assertion in this class still hold. Chromium and WebKit keep the full
+   * emulation, so the property is still measured on two engines out of three.
+   */
+  private static final boolean ENGINE_SUPPORTS_IS_MOBILE = !"firefox".equals(ENGINE);
+
+  /**
    * How many of {@link FrontendPageRoutes#PAGES} a device class must actually measure before the
    * run counts.
    *
@@ -254,7 +281,7 @@ class TouchClassLayoutE2eTest {
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
-          // 810x1080, NOT 768x1024. `PHONE_MAX_WIDTH`, `setIsMobile(width <= 768)` and the
+          // 810x1080, NOT 768x1024. `PHONE_MAX_WIDTH`, the `setIsMobile` gate and the
           // stylesheet's `@media (width <= 768px)` are all INCLUSIVE, so a 768px-wide entry renders
           // and is asserted as the phone class — static footer, `--krt-footer-height: 0px`, mobile
           // emulation — while being documented as tablet portrait. That left REQ-UI-009's
@@ -346,7 +373,7 @@ class TouchClassLayoutE2eTest {
                   // Reported as a touch device, because REQ-UI-009's floors are touch-class rules
                   // and some of them sit behind hover/pointer media queries.
                   .setHasTouch(true)
-                  .setIsMobile(width <= 768))) {
+                  .setIsMobile(width <= PHONE_MAX_WIDTH && ENGINE_SUPPORTS_IS_MOBILE))) {
         Page page = context.newPage();
         // Two collectors, because they answer different questions. `measured` is about the ROUTE
         // LIST — the floor and the cross-class comparison are only meaningful against something of
@@ -537,7 +564,7 @@ class TouchClassLayoutE2eTest {
    * @param where {@code WxH /path}, for the printed line
    */
   private static void screenshotSafely(Page page, Page.ScreenshotOptions options, String where) {
-    if (!SCREENSHOT_ENGINE.equals(System.getProperty("e2e.browser", "chromium"))) {
+    if (!SCREENSHOT_ENGINE.equals(ENGINE)) {
       return;
     }
     try {
@@ -693,8 +720,7 @@ class TouchClassLayoutE2eTest {
     // where a dialog gets tight. The device label belongs in the FILENAME: without it the 768px
     // pass silently overwrote the 375px pictures, and the directory looked complete while holding
     // only the wider half.
-    if (width <= PHONE_MAX_WIDTH
-        && SCREENSHOT_ENGINE.equals(System.getProperty("e2e.browser", "chromium"))) {
+    if (width <= PHONE_MAX_WIDTH && SCREENSHOT_ENGINE.equals(ENGINE)) {
       int count = (int) number(probe.get("modalCount"));
       for (int i = 0; i < count; i++) {
         String id =
@@ -1035,11 +1061,47 @@ class TouchClassLayoutE2eTest {
         // dialog, and the list has taken four separate additions — so update one copy and the same
         // control is a defect in a dialog and compliant on a page, or the reverse. `hitBox` in this
         // same script is already one shared helper; this is the matching extraction.
+        //
+        // The SET IS READ FROM THE STYLESHEET, not written here. A hand-kept copy had already
+        // drifted from the CSS in both directions at once: the list knew six classes while the
+        // stylesheets declared eight `--touch-target-dense` consumers, so `.bank-chart-range-btn`
+        // and `.krt-bp-imp-suggestion` — a real <button> — would be reported as 32px against a 44px
+        // floor the design system does not put on them, the false-positive class the ::after
+        // hit-area handling exists to avoid. The reverse is worse: a class added here and forgotten
+        // in the CSS is silently exempt forever. The design system declares the exemption, so the
+        // design system is asked.
+        //
+        // Only the SUBJECT of each selector counts — the last compound, after any descendant or
+        // child combinator — or `.pa-sort-controls .pa-sort-btn` would exempt its container too.
+        const DENSE_CLASSES = (() => {
+          const out = new Set();
+          const walk = (list) => {
+            for (const rule of Array.from(list || [])) {
+              if (rule.cssRules) { walk(rule.cssRules); continue; }
+              if (!rule.selectorText || !rule.cssText.includes('--touch-target-dense')) continue;
+              for (const one of rule.selectorText.split(',')) {
+                const subject = one.trim().split(/[\\s>+~]+/).pop() || '';
+                for (const m of subject.matchAll(/\\.([A-Za-z0-9_-]+)/g)) out.add(m[1]);
+              }
+            }
+          };
+          for (const sheet of Array.from(document.styleSheets)) {
+            // A cross-origin sheet throws on .cssRules; there are none today, and skipping one
+            // would under-populate the set, which fails loud below rather than exempting silently.
+            try { walk(sheet.cssRules); } catch (e) { /* not readable */ }
+          }
+          return out;
+        })();
         const floorFor = (c) =>
-          (c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
-            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
-            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle'))
-            ? %d : %d;
+          Array.from(c.classList).some((cl) => DENSE_CLASSES.has(cl)) ? %d : %d;
+        // An empty set means no stylesheet was readable, which would put the full 44px floor on
+        // every dense control at once. Reported rather than assumed: silence here used to mean
+        // "compliant", and it would now mean "measured against the wrong floor".
+        if (DENSE_CLASSES.size === 0) {
+          badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
+            + ' --touch-target-dense was readable, so every floor below is the full 44px and'
+            + ' every dense control will read as a defect');
+        }
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();

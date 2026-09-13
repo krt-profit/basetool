@@ -27,11 +27,10 @@
                 box-sizing: border-box;
                 padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
             }
-        /* The phone-class reserve for this page lives in styles.css's `width <= 768px` block,
-           with every other page's. It was a copy in this file and an identical copy in
-           operation-detail.html, and the comment on those copies said in so many words that
-           duplicating the reserve is what caused it to be missed the first time. */
-            }
+            /* The phone-class reserve for this page lives in styles.css's `width <= 768px`
+               block, with every other page's, written `div.page-wrapper` so it out-specifies this
+               rule — head.html renders the per-page style block after styles.css, so an equal-specificity
+               override there loses the source-order tie. The DESKTOP reserve stays here. */
             .mission-head-sticky { position: sticky; top: 0; z-index: 900; background-color: var(--color-bg-black); }
             .mission-head { background-color: var(--color-bg-dark-gray); border-bottom: var(--border-hairline); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
             .mission-head-title { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; min-width: 0; }
@@ -43,7 +42,7 @@
 
             .pane-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
             .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-            @media (max-width: 980px) { .pane-grid-2 { grid-template-columns: 1fr; } }
+            @media (width <= 980px) { .pane-grid-2 { grid-template-columns: 1fr; } }
 
             .kpanel { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); min-width: 0; }
             .kpanel-head { padding: 8px 12px; background-color: var(--color-surface-input); border-left: 4px solid var(--color-primary); border-bottom: var(--border-hairline); font-family: var(--font-body); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: var(--fw-bold); color: var(--color-gray-1); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -58,7 +57,7 @@
 
             /* Finance summary strip (matches the mission Finanzen tab). */
             .sumstrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-            @media (max-width: 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
+            @media (width <= 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
             .sum { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 14px; }
             .sum.is-total { border-top: 3px solid var(--color-primary); }
             .sum .sk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
@@ -118,7 +117,7 @@
             .payout-table tbody tr:has(.payout-paid-yes) { background-color: rgba(35, 158, 51, 0.06); }
             .payout-table tbody tr:has(.payout-paid-checkbox:checked) td.payout-paid-cell,
             .payout-table tbody tr:has(.payout-paid-yes) td.payout-paid-cell { box-shadow: inset 3px 0 0 var(--color-dept-profit, #239E33); }
-            @media (max-width: 768px) { .payout-table th, .payout-table td { padding: 0.75rem 0.6rem; } }
+            @media (width <= 768px) { .payout-table th, .payout-table td { padding: 0.75rem 0.6rem; } }
 
             .footacts { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; border-top: var(--border-hairline); padding-top: 12px; }
             .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }

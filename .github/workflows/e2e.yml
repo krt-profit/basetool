@@ -33,7 +33,11 @@ permissions:
 
 jobs:
   e2e:
-    name: E2E flows (${{ matrix.browser }})
+    # The DEVICE belongs in the name. With fifteen jobs and only the browser in it, five are
+    # indistinguishable per engine — when one was cancelled at its timeout, working out WHICH
+    # device class it was meant comparing artifact sizes, and the run log interleaves all five
+    # under one name so it cannot be read per job at all.
+    name: E2E flows (${{ matrix.browser }}, ${{ matrix.device }})
     # PRs: only when labelled `e2e`. A `labeled` event must be the `e2e` label
     # itself, so toggling an unrelated label never spins up this heavy stack;
     # open/synchronize/reopened run whenever the label is currently present.

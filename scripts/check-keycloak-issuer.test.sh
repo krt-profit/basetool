@@ -21,6 +21,10 @@
 #     catches it, which is the whole reason that scenario exists.
 #   * The vacuity guard. Delete the issuer from the stack entirely and the gate must complain that
 #     it has nothing to check, rather than reporting success over an empty list.
+#   * Case 6b, which the FIRST DRAFT OF THE RULE FAILED. Scanning prometheus.yml for targets under
+#     the identity path and checking their base sounds complete, and is half a check: a probe moved
+#     to another host AND another path shape leaves the scan entirely, so the list shrinks and
+#     nothing objects. The required-probe half exists because this suite caught that.
 #
 # The suite runs the UNMUTATED fixture first and requires it to be clean. Without that, every
 # assertion below would still pass on a checker that failed unconditionally.
@@ -55,12 +59,19 @@ COMPOSE_FILES=(
   docker-compose.e2e.yml
   docker-compose.android.yml
   docker-compose.localtest.yml
+  docker-compose.monitoring.yml
 )
 
 SPRING_DIRS=(
   backend/src/main/resources
   frontend/src/main/resources
   ingest/src/main/resources
+)
+
+# Files the gate reads that are neither compose files nor Spring configs. Copied with their
+# directory structure, because the checker addresses them by repo-relative path.
+NESTED_FILES=(
+  monitoring/prometheus/prometheus.yml
 )
 
 tests_run=0
@@ -84,6 +95,11 @@ new_fixture() {
   for d in "${SPRING_DIRS[@]}"; do
     mkdir -p "${dir}/${d}"
     cp "${REPO_ROOT}/${d}"/application*.yml "${dir}/${d}/"
+  done
+  local n
+  for n in "${NESTED_FILES[@]}"; do
+    mkdir -p "${dir}/$(dirname "$n")"
+    cp "${REPO_ROOT}/${n}" "${dir}/${n}"
   done
   echo "$dir"
 }
@@ -229,9 +245,89 @@ FIXTURE="$(new_fixture)"
 rewrite_or_die "${FIXTURE}/backend/src/main/resources/application-prod.yml" \
   's|${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}|${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}|' \
   "Spring fallback left on the retired host"
-run_checker "$FIXTURE" --only prod-defaults
+run_checker "$FIXTURE" --only spring-defaults
 expect_failure "a Spring fallback default that names the retired issuer is rejected" \
   "would validate the wrong issuer"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 5b. Grafana's OIDC endpoints, decoupled back into literals. Same shape as case 3 and the same
+#     lesson: the defaults still agree, so only the override notices. Grafana's generic_oauth has
+#     no discovery option, so these three URLs are the one place the realm path is spelled out.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/docker-compose.monitoring.yml" \
+  's|${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect|https://profit-base.online/auth/realms/iri/protocol/openid-connect|g' \
+  "Grafana endpoints decoupled from the hostname"
+run_checker "$FIXTURE" --only monitoring-oidc
+expect_failure "decoupled Grafana endpoints no longer follow IRI_KEYCLOAK_HOSTNAME" \
+  "realm other than the one minting"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 5c. One Grafana endpoint left on a stale realm. Two of three move on a rename, the third sends
+#     members somewhere that cannot mint them a token.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/docker-compose.monitoring.yml" \
+  's|\(GF_AUTH_GENERIC_OAUTH_TOKEN_URL: .*\)/realms/iri/|\1/realms/stale/|' \
+  "one Grafana endpoint on a stale realm"
+run_checker "$FIXTURE" --only monitoring-oidc
+expect_failure "a Grafana endpoint on the wrong realm is rejected" "GF_AUTH_GENERIC_OAUTH_TOKEN_URL"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 6a. A Prometheus identity probe left on the retired host. prometheus.yml is NOT interpolated --
+#     it is the one identity surface that cannot be derived, so a domain move never reaches it on
+#     its own and this comparison is the only thing standing in for that.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/monitoring/prometheus/prometheus.yml" \
+  's|https://profit-base.online/auth/health|https://keycloak.profit-base.online/auth/health|' \
+  "identity probe left on the retired host"
+run_checker "$FIXTURE" --only prometheus-targets
+expect_failure "a Prometheus identity probe on the wrong base is rejected" "never reaches it on its own"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 6b. A probe relocated to another host AND another path shape. This case is here because the
+#     first draft of the rule MISSED it, and the suite is what said so: scanning for targets under
+#     the identity path and checking their base is only half a check, because a target that moves
+#     out from under that path stops being scanned at all. The gate reported success over a
+#     shrinking list. Hence the required-probe half.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/monitoring/prometheus/prometheus.yml" \
+  's|https://profit-base.online/auth/metrics|https://keycloak.profit-base.online/metrics|' \
+  "identity probe relocated off the identity path"
+run_checker "$FIXTURE" --only prometheus-targets
+expect_failure "a probe moved off the identity base entirely is reported" "is not probed"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 6c. The discovery probe dropped. Its absence is the one that looks exactly like health: no probe
+#     fails, no alert fires, and the endpoint every login resolves first is simply uncovered.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/monitoring/prometheus/prometheus.yml" \
+  '\|/.well-known/openid-configuration|d' \
+  "discovery probe removed"
+run_checker "$FIXTURE" --only prometheus-targets
+expect_failure "a dropped discovery probe is reported" "openid-configuration is not probed"
+rm -rf "$FIXTURE"
+
+# ---------------------------------------------------------------------------------------------
+# 6d. NEGATIVE CONTROL, and the reason the path test is segment-exact. ADR-0166 records the same
+#     trap for the edge: `location /auth` is a PREFIX and swallows /authorize, /authors and
+#     /authentication. A gate matching identity targets by bare prefix would flag an ordinary app
+#     route as a misplaced identity probe -- a false failure nobody could act on.
+# ---------------------------------------------------------------------------------------------
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/monitoring/prometheus/prometheus.yml" \
+  's|- https://profit-base.online/robots.txt|- https://profit-base.online/authors|' \
+  "an /authors route added beside the identity targets"
+run_checker "$FIXTURE" --only prometheus-targets
+expect_success "a /authors route is not mistaken for an identity probe"
 rm -rf "$FIXTURE"
 
 # ---------------------------------------------------------------------------------------------

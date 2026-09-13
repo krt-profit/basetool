@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -89,26 +88,29 @@ final class PublicPaths {
   }
 
   /**
-   * A sourcemap, anchored to the two trees that can serve one.
-   *
-   * <p>Deliberately not {@code endsWith(".map")} — see {@link #isStaticAsset}.
-   */
-  private static final Pattern SOURCEMAP = Pattern.compile("^/(css|js)/.*\\.map$");
-
-  /**
    * Whether the path is one of the static asset trees, the favicon, or a sourcemap.
    *
    * <p>{@code /sm/} is listed even though its files end in {@code .map}: the prefix is what {@code
    * SecurityConfig} allow-lists, and a sourcemap served from there without the extension would
    * otherwise fall through.
    *
-   * <p><b>The sourcemap match is anchored to the two asset trees, not a bare {@code
-   * endsWith(".map")}.</b> This predicate feeds {@link #isGateExempt}, so a suffix match let ANY
-   * path opt out of both session gates by carrying that ending — a member who declined the terms,
-   * or whose registration is still pending, reaches any String-path-variable route by appending
-   * {@code .map}, since {@code PathPatternParser} happily binds it into the variable. {@code
-   * RequestLoggingFilter} refuses the same shortcut for the same reason, where it costs only an
-   * access-log line.
+   * <p><b>There is deliberately no {@code endsWith(".map")} clause.</b> This predicate feeds {@link
+   * #isGateExempt}, so a suffix match let ANY path opt out of both session gates by carrying that
+   * ending — a member who declined the terms, or whose registration is still pending, reaches any
+   * String-path-variable route by appending {@code .map}, since {@code PathPatternParser} happily
+   * binds it into the variable. {@code RequestLoggingFilter} refuses the same shortcut for the same
+   * reason, where it costs only an access-log line.
+   *
+   * <p><b>What the prefix list therefore costs:</b> a sourcemap served from outside {@code /css/},
+   * {@code /js/} and {@code /sm/} is no longer gate-exempt, while {@code SecurityConfig} still
+   * {@code permitAll}s {@code /**}{@code /*.map} — so such a path is reachable unauthenticated but
+   * redirects a member whose gate is open. Every sourcemap this app serves is built into one of the
+   * three trees ({@code frontend/build.gradle.kts} emits them there and nothing on the classpath
+   * contributes {@code META-INF/resources}), so the set is empty today; it is written down because
+   * a future bundler output directory would fall outside it silently. An anchored {@code
+   * ^/(css|js)/.*\.map$} pattern used to sit in this chain and was removed rather than kept: every
+   * string it can match already satisfies one of the first two prefixes, {@code ||} short-circuits,
+   * and a clause that can never be the deciding one reads like protection while providing none.
    *
    * @param path a context-relative path, as returned by {@link #relativePath}
    * @return {@code true} for an asset path
@@ -120,8 +122,7 @@ final class PublicPaths {
         || path.startsWith("/logos/")
         || path.startsWith("/fonts/")
         || path.startsWith("/sm/")
-        || path.equals("/favicon.ico")
-        || SOURCEMAP.matcher(path).matches();
+        || path.equals("/favicon.ico");
   }
 
   /**
