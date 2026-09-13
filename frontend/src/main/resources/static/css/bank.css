@@ -879,6 +879,11 @@ tr.is-inert td {
     .matrix-flag {
         width: var(--touch-target-dense);
         height: var(--touch-target-dense);
+        /* `min-height`, not only `height`: styles.css puts the 44px floor on every `button` by
+           default now (ADR-0174), and a min-height clamps a height regardless of specificity —
+           different properties never compete. Declaring the dense token is what opts this flag
+           out, and it is also what puts it in TouchClassLayoutE2eTest's CSSOM-derived dense set. */
+        min-height: var(--touch-target-dense);
     }
 
     .bank-row-toggle {
