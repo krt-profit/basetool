@@ -1272,26 +1272,37 @@ class TouchClassLayoutE2eTest {
         // control is a defect in a dialog and compliant on a page, or the reverse. `hitBox` in this
         // same script is already one shared helper; this is the matching extraction.
         //
-        // The SET IS READ FROM THE STYLESHEET, not written here. A hand-kept copy had already
-        // drifted from the CSS in both directions at once: the list knew six classes while the
-        // stylesheets declared eight `--touch-target-dense` consumers, so `.bank-chart-range-btn`
-        // and `.krt-bp-imp-suggestion` — a real <button> — would be reported as 32px against a 44px
-        // floor the design system does not put on them, the false-positive class the ::after
-        // hit-area handling exists to avoid. The reverse is worse: a class added here and forgotten
-        // in the CSS is silently exempt forever. The design system declares the exemption, so the
-        // design system is asked.
-        //
-        // Only the SUBJECT of each selector counts — the last compound, after any descendant or
-        // child combinator — or `.pa-sort-controls .pa-sort-btn` would exempt its container too.
-        const DENSE_CLASSES = (() => {
+        // The selectors are kept WHOLE and matched with `Element.matches`, rather than picked
+        // apart into class names. Harvesting classes cannot express a compound: the design system
+        // writes the dense override as `.btn.btn-xs` (deliberately — REQ-UI-009 records that the
+        // extra specificity is what stops a page's inline rule winning), and lifting each class out
+        // of it puts a bare `btn` in the exempt set. That would drop EVERY button in the app to the
+        // 32px floor while the requirement says `.btn` itself keeps 44px on every class — a guard
+        // that passes by measuring against the wrong number, which is the one failure mode worse
+        // than a red build. Matching also gets `.pa-sort-controls .pa-sort-btn` and
+        // `input.item-checkbox` exactly right for free, where the old "subject compound only"
+        // approximation had to be reasoned about.
+        const DENSE_SELECTORS = (() => {
           const out = new Set();
           const walk = (list) => {
             for (const rule of Array.from(list || [])) {
-              if (rule.cssRules) { walk(rule.cssRules); continue; }
-              if (!rule.selectorText || !rule.cssText.includes('--touch-target-dense')) continue;
+              // NOT `if (rule.cssRules)`. Since CSS Nesting shipped, a plain CSSStyleRule carries
+              // an EMPTY CSSRuleList — an object, therefore truthy — so that test treated every
+              // style rule as a container, skipped it, and returned an EMPTY SET in all three
+              // engines. Verified against Chromium 151: `.btn-xs` reports
+              // `cssRules=CSSRuleList(len=0), truthy=true`. Length is what distinguishes a
+              // container from a leaf.
+              if (rule.cssRules && rule.cssRules.length) { walk(rule.cssRules); }
+              // `rule.style.cssText` is THIS rule's own declarations; `rule.cssText` would also
+              // carry a nested child's, so a parent that merely CONTAINS a dense rule would be
+              // exempted along with it.
+              const own = rule.style ? rule.style.cssText : '';
+              if (!rule.selectorText || !own.includes('--touch-target-dense')) continue;
               for (const one of rule.selectorText.split(',')) {
-                const subject = one.trim().split(/[\\s>+~]+/).pop() || '';
-                for (const m of subject.matchAll(/\\.([A-Za-z0-9_-]+)/g)) out.add(m[1]);
+                const sel = one.trim();
+                // `:root` declares the token and matches no control; it is harmless to keep and
+                // cheaper than special-casing.
+                if (sel) out.add(sel);
               }
             }
           };
@@ -1300,10 +1311,25 @@ class TouchClassLayoutE2eTest {
             // would under-populate the set, which fails loud below rather than exempting silently.
             try { walk(sheet.cssRules); } catch (e) { /* not readable */ }
           }
-          return out;
+          return Array.from(out);
         })();
         const floorFor = (c) =>
-          Array.from(c.classList).some((cl) => DENSE_CLASSES.has(cl)) ? %d : %d;
+          DENSE_SELECTORS.some((sel) => {
+            // A selector out of the CSSOM is always valid, but `matches` is the only thing here
+            // that can throw on one, and a throw would be read as "page unmeasurable".
+            try { return c.matches(sel); } catch (e) { return false; }
+          }) ? %d : %d;
+        // An empty set means no stylesheet declaring the token was readable, which would put the
+        // full 44px floor on every dense control at once. Reported rather than assumed: silence
+        // here used to mean "compliant", and it would now mean "measured against the wrong floor".
+        //
+        // RECORDED here, REPORTED where `badControls` exists. This used to push straight into
+        // `badControls`, which is declared ~100 lines further down — so the first time the guard
+        // actually fired it threw `ReferenceError: Cannot access 'badControls' before
+        // initialization` from inside the probe, `measureSafely` turned that into "could not be
+        // measured", and EVERY page of the class came back unmeasurable. A guard that cannot run
+        // is worse than no guard: it converted a precise diagnosis into a blanket failure.
+        const DENSE_SET_EMPTY = DENSE_SELECTORS.length === 0;
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();
@@ -1397,18 +1423,8 @@ class TouchClassLayoutE2eTest {
         }
 
         const badControls = [];
-        // An empty set means no stylesheet was readable, which would put the full 44px floor on
-        // every dense control at once. Reported rather than assumed: silence here used to mean
-        // "compliant", and it would now mean "measured against the wrong floor".
-        //
-        // It sits HERE, after the declaration, and that is not cosmetic. Written up beside
-        // `floorFor` — which reads better, because that is what the set is for — it referenced
-        // `badControls` about a hundred lines before the `const` that creates it. `const` is
-        // hoisted without being initialised, so the read lands in the temporal dead zone and throws
-        // `ReferenceError: Cannot access 'badControls' before initialization`. Not on some pages:
-        // on every page of every device class, turning all 66 routes into "could not be measured"
-        // and the whole sweep red.
-        if (DENSE_CLASSES.size === 0) {
+        // The dense-floor diagnosis from above, reported now that there is a list to report into.
+        if (DENSE_SET_EMPTY) {
           badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
             + ' --touch-target-dense was readable, so every floor below is the full 44px and'
             + ' every dense control will read as a defect');
