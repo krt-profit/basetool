@@ -129,7 +129,17 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 // find. `junit-platform.properties` selects ClassOrderer.OrderAnnotation, under which every class
 // without @Order sorts at Integer.MAX_VALUE / 2 — so this one value is the whole mechanism.
 @Order(Integer.MAX_VALUE)
-@Tag("smoke")
+// Deliberately NOT @Tag("smoke") (owner decision 2026-09-13).
+//
+// e2e-smoke.yml has a 15-minute ceiling and passes no `-Pe2e.device`, so with the smoke tag
+// this class walked all FIVE device classes over all 65 routes in one job — the exact shape
+// that had just blown a 45-minute budget in the e2e gate and forced the browser x device
+// fan-out. It is dormant only because `vars.E2E_BASE_URL` is empty.
+//
+// The e2e gate already measures all five classes on three engines, which is what REQ-UI-009
+// needs. Smoke asks a different question — is this deployment alive — against a REAL
+// environment, and the suite is documented as non-destructive and safe to run there; this
+// class opens every modal on every route, which is more than that contract allows.
 @Tag("e2e")
 class TouchClassLayoutE2eTest {
 
