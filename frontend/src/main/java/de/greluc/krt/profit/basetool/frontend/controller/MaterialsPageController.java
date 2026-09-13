@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialMatrixItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialPriceDto;
@@ -77,6 +78,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * columns/rows lives in {@link #buildGrid}.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/materials")
 @RequiredArgsConstructor
 @Slf4j

@@ -121,15 +121,24 @@ spring:
     fallback-to-system-locale: false
   web:
     resources:
-      cache:
-        cachecontrol:
-          max-age: 365d
-          must-revalidate: true
+      # WebMvcConfig registers one resource handler per asset tree that actually exists. Boot's
+      # auto-configured mappings would otherwise land in the same registry next to them — `/**`,
+      # which matches every URL and so reinstates exactly the per-render chain walk the narrow
+      # patterns remove, plus `/webjars/**`, which nothing here uses (no webjar is on the
+      # classpath). Turning the defaults off is what makes WebMvcConfig's patterns the only ones.
+      # It also retires `cache.cachecontrol` (max-age 365d + must-revalidate), which only ever
+      # reached Boot's own registrations: WebMvcConfig sets `immutable` on every tree itself, and
+      # leaving the weaker setting here suggested a header the app does not send.
+      add-mappings: false
       chain:
         strategy:
           content:
+            # Load-bearing beyond the resource chain: `@ConditionalOnEnabledResourceChain` reads
+            # this key to register `ResourceUrlEncodingFilter`, which is what rewrites every
+            # Thymeleaf `@{...}` asset link to its content-hashed URL. WebMvcConfig builds the
+            # chain itself, so `add-mappings: false` above costs nothing here, but switching this
+            # to `false` would silently stop the hashing app-wide.
             enabled: true
-            paths: "/**"
     error:
       whitelabel:
         enabled: false

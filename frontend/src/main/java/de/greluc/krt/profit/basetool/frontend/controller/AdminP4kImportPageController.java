@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.P4kImportJobDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
@@ -67,6 +68,7 @@ import reactor.core.publisher.Mono;
  * <p>Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the backend gate.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/p4k-import")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

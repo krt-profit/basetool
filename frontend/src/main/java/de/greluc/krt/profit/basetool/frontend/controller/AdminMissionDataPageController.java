@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
@@ -75,6 +76,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * soft-deleted entries are listed so admins can find them to re-activate.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/mission-data")
 @RequiredArgsConstructor
 @Slf4j

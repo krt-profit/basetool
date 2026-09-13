@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -53,6 +54,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/catalog")
 @RequiredArgsConstructor
 @Slf4j

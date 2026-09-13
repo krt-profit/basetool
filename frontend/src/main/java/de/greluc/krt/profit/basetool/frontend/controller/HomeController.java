@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronReferenceDto;
@@ -53,6 +54,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * re-appearing on every refresh).
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 public class HomeController {

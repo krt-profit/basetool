@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankHolderDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto;
@@ -50,6 +51,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * enforced per-action in the template (and server-side). Admins pass via the role hierarchy.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 public class BankManagePageController {

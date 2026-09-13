@@ -47,6 +47,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -188,10 +189,30 @@ public class GlobalExceptionHandler {
     return "redirect:" + reauthUrl;
   }
 
-  /** Renders the 404 error page for unmapped static resource / page requests. */
-  @ExceptionHandler(NoResourceFoundException.class)
+  /**
+   * Renders the 404 error page for a URL that names neither a handler nor a file.
+   *
+   * <p>Two exceptions, one meaning. {@link NoResourceFoundException} comes from a resource handler
+   * whose pattern matched but whose tree holds no such file ({@code /css/typo.css}); {@link
+   * NoHandlerFoundException} comes from the dispatcher when nothing matched at all ({@code
+   * /favicon.ico}, {@code /actuator/health} on the public connector, any mistyped page).
+   *
+   * <p><strong>The second one used to be unreachable</strong>, which is worth knowing before anyone
+   * simplifies it away again. While the static-resource handler was registered on a catch-all
+   * pattern it matched every unmapped URL, so the dispatcher always found a handler and every 404
+   * in the application arrived here as a {@link NoResourceFoundException}. Narrowing those patterns
+   * to the asset trees that exist — and turning {@code spring.web.resources.add-mappings} off,
+   * which is what lets Spring raise {@link NoHandlerFoundException} at all — made the dispatcher's
+   * own exception reachable, and without this entry it fell through to the {@code Exception}
+   * catch-all below and answered 500 where the app had always answered 404. {@code
+   * ManagementPortIsolationTest} is what caught that.
+   *
+   * @param model the view model the 404 page renders from; never {@code null}
+   * @return the {@code error/error} view name
+   */
+  @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public String handleNoResourceFoundException(@NotNull Model model) {
+  public String handleNotFound(@NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
     model.addAttribute("error", resolve("error.404.title", locale, "Not Found"));
     model.addAttribute(

@@ -175,9 +175,10 @@ public class WebAppManifestController {
    * `"lang": "de"` with English text, cached for an hour by the Cache-Control this controller sets.
    * A fallback that contradicts the locale it is served under is worse than the key being absent.
    *
-   * <p>The value is `messages.properties`' own `pwa.description` — the German one, since that file
-   * is the fallback bundle and German is the primary locale. `pwa.name` and `pwa.short_name` need no
-   * such treatment: they are the product name and are byte-identical in all three bundles.
+   * <p>The value is `messages.properties`' own `pwa.description` — the German one, since that
+   * file is the fallback bundle and German is the primary locale. `pwa.name` and
+   * `pwa.short_name` need no such treatment: they are the product name and are byte-identical in
+   * all three bundles.
    */
   private static final String DEFAULT_DESCRIPTION =
       "Einsätze, Aufträge, Lager und Raffinerie der Organisation.";

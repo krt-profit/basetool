@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * entries, users and locations from the backend and passes them to the template.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j

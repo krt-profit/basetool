@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExternalAliasWriteRequest;
@@ -59,6 +60,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * its own validation + 409 / 404 mapping, so a per-field inline AJAX flow is overkill for R1).
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/material-aliases")
 @RequiredArgsConstructor
 @Slf4j

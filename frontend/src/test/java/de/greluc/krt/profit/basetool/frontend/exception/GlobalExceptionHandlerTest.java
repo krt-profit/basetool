@@ -389,13 +389,13 @@ class GlobalExceptionHandlerTest {
     assertEquals(Boolean.FALSE, body.get("reloadHint"));
   }
 
-  // ─── handleNoResourceFoundException ─────────────────────────────────────
+  // ─── handleNotFound ─────────────────────────────────────────────────────
 
   @Test
   void noResourceFound_setsModelAttributes_andReturnsErrorView() {
     Model model = new ConcurrentModel();
 
-    String view = handler.handleNoResourceFoundException(model);
+    String view = handler.handleNotFound(model);
 
     assertEquals("error/error", view);
     assertEquals("error.404.title", model.getAttribute("error"));

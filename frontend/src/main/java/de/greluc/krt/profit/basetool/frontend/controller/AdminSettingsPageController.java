@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SystemSettingDto;
@@ -71,6 +72,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * have to count leading zeros.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/settings")
 @RequiredArgsConstructor
 @Slf4j

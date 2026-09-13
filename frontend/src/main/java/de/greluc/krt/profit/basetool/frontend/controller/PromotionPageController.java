@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MemberEvaluationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PromotionCategoryDto;
@@ -48,6 +49,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 /** Frontend controller for the promotion system pages. */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/promotion")
 @RequiredArgsConstructor
 @Slf4j
