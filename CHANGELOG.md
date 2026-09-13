@@ -2,7 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
+  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
+  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
+  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
+  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
+
 ### Changed
+
+- **Anmeldefehler sind im Betrieb erstmals unterscheidbar.** Die Kennzahl dafür kannte keinen Wert
+  für „gar keine Anmeldedaten mitgeschickt" — also für genau den Fall, der praktisch immer eintritt
+  — und warf deshalb sämtliche Fehlschläge in einen Topf „sonstige". Neuer Wert `no_credentials`
+  in Backend und Ingest.
 
 - **Bearbeitungen in der Weboberfläche lösen weniger Serverabfragen aus.** Jeder JSON-Aufruf — also
   jedes Speichern, Umschalten und Nachladen ohne Seitenwechsel — hat bisher zusätzlich fünf

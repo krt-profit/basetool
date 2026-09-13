@@ -1130,7 +1130,7 @@ whole reason the flag is mandatory rather than advisory.
 
 **Code:** `docker-compose.yml` (the `JVM CONTAINER SIZING` block and each service's
 `JAVA_TOOL_OPTIONS`) · **Decision:**
-[ADR-0173](../adr/0173-jvm-garbage-collectors-are-set-explicitly.md)
+[ADR-0175](../adr/0175-jvm-garbage-collectors-are-set-explicitly.md)
 
 ## Open questions
 

@@ -1,4 +1,4 @@
-# ADR-0173 — JVM garbage collectors are set explicitly, never left to container ergonomics
+# ADR-0175 — JVM garbage collectors are set explicitly, never left to container ergonomics
 
 - **Status:** Proposed
 - **Date:** 2026-09-13

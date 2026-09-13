@@ -8,7 +8,7 @@
   [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-003`, the no-N+1 rule) ·
   [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the machine-identity
   carve-out that shares this cache key) ·
-  [ADR-0173](0173-jvm-garbage-collectors-are-set-explicitly.md) (the other half of the same
+  [ADR-0175](0175-jvm-garbage-collectors-are-set-explicitly.md) (the other half of the same
   2026-09-13 production investigation) · PR #1141 (the cache itself)
 
 ## Context

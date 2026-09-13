@@ -341,7 +341,7 @@ groups:
 
       # Sustained CPU throttling (#1041 item 7, REQ-OBS-014). container_cpu_cfs_* is emitted only for
       # containers with a CFS quota; the app containers all set cpus limits (db-backend 4.0, backend 3.0,
-      # keycloak 3.0, frontend 2.0, ingest 1.5 — raised 2026-09-13, ADR-0173/0170 investigation,
+      # keycloak 3.0, frontend 2.0, ingest 1.5 — raised 2026-09-13, ADR-0174/0175 investigation,
       # …), so this ratio has data for them. Verified against cadvisor v0.60.3.
       # baseline-tune: the 25% throttled-period ratio is the issue's initial threshold.
       - alert: ContainerCpuThrottledHigh

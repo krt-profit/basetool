@@ -849,7 +849,7 @@ x-frontend: &frontend-template
   #   - the limit goes 1280M -> 1792M, so ergonomics and intent agree instead of contradicting;
   #   - **-XX:+UseG1GC is passed explicitly**, so the collector is a decision recorded in this file
   #     rather than a side effect of a number, and a future limit reduction cannot silently undo
-  #     it. Never rely on the threshold alone (ADR-0173).
+  #     it. Never rely on the threshold alone (ADR-0175).
   # At 1792M x 50 % the ceiling is 896 MB, comfortably above the 529 MB this JVM commits, and
   # 896 + ~420 MB overhead = 73 % of the limit — inside the <= 80 % sizing rule with room for G1's
   # larger native structures. Summed over every prod-profile service, the limits become
@@ -1056,7 +1056,7 @@ x-ingest: &ingest-template
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
     # actually commits, so the container pre-commits almost exactly what it needs.
-    # -XX:+UseSerialGC is DELIBERATE here, unlike on the frontend (ADR-0173). At a 512M limit
+    # -XX:+UseSerialGC is DELIBERATE here, unlike on the frontend (ADR-0175). At a 512M limit
     # this JVM also falls below HotSpot's 1792 MB server-class threshold, so it was already
     # running Serial — by accident. For a relay that served 7 requests in 13 h and is idle
     # between bursts, Serial is the right collector on the merits: lower native overhead and no
