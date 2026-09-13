@@ -86,12 +86,6 @@ class WebAppManifestControllerTest {
   /** The manifest path, spelled once so a rename cannot half-land. */
   private static final String MANIFEST_PATH = "/manifest.webmanifest";
 
-  /** The header fill, mirrored by the manifest, the {@code theme-color} meta tag and the CSS. */
-  private static final String THEME_COLOR = "#141414";
-
-  /** The page background, mirrored by the manifest's {@code background_color} and the CSS. */
-  private static final String BACKGROUND_COLOR = "#000000";
-
   /** Main resources of this module, the root every source-reading assertion below resolves from. */
   private static final Path MAIN_RESOURCES = Path.of("src/main/resources");
 
@@ -384,24 +378,26 @@ class WebAppManifestControllerTest {
     // and it used to be the one nothing checked, so a design refresh could move it while all the
     // tests stayed green. The symptom is a phone status bar one shade off the header it sits above:
     // invisible in review and on every desktop browser.
+    // The STYLESHEET is the reference, read at run time — this test holds no colour of its own.
+    // It used to carry a literal and pin the other three to it, which made it a FOURTH copy of a
+    // value that already existed in three places: change the design token and the test failed
+    // saying the controller was wrong, when what had actually happened is that the token moved and
+    // the controller had not followed. Deriving the expectation says that directly, and there is
+    // one less place to update when the design does change.
+    String headerFill = cssColour("--color-bg-dark-gray");
+    String pageBackground = cssColour("--color-bg-black");
+
     mockMvc
         .perform(get("/"))
         .andExpect(
             content()
                 .string(
-                    containsString("<meta name=\"theme-color\" content=\"" + THEME_COLOR + "\">")));
+                    containsString("<meta name=\"theme-color\" content=\"" + headerFill + "\">")));
 
     mockMvc
         .perform(get(MANIFEST_PATH))
-        .andExpect(jsonPath("$.theme_color").value(THEME_COLOR))
-        .andExpect(jsonPath("$.background_color").value(BACKGROUND_COLOR));
-
-    assertThat(cssColour("--color-bg-dark-gray"))
-        .as("theme-color must be the header fill; see REQ-UI-020")
-        .isEqualTo(THEME_COLOR);
-    assertThat(cssColour("--color-bg-black"))
-        .as("background_color must be the page background; see REQ-UI-020")
-        .isEqualTo(BACKGROUND_COLOR);
+        .andExpect(jsonPath("$.theme_color").value(headerFill))
+        .andExpect(jsonPath("$.background_color").value(pageBackground));
   }
 
   @Test

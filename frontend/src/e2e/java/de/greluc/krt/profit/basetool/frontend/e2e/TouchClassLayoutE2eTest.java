@@ -216,6 +216,19 @@ class TouchClassLayoutE2eTest {
   private static final String SCREENSHOT_ENGINE = "chromium";
 
   /**
+   * Prefix marking a finding as a HIT-AREA one rather than a geometry one.
+   *
+   * <p>The two are filtered differently: above the touch classes only geometry matters, because a
+   * 44px floor is a touch rule and a mouse has no thumb. That filter used to substring-match {@code
+   * "px tall, floor"} out of the probe's own prose, so reformatting a message — adding a unit,
+   * rewording the floor — would silently turn the desktop filter into a pass-through. The comment
+   * on it records that getting this wrong once cost 490 false findings.
+   *
+   * <p>Interpolated into the probe script, so there is one spelling and the compiler moves it.
+   */
+  private static final String HIT_AREA_MARK = "hit-area: ";
+
+  /**
    * The engine this run drives, as {@code e2e.browser}.
    *
    * <p>Read once instead of at each of the three call sites that used to inline the property and
@@ -1016,12 +1029,12 @@ class TouchClassLayoutE2eTest {
       // <select> with no scrollable ancestor at 1600x900 was measured, pushed and thrown away,
       // while its sibling list was already filtered entry-by-entry to keep exactly that half.
       for (Object offender : list(probe.get("badControls"))) {
-        if (!offender.toString().contains("px tall, floor")) {
+        if (!offender.toString().startsWith(HIT_AREA_MARK)) {
           findings.add(where + ": form control — " + offender);
         }
       }
       for (Object offender : list(probe.get("modalIssues"))) {
-        if (!offender.toString().contains("px tall, floor")) {
+        if (!offender.toString().startsWith(HIT_AREA_MARK)) {
           findings.add(where + ": modal — " + offender);
         }
       }
@@ -1284,7 +1297,7 @@ class TouchClassLayoutE2eTest {
             }
             const hit = hitBox(c);
             if (hit.height < floor - slack) {
-              badControls.push(label(c) + ' is ' + Math.round(hit.height)
+              badControls.push('%s' + label(c) + ' is ' + Math.round(hit.height)
                 + 'px tall, floor ' + floor + 'px');
             }
           }
@@ -1365,7 +1378,7 @@ class TouchClassLayoutE2eTest {
                 const floor = floorFor(c);
                 const chit = hitBox(c);
                 if (chit.height < floor - slack) {
-                  modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
+                  modalIssues.push('%s' + name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
                     + 'px tall, floor ' + floor + 'px');
                 }
               }
@@ -1395,5 +1408,5 @@ class TouchClassLayoutE2eTest {
                  modalCount: document.querySelectorAll('.krt-modal-overlay').length };
       }
       """
-          .formatted(DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR);
+          .formatted(DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR, HIT_AREA_MARK, HIT_AREA_MARK);
 }

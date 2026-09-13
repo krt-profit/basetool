@@ -50,7 +50,12 @@
                 <p th:if="${!termsLoadFailed and #lists.isEmpty(termsRows)}"
                    th:text="#{adminTerms.empty}">Keine Einträge für diese Auswahl.</p>
 
-                <table th:if="${!#lists.isEmpty(termsRows)}">
+                <!-- `.table-responsive` so the table scrolls for itself instead of widening the page.
+                     REQ-UI-009: a table is the shape that overflows a phone, and this one carries a
+                     user column, a status, a timestamp and a version. The condition moves to the
+                     wrapper so an empty result renders neither, as on every other admin table. -->
+                <div class="table-responsive" th:if="${!#lists.isEmpty(termsRows)}">
+                <table>
                     <thead>
                     <tr>
                         <th th:text="#{adminTerms.column.user}">Nutzer</th>
@@ -78,6 +83,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </div>
 
                 <div th:if="${termsPage != null and termsPage.totalPages() > 1}" class="mt-2">
                     <span th:text="#{adminTerms.pageOf(${termsPage.page() + 1}, ${termsPage.totalPages()})}">Seite 1 von 1</span>

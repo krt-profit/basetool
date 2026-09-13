@@ -177,8 +177,20 @@ document.addEventListener('DOMContentLoaded', function () {
     // frame; the media query listener keeps the `position` read out of the hot path entirely, since
     // the breakpoint is the only thing that can change the answer.
     if (footerEl) {
+        // The breakpoint IS duplicated here, and saying so is better than the comment above
+        // implying it lives only in the stylesheet: a `change` listener needs a query string,
+        // and there is no way to ask CSS for one. `max-width: 768px` is exactly equivalent to
+        // the stylesheet's `width <= 768px`; the older spelling is kept deliberately, because a
+        // browser that cannot parse the range form would leave `matches` false forever and
+        // publish a footer height of 0 at every width, which is a worse failure than the CSS
+        // simply not applying.
         const phone = window.matchMedia('(max-width: 768px)');
-        let covers = !phone.matches;
+        // Deliberately NOT `!phone.matches`: `onBreakpoint()` runs synchronously below, before
+        // any listener is attached and before anything can read this, and it derives the value
+        // from the computed position — which the comment above calls the single source. Seeding
+        // it from the media query as well made two sources of one answer, and the seed was
+        // always thrown away unread.
+        let covers = false;
         let pending = false;
         const measure = () => {
             pending = false;
