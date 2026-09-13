@@ -1,4 +1,4 @@
-# ADR-0174 — Layout floors are defaults a control opts out of, not lists a control must join
+# ADR-0176 — Layout floors are defaults a control opts out of, not lists a control must join
 
 - **Status:** Accepted — implemented
 - **Date:** 2026-09-13
@@ -8,6 +8,7 @@
   contract and the guard this builds on) · [ADR-0171](0171-an-adr-number-is-claimed-against-the-base-branch.md)
   (how this number was claimed) · specs [`ui-design-system.md`](../specs/ui-design-system.md)
   `REQ-UI-009` (amended)
+- **Stacked on** PR #1873 (the shared page-route catalogue), which is itself stacked on #1870
 
 ## Context
 
@@ -134,8 +135,9 @@ dense set from the CSSOM, so a class that consumes the token nowhere was in no s
 requirement said about it — the exemption was being measured against 44px. It is declared now.
 
 **Verifying the inversion exposed three defects in the guard itself**, all found by loading the real
-stylesheets into a browser and asking for the dense set. They are fixed here because a guard that
-cannot read the stylesheet cannot be the thing that follows it:
+stylesheets into a browser and asking for the dense set — and the dense set is what this decision
+makes load-bearing, because once the floor is a default, a wrongly-derived exempt set *is* the
+exemption:
 
 1. `if (rule.cssRules) { walk(rule.cssRules); continue; }` skipped **every style rule**.
    `CSSStyleRule` inherits from `CSSGroupingRule` since CSS Nesting shipped, so it now carries a
@@ -146,8 +148,21 @@ cannot read the stylesheet cannot be the thing that follows it:
    threw a `ReferenceError` out of the temporal dead zone instead of reporting anything. Two silent
    failures in series is how a guard reports on a stylesheet it never read.
 3. Class names were extracted from each selector's subject, but a compound means AND: `.btn.btn-xs`
-   contributed the bare class `btn`, which exempted **every button in the app** down to 32px. The
-   subject is now kept as a selector and matched with `Element.matches`.
+   contributed the bare class `btn`, which exempted **every button in the app** down to 32px.
+
+**All three are fixed by PR #1873, not here**, and this branch is stacked on it. Three sessions found
+them within a day of each other, which is itself worth recording: the first two also on
+`test/touch-class-legacy-modals`, and all three independently while verifying this inversion. #1873's
+resolution is the better one and is the one that stands — it keeps each **whole selector** out of the
+CSSOM rather than only the subject compound, so `.pa-sort-controls .pa-sort-btn` needs its ancestor
+and `input.item-checkbox` its element, where a subject-only set had to be reasoned about. Rebasing
+onto it dropped this branch's duplicate.
+
+What this branch still carries in the guard is the part the inversion actually requires: **one shared
+control selector for both sweeps**. They kept separate copies and had already drifted —
+`.krt-modal-close` was in the modal list and not the page list — and the constant now mirrors the CSS
+default, which is what pulled `summary` and `[role="button"]` into measurement for the first time.
+That found a real defect on its first run.
 
 **Risk accepted, and one instance of it found.** The wrap rule changes behaviour on rows nobody
 enumerated, which is the point and also the exposure: a flex row that relied on the initial `nowrap`
