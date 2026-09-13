@@ -181,7 +181,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
 
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    String uri = request.getRequestURI();
+    // CONTEXT-RELATIVE, not the raw URI. `/actuator/` and `/webjars/` are anchored with
+    // `startsWith`, so under a non-root context path they matched nothing and both were logged
+    // after all — the quiet-asset exemption silently off. `PublicPaths.relativePath` is the one
+    // place that arithmetic lives; this method was the last caller still doing it by hand.
+    String uri = PublicPaths.relativePath(request);
     return uri.endsWith(".css")
         || uri.endsWith(".js")
         || uri.endsWith(".ico")
