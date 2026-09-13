@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
@@ -82,6 +83,7 @@ import tools.jackson.databind.JsonNode;
  * RefineryOrderWriteController}.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/refinery-orders")
 @RequiredArgsConstructor
 @Slf4j

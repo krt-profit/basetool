@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
@@ -60,6 +61,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * destructive bulk op gated to ADMIN/OFFICER.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/ship-data")
 @RequiredArgsConstructor
 @Slf4j

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LeitungViewDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -65,6 +66,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * group tiles, capability buttons) never desyncs.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/organisation/leitung")
 @RequiredArgsConstructor
 @Slf4j

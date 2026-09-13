@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitParentUpdateRequest;
@@ -67,6 +68,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * shows the right toast.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/org-structure")
 @RequiredArgsConstructor
 @Slf4j

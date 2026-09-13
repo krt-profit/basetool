@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
@@ -93,6 +94,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j

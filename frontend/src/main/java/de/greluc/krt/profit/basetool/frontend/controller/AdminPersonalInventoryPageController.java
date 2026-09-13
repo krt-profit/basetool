@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PersonalInventoryItemDto;
@@ -58,6 +59,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * distinction is unambiguous.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/personal-inventory")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

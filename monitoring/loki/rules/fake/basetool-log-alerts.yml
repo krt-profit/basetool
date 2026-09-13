@@ -126,8 +126,40 @@ groups:
       # risk, since the login code exchange shares the same transport. Pattern verified against the
       # real prod lines of the incident (logger reactor.netty HttpClientConnect, stack_trace
       # PrematureCloseException, remote keycloak.profit-base.online in the same JSON line).
+      #
+      # The discriminator EXCLUDES the backend hop instead of naming the Keycloak one (2026-09-13).
+      #
+      # It used to be `|~ "keycloak"`, which matched the remote `keycloak.profit-base.online` in
+      # that line. ADR-0166 moved identity onto the app origin, so the remote is now
+      # `profit-base.online` and the filter matched NOTHING — the 2026-07-22 incident class, 41
+      # minutes of lost token grants with every probe green and zero alerts, was unmonitored again
+      # and nothing said so. A filter that goes silently empty is the worst failure an alert has.
+      #
+      # The replacement was chosen by REPRODUCING the line rather than by reading the old comment
+      # (reactor-netty 1.3, a server that accepts and closes without answering, DEBUG on):
+      #
+      #   WARN reactor.netty.http.client.HttpClientConnect --
+      #     [b8f9b8d6-1, L:/10.0.0.5:53170 - R:profit-base.online/1.2.3.4:443]
+      #     The connection observed an error
+      #
+      # which rules out the two obvious candidates:
+      #   - the REQUEST URI is not in it. `Handler is being applied: {uri=...}` is a separate DEBUG
+      #     event, and DEBUG is off in production — so `|~ "/auth/realms"` would match nothing and
+      #     reproduce the very silence being fixed.
+      #   - the POOL NAME is not in it either. `Creating a new [frontend-oauth-pool] client pool`
+      #     is logged once, at pool creation, at DEBUG. Keying on ADR-0115's pool name fails the
+      #     same way.
+      #
+      # The remote address is the only discriminator the line actually carries, and naming the
+      # PUBLIC host would re-couple this alert to a value that just moved once and can move again.
+      # The frontend has exactly two reactor-netty destinations — the backend (`BACKEND_URL`,
+      # `https://backend:11261`, pools `frontend-pool` / `frontend-sse-pool`) and Keycloak
+      # (`frontend-oauth-pool`) — so excluding `R:backend` leaves the OAuth backchannel, and does it
+      # through a COMPOSE SERVICE NAME that no domain change touches. If a third outbound
+      # destination is ever added, it lands in this alert as a false attribution, which is loud;
+      # the previous shape failed the other way.
       - alert: FrontendKeycloakBackchannelFailing
-        expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" |~ "keycloak" [10m])) > 10'
+        expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" != "R:backend" [10m])) > 10'
         for: 5m
         labels:
           severity: warning

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.GroupedInventoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
@@ -71,6 +72,7 @@ import tools.jackson.databind.json.JsonMapper;
  * InventoryWriteController}, which delegates back here for inline validation-failure re-renders.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/inventory")
 @RequiredArgsConstructor
 @Slf4j

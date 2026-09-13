@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -52,6 +53,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * never shown.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("isAuthenticated()")

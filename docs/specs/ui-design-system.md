@@ -403,7 +403,7 @@ tile widened its `auto-fit` track and the tablet-landscape class scrolled sidewa
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** [ADR-0165](../adr/0165-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
+**Enforced by:** [ADR-0170](../adr/0170-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
 footer behaviour, chrome share — with a full-page screenshot per page and class) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither

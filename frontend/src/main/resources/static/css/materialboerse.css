@@ -133,7 +133,7 @@
     /* `100dvh`, not `100vh`: `vh` is the LARGE viewport (address bar hidden), so on a phone
        this calc over-estimates by the bar's height and the box's bottom sits under it. That
        was survivable while `--krt-footer-height` subtracted ~75px; since the phone footer
-       scrolls (ADR-0165) the variable publishes 0 there, the box grew by exactly that much,
+       scrolls (ADR-0170) the variable publishes 0 there, the box grew by exactly that much,
        and the error became visible. `.sidebar` and `.krt-modal-overlay` were converted for
        this reason and these four consumers of the same measurement were missed. */
     /* Two declarations, the `vh` line first, the `dvh` line second: an engine that does not know `dvh`

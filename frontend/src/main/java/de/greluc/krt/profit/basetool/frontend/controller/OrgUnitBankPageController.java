@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountRefDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
@@ -66,6 +67,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * /api/proxy/org-units/bank/**} (no reload, REQ-FE-005).
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 public class OrgUnitBankPageController {

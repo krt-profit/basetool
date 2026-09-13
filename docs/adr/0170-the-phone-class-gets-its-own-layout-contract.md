@@ -1,4 +1,4 @@
-# ADR-0165 — The phone class gets its own layout contract, and a guard that measures it
+# ADR-0170 — The phone class gets its own layout contract, and a guard that measures it
 
 - **Status:** Accepted — implemented (owner-requested 2026-09-13)
 - **Date:** 2026-09-13

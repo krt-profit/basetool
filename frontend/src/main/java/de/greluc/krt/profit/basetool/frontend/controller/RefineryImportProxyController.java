@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ImportIssueDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RefineryImportDraftDto;
@@ -69,6 +70,7 @@ import tools.jackson.databind.json.JsonMapper;
  * already-localized problem detail, e.g. unsupported schema version).
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/refinery-orders")
 @RequiredArgsConstructor
 @Slf4j
