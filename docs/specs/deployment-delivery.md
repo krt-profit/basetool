@@ -1092,6 +1092,46 @@ to the shared group and restores the defect exactly.
 - Application-level configuration delivered as environment variables in `.env` is host-only and
   out of scope here (it is never bundled). The list of env keys lives in `README.md`.
 
+### REQ-OPS-028 — Every JVM container names its garbage collector
+
+A container that passes `-XX:+UseContainerSupport` without a collector flag does not choose its
+collector; HotSpot's ergonomics do. G1 is selected only on a *server-class machine* — at least
+**2 CPUs and at least 1792 MB** — and under container support that memory figure is the **cgroup
+limit**, not the host's. Below either bound it falls back to SerialGC silently: no log line, no
+warning, and nothing in any metric that names the collector.
+
+That had been true of `frontend` (1280M) and `ingest` (512M) for the entire life of the limit
+scheme, while `backend` (2048M) ran G1 only by the accident of its limit. `keycloak` was the only
+module that ever said so, via `-XX:+UseG1GC` in its vendor image.
+
+**Every JVM service therefore names its collector in `JAVA_TOOL_OPTIONS`**, and omitting it is a
+defect whether or not ergonomics currently picks the intended one:
+
+|  Service   | Limit |                                                               Collector                                                                |
+|------------|-------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `frontend` | 1792M | `-XX:+UseG1GC`                                                                                                                         |
+| `backend`  | 2048M | `-XX:+UseG1GC`                                                                                                                         |
+| `ingest`   | 512M  | `-XX:+UseSerialGC` — deliberate; a relay that is idle between bursts does not benefit from G1, and Serial's native overhead is smaller |
+
+The sizing rule in `docker-compose.yml` gains a clause with this: **a memory-limit change that
+crosses 1792 MB changes the collector**, with a different heap layout, different native overhead and
+different pause behaviour. It must be made deliberately, not discovered afterwards — which is the
+whole reason the flag is mandatory rather than advisory.
+
+**Acceptance**
+
+- [x] `frontend`, `backend` and `ingest` each pass an explicit collector flag.
+- [x] The frontend's limit is at or above 1792M, so ergonomics and the explicit flag agree rather
+  than contradict each other.
+- [x] The sum of limits over all prod-profile services stays under ADR-0085's ~14 GB review trigger
+  (9792 MiB app + 4368 MiB monitoring = 14 160 MiB).
+- [x] The running collector is verifiable without reading a flag: `jvm_gc_pause_seconds_count`
+  carries `gc="G1 Young Generation"` for G1 and `gc="Copy"` + `gc="MarkSweepCompact"` for Serial.
+
+**Code:** `docker-compose.yml` (the `JVM CONTAINER SIZING` block and each service's
+`JAVA_TOOL_OPTIONS`) · **Decision:**
+[ADR-0173](../adr/0173-jvm-garbage-collectors-are-set-explicitly.md)
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
