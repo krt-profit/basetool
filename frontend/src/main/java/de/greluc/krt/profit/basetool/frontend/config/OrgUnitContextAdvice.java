@@ -70,8 +70,15 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * leaves the badge empty; a non-resolvable squadron list leaves the dropdown empty. We never let an
  * unrelated UI fail because the context advice could not reach the backend — the page would render
  * empty cells for the squadron columns but the rest of the layout stays intact.
+ *
+ * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
+ * they serialise through Jackson and never read a model attribute. See that annotation for why the
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package.
+ * Three of the five layout-model backend reads are made here — the active org unit, the cached
+ * squadron page-walk and the org-unit memberships — so this is the largest single share of the cost
+ * a JSON endpoint used to pay.
  */
-@ControllerAdvice
+@ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 @Slf4j
 public class OrgUnitContextAdvice {

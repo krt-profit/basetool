@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0094
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-13.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0094, ADR-0165
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -1682,6 +1682,43 @@ registry: the admin area is web-only permanently, so a room there would have no 
 > `backend/…/support/ResilientRedisMessageListenerContainer`, `backend/…/support/LiveSyncTopic`,
 > `LiveSyncTopicClass`, `LiveSyncAuthorization` · **ADR:** ADR-0143 (ADR-0094 unchanged) ·
 > **App side:** `basetool-android` `REQ-APP-SYNC-*`
+
+### REQ-FE-020 — A JSON endpoint does not build the layout model
+
+The layout `@ControllerAdvice` beans of `frontend/config` must be scoped so they run only for
+controllers that render Thymeleaf views. A `@RestController` in the `frontend` module — `/csrf` and
+the JSON proxies every `krtFetch` call goes through — must not invoke them, because its response is
+serialised by Jackson and can never read a model attribute.
+
+The scope selector is the marker annotation `UsesLayoutModel`, applied alongside `@Controller` on
+every view controller; the five layout advices declare `@ControllerAdvice(annotations =
+UsesLayoutModel.class)`. The layout model is therefore **opt-in**: a controller added without the
+marker costs nothing, which is the correct default for this spec's JSON surface. See ADR-0165 for
+why the two obvious selectors — the `@Controller` stereotype, and a base package — both fail.
+
+`GlobalBindingAdvice` is explicitly **excluded** from this requirement and stays application-wide.
+It contributes no model attribute; it registers the normalising `String` editor on the
+`WebDataBinder`, through which Spring converts `@RequestParam` and `@PathVariable` strings — so the
+proxies' search terms, `handoff`, `domain` and `roleCode` arguments depend on it for trimming and
+the length cap. Scoping it would be a validation change, not a performance one.
+
+Until this was enforced, none of the six advices carried a selector, and Spring's `ModelFactory`
+ran them ahead of every handler in the module: one authenticated `GET /csrf` cost five backend
+reads — four uncached, plus the cached squadron page-walk — to build a model it discarded. Because
+in-place mutation is the app's primary interaction model (REQ-FE-001…REQ-FE-010), that sat on the
+hot path.
+
+**Acceptance**
+
+- [ ] An authenticated request to a `@RestController` in the `frontend` module triggers none of
+  `/api/v1/me/capabilities`, `/api/v1/notifications/unread-count`, `/api/v1/me/active-org-unit`,
+  `/api/v1/me/org-units` or the `CachedCatalog.SQUADRONS` page-walk.
+- [ ] Every `@Controller` in the module carries `@UsesLayoutModel`; no `@RestController` carries it.
+  Both halves are asserted, so the scoping can neither drift open nor close over a page.
+- [ ] View controllers are unaffected: pages still render with org-unit context, capability flags,
+  app title, unread count, CSRF metas and app version.
+- [ ] `GlobalBindingAdvice` remains unscoped, and a `String` `@RequestParam`/`@PathVariable` on a
+  proxy is still trimmed and length-capped.
 
 ## Out of scope
 

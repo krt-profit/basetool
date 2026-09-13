@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialDemandRowDto;
@@ -50,6 +51,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * one URL stem.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j

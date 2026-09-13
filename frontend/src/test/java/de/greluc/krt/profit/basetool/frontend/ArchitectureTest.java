@@ -26,6 +26,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -149,6 +150,43 @@ class ArchitectureTest {
    * all (REQ-SEC-038). They are exactly the frontend {@code permitAll} entries that are served by a
    * controller rather than by the static-asset handlers, and REQ-SEC-052 enumerates them.
    */
+  @Test
+  void everyViewControllerOptsIntoTheLayoutModel() {
+    // The five layout advices in `frontend.config` select on @UsesLayoutModel. A @Controller
+    // renders Thymeleaf views, so it needs the model they contribute; forgetting the marker
+    // produces a page with no org-unit context, capability flags, app title, unread count or
+    // CSRF metas rather than a compile error, so it is pinned here instead.
+    List<String> unmarked =
+        CLASSES.stream()
+            .filter(c -> c.isAnnotatedWith(Controller.class))
+            .filter(c -> !c.isAnnotatedWith(UsesLayoutModel.class))
+            .map(JavaClass::getSimpleName)
+            .sorted()
+            .toList();
+
+    assertThat(unmarked)
+        .as("every @Controller must opt into the layout model with @UsesLayoutModel")
+        .isEmpty();
+  }
+
+  @Test
+  void noRestControllerOptsIntoTheLayoutModel() {
+    // The inverse half. A @RestController serialises through Jackson and can never read a model
+    // attribute, so marking one only buys back the backend round trips the advices cost — three
+    // of the five reach the backend. LayoutModelScopeMvcTest pins the runtime half of this.
+    List<String> marked =
+        CLASSES.stream()
+            .filter(c -> c.isAnnotatedWith(RestController.class))
+            .filter(c -> c.isAnnotatedWith(UsesLayoutModel.class))
+            .map(JavaClass::getSimpleName)
+            .sorted()
+            .toList();
+
+    assertThat(marked)
+        .as("a @RestController discards the layout model; it must not carry @UsesLayoutModel")
+        .isEmpty();
+  }
+
   private static final Set<String> PUBLIC_BY_DESIGN =
       Set.of(
           "AssetLinksController",

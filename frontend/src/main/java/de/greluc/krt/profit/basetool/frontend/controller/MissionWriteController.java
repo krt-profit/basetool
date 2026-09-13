@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
@@ -102,6 +103,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * opposites.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/missions")
 @RequiredArgsConstructor
 @Slf4j

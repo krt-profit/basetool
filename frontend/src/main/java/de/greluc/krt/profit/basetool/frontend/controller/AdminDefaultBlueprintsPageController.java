@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.DefaultBlueprintCreateRequest;
@@ -54,6 +55,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * without per-row DOM patching — the set is small and admin-only, so a reload is cheap.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/default-blueprints")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

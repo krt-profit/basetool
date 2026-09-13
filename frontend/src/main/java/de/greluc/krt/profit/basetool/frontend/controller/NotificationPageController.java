@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.config.TermsAcceptanceGateFilter;
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationBulkResultDto;
@@ -81,6 +82,7 @@ import reactor.core.Disposable;
  * MessageSource} so the page and the bell dropdown render identical strings.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/notifications")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")

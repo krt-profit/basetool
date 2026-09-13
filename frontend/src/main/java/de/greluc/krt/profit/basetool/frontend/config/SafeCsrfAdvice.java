@@ -53,9 +53,15 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *
  * <p>The advice is deliberately <em>not</em> limited to the error views. Every page benefits: a
  * template can no longer be taken down by a token accessor, wherever the session came from.
+ *
+ * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
+ * they serialise through Jackson and never read a model attribute. See that annotation for why the
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
+ * reaches no backend; the CSRF metas it publishes are template input, and a REST caller reads its
+ * token from {@code /csrf} instead.
  */
 @Slf4j
-@ControllerAdvice
+@ControllerAdvice(annotations = UsesLayoutModel.class)
 public class SafeCsrfAdvice {
 
   /**

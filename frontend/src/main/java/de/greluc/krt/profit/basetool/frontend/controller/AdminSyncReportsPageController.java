@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.SyncReportPurgeResultDto;
@@ -54,6 +55,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * Read-only: the page never mutates the audit log.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

@@ -41,8 +41,13 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * <p>The capability resolution fails <em>closed</em>: any backend hiccup yields all-off rather than
  * exposing a gated menu or page the caller may not be entitled to. The backend enforces the same
  * gates, so a hidden control and the API stay in lockstep.
+ *
+ * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
+ * they serialise through Jackson and never read a model attribute. See that annotation for why the
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
+ * is one uncached backend read ({@code /api/v1/me/capabilities}) per authenticated request.
  */
-@ControllerAdvice
+@ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 @Slf4j
 public class CapabilityFlagsAdvice {

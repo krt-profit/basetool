@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -47,6 +48,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * this-order slice delivered.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/orders")
 @RequiredArgsConstructor
 @Slf4j

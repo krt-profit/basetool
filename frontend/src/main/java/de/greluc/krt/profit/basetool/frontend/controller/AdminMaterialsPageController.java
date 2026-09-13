@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialCreateAjaxRequest;
@@ -68,6 +69,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * through full-page redirects because both invalidate the materials cache.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/materials")
 @RequiredArgsConstructor
 @Slf4j
