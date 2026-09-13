@@ -664,6 +664,42 @@ val lintCss =
     inputs.file(".stylelintrc.json")
   }
 
+// The CSS inside a Thymeleaf <style> block, which no gate read until 2026-09-13.
+//
+// `lintCss` globs `static/css/**`, `prettierCheck` the same plus `static/js` and `types/`, and
+// HTMLHint does not parse CSS at all — so roughly 2,000 lines of inline CSS across 110 templates
+// were unlinted. A review found what that costs: two templates carried a STRAY `}` after a rule
+// that was already closed, and per CSS Syntax 3 the parser consumes the next rule as part of an
+// invalid prelude and drops it — `.mission-head-sticky` was deleted on three pages at every
+// viewport width, with `nginx -t`-grade confidence from every green check in CI.
+//
+// Stylelint reads inline CSS with `postcss-html`. This task runs with a DELIBERATELY TINY rule set
+// (see .stylelintrc.templates.json) rather than the stylesheet config, because the value is almost
+// all in the parse: run against the broken revision with NO rules enabled at all, it reports
+// `Unexpected }` at mission-detail.html:39:9 — exactly the defect, exactly the line. Adopting the
+// full `stylelint-config-standard` here would instead surface hundreds of pre-existing findings
+// and the gate would never be enabled. `media-feature-range-notation` is the one style rule worth
+// its cost: it is what keeps `@media (max-width: 768px)` from reappearing beside the range form
+// every rule in static/css uses, and it auto-fixes.
+val lintCssInline =
+  tasks.register<NpxTask>("lintCssInline") {
+    group = "verification"
+    description = "Lints the CSS inside Thymeleaf <style> blocks (Stylelint + postcss-html)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("stylelint")
+    args.set(
+      listOf(
+        "--config",
+        ".stylelintrc.templates.json",
+        "src/main/resources/templates/**/*.html",
+      )
+    )
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
+    inputs.file("package.json")
+    inputs.file(".stylelintrc.templates.json")
+  }
+
 val lintHtml =
   tasks.register<NpxTask>("lintHtml") {
     group = "verification"
@@ -817,5 +853,13 @@ val testGenApiTypes =
   }
 
 tasks.named("check").configure {
-  dependsOn(lintCss, lintHtml, lintJs, prettierCheck, typecheckJs, testGenApiTypes)
+  dependsOn(
+    lintCss,
+    lintCssInline,
+    lintHtml,
+    lintJs,
+    prettierCheck,
+    typecheckJs,
+    testGenApiTypes,
+  )
 }
