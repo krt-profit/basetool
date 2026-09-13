@@ -364,22 +364,13 @@ tr.is-inert td {
     padding: 14px 16px;
 }
 
-.krt-modal-foot {
-    display: flex;
-    justify-content: flex-end;
-    /*
-     * Repeats the wrap from styles.css on purpose. This file loads AFTER it and
-     * redeclares the same selector, so every property named here wins — and a
-     * `justify-content` row with no wrap pushes the last button out of a 335px
-     * modal frame on a 375px phone. The bank carries the tool's longest button
-     * labels ("Endgültig löschen", "Buchung freigeben"), so this is exactly the
-     * page set where the omission would bite.
-     */
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px 16px;
-    border-top: var(--border-hairline);
-}
+/* `.krt-modal-foot` is NOT redeclared here any more.
+ *
+ * This file loads after styles.css, so a copy of the selector wins every property it names — and
+ * the copy named six of the canonical rule's seven, silently dropping `flex-shrink: 0`. A tall bank
+ * modal's button row could therefore be squeezed while every other modal's could not. Deleting the
+ * copy gives the bank pages the canonical rule, wrap included, and ends the obligation to keep two
+ * declarations of one thing in step. */
 
 .krt-modal .confirm-input {
     width: 100%;
@@ -1426,7 +1417,7 @@ tr.is-inert td {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 32px;
+    min-height: var(--touch-target-dense);
     padding: 0 0.75rem;
     font-size: 0.75rem;
     color: var(--color-gray-1);

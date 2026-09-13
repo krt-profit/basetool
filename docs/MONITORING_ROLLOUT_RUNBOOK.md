@@ -72,8 +72,9 @@ grep -E '^\s+image:' docker-compose.monitoring.yml
 
 **Adjacent products** (UI click-paths verified against these): **Keycloak 26.6**, **NPM 2.15.1**,
 Grafana 13.x, Hetzner Cloud Console (current), healthchecks.io (current). Realm: `iri`. Public hosts:
-`profit-base.online`, `ingest.profit-base.online`, `keycloak.profit-base.online`, and the new
-`grafana.profit-base.online`.
+`profit-base.online`, `ingest.profit-base.online`, and the new `grafana.profit-base.online`.
+(`keycloak.profit-base.online` was retired 2026-09-13 — identity answers at `/auth` on the web
+host, ADR-0166.)
 
 **Run everything below as `root` (via `sudo`) unless a command is explicitly `sudo -u deploy`.**
 

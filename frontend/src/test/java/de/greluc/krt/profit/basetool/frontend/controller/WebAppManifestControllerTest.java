@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -51,6 +52,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.i18n.CookieLocaleResolver;
 
 /**
  * Pins the properties that decide whether an iPhone or iPad can install the Basetool at all
@@ -408,5 +411,29 @@ class WebAppManifestControllerTest {
             "REQ-UI-020 / ADR-0164: the frontend registers no service worker. Adding one needs an"
                 + " ADR, because it would put member data in a store no logout clears.")
         .isEmpty();
+  }
+
+  /**
+   * The manifest's fallback language is the one the application actually defaults to.
+   *
+   * <p>{@code WebAppManifestController.DEFAULT_LOCALE} and {@code LocaleConfig}'s {@code
+   * clr.setDefaultLocale(...)} are two declarations of one fact with nothing tying them together.
+   * Changing the resolver alone leaves the manifest emitting {@code "lang": "de"} over German
+   * {@code pwa.*} strings while every page renders English — and because the body is cached {@code
+   * public, max-age=1h} and read by installers, every home screen added afterwards keeps the wrong
+   * name, with no error raised anywhere. This is the assertion that makes the pair break loudly.
+   */
+  @Test
+  void theDefaultLocaleMatchesTheResolvers() throws Exception {
+    LocaleResolver resolver = context.getBean(LocaleResolver.class);
+    assertInstanceOf(
+        CookieLocaleResolver.class,
+        resolver,
+        "the locale resolver is the cookie one; this test reads its default");
+
+    mockMvc
+        .perform(get("/manifest.webmanifest"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lang").value("de"));
   }
 }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -88,11 +89,26 @@ final class PublicPaths {
   }
 
   /**
+   * A sourcemap, anchored to the two trees that can serve one.
+   *
+   * <p>Deliberately not {@code endsWith(".map")} — see {@link #isStaticAsset}.
+   */
+  private static final Pattern SOURCEMAP = Pattern.compile("^/(css|js)/.*\\.map$");
+
+  /**
    * Whether the path is one of the static asset trees, the favicon, or a sourcemap.
    *
    * <p>{@code /sm/} is listed even though its files end in {@code .map}: the prefix is what {@code
    * SecurityConfig} allow-lists, and a sourcemap served from there without the extension would
    * otherwise fall through.
+   *
+   * <p><b>The sourcemap match is anchored to the two asset trees, not a bare {@code
+   * endsWith(".map")}.</b> This predicate feeds {@link #isGateExempt}, so a suffix match let ANY
+   * path opt out of both session gates by carrying that ending — a member who declined the terms,
+   * or whose registration is still pending, reaches any String-path-variable route by appending
+   * {@code .map}, since {@code PathPatternParser} happily binds it into the variable. {@code
+   * RequestLoggingFilter} refuses the same shortcut for the same reason, where it costs only an
+   * access-log line.
    *
    * @param path a context-relative path, as returned by {@link #relativePath}
    * @return {@code true} for an asset path
@@ -105,7 +121,7 @@ final class PublicPaths {
         || path.startsWith("/fonts/")
         || path.startsWith("/sm/")
         || path.equals("/favicon.ico")
-        || path.endsWith(".map");
+        || SOURCEMAP.matcher(path).matches();
   }
 
   /**
@@ -170,6 +186,26 @@ final class PublicPaths {
    * @return {@code true} when neither session gate may redirect this path
    */
   static boolean isGateExempt(@NotNull String path) {
-    return isAssetOrPublicDocument(path) || isAuthInfrastructure(path);
+    return isAssetOrPublicDocument(path) || isAuthInfrastructure(path) || isLegalPage(path);
+  }
+
+  /**
+   * The three pages a member must be able to read while a gate is holding them.
+   *
+   * <p>Neither gate may redirect these, and for the same reason in both cases: nobody can be asked
+   * to agree to terms they are prevented from reading, and nobody may be cut off from the imprint
+   * or the privacy policy because their registration has not been approved yet. {@link
+   * TermsAcceptanceGateFilter} said so in its own Javadoc — "that last one is what a careless
+   * allowlist drops, and dropping it makes the gate legally self-defeating" — and listed them
+   * inline while {@link BackendRoleSyncFilter} did not, so a signed-in member whose registration
+   * was PENDING or REJECTED was bounced to the waiting page from all three and had to sign out to
+   * read them. They live here now because this class exists precisely so that two gates cannot
+   * disagree about what is reachable.
+   *
+   * @param path a context-relative path, as returned by {@link #relativePath}
+   * @return {@code true} for the imprint, the privacy policy or the public terms page
+   */
+  static boolean isLegalPage(@NotNull String path) {
+    return path.equals("/impressum") || path.equals("/privacy") || path.equals("/terms");
   }
 }

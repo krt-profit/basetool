@@ -19,18 +19,19 @@ Budget 15 minutes. Everything is reversible at every step; the way back is at th
 
 ## 0. Before you start
 
-Six variables must be in the host `.env`, and the edge **refuses to start** without the five host
+Five variables must be in the host `.env` since ADR-0166 retired the Keycloak vhost (it was
+six), and the edge **refuses to start** without the four host
 names — nginx has no variables in `server_name`, one promoted bundle serves every environment, and a
 missing name would render `server_name ;`.
 
 ```bash
-grep -cE '^(ACME_EMAIL|EDGE_HOST_(FRONTEND|KEYCLOAK|INGEST|GRAFANA|API))=' /var/iri/code/.env   # expect: 6
+grep -cE '^(ACME_EMAIL|EDGE_HOST_(FRONTEND|INGEST|GRAFANA|API))=' /var/iri/code/.env   # expect: 5
 ```
 
 `ACME_HOSTS` is the seventh and the only one that may be **empty**: an environment whose certificate
 is provided rather than issued — a test host behind a proxy, where HTTP-01 cannot reach anything —
 leaves it unset and the `acme` container idles instead of exiting. On production it carries the same
-five names, the first of which becomes the certificate's CN.
+four names since ADR-0166 retired the Keycloak host, the first of which becomes the certificate's CN.
 
 The edge verifies its upstreams against the certificate exported from the shared keystore. It is
 already on the host for Prometheus; confirm rather than assume:
@@ -54,7 +55,8 @@ would "ship and do nothing":
 ls /var/iri/code/docker/edge/conf.d/ /var/iri/code/docker/edge/include/
 ```
 
-Expect **seven** files under `conf.d/` (the maps plus six server blocks) and **seven** under
+Expect **six** files under `conf.d/` (the maps plus five server blocks — the Keycloak one went with
+ADR-0166) and **eight** under
 `include/`. If the directory is absent, the bundle predates the change — promote again and do not
 continue.
 
@@ -97,13 +99,13 @@ docker volume create code_edge-certs && docker volume ls --format '{{.Name}}' | 
 Copy each host's material into the per-host layout the edge mounts. The mapping was read from the
 live NPM configuration on 2026-09-12:
 
-|             Host              | NPM certificate |
-|-------------------------------|-----------------|---------------------------------------------------------|
-| `profit-base.online`          | `npm-3`         |
-| `keycloak.profit-base.online` | `npm-4`         | — **retired 2026-09-13 (ADR-0166)**, see the note below |
-| `ingest.profit-base.online`   | `npm-5`         |
-| `grafana.profit-base.online`  | `npm-7`         |
-| `api.profit-base.online`      | `npm-8`         |
+|             Host              | NPM certificate |                     Note                     |
+|-------------------------------|-----------------|----------------------------------------------|
+| `profit-base.online`          | `npm-3`         |                                              |
+| `keycloak.profit-base.online` | `npm-4`         | **retired 2026-09-13 (ADR-0166)**, see below |
+| `ingest.profit-base.online`   | `npm-5`         |                                              |
+| `grafana.profit-base.online`  | `npm-7`         |                                              |
+| `api.profit-base.online`      | `npm-8`         |                                              |
 
 ```bash
 docker run --rm \
@@ -206,7 +208,7 @@ recreates the edge to load them. Nothing to do by hand.
 > docker run --rm -v code_edge-certs:/c:ro alpine:3 sh -c 'ls -ln /c/*/ | head -20'
 > ```
 >
-> Every one of the five host directories must carry a `fullchain.pem` and a `privkey.pem` owned by
+> Every one of the four host directories must carry a `fullchain.pem` and a `privkey.pem` owned by
 > `101:101`, with a timestamp from the acme run rather than from the seeding.
 
 ---

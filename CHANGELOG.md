@@ -54,6 +54,15 @@
 - **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
   als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
   Einsatzseiten sah er immer schon richtig aus.
+- **Wer auf seine Freigabe wartete, kam nicht an Impressum und Datenschutz.** Ein angemeldetes
+  Mitglied mit noch offener Registrierung wurde von beiden Seiten auf die Wartesseite geschickt und
+  musste sich abmelden, um sie zu lesen. Beide Seiten sind jetzt erreichbar, wie die
+  Nutzungsbedingungen es schon waren.
+- **Auf kurzen Seiten hing die Fußzeile auf dem Handy mitten im Bild** statt am Seitenende — etwa
+  auf einer leeren Benachrichtigungsliste. Sie sitzt jetzt wieder unten.
+- **Die Aktionsleiste der Einsatz-Verwaltung und der Balken des Organigramms überdeckten auf dem
+  Handy die Fußzeilen-Links**, seit die Fußzeile dort mitscrollt. Beide geben sie jetzt frei, wenn
+  man ans Seitenende kommt.
 - **Die Einheiten-Tabelle unter Administration → Organisationsstruktur passte auf dem Handy nicht
   auf den Bildschirm.** Sobald Einheiten eingetragen waren, wurde sie breiter als das Gerät und
   schob die ganze Seite samt Glocke seitlich weg. Jetzt scrollt sie für sich.

@@ -44,7 +44,23 @@ jobs:
       (github.event.action != 'labeled' &&
       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 75, raised from 45 on 2026-09-13 — a deliberate trade of CI minutes for coverage, not a
+    # workaround for a slow test.
+    #
+    # The touch-class sweep added 64 routes x 5 device classes on top of the 93 existing classes,
+    # and Firefox is roughly four times slower than Chromium on that workload: it was CANCELLED at
+    # the 45-minute ceiling on six consecutive runs while Chromium finished in 20 and WebKit in 21,
+    # and two green engines made it easy to miss. Two rounds of work on the sweep itself came first
+    # — screenshots confined to the artifact-bearing shard, the duplicate whole-document walk
+    # removed, and a flat 150ms-per-measurement sleep replaced by the condition it was guessing at,
+    # together about 40% off the Firefox sweep — which brings it under the old ceiling by an
+    # estimated 11 minutes. That is too thin a margin to rely on, and running the matrix on a
+    # ceiling is how this recurs silently.
+    #
+    # The structural fix is to stop serialising the five device classes inside one @Test; it is
+    # tracked separately because it needs one Playwright instance per thread and is a refactor, not
+    # a setting.
+    timeout-minutes: 75
     strategy:
       # Run all three engines even if one fails, so a Chromium-only regression
       # doesn't hide a Firefox/WebKit pass (and vice versa).

@@ -166,15 +166,42 @@ document.addEventListener('DOMContentLoaded', function () {
     // single place that decides when the footer stops being pinned, and
     // this code cannot drift out from under it. The `resize` listener is
     // what re-evaluates it when a device is rotated across 768px.
+    //
+    // COALESCED, and the `position` read is cached against the breakpoint.
+    //
+    // This runs on `resize` AND on a ResizeObserver, and iOS Safari — the platform the installable
+    // app targets — fires `resize` repeatedly while the address bar collapses during a scroll. An
+    // uncoalesced handler that calls getComputedStyle and then reads offsetHeight forces two
+    // synchronous layout flushes per event and then invalidates a custom property the whole
+    // document depends on. rAF with a pending flag collapses a burst into one measurement per
+    // frame; the media query listener keeps the `position` read out of the hot path entirely, since
+    // the breakpoint is the only thing that can change the answer.
     if (footerEl) {
-        const applyFooterHeight = () => {
-            const covers = window.getComputedStyle(footerEl).position === 'fixed';
+        const phone = window.matchMedia('(max-width: 768px)');
+        let covers = !phone.matches;
+        let pending = false;
+        const measure = () => {
+            pending = false;
             document.documentElement.style.setProperty(
                 '--krt-footer-height',
                 (covers ? footerEl.offsetHeight : 0) + 'px',
             );
         };
-        applyFooterHeight();
+        const applyFooterHeight = () => {
+            if (pending) return;
+            pending = true;
+            window.requestAnimationFrame(measure);
+        };
+        const onBreakpoint = () => {
+            // Only here does the computed position need reading — the media query is what decides
+            // whether the footer is pinned, so this stays the single source and cannot drift.
+            covers = window.getComputedStyle(footerEl).position === 'fixed';
+            applyFooterHeight();
+        };
+        onBreakpoint();
+        if (typeof phone.addEventListener === 'function') {
+            phone.addEventListener('change', onBreakpoint);
+        }
         window.addEventListener('resize', applyFooterHeight);
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(applyFooterHeight).observe(footerEl);

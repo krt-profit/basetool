@@ -387,10 +387,11 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   private static boolean isExempt(HttpServletRequest request) {
     String path = PublicPaths.relativePath(request);
     return path.equals(CONSENT_PATH)
-        || path.equals("/terms")
-        || path.equals("/privacy")
-        || path.equals("/impressum")
         || path.startsWith("/pending-approval")
+        // The three legal pages moved into PublicPaths.isLegalPage, which isGateExempt now covers,
+        // so BackendRoleSyncFilter honours them too — it did not, and a member awaiting approval
+        // could not read the imprint. Restating them here was the drift this class's own Javadoc
+        // warned about two paragraphs up.
         || PublicPaths.isGateExempt(path);
   }
 }

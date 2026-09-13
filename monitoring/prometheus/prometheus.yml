@@ -226,6 +226,15 @@ scrape_configs:
           # HEALTHCHECK over localhost, so neither needs any edge exposure (REQ-OBS-005/-012).
           - https://profit-base.online/actuator/prometheus
           - https://profit-base.online/actuator/health
+          # Keycloak's management surface, denied at the edge since ADR-0166 mounted identity on
+          # this host. They answer on the management port rather than the public one, so these
+          # denies are defence in depth — but `KC_HTTP_MANAGEMENT_RELATIVE_PATH` is what keeps them
+          # off the public connector, and if it is ever cleared, or either location is dropped or
+          # shadowed by a longer prefix, Keycloak's readiness detail and its full metric set (realm
+          # names, user and session counts, client ids) become internet-readable with nothing
+          # reporting it. A new public surface without a probe is incomplete (REQ-OBS-012).
+          - https://profit-base.online/auth/health
+          - https://profit-base.online/auth/metrics
           - https://ingest.profit-base.online/actuator/prometheus
           - https://ingest.profit-base.online/actuator/health
           # The backend's actuator already moved to the internal-only management port 11271

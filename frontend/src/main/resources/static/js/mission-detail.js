@@ -313,7 +313,6 @@ window.krtLiveSync.createReceiver({
     },
     pill: {
         id: 'mission-livesync-pill',
-        className: 'mission-livesync-pill',
         label: function () {
             const dict = window.MISSION_LIVESYNC_I18N || {};
             return dict['mission.livesync.updates_available'] != null &&

@@ -177,6 +177,11 @@
        It is never the floor for a form control or a standalone button. A token rather than a
        literal so the stylesheet and TouchClassLayoutE2eTest's DENSE_ACTION_FLOOR name the
        same number. */
+    /* Named by `.btn.btn-xs`, `.btn-icon`, `.bank-chart-range-btn`,
+       `.krt-bp-imp-suggestion` and the touch-block rules — a second spelling of the same
+       number is how the two drift. The other `32px` values in these files (the scrollbar
+       thumb, the header mark's height) are NOT touch floors and deliberately keep the
+       literal: the token is what says "this number is the dense hit area". */
     --touch-target-dense: 32px;
     --content-max: 1200px; /* main column cap */
     --measure: 80ch; /* paragraph max line length */
@@ -1031,7 +1036,7 @@ tbody tr:nth-child(even):hover {
    (0,2,0) wins wherever `.btn` appears, in any file and inside any media query. Never drop
    the qualifier, and never rely on moving these blocks around instead. */
 .btn.btn-xs {
-    min-height: 32px;
+    min-height: var(--touch-target-dense);
     padding: 0.25rem 0.55rem;
     font-size: 0.68rem;
 }
@@ -1046,7 +1051,7 @@ tbody tr:nth-child(even):hover {
    `.btn.btn-xs` on purpose — equal specificity, so this padding wins when a button carries
    both classes, which is what squares off an icon-only dense action (32x32). */
 .btn-icon {
-    min-width: 32px;
+    min-width: var(--touch-target-dense);
 }
 
 .btn.btn-icon {
@@ -1318,7 +1323,7 @@ tbody tr:nth-child(even):hover {
     /*
      * The custom multi-select is not a `<select>`, so the form-control cap in the
      * <=1024px block does not reach it — it is a div widget carrying a hard
-     * `min-width: 200px`. Two of them in the Preis-Übersicht's filter row make
+     * `min-width: 200px`. Two of them in the price-overview filter row make
      * 400px plus a 24px gap on a 375px screen: the row does wrap and the flex
      * items do shrink, but that 200px floor inside them does not, so the content
      * spills out of its own box and the page ends up 401px wide. Dropping the
@@ -1328,7 +1333,17 @@ tbody tr:nth-child(even):hover {
         min-width: 0;
     }
 
-    .filters-container > .form-group {
+    /*
+     * `div.filters-container`, not `.filters-container` — the same out-specifying this block does
+     * for `.btn.btn-xs2` and `input.item-checkbox`, and for the same reason. The bare form is
+     * (0,2,0), exactly what `materials-overview.css`'s `.materials-overview-main .form-group
+     * { flex: 1; min-width: 150px }` scores; a media query adds no specificity, and that file loads
+     * after this one through the head fragment's extraLinks. So source order decided and the stack
+     * never happened on the one page that has this filter row — the two groups stayed side by side
+     * at ~160px on a 375px screen. The sibling `.multi-select-container` rule wins only because it
+     * happens to out-specify a (0,1,0) base rule, so half the fix landed and half did not.
+     */
+    div.filters-container > .form-group {
         flex: 1 1 100%;
     }
 
@@ -1350,10 +1365,13 @@ tbody tr:nth-child(even):hover {
         min-width: 0;
     }
 
+    /* `.bank-filter-group` is gone: zero hits across templates/ and static/js/, and the only other
+       reference (bank.css) is itself dead. The rule's own justification names `#audit-event`, which
+       lives in a `.bank-form-row` and is covered by the half that does match — so the fix worked
+       while two of its four selectors could never fire, and a reader would have kept them in step
+       with markup that does not exist. */
     .bank-form-row select,
-    .bank-form-row input,
-    .bank-filter-group select,
-    .bank-filter-group input {
+    .bank-form-row input {
         width: 100%;
     }
 
@@ -1413,6 +1431,35 @@ tbody tr:nth-child(even):hover {
     body {
         display: flex;
         flex-direction: column;
+    }
+
+    /*
+     * …and something has to GROW, or the column does nothing on a short page.
+     *
+     * `body` keeps `min-height: 100vh` from the base rule, so on a page shorter than the viewport
+     * (an empty /notifications, /pending-approval, /terms/accept) the flex column lays header, main
+     * and footer out at their natural heights and leaves the remainder as bare page background —
+     * with the footer floating in the middle of the screen instead of at the end of the page.
+     * `flex: 1 0 auto` on `main` is the missing half of the sticky-footer pattern, and the base
+     * `body` comment names it as the mechanism that was dropped when the footer became
+     * unconditionally fixed.
+     */
+    main {
+        flex: 1 0 auto;
+    }
+
+    /*
+     * The two page-local footer reserves, here rather than in two inline <style> blocks.
+     *
+     * mission-detail.html and operation-detail.html put the reserve on `.page-wrapper` instead of
+     * `main`, so the shared override above does not reach them: `--krt-footer-height` publishes 0
+     * on this class, their `calc(... + 5rem)` resolves to a bare 80px, and the three densest pages
+     * in the app kept 80px of dead scroll where every other page has 16px. Both carried an
+     * identical copy of this rule, and the comment on those copies said outright that duplicating
+     * the reserve is how it came to be missed — so it is stated once, here, with every other page's.
+     */
+    .page-wrapper {
+        padding-bottom: var(--space-4);
     }
 }
 
@@ -2153,6 +2200,19 @@ label:has(+ [required])::after {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    /*
+     * Wrap and gap belong on the BASE rule, not only in the phone block.
+     *
+     * Three templates used to carry a generated `flex-wrap: wrap; gap: 1rem` utility on this exact
+     * element at every width. Removing it in favour of the shared media-query fix left 769-1024px
+     * uncovered, where a long German compound heading (MATERIALSAMMELÜBERSICHT) beside its button
+     * can still not break. `space-between` already pushes the items apart, so the gap only shows
+     * once a row is full — which is precisely when it is wanted — and wrapping is inert until the
+     * content stops fitting. Both are therefore no-ops on a wide screen and the fix that was
+     * missing on a medium one.
+     */
+    flex-wrap: wrap;
+    gap: var(--space-3);
 }
 .flex-between-mb {
     display: flex;
@@ -4706,8 +4766,8 @@ textarea:focus-visible,
      * A form control may never be wider than the space it is given.
      *
      * A bare `<select>` sizes itself to its LONGEST OPTION, and nothing caps it:
-     * the audit log's „Ereignistyp" list pushed the page to 443px on a 375px
-     * screen, and the Preis-Übersicht's two filter selects to 401px. On a phone
+     * the audit log's event-type list pushed the page to 443px on a 375px
+     * screen, and the price overview's two filter selects to 401px. On a phone
      * that does not produce a scrollbar — the layout viewport simply widens and
      * the whole page is scaled down, so every other element gets smaller too.
      *
@@ -4741,18 +4801,15 @@ textarea:focus-visible,
         height: var(--touch-target);
     }
 
-    .close-sidebar-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-width: var(--touch-target);
-        min-height: var(--touch-target);
-    }
-
     .dropbtn {
         min-height: var(--touch-target);
     }
 
+    /* One list, because the two are the same control: a dismiss button that has to be hittable.
+       They were two rules with byte-identical bodies twelve lines apart, and the comment beside the
+       second already promised to keep them in step ("same job, same treatment") — which a selector
+       list states in code instead of in prose. */
+    .close-sidebar-btn,
     .krt-modal-close {
         display: flex;
         align-items: center;
@@ -4764,7 +4821,7 @@ textarea:focus-visible,
     /*
      * `.btn-xs2` is a page-local dense variant declared inline in mission-detail.html and
      * operation-detail.html (`min-height: 32px`, 21 uses). Two of its instances are FORM actions —
-     * "Ziel hinzufügen" and "Schritt hinzufügen" on the Einsatz create form — and REQ-UI-009 is
+     * "Ziel hinzufügen" and "Schritt hinzufügen" on the mission create form — and REQ-UI-009 is
      * explicit that a form button keeps the 44px floor; only repeated dense ROW actions
      * (`.btn-xs`, `.btn-icon`) are exempt. Owner decision 2026-09-13: raise the whole variant on
      * the touch classes and leave desktop density untouched.
@@ -4828,8 +4885,7 @@ textarea:focus-visible,
      * the TOUCH classes, as the comment at the top of this block says; the value was argued and the
      * scope was not.
      */
-    .krt-livesync-pill,
-    .mission-livesync-pill {
+    .krt-livesync-pill {
         min-height: var(--touch-target);
     }
 
@@ -5059,9 +5115,9 @@ textarea:focus-visible,
 /* Live multi-user sync (REQ-FE-010): the deferred-refresh pill, shown bottom-right when a peer's
    change arrives while the local user is mid-edit. Clicking it applies the held-back refresh.
 
-   `.krt-livesync-pill` is the DEFAULT class krt-live-sync.js gives the pill (`pillCfg.className ||
-   'krt-livesync-pill'`); only the mission pages pass a name of their own. Until now just the
-   mission variant was styled, so on every other consumer — /bank, /bank/requests, /bank/manage —
+   `.krt-livesync-pill` is the ONLY class krt-live-sync.js gives the pill, and that is now fixed in
+   the helper rather than configurable — it used to be a `pillCfg.className` default that only the
+   mission pages overrode, and only the mission variant was styled, so on every other consumer — /bank, /bank/requests, /bank/manage —
    the pill rendered as a bare browser-default button, 21px tall, unbranded, with no fixed position
    and no pulse: not a small deviation from the design system but no styling at all. Found by the
    touch-class sweep (2026-09-13), which flagged it for height; the missing branding was the larger
@@ -5070,8 +5126,7 @@ textarea:focus-visible,
 
    `min-height` is the 44px floor rather than the dense exception: this is a standalone floating
    control, not a repeated row action. */
-.krt-livesync-pill,
-.mission-livesync-pill {
+.krt-livesync-pill {
     position: fixed;
     right: var(--space-4);
     bottom: var(--space-4);
@@ -5095,9 +5150,7 @@ textarea:focus-visible,
 }
 
 .krt-livesync-pill:hover,
-.krt-livesync-pill:focus-visible,
-.mission-livesync-pill:hover,
-.mission-livesync-pill:focus-visible {
+.krt-livesync-pill:focus-visible {
     background: rgb(231 126 35 / 12%);
 }
 

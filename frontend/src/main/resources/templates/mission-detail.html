@@ -32,16 +32,10 @@
             /* Reserve viewport-bottom space for the fixed footer (see styles.css `main`). */
             padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
         }
-
-        /* The phone class drops the reserve, exactly as the shared `main` rule does.
-           `--krt-footer-height` publishes 0px below 768px (the footer scrolls there, ADR-0165), so
-           this calc resolves to the bare 5rem separator — 80px of dead scroll at the bottom of the
-           three most content-dense pages in the app, where every other page now has 16px. The
-           shared rule was overridden for this; these two page-local copies of the same reserve were
-           missed, and the guard only asserts the reserve is large ENOUGH, never that it is not
-           excessive. */
-        @media (max-width: 768px) {
-            .page-wrapper { padding-bottom: var(--space-4); }
+        /* The phone-class reserve for this page lives in styles.css's `width <= 768px` block,
+           with every other page's. It was a copy in this file and an identical copy in
+           operation-detail.html, and the comment on those copies said in so many words that
+           duplicating the reserve is what caused it to be missed the first time. */
         }
         .mission-head-sticky {
             position: sticky;
@@ -207,6 +201,12 @@
            solid bar + top border separate it from the scrolling content; the pane's extra
            padding-bottom keeps the last tile from hiding behind it. */
         #pane-verw.on { padding-bottom: 4rem; }
+        /* Phone class: the footer is static and scrolls, so `--krt-footer-height` is 0 and a
+           fixed bar here would cover the legal links at the end of the page. Sticky pins it to the
+           viewport bottom while the pane is in view and releases at the pane's end. */
+        @media (max-width: 768px) {
+            #pane-verw.on .footacts { position: sticky; bottom: 0; }
+        }
         #pane-verw.on .footacts {
             position: fixed;
             left: 0;

@@ -71,6 +71,19 @@ main.oc-page .oc-greeting .oc-edit-toggle {
    by the JS (hidden until the chart overflows); while it is active the chart's own bar is suppressed
    (.oc-chart--proxied) so there is never a duplicate. Pinned above the fixed footer via the shared
    --krt-footer-height and kept just under it in the stacking order. */
+/* On the phone class the footer is `position: static` and scrolls with the page, so
+   `--krt-footer-height` publishes 0 and this bar would sit at `bottom: 0` — painting over the legal
+   links once the reader reaches the end, with the footer's own `z-index: 999` no longer applying
+   because a static element has no stacking position. `sticky` keeps the same viewport-pinned feel
+   while the chart is in view and releases at the end of the flow, which is where the footer is.
+   The bar is inserted `afterend` of the chart by org-chart.js, so it is in flow and sticky works. */
+@media (width <= 768px) {
+    .oc-scrollbar {
+        position: sticky;
+        bottom: 0;
+    }
+}
+
 .oc-scrollbar {
     position: fixed;
     left: 0;

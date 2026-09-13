@@ -1208,7 +1208,14 @@ Nothing stored is lost. Sessions end, and members sign in again.
      container does not rewrite `.env`. Miss this and the ingest gateway keeps asking the retired
      host for its token, which none of the verification steps below would notice;
    - if `IRI_KEYCLOAK_HOSTNAME` / `IRI_KEYCLOAK_ISSUER_URI` are set (they are optional overrides),
-     move them together and **include the `/auth` path in the hostname** — see step 5.
+     move them together and **include the `/auth` path in the hostname** — see step 5;
+   - **and if `IRI_KEYCLOAK_HOST_ALIAS` is set, repoint it at the WEB host.** It exists for a host
+     whose NAT does not hairpin (REQ-OPS-022): the apps load their OIDC metadata from the issuer at
+     start-up, so the issuer's hostname has to resolve to something that answers from inside. After
+     ADR-0166 that name is `profit-base.online`, not a Keycloak host — an alias left on the old name
+     resolves nothing, backend, frontend and ingest time out fetching metadata, all three fail the
+     health gate and `docker compose up -d --wait` rolls the deploy back. Steps 7-9 would not catch
+     it earlier because they run after that.
 5. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
    (`KC_HTTP_RELATIVE_PATH`) **and advertising `https://profit-base.online/auth`** — the path belongs
    in `KC_HOSTNAME` as well, and the two must agree. Its management interface stays at the root

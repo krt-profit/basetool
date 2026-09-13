@@ -48,7 +48,14 @@ server {
   # implicitly — an `allow` list without the closing `deny all` reads as a
   # lockdown and is open to the internet. The 2026-07-03 audit found exactly
   # that on this location, on the old host.
-  location /auth/admin {
+  # `^~`, not a bare prefix. nginx precedence is `=` > `^~` > regex in file order > longest
+  # prefix, so a plain `location /auth/admin` still lets every regex location in hardening.conf be
+  # evaluated first — and the day one of them proxies instead of returning 404 (the classic
+  # `location ~* \.(css|js|png|woff2)$ { expires 1y; ... }`, or a future `~ ^/(auth|api)/`), the
+  # admin console is served past this allow-list with no error anywhere. `nginx -t` cannot see an
+  # ACL that stopped applying, and the external deny probe only asks for the bare `/auth/admin/`
+  # path. `^~` makes the match final and costs nothing.
+  location ^~ /auth/admin {
     allow 172.28.3.1;   # net-proxy-frontend gateway
     allow 172.28.4.1;   # net-proxy-keycloak gateway
     allow 172.28.7.1;   # net-proxy-ingest gateway
@@ -90,10 +97,7 @@ server {
 
   location / {
     include /etc/nginx/edge/include/proxy.conf;
-    proxy_ssl_verify              on;
-    proxy_ssl_verify_depth        2;
-    proxy_ssl_trusted_certificate /etc/nginx/upstream-ca.crt;
-    proxy_ssl_server_name         on;
+    include /etc/nginx/edge/include/upstream-tls.conf;
     proxy_ssl_name                frontend;
     # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
     # once at startup and caches the address forever, so a recreated container

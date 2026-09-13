@@ -34,7 +34,7 @@
     <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
     <link rel="apple-touch-icon" th:href="@{/logos/basetool-appicon-512.png}">
     <!--/* Installable web app (REQ-UI-020, ADR-0164). This block plus the `apple-touch-icon` above
-           is the whole iPhone/iPad story: Safari's "Zum Home-Bildschirm" needs no service worker,
+           is the whole iPhone/iPad story: Safari's Add to Home Screen needs no service worker,
            and this app deliberately ships none — a worker caching navigations would copy member
            data into a second store outside every path that wipes the first, which is the same
            reason the backend marks those reads `no-store`. See WebAppManifestController.

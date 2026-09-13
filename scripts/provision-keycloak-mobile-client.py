@@ -46,7 +46,11 @@
 #   # NOTE THE /auth: Keycloak serves under that relative path since ADR-0166, so a --server
 #   # without it answers 404 and kcadm reports that as a credentials failure.
 #   docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-#       --server http://localhost:8080/auth --realm master --user <admin>
+#       --server https://localhost:18443/auth --realm master --user <admin>
+#
+#   (18443 and https, because that is the connector the prod container listens on -
+#   `--https-port=18443 --http-enabled=false`. The dev/test container serves plain HTTP
+#   on 18080, so there it is `--server http://localhost:18080/auth`. Neither is 8080.)
 #
 #   scripts/provision-keycloak-mobile-client.py --dry-run     # print every payload, write nothing
 #   scripts/provision-keycloak-mobile-client.py               # apply

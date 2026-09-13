@@ -78,6 +78,17 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       chevrons as defects.
  * </ol>
  *
+ * <p><b>What this class measures depends on data other classes create, and nothing enforces the
+ * order.</b> Carrying the {@code e2e} tag is what puts it in the destructive suite where the CRUD
+ * flows have populated the tables — and that is where it found 118 defects a fresh stack hid. But
+ * the ordering that currently runs it after those classes is JUnit's unspecified discovery order:
+ * there is no {@code junit-platform.properties}, no {@code ClassOrderer} and no {@code @Order}
+ * anywhere in the repository. Rename this class, upgrade JUnit, or have a destructive flow clean up
+ * after itself, and the sweep is back to measuring empty {@code <thead>}s and reporting clean. The
+ * coverage report below names the list pages that rendered no row, which makes the degradation
+ * visible in the log rather than silent — it is a smoke alarm, not a lock. A {@code ClassOrderer}
+ * is the lock, and is tracked separately.
+ *
  * <p><b>Artifacts come from one engine, assertions from all three.</b> Every engine measures every
  * page at every device class and fails on its own findings; only the Chromium shard writes the
  * screenshots. They are review evidence rather than assertions, and paying for ~430 captures three
@@ -123,7 +134,12 @@ class TouchClassLayoutE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   /** Where the screenshots go; one PNG per page and device class. */
-  private static final Path ARTIFACTS = Path.of("build", "e2e-artifacts", "touch-layout");
+  // `build/e2e/...`, which is what e2e.yml's upload step globs — `build/e2e-artifacts/`
+  // matched none of its three patterns, so every capture this class took was discarded
+  // with the runner. Every other e2e class writes under `build/e2e` for exactly that
+  // reason. Sharper since screenshots were confined to one shard so a reviewer would have
+  // one good set to open: the set existed and never left the machine.
+  private static final Path ARTIFACTS = Path.of("build", "e2e", "touch-layout");
 
   /**
    * Share of the viewport height the sticky header and the fixed footer may occupy together.
@@ -214,7 +230,14 @@ class TouchClassLayoutE2eTest {
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
-          new int[] {768, 1024},
+          // 810x1080, NOT 768x1024. `PHONE_MAX_WIDTH`, `setIsMobile(width <= 768)` and the
+          // stylesheet's `@media (width <= 768px)` are all INCLUSIVE, so a 768px-wide entry renders
+          // and is asserted as the phone class — static footer, `--krt-footer-height: 0px`, mobile
+          // emulation — while being documented as tablet portrait. That left REQ-UI-009's
+          // 769-1023px band covered by no class at all, and a regression confined to it invisible:
+          // the header's bell-clearance reserve is scoped `<= 768px` while the bell itself stays a
+          // 44px fixed overlay up to 1024px, which is exactly that shape.
+          new int[] {810, 1080},
           new int[] {1024, 768},
           new int[] {1280, 800},
           new int[] {1600, 900});
@@ -292,6 +315,13 @@ class TouchClassLayoutE2eTest {
           // change adds `.leitung-group-actions` and `.leitung-modal-actions` to the phone
           // flex-wrap fix, and the page carrying them was never loaded, so the fix shipped
           // unmeasured while the spec recorded the requirement as measured.
+          // `/members` is the member-administration table — one of the widest in the app, so
+          // exactly the shape that overflows a phone — and it was in AdminPagesSmokeE2eTest's list
+          // but not this one. Three hand-maintained lists of the same routes is the standing
+          // problem; `test-support` already ships `EndpointEnumeration.mappings(...)` and is on
+          // this
+          // compile classpath, which is the way out.
+          "/members",
           "/admin/settings",
           "/admin/locations",
           "/admin/blueprints",
@@ -468,25 +498,33 @@ class TouchClassLayoutE2eTest {
       findings.add("no device class ran at all");
       return;
     }
-    Map.Entry<String, Set<String>> first = measuredByDevice.entrySet().iterator().next();
-    if (first.getValue().size() < MIN_MEASURED_ROUTES) {
+    // The UNION of every class, not the first one. `entrySet().iterator().next()` is always
+    // 375x812, and `missing = first - measured` can only ever report a LATER class going quiet: if
+    // the phone class is the one that dies, every wider class measures a superset and nothing is
+    // missing anywhere. The floor was the only backstop, and 30 of 64 is met by a session that
+    // expires halfway — which is the phone class, the one this guard exists for, reporting clean
+    // on 35 routes. Against the union, a class that stops short is named whichever class it is.
+    Set<String> union = new LinkedHashSet<>();
+    measuredByDevice.values().forEach(union::addAll);
+    int widest = measuredByDevice.values().stream().mapToInt(Set::size).max().orElse(0);
+    if (widest < MIN_MEASURED_ROUTES) {
       findings.add(
           String.format(
-              "coverage floor: %s measured only %d of %d routes (minimum %d) — the sweep did not"
-                  + " run, it skipped",
-              first.getKey(), first.getValue().size(), PAGES.size(), MIN_MEASURED_ROUTES));
+              "coverage floor: no device class measured more than %d of %d routes (minimum %d) —"
+                  + " the sweep did not run, it skipped",
+              widest, PAGES.size(), MIN_MEASURED_ROUTES));
     }
     measuredByDevice.forEach(
         (device, measured) -> {
-          Set<String> missing = new LinkedHashSet<>(first.getValue());
+          Set<String> missing = new LinkedHashSet<>(union);
           missing.removeAll(measured);
           if (!missing.isEmpty()) {
             findings.add(
                 String.format(
-                    "coverage gap: %s measured %d routes where %s measured %d — missing %s."
-                        + " A whole class going quiet mid-sweep is what an expired session looks"
-                        + " like.",
-                    device, measured.size(), first.getKey(), first.getValue().size(), missing));
+                    "coverage gap: %s measured %d routes where the union across classes is %d —"
+                        + " missing %s. A class going quiet mid-sweep is what an expired session"
+                        + " looks like.",
+                    device, measured.size(), union.size(), missing));
           }
         });
   }
@@ -646,10 +684,17 @@ class TouchClassLayoutE2eTest {
     // What the measurement actually needs is a settled LAYOUT: the document parsed, the webfont
     // applied (Lato changes every text box, and the header height is text-driven), and one beat for
     // the ResizeObserver that publishes --krt-footer-height.
+    //
+    // The THIRD condition is the real one, and it replaced a flat `waitForTimeout(150)`. That sleep
+    // was a guess at the ResizeObserver beat that publishes `--krt-footer-height`: ~50 seconds of
+    // dead wall clock per shard across ~350 measurements, and still a guess — a slow runner can
+    // miss the beat, so it bought no flakiness resistance either. Waiting for the property to exist
+    // waits for exactly what the measurement needs, and returns as soon as it does.
     page.waitForFunction(
         "() => document.readyState === 'complete'"
-            + " && (!document.fonts || document.fonts.status === 'loaded')");
-    page.waitForTimeout(150);
+            + " && (!document.fonts || document.fonts.status === 'loaded')"
+            + " && getComputedStyle(document.documentElement)"
+            + "     .getPropertyValue('--krt-footer-height').trim() !== ''");
 
     // Is this a page at all? The route list is taken from the controllers rather than curated, so
     // it contains fragment and JSON endpoints too. A Basetool page is recognised by its app shell;
@@ -877,7 +922,15 @@ class TouchClassLayoutE2eTest {
         findings.add(where + ": modal — " + offender);
       }
     } else {
-      // Above the touch classes only the geometry of a modal matters, never its hit areas.
+      // Above the touch classes only GEOMETRY matters, never hit areas — for a page control as
+      // much as for a modal's. `badControls` used to be discarded wholesale here, so a 1700px
+      // <select> with no scrollable ancestor at 1600x900 was measured, pushed and thrown away,
+      // while its sibling list was already filtered entry-by-entry to keep exactly that half.
+      for (Object offender : list(probe.get("badControls"))) {
+        if (!offender.toString().contains("px tall, floor")) {
+          findings.add(where + ": form control — " + offender);
+        }
+      }
       for (Object offender : list(probe.get("modalIssues"))) {
         if (!offender.toString().contains("px tall, floor")) {
           findings.add(where + ": modal — " + offender);
@@ -976,6 +1029,23 @@ class TouchClassLayoutE2eTest {
         // under a sticky header returns null or the wrong element, which would invent findings.
         // This can only ever widen a measurement, so it removes false positives without hiding
         // anything.
+        // The dense exemption of REQ-UI-009, as ONE helper: a repeated IN-ROW control may stop at
+        // the dense floor, because raising every one of them would turn a scannable table into a
+        // list of cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows
+        // are a scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
+        // `bank-row-toggle` joined on the same reading once seeded data first exposed them. Never a
+        // form button or a standalone control: `.btn-xs2` was refused this exemption for that
+        // reason.
+        //
+        // It was two byte-identical copies, one for page controls and one for controls inside a
+        // dialog, and the list has taken four separate additions — so update one copy and the same
+        // control is a defect in a dialog and compliant on a page, or the reverse. `hitBox` in this
+        // same script is already one shared helper; this is the matching extraction.
+        const floorFor = (c) =>
+          (c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
+            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
+            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle'))
+            ? %d : %d;
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();
@@ -1033,12 +1103,23 @@ class TouchClassLayoutE2eTest {
         // such overlaps and every one was noise: sidebar drawer links (z-index 2000, painted
         // ABOVE the footer's 999) and ordinary content sitting below the fold at scroll 0.
         // The invariant worth testing is the reserve, not an instantaneous rectangle.
+        // ONE walk of the document, not two. The widest-box diagnostic below used to repeat this
+        // exact sweep — same selector, same getComputedStyle, same getBoundingClientRect — purely
+        // to fill a printf, and its own comment called it "DIAGNOSTIC ONLY, never an assertion".
+        // Style resolution plus forced layout per element is the dominant in-page cost, and on the
+        // pages this file calls out as large (the materials matrix, /hangar, the Lager tables) it
+        // was thousands of elements walked twice, ~350 times per shard. This loop's filter is a
+        // superset of the old one — it additionally skips `position: fixed`, which for a "widest
+        // laid-out box" line is at worst worth knowing.
         const cutOff = [];
+        let maxRight = 0;
+        let widest = '(none)';
         for (const el of document.body.querySelectorAll('*')) {
           const cs = getComputedStyle(el);
           if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'fixed') continue;
           const r = el.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
+          if (r.right > maxRight) { maxRight = r.right; widest = label(el); }
           if (r.right > vw + slack && !scrollsHorizontally(el) && cutOff.length < 6) {
             cutOff.push(label(el) + ' right=' + Math.round(r.right) + 'px');
           }
@@ -1060,25 +1141,23 @@ class TouchClassLayoutE2eTest {
           if (c.type === 'hidden') continue;
           const r = c.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
-          // The dense exemption of REQ-UI-009: a repeated IN-ROW control may stop at the dense
-          // floor, because raising every one of them would turn a scannable table into a list of
-          // cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows are a
-          // scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
-          // `bank-row-toggle` joined on the same reading once seeded data first exposed them — an
-          // inventory row's selector, a grant row's three permission flags, a booking row's
-          // disclosure chevron. Never a form button or a standalone control: `.btn-xs2` was refused
-          // this exemption for exactly that reason.
-          const dense = c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
-            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
-            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle');
-          const floor = dense ? %d : %d;
-          const hit = hitBox(c);
-          if (r.width > vw + slack && !scrollsHorizontally(c) && badControls.length < 6) {
-            badControls.push(label(c) + ' is ' + Math.round(r.width)
-              + 'px wide in a ' + vw + 'px viewport');
-          } else if (hit.height < floor - slack && badControls.length < 6) {
-            badControls.push(label(c) + ' is ' + Math.round(hit.height)
-              + 'px tall, floor ' + floor + 'px');
+          // Two INDEPENDENT properties, so both are pushed. They used to be an if/else, and a
+          // <select> that was 427px wide in a 375px viewport AND 22px tall reported only its width
+          // — the developer fixed that, re-ran a five-minute sweep across three shards, and only
+          // then learned about the height. The cap is checked once, up front, so `hitBox` (two
+          // getComputedStyle calls plus a document-wide querySelector) is not evaluated for every
+          // remaining control on precisely the overflowing pages where this is already slowest.
+          if (badControls.length < 6) {
+            const floor = floorFor(c);
+            if (r.width > vw + slack && !scrollsHorizontally(c)) {
+              badControls.push('too wide: ' + label(c) + ' is ' + Math.round(r.width)
+                + 'px wide in a ' + vw + 'px viewport');
+            }
+            const hit = hitBox(c);
+            if (hit.height < floor - slack) {
+              badControls.push(label(c) + ' is ' + Math.round(hit.height)
+                + 'px tall, floor ' + floor + 'px');
+            }
           }
         }
 
@@ -1151,18 +1230,7 @@ class TouchClassLayoutE2eTest {
               if (cs.display === 'none' || cs.visibility === 'hidden' || c.type === 'hidden') continue;
               const cr = c.getBoundingClientRect();
               if (cr.width === 0 || cr.height === 0) continue;
-          // The dense exemption of REQ-UI-009: a repeated IN-ROW control may stop at the dense
-          // floor, because raising every one of them would turn a scannable table into a list of
-          // cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows are a
-          // scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
-          // `bank-row-toggle` joined on the same reading once seeded data first exposed them — an
-          // inventory row's selector, a grant row's three permission flags, a booking row's
-          // disclosure chevron. Never a form button or a standalone control: `.btn-xs2` was refused
-          // this exemption for exactly that reason.
-          const dense = c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
-            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
-            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle');
-              const floor = dense ? %d : %d;
+              const floor = floorFor(c);
               const chit = hitBox(c);
               if (chit.height < floor - slack && modalIssues.length < 12) {
                 modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
@@ -1179,15 +1247,6 @@ class TouchClassLayoutE2eTest {
         // REQ-UI-009 asks for. What decides whether the PAGE scrolls sideways is scrollWidth, and
         // the two disagreeing is the normal, healthy case. Printed so a reader can tell the two
         // apart at a glance instead of re-deriving it from a screenshot.
-        let maxRight = 0;
-        let widest = '(none)';
-        for (const el of document.body.querySelectorAll('*')) {
-          const cs = getComputedStyle(el);
-          if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-          const r = el.getBoundingClientRect();
-          if (r.width === 0 || r.height === 0) continue;
-          if (r.right > maxRight) { maxRight = r.right; widest = label(el); }
-        }
         const docScrollWidth = Math.max(
           document.documentElement.scrollWidth, document.body.scrollWidth);
 
@@ -1203,6 +1262,5 @@ class TouchClassLayoutE2eTest {
                  modalCount: document.querySelectorAll('.krt-modal-overlay').length };
       }
       """
-          .formatted(
-              DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR, DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR);
+          .formatted(DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR);
 }

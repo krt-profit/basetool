@@ -86,14 +86,14 @@ import org.springframework.web.servlet.resource.ResourceUrlProvider;
  * implements neither {@code lang} nor {@code description}, and the iOS home-screen label comes from
  * {@code apple-mobile-web-app-title} on the page itself. See ADR-0164.
  *
- * <p><strong>There is deliberately no service worker.</strong> „PWA" normally implies one, and this
+ * <p><strong>There is deliberately no service worker.</strong> "PWA" normally implies one, and this
  * one ships without: a worker that cached navigations would put member data — bank balances,
  * mission rosters, inventory — into a second store outside every path that wipes the first one,
  * while the backend marks those reads {@code no-store} (REQ-SEC-031) precisely so they are not
- * copied. iOS needs no worker for „Zum Home-Bildschirm", which is the case this ships for. The cost
- * is stated rather than hidden: Chromium browsers require a fetch-handling worker before they offer
- * their own install prompt, so on Android and desktop the app stays installable only through the
- * browser menu. ADR-0164 records that trade.
+ * copied. iOS needs no worker for its Add to Home Screen flow, which is the case this ships for.
+ * The cost is stated rather than hidden: Chromium browsers require a fetch-handling worker before
+ * they offer their own install prompt, so on Android and desktop the app stays installable only
+ * through the browser menu. ADR-0164 records that trade.
  */
 @RestController
 @RequiredArgsConstructor
@@ -146,10 +146,40 @@ public class WebAppManifestController {
       Map.of("de", Locale.GERMAN, "en", Locale.ENGLISH);
 
   /**
+   * Last-resort copy, used only if a {@code pwa.*} key is missing from every bundle.
+   *
+   * <p>Not a translation and not a second source of truth: the bundles are authoritative and {@code
+   * MessageKeyParityTest} is what keeps them complete. These exist so that a missing key degrades
+   * to a plain manifest instead of a 500, because this endpoint's contract is "always 200, never a
+   * redirect" and a browser reads it while installing. The product name is a proper noun and
+   * byte-identical in every bundle, so the fallback for it is exact rather than approximate.
+   */
+  private static final String DEFAULT_NAME = "Profit Basetool";
+
+  /**
+   * Fallback short name.
+   *
+   * @see #DEFAULT_NAME
+   */
+  private static final String DEFAULT_SHORT_NAME = "Basetool";
+
+  /**
+   * Fallback description.
+   *
+   * @see #DEFAULT_NAME
+   */
+  private static final String DEFAULT_DESCRIPTION =
+      "The organisation's missions, orders, inventory and refinery.";
+
+  /**
    * Locale used when the request names none, or names one that is not shipped.
    *
-   * <p>German, matching {@code CookieLocaleResolver}'s default in {@code LocaleConfig} — the
-   * application's default language, not the platform's.
+   * <p>German, and it must stay the same German {@code LocaleConfig} gives {@code
+   * CookieLocaleResolver}. Nothing in the type system ties the two together, so {@link
+   * WebAppManifestControllerTest#theDefaultLocaleMatchesTheResolvers()} does: change the resolver
+   * alone and the manifest would keep emitting {@code "lang": "de"} with German {@code pwa.*} while
+   * every page rendered English — cached {@code public, max-age=1h} and read by installers, so
+   * every home screen added from then on would carry the wrong name with no error anywhere.
    */
   private static final Locale DEFAULT_LOCALE = Locale.GERMAN;
 
@@ -200,9 +230,18 @@ public class WebAppManifestController {
     final var manifest =
         new WebAppManifest(
             root,
-            messageSource.getMessage("pwa.name", null, resolved),
-            messageSource.getMessage("pwa.short_name", null, resolved),
-            messageSource.getMessage("pwa.description", null, resolved),
+            // The four-arg overload, with a default — NOT the throwing one. This method's contract
+            // is "always 200, never a redirect": ArchitectureTest lists it PUBLIC_BY_DESIGN,
+            // AnonymousSurfaceSweepMvcTest asserts the non-redirect, and it now sits behind a
+            // blackbox module pinned to `valid_status_codes: [200]` with EdgePublicSurfaceNot200
+            // watching. `getMessage(code, args, locale)` throws NoSuchMessageException, so dropping
+            // or renaming one of these three keys in a later bundle edit would turn every anonymous
+            // fetch into a 500 — including the browser's install-time read, which would then name
+            // the home-screen icon after an error page. A fallback keeps the contract; the
+            // key-parity test is what catches the missing key.
+            messageSource.getMessage("pwa.name", null, DEFAULT_NAME, resolved),
+            messageSource.getMessage("pwa.short_name", null, DEFAULT_SHORT_NAME, resolved),
+            messageSource.getMessage("pwa.description", null, DEFAULT_DESCRIPTION, resolved),
             resolved.toLanguageTag(),
             "ltr",
             root,

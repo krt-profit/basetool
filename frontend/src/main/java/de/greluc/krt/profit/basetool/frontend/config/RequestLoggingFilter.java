@@ -196,7 +196,15 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
         // silence their own access-log line by appending it to an arbitrary path — none of which
         // is permitAll, so each would 302 or 404 with no trace, against the one-line-per-request
         // guarantee of REQ-OBS-001.
-        || uri.equals(contextPath + "/manifest.webmanifest")
+        // NOT `/manifest.webmanifest` — it is logged like any other page.
+        //
+        // It was suppressed here as one more quiet asset, and then given a blackbox probe and the
+        // `EdgePublicSurfaceNot200` alert in the same change. That combination is the worst of
+        // both: when the alert fires, a Loki query for the path around the window returns nothing
+        // at all — not the 302 into OAuth, not a 404, not a 500 out of GlobalExceptionHandler — and
+        // the same blank answers a member reporting a failed home-screen install. The `.css`/`.js`
+        // precedents are quiet because nothing watches them; this one is watched. REQ-OBS-001 says
+        // one line per request, and a ~30s probe interval is not a volume argument.
         || uri.contains("/images/")
         || uri.contains("/logos/")
         || uri.contains("/fonts/")

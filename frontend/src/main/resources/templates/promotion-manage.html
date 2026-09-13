@@ -129,6 +129,9 @@
             overflow: auto;
             /* 100dvh, not 100vh: vh is the large viewport, so on a phone this
                over-estimates by the address bar. See materialboerse.css. */
+            /* two declarations: an engine that does not know dvh discards that one
+                   whole, and with no predecessor the container gets no max-height at all. */
+            max-height: max(16rem, calc(100vh - var(--krt-footer-height, 5rem) - 25rem));
             max-height: max(16rem, calc(100dvh - var(--krt-footer-height, 5rem) - 25rem));
             border: 1px solid var(--color-gray-3);
             background-color: var(--color-bg-dark-gray);
