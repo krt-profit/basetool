@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.18](https://github.com/krt-profit/basetool/releases/tag/v1.7.18) - 2026-09-13
+
 ### Changed
 
 - **Der Edge-Proxy ist nicht mehr auf die Produktionsadressen festgelegt.** Die Hostnamen kommen
