@@ -218,7 +218,8 @@ scrape_configs:
       module: [http_deny_404]
     static_configs:
       - targets:
-          # The whole `/actuator` prefix is denied at the NPM edge (`location /actuator` → 404),
+          # The whole `/actuator` prefix is denied at the edge (`location /actuator` → 404,
+          # `docker/edge/conf.d/10-frontend.conf.template` since ADR-0162 replaced NPM),
           # so NEITHER the metrics endpoint NOR the health endpoint is internet-reachable. Both are
           # asserted per public host: `/actuator/prometheus` (the credentialed metrics surface) and
           # `/actuator/health` (liveness/readiness/build info — a passive info leak if it drifts

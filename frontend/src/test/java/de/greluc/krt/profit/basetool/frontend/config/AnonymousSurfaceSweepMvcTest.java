@@ -211,6 +211,35 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       if (PUBLIC_RESOURCES.contains(call.path())) {
+        // An ASSERTION, not a skip — which is what this set's own Javadoc, SecurityConfig:249 and
+        // WebAppManifestController all say it is. It was a bare `continue`, so adding a path here
+        // REMOVED it from the sweep instead of covering it, and the `permitAll` entry those
+        // comments
+        // point at could have been deleted with every test still green.
+        //
+        // Asked for with `*/*` rather than `text/html`, which is why it could not simply go through
+        // `issue()`: both of these mappings declare `produces`, so an HTML Accept header fails
+        // content negotiation and returns a status that means "I cannot represent this" — read, in
+        // the shape this sweep uses, as "the gate refused you". `*/*` matches any `produces`, so a
+        // 200 here means served, and a 3xx means the gate redirected a resource that must never
+        // redirect.
+        int rendered =
+            mockMvc
+                .perform(
+                    MockMvcRequestBuilders.request(call.method(), call.path())
+                        .accept(MediaType.ALL)
+                        .with(csrf()))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+        if (rendered != 200) {
+          served.add(
+              call
+                  + " -> "
+                  + rendered
+                  + " (a REQ-SEC-052 public resource must be served anonymously, never"
+                  + " redirected)");
+        }
         continue;
       }
       if (PUBLIC_PAGES.contains(call.path())) {
@@ -283,6 +312,11 @@ class AnonymousSurfaceSweepMvcTest {
     for (Call call : allCalls()) {
       if (call.method() == HttpMethod.GET
           && (PUBLIC_PAGES.contains(call.path()) || PUBLIC_RESOURCES.contains(call.path()))) {
+        // A genuine exclusion here, unlike the one in `navigationIsSentToTheLogin` above: this test
+        // asserts that a background call is REFUSED, and a public path is the one kind that must
+        // not
+        // be. That it is served anonymously is asserted there, so the entry is covered once rather
+        // than nowhere.
         continue;
       }
       int status = issue(call, MediaType.APPLICATION_JSON);

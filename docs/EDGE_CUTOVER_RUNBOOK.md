@@ -55,9 +55,10 @@ would "ship and do nothing":
 ls /var/iri/code/docker/edge/conf.d/ /var/iri/code/docker/edge/include/
 ```
 
-Expect **six** files under `conf.d/` (the maps plus five server blocks — the Keycloak one went with
-ADR-0166) and **eight** under
-`include/`. If the directory is absent, the bundle predates the change — promote again and do not
+Expect **six** files under `conf.d/` (the maps, the default server and four vhost blocks — the
+Keycloak one went with ADR-0166) and **ten** under
+`include/` (the seven that were always there plus `upstream-keycloak.conf`, `upstream-tls.conf`
+and `proxy-common.conf`, all three added with the identity move). If the directory is absent, the bundle predates the change — promote again and do not
 continue.
 
 ## 2. Seed the certificates — BEFORE stopping anything

@@ -215,6 +215,24 @@ body {
      * the sticky-footer pattern is not needed there either.
      */
     min-height: 100vh;
+    /*
+     * `dvh` as well, for the same reason `.sidebar` and `.krt-modal-overlay` carry the pair: on a
+     * phone browser `100vh` is the LARGE viewport, the one with the address bar hidden.
+     *
+     * It was harmless while the footer was `position: fixed` at every width. The phone class made it
+     * load-bearing: `body` is a flex column there and `main` / `.page-wrapper` take `flex: 1 0 auto`,
+     * so whatever slack `min-height` invents is absorbed by the content box and pushes the now
+     * in-flow footer down with it. In Safari's TAB mode on a short page — `/notifications` with no
+     * rows, `/impressum`, `/privacy`, `/terms`, `/profile` — that is 60-100px, and the member has to
+     * scroll a page with nothing to scroll in order to reach the legal links.
+     *
+     * Invisible to TouchClassLayoutE2eTest and to the installed app alike, because neither has
+     * dynamic browser chrome and `vh == dvh` there. It bites only in the browser tab.
+     *
+     * The `vh` line stays first: an engine that does not know `dvh` discards that declaration alone
+     * and keeps this one.
+     */
+    min-height: 100dvh;
 }
 
 h1,
@@ -1441,7 +1459,20 @@ tbody tr:nth-child(even):hover {
      * `body` comment names it as the mechanism that was dropped when the footer became
      * unconditionally fixed.
      */
-    main {
+    main,
+    /*
+     * `.page-wrapper` too, because on the two pages this pattern was written for `main` is not the
+     * body's flex child. `operation-detail.html` has NO `<main>` at all, and
+     * `mission-detail.html`'s is nested inside `.page-wrapper` and gated on `th:if="${isNew}"` — so
+     * an existing mission has none either, and the body-level child is `.page-wrapper` in both
+     * cases. Nothing in the column could absorb the slack, and the footer landed mid-screen with
+     * bare page background beneath it, which is precisely the failure the comment above describes.
+     * Before this class the footer was `position: fixed` everywhere and the case could not arise.
+     *
+     * Harmless where `.page-wrapper` sits INSIDE `main`, which is the usual shape: `flex` on a
+     * non-flex-child is inert.
+     */
+    .page-wrapper {
         flex: 1 0 auto;
     }
 

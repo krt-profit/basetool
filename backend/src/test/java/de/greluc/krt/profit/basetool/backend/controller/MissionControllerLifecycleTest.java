@@ -563,7 +563,7 @@ class MissionControllerLifecycleTest {
 
     // guestName, comment and orgUnitIds stay null on purpose: this body cannot name anybody but
     // the caller, which is what lets the endpoint skip the self-vs-manager check that
-    // /participants/add needs (ADR-0154).
+    // /participants/add needs (ADR-0170).
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .addParticipant(

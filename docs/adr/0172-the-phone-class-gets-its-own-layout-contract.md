@@ -1,4 +1,4 @@
-# ADR-0170 — The phone class gets its own layout contract, and a guard that measures it
+# ADR-0172 — The phone class gets its own layout contract, and a guard that measures it
 
 - **Status:** Accepted — implemented (owner-requested 2026-09-13)
 - **Date:** 2026-09-13
@@ -73,7 +73,7 @@ measures it.** Four owner decisions, taken 2026-09-13:
 ## Consequences
 
 - **The two touch classes are gate-enforced for the first time.** `TouchClassLayoutE2eTest` sweeps
-  375×812, 768×1024, 1024×768, 1280×800 and 1600×900 over every page route, follows a real detail
+  375×812, 810×1080, 1024×768, 1280×800 and 1600×900 over every page route, follows a real detail
   link from each list, shows and measures **every modal on the page** without needing its trigger,
   and writes a full-page screenshot per page and class plus one per modal on the touch classes. It
   collects every finding before failing, so an audit names all offenders rather than the first.

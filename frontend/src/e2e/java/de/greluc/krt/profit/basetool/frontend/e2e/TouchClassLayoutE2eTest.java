@@ -261,18 +261,6 @@ class TouchClassLayoutE2eTest {
   private static final int MAX_REASON_CHARS = 600;
 
   /**
-   * All four device classes of REQ-UI-009, with the tablet taken at both orientations.
-   *
-   * <p>375×812 is the iPhone viewport the phone class is written for. 768×1024 and 1024×768 are the
-   * tablet class at both orientations, and they really are different layouts here because every
-   * breakpoint is width-only (`width <= 768px` / `<= 1024px`), so a rotation crosses them. 1280×800
-   * is the desktop class and 1600×900 the ultra-wide one, where `main` gains its `max-width` — the
-   * two classes that were already covered by review and by {@code
-   * MissionDatetimeSplitLayoutE2eTest} but never by a whole-page sweep.
-   *
-   * <p>Ordered narrow to wide so the output reads as a ladder.
-   */
-  /**
    * Restricts the sweep to one device class, as {@code WxH}.
    *
    * <p>Set by CI, which fans the five classes out across runners ({@code browser x device}) rather
@@ -288,6 +276,23 @@ class TouchClassLayoutE2eTest {
    */
   private static final String DEVICE_FILTER = System.getProperty("e2e.device", "").trim();
 
+  /**
+   * The five device classes of REQ-UI-009, with the tablet taken at both orientations.
+   *
+   * <p>375×812 is the iPhone viewport the phone class is written for. 810×1080 and 1024×768 are the
+   * tablet class at both orientations, and they really are different layouts here because every
+   * breakpoint is width-only ({@code width <= 768px} / {@code <= 1024px}), so a rotation crosses
+   * them. 1280×800 is the desktop class and 1600×900 the ultra-wide one, where {@code main} gains
+   * its {@code max-width} — the two classes that were already covered by review and by {@code
+   * MissionDatetimeSplitLayoutE2eTest} but never by a whole-page sweep.
+   *
+   * <p>Ordered narrow to wide so the output reads as a ladder.
+   *
+   * <p>This block sat ABOVE {@link #DEVICE_FILTER} as a second consecutive Javadoc comment, which
+   * javac discards — so it documented nothing, and what it said had stopped being true: "all four
+   * device classes" for a five-entry list, and 768×1024 for the entry deliberately changed to
+   * 810×1080. `REQ-UI-009` and the ADR named the same retired number and are corrected with it.
+   */
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
@@ -672,21 +677,67 @@ class TouchClassLayoutE2eTest {
     // dead wall clock per shard across ~350 measurements, and still a guess — a slow runner can
     // miss the beat, so it bought no flakiness resistance either. Waiting for the property to exist
     // waits for exactly what the measurement needs, and returns as soon as it does.
+    //
+    // It is CONDITIONAL on the page having a footer, and that guard is load-bearing. `sidebar.js`
+    // publishes the property inside `if (footerEl)`, and eight templates render no
+    // `fragments/sidebar` at all — the five error pages, `terms-accept.html` and
+    // `pending-approval.html`. On any of them an unconditional wait runs to Playwright's full 30s
+    // default, `measureSafely` turns the TimeoutError into a FINDING, and the documented
+    // "SKIPPED — no app shell" line ten lines below is never reached. Two ways that bites: a route
+    // that answers 403/404/500 during a run — exactly what this sweep exists to report — costs 30s
+    // per device class and reports a timeout instead of the status; and adding `/terms/accept` to
+    // PAGES, which the consent gate makes mandatory reading, would hang five classes on a page that
+    // renders perfectly. The PAGES Javadoc promises the opposite ("skipped at runtime, not guessed
+    // at here"), and the sleep this replaced did have that property.
     page.waitForFunction(
         "() => document.readyState === 'complete'"
             + " && (!document.fonts || document.fonts.status === 'loaded')"
-            + " && getComputedStyle(document.documentElement)"
-            + "     .getPropertyValue('--krt-footer-height').trim() !== ''");
+            + " && (!document.querySelector('.krt-footer')"
+            + "     || getComputedStyle(document.documentElement)"
+            + "         .getPropertyValue('--krt-footer-height').trim() !== '')");
+
+    // Did the route actually SERVE this path, or send us somewhere else?
+    //
+    // Without this, a redirect is counted as a measurement of the page it landed on.
+    // `/pending-approval` is the case that proved it: `PendingApprovalPageController` answers
+    // `redirect:/` for an ACTIVE role-bearing session, which is the only kind this suite has, so
+    // the
+    // browser sat on the dashboard, the shell check passed, and the route joined `measured` having
+    // never been looked at — every class measured the dashboard twice and the coverage line
+    // over-reported by one. The comment on that entry claimed it "skips at every class and cancels
+    // out of the coverage comparison"; it did neither.
+    //
+    // Reported rather than silently dropped, because a route that has started redirecting is worth
+    // seeing. Query and fragment are ignored: a redirect that only adds `?foo` is still this page.
+    String landedPath = page.url().replace(baseUrl, "").replaceAll("[?#].*$", "");
+    if (landedPath.isEmpty()) {
+      // `baseUrl` carries no trailing slash, so the dashboard strips to the empty string.
+      landedPath = "/";
+    }
+    if (!landedPath.equals(path) && !landedPath.equals(path + "/")) {
+      System.out.printf(
+          "[touch-layout] %-34s SKIPPED — redirected to %s (not measured, not counted)%n",
+          deviceLabel + " " + path, landedPath);
+      return findings;
+    }
 
     // Is this a page at all? The route list is taken from the controllers rather than curated, so
     // it contains fragment and JSON endpoints too. A Basetool page is recognised by its app shell;
     // anything without one is skipped and said so, which is also how a page that quietly stops
     // rendering the shell would surface.
+    //
+    // `main` OR `.page-wrapper`, because two pages have no `<main>` and were being skipped as if
+    // they were not pages: `operation-detail.html` has none at all, and `mission-detail.html`'s is
+    // gated on `th:if="${isNew}"`, so an existing mission has none either. Those are the two
+    // densest views in the app and the ones the phone-class contract most needs measured, and the
+    // guard was silently declining both. The brand check still keeps fragments and JSON endpoints
+    // out, which is what this test is for.
     boolean hasAppShell =
         Boolean.TRUE.equals(
             page.evaluate(
                 "() => !!document.querySelector('header nav .brand') &&"
-                    + " !!document.querySelector('main')"));
+                    + " (!!document.querySelector('main')"
+                    + "  || !!document.querySelector('.page-wrapper'))"));
     if (!hasAppShell) {
       System.out.printf(
           "[touch-layout] %-34s SKIPPED — no app shell (fragment, redirect or non-HTML); now at"

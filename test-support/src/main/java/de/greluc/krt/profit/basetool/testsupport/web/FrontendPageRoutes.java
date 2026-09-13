@@ -143,9 +143,17 @@ public final class FrontendPageRoutes {
           "/admin/special-commands",
           "/admin/uex-data",
           "/organisation/leitung",
-          // Measured with an APPROVED session, which this route redirects away from, so it skips at
-          // every device class and cancels out of the coverage comparison. It is listed anyway: the
-          // day it stops redirecting, it is a page like any other and wants measuring.
+          // Measured with an APPROVED session, which this route redirects away from — so the
+          // REDIRECT CHECK in the touch sweep's `measure()` skips it and says so. Corrected
+          // 2026-09-13: this entry used to claim the route "cancels out of the coverage
+          // comparison", and it did not. `PendingApprovalPageController` answers `redirect:/`, the
+          // browser landed on the dashboard, the shell check passed, and the route was counted as
+          // MEASURED while every device class measured the dashboard twice.
+          //
+          // It is listed anyway, and the escape hatch is real rather than decorative now: the day
+          // it stops redirecting, it is a page like any other and gets measured. It is also one of
+          // the two non-error templates with no `fragments/sidebar`, so it has no `.krt-footer` and
+          // could not satisfy the phone-class footer contract even if it did render.
           "/pending-approval",
           // The PAGE. Its JSON polling endpoint `/admin/p4k-import/jobs` is in NOT_PAGES, where the
           // first sweep put it by reporting a route with no footer at all.

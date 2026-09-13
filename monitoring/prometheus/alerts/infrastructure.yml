@@ -51,8 +51,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Edge /actuator deny broken: {{ $labels.instance }}"
-          description: "{{ $labels.instance }} no longer answers 404 — the `location /actuator` deny on the NPM proxy host has drifted (ADR-0072 compensating control). Re-add it in the proxy host's Advanced config."
+          summary: "Edge deny broken: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} no longer answers 404 — the edge `location` that denies it has drifted. The instance label names the path, and it is no longer only `/actuator`: since ADR-0166 this job also probes `/auth/health` and `/auth/metrics`, so a firing alert may mean Keycloak's readiness detail and its full metric set (realm names, user and session counts, client ids) are internet-readable. Fix it in `docker/edge/conf.d/10-frontend.conf.template` and promote — the edge is nginx configured from this repository, NOT the retired NPM proxy host whose Advanced config this alert used to name (ADR-0162, ADR-0166). ADR-0072 is the compensating control for the `/actuator` half."
 
       - alert: HostDiskCritical
         expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.90
