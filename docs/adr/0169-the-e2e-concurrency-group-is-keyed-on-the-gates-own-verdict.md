@@ -112,8 +112,17 @@ is the defect.
 
 ## Consequences
 
-- The five runs of a multi-label `gh pr create` now resolve to **one executing suite and four
-  `skipped` runs**. Nothing is cancelled, so nothing renders as `fail`.
+- **No run that will skip can cancel a run that will execute.** That is the defect, and it is what
+  the change removes. Measured on #1877, whose `gh pr create` carried five labels and produced
+  eleven runs: one executed the full three-browser matrix, eight skipped (matrix never expanded),
+  and **none of the skipping runs was cancelled**.
+- Two runs of that burst were still cancelled, and both had **passed** the gate — one had already
+  expanded its matrix. Those are duplicate qualifying runs (the `opened` payload carried `e2e`, and
+  so did the `labeled` event that followed) being superseded by the newest, which is
+  `cancel-in-progress` doing exactly its job; running three identical suites side by side would be
+  the defect. So a burst still leaves a `cancelled` run or two on the board, and `gh pr checks`
+  still colours those like a failure. **This ADR makes the suite run; it does not make the
+  `cancelled`/`failure` rendering unambiguous** — see the last consequence.
 - The knowledge base's *"add `e2e` last, on its own"* rule becomes historical. Label order no longer
   changes the outcome, and the recovery dance (`gh pr edit --remove-label e2e`, wait, re-add) is no
   longer needed for this cause.

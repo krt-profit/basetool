@@ -1070,8 +1070,9 @@ to the shared group and restores the defect exactly.
 **Acceptance**
 
 - [ ] A `gh pr create` applying several labels including `e2e` in one invocation yields **exactly
-  one** E2E run that executes; every other run of that burst reports `skipped`, and none reports
-  `cancelled`.
+  one** E2E run that executes, whatever order the events arrive in. Every run whose gate is false
+  reports `skipped` and **none of them is cancelled**; a run that is cancelled must be one whose
+  gate was true, superseded by a newer qualifying run.
 - [ ] Applying `e2e` to an already-open PR starts the suite without waiting for a further push.
 - [ ] Toggling a label other than `e2e` on an `e2e`-labelled PR starts **no** suite.
 - [ ] A further push to an `e2e`-labelled PR supersedes the in-flight suite rather than running a
