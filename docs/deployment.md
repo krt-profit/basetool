@@ -696,11 +696,15 @@ behave exactly as they do in production — the only thing that changed is which
 is resolved.
 
 > A testing environment serves the app under its own domain from the **same**
-> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` and
-> `IRI_KEYCLOAK_ISSUER_URI` override the two public-identity values baked into
-> `docker-compose.yml`. **Set both or neither** — a half-set pair fails every
-> request with `issuer does not match`, which reads like a token bug and is in fact
-> a configuration one. Production sets neither and is unaffected.
+> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` overrides the
+> public identity baked into `docker-compose.yml` — **set that one value**, with its
+> `/auth` path, and the issuer the three apps validate is derived from it
+> (ADR-0167). It used to be a second variable, `IRI_KEYCLOAK_ISSUER_URI`, that you
+> had to keep in agreement by hand: a half-set pair failed every request with
+> `issuer does not match`, which reads like a token bug and was in fact a
+> configuration one. That variable still exists as an override for a deployment
+> whose advertised issuer genuinely differs, and is otherwise left unset.
+> Production sets neither and is unaffected.
 
 ### Forcing an immediate run
 
@@ -1207,8 +1211,10 @@ Nothing stored is lost. Sessions end, and members sign in again.
      ingest binding is empty-by-default — so the host `.env` is its only live value, and recreating a
      container does not rewrite `.env`. Miss this and the ingest gateway keeps asking the retired
      host for its token, which none of the verification steps below would notice;
-   - if `IRI_KEYCLOAK_HOSTNAME` / `IRI_KEYCLOAK_ISSUER_URI` are set (they are optional overrides),
-     move them together and **include the `/auth` path in the hostname** — see step 5;
+   - if `IRI_KEYCLOAK_HOSTNAME` is set (it is an optional override), move it and **include the
+     `/auth` path** — the issuer follows from it (ADR-0167), so there is no second value to keep in
+     step with. See step 5. If this host also sets `IRI_KEYCLOAK_ISSUER_URI` — which it should not
+     need to — that value overrides the derivation and has to be moved by hand as well;
    - **and if `IRI_KEYCLOAK_HOST_ALIAS` is set, repoint it at the WEB host.** It exists for a host
      whose NAT does not hairpin (REQ-OPS-022): the apps load their OIDC metadata from the issuer at
      start-up, so the issuer's hostname has to resolve to something that answers from inside. After
