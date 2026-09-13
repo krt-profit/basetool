@@ -164,6 +164,29 @@ Both now say `nowrap`. Everything else (`.sidebar-content`, the search-form colu
 constrains itself with `min-height`, which is a floor and can never make a flex line run out of
 space.
 
+**What the guard found once it could see.** Running it at 375×812 after the inversion produced one
+finding, six times over: the `<summary class="btn btn-ghost">` "Details" disclosures on
+`/blueprint-overview` at **29px**. The cause is a class in `inline-migration.css` carrying
+`min-height: unset` — an inline style migrated faithfully from markup where it should never have
+been written. That file loads **last**, so at equal specificity it beat `.btn`'s floor in
+`styles.css` and had done so silently since the migration; nothing measured a `<summary>` until this
+change put one in the guard's control set. Reading the rest of the generated file for the same shape
+found a second, `min-height: auto` on two `.btn.btn-claim-add` buttons on `/orders/{id}` (a third,
+`min-height: 36px`, sits on `.btn-icon` and clears the 32px dense floor, so it stands). Both
+cancelling declarations are deleted rather than out-specified from elsewhere: a rule that says "no
+floor here" is a trap for the next reader even when something overrules it.
+
+Both controls therefore take the full 44px, because REQ-UI-009 keeps the floor on `.btn` itself and
+grants the 32px exemption per class by owner decision. **The "Details" disclosure is a plausible
+candidate for that exemption** — one per row in a table, the same shape as `.bank-row-toggle` — and
+raising it makes those rows taller on a phone. Widening the exemption is an owner call and an
+amendment, not something to take while fixing the mechanism, so it is raised here and flagged there.
+
+**The verification run was on an unseeded stack**, because it selected this class alone rather than
+the destructive suite that populates the tables. That is the blind spot REQ-UI-009 already records:
+the `/orders/{id}` cancellation was found by reading the stylesheet, not by measuring, precisely
+because the claim controls never rendered.
+
 **Not done here.** `.close-modal` is a `<span>` in `admin/mission-data.html`'s three dialogs, so it
 is reached by no element selector on either side; the touch block keeps an explicit `min-height` for
 it and the guard names the class directly. The real defect is the markup — a dismiss control that is

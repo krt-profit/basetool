@@ -28,6 +28,10 @@
   Eingabefelder und Auswahllisten erfüllen das Maß von sich aus; dichte Tabellenzeilen behalten ihre
   32px. Neue Bedienelemente sind damit von Anfang an groß genug, statt erst beim nächsten Fund
   nachgetragen zu werden.
+- **Die „Details"-Schalter in den Übersichtstabellen waren zu klein.** In der Blueprint-Übersicht
+  und im Staffel-Hangar maßen sie 29px statt der geforderten 44px, ebenso zwei Schalter in der
+  Auftragsansicht. Ursache war eine alte Formatierungsanweisung, die das Mindestmaß gezielt
+  aufhob — auf Touch-Geräten sind sie jetzt normal groß.
 - **Knopfzeilen brechen auf dem Telefon zuverlässig um.** Auch das war eine Namensliste, und sie
   konnte nie vollständig sein: ein Teil der Zeilen trägt automatisch erzeugte Klassennamen, die sich
   bei jeder Änderung mitändern. Jetzt zählt der Aufbau der Zeile, nicht ihr Name.
