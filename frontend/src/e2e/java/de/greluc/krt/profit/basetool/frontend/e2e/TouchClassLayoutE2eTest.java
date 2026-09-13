@@ -78,6 +78,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *       chevrons as defects.
  * </ol>
  *
+ * <p><b>Artifacts come from one engine, assertions from all three.</b> Every engine measures every
+ * page at every device class and fails on its own findings; only the Chromium shard writes the
+ * screenshots. They are review evidence rather than assertions, and paying for ~430 captures three
+ * times over cost the Firefox shard its 45-minute job timeout — it was cancelled on every run of a
+ * branch whose other two engines reported green.
+ *
  * <p><b>Bounding rectangles, not {@code scrollWidth} alone.</b> The same lesson {@code
  * MissionDatetimeSplitLayoutE2eTest} records: overflow that lands inside a container's padding does
  * not show up in {@code scrollWidth - clientWidth}. Checks 4 and 6 therefore compare rectangles
@@ -157,6 +163,24 @@ class TouchClassLayoutE2eTest {
 
   /** Sub-pixel slack, for the same reason the sibling layout guard carries one. */
   private static final double SLACK_PX = 1.0;
+
+  /**
+   * The engine that WRITES the screenshots. Every engine still measures and still asserts.
+   *
+   * <p>The sweep takes a full-page capture per page per device class plus one per modal on the two
+   * phone classes — around 430 images — and in Firefox that is the dominant cost. Growing the route
+   * list from 47 to 64 pushed the Firefox shard from ~18 minutes past the workflow's {@code
+   * timeout-minutes: 45}, where it was cancelled on every run of the branch while Chromium finished
+   * in 20 and WebKit in 23. Chromium and WebKit reported green and the third of the matrix that
+   * never finished went unnoticed for six runs.
+   *
+   * <p>The images are review evidence, and one engine's set is what a reviewer opens; three
+   * near-identical copies buy nothing. This is the same distinction {@link #screenshotSafely}
+   * already draws — the measurement is the assertion, the picture is what lets a reader check it —
+   * applied to which shard pays for the picture. A local run defaults to this engine, so nobody
+   * loses artifacts by accident.
+   */
+  private static final String SCREENSHOT_ENGINE = "chromium";
 
   /**
    * How many of {@link #PAGES} a device class must actually measure before the run counts.
@@ -530,6 +554,9 @@ class TouchClassLayoutE2eTest {
    * @param where {@code WxH /path}, for the printed line
    */
   private static void screenshotSafely(Page page, Page.ScreenshotOptions options, String where) {
+    if (!SCREENSHOT_ENGINE.equals(System.getProperty("e2e.browser", "chromium"))) {
+      return;
+    }
     try {
       page.screenshot(options);
     } catch (RuntimeException e) {
@@ -676,7 +703,8 @@ class TouchClassLayoutE2eTest {
     // where a dialog gets tight. The device label belongs in the FILENAME: without it the 768px
     // pass silently overwrote the 375px pictures, and the directory looked complete while holding
     // only the wider half.
-    if (width <= PHONE_MAX_WIDTH) {
+    if (width <= PHONE_MAX_WIDTH
+        && SCREENSHOT_ENGINE.equals(System.getProperty("e2e.browser", "chromium"))) {
       int count = (int) number(probe.get("modalCount"));
       for (int i = 0; i < count; i++) {
         String id =
