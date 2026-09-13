@@ -10,6 +10,46 @@
   keine eigene App gibt. Ohne Netz funktioniert es nicht — bewusst, damit keine Mitgliederdaten auf
   dem Gerät zwischengespeichert werden.
 
+### Changed
+
+- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dort
+  dauerhaft sichtbar und der Inhaltsbereich musste zusätzlich Platz für sie freihalten — zusammen
+  rund ein Fünftel des Bildschirms für drei Links. Jetzt siehst du sie, wenn du ganz nach unten
+  scrollst; der Rest der Höhe gehört dem Inhalt. Auf Tablet und Rechner bleibt sie wie bisher
+  fixiert.
+- **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
+  Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
+  Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
+
+### Fixed
+
+- **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
+  (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
+  Alle drei erfüllen jetzt das 44px-Mindestmaß.
+- **Auf schmalen Bildschirmen lief der Seitenkopf über.** Wo neben der Überschrift ein Knopf steht
+  („Neuer Auftrag“ und ähnliche), wurde er aus dem Bild geschoben und die ganze Seite musste
+  seitlich gescrollt werden — auf der Auftragsseite um 159px. Der Knopf rutscht jetzt in die
+  nächste Zeile.
+- **Das Schließkreuz in Dialogen sah aus wie ein fremder Knopf** — es hatte als einziges
+  Bedienelement gar keine Gestaltung und war auf Touch-Geräten zu klein. Es passt sich jetzt dem
+  übrigen Bild an; die Knopfzeile eines Dialogs bricht auf schmalen Bildschirmen um, statt den
+  letzten Knopf abzuschneiden.
+- **Die Navigationsschublade war auf dem Handy unten abgeschnitten.** Ihre Höhe richtete sich nach
+  dem Bildschirm ohne Browserleiste, sodass die letzten Einträge — darunter „Abmelden“ — hinter
+  der Leiste lagen und nicht erreichbar waren.
+- **Überschriften liefen auf dem Handy über den Rand.** Lange deutsche Komposita wie
+  „Nutzungsbedingungen“ passen nicht auf eine Handybreite und hatten keine Umbruchstelle; die
+  Rechtsseiten ragten dadurch bis zu 88px, die Audit-Seiten 151px hinaus. Sie werden jetzt mit
+  Trennstrich umbrochen.
+- **Knopfleisten brachen nicht um.** In dreizehn Fällen — am deutlichsten im Audit-Log mit vier
+  Knöpfen — wurde der letzte Knopf aus dem Bild geschoben. Sie setzen sich jetzt in die nächste
+  Zeile.
+- **Die Glocke überdeckte den Titel.** Sie schwebt über der Kopfzeile, die deshalb keinen Platz
+  für sie freihielt — der Titel endete unlesbar unter ihr. Jetzt ist ihr Platz reserviert.
+- **Auswahlfelder waren breiter als der Bildschirm.** Ein Auswahlfeld richtet sich nach seinem
+  längsten Eintrag; im Audit-Log und in der Preis-Übersicht wurde die Seite dadurch verkleinert
+  dargestellt, statt zu scrollen. Sie passen sich jetzt der verfügbaren Breite an.
+
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
 ### Fixed

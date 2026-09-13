@@ -139,20 +139,33 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(footerEl);
     }
 
-    // Publish the actual rendered footer height as a CSS custom
-    // property (--krt-footer-height) so <main> can reserve exactly
-    // that much padding-bottom — see the `main` rule in styles.css.
+    // Publish how much of the viewport bottom the footer COVERS as a
+    // CSS custom property (--krt-footer-height), so <main> can reserve
+    // exactly that much padding-bottom — see the `main` rule in
+    // styles.css — and so the half-dozen max-height / bottom calcs that
+    // read it (materialboerse, materials-overview, promotion, org-chart,
+    // mission- and operation-detail) stay off the footer too.
     // Footer height varies with viewport width (link wrap, column
     // stacking on <=768px, font load) and a static `padding-bottom`
     // value either over-reserves space on wide screens or under-
     // reserves and clips the last content line behind the fixed
     // footer. Re-measuring on resize + ResizeObserver covers every
     // reflow path without coupling to specific breakpoints.
+    //
+    // COVERS, not "is tall": on the phone class (<=768px) the footer is
+    // `position: static` and scrolls with the page (owner decision
+    // 2026-09-13), so it covers nothing and every consumer must reserve
+    // ZERO. Reading the computed position rather than matching the
+    // breakpoint here keeps the two in step: the media query stays the
+    // single place that decides when the footer stops being pinned, and
+    // this code cannot drift out from under it. The `resize` listener is
+    // what re-evaluates it when a device is rotated across 768px.
     if (footerEl) {
         const applyFooterHeight = () => {
+            const covers = window.getComputedStyle(footerEl).position === 'fixed';
             document.documentElement.style.setProperty(
                 '--krt-footer-height',
-                footerEl.offsetHeight + 'px',
+                (covers ? footerEl.offsetHeight : 0) + 'px',
             );
         };
         applyFooterHeight();

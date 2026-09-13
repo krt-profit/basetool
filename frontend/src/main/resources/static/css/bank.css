@@ -367,6 +367,15 @@ tr.is-inert td {
 .krt-modal-foot {
     display: flex;
     justify-content: flex-end;
+    /*
+     * Repeats the wrap from styles.css on purpose. This file loads AFTER it and
+     * redeclares the same selector, so every property named here wins — and a
+     * `justify-content` row with no wrap pushes the last button out of a 335px
+     * modal frame on a 375px phone. The bank carries the tool's longest button
+     * labels ("Endgültig löschen", "Buchung freigeben"), so this is exactly the
+     * page set where the omission would bite.
+     */
+    flex-wrap: wrap;
     gap: 8px;
     padding: 12px 16px;
     border-top: var(--border-hairline);

@@ -193,11 +193,13 @@ body {
      * full viewport even when the content is short. The previous `display:
      * flex; flex-direction: column` was only there to power a sticky-footer
      * pattern (`<main flex: 1 0 auto>` grew to push the footer down). The
-     * footer is now `position: fixed; bottom: 0` (see `.krt-footer`), so it
-     * stays anchored to the viewport bottom on every scroll position
-     * regardless of content length — the flex column trick is no longer
-     * needed and is dropped to keep <main>'s normal block-layout width
-     * calculation simple.
+     * footer is `position: fixed; bottom: 0` (see `.krt-footer`) on every class
+     * ABOVE the phone one, so it stays anchored to the viewport bottom at every
+     * scroll position regardless of content length — the flex column trick is no
+     * longer needed and is dropped to keep <main>'s normal block-layout width
+     * calculation simple. On the phone class the footer is `static` again (owner
+     * decision 2026-09-13) and simply follows the content as the last block, so
+     * the sticky-footer pattern is not needed there either.
      */
     min-height: 100vh;
 }
@@ -363,7 +365,10 @@ main {
      * custom property is set by sidebar.html JS after measuring the actual
      * rendered footer (with ResizeObserver + resize listener), so the
      * reservation tracks the real height across breakpoints, link wrap and
-     * font load. The fallback `5rem` covers the brief window before
+     * font load. What it publishes is the height the footer COVERS, so on the
+     * phone class — where the footer is `position: static` and scrolls with the
+     * page — it is 0 and this reserve collapses to its separator gap, which the
+     * `width <= 768px` block then replaces outright. The fallback `5rem` covers the brief window before
      * DOMContentLoaded fires and the JS publishes the measured value; the
      * extra `5rem` is the visible gap between the last content line and the
      * top edge of the footer — `1rem` and `2rem` both read as flush against
@@ -1196,18 +1201,154 @@ tbody tr:nth-child(even):hover {
 }
 
 @media (width <= 768px) {
+    /*
+     * The page-title row wraps on a phone (REQ-UI-009, measured 2026-09-13).
+     *
+     * `.greeting.hud-box.flex-between` is the standard page header — an <h1>
+     * beside its primary action — and it is used by 28 templates. `space-
+     * between` with no `flex-wrap` means the row cannot break: the German
+     * headings are long compounds ("AUFTRAGSVERWALTUNG") that already fill a
+     * 375px screen on their own, so the CTA beside them was pushed clean off
+     * the viewport and took the whole document width with it. Measured on the
+     * phone class: /orders overflowed by 159px, /notifications by 52px,
+     * /missions and /materials/overview by 26px, /bank by 10px — nothing was
+     * clipped, the page simply became 534px wide and every screen had to be
+     * panned sideways. REQ-UI-009 lets a wide TABLE scroll; it does not let the
+     * page do it.
+     *
+     * That three templates already carried a generated `flex-wrap: wrap` +
+     * gap utility on this exact element is the tell: the defect was hit before
+     * and patched per page. This fixes the other 28 at the utility instead.
+     *
+     * `.flex-between-mb` gets the same treatment — same shape, same trap.
+     */
+    .flex-between,
+    .flex-between-mb {
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    /*
+     * Every other action row wraps too, for the same reason and by the same
+     * measurement. A sweep of the stylesheets for `display: flex` rules that
+     * declare no `flex-wrap` and read like a button row turned up thirteen; the
+     * admin audit log was the one that showed what it costs — four buttons
+     * (FILTERN / ZURÜCKSETZEN / PDF EXPORTIEREN / EINTRÄGE LÖSCHEN) ran 151px
+     * past a 375px screen with the last one sliced in half.
+     *
+     * Listed here rather than patched in six files: none of those rules declares
+     * `flex-wrap` at all, so there is nothing to out-specify and this single
+     * declaration reaches all of them. Three candidates were deliberately left
+     * out — `.krt-pi-typeahead-item` and `.mb-modal-footnote` are not action rows,
+     * and `.oc-chart.editing .oc-actions` belongs to the org-chart editor, which
+     * carries its own narrow-screen block.
+     */
+    .bank-filter-actions,
+    .kpi-card-foot,
+    .leitung-group-actions,
+    .leitung-modal-actions,
+    .krt-bp-detail-actions,
+    .search-form-actions,
+    .notification-dropdown-footer,
+    .notification-item-actions,
+    .notification-page-actions,
+    .demand-actions-bar {
+        flex-wrap: wrap;
+    }
+
+    /*
+     * German headings break inside the word on a phone, because they have to.
+     *
+     * This UI's headings are compounds — NUTZUNGSBEDINGUNGEN, AUFTRAGSVERWALTUNG,
+     * MATERIALBEDARFSÜBERSICHT — set uppercase at --fs-h1 with letter-spacing, and
+     * a single one of them is wider than a 375px screen with no space to wrap at.
+     * Measured: the admin Nutzungsbedingungen page ran 88px past the viewport on
+     * the word alone, the two audit pages 151px. Scoping this to `.greeting h1`
+     * (where it started) covered a fraction — 76 templates carry an <h1> and most
+     * are not in a `.greeting`.
+     *
+     * `hyphens: auto` first, so the break lands on a syllable boundary and gets a
+     * hyphen; the documents carry `lang` from the request locale, which is what
+     * makes that work at all. `overflow-wrap: anywhere` is the fallback for the
+     * words hyphenation declines — and it also lowers the element's min-content
+     * width, which is what lets a flex row shrink instead of overflowing.
+     */
+    h1,
+    h2,
+    h3 {
+        hyphens: auto;
+        overflow-wrap: anywhere;
+    }
+
+    /*
+     * The custom multi-select is not a `<select>`, so the form-control cap in the
+     * <=1024px block does not reach it — it is a div widget carrying a hard
+     * `min-width: 200px`. Two of them in the Preis-Übersicht's filter row make
+     * 400px plus a 24px gap on a 375px screen: the row does wrap and the flex
+     * items do shrink, but that 200px floor inside them does not, so the content
+     * spills out of its own box and the page ends up 401px wide. Dropping the
+     * floor and giving each filter a row of its own is the phone layout for it.
+     */
+    .filters-container .multi-select-container {
+        min-width: 0;
+    }
+
+    .filters-container > .form-group {
+        flex: 1 1 100%;
+    }
+
+    /*
+     * The bank / audit filter bar: the same defect one level up.
+     *
+     * `.bank-filterbar` is a wrapping flex ROW, so its children are flex items and each carries
+     * `min-width: auto` — the content's min-content size. A `<select>` does not shrink below its
+     * longest option, so `#audit-event` („Alle Ereignisse / Konto angelegt / Konto umbenannt / …")
+     * measured 427px inside a 375px screen and dragged its row and label out to 443px. That is why
+     * neither `max-width: 100%` nor the bar's own `flex-wrap` helped: wrapping cannot rescue a
+     * single item that is itself too wide, and a percentage max-width resolves against a containing
+     * block the select is busy widening.
+     *
+     * `min-width: 0` on the items is the half that lets the chain shrink; `width: 100%` on the
+     * controls is the half that makes them fill the shrunken row instead of their own content.
+     */
+    .bank-filterbar > * {
+        min-width: 0;
+    }
+
+    .bank-form-row select,
+    .bank-form-row input,
+    .bank-filter-group select,
+    .bank-filter-group input {
+        width: 100%;
+    }
+
+    /*
+     * On a phone the footer SCROLLS WITH THE PAGE instead of being pinned to
+     * the viewport bottom (owner decision 2026-09-13, REQ-UI-009).
+     *
+     * Pinned, it cost the phone class twice over: the column-stacked footer is
+     * two rows tall (~75px of an 812px viewport), and `main` reserved that
+     * height AGAIN as padding-bottom so the last content line could clear it.
+     * Together that is roughly a fifth of the screen permanently spent on three
+     * legal links — on the one device class where vertical space is scarcest,
+     * and where the app is now the mobile client (REQ-UI-020). Scrolling it
+     * away gives the whole viewport to content and still leaves the links
+     * exactly where web convention puts them: at the end of the page.
+     *
+     * `position: static` is the whole mechanism, and it is load-bearing in one
+     * non-obvious way: `--krt-footer-height` feeds EIGHT consumers (this file's
+     * `main` reserve, the materialboerse / materials-overview / promotion
+     * max-height calcs, the org-chart proxy scrollbar's `bottom`, and the
+     * mission- and operation-detail padding), all of which mean "how much of
+     * the viewport bottom is covered". sidebar.js therefore publishes 0 as soon
+     * as the footer is not `fixed`, so every one of them stops reserving in the
+     * same breath rather than each needing its own media query.
+     */
     .krt-footer {
         flex-direction: column;
         align-items: flex-start;
+        position: static;
     }
-    /*
-     * The base `main` rule's padding-bottom reserves room for this fixed
-     * footer and grows automatically on mobile: `--krt-footer-height` (set by
-     * sidebar.html JS) reflects the taller column-stacked footer above. This
-     * only holds because the responsive `main` rules set padding via longhand
-     * (padding-top + padding-inline) — a `padding` shorthand there silently
-     * resets padding-bottom and hides content behind the footer.
-     */
 }
 
 /*
@@ -2959,7 +3100,20 @@ input[type='radio']:focus {
     left: 0;
     width: 380px;
     max-width: 85vw;
+    /*
+     * `dvh`, with `vh` kept above it as the fallback for engines that do not
+     * know the unit. This drawer is a scroll container (`overflow: hidden auto`
+     * below) and its height is what decides where its scrollable area ends. On a
+     * phone browser `100vh` is the LARGE viewport — the one with the address bar
+     * hidden — so with the bar showing, the bottom of the drawer sits behind it:
+     * the container believes it fits, produces no overflow to scroll, and the
+     * last nav entries (Abmelden among them) simply cannot be reached. `dvh`
+     * tracks the viewport that is actually visible. Inside the installed PWA
+     * (REQ-UI-020) there is no browser chrome and the two are identical, which is
+     * why this only ever bit in Safari's tab mode.
+     */
     height: 100vh;
+    height: 100dvh;
     z-index: 2000;
 
     /* Animate transform (compositor-only) instead of `left` to avoid a
@@ -2989,8 +3143,17 @@ input[type='radio']:focus {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
+    /*
+     * `100%` rather than `100vw`: on a viewport with a classic (space-taking)
+     * scrollbar, `100vw` counts the scrollbar's width too, so a full-width fixed
+     * layer overflows the page by exactly that much and hands the document a
+     * horizontal scrollbar of its own. `inset: 0` semantics via width/height
+     * percentages of the initial containing block avoid it. `dvh` for the height,
+     * for the same reason as the drawer above.
+     */
+    width: 100%;
     height: 100vh;
+    height: 100dvh;
     background-color: rgb(0 0 0 / 80%);
     z-index: 1999;
     opacity: 0;
@@ -4431,6 +4594,82 @@ textarea:focus-visible,
     }
 
     /*
+     * A form control may never be wider than the space it is given.
+     *
+     * A bare `<select>` sizes itself to its LONGEST OPTION, and nothing caps it:
+     * the audit log's „Ereignistyp" list pushed the page to 443px on a 375px
+     * screen, and the Preis-Übersicht's two filter selects to 401px. On a phone
+     * that does not produce a scrollbar — the layout viewport simply widens and
+     * the whole page is scaled down, so every other element gets smaller too.
+     *
+     * `min-width: 0` is the half that is easy to miss: a flex item's automatic
+     * minimum size is its content size, so a select in a filter row refuses to
+     * shrink below its longest option no matter what `max-width` says. The pair
+     * is what makes it fit; the same trap the header wordmark and the page-title
+     * row above each needed their own `min-width: 0` for.
+     */
+    input,
+    select,
+    textarea {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    /*
+     * The three chrome controls the rule above never reached, measured on every
+     * page at 375px and 768px by TouchClassLayoutE2eTest (2026-09-13): the
+     * language switcher rendered 17px tall, the sidebar's close button 34px and
+     * the notification bell 40px — all below REQ-UI-009's 44px floor, and none
+     * of them carrying the `.btn-xs` / `.btn-icon` exemption, which covers only
+     * repeated dense ROW actions. They were missed because each is a bare
+     * `button` with its own rule and none is a `.btn`: the selector list above
+     * enumerates classes, so a control that opts out of `.btn` opts out of the
+     * floor with it. They are the controls a member reaches for first on a
+     * phone — open the menu, read a notification, switch language.
+     */
+    .notification-bell-btn {
+        width: var(--touch-target);
+        height: var(--touch-target);
+    }
+
+    .close-sidebar-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--touch-target);
+        min-height: var(--touch-target);
+    }
+
+    .dropbtn {
+        min-height: var(--touch-target);
+    }
+
+    .krt-modal-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--touch-target);
+        min-height: var(--touch-target);
+    }
+
+    /*
+     * `.btn-xs2` is a page-local dense variant declared inline in mission-detail.html and
+     * operation-detail.html (`min-height: 32px`, 21 uses). Two of its instances are FORM actions —
+     * "Ziel hinzufügen" and "Schritt hinzufügen" on the Einsatz create form — and REQ-UI-009 is
+     * explicit that a form button keeps the 44px floor; only repeated dense ROW actions
+     * (`.btn-xs`, `.btn-icon`) are exempt. Owner decision 2026-09-13: raise the whole variant on
+     * the touch classes and leave desktop density untouched.
+     *
+     * Written as `.btn.btn-xs2`, not `.btn-xs2`, and that is not decoration: the page's own rule
+     * lives in an inline <style> that the browser reads AFTER this file, so at equal specificity it
+     * would win. Out-specifying it is the same technique REQ-UI-009 already prescribes for
+     * `.btn.btn-xs` over `.btn` — relying on source order is what makes such a rule silently inert.
+     */
+    .btn.btn-xs2 {
+        min-height: var(--touch-target);
+    }
+
+    /*
      * On touch devices the generic rule sets padding: 0.75rem 1rem which,
      * combined with the fixed height of 2.75rem, leaves too little room
      * for a 1rem font at line-height 1.5 and clips descenders/umlauts in
@@ -4460,18 +4699,77 @@ textarea:focus-visible,
 @media (width <= 768px) {
     header {
         padding: var(--space-2) var(--space-4);
+        /*
+         * Reserve the notification bell's footprint. The bell is
+         * `position: fixed; top: 1rem; right: 1rem` with a 44px button, so it
+         * floats ABOVE the header and outside its flex flow — the header has no
+         * idea it is there. On a 375px screen the wordmark therefore truncates at
+         * the header's own padding edge and the last characters, ellipsis
+         * included, are drawn underneath the bell: seen on the Lager booking page
+         * as "Profit Basetool – Alle Staf" with no ellipsis and no gap.
+         * 16px offset + 44px button + 8px breathing room.
+         */
+        padding-right: calc(1rem + var(--touch-target) + var(--space-2));
     }
 
+    /*
+     * Compact header on the phone class (owner decision 2026-09-13, REQ-UI-009).
+     *
+     * Measured before changing anything: the header was 76px tall on a 375px
+     * screen — 16px padding plus 60px of content — and the 60px did NOT come
+     * from the 50px mark. It came from the wordmark wrapping to two lines,
+     * because it carries the active OrgUnit context ("Profit Basetool – Alle
+     * Staffeln", REQ-ORG-010) and that is simply longer than a phone is wide.
+     *
+     * So the fix is one line of text, not a smaller font alone: `nowrap` +
+     * ellipsis caps the row at a single line, and `min-width: 0` on both flex
+     * levels is what actually lets it shrink — a flex item's automatic minimum
+     * size is its CONTENT size, so without this the text refuses to shrink,
+     * pushes the row wider than the viewport and the ellipsis never appears.
+     * That is the same trap the page-title row above fell into.
+     *
+     * The mark goes to 32px. REQ-UI-019 fixes the asset's presentation — its
+     * 240×240 viewBox carries ~30% breathing room that must not be cropped —
+     * and scaling the whole box keeps those proportions exactly; nothing is
+     * forked or tightened. Result: ~48px instead of 76px, and the menu, mark
+     * and bell all stay reachable without scrolling, which is why this was
+     * chosen over letting the header scroll away like the footer.
+     */
     nav {
         gap: var(--space-4);
+        min-width: 0;
     }
 
-    /* Longhand only — see the <=1024px note above. A `padding` shorthand here
-       would wipe the base footer reservation (padding-bottom), which matters
-       most on mobile where the stacked footer is tallest. */
+    nav .brand {
+        gap: var(--space-2);
+        min-width: 0;
+    }
+
+    nav .brand img {
+        height: 32px;
+    }
+
+    nav .logo-text {
+        font-size: 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    /* Still longhand — see the <=1024px note above — but padding-bottom is now
+       set DELIBERATELY rather than inherited from the base rule's footer
+       reservation. On this class the footer is `position: static` and scrolls
+       with the page, so there is nothing to reserve: --krt-footer-height is 0
+       here (sidebar.js publishes the covered height, not the rendered one) and
+       the base calc would still leave its 5rem separator gap, which on a phone
+       is 80px of empty page between the last row and a footer that is simply
+       the next block. --space-4 plus the footer's own border-top is the whole
+       separation this needs. */
     main {
         padding-top: var(--space-4);
         padding-inline: var(--space-4);
+        padding-bottom: var(--space-4);
     }
 
     .hud-box {
@@ -5413,9 +5711,44 @@ textarea:focus-visible,
     min-height: 0;
     overflow-y: auto;
 }
+/*
+ * The modal's close control (20 modals use it) had NO rule in any stylesheet —
+ * verified across styles.css, bank.css, personal-inventory.css and the rest on
+ * 2026-09-13, including descendant forms like `.krt-modal-head button`. It was
+ * therefore rendering as a browser-default button: a light chrome box with a
+ * system-font ✕ inside a dark HUD panel, and on a touch class it also missed the
+ * 44px floor, because the `<=1024px` touch rule enumerates classes (`.btn`,
+ * `.hamburger-btn`, …) and this is a bare `button` that is none of them.
+ *
+ * Styled to match `.close-sidebar-btn`, its already-approved sibling — same job
+ * (an ✕ that dismisses a surface), same treatment — rather than inventing a
+ * variant. The touch floor is applied in the `<=1024px` block with the others.
+ */
+.krt-modal-close {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--color-primary);
+    font-family: var(--font-body);
+    font-size: var(--fs-h3);
+    line-height: 1;
+    cursor: pointer;
+}
+
+.krt-modal-close:hover {
+    color: var(--color-accent-light);
+}
+
 .krt-modal-foot {
     display: flex;
     justify-content: flex-end;
+    /*
+     * Wraps, because it cannot not: three German labels ("Abbrechen",
+     * "Endgültig löschen", …) in a 335px modal on a 375px phone do not fit on
+     * one line, and `justify-content` alone would push the last button out of
+     * the frame. Same trap as the page-title row and `.flex-between`.
+     */
+    flex-wrap: wrap;
     gap: 8px;
     padding: 12px 16px;
     border-top: var(--border-hairline);

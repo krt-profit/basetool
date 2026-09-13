@@ -289,16 +289,70 @@ since they were introduced: `.btn` is declared after them in `styles.css` and re
 the ≤1024px touch block, so it won every shared property and each "dense" button had in fact
 been rendering full-size.
 
+**The header is compact on the Smartphone class** (owner decision 2026-09-13). It measured 76px on
+a 375px screen — 16px padding plus 60px of content — and the 60px came from the wordmark wrapping to
+two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-010) and
+„Profit Basetool – Alle Staffeln" is simply longer than a phone is wide. The phone class therefore
+renders the mark at 32px and the wordmark on one line with an ellipsis, for roughly 48px. It stays
+**sticky**: menu, mark and bell remain reachable without scrolling, which is why this was chosen
+over letting the header scroll away like the footer. Scaling the mark's box is not a REQ-UI-019
+deviation — the asset keeps its own proportions and its specified breathing room; nothing is cropped
+or forked.
+
+**On the Smartphone class the page footer scrolls with the content** (owner decision 2026-09-13);
+on every wider class it stays pinned to the viewport bottom. Pinned, it cost the phone twice: the
+column-stacked footer is two rows tall and `main` reserved that height *again* as `padding-bottom`
+so the last line could clear it — roughly a fifth of an 812px screen spent on three legal links, on
+the class with the least room and the one the app now ships to as its mobile client (REQ-UI-020).
+
+The mechanism is `position: static` inside the `width <= 768px` block, and one consequence is not
+optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
+the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because eight
+places read that property — `main`'s reserve, the Materialbörse / Materialien-Übersicht / Beförderung
+`max-height` calcs, the org-chart proxy scrollbar's `bottom`, and the mission- and operation-detail
+paddings — and every one of them would otherwise reserve space for a footer that is not there.
+
+**Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
+measured sweep of the touch classes found both:
+
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in an inline `<style>` by
+  `mission-detail.html` and `operation-detail.html` (21 uses), and two of its instances are *form*
+  actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
+  explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
+  classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
+  page's inline rule is read *after* `styles.css`: at equal specificity the page would win and the
+  fix would be silently inert — the same trap this requirement already records for `.btn.btn-xs`.
+- **`.master-row` IS exempt**, at 32px. The blueprint list rows on `/personal-inventory/blueprints`
+  measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
+  to a repeated row action rather than a standalone control.
+
 **Acceptance**
 
 - [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes, except
-  `.btn-xs` / `.btn-icon` dense-row actions, which are ≥ 32px on every class.
+  `.btn-xs` / `.btn-icon` / `.master-row` dense-row actions, which are ≥ 32px on every class.
 - [ ] A compact variant actually renders compact — `.btn.btn-xs` out-specifies `.btn` rather
   than relying on source order, since `.btn` is declared later and again inside the ≤1024px
   touch block. A bare `.btn-xs` selector is silently inert and is a regression.
+- [ ] The page never scrolls sideways on a touch class; a table wider than the screen scrolls
+  inside a container that itself fits.
+- [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
+  `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** code/design review · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
-`.btn.btn-icon`, the `width <= 1024px` touch block).
+**Enforced by:** [ADR-0165](../adr/0165-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over every page route the controllers expose plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
+footer behaviour, chrome share — with a full-page screenshot per page and class) + code/design
+review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`, the
+`width <= 1024px` touch block and the `width <= 768px` block), `static/js/sidebar.js`
+(`--krt-footer-height`).
+
+> **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement
+> read "Enforced by: code/design review", the only other geometric guard
+> (`MissionDatetimeSplitLayoutE2eTest`) sweeps 1280–1800px, and the smoke suite loads pages at the
+> default desktop viewport. The first run of the new guard found five pages overflowing the phone
+> viewport (`/orders` by 159px) and three chrome controls below the 44px floor on every page: the
+> language switcher at 17px, the sidebar close button at 34px and the notification bell at 40px.
+> None carried the `.btn-xs` / `.btn-icon` exemption; each was a bare `button` with its own rule,
+> and the touch block's selector list enumerates classes, so a control that opts out of `.btn` opted
+> out of the floor with it.
 
 ### REQ-UI-010 — Standard action-button icons
 
