@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
+
 ### Fixed
 
 - **Der Edge-Proxy kann jetzt so viele gleichzeitige Verbindungen bedienen, wie er soll.** Er war auf
