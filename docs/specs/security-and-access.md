@@ -1468,11 +1468,38 @@ original; `PathSegment#valueToMatch()`, which `PathPattern` matches on, is the d
 **Direction matters, and only one direction is a defect.** A raw test that decides *inclusion in a
 protective scope* fails **open** — this is the defect. A raw test that decides an *exemption from* a
 gate fails **closed**: encoding can only break such a match, so the caller gets more enforcement,
-not less. Converting an exemption list to decoded matching would *widen* it, so the two frontend
-UX-routing filters deliberately keep their raw string tests — `BackendRoleSyncFilter` (waiting-page
-redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter` (consent-page redirect
-exemptions) — as do the deny-list bot filters and the backend access log's skip list. The boundary
-in both those cases is the backend gate, which does match on the decoded path.
+not less. The deny-list bot filters and the backend access log's skip list therefore keep their raw
+string tests; the boundary in each of those cases is the backend gate, which does match on the
+decoded path.
+
+> [!important] Amended 2026-09-13 — the frontend's gate-exemption list is no longer carved out
+> This requirement used to name two more deliberate exceptions: `BackendRoleSyncFilter`
+> (waiting-page redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter`
+> (consent-page redirect exemptions), on the ground that decoding an exemption list only *widens*
+> it. Two things undid that. Both filters now read one list, `frontend/config/PublicPaths`
+> (REQ-SEC-052), so the exception no longer described where the code was; and the widening argument
+> proved too coarse to be right.
+>
+> `PublicPaths` answers the same question `SecurityConfig`'s `permitAll` list answers, and Spring
+> Security matches that list with a `PathPatternRequestMatcher` — on the **decoded** segment.
+> Matching raw therefore made the two layers disagree about the same path:
+> `/.well-known/assetlink%73.json` (`%73` is `s`) was `permitAll` and gate-exempt in neither filter,
+> so the URL layer admitted the request and the gate below it redirected. Fail-closed, and a
+> redirect rather than an exposure — but `PublicPaths` exists to be the *one* answer to "may a
+>
+>> session gate redirect this path", and it was not the one answer for encoded spellings. That is the
+>> same defect as the two drifted `isStaticAsset` copies the class was extracted to replace, one
+>> layer down.
+>
+> **The widening is bounded, and that is what makes it safe.** A `PathPattern` decodes per segment
+> and never re-joins them, so a spelling can only reach an entry `SecurityConfig` already
+> `permitAll`s under that same spelling: the set of exempt **resources** is unchanged, and only the
+> set of spellings that map onto them grows. Decoding the whole string instead — the shape this
+> paragraph was right to fear — would have been fail-**open**: `/css%2f../missions` decodes to
+> `/css/../missions`, which passes a `startsWith("/css/")` that Spring Security's own `/css/**`
+> refuses, because a decoded `%2F` stays inside its segment.
+>
+> Found in the review of PR #1870 and fixed as its own change. Owner-approved 2026-09-13.
 
 The rule is enforced by tests, not by review: each converted site carries a **direct filter test**
 driving an encoded spelling. It cannot be a MockMvc test — MockMvc normalises the path before the
@@ -1492,14 +1519,18 @@ filter runs, so such a test passes against the broken code.
   member only on the two import endpoints, in both directions — an encoded spelling of an unbound
   path stays refused, and an encoded spelling of a bound one still acts (ADR-0129).
 - [x] Every converted site has a direct filter regression test that fails against the raw idiom.
+- [x] The frontend's gate-exemption list decides on the decoded path, so `permitAll` and both
+  session gates accept the same spellings of a public document (REQ-SEC-052). The exempt
+  **resource** set is unchanged; an encoded slash cannot manufacture an asset prefix, and a
+  double-encoded spelling is not decoded a second time.
 
 **Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
 `ActingMemberFilterPathMatchingTest`, `IngestPathScopeTest`, `ClientIdentityFilterTest`,
 `FiltersTest`, `RequestLoggingFilterTest` (ingest), `RequestBodySizeLimitFilterTest`,
-`ApiCacheControlFilterTest` · **Code:** `IngestPathScope`, `PendingApprovalAccessFilter`,
-`TermsAcceptanceAccessFilter`, `ActingMemberFilter`, `RequestBodySizeLimitFilter`,
-`ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest), `PayloadSizeLimitFilter`,
-`RequestLoggingFilter` (ingest)
+`ApiCacheControlFilterTest`, `PublicPathsTest` · **Code:** `IngestPathScope`,
+`PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`, `ActingMemberFilter`,
+`RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
+`PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest), `PublicPaths` (frontend)
 
 ### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be
 
@@ -3042,6 +3073,24 @@ a method gate.
 > (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`) and `isAuthInfrastructure`
 > (login, logout, OAuth, error, actuator). **A new public document goes in both this table and
 > `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
+>
+> **Both halves match the same way, so both accept the same spellings.** Spring Security matches
+> `permitAll` with a `PathPatternRequestMatcher`, which decides on the percent-**decoded**
+> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/.well-known/assetlink%73.json`
+> was `permitAll` here and exempt in neither gate — admitted by the URL layer, then redirected by
+> the one below it. Fail-closed, so a consistency defect rather than a hole, but the same defect
+> as the drifted copies above, one layer down. Every predicate in `PublicPaths` matches a parsed
+> `PathPattern` now: **Spring Security is the reference and `PublicPaths` follows it.**
+>
+> Decoding widens the *spellings*, never the set of exempt *resources* — nothing becomes exempt
+> that this table does not already list. Decoding the whole string instead would have been
+> fail-**open**: `/css%2f../missions` decodes to `/css/../missions` and passes a
+> `startsWith("/css/")` that Spring Security's own `/css/**` refuses, because a decoded `%2F`
+> stays inside its segment. Matching per segment cannot make that mistake. `PublicPathsTest` pins
+> `%73`, `%2E`, `%2e%2e`, `%252e` and `%2f`; the default `StrictHttpFirewall` refuses all but the
+> first of those with a `400` before any of it is reached. Same defect, same fix and same
+> reasoning as the backend's `TermsAcceptanceAccessFilter`, `PendingApprovalAccessFilter` and
+> `RequestBodySizeLimitFilter`.
 
 **Backend** — the only `permitAll()` matchers on the main chain:
 

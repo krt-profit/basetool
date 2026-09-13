@@ -15,7 +15,8 @@
 - **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
   auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
   bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
-  zusätzliche Abfrage beim Server.
+  zusätzliche Abfrage beim Server. Das gilt auch für kodierte Schreibweisen derselben
+  Adresse.
 
 - **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
   (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
