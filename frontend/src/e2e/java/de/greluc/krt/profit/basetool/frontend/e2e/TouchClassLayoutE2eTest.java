@@ -714,23 +714,45 @@ class TouchClassLayoutE2eTest {
     if ("/".equals(listPath)) {
       return null;
     }
-    Object href =
-        page.evaluate(
-            """
-            (prefix) => {
-              // Plain string work rather than a built RegExp: escaping a path into a pattern
-              // inside a Java text block inside a JS string is three layers of backslash and
-              // exactly the kind of cleverness that fails to compile for an hour.
-              for (const a of document.querySelectorAll('a[href]')) {
-                const path = new URL(a.getAttribute('href'), location.origin).pathname;
-                if (!path.startsWith(prefix + '/')) continue;
-                const rest = path.slice(prefix.length + 1);
-                if (rest.length >= 6 && /^[0-9a-fA-F-]+$/.test(rest)) return path;
+    Object href;
+    try {
+      href =
+          page.evaluate(
+              """
+              (prefix) => {
+                // Plain string work rather than a built RegExp: escaping a path into a pattern
+                // inside a Java text block inside a JS string is three layers of backslash and
+                // exactly the kind of cleverness that fails to compile for an hour.
+                for (const a of document.querySelectorAll('a[href]')) {
+                  const path = new URL(a.getAttribute('href'), location.origin).pathname;
+                  if (!path.startsWith(prefix + '/')) continue;
+                  const rest = path.slice(prefix.length + 1);
+                  if (rest.length >= 6 && /^[0-9a-fA-F-]+$/.test(rest)) return path;
+                }
+                return null;
               }
-              return null;
-            }
-            """,
-            listPath);
+              """,
+              listPath);
+    } catch (RuntimeException e) {
+      // A page-side evaluate outside `measureSafely` ends the WHOLE sweep, which is the one thing
+      // the loop that calls this says must not happen ("one page that hangs must not end the
+      // audit"). It did: a run aborted with `Execution context was destroyed, most likely because
+      // of a navigation` — the page had navigated under the audit (live sync, a redirect) between
+      // the measurement and this lookup — and every remaining route and device class went
+      // unmeasured, reported as one Playwright stack trace rather than as findings.
+      //
+      // Widening the modal sweep to all three shapes made this far likelier without being its
+      // cause: the phone class now reveals and photographs ~138 dialogs per page instead of ~24, so
+      // the window between landing on a list and asking it for a detail link grew several-fold.
+      //
+      // A detail link that cannot be read is not a layout defect, so it is NOT pushed as a finding
+      // here — it is a gap in coverage, which `reportCoverage` already names by comparing each
+      // device class against the union. Returning null routes it there.
+      System.out.printf(
+          "[touch-layout] %-22s detail link unreadable (%s) — its detail view is not measured%n",
+          listPath, e.getClass().getSimpleName());
+      return null;
+    }
     return href instanceof String str ? str : null;
   }
 
