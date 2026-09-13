@@ -156,6 +156,14 @@ class TouchClassLayoutE2eTest {
   private static final double SLACK_PX = 1.0;
 
   /**
+   * How much of a failure-to-measure message is kept in the finding.
+   *
+   * <p>Enough for a Playwright page-side error to name its cause and its call site, short enough
+   * that one unmeasurable page cannot bury the other findings in stack trace.
+   */
+  private static final int MAX_REASON_CHARS = 600;
+
+  /**
    * All four device classes of REQ-UI-009, with the tablet taken at both orientations.
    *
    * <p>375×812 is the iPhone viewport the phone class is written for. 768×1024 and 1024×768 are the
@@ -341,10 +349,19 @@ class TouchClassLayoutE2eTest {
     try {
       return measure(page, baseUrl, path, deviceLabel, width, height);
     } catch (RuntimeException e) {
+      // The WHOLE message, newlines folded — not its first line. Taking `.lines().findFirst()`
+      // threw
+      // away the only useful half: Playwright formats a page-side error as a multi-line `Error {`
+      // block whose first line is literally "Error {", so five findings on /ship-data named the
+      // brace and nothing else. A diagnostic that cannot say what went wrong costs a CI round trip
+      // per attempt.
       String reason =
           e.getClass().getSimpleName()
               + ": "
-              + String.valueOf(e.getMessage()).lines().findFirst().orElse("");
+              + String.valueOf(e.getMessage()).replaceAll("\s+", " ").trim();
+      if (reason.length() > MAX_REASON_CHARS) {
+        reason = reason.substring(0, MAX_REASON_CHARS) + "…";
+      }
       System.out.printf(
           "[touch-layout] %-34s COULD NOT MEASURE — %s%n", deviceLabel + " " + path, reason);
       return List.of(deviceLabel + " " + path + ": could not be measured — " + reason);
