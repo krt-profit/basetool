@@ -79,7 +79,46 @@
   der Server nicht lesen kann, beendete den Seitenaufruf mit einem Fehler, statt ihn einfach zu
   übergehen. Betraf jede Seite, auch das Web-App-Manifest.
 
+- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
+  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
+  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
+  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
+  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
+
 ### Changed
+
+- **Anmeldefehler sind im Betrieb erstmals unterscheidbar.** Die Kennzahl dafür kannte keinen Wert
+  für „gar keine Anmeldedaten mitgeschickt" — also für genau den Fall, der praktisch immer eintritt
+  — und warf deshalb sämtliche Fehlschläge in einen Topf „sonstige". Neuer Wert `no_credentials`
+  in Backend und Ingest.
+
+- **Bearbeitungen in der Weboberfläche lösen weniger Serverabfragen aus.** Jeder JSON-Aufruf — also
+  jedes Speichern, Umschalten und Nachladen ohne Seitenwechsel — hat bisher zusätzlich fünf
+  Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
+  Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
+  entfallen.
+- **Die Datenbank wird bei vielen gleichzeitigen Mitgliedern nicht mehr ausgebremst.** Rollen und
+  Berechtigungen wurden je Mitglied alle 30 Sekunden vollständig neu aus der Datenbank gelesen; das
+  verursachte den Großteil der Datenbanklast und kurze, spürbare Verzögerungen. Der Zwischenspeicher
+  hält sie jetzt 5 Minuten — eine entzogene Rolle wirkt dadurch bis zu 5 Minuten später, sofern sich
+  das Mitglied nicht neu anmeldet.
+- **Mehr CPU für Datenbank, Backend und Keycloak, und eine passendere Datenbankkonfiguration.** Die
+  Grenzen waren so eng gesetzt, dass kurze Lastspitzen ausgebremst wurden, obwohl der Server fast
+  ungenutzt ist. Neue optionale Servervariable `IRI_AUTHORITIES_CACHE_TTL` (Standard `PT5M`,
+  zulässig bis `PT15M`) steuert den oben genannten Zwischenspeicher.
+
+### Fixed
+
+- **Der Speicherverbrauch der Weboberfläche steigt nicht mehr den ganzen Tag an.** Der Dienst lief
+  unbemerkt mit der einfachsten Speicherbereinigung der Java-Laufzeit, weil seine Speichergrenze
+  knapp unter der Schwelle lag, ab der automatisch die bessere gewählt wird — Seitenaufbauten wurden
+  dadurch regelmäßig kurz angehalten. Die Bereinigung wird jetzt ausdrücklich festgelegt, die Grenze
+  steigt von 1280 MB auf 1792 MB.
+
+- **Seiten werden schneller ausgeliefert.** Beim Aufbau jeder Seite sah der Server für jeden Link
+  in Menü und Fußzeile erst noch nach, ob dahinter vielleicht eine Datei liegt — und merkte sich
+  das Ergebnis nie, sodass er bei jedem Seitenaufruf von vorn suchte. Er sieht jetzt nur noch dort
+  nach, wo tatsächlich Dateien liegen. Am Aussehen und an der Bedienung ändert sich nichts.
 
 - **Die Anmeldung läuft jetzt unter derselben Adresse wie das Basetool selbst**, damit der Login
   die installierte Web-App auf iPhone und iPad nicht mehr aus ihrem Fenster wirft. **Du musst dich

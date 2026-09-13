@@ -26,10 +26,10 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,7 +38,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -75,7 +74,6 @@ import org.springframework.stereotype.Component;
  * client retry loop.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class CustomJwtGrantedAuthoritiesConverter
     implements Converter<Jwt, Collection<GrantedAuthority>> {
@@ -95,16 +93,6 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   private static final long RETRY_BACKOFF_MILLIS = 50L;
 
-  /**
-   * Short memoisation window for the assembled authorities (#1141). Bounds the staleness of a
-   * mid-token role / permission / approval / membership change to ~30&nbsp;s (after which the next
-   * request re-runs {@code syncUser}), while collapsing the per-request {@code syncUser} +
-   * role-lookup + membership query storm to once per token issuance. This login-path reconciliation
-   * is independent of — and far fresher than — the periodic drift-correction {@code
-   * app.keycloak.sync} (now daily), which only covers users who are not currently logging in.
-   */
-  private static final Duration AUTHORITIES_CACHE_TTL = Duration.ofSeconds(30);
-
   /** Upper bound on distinct cached {@code (sub, issuedAt)} entries. */
   private static final long AUTHORITIES_CACHE_MAX_SIZE = 10_000;
 
@@ -121,22 +109,54 @@ public class CustomJwtGrantedAuthoritiesConverter
    * ~5&ndash;8 SELECTs (user load, {@code user_roles}, one role lookup per realm role, and the
    * membership read). Keying on the token's {@code issuedAt} means a fresh login always misses and
    * re-reads, so a re-authentication picks up new authorities immediately; within one token's life
-   * the {@link #AUTHORITIES_CACHE_TTL} bounds staleness. Only successful results are cached (an
-   * exception propagates uncached), the cached value is an immutable copy so a downstream mutation
-   * cannot corrupt it, and a token missing {@code sub} or {@code issuedAt} bypasses the cache
-   * entirely (always recomputed).
+   * the configured {@link AuthoritiesCacheProperties#getTtl() TTL} bounds staleness. Only
+   * successful results are cached (an exception propagates uncached), the cached value is an
+   * immutable copy so a downstream mutation cannot corrupt it, and a token missing {@code sub} or
+   * {@code issuedAt} bypasses the cache entirely (always recomputed).
    */
-  private final Cache<String, Collection<GrantedAuthority>> authoritiesCache =
-      Caffeine.newBuilder()
-          .maximumSize(AUTHORITIES_CACHE_MAX_SIZE)
-          .expireAfterWrite(AUTHORITIES_CACHE_TTL)
-          .build();
+  private final Cache<String, Collection<GrantedAuthority>> authoritiesCache;
 
   /**
-   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, issuedAt)} for {@link
-   * #AUTHORITIES_CACHE_TTL} (#1141). On a cache hit the whole {@link #assembleAuthorities(Jwt)}
-   * pipeline — {@code syncUser} and its query storm — is skipped; on a miss (or an unkeyable token)
-   * it is assembled fresh and, when keyable, cached as an immutable copy.
+   * Creates the converter and sizes its authorities cache from configuration.
+   *
+   * <p>An explicit constructor rather than {@code @RequiredArgsConstructor}: the cache's {@code
+   * expireAfterWrite} window comes from {@code app.security.authorities-cache.ttl} (ADR-0174), so
+   * it cannot be built in a field initialiser that runs before any dependency is available.
+   *
+   * @param userReconciliationService creates or updates the local {@code app_user} row on a cache
+   *     miss; never {@code null}.
+   * @param ingestGatewayProperties the machine-identity allowlist deciding whether a caller is a
+   *     gateway rather than a member (ADR-0129); never {@code null}.
+   * @param orgUnitMembershipRepository reads the memberships whose {@code is_logistician} / {@code
+   *     is_mission_manager} flags become flat and contextual authorities; never {@code null}.
+   * @param orgUnitCascadeService expands a leadership membership downward over the org-unit tree
+   *     (REQ-ORG-015); never {@code null}.
+   * @param authoritiesCacheProperties supplies the memoisation TTL, validated at startup to be
+   *     positive and at most {@link AuthoritiesCacheProperties#MAX_TTL}; never {@code null}.
+   */
+  public CustomJwtGrantedAuthoritiesConverter(
+      @NonNull UserReconciliationService userReconciliationService,
+      @NonNull IngestGatewayProperties ingestGatewayProperties,
+      @NonNull OrgUnitMembershipRepository orgUnitMembershipRepository,
+      @NonNull OrgUnitCascadeService orgUnitCascadeService,
+      @NonNull AuthoritiesCacheProperties authoritiesCacheProperties) {
+    this.userReconciliationService = userReconciliationService;
+    this.ingestGatewayProperties = ingestGatewayProperties;
+    this.orgUnitMembershipRepository = orgUnitMembershipRepository;
+    this.orgUnitCascadeService = orgUnitCascadeService;
+    this.authoritiesCache =
+        Caffeine.newBuilder()
+            .maximumSize(AUTHORITIES_CACHE_MAX_SIZE)
+            .expireAfterWrite(authoritiesCacheProperties.getTtl())
+            .build();
+  }
+
+  /**
+   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, issuedAt)} for the
+   * configured {@link AuthoritiesCacheProperties#getTtl() TTL} (#1141). On a cache hit the whole
+   * {@link #assembleAuthorities(Jwt)} pipeline — {@code syncUser} and its query storm — is skipped;
+   * on a miss (or an unkeyable token) it is assembled fresh and, when keyable, cached as an
+   * immutable copy.
    *
    * @param jwt the validated Keycloak access token; never {@code null}.
    * @return the authorities Spring Security checks against {@code @PreAuthorize}.

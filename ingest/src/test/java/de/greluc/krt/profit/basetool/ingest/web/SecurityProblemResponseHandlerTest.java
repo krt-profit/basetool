@@ -112,6 +112,36 @@ class SecurityProblemResponseHandlerTest {
     assertThat(authFailureCount(MetricNames.AUTH_INVALID_TOKEN)).isZero();
   }
 
+  @Test
+  void aRequestWithNoCredentialAtAllReadsAsNoCredentials() throws Exception {
+    // The production case this gateway is dominated by: its own root is probed with the
+    // http_2xx_or_401 blackbox module, and every such probe presents no Authorization header at
+    // all. ExceptionTranslationFilter raises this rather than an OAuth2AuthenticationException, so
+    // before the split all 4 927 of the gateway's 401s sat on `other` (REQ-OBS-018).
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    handler.commence(
+        request(),
+        response,
+        new org.springframework.security.authentication.InsufficientAuthenticationException(
+            "Full authentication is required"));
+
+    assertThat(authFailureCount(MetricNames.AUTH_NO_CREDENTIALS)).isEqualTo(1.0d);
+    assertThat(authFailureCount(MetricNames.AUTH_OTHER)).isEqualTo(0.0d);
+  }
+
+  @Test
+  void aRejectedTokenStaysOffTheNoCredentialSeries() throws Exception {
+    // IngestAuthFailureSpike watches invalid_token alone; merging the two would put the probe
+    // baseline back into a brute-force alert (ADR-0173).
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    handler.commence(request(), response, new InvalidBearerTokenException("bad signature"));
+
+    assertThat(authFailureCount(MetricNames.AUTH_INVALID_TOKEN)).isEqualTo(1.0d);
+    assertThat(authFailureCount(MetricNames.AUTH_NO_CREDENTIALS)).isEqualTo(0.0d);
+  }
+
   /**
    * Reads the bounded auth-failure counter for one reason.
    *

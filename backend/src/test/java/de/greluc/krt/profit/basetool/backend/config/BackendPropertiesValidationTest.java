@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
@@ -31,16 +33,75 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+/**
+ * Startup-validation tests for the backend's {@code @ConfigurationProperties} classes.
+ *
+ * <p><strong>One properties class per runner, deliberately.</strong> A runner that registers
+ * several of them cannot assert a <em>successful</em> start: {@link KeycloakSyncProperties} alone
+ * carries four {@code @NotBlank} fields with no defaults ({@code adminUrl}, {@code realm}, {@code
+ * clientId}, {@code clientSecret}), so any context that does not supply them fails binding whatever
+ * the class under test does. The subtler damage is to the failure cases — a shared runner makes
+ * {@code hasFailed()} pass for the wrong reason, so such a test stays green even with its own
+ * constraint deleted. Isolating each class keeps every assertion about its own subject.
+ */
 class BackendPropertiesValidationTest {
 
-  private final ApplicationContextRunner contextRunner =
-      new ApplicationContextRunner()
-          .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
-          .withUserConfiguration(TestConfig.class);
+  private final ApplicationContextRunner rateLimitRunner = runnerFor(RateLimitConfig.class);
+  private final ApplicationContextRunner keycloakSyncRunner = runnerFor(KeycloakSyncConfig.class);
+  private final ApplicationContextRunner authoritiesCacheRunner =
+      runnerFor(AuthoritiesCacheConfig.class);
 
+  /**
+   * Builds a context runner around one properties configuration and a real JSR-380 validator.
+   *
+   * @param configuration a nested {@code @Configuration} enabling exactly one properties class
+   * @return a runner whose only binding subject is that class
+   */
+  private static ApplicationContextRunner runnerFor(Class<?> configuration) {
+    return new ApplicationContextRunner()
+        .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+        .withUserConfiguration(configuration);
+  }
+
+  /** Registers {@link RateLimitProperties} and the validator that enforces its constraints. */
   @Configuration
-  @EnableConfigurationProperties({RateLimitProperties.class, KeycloakSyncProperties.class})
-  static class TestConfig {
+  @EnableConfigurationProperties(RateLimitProperties.class)
+  static class RateLimitConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Registers {@link KeycloakSyncProperties} and the validator that enforces its constraints. */
+  @Configuration
+  @EnableConfigurationProperties(KeycloakSyncProperties.class)
+  static class KeycloakSyncConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
+    @Bean
+    LocalValidatorFactoryBean validator() {
+      return new LocalValidatorFactoryBean();
+    }
+  }
+
+  /** Registers {@link AuthoritiesCacheProperties} and the validator enforcing its TTL bounds. */
+  @Configuration
+  @EnableConfigurationProperties(AuthoritiesCacheProperties.class)
+  static class AuthoritiesCacheConfig {
+    /**
+     * The JSR-380 validator {@code @Validated} properties binding delegates to.
+     *
+     * @return a real validator factory, so constraint violations fail the context as in production
+     */
     @Bean
     LocalValidatorFactoryBean validator() {
       return new LocalValidatorFactoryBean();
@@ -49,7 +110,7 @@ class BackendPropertiesValidationTest {
 
   @Test
   void shouldFail_WhenRateLimitCapacityIsZero() {
-    contextRunner
+    rateLimitRunner
         .withPropertyValues(
             "app.rate-limit.capacity=0",
             "app.rate-limit.refillTokens=1",
@@ -57,9 +118,20 @@ class BackendPropertiesValidationTest {
         .run((context) -> assertThat(context).hasFailed());
   }
 
+  /** The same properties minus the offending one must start, or the test above proves nothing. */
+  @Test
+  void shouldStart_WhenRateLimitCapacityIsValid() {
+    rateLimitRunner
+        .withPropertyValues(
+            "app.rate-limit.capacity=1",
+            "app.rate-limit.refillTokens=1",
+            "app.rate-limit.refillPeriod=1m")
+        .run((context) -> assertThat(context).hasNotFailed());
+  }
+
   @Test
   void shouldFail_WhenKeycloakAdminUrlInvalid() {
-    contextRunner
+    keycloakSyncRunner
         .withPropertyValues(
             "app.keycloak.sync.enabled=true",
             "app.keycloak.sync.admin-url=htp://not-a-url",
@@ -67,5 +139,74 @@ class BackendPropertiesValidationTest {
             "app.keycloak.sync.client-id=backend-service",
             "app.keycloak.sync.client-secret=secret")
         .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The same configuration with a well-formed URL must start, for the same reason as above. */
+  @Test
+  void shouldStart_WhenKeycloakAdminUrlIsValid() {
+    keycloakSyncRunner
+        .withPropertyValues(
+            "app.keycloak.sync.enabled=true",
+            "app.keycloak.sync.admin-url=https://keycloak.example.invalid",
+            "app.keycloak.sync.realm=iri",
+            "app.keycloak.sync.client-id=backend-service",
+            "app.keycloak.sync.client-secret=secret")
+        .run((context) -> assertThat(context).hasNotFailed());
+  }
+
+  /**
+   * A zero TTL would build a Caffeine cache that expires every entry immediately, silently
+   * restoring the per-request {@code syncUser} + permission-table query storm the cache exists to
+   * bound (ADR-0174). It must fail the context, not degrade at run time.
+   */
+  @Test
+  void shouldFail_WhenAuthoritiesCacheTtlIsZero() {
+    authoritiesCacheRunner
+        .withPropertyValues("app.security.authorities-cache.ttl=0s")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** A negative TTL is rejected for the same reason a zero one is. */
+  @Test
+  void shouldFail_WhenAuthoritiesCacheTtlIsNegative() {
+    authoritiesCacheRunner
+        .withPropertyValues("app.security.authorities-cache.ttl=-1m")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /**
+   * The TTL is the window in which a revoked role, permission, approval or membership stays
+   * effective on an already-issued token. Anything past {@link AuthoritiesCacheProperties#MAX_TTL}
+   * widens that window beyond what the access model assumes, so a mistyped value must not start.
+   */
+  @Test
+  void shouldFail_WhenAuthoritiesCacheTtlExceedsCeiling() {
+    authoritiesCacheRunner
+        .withPropertyValues("app.security.authorities-cache.ttl=16m")
+        .run((context) -> assertThat(context).hasFailed());
+  }
+
+  /** The ceiling itself is allowed — the constraint is "at most", not "below". */
+  @Test
+  void shouldBind_WhenAuthoritiesCacheTtlIsExactlyTheCeiling() {
+    authoritiesCacheRunner
+        .withPropertyValues("app.security.authorities-cache.ttl=15m")
+        .run(
+            (context) ->
+                assertThat(context.getBean(AuthoritiesCacheProperties.class).getTtl())
+                    .isEqualTo(AuthoritiesCacheProperties.MAX_TTL));
+  }
+
+  /**
+   * With nothing configured the shipped default is five minutes (ADR-0174). Asserted because every
+   * environment that does not set the variable — dev, test, e2e, and production until an operator
+   * overrides it — runs on exactly this value.
+   */
+  @Test
+  void shouldDefaultToFiveMinutes_WhenAuthoritiesCacheTtlOmitted() {
+    authoritiesCacheRunner.run(
+        (context) ->
+            assertThat(context.getBean(AuthoritiesCacheProperties.class).getTtl())
+                .isEqualTo(Duration.ofMinutes(5)));
   }
 }

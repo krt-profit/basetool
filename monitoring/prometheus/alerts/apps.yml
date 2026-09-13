@@ -20,23 +20,61 @@ groups:
       # adds is the CAUSE, which the description sends the operator to — a spike of invalid_token is
       # a client with a stale/rotated key, a spike of invalid_request is a malformed Authorization
       # header, and until A8 those were one number (REQ-OBS-018).
+      # Watches REJECTED TOKENS, not 401 volume. Retargeted 2026-09-13 after measuring production:
+      # the old expression counted every UNAUTHENTICATED, and ~75% of that threshold was consumed by
+      # this deployment's OWN blackbox probes, which assert liveness by expecting a 401 on an
+      # authenticated path (REQ-OBS-018). A "possible JWT brute force" page whose baseline is the
+      # monitoring plane is not a security signal. reason="invalid_token" means a token WAS presented
+      # and rejected - bad signature, wrong issuer, expired, failed audience - which is exactly what
+      # credential guessing looks like and what a probe can never produce, so the series sits at a
+      # true zero and a low threshold is meaningful rather than noisy.
       - alert: BackendAuthFailureSpike
-        expr: rate(basetool_http_error_total{application="basetool-backend",code="UNAUTHENTICATED"}[5m]) > 0.2
+        expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="invalid_token"}[5m]) > 0.05
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "401 spike on backend (possible JWT brute force)"
-          description: "The backend is rejecting authentication at an elevated rate — possible credential/JWT guessing. Split it by cause with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope."
+          summary: "Rejected-token spike on backend (possible JWT brute force)"
+          description: "The backend is rejecting presented tokens at an elevated rate - possible credential/JWT guessing. This series is normally zero: a caller with no token at all counts as reason=no_credentials, not here. Split the whole picture with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope, no_credentials a request that presented nothing (the ordinary background - probes, scanners, pre-login navigation), other an unenumerated failure worth reading the DEBUG line for."
 
+      # The volume half the retarget above would otherwise drop. Deliberately far above the probe
+      # floor (~0.1/s on this surface, three blackbox jobs at a 30s interval) so it means a flood
+      # rather than a Tuesday - the baseline is documented in REQ-OBS-018 and must be re-checked
+      # whenever a probe target is added.
+      - alert: BackendUnauthenticatedFlood
+        expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}[5m]) > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained flood of credential-less requests on backend"
+          description: "The backend is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes. That is an order of magnitude above the blackbox-probe floor, so it is scanning or a misconfigured client looping - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
+
+      # Same retarget as the backend, and moved onto the dedicated counter: the old expression read
+      # http_server_requests_seconds_count{status="401"}, whose uri label is UNKNOWN for every
+      # filter-chain rejection, so it could not be narrowed either. The gateway's own root is probed
+      # with the http_2xx_or_401 module, which is why its 401 volume is likewise a monitoring
+      # baseline rather than a threat.
       - alert: IngestAuthFailureSpike
-        expr: rate(http_server_requests_seconds_count{application="basetool-ingest",status="401"}[5m]) > 0.2
+        expr: rate(basetool_ingest_auth_failures_total{application="basetool-ingest",reason="invalid_token"}[5m]) > 0.05
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "401 spike on ingest (possible JWT brute force)"
-          description: "The ingest gateway is rejecting authentication at an elevated rate."
+          summary: "Rejected-token spike on ingest (possible JWT brute force)"
+          description: "The ingest gateway is rejecting presented tokens at an elevated rate. Normally zero - a credential-less request counts as reason=no_credentials. Split with sum by (reason) (rate(basetool_ingest_auth_failures_total[5m]))."
+
+      # The gateway's volume half, kept for the same reason as the backend's: retargeting the spike
+      # alert onto invalid_token would otherwise drop 401-flood coverage on the more exposed surface
+      # entirely. Threshold matches the backend's - well above the probe floor either way.
+      - alert: IngestUnauthenticatedFlood
+        expr: rate(basetool_ingest_auth_failures_total{application="basetool-ingest",reason="no_credentials"}[5m]) > 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained flood of credential-less requests on ingest"
+          description: "The ingest gateway is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes - far above its blackbox-probe baseline. Scanning or a looping client, not credential guessing. Check basetool_bot_blocked_total and the per-IP rate limiter before widening anything."
 
       - alert: JvmHeapHigh
         expr: |

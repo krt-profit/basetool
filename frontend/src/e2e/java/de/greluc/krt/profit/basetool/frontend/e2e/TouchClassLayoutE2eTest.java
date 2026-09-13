@@ -733,9 +733,15 @@ class TouchClassLayoutE2eTest {
     //
     // Reported rather than silently dropped, because a route that has started redirecting is worth
     // seeing. Query and fragment are ignored: a redirect that only adds `?foo` is still this page.
-    String landedPath = page.url().replace(baseUrl, "").replaceAll("[?#].*$", "");
+    // The base URL is normalised before stripping, because it is operator-supplied on staging
+    // (`E2E_BASE_URL` / `-Pe2e.baseUrl`, which is how the smoke workflow points at a deployment).
+    // A trailing slash there would leave every landed path without its leading one, every route
+    // would look redirected, and the sweep would skip all 66 and fail on the coverage floor —
+    // loud, but for entirely the wrong reason. The ephemeral stack's own URL carries no slash.
+    String origin = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+    String landedPath = page.url().replace(origin, "").replaceAll("[?#].*$", "");
     if (landedPath.isEmpty()) {
-      // `baseUrl` carries no trailing slash, so the dashboard strips to the empty string.
+      // The dashboard strips to the empty string, since the origin has no trailing slash.
       landedPath = "/";
     }
     if (!landedPath.equals(path) && !landedPath.equals(path + "/")) {

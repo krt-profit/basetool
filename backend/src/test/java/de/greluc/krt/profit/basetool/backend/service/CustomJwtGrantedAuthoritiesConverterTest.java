@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.Role;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.service.UserReconciliationService.ReconciledUser;
+import de.greluc.krt.profit.basetool.backend.support.AuthoritiesCacheProperties;
 import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import de.greluc.krt.profit.basetool.backend.support.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -84,6 +85,16 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Spy
   private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
+
+  /**
+   * A real instance, not a mock: the converter reads {@link AuthoritiesCacheProperties#getTtl()} in
+   * its constructor to size the memoisation window, so a mock would hand it {@code null} and the
+   * Caffeine builder would fail before any test ran. The default five minutes (ADR-0174) is the
+   * production value, so every case below exercises the shipped configuration.
+   */
+  @Spy
+  private final AuthoritiesCacheProperties authoritiesCacheProperties =
+      new AuthoritiesCacheProperties();
 
   @InjectMocks private CustomJwtGrantedAuthoritiesConverter converter;
 

@@ -344,7 +344,8 @@ groups:
           description: "Container {{ $labels.name }} recorded an out-of-memory kill in the last 15 minutes. Check its memory limit and working set; on the memory-capped host this is the designed sacrifice order — confirm it was the intended victim."
 
       # Sustained CPU throttling (#1041 item 7, REQ-OBS-014). container_cpu_cfs_* is emitted only for
-      # containers with a CFS quota; the app containers all set cpus limits (backend 2.0, keycloak 2.0,
+      # containers with a CFS quota; the app containers all set cpus limits (db-backend 4.0, backend 3.0,
+      # keycloak 3.0, frontend 2.0, ingest 1.5 — raised 2026-09-13, ADR-0174/0175 investigation,
       # …), so this ratio has data for them. Verified against cadvisor v0.60.3.
       # baseline-tune: the 25% throttled-period ratio is the issue's initial threshold.
       - alert: ContainerCpuThrottledHigh
