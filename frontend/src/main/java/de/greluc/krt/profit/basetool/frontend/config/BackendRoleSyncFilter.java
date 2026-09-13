@@ -422,12 +422,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         || path.startsWith("/logos/")
         || path.startsWith("/fonts/")
         || path.equals("/favicon.ico")
-        // The web app manifest (REQ-UI-020, ADR-0164). Linked with
-        // crossorigin="use-credentials" so the installed app inherits the member's language, which
-        // makes the fetch authenticated — and without this line every manifest fetch would spend a
-        // backend /api/v1/users/me round trip to reconcile roles for a document that contains
-        // three localised strings and two colours.
-        || path.equals("/manifest.webmanifest")
         || path.endsWith(".map");
   }
 

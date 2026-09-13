@@ -640,14 +640,14 @@ home-screen web app is the whole mobile story on that platform. The analysis beh
 
 Binding surface:
 
-|            Piece             |                                   What it is                                   |
-|------------------------------|--------------------------------------------------------------------------------|
-| `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json` |
-| `<link rel="manifest">`      | In `fragments/head.html`, **with `crossorigin="use-credentials"`**             |
-| `theme-color`                | `#141414` — the header fill, not the black page background                     |
-| `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship        |
-| `apple-mobile-web-app-title` | From `pwa.short_name`, so the home-screen label is localised and short         |
-| `apple-touch-icon`           | Already shipped by REQ-UI-019; the manifest reuses the same opaque 512 px tile |
+|            Piece             |                                                    What it is                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json`, **no `produces` on the mapping** |
+| `<link rel="manifest">`      | In `fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
+| `theme-color`                | `#141414` — the header fill, not the black page background                                                       |
+| `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship                                          |
+| `apple-mobile-web-app-title` | From `pwa.short_name` — short, and the **same in both locales**, because the product name is a proper noun       |
+| `apple-touch-icon`           | Already shipped by REQ-UI-019; the manifest reuses the same tile, at its **content-hashed** URL                  |
 
 Binding details:
 
@@ -657,18 +657,38 @@ Binding details:
   for „Zum Home-Bildschirm". **The cost is accepted and stated:** Chromium requires a fetch-handling
   worker before it offers its own install prompt, so on Android and desktop the app installs only
   through the browser menu. Adding a worker later is an ADR, not a refactor.
-- **The manifest is a controller, not a file under `static/`.** Three of its properties belong to the
-  response rather than to a file: the localised strings, the media type Spring's resource handler
-  does not know, and `200`-never-`302`. The third is the same trap `/.well-known/assetlinks.json`
-  was written for, and both paths sit in the same `SecurityConfig` allow-list.
-- **`crossorigin="use-credentials"` is load-bearing.** A manifest is fetched *without* cookies by
-  default; the locale lives in `KRT_LOCALE`, so without the attribute every install is labelled in
-  the default language regardless of what the member reads the tool in. Because the fetch then
-  arrives authenticated, `/manifest.webmanifest` is also exempt in `TermsAcceptanceGateFilter` (or a
-  member who has not accepted the terms installs an app whose manifest is the consent page) and in
-  `BackendRoleSyncFilter` (or every manifest fetch spends a `/api/v1/users/me` round trip).
-- **`start_url` and `scope` are both `/`.** One entry point serves both states, because `/` already
-  answers with the landing page for a visitor and the dashboard for a member.
+- **The manifest is a controller, not a file under `static/`.** Four of its properties belong to the
+  response rather than to a file: the localised `description`, the content-hashed icon URL, the
+  media type Spring's resource handler does not know, and `200`-never-`302`. The last is the same
+  trap `/.well-known/assetlinks.json` was written for, and both paths sit in the same
+  `SecurityConfig` allow-list.
+- **The locale travels in the URL, and the fetch carries no credentials.** The page is
+  server-rendered and already knows the reader's locale, so the link is
+  `@{/manifest.webmanifest(locale=${#locale.language})}` and the response is a pure function of its
+  URL. **`crossorigin="use-credentials"` is expressly rejected** — it makes the fetch an
+  *authenticated* request, and the unscoped layout `@ControllerAdvice` beans run before every
+  handler, `@RestController`s included, so one manifest fetch cost **five** backend round trips and
+  needed carve-outs in `TermsAcceptanceGateFilter` and `BackendRoleSyncFilter` for a public
+  document. It bought nothing measurable: `name` and `short_name` are identical in both bundles,
+  Safari implements neither `lang` nor `description`, and the iOS home-screen label comes from
+  `apple-mobile-web-app-title` on the page. Re-adding it needs an ADR.
+- **An unsupported `?locale=` renders the default, never a mismatched `lang`.** The controller
+  clamps to the shipped bundles. `spring.messages.fallback-to-system-locale` is `false` and the base
+  bundle holds **German** copy, so passing a client value through produced a manifest declaring e.g.
+  `"lang": "fr"` over German text — and an empty `lang`, which the specification forbids, for a
+  malformed value.
+- **No `produces` on the mapping.** It makes content negotiation part of the match, and
+  `application/json` is not compatible with `application/manifest+json`, so a caller asking for JSON
+  — `krtFetch`'s shape, and a blackbox probe with a header set — got a `500` and an `ERROR` log line
+  from the `Exception` catch-all. The content type is set on the response instead.
+- **The icon is emitted at its content-hashed URL**, resolved through `ResourceUrlProvider`.
+  `/logos/**` is served `immutable` for a year, so a manifest naming the bare path would pin every
+  installed home screen to a URL no browser revalidates — a redesigned icon would never arrive.
+- **`start_url` and `scope` are both the application root.** One entry point serves both states,
+  because `/` already answers with the landing page for a visitor and the dashboard for a member.
+  **`scope` cannot cover the login:** `/oauth2/authorization/keycloak` and the logout redirect both
+  navigate to the Keycloak origin, and a manifest scope must be same-origin with `start_url`. The
+  behaviour of an installed standalone app across that hop is **unverified** — see Open questions.
 - **The icon is never declared `maskable`.** Android crops a maskable icon to its own shape and
   guarantees only the inner ~40 %; claiming it for artwork not drawn with that safe zone cuts into
   the mark. A dedicated maskable asset is a request to the design system — see Open questions.
@@ -680,19 +700,28 @@ Binding details:
 **Acceptance**
 
 - [ ] `GET /manifest.webmanifest` answers `200` as `application/manifest+json` to an **anonymous**
-  request, with no redirect.
-- [ ] Its `name`, `short_name` and `description` come from the bundles and follow `KRT_LOCALE`.
-- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are `/`.
-- [ ] The single icon is the opaque 512 px tile and its `purpose` is `any`, never `maskable`.
-- [ ] `Cache-Control: private, max-age=3600` and `Vary: Cookie`, because the body is localised.
-- [ ] The rendered page carries the manifest link **with** `crossorigin="use-credentials"`, the
-  `theme-color` meta matching the controller's constant, and both standalone hints.
+  request, with no redirect, **for every `Accept` header**.
+- [ ] Its `name`, `short_name` and `description` come from the bundles and follow `?locale=`; an
+  unsupported or malformed value renders German with `"lang": "de"`, never a mismatched pair.
+- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are the application root.
+- [ ] `icons` holds **exactly one** entry: the opaque 512 px tile at its **content-hashed** URL,
+  `purpose` `any`, never `maskable`.
+- [ ] `Cache-Control: max-age=3600, public` and **no** `Vary`, because the body depends only on the
+  URL.
+- [ ] The rendered page carries the manifest link **with `?locale=` and without any `crossorigin`
+  attribute**, the `theme-color` meta matching both the controller constant **and**
+  `--color-bg-dark-gray` in `styles.css`, and both standalone hints.
 - [ ] No service worker is registered anywhere in the frontend.
+- [ ] The path is probed from outside by `blackbox-public-surface` with `follow_redirects: false`,
+  and `EdgePublicSurfaceNot200` alerts when it stops answering `200` (REQ-OBS-012).
 
-**Enforced by:** `WebAppManifestControllerTest` · **Code:** `WebAppManifestController`,
-`fragments/head.html`, `SecurityConfig`, `TermsAcceptanceGateFilter`, `BackendRoleSyncFilter`,
-`RequestLoggingFilter`, `pwa.*` in the three message bundles · **Related:** REQ-UI-019 (the icon
-family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path table).
+**Enforced by:** `WebAppManifestControllerTest` (including the no-service-worker sweep and the
+stylesheet colour pin), `SecurityConfigStaticAssetPermitAllTest` (the no-redirect contract),
+`AnonymousSurfaceSweepMvcTest` (the REQ-SEC-052 registry) · **Code:** `WebAppManifestController`,
+`fragments/head.html`, `SecurityConfig`, `RequestLoggingFilter`, `pwa.*` in the three message
+bundles, `monitoring/blackbox/blackbox.yml` + `prometheus.yml` + `alerts/infrastructure.yml` ·
+**Related:** REQ-UI-019 (the icon family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path
+table), REQ-OBS-012 (the edge posture probes).
 
 ## Out of scope
 
@@ -711,4 +740,19 @@ This spec still governs how those fields *look*.
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated
   ESLint/Stylelint rule so they are gate-enforced, not review-enforced? (Promote to an ADR
   if yes.)
+- **REQ-UI-020: can an installed standalone app actually sign in?** `scope` is the app origin, but
+  `/oauth2/authorization/keycloak` and the logout redirect both navigate to the Keycloak origin, and
+  a manifest scope must be same-origin with `start_url`. On iOS an out-of-scope navigation goes to
+  an in-app browser whose storage is not shared with the standalone app, which would strand the
+  PKCE/state values Spring Security wrote before the hop. **Nothing in this repository verifies
+  this, and no test can** — it needs a real iPhone or iPad. If it fails, the fix is to reverse-proxy
+  Keycloak onto the app origin at the edge, which is an ADR of its own. Until it is tried, treat
+  "the installed app is the mobile client" as unproven for the signed-in half.
+- **REQ-UI-020: a dedicated `maskable` icon.** The current artwork was not drawn with Android's
+  ~40 % safe zone, so the manifest declares `purpose: any` only. A maskable variant is a request to
+  the design system.
+- **REQ-UI-020: a 192 px icon.** Chromium's documented install criteria name a 192 px and a 512 px
+  entry; the implementation constant is a 144 px minimum, which the single 512 px tile satisfies.
+  One extra entry would remove the question rather than leave it resting on an implementation
+  detail.
 

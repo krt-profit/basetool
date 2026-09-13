@@ -1695,6 +1695,23 @@ instead of trusting the one-time rollout verification:
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
   design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
   contract.
+- **Public surface stays public** — the `blackbox-public-surface` job probes the seven frontend
+  paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/robots.txt`,
+  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`) with
+  `http_public_200_no_redirect` — exactly `200`, **redirects not followed**;
+  `EdgePublicSurfaceNot200` (warning, 15 min) fires on drift. This is the inverse of the
+  members-only probe and, until 2026-09-13, the half that had none. **`follow_redirects: false` is
+  the entire point:** `http_2xx` follows them, so a target there stays green after the path has
+  regressed into the OAuth entry point — the probe follows the `302`, Keycloak answers `200`, and
+  the module reports success on an endpoint that is now the login page. That reads as coverage and
+  is worse than no probe, which is why these targets do not live in `blackbox-http`. The manifest is
+  the one with a user-visible failure mode: a browser reads it before any login, so a redirect makes
+  every new home-screen install take its name and icon from the login page (REQ-UI-020, ADR-0164);
+  `assetlinks.json` is the same trap on the Android side and is the one that has already sprung. No
+  `Accept` header is sent, because the targets span HTML, a manifest, JSON and plain text and a
+  probe naming one type would assert content negotiation rather than reachability. The probe
+  declares itself with `X-Basetool-Probe: public-surface` so the frontend's request cache does not
+  mint a Redis session per hit, for the same reason as the members-only probe.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
   `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their

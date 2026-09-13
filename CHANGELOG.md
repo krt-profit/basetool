@@ -7,8 +7,8 @@
 - **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
   über „Zum Home-Bildschirm“, auf Android und am Rechner über das Browsermenü; danach hat es ein
   eigenes Symbol und startet ohne Adressleiste. Gedacht für iPhone- und iPad-Mitglieder, für die es
-  keine eigene App gibt. Ohne Netz funktioniert es nicht — bewusst, damit keine Mitgliederdaten auf
-  dem Gerät zwischengespeichert werden.
+  keine eigene App gibt. Ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf dem Gerät
+  liegen bleiben.
 
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 

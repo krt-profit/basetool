@@ -326,3 +326,40 @@ modules:
       ip_protocol_fallback: false
       tls_config:
         insecure_skip_verify: false
+
+  # Succeeds ONLY when a public path answers 200 on the FIRST response — the inverse of
+  # http_members_only_redirect, and the module REQ-SEC-052's public half was missing.
+  #
+  # follow_redirects is the whole point. http_2xx follows them, so a probe there stays green after
+  # a public path has regressed into the OAuth entry point: the probe dutifully follows the 302,
+  # Keycloak answers 200, and the module reports success on an endpoint that is now the login page.
+  # That is worse than no probe, because it reads as coverage. Asserting the first response is what
+  # makes the difference, and it is why this module exists separately rather than as another
+  # blackbox-http target.
+  #
+  # The failure it guards is silent and prod-only: a cache rule, a stale upstream, a mis-ordered
+  # NPM location, or a permitAll entry lost in a merge. The app's own sweeps run in-process against
+  # MockMvc and stay green through every one of those. /.well-known/assetlinks.json broke exactly
+  # this way once and was found from a member's report of a broken login.
+  http_public_200_no_redirect:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [200]
+      method: GET
+      follow_redirects: false
+      headers:
+        # No Accept header is set on purpose: the targets span HTML pages, a manifest, JSON and
+        # plain text, and a probe that named one type would assert content negotiation rather than
+        # reachability. Blackbox sends no Accept by default, which every one of them answers.
+        #
+        # Declares itself, so the frontend's request cache does not remember the probe and mint a
+        # Redis session per hit — same reason as http_members_only_redirect above.
+        X-Basetool-Probe: "public-surface"
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false

@@ -265,6 +265,38 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
+  # The public posture, asserted from outside — the inverse of blackbox-members-only and the half
+  # REQ-SEC-052 never had a probe for. Every path here is a deliberate permitAll entry that must
+  # answer 200 on the FIRST response; a 302 means it fell behind anyRequest().authenticated(), and
+  # http_2xx would have hidden exactly that by following the redirect to a Keycloak 200.
+  #
+  # The manifest is the one with a user-visible failure mode: a browser reads it before any login,
+  # so a redirect makes the installed app take its name and icon from the login page (REQ-UI-020,
+  # ADR-0164). assetlinks.json is the same trap on the Android side, and it is the one that has
+  # already sprung. ?locale=de is passed because the manifest keys its cache on it — probing the
+  # bare path would exercise a URL no page ever links.
+  - job_name: blackbox-public-surface
+    metrics_path: /probe
+    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    params:
+      module: [http_public_200_no_redirect]
+    static_configs:
+      - targets:
+          - https://profit-base.online/
+          - https://profit-base.online/impressum
+          - https://profit-base.online/privacy
+          - https://profit-base.online/terms
+          - https://profit-base.online/robots.txt
+          - https://profit-base.online/.well-known/assetlinks.json
+          - https://profit-base.online/manifest.webmanifest?locale=de
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   - job_name: blackbox-force-ssl
     metrics_path: /probe
     scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
