@@ -3,21 +3,25 @@
 groups:
   - name: infrastructure-critical
     rules:
-      # Scoped OFF the 12 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
-      # -members-only, -hsts, -internal-tls*, -dns-*). On a /probe job `up==0` does NOT mean the probed target is down — it
+      # Scoped OFF the 16 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
+      # -members-only, -public-surface, -hsts*, -internal-tls*, -dns-*). Prometheus anchors label
+      # regexes FULLY, so every job name has to be reachable from one of the alternatives — adding a
+      # probe job without adding its prefix here puts it back in scope and pages critical on a
+      # scrape timeout. `-public-surface` was exactly that on 2026-09-13, caught in review.
+      # On a /probe job `up==0` does NOT mean the probed target is down — it
       # means the Prometheus->exporter scrape itself timed out, because the blackbox module timeout
       # equalled scrape_timeout (2026-07-12 false-critical: blackbox-internal-tls + blackbox-http-ipv6
       # paged critical for backend/frontend/ingest + all three public hosts at once, while every
       # service was healthy). Those probes now carry scrape_timeout:15s, and a genuine failure surfaces
       # FAST as `probe_success==0` (up stays 1) via the dedicated probe alerts — BlackboxProbeFailed,
       # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeMembersOnlyRedirectBroken,
-      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable,
+      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable, EdgePublicSurfaceNot200,
       # DnsResolutionFailed, CertificateExpiringSoon — and app-down liveness for the internal-tls
       # targets is already paged by the basetool-backend/frontend/ingest scrape jobs. The `!~` regex
       # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
       # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
-        expr: up{job!~"blackbox-(http|edge|force|members|hsts|internal|dns).*"} == 0
+        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns).*"} == 0
         for: 3m
         labels:
           severity: critical

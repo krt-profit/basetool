@@ -1383,6 +1383,36 @@ tbody tr:nth-child(even):hover {
         flex-direction: column;
         align-items: flex-start;
         position: static;
+        /*
+         * `order` is what keeps the footer last, and on this class it is not decoration.
+         *
+         * The footer fragment is included from `fragments/sidebar.html`, which every template puts
+         * as the FIRST element of <body> — before <header>. While the footer was unconditionally
+         * `position: fixed` that did not matter, and `sidebar.js` moved it to the end of <body>
+         * only so screen readers read it after the content. Take `fixed` away and DOM order becomes
+         * visual order: the legal links and the version string paint ABOVE the header until the
+         * `DOMContentLoaded` handler gets ~105 lines in to the `appendChild`, and stay there for
+         * good if anything earlier in that handler throws. The layout guard cannot see it, because
+         * it waits for `readyState === 'complete'` — always after the relocation.
+         *
+         * This restores the mechanism `fragments/footer.html`'s comment has described all along.
+         * The JS move stays: it costs nothing, keeps the DOM tidy, and is what the wider classes
+         * have always used.
+         */
+        order: 999;
+    }
+
+    /*
+     * …and `order` needs a flex container to act on, which is why the column comes back HERE and
+     * only here. It was dropped from the base `body` rule when the footer became unconditionally
+     * fixed; scoping it to the one class where the footer is in flow keeps every wider class on the
+     * block layout it has today. `.krt-footer` is the only child that asks for a non-default order,
+     * and the sidebar and its overlay are `position: fixed`, so they are out of flow and not flex
+     * items at all.
+     */
+    body {
+        display: flex;
+        flex-direction: column;
     }
 }
 
@@ -4790,6 +4820,20 @@ textarea:focus-visible,
     }
 
     /*
+     * The live-sync pill's floor, here rather than on the base rule.
+     *
+     * It sat outside every media query for a day, which made it the only control this work touched
+     * that also grew on desktop and ultra-wide — including `.mission-livesync-pill`, a pre-existing
+     * and already-designed element that nobody asked to change. REQ-UI-009 puts the 44px floor on
+     * the TOUCH classes, as the comment at the top of this block says; the value was argued and the
+     * scope was not.
+     */
+    .krt-livesync-pill,
+    .mission-livesync-pill {
+        min-height: var(--touch-target);
+    }
+
+    /*
      * On touch devices the generic rule sets padding: 0.75rem 1rem which,
      * combined with the fixed height of 2.75rem, leaves too little room
      * for a 1rem font at line-height 1.5 and clips descenders/umlauts in
@@ -5048,7 +5092,6 @@ textarea:focus-visible,
     cursor: pointer;
     box-shadow: 0 2px 12px rgb(0 0 0 / 45%);
     animation: krt-presence-pulse 2s infinite;
-    min-height: var(--touch-target);
 }
 
 .krt-livesync-pill:hover,

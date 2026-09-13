@@ -1714,7 +1714,7 @@ instead of trusting the one-time rollout verification:
   mint a Redis session per hit, for the same reason as the members-only probe.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
-  `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their
+  `EdgeHstsHeaderMissing` (warning). Extended to the grafana/ingest vhosts once their
   header posture is verified in the NPM UI.
 - **Keycloak `/admin` allow-list** — asserted **externally** by the daily
   `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this

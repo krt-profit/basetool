@@ -27,8 +27,11 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -156,6 +159,15 @@ class TouchClassLayoutE2eTest {
   private static final double SLACK_PX = 1.0;
 
   /**
+   * How many of {@link #PAGES} a device class must actually measure before the run counts.
+   *
+   * <p>A floor, not a target: it exists so a sweep that skipped everything cannot report clean. The
+   * relative check in {@link #reportCoverage} is the real guard; this only catches the case where
+   * every class is equally empty, which the relative check cannot see.
+   */
+  private static final int MIN_MEASURED_ROUTES = 30;
+
+  /**
    * How much of a failure-to-measure message is kept in the finding.
    *
    * <p>Enough for a Playwright page-side error to name its cause and its call site, short enough
@@ -197,6 +209,13 @@ class TouchClassLayoutE2eTest {
    * <p>Only three kinds of route are left out, and none of them by judgement: the {@code /api/**}
    * proxies, the two machine descriptors ({@code assetlinks.json}, {@code manifest.webmanifest}),
    * and {@code /csrf}.
+   *
+   * <p><b>This list is hand-maintained and was wrong once.</b> Seventeen page routes were absent
+   * until 2026-09-13 while this Javadoc and {@code REQ-UI-009}'s "Enforced by" clause both said
+   * every route was covered. {@code CorePagesSmokeE2eTest} and {@code AdminPagesSmokeE2eTest}
+   * maintain their own copies of the same information, so three lists now have to agree by hand;
+   * folding them into one home on {@code E2eSupport} is the obvious next step and is deliberately
+   * not done here, where it would ride along with an unrelated change.
    */
   private static final List<String> PAGES =
       List.of(
@@ -243,6 +262,32 @@ class TouchClassLayoutE2eTest {
           "/admin/sync-reports/uex",
           "/admin/sync-reports/scwiki",
           "/admin/terms",
+          // Seventeen routes were missing until 2026-09-13, each a class-level @RequestMapping plus
+          // a bare @GetMapping returning a view, and the Javadoc above claimed completeness the
+          // whole time. `/organisation/leitung` is the one that shows what that costs: this very
+          // change adds `.leitung-group-actions` and `.leitung-modal-actions` to the phone
+          // flex-wrap fix, and the page carrying them was never loaded, so the fix shipped
+          // unmeasured while the spec recorded the requirement as measured.
+          "/admin/settings",
+          "/admin/locations",
+          "/admin/blueprints",
+          "/admin/default-blueprints",
+          "/admin/discord-registrations",
+          "/admin/material-aliases",
+          "/admin/materials",
+          "/admin/mission-data",
+          "/admin/notification-rules",
+          "/admin/org-structure",
+          "/admin/announcement",
+          "/admin/personal-inventory",
+          "/admin/personal-blueprints",
+          "/admin/special-commands",
+          "/admin/uex-data",
+          "/organisation/leitung",
+          // Measured with an APPROVED session, which this route redirects away from, so it skips
+          // at every class and cancels out of the coverage comparison. It is listed anyway: the day
+          // it stops redirecting, it is a page like any other and wants measuring.
+          "/pending-approval",
           // NOT `/admin/p4k-import/jobs` — that is the page's JSON polling endpoint
           // (@ResponseBody List<P4kImportJobDto>), which the first sweep proved by reporting it as
           // having no footer at all. The page itself is this one.
@@ -250,6 +295,17 @@ class TouchClassLayoutE2eTest {
           "/impressum",
           "/privacy",
           "/terms");
+
+  /**
+   * The list routes that own a {@code /{id}} detail view.
+   *
+   * <p>Used only to say so when one of them renders no row: the detail view then goes unmeasured,
+   * and that is worth printing rather than passing over in silence. It is NOT a failure — an empty
+   * list is a legitimate state of a fresh or shared stack, and the {@code smoke} tag exists so this
+   * can run against one.
+   */
+  private static final Set<String> DETAIL_LIST_PAGES =
+      Set.of("/missions", "/operations", "/orders", "/refinery-orders");
 
   private static Playwright playwright;
   private static Browser browser;
@@ -289,6 +345,15 @@ class TouchClassLayoutE2eTest {
     List<String> findings = new ArrayList<>();
     String baseUrl = STACK.baseUrl();
 
+    // Coverage is ASSERTED, not merely printed. Two silent-pass modes were possible without this
+    // and both were found in review: a list with no rows yields no detail link and dropped out of
+    // the audit, and a page without an app shell returns no findings — so a session that expired
+    // part-way through would SKIP every remaining combination and the suite would pass having
+    // measured almost nothing. `assertTrue(findings.isEmpty())` cannot tell "clean" from "never
+    // looked".
+    Map<String, Set<String>> measuredByDevice = new LinkedHashMap<>();
+    List<String> uncoveredLists = new ArrayList<>();
+
     for (int[] device : DEVICE_CLASSES) {
       int width = device[0];
       int height = device[1];
@@ -305,10 +370,12 @@ class TouchClassLayoutE2eTest {
                   .setHasTouch(true)
                   .setIsMobile(width <= 768))) {
         Page page = context.newPage();
+        Set<String> measured = new LinkedHashSet<>();
+        measuredByDevice.put(deviceLabel, measured);
         for (String path : PAGES) {
           // One page that hangs must not end the audit: the whole point is to name every offender,
           // so a failure to measure is itself a finding and the sweep carries on.
-          findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height));
+          findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height, measured));
 
           // Detail views are reached by FOLLOWING A LINK from their list, not by seeding an entity.
           // 33 of the frontend's routes carry a path variable and none of them can be visited by
@@ -319,11 +386,25 @@ class TouchClassLayoutE2eTest {
           // silently passing.
           String detail = firstDetailLink(page, path);
           if (detail != null) {
-            findings.addAll(measureSafely(page, baseUrl, detail, deviceLabel, width, height));
+            findings.addAll(
+                measureSafely(page, baseUrl, detail, deviceLabel, width, height, measured));
+          } else if (DETAIL_LIST_PAGES.contains(path)) {
+            // Named, not silently skipped - this is the half the comment above promised and the
+            // code did not do. It is reported rather than failed because an empty list is a
+            // legitimate state of a fresh or shared stack, which is exactly what the `smoke` tag
+            // exists to let this run against.
+            uncoveredLists.add(
+                deviceLabel
+                    + " "
+                    + path
+                    + ": no row, so its detail view was not"
+                    + " measured at this class");
           }
         }
       }
     }
+
+    reportCoverage(measuredByDevice, uncoveredLists, findings);
 
     assertTrue(
         findings.isEmpty(),
@@ -331,6 +412,59 @@ class TouchClassLayoutE2eTest {
             + ARTIFACTS.toAbsolutePath()
             + System.lineSeparator()
             + String.join(System.lineSeparator(), findings));
+  }
+
+  /**
+   * Turns what the sweep actually looked at into an assertion.
+   *
+   * <p>Two ways to pass without measuring anything were possible before this, and the suite's only
+   * assertion — {@code findings.isEmpty()} — cannot tell "clean" from "never looked". The check is
+   * deliberately RELATIVE rather than a magic number: every device class must have measured the
+   * same set of routes. A route with no app shell (a fragment, a JSON endpoint, a redirect) skips
+   * at all five classes and cancels out, while a session that expires during the third class
+   * shrinks that class's set and is named here. One absolute floor guards the degenerate case where
+   * nothing is measured anywhere.
+   *
+   * @param measuredByDevice per device class, the routes that reached the measurement
+   * @param uncoveredLists list pages that rendered no row, so their detail view went unmeasured
+   * @param findings the sweep's findings, appended to when coverage is short
+   */
+  private static void reportCoverage(
+      Map<String, Set<String>> measuredByDevice,
+      List<String> uncoveredLists,
+      List<String> findings) {
+    measuredByDevice.forEach(
+        (device, measured) ->
+            System.out.printf(
+                "[touch-layout] coverage %-10s %d of %d routes measured%n",
+                device, measured.size(), PAGES.size()));
+    uncoveredLists.forEach(line -> System.out.println("[touch-layout] uncovered " + line));
+
+    if (measuredByDevice.isEmpty()) {
+      findings.add("no device class ran at all");
+      return;
+    }
+    Map.Entry<String, Set<String>> first = measuredByDevice.entrySet().iterator().next();
+    if (first.getValue().size() < MIN_MEASURED_ROUTES) {
+      findings.add(
+          String.format(
+              "coverage floor: %s measured only %d of %d routes (minimum %d) — the sweep did not"
+                  + " run, it skipped",
+              first.getKey(), first.getValue().size(), PAGES.size(), MIN_MEASURED_ROUTES));
+    }
+    measuredByDevice.forEach(
+        (device, measured) -> {
+          Set<String> missing = new LinkedHashSet<>(first.getValue());
+          missing.removeAll(measured);
+          if (!missing.isEmpty()) {
+            findings.add(
+                String.format(
+                    "coverage gap: %s measured %d routes where %s measured %d — missing %s."
+                        + " A whole class going quiet mid-sweep is what an expired session looks"
+                        + " like.",
+                    device, measured.size(), first.getKey(), first.getValue().size(), missing));
+          }
+        });
   }
 
   /**
@@ -342,14 +476,30 @@ class TouchClassLayoutE2eTest {
    * @param deviceLabel {@code WxH}
    * @param width viewport width in CSS pixels
    * @param height viewport height in CSS pixels
+   * @param measured collects the paths this device class actually measured, for the coverage
+   *     assertion; a path that skips or throws is deliberately absent from it
    * @return the page's findings, or a single line naming why it could not be measured
    */
   private static List<String> measureSafely(
-      Page page, String baseUrl, String path, String deviceLabel, int width, int height) {
+      Page page,
+      String baseUrl,
+      String path,
+      String deviceLabel,
+      int width,
+      int height,
+      Set<String> measured) {
     try {
-      return measure(page, baseUrl, path, deviceLabel, width, height);
+      return measure(page, baseUrl, path, deviceLabel, width, height, measured);
     } catch (RuntimeException e) {
-      // The WHOLE message, newlines folded — not its first line. Taking `.lines().findFirst()`
+      // The WHOLE message, newlines folded — not its first line.
+      //
+      // The pattern is `\\s+` and the SECOND BACKSLASH IS LOAD-BEARING: since Java 15 `\s` is
+      // a valid string escape for a space, so the single-backslash form compiles without
+      // complaint to the pattern " +" and folds runs of SPACES while leaving every newline in
+      // place — the exact character this exists to fold. It shipped that way and was caught in
+      // review; the page-side JS in this same file had it right, which is what gave it away.
+      //
+      // Taking `.lines().findFirst()`
       // threw
       // away the only useful half: Playwright formats a page-side error as a multi-line `Error {`
       // block whose first line is literally "Error {", so five findings on /ship-data named the
@@ -358,7 +508,7 @@ class TouchClassLayoutE2eTest {
       String reason =
           e.getClass().getSimpleName()
               + ": "
-              + String.valueOf(e.getMessage()).replaceAll("\s+", " ").trim();
+              + String.valueOf(e.getMessage()).replaceAll("\\s+", " ").trim();
       if (reason.length() > MAX_REASON_CHARS) {
         reason = reason.substring(0, MAX_REASON_CHARS) + "…";
       }
@@ -383,7 +533,7 @@ class TouchClassLayoutE2eTest {
     try {
       page.screenshot(options);
     } catch (RuntimeException e) {
-      String reason = String.valueOf(e.getMessage()).replaceAll("\s+", " ").trim();
+      String reason = String.valueOf(e.getMessage()).replaceAll("\\s+", " ").trim();
       if (reason.length() > MAX_REASON_CHARS) {
         reason = reason.substring(0, MAX_REASON_CHARS) + "…";
       }
@@ -437,10 +587,18 @@ class TouchClassLayoutE2eTest {
    * @param deviceLabel {@code WxH}, used in artifact names and in every finding line
    * @param width viewport width in CSS pixels
    * @param height viewport height in CSS pixels
+   * @param measured receives {@code path} once the page is established as a real page, i.e. after
+   *     the app-shell check; the coverage assertion reads it
    * @return one line per finding; empty when the page is clean at this size
    */
   private static List<String> measure(
-      Page page, String baseUrl, String path, String deviceLabel, int width, int height) {
+      Page page,
+      String baseUrl,
+      String path,
+      String deviceLabel,
+      int width,
+      int height,
+      Set<String> measured) {
     List<String> findings = new ArrayList<>();
     // Re-assert the viewport before every page, and force it to actually take.
     //
@@ -482,6 +640,7 @@ class TouchClassLayoutE2eTest {
           deviceLabel + " " + path, page.url().replace(baseUrl, ""));
       return findings;
     }
+    measured.add(path);
 
     // MEASURE FIRST, screenshot second — the order is load-bearing. A full-page capture widens the
     // viewport to the content size to take the picture, and a measurement taken afterwards can

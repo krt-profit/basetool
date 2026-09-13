@@ -32,6 +32,17 @@
             /* Reserve viewport-bottom space for the fixed footer (see styles.css `main`). */
             padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
         }
+
+        /* The phone class drops the reserve, exactly as the shared `main` rule does.
+           `--krt-footer-height` publishes 0px below 768px (the footer scrolls there, ADR-0165), so
+           this calc resolves to the bare 5rem separator — 80px of dead scroll at the bottom of the
+           three most content-dense pages in the app, where every other page now has 16px. The
+           shared rule was overridden for this; these two page-local copies of the same reserve were
+           missed, and the guard only asserts the reserve is large ENOUGH, never that it is not
+           excessive. */
+        @media (max-width: 768px) {
+            .page-wrapper { padding-bottom: var(--space-4); }
+        }
         .mission-head-sticky {
             position: sticky;
             top: 0; /* corrected at runtime to the real <header> height */

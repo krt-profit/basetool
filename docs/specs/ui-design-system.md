@@ -373,6 +373,14 @@ tile widened its `auto-fit` track and the tablet-landscape class scrolled sidewa
 - [ ] Measured with rows in the tables, not only on a fresh stack: a detail view, a populated list
   and a populated table are each a different layout from their empty state, and an empty one hides
   every defect it has.
+- [ ] **The sweep's route list is complete, and its coverage is asserted rather than assumed.**
+  `PAGES` is hand-maintained and was short by seventeen routes for a day while this clause claimed
+  otherwise — `/organisation/leitung` among them, whose action rows the same change was fixing. The
+  guard now requires every device class to have measured the same set of routes (a class that goes
+  quiet mid-sweep is what an expired session looks like) over a floor, and names any list page that
+  rendered no row so its detail view is known to be unmeasured. Adding the missing routes found a
+  1303px table with no scroll container on `/admin/notification-rules`, broken at **every** class
+  including desktop, the first time it ran.
 - [ ] A compact variant actually renders compact — `.btn.btn-xs` out-specifies `.btn` rather
   than relying on source order, since `.btn` is declared later and again inside the ≤1024px
   touch block. A bare `.btn-xs` selector is silently inert and is a regression.
@@ -386,7 +394,7 @@ tile widened its `auto-fit` track and the tablet-landscape class scrolled sidewa
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** [ADR-0165](../adr/0165-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over every page route the controllers expose plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
+**Enforced by:** [ADR-0165](../adr/0165-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over the page routes named in its own hand-maintained `PAGES` list, plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
 footer behaviour, chrome share — with a full-page screenshot per page and class) + code/design
 review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),

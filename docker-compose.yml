@@ -568,8 +568,15 @@ x-backend: &backend-template
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
     # (backend application-prod.yml); hostname verification stays ON, so the cert's SAN MUST include
     # `dns:keycloak` (see the README keytool recipe). The dev/test stack overrides this back to
-    # http://keycloak:18080 in docker-compose.test.yml.
-    KEYCLOAK_ADMIN_URL: https://keycloak:18443
+    # http://keycloak:18080/auth in docker-compose.test.yml.
+    # THE /auth IS PART OF THE BASE URL (ADR-0166). `KC_HTTP_RELATIVE_PATH` moves Keycloak's WHOLE
+    # HTTP surface, `/realms/**` and `/admin/realms/**` alike, and this value is the base for both:
+    # KeycloakService POSTs the client-credentials token to `/realms/{realm}/protocol/openid-connect/
+    # token` and then pages `/admin/realms/{realm}/users`. Without the prefix the token POST 404s,
+    # so the daily UserSyncTask, the "Sync now" button, the Discord link back-fill and the deletion
+    # probe all fail — and `fetchUsers` swallows it and returns an empty list, so the sync fails
+    # SILENTLY until the fetch-failure alert fires.
+    KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
     # Optional (REQ-SEC-022): shared secret guarding the internal /internal/discord/account-existence
     # endpoint the Keycloak Discord SPI calls. Blank → the endpoint is disabled (503) and the SPI

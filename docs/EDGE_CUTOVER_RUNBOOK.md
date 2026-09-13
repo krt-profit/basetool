@@ -98,9 +98,9 @@ Copy each host's material into the per-host layout the edge mounts. The mapping 
 live NPM configuration on 2026-09-12:
 
 |             Host              | NPM certificate |
-|-------------------------------|-----------------|
+|-------------------------------|-----------------|---------------------------------------------------------|
 | `profit-base.online`          | `npm-3`         |
-| `keycloak.profit-base.online` | `npm-4`         |
+| `keycloak.profit-base.online` | `npm-4`         | — **retired 2026-09-13 (ADR-0166)**, see the note below |
 | `ingest.profit-base.online`   | `npm-5`         |
 | `grafana.profit-base.online`  | `npm-7`         |
 | `api.profit-base.online`      | `npm-8`         |
@@ -113,7 +113,10 @@ docker run --rm \
     set -eu
     seed() { mkdir -p "/certs/$2"; cp -L "/seed/live/$1/fullchain.pem" "/certs/$2/fullchain.pem"; cp -L "/seed/live/$1/privkey.pem" "/certs/$2/privkey.pem"; }
     seed npm-3 profit-base.online
-    seed npm-4 keycloak.profit-base.online
+    # npm-4 is GONE since ADR-0166 - identity moved to /auth on the web host, so this
+    # line would set a variable render-and-run.sh no longer reads and seed a fifth
+    # certificate directory nothing references. Four vhosts is the current count.
+    # seed npm-4 keycloak.profit-base.online
     seed npm-5 ingest.profit-base.online
     seed npm-7 grafana.profit-base.online
     seed npm-8 api.profit-base.online

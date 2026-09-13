@@ -51,7 +51,9 @@
              */
             .table-wrapper {
                 overflow: auto;
-                max-height: max(16rem, calc(100vh - var(--krt-footer-height, 5rem) - 25rem));
+                /* 100dvh, not 100vh: vh is the large viewport, so on a phone this
+                   over-estimates by the address bar. See materialboerse.css. */
+                max-height: max(16rem, calc(100dvh - var(--krt-footer-height, 5rem) - 25rem));
                 border: 1px solid var(--color-gray-3);
                 margin-top: 1rem;
             }

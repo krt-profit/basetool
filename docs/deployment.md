@@ -1196,28 +1196,46 @@ Nothing stored is lost. Sessions end, and members sign in again.
    It renders every vhost template and runs `nginx -t` with throwaway certificates. Four vhosts is
    the expected count now, not five.
 
-4. **Update the host `.env`:** delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from
-   `ACME_HOSTS`. Leaving them costs nothing at run-time — the edge simply ignores an unused
-   variable — but the certificate keeps a SAN for a name nothing serves.
+4. **Update the host `.env`.** Three edits, and the third is the one a recreate cannot do for you:
 
+   - delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from `ACME_HOSTS` — leaving them costs
+     nothing at run-time (the edge ignores an unused variable) but the certificate keeps a SAN for a
+     name nothing serves;
+   - **repoint `IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI`** to
+     `https://profit-base.online/auth/realms/iri/protocol/openid-connect/token`. It has **no default
+     anywhere** — `docker-compose.yml` passes `${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}` and the
+     ingest binding is empty-by-default — so the host `.env` is its only live value, and recreating a
+     container does not rewrite `.env`. Miss this and the ingest gateway keeps asking the retired
+     host for its token, which none of the verification steps below would notice;
+   - if `IRI_KEYCLOAK_HOSTNAME` / `IRI_KEYCLOAK_ISSUER_URI` are set (they are optional overrides),
+     move them together and **include the `/auth` path in the hostname** — see step 5.
 5. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
-   (`KC_HTTP_RELATIVE_PATH`), advertising `https://profit-base.online` (`KC_HOSTNAME`, origin only —
-   see the ADR for why the path must *not* be repeated there), and with its management interface
-   still at the root, so the container healthcheck's `/health/ready` and Prometheus's `/metrics`
-   are unaffected.
+   (`KC_HTTP_RELATIVE_PATH`) **and advertising `https://profit-base.online/auth`** — the path belongs
+   in `KC_HOSTNAME` as well, and the two must agree. Its management interface stays at the root
+   (`KC_HTTP_MANAGEMENT_RELATIVE_PATH`), so the container healthcheck's `/health/ready` and
+   Prometheus's `/metrics` are unaffected. The shipped compose already carries all three; you only
+   have to touch them if the host `.env` overrides `IRI_KEYCLOAK_HOSTNAME`.
+
+   > **The failure this invites is silent, and it is the one to watch for.** Setting only the
+   > relative path — leaving `KC_HOSTNAME` at the bare origin — produces a Keycloak that ANSWERS on
+   > `/auth` and ADVERTISES root issuer links. It reports **healthy**, its discovery document parses,
+   > and `backend`, `frontend` and `ingest` then die at start-up on
+   > `The Issuer "…/realms/iri" did not match the requested issuer "…/auth/realms/iri"` — which reads
+   > as a backend fault. ADR-0166 carries the measurement of all three combinations.
 
 6. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
    A service left on the old issuer rejects every token with a signature/issuer mismatch, which
    reads in the log as a Keycloak outage rather than as a stale container.
-
 7. **Verify, from outside:**
 
    ```bash
    curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration      | grep -o '"issuer":"[^"]*"'
    ```
 
-   It must read `https://profit-base.online/auth/realms/iri`. A doubled `/auth/auth` here is the
-   one misconfiguration this arrangement invites — see ADR-0166.
+   It must read `https://profit-base.online/auth/realms/iri`. **A root issuer** — `https://profit-base.online/realms/iri`,
+   with no `/auth` — is the misconfiguration this arrangement invites, and it means `KC_HOSTNAME` is
+   missing the path while `KC_HTTP_RELATIVE_PATH` has it (step 5). The doubled `/auth/auth` shape is
+   *not* what happens when the two agree; ADR-0166 has the measured table.
 
 8. **Sign in through the web app**, then **sign out**, and do it **once through Discord** as well:
    the end-session redirect is the navigation that used to leave the origin, and the Discord broker

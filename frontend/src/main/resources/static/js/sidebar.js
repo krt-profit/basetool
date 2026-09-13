@@ -128,12 +128,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // Relocate the global footer to the bottom of <body>. The footer
     // fragment is included from this sidebar fragment, which Thymeleaf
     // renders near the top of <body> — before <header> and <main>.
-    // The footer is `position: fixed; bottom: 0` (see `.krt-footer`
-    // in styles.css), so visual placement does not depend on the DOM
-    // position — but moving the element to the end of <body> keeps
-    // the reading order consistent for screen readers and other
-    // assistive tech (footer is read after the main content, as
-    // expected by web convention).
+    //
+    // This is a TIDY-UP, not the layout mechanism, and it stopped being
+    // the latter twice over. Above 768px the footer is
+    // `position: fixed; bottom: 0`, so DOM order never mattered there.
+    // On the phone class it is `position: static` and in flow, where DOM
+    // order WOULD matter — so `styles.css` gives it `order: 999` inside a
+    // flex-column body, which places it correctly at first paint. Relying
+    // on this handler instead would paint the legal links above the header
+    // until it runs, and leave them there if anything earlier in it throws.
+    //
+    // What the move still buys: reading order for screen readers, which get
+    // the footer after the main content as web convention expects.
     const footerEl = document.querySelector('body > .krt-footer');
     if (footerEl && footerEl !== document.body.lastElementChild) {
         document.body.appendChild(footerEl);

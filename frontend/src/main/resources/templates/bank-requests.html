@@ -94,7 +94,13 @@
                  then centred themselves at 456px and sat almost entirely off-screen, and the header
                  bell was pushed out with them. Measured 2026-09-13; this was the only data-table in
                  the whole template tree without the wrapper. -->
-            <div class="table-responsive">
+            <!-- The wrapper carries the SAME condition as the table it wraps. Every sibling
+                 gates the wrapper this way (admin/audit-log.html, admin-settings.html); an
+                 unconditional one emits a stray empty scroll container after the "Keine
+                 Anträge" paragraph on an empty queue, in a fragment that is swapped on
+                 every filter toggle. -->
+            <div class="table-responsive"
+                 th:if="${requests != null and !#lists.isEmpty(requests.content())}">
             <table class="data-table" th:if="${requests != null and !#lists.isEmpty(requests.content())}"
                    data-testid="bank-requests-table">
                 <thead>

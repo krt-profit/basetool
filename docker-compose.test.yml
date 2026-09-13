@@ -115,8 +115,10 @@ services:
       # Override the prod-target issuer URI baked into the base template.
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
       # Admin-API calls stay on the internal Docker network — no need to go
-      # via host.docker.internal for service-to-service traffic.
-      KEYCLOAK_ADMIN_URL: http://keycloak:18080
+      # via host.docker.internal for service-to-service traffic. The /auth is the
+      # server's relative path and applies to the internal hop exactly as it does
+      # to the public one (ADR-0166); see the base template for what 404s without it.
+      KEYCLOAK_ADMIN_URL: http://keycloak:18080/auth
       KEYCLOAK_REALM: iri
       KEYCLOAK_ADMIN_CLIENT_ID: backend-service
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}

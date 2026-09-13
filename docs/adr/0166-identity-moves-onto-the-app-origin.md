@@ -80,10 +80,17 @@ request, so the heuristic above has no reason to cover it at all.
   redirect with nothing wrong in any log. A first draft of this ADR specified exactly that
   combination on the strength of the guide's wording; the measurement is what caught it.
 
-  The test stack uses a **bare** hostname instead, where scheme, port and context path are resolved
-  from the request — verified to yield `http://host.docker.internal:18080/auth/realms/…` — which is
-  also why `KC_HOSTNAME_PORT` could be dropped from it: it is not an option of Keycloak 26 at all,
-  and the port was never coming from it.
+  The test stack uses a **bare** hostname instead, and that combination was measured too rather than
+  assumed: `KC_HOSTNAME=host.docker.internal` with `KC_HTTP_RELATIVE_PATH=/auth` advertises
+  `http://host.docker.internal:18080/auth/realms/…`, answers 404 at the root, and keeps
+  `:9000/health/ready` at 200. Scheme, port **and context path** all come from the request when no
+  full URL is configured — which is also why `KC_HOSTNAME_PORT` could be dropped: it is not an
+  option of Keycloak 26 at all, and the port was never coming from it.
+
+  The e2e override is the exception and needs the full URL for a documented reason of its own
+  (`docker-compose.e2e.yml`: KC 26 refused the browser's plain-HTTP auth request under a bare
+  hostname). It therefore carries the path as well — and getting that wrong is precisely how the
+  first attempt failed.
 
 - **The management interface stays at the root**, `KC_HTTP_MANAGEMENT_RELATIVE_PATH=/`. Left alone,
   `http-relative-path` takes port 9000's endpoints with it, which would have moved `/health/ready`

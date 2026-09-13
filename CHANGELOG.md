@@ -17,25 +17,6 @@
   bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
   zusätzliche Abfrage beim Server.
 
-### Changed
-
-- **Die Anmeldung läuft jetzt unter derselben Adresse wie das Basetool selbst.** Keycloak sitzt
-  nicht mehr auf `keycloak.profit-base.online`, sondern unter `/auth` auf `profit-base.online`. Für
-  die installierte Web-App auf iPhone und iPad heißt das: der Login verlässt das App-Fenster nicht
-  mehr. **Du musst dich einmalig neu anmelden**, und die Android-App braucht die dazu passende neue
-  Version — ältere Installationen können sich nicht mehr anmelden.
-
-- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
-  sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
-  des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und
-  Rechner bleibt sie fixiert.
-
-- **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
-  Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
-  Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
-
-### Fixed
-
 - **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
   (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
   Alle drei erfüllen jetzt das 44px-Mindestmaß.
@@ -73,9 +54,28 @@
 - **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
   als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
   Einsatzseiten sah er immer schon richtig aus.
+- **Die Regel-Tabelle unter Administration → Benachrichtigungsregeln sprengte jeden Bildschirm.**
+  Sie ist 1303px breit und hatte keinen eigenen Scrollbereich, sodass die ganze Seite seitlich
+  verschoben werden musste — auch am Rechner. Jetzt scrollt die Tabelle für sich.
 - **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
   Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
   und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
+
+### Changed
+
+- **Die Anmeldung läuft jetzt unter derselben Adresse wie das Basetool selbst**, damit der Login
+  die installierte Web-App auf iPhone und iPad nicht mehr aus ihrem Fenster wirft. **Du musst dich
+  einmalig neu anmelden.** Die Android-App braucht die dazu passende neue Version — ältere
+  Installationen können sich nicht mehr anmelden.
+
+- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
+  sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
+  des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und
+  Rechner bleibt sie fixiert.
+
+- **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
+  Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
+  Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
 
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
