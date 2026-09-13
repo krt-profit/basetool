@@ -33,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
@@ -227,6 +228,96 @@ class TouchClassLayoutE2eTest {
    * <p>Interpolated into the probe script, so there is one spelling and the compiler moves it.
    */
   private static final String HIT_AREA_MARK = "hit-area: ";
+
+  /**
+   * The modal ROOT selectors the templates actually use, and the inner parts to measure in each.
+   *
+   * <p><b>There are three shapes, and this sweep knew one.</b> The canonical {@code
+   * .krt-modal-overlay} shell ({@code fragments/modal-wrapper.html}, 42 instances), and two legacy
+   * shapes that predate it: {@code .modal} / {@code .modal-content} (47 instances, {@code
+   * styles.css}) and its promotion-admin sister {@code .modal-overlay} / {@code .modal-box} (7,
+   * {@code promotion-admin.css}). <b>54 of the 96 modal roots in the template tree are legacy</b>,
+   * and this sweep saw none of them until 2026-09-13, while the comment on the measurement loop
+   * called 42 "the full set". {@code orders-detail.html} alone carries eight.
+   *
+   * <p>Counting them is as easy to get wrong in the other direction. A grep for class attributes
+   * containing "modal" over the templates returns ~418, but most of those are inner elements
+   * ({@code .modal-content} 47, {@code .krt-modal-head} 42, {@code .modal-title} 7 and so on). Only
+   * a ROOT may be un-hidden and measured as an overlay: un-hiding a {@code .modal-content} would
+   * measure a box in a layout context it never has, and would report on it as if it were a dialog.
+   * None of the legacy markup is dead — all 54 roots are reachable from a trigger or a script — so
+   * the sweep is widened rather than the markup deleted.
+   *
+   * <p>Declared ONCE because the selector has to agree at four sites — {@code modalCount}, the
+   * probe's own measurement loop, and the Java-side un-hide and restore around the screenshot.
+   * Widening one alone does nothing: if the probe measured a wider set than the un-hide reveals,
+   * the extra modals are still {@code display: none}, are skipped by the zero-rect guards, and the
+   * change looks harmless while buying nothing.
+   *
+   * <p><b>Nothing detects a FOURTH shape.</b> This list is hand-maintained, exactly like {@link
+   * #PAGES}, and it failed the same way: a family nobody listed is not reported, it is silently not
+   * measured. A {@code check}-time guard over the template tree would catch it on every push
+   * instead of only on a PR carrying the {@code e2e} label — and it cannot live here, because the
+   * frontend's {@code test} source set does not compile against its {@code e2e} one. The home is
+   * {@code test-support} ({@code e2eImplementation} extends {@code testImplementation}), which is
+   * where {@code EndpointEnumeration} already went for the identical problem on {@code PAGES}.
+   *
+   * @param root the overlay or scrim element — the thing that is hidden and shown
+   * @param box the framed dialog inside it, whose geometry is the assertion
+   * @param body the scrolling region, or {@code null} where the family has no such class
+   * @param foot the button row, or {@code null} where the family has no such class
+   * @param openClass a class the family's own JS adds to open it, or {@code null} when display
+   *     alone opens it. {@code .modal-overlay} centres its box in {@code .active} only, so
+   *     revealing it with display alone would stretch the dialog and measure a shape no user sees.
+   */
+  private record ModalShape(String root, String box, String body, String foot, String openClass) {}
+
+  /**
+   * The shapes, canonical first — the one new work is written against.
+   *
+   * <p>Order is not load-bearing: the three selectors are disjoint, so the {@code find} that
+   * resolves an element to its shape can match at most one of them. It would become load-bearing
+   * the day a shape's selector is a subset of another's, and the more specific would then have to
+   * come first.
+   */
+  private static final List<ModalShape> MODAL_SHAPES =
+      List.of(
+          new ModalShape(
+              ".krt-modal-overlay", ".krt-modal", ".krt-modal-body", ".krt-modal-foot", null),
+          new ModalShape(".modal", ".modal-content", null, null, null),
+          new ModalShape(".modal-overlay", ".modal-box", null, ".modal-actions", "active"));
+
+  /**
+   * {@link #MODAL_SHAPES} as one selector, for the three sites that only need to find the roots.
+   *
+   * <p>Derived rather than written out, so a family added above reaches all four sites at once.
+   */
+  private static final String MODAL_ROOT_SELECTOR =
+      MODAL_SHAPES.stream().map(ModalShape::root).collect(Collectors.joining(", "));
+
+  /** {@link #MODAL_SHAPES} as a JS array literal, for the two scripts that need the inner parts. */
+  private static final String MODAL_SHAPES_JS =
+      MODAL_SHAPES.stream()
+          .map(
+              shape ->
+                  "{root:%s,box:%s,body:%s,foot:%s,openClass:%s}"
+                      .formatted(
+                          asJsString(shape.root()),
+                          asJsString(shape.box()),
+                          asJsString(shape.body()),
+                          asJsString(shape.foot()),
+                          asJsString(shape.openClass())))
+          .collect(Collectors.joining(",", "[", "]"));
+
+  /**
+   * A selector as a JS string literal, or the bare token {@code null} for a part a family lacks.
+   *
+   * @param selector a CSS selector, or {@code null}
+   * @return {@code 'selector'}, or {@code null}
+   */
+  private static String asJsString(String selector) {
+    return selector == null ? "null" : "'" + selector + "'";
+  }
 
   /**
    * The engine this run drives, as {@code e2e.browser}.
@@ -805,7 +896,7 @@ class TouchClassLayoutE2eTest {
     // Photograph every modal too, on the touch classes.
     //
     // The measurement above already covers them, but a modal is `display: none` in the page
-    // screenshot — so an audit that is supposed to be looked at would contain no picture of the 42
+    // screenshot — so an audit that is supposed to be looked at would contain no picture of the 96
     // surfaces where the tool asks for input. Showing one at a time and capturing the viewport
     // gives a reviewer the same evidence for a dialog as for a page, and the touch classes are
     // where a dialog gets tight. The device label belongs in the FILENAME: without it the 768px
@@ -817,9 +908,21 @@ class TouchClassLayoutE2eTest {
         String id =
             String.valueOf(
                 page.evaluate(
-                    "(i) => { const o = document.querySelectorAll('.krt-modal-overlay')[i];"
-                        + " if (!o) return ''; o.dataset.krtPrevDisplay = o.style.display;"
-                        + " o.style.display = 'flex'; return o.id || ('modal-' + i); }",
+                    """
+                    (i) => {
+                      const o = document.querySelectorAll('%s')[i];
+                      if (!o) return '';
+                      const shape = %s.find((s) => o.matches(s.root));
+                      o.dataset.krtPrevDisplay = o.style.display;
+                      if (shape && shape.openClass && !o.classList.contains(shape.openClass)) {
+                        o.classList.add(shape.openClass);
+                        o.dataset.krtAddedOpenClass = shape.openClass;
+                      }
+                      o.style.display = 'flex';
+                      return o.id || ('modal-' + i);
+                    }
+                    """
+                        .formatted(MODAL_ROOT_SELECTOR, MODAL_SHAPES_JS),
                     i));
         if (!id.isEmpty()) {
           screenshotSafely(
@@ -832,9 +935,19 @@ class TouchClassLayoutE2eTest {
               deviceLabel + " " + path + " > " + id);
         }
         page.evaluate(
-            "(i) => { const o = document.querySelectorAll('.krt-modal-overlay')[i]; if (!o) return;"
-                + " o.style.display = o.dataset.krtPrevDisplay || '';"
-                + " delete o.dataset.krtPrevDisplay; }",
+            """
+            (i) => {
+              const o = document.querySelectorAll('%s')[i];
+              if (!o) return;
+              o.style.display = o.dataset.krtPrevDisplay || '';
+              delete o.dataset.krtPrevDisplay;
+              if (o.dataset.krtAddedOpenClass) {
+                o.classList.remove(o.dataset.krtAddedOpenClass);
+                delete o.dataset.krtAddedOpenClass;
+              }
+            }
+            """
+                .formatted(MODAL_ROOT_SELECTOR),
             i);
       }
     }
@@ -1381,14 +1494,21 @@ class TouchClassLayoutE2eTest {
           }
         }
 
-        // EVERY modal on this page, measured without knowing how any of them opens.
+        // EVERY modal on this page, in ALL THREE SHAPES, measured without knowing how any opens.
         //
-        // 42 modal instances live across the templates and each has its own trigger — a row action,
-        // a menu entry, a server-rendered flag. Driving all of them would mean encoding 42 click
-        // paths and would still miss the ones a fixture cannot reach. Every one of them is instead
-        // in the DOM already, hidden by `display: none` on `.krt-modal-overlay`; showing one, taking
-        // its geometry and putting the inline style back measures it in its real layout context.
+        // 96 modal instances live across the templates — 42 canonical `.krt-modal-overlay` and 54
+        // legacy (`.modal` and `.modal-overlay`, see MODAL_SHAPES) — and each has its own trigger:
+        // a row action, a menu entry, a server-rendered flag. Driving all of them would mean
+        // encoding 96 click paths and would still miss the ones a fixture cannot reach. Every one
+        // of them is instead in the DOM already and hidden — by the family's default `display`, or
+        // by a generated `krtm-display-none-*` class on the legacy shape. Revealing one, taking its
+        // geometry and putting the previous state back measures it in its real layout context.
         // One at a time, so two overlays never stack.
+        //
+        // Revealing it is per family, not one trick: an inline `display: flex` outranks every class
+        // and is enough for the two display-toggled families, but `.modal-overlay` takes its
+        // centring from `.active` alone, so display by itself would stretch the box and measure a
+        // dialog no user is ever shown.
         //
         // What this can NOT see, stated rather than implied: a modal whose body is filled by script
         // when it opens is measured empty, so its content height is understated. The structural
@@ -1416,10 +1536,16 @@ class TouchClassLayoutE2eTest {
         }
 
         const modalIssues = [];
-        for (const ov of document.querySelectorAll('.krt-modal-overlay')) {
+        const MODAL_SHAPES = %s;
+        for (const ov of document.querySelectorAll('%s')) {
+          const shape = MODAL_SHAPES.find((s) => ov.matches(s.root));
+          if (!shape) continue;
           const previous = ov.style.display;
+          const opened =
+            shape.openClass && !ov.classList.contains(shape.openClass) ? shape.openClass : null;
+          if (opened) ov.classList.add(opened);
           ov.style.display = 'flex';
-          const modal = ov.querySelector('.krt-modal');
+          const modal = ov.querySelector(shape.box);
           if (modal) {
             const mr = modal.getBoundingClientRect();
             const name = (ov.id ? '#' + ov.id : label(modal));
@@ -1431,12 +1557,12 @@ class TouchClassLayoutE2eTest {
               modalIssues.push(name + ' is ' + Math.round(mr.height)
                 + 'px tall in a ' + vh + 'px viewport');
             }
-            const foot = ov.querySelector('.krt-modal-foot');
+            const foot = shape.foot ? ov.querySelector(shape.foot) : null;
             if (foot && foot.scrollWidth > foot.clientWidth + slack) {
               modalIssues.push(name + ' footer buttons overflow their row ('
                 + foot.scrollWidth + ' > ' + foot.clientWidth + 'px)');
             }
-            const body = ov.querySelector('.krt-modal-body');
+            const body = shape.body ? ov.querySelector(shape.body) : null;
             if (body) {
               const oy = getComputedStyle(body).overflowY;
               if (body.scrollHeight > body.clientHeight + slack
@@ -1462,6 +1588,7 @@ class TouchClassLayoutE2eTest {
             }
           }
           ov.style.display = previous;
+          if (opened) ov.classList.remove(opened);
         }
 
         // Widest right edge of any laid-out box — DIAGNOSTIC ONLY, never an assertion. It routinely
@@ -1482,8 +1609,15 @@ class TouchClassLayoutE2eTest {
                  footerPosition: footer ? getComputedStyle(footer).position : '(no footer)',
                  headerHeight, footerHeight, mainPaddingBottom, footerHeightVar,
                  cutOff, unscrollableTables, badControls, modalIssues, overlaps,
-                 modalCount: document.querySelectorAll('.krt-modal-overlay').length };
+                 modalCount: document.querySelectorAll('%s').length };
       }
       """
-          .formatted(DENSE_ACTION_FLOOR, TOUCH_TARGET_FLOOR, HIT_AREA_MARK, HIT_AREA_MARK);
+          .formatted(
+              DENSE_ACTION_FLOOR,
+              TOUCH_TARGET_FLOOR,
+              HIT_AREA_MARK,
+              MODAL_SHAPES_JS,
+              MODAL_ROOT_SELECTOR,
+              HIT_AREA_MARK,
+              MODAL_ROOT_SELECTOR);
 }

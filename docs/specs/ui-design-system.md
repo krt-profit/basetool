@@ -446,7 +446,7 @@ was hopeless there for an additional reason — many rows carry a generated clas
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
+**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page — all three shapes, the canonical `.krt-modal-overlay` shell and the legacy `.modal` / `.modal-overlay` ones, 96 roots in all: page-level overflow, cut-off elements, unscrollable tables, control floors,
 footer behaviour, chrome share — with a full-page screenshot per page and class) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
@@ -466,6 +466,29 @@ review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
 > None carried the `.btn-xs` / `.btn-icon` exemption; each was a bare `button` with its own rule,
 > and the touch block's selector list enumerates classes, so a control that opts out of `.btn` opted
 > out of the floor with it.
+>
+> **Corrected 2026-09-13: "every modal on the page" was true of one shape out of three.** The sweep
+> selected `.krt-modal-overlay` only — 42 roots — while the template tree also carries two legacy
+> shapes that predate the canonical shell: `.modal` / `.modal-content` (47) and its promotion-admin
+> sister `.modal-overlay` / `.modal-box` (7). **54 of the 96 modal roots went unmeasured**, eight of
+> them in `orders-detail.html` alone, and a comment in the guard called 42 "the full set". None of
+> that markup is dead — all 54 roots are reachable from a trigger or a script — so the sweep was
+> widened rather than the markup deleted.
+>
+> The selector is now declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`) and used at all four
+> sites that have to agree — the count, the probe's measurement loop, and the un-hide and restore
+> around the screenshot — because **widening one alone buys nothing**: a modal the probe measures
+> but the un-hide never reveals is still `display: none`, every rect it returns is 0×0, and every
+> zero-rect guard skips it. The change would look harmless and cost the same time.
+>
+> Revealing is per shape, and that is the part worth remembering: an inline `display: flex` outranks
+> every class and opens the two display-toggled families, but `.modal-overlay` takes its **centring**
+> from `.active` alone — so display by itself would have measured a stretched, left-aligned dialog
+> that no user is ever shown. A tool that reveals hidden markup has to reproduce what the markup's
+> own JS does, not merely make the box visible.
+>
+> Nothing detects a **fourth** shape. `MODAL_SHAPES` is hand-maintained exactly like the guard's
+> `PAGES` list, and it failed the same way that list did.
 
 ### REQ-UI-010 — Standard action-button icons
 

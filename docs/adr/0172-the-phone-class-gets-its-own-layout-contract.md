@@ -74,7 +74,9 @@ measures it.** Four owner decisions, taken 2026-09-13:
 
 - **The two touch classes are gate-enforced for the first time.** `TouchClassLayoutE2eTest` sweeps
   375×812, 810×1080, 1024×768, 1280×800 and 1600×900 over every page route, follows a real detail
-  link from each list, shows and measures **every modal on the page** without needing its trigger,
+  link from each list, shows and measures **every modal on the page** without needing its trigger
+  (true of one shape out of three until 2026-09-13 — the legacy `.modal` and `.modal-overlay`
+  families, 54 of the 96 roots, were not selected; see the correction note under REQ-UI-009),
   and writes a full-page screenshot per page and class plus one per modal on the touch classes. It
   collects every finding before failing, so an audit names all offenders rather than the first.
 - **The guard is only as good as its own correctness, and it was wrong four times first** — each is
