@@ -43,7 +43,9 @@ import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -316,6 +318,67 @@ class SecurityProblemResponseHandlerTest {
             new BadCredentialsException("nope"));
 
     assertEquals(1.0d, authFailures(MetricNames.AUTH_OTHER));
+  }
+
+  @Test
+  @DisplayName("a request with no Authorization header at all reads as no_credentials, not other")
+  void aCredentiallessRequestIsCountedUnderItsOwnReason() throws Exception {
+    // The production case, and the one the counter was blind to. ExceptionTranslationFilter raises
+    // this — never an OAuth2AuthenticationException — for every caller that presents no token, so
+    // before the split it swallowed 100% of real traffic: 6 618 of 6 618 backend 401s on
+    // 2026-09-13 read `other`, and the metric built to answer "why" answered nothing (REQ-OBS-018).
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/terms/status"),
+            new MockHttpServletResponse(),
+            new InsufficientAuthenticationException("Full authentication is required"));
+
+    assertEquals(1.0d, authFailures(MetricNames.AUTH_NO_CREDENTIALS));
+    assertEquals(
+        0.0d,
+        authFailures(MetricNames.AUTH_OTHER),
+        "collapsing this into `other` is what made the counter unreadable in production");
+  }
+
+  @Test
+  @DisplayName("the method-security spelling of 'nothing was presented' maps the same way")
+  void aMissingCredentialFromMethodSecurityIsAlsoNoCredentials() throws Exception {
+    // Same meaning, different filter: method security throws this one. Mapping only the
+    // ExceptionTranslationFilter spelling would split one cause across two series.
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/missions"),
+            new MockHttpServletResponse(),
+            new AuthenticationCredentialsNotFoundException("no authentication"));
+
+    assertEquals(1.0d, authFailures(MetricNames.AUTH_NO_CREDENTIALS));
+    assertEquals(0.0d, authFailures(MetricNames.AUTH_OTHER));
+  }
+
+  @Test
+  @DisplayName("a rejected token never lands on no_credentials — the alert depends on the split")
+  void aRejectedTokenDoesNotLandOnTheNoCredentialSeries() throws Exception {
+    // BackendAuthFailureSpike now watches invalid_token alone, precisely because probe traffic and
+    // scanners can only ever produce no_credentials. If these two ever merged, the alert would be
+    // measuring the monitoring plane again (ADR-0173).
+    HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
+    when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
+
+    newHandler(resolver)
+        .commence(
+            new MockHttpServletRequest("GET", "/api/v1/missions"),
+            new MockHttpServletResponse(),
+            new OAuth2AuthenticationException(
+                new OAuth2Error(MetricNames.AUTH_INVALID_TOKEN, "bad signature", null)));
+
+    assertEquals(1.0d, authFailures(MetricNames.AUTH_INVALID_TOKEN));
+    assertEquals(0.0d, authFailures(MetricNames.AUTH_NO_CREDENTIALS));
   }
 
   @Test

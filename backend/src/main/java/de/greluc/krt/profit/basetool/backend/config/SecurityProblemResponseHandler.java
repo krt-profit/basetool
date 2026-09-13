@@ -31,6 +31,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -141,19 +143,36 @@ public class SecurityProblemResponseHandler
 
   /**
    * Maps an authentication failure onto its RFC 6750 bearer error code, kept to the fixed set the
-   * spec defines so the metric label stays bounded (REQ-OBS-006).
+   * spec defines so the metric label stays bounded (REQ-OBS-006), with one deliberate addition
+   * below the RFC set for the request that presented no credential at all.
    *
    * <p>Only the code is taken, never {@code OAuth2Error#getDescription()}: Spring puts the raw
    * decode failure in there ("An error occurred while attempting to decode the Jwt: …"), which can
    * quote fragments of the presented token and must never reach a label or an appender
    * (REQ-OBS-004).
    *
+   * <p><b>The no-credential case is the common one and has no RFC code.</b> A request with no
+   * {@code Authorization} header never reaches {@code BearerTokenAuthenticationFilter}'s failure
+   * path; {@code ExceptionTranslationFilter} raises a plain {@link
+   * InsufficientAuthenticationException} instead, and method security raises {@link
+   * AuthenticationCredentialsNotFoundException}. Neither is an {@link
+   * OAuth2AuthenticationException} and RFC 6750 §3.1 says to omit the error code entirely for them,
+   * so both once collapsed into {@link MetricNames#AUTH_OTHER} — which on production meant
+   * <em>every single</em> 401 did: 6&nbsp;618 of 6&nbsp;618 on 2026-09-13, 8.5&nbsp;% of all
+   * backend traffic, with the counter that exists to answer "why" answering nothing. They now carry
+   * {@link MetricNames#AUTH_NO_CREDENTIALS}, which leaves {@link MetricNames#AUTH_INVALID_TOKEN} —
+   * a token that was presented and rejected — as a series quiet enough to alert on (REQ-OBS-018).
+   *
    * @param authException the failure Spring Security raised
    * @return one of the bounded {@code MetricNames.AUTH_*} values
    */
   private static @NotNull String bearerErrorCode(@NotNull AuthenticationException authException) {
     if (!(authException instanceof OAuth2AuthenticationException oauth2Exception)) {
-      return MetricNames.AUTH_OTHER;
+      // Both spellings of "nothing was presented"; anything else genuinely is unclassified.
+      return authException instanceof InsufficientAuthenticationException
+              || authException instanceof AuthenticationCredentialsNotFoundException
+          ? MetricNames.AUTH_NO_CREDENTIALS
+          : MetricNames.AUTH_OTHER;
     }
     OAuth2Error error = oauth2Exception.getError();
     String code = error == null ? null : error.getErrorCode();

@@ -2574,7 +2574,7 @@
       },
       "type": "timeseries",
       "title": "Ingest auth failures/hour by bearer error",
-      "description": "Every ingest 401 under its RFC 6750 bearer error code. The 401 itself logs at DEBUG only (scanner-flood protection on the public surface), so this is the sole signal an operator has when a client fails to authenticate. invalid_token covers malformed header, bad signature, wrong issuer, expired AND failed audience - check the gateway config before assuming the client is at fault. Deliberately not alerted: unauthenticated probes are constant noise.",
+      "description": "Every ingest 401 under its RFC 6750 bearer error code. The 401 itself logs at DEBUG only (scanner-flood protection on the public surface), so this is the sole signal an operator has when a client fails to authenticate. invalid_token covers bad signature, wrong issuer, expired AND failed audience - check the gateway config before assuming the client is at fault. no_credentials is a request that brought no Authorization header at all and is normally the only non-zero series here: the gateway's own root is probed with the http_2xx_or_401 blackbox module, so its 401 volume is a monitoring baseline rather than a threat (ADR-0173). Deliberately not alerted: unauthenticated probes are constant noise.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2721,7 +2721,7 @@
       },
       "type": "timeseries",
       "title": "Auth failures/hour by reason",
-      "description": "The cause behind the 401s BackendAuthFailureSpike counts (A8, REQ-OBS-018). invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope, other anything outside the RFC 6750 set. Reading this beats raising a log level on a surface anonymous scanners can reach.",
+      "description": "The cause behind the backend's 401s (A8, REQ-OBS-018, ADR-0173). no_credentials is a request that presented no Authorization header at all - the ordinary background, and normally the ONLY non-zero series: it is dominated by this deployment's own blackbox probes, which assert liveness by expecting a 401 on an allow-listed path (~0.1/s floor). invalid_token is a token that was presented and rejected (expired, wrong issuer/audience, bad signature) and is what BackendAuthFailureSpike watches, precisely because a probe or a scanner can never produce it. invalid_request is a malformed Authorization header, insufficient_scope a valid token missing a scope, other an unenumerated failure worth reading the DEBUG line for. Reading this beats raising a log level on a surface anonymous scanners can reach - but read the SPLIT, never the total: the total measures the monitoring plane.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
