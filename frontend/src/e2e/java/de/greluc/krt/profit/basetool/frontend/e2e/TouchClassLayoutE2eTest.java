@@ -1161,8 +1161,7 @@ class TouchClassLayoutE2eTest {
         // hit-area handling exists to avoid. The reverse is worse: a class added here and forgotten
         // in the CSS is silently exempt forever. The design system declares the exemption, so the
         // design system is asked.
-        //
-        // The selectors are kept WHOLE and matched with `Element.matches`, rather than picked
+        //        // The selectors are kept WHOLE and matched with `Element.matches`, rather than picked
         // apart into class names. Harvesting classes cannot express a compound: the design system
         // writes the dense override as `.btn.btn-xs` (deliberately — REQ-UI-009 records that the
         // extra specificity is what stops a page's inline rule winning), and lifting each class out
