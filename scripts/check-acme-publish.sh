@@ -92,8 +92,12 @@ for line in lines[opener + 1:]:
 out = []
 for line in body:
     stripped = line.strip()
-    if stripped.startswith("/lego "):
-        # Keep the indentation so the surrounding if/else stays valid.
+    if "/lego " in stripped:
+        # Substring, not startswith: lego v5's `migrate` step is invoked as
+        # `echo "Y" | /lego migrate ...` (piping a confirmation past its
+        # interactive prompt), so the binary is no longer always the first
+        # token on the line. Keep the indentation so the surrounding
+        # if/else/while stays valid.
         out.append(line[:len(line) - len(line.lstrip())] + ": # lego stubbed out")
     elif stripped.startswith("sleep "):
         out.append(line[:len(line) - len(line.lstrip())] + "exit 0")
