@@ -91,8 +91,17 @@ class AnonymousSurfaceSweepMvcTest {
    * and the login callback opened in the browser instead of the app — the member landed on the 404
    * page mid-login. Asked for as HTML it answers {@code 500}, which is why it is swept in the
    * background shape only.
+   *
+   * <p>The web app manifest is here for the same reason (REQ-UI-020, ADR-0164): a browser reads it
+   * on the landing page with no session, and a {@code 302} would make the installed app's name and
+   * icon come from the login page. <strong>Listing it is not a formality.</strong> Until it was
+   * added, the sweep did issue it — and passed only because the mapping's {@code produces} made
+   * both sweep shapes fail content negotiation, so a status that meant "I could not represent this"
+   * was read as "the gate refused you". A path can be enumerated by this sweep and still have no
+   * coverage at all; the entry is what turns that into a real assertion.
    */
-  private static final Set<String> PUBLIC_RESOURCES = Set.of("/.well-known/assetlinks.json");
+  private static final Set<String> PUBLIC_RESOURCES =
+      Set.of("/.well-known/assetlinks.json", "/manifest.webmanifest");
 
   /**
    * <b>The enumeration below is duplicated in the sibling sweep of the other module</b> ({@code

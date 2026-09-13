@@ -369,50 +369,28 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   /**
    * Whether the request must NOT be redirected.
    *
-   * <p>Three groups, each for its own reason. The consent page and its POST, or the gate loops.
-   * Logout and the OAuth endpoints, or a user who declines cannot leave. And the imprint, the
-   * privacy policy and the public terms page, because nobody can be asked to agree to something
-   * they are prevented from reading — that last group is the one a careless allowlist drops, and
-   * dropping it makes the gate legally self-defeating.
+   * <p>Two groups. <strong>This gate's own</strong> — the consent page and its POST, or the gate
+   * loops; the waiting page, which a member can be sent to while still unconsented; and the
+   * imprint, the privacy policy and the public terms page, because nobody can be asked to agree to
+   * something they are prevented from reading. That last one is what a careless allowlist drops,
+   * and dropping it makes the gate legally self-defeating.
+   *
+   * <p><strong>And everything {@link PublicPaths#isGateExempt} covers</strong> — assets, public
+   * documents and the authentication plumbing — shared with {@link BackendRoleSyncFilter} rather
+   * than restated here. The two lists used to be separate copies of the same predicates, which is
+   * how {@code /.well-known/assetlinks.json} ended up {@code permitAll} in {@code SecurityConfig}
+   * and exempt in neither gate.
    *
    * @param request the current request
    * @return {@code true} when the request is exempt from the consent redirect
    */
   private static boolean isExempt(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
+    String path = PublicPaths.relativePath(request);
     return path.equals(CONSENT_PATH)
         || path.equals("/terms")
         || path.equals("/privacy")
         || path.equals("/impressum")
         || path.startsWith("/pending-approval")
-        || path.startsWith("/logout")
-        || path.startsWith("/oauth2")
-        || path.startsWith("/login")
-        || path.startsWith("/error")
-        || path.startsWith("/actuator")
-        || isStaticAsset(path);
-  }
-
-  /**
-   * Whether the path targets a static asset, which the filter skips entirely so a page load does
-   * not turn each of its CSS/JS/font requests into a candidate backend read.
-   *
-   * @param path the context-relative request path
-   * @return {@code true} for static-asset paths
-   */
-  private static boolean isStaticAsset(String path) {
-    return path.startsWith("/css/")
-        || path.startsWith("/js/")
-        || path.startsWith("/images/")
-        || path.startsWith("/logos/")
-        || path.startsWith("/fonts/")
-        || path.equals("/favicon.ico")
-        // The web app manifest (REQ-UI-020, ADR-0164). It is linked with
-        // crossorigin="use-credentials" so the browser sends KRT_LOCALE and the installed app
-        // carries the member's language — which also makes the fetch an AUTHENTICATED one, and
-        // therefore something this gate would otherwise redirect. A member who has not accepted
-        // the terms yet would then install an app whose manifest is the consent page.
-        || path.equals("/manifest.webmanifest")
-        || path.endsWith(".map");
+        || PublicPaths.isGateExempt(path);
   }
 }

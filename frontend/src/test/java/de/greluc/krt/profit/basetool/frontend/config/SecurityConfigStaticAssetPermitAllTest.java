@@ -82,6 +82,10 @@ class SecurityConfigStaticAssetPermitAllTest {
    *       CSS sourcemap.
    *   <li>{@code /error/foo} — non-default Spring Boot error dispatch subpath; must stay open so it
    *       never lands in the saved-request slot.
+   *   <li>{@code /manifest.webmanifest} — the web app manifest (REQ-UI-020, ADR-0164). A browser
+   *       reads it on the landing page with no session and no credentials; a redirect here makes
+   *       every new home-screen install take its name and icon from the login page, which is the
+   *       Android-side failure {@code /.well-known/assetlinks.json} already lived through.
    * </ul>
    *
    * <p>Exact response status is intentionally not asserted — known files resolve 200, missing files
@@ -100,7 +104,8 @@ class SecurityConfigStaticAssetPermitAllTest {
         "/robots.txt",
         "/css/styles.css",
         "/css/does-not-exist.css.map",
-        "/error/foo"
+        "/error/foo",
+        "/manifest.webmanifest"
       })
   @WithAnonymousUser
   void anonymousGetOnStaticAssetPath_doesNotRedirectToOAuth2Login(String path) throws Exception {

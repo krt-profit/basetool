@@ -7,8 +7,15 @@
 - **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
   über „Zum Home-Bildschirm“, auf Android und am Rechner über das Browsermenü; danach hat es ein
   eigenes Symbol und startet ohne Adressleiste. Gedacht für iPhone- und iPad-Mitglieder, für die es
-  keine eigene App gibt. Ohne Netz funktioniert es nicht — bewusst, damit keine Mitgliederdaten auf
-  dem Gerät zwischengespeichert werden.
+  keine eigene App gibt. Ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf dem Gerät
+  liegen bleiben.
+
+### Fixed
+
+- **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
+  auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
+  bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
+  zusätzliche Abfrage beim Server.
 
 ### Changed
 

@@ -3008,6 +3008,23 @@ a method gate.
 | `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                                                                                                        |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
+> [!important] `permitAll` is only half of "public" — the session gates are the other half
+> `permitAll` decides **authorisation**. It does not stop a filter further down the chain from
+> redirecting an *authenticated* caller away from the path, and two do: `TermsAcceptanceGateFilter`
+> sends an unconsented member to the consent page, and `BackendRoleSyncFilter` sends an unapproved
+> one to the waiting page and reconciles roles against the backend on the way.
+>
+> For a **page** that is correct. For a **document** — one an external verifier or a browser fetches
+> on its own schedule — it turns the document into a login page. `/.well-known/assetlinks.json`
+> shipped exactly that way: `permitAll` here, exempt in neither gate, so a signed-in member was
+> answered with the consent page and each hit paid a `/api/v1/users/me` round trip.
+>
+> The exemption therefore lives in **one** place, `frontend/config/PublicPaths`, which both gates
+> read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
+> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`) and `isAuthInfrastructure`
+> (login, logout, OAuth, error, actuator). **A new public document goes in both this table and
+> `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
+
 **Backend** — the only `permitAll()` matchers on the main chain:
 
 |                   Path                    |                                                                                                                             Why it stays                                                                                                                              |

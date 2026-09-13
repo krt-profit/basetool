@@ -20,15 +20,22 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.resource.ResourceUrlProvider;
 
 /**
  * Serves {@code /manifest.webmanifest}, the document that lets a browser install the Basetool as an
@@ -42,15 +49,20 @@ import org.springframework.web.bind.annotation.RestController;
  * analysis is {@code docs/APPLE_PLATFORM_FEASIBILITY.md} in the {@code basetool-android}
  * repository; the decision is ADR-0164.
  *
- * <p><strong>A controller rather than a file under {@code static/}.</strong> Three reasons, in
+ * <p><strong>A controller rather than a file under {@code static/}.</strong> Four reasons, in
  * descending order of how badly a static file would fail:
  *
  * <ol>
- *   <li><strong>i18n.</strong> {@code name}, {@code short_name} and {@code description} are shown
- *       to the user — under the home-screen icon and in the install dialog. Every user-visible
- *       string in this application comes from the message bundles, with no exceptions, so they are
- *       resolved through {@link MessageSource} for the request's locale rather than frozen into a
- *       JSON file.
+ *   <li><strong>i18n.</strong> {@code description} is shown to the user in Android's install
+ *       dialog, and every user-visible string in this application comes from the message bundles
+ *       with no exceptions, so it is resolved through {@link MessageSource} rather than frozen into
+ *       a JSON file. ({@code name} and {@code short_name} happen to be identical in both bundles —
+ *       the product name is a proper noun — but they come from the same place for the same reason.)
+ *   <li><strong>The icon URL is build-dependent.</strong> {@code /logos/**} is served with a
+ *       content hash by {@link ResourceUrlProvider} under a one-year {@code immutable} cache
+ *       ({@code WebMvcConfig}), so the manifest has to resolve the fingerprinted path at request
+ *       time. A hardcoded {@code /logos/basetool-appicon-512.png} would pin installed home screens
+ *       to a URL whose bytes can change but which no browser will ever revalidate.
  *   <li><strong>Content type.</strong> The registered type is {@code application/manifest+json},
  *       which Spring's static-resource handler does not know: a {@code .webmanifest} file would be
  *       served as {@code application/octet-stream}, and a browser is entitled to ignore it.
@@ -60,6 +72,19 @@ import org.springframework.web.bind.annotation.RestController;
  *       trap {@link AssetLinksController} was written for, and the reason its path sits in the same
  *       {@code SecurityConfig} allow-list as this one.
  * </ol>
+ *
+ * <p><strong>The locale travels in the URL, and the fetch carries no credentials.</strong> The
+ * {@code <link rel="manifest">} in {@code fragments/head.html} is rendered by a server that already
+ * knows the reader's locale, so it appends {@code ?locale=…} and the response becomes a pure
+ * function of its URL. The obvious-looking alternative — {@code crossorigin="use-credentials"}, so
+ * the manifest fetch carries {@code KRT_LOCALE} — was tried first and reverted in the same pull
+ * request, because it made every fetch an <em>authenticated</em> request: the unscoped
+ * {@code @ControllerAdvice} beans that build the layout model run before <em>every</em> handler,
+ * {@code @RestController}s included, so one manifest fetch cost five backend round trips, and the
+ * consent gate and the role-sync filter each needed a carve-out for a public document. It bought
+ * nothing in return: {@code name} and {@code short_name} are identical in both bundles, Safari
+ * implements neither {@code lang} nor {@code description}, and the iOS home-screen label comes from
+ * {@code apple-mobile-web-app-title} on the page itself. See ADR-0164.
  *
  * <p><strong>There is deliberately no service worker.</strong> „PWA" normally implies one, and this
  * one ships without: a worker that cached navigations would put member data — bank balances,
@@ -98,43 +123,131 @@ public class WebAppManifestController {
    */
   private static final String THEME_COLOR = "#141414";
 
-  /** Resolves the three user-visible strings for the request's locale. */
+  /**
+   * Unversioned classpath path of the home-screen icon, as it exists under {@code
+   * META-INF/resources}.
+   *
+   * <p>Never emitted as-is: it is the lookup key handed to {@link ResourceUrlProvider}, which
+   * answers with the content-hashed path the manifest actually ships.
+   */
+  private static final String ICON_LOOKUP_PATH = "/logos/basetool-appicon-512.png";
+
+  /**
+   * The locales this manifest can be rendered in, keyed by primary language subtag.
+   *
+   * <p>An allow-list rather than a pass-through, because the strings and the declared {@code lang}
+   * have to agree. {@code spring.messages.fallback-to-system-locale} is {@code false} and the base
+   * bundle holds <em>German</em> copy, so handing an arbitrary tag straight to {@link
+   * MessageSource} produced a manifest that declared, say, {@code "lang": "fr"} over German text —
+   * and an empty {@code lang} for a cookie value like {@code _DE}, which the specification does not
+   * permit.
+   */
+  private static final Map<String, Locale> SUPPORTED_LOCALES =
+      Map.of("de", Locale.GERMAN, "en", Locale.ENGLISH);
+
+  /**
+   * Locale used when the request names none, or names one that is not shipped.
+   *
+   * <p>German, matching {@code CookieLocaleResolver}'s default in {@code LocaleConfig} — the
+   * application's default language, not the platform's.
+   */
+  private static final Locale DEFAULT_LOCALE = Locale.GERMAN;
+
+  /** Resolves the three user-visible strings for the requested locale. */
   private final MessageSource messageSource;
 
   /**
-   * Returns the web app manifest for the current locale.
+   * Turns {@link #ICON_LOOKUP_PATH} into the content-hashed URL the resource chain serves.
    *
-   * <p>Caching is {@code private} with {@code Vary: Cookie} because the body depends on the {@code
-   * KRT_LOCALE} cookie: a shared cache would otherwise hand a German manifest to a member who reads
-   * the tool in English. One hour is long enough to spare the repeat fetches a browser makes around
-   * an install and short enough that a corrected wording reaches installed apps the same day.
+   * <p>Autowired rather than constructed: this is Spring MVC's own {@code mvcResourceUrlProvider},
+   * the same instance {@code ResourceUrlEncodingFilter} hands to Thymeleaf's {@code @{…}}, so the
+   * manifest and the {@code apple-touch-icon} in the page head cannot disagree about which file
+   * they mean.
+   */
+  private final ResourceUrlProvider resourceUrlProvider;
+
+  /**
+   * Returns the web app manifest for the locale named in the query string.
    *
+   * <p><strong>The body is a pure function of the URL.</strong> Nothing is read from the session,
+   * the cookies or {@code LocaleContextHolder}, so the response can be cached {@code public} and
+   * needs no {@code Vary}. That is the point of carrying the locale in the URL: a language switch
+   * changes the link the page renders, which changes the cache key, instead of invalidating one
+   * entry on every unrelated cookie rotation.
+   *
+   * <p>There is deliberately no {@code produces} on the mapping. It would make content negotiation
+   * part of the match, and {@code application/json} is not compatible with {@code
+   * application/manifest+json}, so a caller that asks for JSON — the shape {@code krtFetch} and a
+   * blackbox probe both send — got {@code HttpMediaTypeNotAcceptableException}, which the {@code
+   * Exception} catch-all in {@code GlobalExceptionHandler} turns into a {@code 500} and an {@code
+   * ERROR} log line on a public endpoint. Setting the content type on the response instead makes
+   * Spring skip negotiation entirely and answer every {@code Accept} with the manifest.
+   *
+   * @param locale primary language subtag from {@code ?locale=…}; anything not in {@link
+   *     #SUPPORTED_LOCALES} falls back to {@link #DEFAULT_LOCALE}, so the strings and the declared
+   *     {@code lang} always agree. {@code null} when the parameter is absent.
+   * @param request the current request, read only for its context path so the manifest's URLs stay
+   *     correct under a non-root {@code server.servlet.context-path}
    * @return the manifest as {@code application/manifest+json}, always {@code 200} and never a
    *     redirect, for anonymous and authenticated requests alike.
    */
-  @GetMapping(path = "/manifest.webmanifest", produces = MANIFEST_JSON)
-  public @NotNull ResponseEntity<WebAppManifest> manifest() {
-    final Locale locale = LocaleContextHolder.getLocale();
+  @GetMapping("/manifest.webmanifest")
+  public @NotNull ResponseEntity<WebAppManifest> manifest(
+      @RequestParam(name = "locale", required = false) @Nullable String locale,
+      @NotNull HttpServletRequest request) {
+    final Locale resolved = resolveSupported(locale);
+    final String root = request.getContextPath() + "/";
     final var manifest =
         new WebAppManifest(
-            "/",
-            messageSource.getMessage("pwa.name", null, locale),
-            messageSource.getMessage("pwa.short_name", null, locale),
-            messageSource.getMessage("pwa.description", null, locale),
-            locale.getLanguage(),
+            root,
+            messageSource.getMessage("pwa.name", null, resolved),
+            messageSource.getMessage("pwa.short_name", null, resolved),
+            messageSource.getMessage("pwa.description", null, resolved),
+            resolved.toLanguageTag(),
             "ltr",
-            "/",
-            "/",
+            root,
+            root,
             "standalone",
             BACKGROUND_COLOR,
             THEME_COLOR,
-            List.of(
-                new ManifestIcon(
-                    "/logos/basetool-appicon-512.png", "512x512", "image/png", "any")));
+            List.of(new ManifestIcon(iconUrl(request), "512x512", "image/png", "any")));
     return ResponseEntity.ok()
-        .header("Cache-Control", "private, max-age=3600")
-        .header("Vary", "Cookie")
+        .contentType(MediaType.parseMediaType(MANIFEST_JSON))
+        .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
         .body(manifest);
+  }
+
+  /**
+   * Maps a requested language subtag onto one of the shipped bundles.
+   *
+   * <p>Only the primary subtag is considered, so {@code de-CH} and {@code de_AT} both resolve to
+   * German rather than falling through to the default. Matching is case-insensitive because the
+   * value arrives from a URL.
+   *
+   * @param requested the raw {@code ?locale=…} value, or {@code null} when absent
+   * @return a locale the message bundles actually cover; never {@code null}
+   */
+  private static @NotNull Locale resolveSupported(@Nullable String requested) {
+    if (requested == null || requested.isBlank()) {
+      return DEFAULT_LOCALE;
+    }
+    final String primary = requested.split("[-_]", 2)[0].toLowerCase(Locale.ROOT).trim();
+    return SUPPORTED_LOCALES.getOrDefault(primary, DEFAULT_LOCALE);
+  }
+
+  /**
+   * Resolves the home-screen icon to the content-hashed URL the resource chain serves.
+   *
+   * <p>Falls back to the plain, context-prefixed path when the provider cannot resolve it — which
+   * happens only if the asset is missing, and a manifest naming a 404 icon is still better than a
+   * {@code 500} on the endpoint that decides whether the app installs at all.
+   *
+   * @param request the current request, for its context path
+   * @return an absolute path on this origin, fingerprinted where the resource chain allows it
+   */
+  private @NotNull String iconUrl(@NotNull HttpServletRequest request) {
+    final String versioned = resourceUrlProvider.getForLookupPath(ICON_LOOKUP_PATH);
+    return request.getContextPath() + (versioned != null ? versioned : ICON_LOOKUP_PATH);
   }
 
   /**
@@ -150,11 +263,15 @@ public class WebAppManifestController {
    * @param name full name, shown in the install dialog.
    * @param shortName short name, shown under the home-screen icon where the full one is truncated.
    * @param description one sentence, shown by the richer install dialogs.
-   * @param lang language of the strings above — the request's language, not a fixed one.
+   * @param lang BCP 47 tag for the strings above, from {@link Locale#toLanguageTag()} on a locale
+   *     the bundles actually cover — never a raw client value, or the tag and the copy disagree.
    * @param dir writing direction; both shipped locales are left-to-right.
-   * @param startUrl what the icon opens: {@code /} answers with the landing page for a visitor and
-   *     the dashboard for a member, so one entry point serves both states.
-   * @param scope the whole origin, so in-app navigation never bounces out into the browser.
+   * @param startUrl what the icon opens: the application root answers with the landing page for a
+   *     visitor and the dashboard for a member, so one entry point serves both states.
+   * @param scope the application root. Note this cannot cover the login: {@code
+   *     /oauth2/authorization/keycloak} and the logout redirect both navigate to the Keycloak
+   *     origin, and a manifest scope must be same-origin with {@code start_url}. ADR-0164 records
+   *     that the installed-app sign-in has not been verified on a device.
    * @param display {@code standalone} — the app window carries no browser address bar.
    * @param backgroundColor see {@link #BACKGROUND_COLOR}.
    * @param themeColor see {@link #THEME_COLOR}.
@@ -179,8 +296,10 @@ public class WebAppManifestController {
   /**
    * One entry of the manifest's {@code icons} array.
    *
-   * @param src absolute path on this origin; {@code /logos/**} is already public and already
-   *     excluded from the role-sync and terms gates, so the icon needs no further wiring.
+   * @param src absolute, content-hashed path on this origin, resolved through {@link
+   *     ResourceUrlProvider}. {@code /logos/**} is already public, so the icon needs no further
+   *     wiring — but it is also served {@code immutable} for a year, which is why the fingerprint
+   *     matters: without it a replaced icon would never reach an installed home screen.
    * @param sizes pixel dimensions, {@code WxH}.
    * @param type media type, so a browser can skip a format it cannot decode without fetching it.
    * @param purpose {@code any} only. {@code maskable} is NOT claimed: Android crops a maskable icon

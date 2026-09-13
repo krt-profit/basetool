@@ -182,6 +182,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
     String uri = request.getRequestURI();
+    String contextPath = request.getContextPath();
     return uri.endsWith(".css")
         || uri.endsWith(".js")
         || uri.endsWith(".ico")
@@ -190,7 +191,12 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
         // The web app manifest (REQ-UI-020): a browser re-fetches it around every install and on
         // its own schedule afterwards, and each hit would otherwise log a request line that says
         // nothing — the same reason the asset extensions above are here.
-        || uri.endsWith(".webmanifest")
+        //
+        // The exact path, NOT an `endsWith(".webmanifest")` suffix. A suffix would let any caller
+        // silence their own access-log line by appending it to an arbitrary path — none of which
+        // is permitAll, so each would 302 or 404 with no trace, against the one-line-per-request
+        // guarantee of REQ-OBS-001.
+        || uri.equals(contextPath + "/manifest.webmanifest")
         || uri.contains("/images/")
         || uri.contains("/logos/")
         || uri.contains("/fonts/")
