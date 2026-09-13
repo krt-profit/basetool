@@ -44,29 +44,30 @@ jobs:
       (github.event.action != 'labeled' &&
       contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubuntu-latest
-    # 75, raised from 45 on 2026-09-13 — a deliberate trade of CI minutes for coverage, not a
-    # workaround for a slow test.
+    # Back to 45 now that each runner measures ONE device class instead of five.
     #
-    # The touch-class sweep added 64 routes x 5 device classes on top of the 93 existing classes,
+    # The touch-class sweep added 65 routes x 5 device classes on top of the 93 existing classes,
     # and Firefox is roughly four times slower than Chromium on that workload: it was CANCELLED at
-    # the 45-minute ceiling on six consecutive runs while Chromium finished in 20 and WebKit in 21,
-    # and two green engines made it easy to miss. Two rounds of work on the sweep itself came first
-    # — screenshots confined to the artifact-bearing shard, the duplicate whole-document walk
-    # removed, and a flat 150ms-per-measurement sleep replaced by the condition it was guessing at,
-    # together about 40% off the Firefox sweep — which brings it under the old ceiling by an
-    # estimated 11 minutes. That is too thin a margin to rely on, and running the matrix on a
-    # ceiling is how this recurs silently.
-    #
-    # The structural fix is to stop serialising the five device classes inside one @Test; it is
-    # tracked separately because it needs one Playwright instance per thread and is a refactor, not
-    # a setting.
-    timeout-minutes: 75
+    # this ceiling on six consecutive runs while Chromium finished in 20 minutes and WebKit in 21,
+    # and two green engines made it easy to miss. Trimming the sweep came first — screenshots
+    # confined to the artifact-bearing shard, the duplicate whole-document walk removed, and a flat
+    # 150ms-per-measurement sleep replaced by the condition it was guessing at, together about 40%
+    # — and the ceiling was briefly 75 while the remaining margin was too thin to trust.
+    timeout-minutes: 45
     strategy:
       # Run all three engines even if one fails, so a Chromium-only regression
       # doesn't hide a Firefox/WebKit pass (and vice versa).
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
+        # One runner per device class (owner decision 2026-09-13), rather than five walked one
+        # after another inside a single @Test. Each runner still runs the whole destructive suite,
+        # because that is what puts rows in the tables and an empty table hides what this sweep
+        # exists to find — so 14 of the 15 repeat work that only one of them needs. That is the
+        # price, and it was chosen knowingly: it buys a wall clock per job that does not sit on the
+        # timeout, and it removes the in-process parallelisation that would otherwise be needed
+        # (a Playwright instance is not thread-safe, so that is a refactor rather than a setting).
+        device: ['375x812', '810x1080', '1024x768', '1280x800', '1600x900']
 
     steps:
       - name: Checkout
@@ -108,7 +109,11 @@ jobs:
       # E2E_BASE_URL => ephemeral mode); the Dockerfiles are multi-stage, so no
       # separate bootJar step is needed. Docker + compose v2 ship on the runner.
       - name: Run e2e flows
-        run: ./gradlew :frontend:e2eTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
+        run: >-
+          ./gradlew :frontend:e2eTest
+          -Pe2e.browser=${{ matrix.browser }}
+          -Pe2e.device=${{ matrix.device }}
+          --stacktrace
 
       # Playwright traces, failure screenshots/HTML dumps and the docker compose
       # build/boot logs all land under frontend/build/e2e.
@@ -116,7 +121,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-artifacts-${{ matrix.browser }}
+          # The device belongs in the name: fifteen jobs upload, and an artifact name
+          # collision drops all but one.
+          name: e2e-artifacts-${{ matrix.browser }}-${{ matrix.device }}
           path: |
             frontend/build/e2e/**
             frontend/build/test-results/e2eTest/**

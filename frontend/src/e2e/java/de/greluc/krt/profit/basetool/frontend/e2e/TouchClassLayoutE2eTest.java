@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -82,12 +83,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * order.</b> Carrying the {@code e2e} tag is what puts it in the destructive suite where the CRUD
  * flows have populated the tables — and that is where it found 118 defects a fresh stack hid. But
  * the ordering that currently runs it after those classes is JUnit's unspecified discovery order:
- * there is no {@code junit-platform.properties}, no {@code ClassOrderer} and no {@code @Order}
- * anywhere in the repository. Rename this class, upgrade JUnit, or have a destructive flow clean up
- * after itself, and the sweep is back to measuring empty {@code <thead>}s and reporting clean. The
- * coverage report below names the list pages that rendered no row, which makes the degradation
- * visible in the log rather than silent — it is a smoke alarm, not a lock. A {@code ClassOrderer}
- * is the lock, and is tracked separately.
+ * it used to rest on JUnit's unspecified discovery order. {@code junit-platform.properties} now
+ * selects {@code ClassOrderer.OrderAnnotation} and this class carries
+ * {@code @Order(Integer.MAX_VALUE)}, so it runs after every class that has no {@code @Order} —
+ * which is all 93 of them. Belt and braces: the coverage report below still names any list page
+ * that rendered no row, so if the ordering is ever defeated the degradation shows in the log
+ * instead of passing quietly.
  *
  * <p><b>Artifacts come from one engine, assertions from all three.</b> Every engine measures every
  * page at every device class and fails on its own findings; only the Chromium shard writes the
@@ -123,6 +124,11 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * is exactly the set that touches frontend flows, auth or controllers. Owner decision 2026-09-13,
  * at a cost of roughly five minutes on those runs.
  */
+// LAST in the suite, and that is a dependency rather than a preference: this class measures
+// against the rows the destructive CRUD flows create, and a fresh stack hides what it exists to
+// find. `junit-platform.properties` selects ClassOrderer.OrderAnnotation, under which every class
+// without @Order sorts at Integer.MAX_VALUE / 2 — so this one value is the whole mechanism.
+@Order(Integer.MAX_VALUE)
 @Tag("smoke")
 @Tag("e2e")
 class TouchClassLayoutE2eTest {
@@ -227,6 +233,22 @@ class TouchClassLayoutE2eTest {
    *
    * <p>Ordered narrow to wide so the output reads as a ladder.
    */
+  /**
+   * Restricts the sweep to one device class, as {@code WxH}.
+   *
+   * <p>Set by CI, which fans the five classes out across runners ({@code browser x device}) rather
+   * than walking them one after another in a single job — the shape that put the Firefox shard on
+   * its job timeout. Unset locally and in the smoke suite, where all five run as before.
+   *
+   * <p>It changes what {@link #reportCoverage} can assert, and that is worth stating rather than
+   * discovering: the relative check compares each class against the union across classes, so with
+   * exactly one class the union IS that class and the comparison is vacuous. The absolute floor is
+   * what still catches a sweep that skipped everything, and the five runners together still cover
+   * the same routes — the cross-class comparison simply moves from inside one JVM to a reader
+   * comparing five job logs.
+   */
+  private static final String DEVICE_FILTER = System.getProperty("e2e.device", "").trim();
+
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
@@ -406,12 +428,16 @@ class TouchClassLayoutE2eTest {
     // measured almost nothing. `assertTrue(findings.isEmpty())` cannot tell "clean" from "never
     // looked".
     Map<String, Set<String>> measuredByDevice = new LinkedHashMap<>();
+    Map<String, Set<String>> detailsByDevice = new LinkedHashMap<>();
     List<String> uncoveredLists = new ArrayList<>();
 
     for (int[] device : DEVICE_CLASSES) {
       int width = device[0];
       int height = device[1];
       String deviceLabel = width + "x" + height;
+      if (!DEVICE_FILTER.isEmpty() && !DEVICE_FILTER.equals(deviceLabel)) {
+        continue;
+      }
 
       try (BrowserContext context =
           browser.newContext(
@@ -424,8 +450,15 @@ class TouchClassLayoutE2eTest {
                   .setHasTouch(true)
                   .setIsMobile(width <= 768))) {
         Page page = context.newPage();
+        // Two collectors, because they answer different questions. `measured` is about the ROUTE
+        // LIST — the floor and the cross-class comparison are only meaningful against something of
+        // known size. Detail views are reached by following whatever link a list happens to render,
+        // so their paths vary per run and per device and cannot be compared to anything; counting
+        // them in the same set produced lines like "66 of 65 routes measured".
         Set<String> measured = new LinkedHashSet<>();
+        Set<String> measuredDetails = new LinkedHashSet<>();
         measuredByDevice.put(deviceLabel, measured);
+        detailsByDevice.put(deviceLabel, measuredDetails);
         for (String path : PAGES) {
           // One page that hangs must not end the audit: the whole point is to name every offender,
           // so a failure to measure is itself a finding and the sweep carries on.
@@ -441,7 +474,7 @@ class TouchClassLayoutE2eTest {
           String detail = firstDetailLink(page, path);
           if (detail != null) {
             findings.addAll(
-                measureSafely(page, baseUrl, detail, deviceLabel, width, height, measured));
+                measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
           } else if (DETAIL_LIST_PAGES.contains(path)) {
             // Named, not silently skipped - this is the half the comment above promised and the
             // code did not do. It is reported rather than failed because an empty list is a
@@ -458,7 +491,7 @@ class TouchClassLayoutE2eTest {
       }
     }
 
-    reportCoverage(measuredByDevice, uncoveredLists, findings);
+    reportCoverage(measuredByDevice, detailsByDevice, uncoveredLists, findings);
 
     assertTrue(
         findings.isEmpty(),
@@ -479,23 +512,37 @@ class TouchClassLayoutE2eTest {
    * shrinks that class's set and is named here. One absolute floor guards the degenerate case where
    * nothing is measured anywhere.
    *
-   * @param measuredByDevice per device class, the routes that reached the measurement
+   * @param measuredByDevice per device class, the {@link #PAGES} routes that reached the
+   *     measurement
+   * @param detailsByDevice per device class, the detail views reached by following a list link —
+   *     reported but never compared, since which one a list renders varies per run
    * @param uncoveredLists list pages that rendered no row, so their detail view went unmeasured
    * @param findings the sweep's findings, appended to when coverage is short
    */
   private static void reportCoverage(
       Map<String, Set<String>> measuredByDevice,
+      Map<String, Set<String>> detailsByDevice,
       List<String> uncoveredLists,
       List<String> findings) {
     measuredByDevice.forEach(
         (device, measured) ->
             System.out.printf(
-                "[touch-layout] coverage %-10s %d of %d routes measured%n",
-                device, measured.size(), PAGES.size()));
+                "[touch-layout] coverage %-10s %d of %d routes measured, plus %d detail view(s)%n",
+                device,
+                measured.size(),
+                PAGES.size(),
+                detailsByDevice.getOrDefault(device, Set.of()).size()));
     uncoveredLists.forEach(line -> System.out.println("[touch-layout] uncovered " + line));
 
     if (measuredByDevice.isEmpty()) {
-      findings.add("no device class ran at all");
+      findings.add(
+          DEVICE_FILTER.isEmpty()
+              ? "no device class ran at all"
+              : "no device class ran at all — e2e.device="
+                  + DEVICE_FILTER
+                  + " matched none of "
+                  + DEVICE_CLASSES.size()
+                  + " classes, so this runner measured nothing");
       return;
     }
     // The UNION of every class, not the first one. `entrySet().iterator().next()` is always
@@ -779,6 +826,29 @@ class TouchClassLayoutE2eTest {
 
     String where = deviceLabel + " " + path;
 
+    // The rules themselves live in their own methods. This one was 282 lines that navigated,
+    // resized, skipped non-pages, ran the probe, wrote page and modal screenshots, printed two
+    // diagnostics and evaluated twelve assertions — so a reviewer had to read all of it to see
+    // whether a change to the footer branch could reach the chrome-budget branch. Each part now
+    // takes the already-computed `probe` map and answers one question.
+    printDiagnostics(where, probe);
+    findings.addAll(checkGeometry(where, probe, width, height));
+    findings.addAll(collectOffenders(where, probe, width));
+    return findings;
+  }
+
+  /**
+   * Prints what was measured, pass or fail.
+   *
+   * <p>The first version of this guard reported clean on five pages whose screenshots were 10-159px
+   * wider than the viewport, and the only reason that was caught is that somebody measured the
+   * PNGs. A guard whose measurements are invisible until it fails cannot be sanity-checked against
+   * the artifacts it writes beside them.
+   *
+   * @param where {@code WxH /path}
+   * @param probe the page-side measurement
+   */
+  private static void printDiagnostics(String where, Map<String, Object> probe) {
     // Printed for every page, pass or fail. The first version of this guard reported clean on five
     // pages whose screenshots were 10-159px wider than the viewport, and the only reason that was
     // caught is that somebody measured the PNGs. A guard whose measurements are invisible until it
@@ -801,12 +871,25 @@ class TouchClassLayoutE2eTest {
         String.valueOf(probe.get("footerHeightVar")),
         String.valueOf(probe.get("widestElement")),
         String.valueOf(probe.get("widestRight")));
-
     int modalCount = (int) number(probe.get("modalCount"));
     if (modalCount > 0) {
       System.out.printf("[touch-layout] %-34s %d modal(s) measured%n", where, modalCount);
     }
+  }
 
+  /**
+   * The whole-page geometry rules: does the page fit, does the footer behave, is the chrome budget
+   * respected.
+   *
+   * @param where {@code WxH /path}
+   * @param probe the page-side measurement
+   * @param width viewport width in CSS pixels
+   * @param height viewport height in CSS pixels
+   * @return one line per finding
+   */
+  private static List<String> checkGeometry(
+      String where, Map<String, Object> probe, int width, int height) {
+    List<String> findings = new ArrayList<>();
     double docScrollWidth = number(probe.get("docScrollWidth"));
     double innerWidth = number(probe.get("innerWidth"));
 
@@ -910,6 +993,19 @@ class TouchClassLayoutE2eTest {
     for (Object offender : list(probe.get("unscrollableTables"))) {
       findings.add(where + ": wide table with no scrollable ancestor — " + offender);
     }
+    return findings;
+  }
+
+  /**
+   * The per-element offender lists the probe collected.
+   *
+   * @param where {@code WxH /path}
+   * @param probe the page-side measurement
+   * @param width viewport width in CSS pixels, which decides whether the touch floors apply
+   * @return one line per finding
+   */
+  private static List<String> collectOffenders(String where, Map<String, Object> probe, int width) {
+    List<String> findings = new ArrayList<>();
     // REQ-UI-009 puts the 44px floor on the TOUCH classes, not on every class: it is a fat-finger
     // rule, and the app's own touch block is scoped `width <= 1024px` for exactly that reason. The
     // first full sweep applied it everywhere and produced 490 findings at 1280px and 1600px that

@@ -543,12 +543,20 @@ x-backend: &backend-template
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    # Must resolve to the SAME issuer string Keycloak stamps into its tokens, i.e. it has to track
-    # KC_HOSTNAME above — a mismatch fails JWT validation on every request with a confusing
-    # "issuer does not match" rather than an obvious configuration error. Both default to
-    # production, so an .env that sets neither is unchanged; a non-production environment sets
-    # both. The frontend and ingest templates below carry the same variable for the same reason.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://profit-base.online/auth/realms/iri}
+    # DERIVED from KC_HOSTNAME rather than restated beside it.
+    #
+    # This must resolve to the same issuer string Keycloak stamps into its tokens, and for as long
+    # as it was a second independent variable that was manual discipline — `.env.example` said so in
+    # so many words ("The two values below must agree"). The failure when they do not is the one
+    # ADR-0166 measured: Keycloak reports HEALTHY while backend, frontend and ingest die at start-up
+    # on "issuer does not match", which reads as a backend fault. The identity base URL was a
+    # literal on 36 lines across 19 files with nothing checking that any two agreed.
+    #
+    # `IRI_KEYCLOAK_HOSTNAME` is the one source now: set it alone and the issuer follows.
+    # `IRI_KEYCLOAK_ISSUER_URI` still overrides, so nothing that sets it today changes behaviour —
+    # verified against compose's nested interpolation for all three cases (neither set, hostname
+    # only, issuer overridden). The frontend and ingest templates below derive it the same way.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
     # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
     # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
@@ -860,8 +868,8 @@ x-frontend: &frontend-template
   environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
-    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://profit-base.online/auth/realms/iri}
+    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
     # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
     # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
@@ -964,8 +972,8 @@ x-ingest: &ingest-template
   environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
-    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://profit-base.online/auth/realms/iri}
+    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
     # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
     # deployment in .env; the local dev stack should point this at http://localhost:18081.

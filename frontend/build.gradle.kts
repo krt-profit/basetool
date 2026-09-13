@@ -604,7 +604,14 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
-  listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
+  listOf(
+      "e2e.baseUrl",
+      "e2e.browser",
+      "e2e.device",
+      "e2e.username",
+      "e2e.password",
+      "e2e.hostResolverRules",
+    )
     .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }
 
