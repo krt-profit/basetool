@@ -93,6 +93,10 @@ x-db-backend: &db-backend-template
     -c work_mem=8MB
     -c maintenance_work_mem=64MB
     -c max_connections=150
+    -c random_page_cost=1.1
+    -c max_parallel_workers_per_gather=0
+    -c jit=off
+    -c shared_preload_libraries=pg_stat_statements
     -c log_error_verbosity=terse
     -c log_line_prefix='%m [%p] %q%u@%d/%a '
   environment:
@@ -160,9 +164,18 @@ x-db-backend: &db-backend-template
     resources:
       limits:
         memory: 1536M
-        # Throttle 7d: peak ratio 6.0 %, average 0.104 %, 164 s total — the quota is not a
-        # constraint for this workload, so it stays at 1.5.
-        cpus: '1.5'
+        # 1.5 -> 4.0 (2026-09-13). The 7-day baseline this block used to quote (164 s total,
+        # 0.104 % average) read as "not a constraint" and was the wrong conclusion drawn from the
+        # right number. Re-measured under real use, db-backend took 161 s of throttling in 29 h —
+        # six times that rate — at an average of 0.024 cores, i.e. 1.6 % OF ITS OWN QUOTA. An
+        # average cannot see this: CFS enforces the quota inside each 100 ms period, so a burst of
+        # concurrent sub-millisecond queries exhausts 1.5 cores in milliseconds while utilisation
+        # stays flat. The severity is in the per-event figure — 161.1 s over 703 events is a
+        # **229 ms average stall**, the worst in the stack and more than two whole periods, which
+        # is plainly visible latency. Postgres forks a backend PER CONNECTION, so the natural
+        # concurrency here is the Hikari pool, not one process; 1.5 was always going to clip it.
+        # Read cpu.stat directly when judging this, never a utilisation panel.
+        cpus: '4.0'
         # Fork-bomb / runaway-backend ceiling. max_connections=150 caps live backends at ~150 +
         # background workers, so 512 is generous headroom, not a tight limit.
         pids: 512
@@ -286,10 +299,12 @@ x-keycloak: &keycloak-template
     resources:
       limits:
         memory: 2560M
-        # Throttle 7d: peak ratio 53.0 %, average 0.106 %, 417 s total. High peaks but a
-        # negligible average — 2.0 already covers the realm-import and token-burst spikes,
-        # so the quota stays.
-        cpus: '2.0'
+        # 2.0 -> 3.0 (2026-09-13). 34.3 s over 216 events in 13 h — a **159 ms average stall**,
+        # second-worst in the stack after db-backend. The 7-day view called the average negligible
+        # and stopped there; the per-event figure is what matters, because every one of those
+        # stalls sits inside a token issuance or refresh and is therefore login latency a member
+        # feels directly. Same reasoning as backend: the ceiling is free on an idle host.
+        cpus: '3.0'
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Keycloak's
         # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
         pids: 2048
@@ -496,9 +511,11 @@ x-backend: &backend-template
     resources:
       limits:
         memory: 2048M
-        # Throttle 7d: peak ratio 47.0 %, average 0.168 %, 284 s total. The 2.0 quota already
-        # absorbs the Flyway-plus-JIT startup burst that produces those peaks; unchanged.
-        cpus: '2.0'
+        # 2.0 -> 3.0 (2026-09-13). 19.2 s over 418 events in 13 h, a 46 ms average stall. Far
+        # milder than db-backend's, but it lands on the same request path and therefore adds to
+        # the same user-visible latency. Quota is a burst ceiling, not a reservation, and the host
+        # averages ~3 % CPU — widening it costs nothing and removes a tax paid per request.
+        cpus: '3.0'
         # JVM threads count as tasks toward this ceiling; 2048 is generous headroom over Tomcat +
         # Hikari + scheduler + GC/JIT threads, so it is a runaway ceiling, not a limit hit under load.
         pids: 2048
@@ -531,6 +548,14 @@ x-backend: &backend-template
     # Which client may act for another member via X-Ingest-On-Behalf-Of (ADR-0129). Must be the
     # ingest gateway's confidential client id. EMPTY MEANS NOBODY.
     APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${IRI_INGEST_GATEWAY_CLIENT_IDS:-}
+    # How long an assembled authority collection is reused before the authorization path is
+    # re-resolved from the database (REQ-SEC-056, ADR-0174). Default PT5M. This block is a CLOSED
+    # ALLOW-LIST with no `env_file:`, so without this line the variable never reaches the
+    # container whatever /var/iri/.env says — which is precisely the trap the frontend's
+    # APP_HTTP_* levers were added to escape. Validated at startup: positive and at most PT15M,
+    # because the TTL is also the window in which a revoked role stays effective on an
+    # already-issued token. Lower it to tighten revocation, raise it to cut database load.
+    APP_SECURITY_AUTHORITIES_CACHE_TTL: ${IRI_AUTHORITIES_CACHE_TTL:-PT5M}
     # Internal admin / user-sync path: direct backend→Keycloak over the isolated
     # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
@@ -801,11 +826,42 @@ x-frontend: &frontend-template
   # GC overhead peaked at 0.19 % (frontend) and averaged <= 0.017 % everywhere — no JVM is heap
   # constrained, and all three MaxRAMPercentage values stay exactly as PR #1419 derived them.
   # NO JVM MEMORY LIMIT CHANGED in #937; the CPU quotas did (see each block).
+  #
+  # ---- 2026-09-13: every figure above was measured on the WRONG COLLECTOR --------------------
+  # The derivation above is sound about QUANTITY and its `otherNative` term is real. What it
+  # could not see is that the collector was a free variable. HotSpot picks G1 only on a
+  # "server-class machine" — at least 2 CPUs AND at least **1792 MB** — and with
+  # -XX:+UseContainerSupport the memory figure it reads is the CGROUP LIMIT, not the host's 16 GB.
+  # The frontend clears the CPU half and failed the memory half by 512 MB, so it had been running
+  # **SerialGC** for the entire life of this limit scheme (768M -> 1024M -> 1280M are all below
+  # 1792). Backend was on G1 only by the accident of its 2048M limit; Keycloak is the only module
+  # that ever said so, via -XX:+UseG1GC in its vendor image.
+  #
+  # What that cost, measured on prod over 12.9 h: Eden max 179 MB behind a **22.3 MB survivor
+  # space**, so anything surviving a young collection in quantity was promoted straight into
+  # Tenured, which only a single-threaded full compaction reclaims. Tenured stood at 298 MB of a
+  # 447 MB ceiling and had climbed since start; all **4** full GCs were CodeCache- or
+  # Metaspace-triggered and NOT ONE came from heap pressure. That is the curve that was read as a
+  # leak. It never was one — cgroup anon was 63 % of the limit with zero pressure events — but the
+  # 730 minor GCs averaged 13.4 ms each, single-threaded, on the tier that renders every page.
+  #
+  # Two changes, and the second is the one that matters:
+  #   - the limit goes 1280M -> 1792M, so ergonomics and intent agree instead of contradicting;
+  #   - **-XX:+UseG1GC is passed explicitly**, so the collector is a decision recorded in this file
+  #     rather than a side effect of a number, and a future limit reduction cannot silently undo
+  #     it. Never rely on the threshold alone (ADR-0175).
+  # At 1792M x 50 % the ceiling is 896 MB, comfortably above the 529 MB this JVM commits, and
+  # 896 + ~420 MB overhead = 73 % of the limit — inside the <= 80 % sizing rule with room for G1's
+  # larger native structures. Summed over every prod-profile service, the limits become
+  # **9792 MiB app + 4368 MiB monitoring = 14 160 MiB (13.83 GiB)**, still under ADR-0085's ~14 GB
+  # review trigger, and ~1.4 GiB under the 15.24 GiB the host has. (Counted from this file rather
+  # than carried forward: the "9216 MiB" quoted in the #937 block above no longer reconciles with
+  # what the services actually declare, so re-derive it instead of adding to it.)
   # ==========================================================================================
   deploy:
     resources:
       limits:
-        memory: 1280M
+        memory: 1792M
         # 1.0 -> 2.0 (#937). This container had the **worst absolute CFS stall in the entire
         # stack: 1506 s throttled over 7 days** (0.725 % average, 66.7 % peak ratio) — about
         # 25 minutes a week in which the user-facing SSR tier was stopped mid-period. Its
@@ -850,7 +906,7 @@ x-frontend: &frontend-template
     # max (at the old 50 it would be 640M == the max, an inverted/equal pair that makes the JVM refuse
     # to start or clamp), and sitting just under the measured commit avoids pre-committing dead
     # memory. See the JVM CONTAINER SIZING block above for the measured derivation.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseG1GC -XX:MaxRAMPercentage=50.0 -XX:InitialRAMPercentage=35.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - /var/iri/frontend/log:/app/logs
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
@@ -1000,7 +1056,13 @@ x-ingest: &ingest-template
     # above. InitialRAMPercentage stays 50 (256M): still below the 60% max (307M) — keep Initial < Max,
     # an inverted pair makes the JVM refuse to start — and it happens to match the 248M this service
     # actually commits, so the container pre-commits almost exactly what it needs.
-    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
+    # -XX:+UseSerialGC is DELIBERATE here, unlike on the frontend (ADR-0175). At a 512M limit
+    # this JVM also falls below HotSpot's 1792 MB server-class threshold, so it was already
+    # running Serial — by accident. For a relay that served 7 requests in 13 h and is idle
+    # between bursts, Serial is the right collector on the merits: lower native overhead and no
+    # concurrent GC threads to schedule. Saying so explicitly turns an accident into a choice and
+    # stops a future limit change from silently switching the collector in either direction.
+    JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:+UseSerialGC -XX:MaxRAMPercentage=60.0 -XX:InitialRAMPercentage=50.0 ${IRI_EXTRA_JAVA_OPTS:-}
   volumes:
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata

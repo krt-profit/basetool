@@ -22,6 +22,23 @@
   Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
   Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
   entfallen.
+- **Die Datenbank wird bei vielen gleichzeitigen Mitgliedern nicht mehr ausgebremst.** Rollen und
+  Berechtigungen wurden je Mitglied alle 30 Sekunden vollständig neu aus der Datenbank gelesen; das
+  verursachte den Großteil der Datenbanklast und kurze, spürbare Verzögerungen. Der Zwischenspeicher
+  hält sie jetzt 5 Minuten — eine entzogene Rolle wirkt dadurch bis zu 5 Minuten später, sofern sich
+  das Mitglied nicht neu anmeldet.
+- **Mehr CPU für Datenbank, Backend und Keycloak, und eine passendere Datenbankkonfiguration.** Die
+  Grenzen waren so eng gesetzt, dass kurze Lastspitzen ausgebremst wurden, obwohl der Server fast
+  ungenutzt ist. Neue optionale Servervariable `IRI_AUTHORITIES_CACHE_TTL` (Standard `PT5M`,
+  zulässig bis `PT15M`) steuert den oben genannten Zwischenspeicher.
+
+### Fixed
+
+- **Der Speicherverbrauch der Weboberfläche steigt nicht mehr den ganzen Tag an.** Der Dienst lief
+  unbemerkt mit der einfachsten Speicherbereinigung der Java-Laufzeit, weil seine Speichergrenze
+  knapp unter der Schwelle lag, ab der automatisch die bessere gewählt wird — Seitenaufbauten wurden
+  dadurch regelmäßig kurz angehalten. Die Bereinigung wird jetzt ausdrücklich festgelegt, die Grenze
+  steigt von 1280 MB auf 1792 MB.
 
 - **Seiten werden schneller ausgeliefert.** Beim Aufbau jeder Seite sah der Server für jeden Link
   in Menü und Fußzeile erst noch nach, ob dahinter vielleicht eine Datei liegt — und merkte sich
