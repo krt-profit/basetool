@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Seiten werden schneller ausgeliefert.** Beim Aufbau jeder Seite sah der Server für jeden Link
+  in Menü und Fußzeile erst noch nach, ob dahinter vielleicht eine Datei liegt — und merkte sich
+  das Ergebnis nie, sodass er bei jedem Seitenaufruf von vorn suchte. Er sieht jetzt nur noch dort
+  nach, wo tatsächlich Dateien liegen. Am Aussehen und an der Bedienung ändert sich nichts.
+
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
 ### Fixed
