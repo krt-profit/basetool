@@ -64,6 +64,19 @@ The rules, in the order they are reported:
   ``application*.yml`` files carry ``${KEYCLOAK_ISSUER_URI:<literal>}``. That literal is what an app
   validates when the variable is absent, it sits nowhere near the compose file, and moving the
   domain without it leaves a build that silently trusts the retired issuer.
+* **Rule E -- Grafana's three OIDC endpoints sit on the issuer the apps validate.** Grafana's
+  ``generic_oauth`` provider has no discovery option, so ``docker-compose.monitoring.yml`` names the
+  authorize, token and userinfo URLs one at a time. They derive from the same
+  ``IRI_KEYCLOAK_HOSTNAME`` now, and this rule checks both that they still do and that they follow an
+  override -- the monitoring project reads the same ``.env`` because it runs with the same
+  ``--project-directory``. A Grafana pointed at a realm other than the one minting the tokens fails
+  login with nothing wrong in any log.
+* **Rule F -- the Prometheus identity probes name the deployed identity base.** ``prometheus.yml``
+  is a **static file**: nothing interpolates it, so unlike everything above it cannot be derived, and
+  checking it is the only option available. Four targets live under the identity path -- the
+  discovery document twice (IPv4 and IPv6 blackbox jobs) and the two management-surface denies. A
+  domain move that misses them leaves probes that fail for the wrong reason, or, worse, a discovery
+  probe that quietly stops covering the endpoint every login depends on.
 
 Usage:
     python scripts/check-keycloak-issuer.py [--repo-root DIR]
@@ -121,12 +134,43 @@ SPRING_CONFIGS = (
     "ingest/src/main/resources/application-dev.yml",
 )
 
+# Grafana names its three OIDC endpoints one at a time -- generic_oauth has no discovery option --
+# so each is `<issuer>/protocol/openid-connect/<endpoint>`. Mapped here rather than hardcoded three
+# times, for the same reason the compose file stopped spelling the base three times.
+GRAFANA_OIDC_ENDPOINTS = {
+    "GF_AUTH_GENERIC_OAUTH_AUTH_URL": "auth",
+    "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": "token",
+    "GF_AUTH_GENERIC_OAUTH_API_URL": "userinfo",
+}
+
+# Any absolute http(s) URL in prometheus.yml. The scan is deliberately URL-scoped: `config.alloy`
+# and the meta alerts reference `/hostlog/auth.log`, a filesystem path that shares the prefix and is
+# not an identity URL at all.
+PROM_URL = re.compile(r"https?://[^\s\"']+")
+
+# The identity probes that must EXIST, as suffixes of the deployed identity base. Scanning for
+# strays is only half a check: a domain move that relocates a probe to another host AND another path
+# shape -- `https://keycloak.example/health` -- leaves nothing under the identity path to object to,
+# so the target simply disappears and the gate would report success over a shrinking list. These are
+# the two-sided half. REQ-OBS-012: a public surface without a probe is incomplete.
+#
+#   discovery   what every login resolves first; its absence looks exactly like health
+#   /health     Keycloak's readiness detail, which must stay 404 on the PUBLIC connector
+#   /metrics    realm names, user and session counts, client ids -- likewise
+REQUIRED_PROBE_SUFFIXES = (
+    "/realms/{realm}/.well-known/openid-configuration",
+    "/health",
+    "/metrics",
+)
+
 BASE = "docker-compose.yml"
 TEST = "docker-compose.test.yml"
 BUILD = "docker-compose.build.yml"
 E2E = "docker-compose.e2e.yml"
 ANDROID = "docker-compose.android.yml"
 LOCALTEST = "docker-compose.localtest.yml"
+MONITORING = "docker-compose.monitoring.yml"
+PROMETHEUS = "monitoring/prometheus/prometheus.yml"
 
 
 class Scenario:
@@ -274,12 +318,14 @@ def placeholder_env(root: Path, files) -> dict:
     return env
 
 
-def render(root: Path, scenario: Scenario) -> dict:
-    """Renders one scenario's stack through compose's own interpolation.
+def render_files(root: Path, files, profile, overrides) -> dict:
+    """Renders a set of compose files through compose's own interpolation.
 
     Args:
         root: the repository root.
-        scenario: the stack to render.
+        files: the compose file names, in precedence order.
+        profile: the compose profile to render, or None.
+        overrides: environment overrides layered on top of the placeholder set.
 
     Returns:
         The ``services`` mapping of the rendered configuration.
@@ -292,14 +338,14 @@ def render(root: Path, scenario: Scenario) -> dict:
     # make this gate pass or fail for a reason that is not in the repository.
     for key in ("IRI_KEYCLOAK_HOSTNAME", "IRI_KEYCLOAK_ISSUER_URI"):
         env.pop(key, None)
-    env.update(placeholder_env(root, scenario.files))
-    env.update(scenario.env)
+    env.update(placeholder_env(root, files))
+    env.update(overrides)
 
     cmd = ["docker", "compose"]
-    for name in scenario.files:
+    for name in files:
         cmd += ["-f", name]
-    if scenario.profile:
-        cmd += ["--profile", scenario.profile]
+    if profile:
+        cmd += ["--profile", profile]
     cmd += ["config", "--format", "json"]
 
     proc = subprocess.run(cmd, cwd=str(root), env=env, capture_output=True, text=True, check=False)
@@ -308,6 +354,22 @@ def render(root: Path, scenario: Scenario) -> dict:
             "`%s` failed (exit %d):\n%s" % (" ".join(cmd), proc.returncode, proc.stderr.strip())
         )
     return json.loads(proc.stdout).get("services", {})
+
+
+def render(root: Path, scenario: Scenario) -> dict:
+    """Renders one scenario's stack.
+
+    Args:
+        root: the repository root.
+        scenario: the stack to render.
+
+    Returns:
+        The ``services`` mapping of the rendered configuration.
+
+    Raises:
+        RuntimeError: if ``docker compose config`` fails.
+    """
+    return render_files(root, scenario.files, scenario.profile, scenario.env)
 
 
 def collect(services: dict):
@@ -544,6 +606,133 @@ def check_spring_defaults(root: Path, problems: list) -> str:
     return "spring-defaults: %d fallback default(s) match %s" % (checked, expected)
 
 
+def check_monitoring_oidc(root: Path, problems: list) -> str:
+    """Rule E -- Grafana's three OIDC endpoints sit on the issuer the apps validate.
+
+    Checked twice: once on the production defaults, and once with ``IRI_KEYCLOAK_HOSTNAME``
+    overridden, because the second is the only one that can tell a derived value from three literals
+    that happen to agree today. The monitoring stack is its own compose project but runs with the
+    same ``--project-directory``, so it reads the same ``.env`` and the same variable reaches it.
+
+    Args:
+        root: the repository root.
+        problems: accumulator; every mismatch is appended.
+
+    Returns:
+        A one-line summary for the clean-run report.
+    """
+    cases = [
+        ("defaults", {}, PROD_BASE),
+        ("hostname-override", {"IRI_KEYCLOAK_HOSTNAME": FAKE_BASE}, FAKE_BASE),
+    ]
+    checked = 0
+    for label, overrides, base in cases:
+        try:
+            services = render_files(root, [MONITORING], None, overrides)
+        except RuntimeError as exc:
+            problems.append("monitoring-oidc (%s): %s" % (label, exc))
+            return "monitoring-oidc: NOT RENDERED"
+
+        env = (services.get("grafana") or {}).get("environment") or {}
+        if not env:
+            problems.append(
+                "monitoring-oidc (%s): docker-compose.monitoring.yml has no `grafana` service with "
+                "an environment -- this rule has stopped watching anything" % label
+            )
+            return "monitoring-oidc: NO GRAFANA"
+
+        expected_prefix = "%s/realms/%s/protocol/openid-connect" % (base, REALM)
+        for key, endpoint in sorted(GRAFANA_OIDC_ENDPOINTS.items()):
+            actual = env.get(key)
+            if not actual:
+                problems.append(
+                    "monitoring-oidc (%s): %s is not set. Grafana's generic_oauth has no discovery "
+                    "option, so a missing endpoint is a login that cannot complete." % (label, key)
+                )
+                continue
+            checked += 1
+            expected = "%s/%s" % (expected_prefix, endpoint)
+            if actual != expected:
+                problems.append(
+                    "monitoring-oidc (%s): %s is %s but the apps validate issuer %s/realms/%s, so it "
+                    "should be %s. Grafana would send members to a realm other than the one minting "
+                    "their tokens, and the login fails with nothing wrong in any log."
+                    % (label, key, actual, base, REALM, expected)
+                )
+    return "monitoring-oidc: %d Grafana endpoint(s) follow the issuer, defaults and override" % checked
+
+
+def check_prometheus_targets(root: Path, problems: list) -> str:
+    """Rule F -- the Prometheus identity probes name the deployed identity base.
+
+    ``prometheus.yml`` is static: nothing interpolates it, so this is the one identity surface that
+    cannot be derived and can only be compared. Every absolute URL whose path is the identity mount
+    point (or sits under it) must be on the deployed base, and the discovery document every login
+    depends on must still be probed.
+
+    The path test is segment-exact rather than a prefix match, which is the same trap ADR-0166 records
+    for the edge's ``location /auth``: a plain prefix would swallow ``/authors`` and ``/authorize``.
+
+    Args:
+        root: the repository root.
+        problems: accumulator; every mismatch is appended.
+
+    Returns:
+        A one-line summary for the clean-run report.
+    """
+    path = root / PROMETHEUS
+    if not path.exists():
+        problems.append("prometheus-targets: %s does not exist -- the file list is stale" % PROMETHEUS)
+        return "prometheus-targets: MISSING"
+
+    identity_path = norm_path(urlsplit(PROD_BASE).path)
+    text = path.read_text(encoding="utf-8")
+
+    identity_targets = []
+    for url in PROM_URL.findall(text):
+        url = url.rstrip(",")
+        parts = urlsplit(url)
+        target_path = norm_path(parts.path)
+        if target_path == identity_path or target_path.startswith(identity_path + "/"):
+            identity_targets.append(url)
+
+    if not identity_targets:
+        problems.append(
+            "prometheus-targets: no probe target under %r at all. The Keycloak discovery document "
+            "and the two management-surface denies are supposed to be probed from outside "
+            "(REQ-OBS-012); finding none means they were dropped or the base moved without this "
+            "rule noticing." % identity_path
+        )
+        return "prometheus-targets: NONE FOUND"
+
+    # Half one -- no strays: nothing probed under the identity path may sit on another base.
+    for url in sorted(set(identity_targets)):
+        if not url.startswith(PROD_BASE + "/") and url != PROD_BASE:
+            problems.append(
+                "prometheus-targets: %s is probed, but docker-compose.yml deploys identity at %s. "
+                "prometheus.yml is not interpolated, so a domain move never reaches it on its own."
+                % (url, PROD_BASE)
+            )
+
+    # Half two -- nothing missing. Without this, relocating a probe to another host AND another path
+    # shape removes it from the scan entirely and the check above has nothing left to object to.
+    present = set(identity_targets)
+    for suffix in REQUIRED_PROBE_SUFFIXES:
+        expected = PROD_BASE + suffix.format(realm=REALM)
+        if expected not in present:
+            problems.append(
+                "prometheus-targets: %s is not probed. Either it was dropped or it was moved off the "
+                "identity base -- both leave the endpoint uncovered, and an uncovered probe is "
+                "indistinguishable from a passing one (REQ-OBS-012)." % expected
+            )
+
+    return "prometheus-targets: %d identity probe(s) on %s, all %d required present" % (
+        len(present),
+        PROD_BASE,
+        len(REQUIRED_PROBE_SUFFIXES),
+    )
+
+
 def check_prod_base_is_real(root: Path, problems: list) -> None:
     """Pins PROD_BASE to docker-compose.yml, so this file cannot drift from the stack it checks.
 
@@ -571,28 +760,37 @@ def main() -> int:
         "--only",
         default="",
         help=(
-            "comma-separated scenario names to run instead of all of them. A debugging and "
-            "self-test aid -- each stack costs a `docker compose config` render, and the "
-            "regression suite has no reason to pay for seven of them per mutation. CI runs the "
-            "gate with no filter."
+            "comma-separated check names to run instead of all of them -- any stack scenario, plus "
+            "spring-defaults, monitoring-oidc and prometheus-targets. A debugging and self-test aid: "
+            "each stack costs a `docker compose config` render, and the regression suite has no "
+            "reason to pay for all of them per mutation. CI runs the gate with no filter."
         ),
     )
     args = parser.parse_args()
     root = Path(args.repo_root).resolve()
 
+    # The checks that are not stack scenarios: one reads a separate compose project, one a static
+    # file, one a set of Spring configs. Named here so --only can address them like any other.
+    extra_checks = {
+        "spring-defaults": check_spring_defaults,
+        "monitoring-oidc": check_monitoring_oidc,
+        "prometheus-targets": check_prometheus_targets,
+    }
+
     scenarios = SCENARIOS
+    extras = list(extra_checks)
     if args.only:
         wanted = [name.strip() for name in args.only.split(",") if name.strip()]
-        known = {s.name for s in SCENARIOS}
+        known = {s.name for s in SCENARIOS} | set(extra_checks)
         unknown = [name for name in wanted if name not in known]
         if unknown:
             print(
-                "unknown scenario(s): %s (known: %s)"
-                % (", ".join(unknown), ", ".join(sorted(known))),
+                "unknown check(s): %s (known: %s)" % (", ".join(unknown), ", ".join(sorted(known))),
                 file=sys.stderr,
             )
             return 2
         scenarios = [s for s in SCENARIOS if s.name in wanted]
+        extras = [name for name in extra_checks if name in wanted]
 
     problems: list = []
     summaries = []
@@ -600,7 +798,8 @@ def main() -> int:
     check_prod_base_is_real(root, problems)
     for scenario in scenarios:
         summaries.append(check_scenario(root, scenario, problems))
-    summaries.append(check_spring_defaults(root, problems))
+    for name in extras:
+        summaries.append(extra_checks[name](root, problems))
 
     if problems:
         print("Keycloak issuer check FAILED (%d problem(s)):\n" % len(problems), file=sys.stderr)
@@ -613,7 +812,10 @@ def main() -> int:
         )
         return 1
 
-    print("Keycloak issuer OK -- %d stack(s) checked:" % len(scenarios))
+    print(
+        "Keycloak issuer OK -- %d stack(s) and %d further surface(s) checked:"
+        % (len(scenarios), len(extras))
+    )
     for summary in summaries:
         print("  %s" % summary)
     return 0
