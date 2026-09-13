@@ -1608,6 +1608,23 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
     read_only: true
+    # File-descriptor ceiling, same value and same reasoning as backend/frontend:
+    # pinned explicitly and generously rather than inherited from the daemon, and
+    # 65536 only ever LOWERS a large default to a still-ample one, so it cannot
+    # fail the container start by trying to raise.
+    #
+    # The edge was the one service without it, and it showed. Every start logged
+    #   [warn] 4096 worker_connections exceed open file resource limit: 1024
+    # — not cosmetic: a proxied request needs two descriptors, one to the client
+    # and one to the upstream, so a worker capped at 1024 could not come close to
+    # the 4096 connections it was configured for. `worker_rlimit_nofile` in
+    # docker/edge/nginx.conf asks for 16384 of this, which is 2 × the connection
+    # ceiling doubled again; it sits well under this limit, so nginx never has to
+    # raise past a hard limit and refuse.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     tmpfs:
       # nginx writes nowhere else. `noexec,nosuid` because nothing here is ever
       # meant to be executed or to gain privileges.

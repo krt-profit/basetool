@@ -113,12 +113,23 @@ echo "==> validating ${EDGE_DIR} with ${IMAGE}"
 # On Linux there is no cygpath and the paths are already native.
 to_native() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
 
+# The file-descriptor ceiling the compose file gives the edge, applied to THIS
+# container too. Without it the validator runs on the daemon default, far above
+# production's, so nginx never emits its worker_connections warning here and the
+# gate stayed green while every production start logged one.
+NOFILE="$(awk '
+  /^  [a-z0-9-]+:$/ { in_edge = ($0 == "  edge:") }
+  in_edge && /^ *soft:/ { print $2; exit }
+' "${REPO_ROOT}/docker-compose.yml")"
+[[ -n "${NOFILE}" ]] \
+  || { echo "FAIL: the edge service declares no ulimits.nofile.soft"; exit 1; }
+
 # Pass the synthetic host names in, and render through the runtime own script.
 ENV_ARGS=()
 for v in "${EDGE_VARS[@]}"; do ENV_ARGS+=(-e "${v}=${RENDER[${v}]}"); done
 
 docker run --rm --user 0:0 --network none \
-  "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 \
+  "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 --ulimit "nofile=${NOFILE}:${NOFILE}" \
   -v "$(to_native "${EDGE_DIR}"):/edge:ro" \
   -v "$(to_native "${CERT_DIR}"):/certs:ro" \
   --entrypoint sh \
@@ -140,12 +151,35 @@ sh /etc/nginx/edge/render-and-run.sh
 # -T, not -t. An `include` whose glob matches NOTHING is not an error in nginx,
 # so a plain -t passes a configuration with zero vhosts in it -- which is exactly
 # what this gate did the first time the render step was wired up wrongly.
+# -t and -T, separately, and the sentinel matters. `nginx -T` dumps the whole
+# configuration INCLUDING COMMENTS, and the comments in nginx.conf quote the very
+# warnings this gate looks for -- so a single combined stream makes the check find
+# its own documentation and fail. Warnings are read from the -t part, the vhost
+# presence from the -T part.
+nginx -t -c /etc/nginx/edge/nginx.conf
+echo "@@@CONFIG-DUMP@@@"
 nginx -T -c /etc/nginx/edge/nginx.conf
+echo "@@@RUNTIME@@@"
+# `nginx -t` PARSES. It does not start workers, and several of the things that
+# have taken this edge down only happen when they start: the pid path on a
+# read-only root, the temp directories nginx creates but does not parent, and the
+# worker_connections-versus-file-descriptor warning production logged on every
+# start while this gate stayed green. So start it for real, briefly, and read
+# what it says.
+nginx -g "daemon off;" -c /etc/nginx/edge/nginx.conf > /tmp/runtime.log 2>&1 &
+npid=$!
+sleep 2
+kill "$npid" 2>/dev/null || true
+wait "$npid" 2>/dev/null || true
+cat /tmp/runtime.log
 ' 2>&1 | tee "${CERT_DIR}/nginx-t.out"
 
 # `nginx -t` exits 0 on a warning, and a configuration that always warns is one
 # where the next — real — warning is not read. Treat any [warn] as a failure.
-if grep -q '\[warn\]' "${CERT_DIR}/nginx-t.out"; then
+# Only the part BEFORE the dump sentinel: everything after it is the configuration
+# itself, whose comments quote warnings verbatim.
+sed -n '1,/@@@CONFIG-DUMP@@@/p' "${CERT_DIR}/nginx-t.out" > "${CERT_DIR}/nginx-t.warnings"
+if grep -q '\[warn\]' "${CERT_DIR}/nginx-t.warnings"; then
   echo "FAIL: nginx -t emitted a warning (shown above). Fix it or state why it is acceptable."
   exit 1
 fi
@@ -158,4 +192,16 @@ for h in "${HOSTS[@]}"; do
     || { echo "FAIL: ${h} is missing from the assembled configuration"; exit 1; }
 done
 
-echo "==> edge configuration is valid, ${#HOSTS[@]} vhosts rendered and present"
+# The runtime section, read on its own. `nginx -t` never prints these: a warning
+# about worker_connections versus the descriptor limit, an alert about a failed
+# setrlimit, an emerg about a path it cannot create. Production logged the first
+# of those on every start for two days while this gate reported the configuration
+# valid, because parsing and starting are not the same thing.
+sed -n '/@@@RUNTIME@@@/,$p' "${CERT_DIR}/nginx-t.out" > "${CERT_DIR}/nginx-runtime.out"
+if grep -qE '\[(warn|alert|emerg)\]' "${CERT_DIR}/nginx-runtime.out"; then
+  echo "FAIL: the edge logged a warning or worse when it actually started:"
+  grep -E '\[(warn|alert|emerg)\]' "${CERT_DIR}/nginx-runtime.out" | sed 's/^/  /'
+  exit 1
+fi
+
+echo "==> edge configuration is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
