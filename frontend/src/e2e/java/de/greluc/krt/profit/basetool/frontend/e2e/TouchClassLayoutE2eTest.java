@@ -660,8 +660,16 @@ class TouchClassLayoutE2eTest {
     // page stays as wide as the previous screenshot left it. Measured: six pages reported viewports
     // of 401-526px on the 375px class, and every width comparison on them was against that wrong
     // reference. Going through a different height first makes it a real resize.
-    page.setViewportSize(width, height + 1);
-    page.setViewportSize(width, height);
+    // Only where a screenshot can actually have happened. A full-page capture resizes the
+    // viewport and Playwright's own `setViewportSize` back to the same numbers is then a no-op, so
+    // this goes through a different height to force a real resize. But `screenshotSafely` returns
+    // early unless the engine is the screenshot one, so on the other ten jobs of the matrix this
+    // was
+    // 130 real relayouts each, undoing a state they cannot enter.
+    if (SCREENSHOT_ENGINE.equals(ENGINE)) {
+      page.setViewportSize(width, height + 1);
+      page.setViewportSize(width, height);
+    }
     E2eSupport.navigate(page, baseUrl + path);
     // NOT `NETWORKIDLE`: this app never goes idle. The notification badge polls, the live-sync
     // WebSocket stays open, and the P4K import page polls its job list — so waiting for a quiet
@@ -1237,7 +1245,11 @@ class TouchClassLayoutE2eTest {
           const r = el.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
           if (r.right > maxRight) { maxRight = r.right; widest = label(el); }
-          if (r.right > vw + slack && !scrollsHorizontally(el) && cutOff.length < 6) {
+          // Cap FIRST. `scrollsHorizontally` walks every ancestor to the root, so with the cap
+          // last it ran for every remaining element on precisely the overflowing pages where this
+          // probe is already slowest — and threw the answer away. The page-control loop below
+          // already reads this way round.
+          if (cutOff.length < 6 && r.right > vw + slack && !scrollsHorizontally(el)) {
             cutOff.push(label(el) + ' right=' + Math.round(r.right) + 'px');
           }
         }
@@ -1347,11 +1359,15 @@ class TouchClassLayoutE2eTest {
               if (cs.display === 'none' || cs.visibility === 'hidden' || c.type === 'hidden') continue;
               const cr = c.getBoundingClientRect();
               if (cr.width === 0 || cr.height === 0) continue;
-              const floor = floorFor(c);
-              const chit = hitBox(c);
-              if (chit.height < floor - slack && modalIssues.length < 12) {
-                modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
-                  + 'px tall, floor ' + floor + 'px');
+              // Cap first, for the same reason: `hitBox` makes two getComputedStyle calls per
+              // control, and a modal with thirty controls paid all of them after the list was full.
+              if (modalIssues.length < 12) {
+                const floor = floorFor(c);
+                const chit = hitBox(c);
+                if (chit.height < floor - slack) {
+                  modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
+                    + 'px tall, floor ' + floor + 'px');
+                }
               }
             }
           }
