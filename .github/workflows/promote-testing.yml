@@ -132,7 +132,29 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}')
+          # Retried, and this is the step that actually bit: the 1.7.18 promotion to
+          # :testing got `403 Forbidden` on manifests/1.7.18 ninety seconds after the
+          # :stable promotion had resolved the very same tag successfully. GHCR
+          # answers 403 for a read it cannot serve, so a blip is indistinguishable
+          # from a missing image — and a read is idempotent, so a retry costs
+          # nothing. release-images.yml has carried exactly this since run
+          # 30931003203 hit the identical shape; the promote path never got it.
+          DIGEST=""
+          for attempt in 1 2 3; do
+            # `if cmd; then` rather than `cmd && …`: a `run:` block is `bash -e`, and
+            # an AND-OR list whose FIRST command fails still trips errexit, which
+            # would abort on attempt 1 and make the retry decorative. The inner test
+            # is a full `if` for the same reason.
+            if DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}'); then
+              if [ -n "${DIGEST}" ]; then break; fi
+            fi
+            echo "::warning::digest lookup attempt ${attempt} failed for ${IMAGE}:${VERSION}; retrying" >&2
+            sleep $((attempt * 10))
+          done
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::could not resolve ${IMAGE}:${VERSION} after 3 attempts" >&2
+            exit 1
+          fi
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
           echo "Source: ${IMAGE}:${VERSION} → ${DIGEST}"
 
