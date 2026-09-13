@@ -43,7 +43,7 @@ RUN ./gradlew :frontend:dependencies --no-daemon
 # Quellcode kopieren und Anwendung bauen.
 # `-x test` skips the test suite; `-x checkstyleMain -x spotbugsMain
 # -x spotlessCheck -x spotlessJavaCheck` skip the Java static-analysis and
-# formatting verification steps, and `-x lintCss -x lintCssInline -x lintHtml -x lintJs
+# formatting verification steps, and `-x lintCss -x lintCssInline -x lintProbeJs -x extractProbeJs -x lintHtml -x lintJs
 # -x prettierCheck -x typecheckJs -x generateApiTypes -x testGenApiTypes` skip
 # the Node-based web-asset linters, the Prettier formatter, the TypeScript type
 # check (ADR-0125) and the OpenAPI-emitter regression tests (ADR-0130) — all of
@@ -97,6 +97,8 @@ RUN ./gradlew :frontend:build \
     -x spotlessJavaCheck \
     -x lintCss \
     -x lintCssInline \
+    -x extractProbeJs \
+    -x lintProbeJs \
     -x lintHtml \
     -x lintJs \
     -x prettierCheck \

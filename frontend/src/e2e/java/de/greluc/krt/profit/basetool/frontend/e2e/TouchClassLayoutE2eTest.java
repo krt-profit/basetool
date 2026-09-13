@@ -1304,14 +1304,6 @@ class TouchClassLayoutE2eTest {
         })();
         const floorFor = (c) =>
           Array.from(c.classList).some((cl) => DENSE_CLASSES.has(cl)) ? %d : %d;
-        // An empty set means no stylesheet was readable, which would put the full 44px floor on
-        // every dense control at once. Reported rather than assumed: silence here used to mean
-        // "compliant", and it would now mean "measured against the wrong floor".
-        if (DENSE_CLASSES.size === 0) {
-          badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
-            + ' --touch-target-dense was readable, so every floor below is the full 44px and'
-            + ' every dense control will read as a defect');
-        }
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();
@@ -1405,6 +1397,22 @@ class TouchClassLayoutE2eTest {
         }
 
         const badControls = [];
+        // An empty set means no stylesheet was readable, which would put the full 44px floor on
+        // every dense control at once. Reported rather than assumed: silence here used to mean
+        // "compliant", and it would now mean "measured against the wrong floor".
+        //
+        // It sits HERE, after the declaration, and that is not cosmetic. Written up beside
+        // `floorFor` — which reads better, because that is what the set is for — it referenced
+        // `badControls` about a hundred lines before the `const` that creates it. `const` is
+        // hoisted without being initialised, so the read lands in the temporal dead zone and throws
+        // `ReferenceError: Cannot access 'badControls' before initialization`. Not on some pages:
+        // on every page of every device class, turning all 66 routes into "could not be measured"
+        // and the whole sweep red.
+        if (DENSE_CLASSES.size === 0) {
+          badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
+            + ' --touch-target-dense was readable, so every floor below is the full 44px and'
+            + ' every dense control will read as a defect');
+        }
         for (const c of document.querySelectorAll('input, select, textarea, button, a.btn')) {
           const cs = getComputedStyle(c);
           if (cs.display === 'none' || cs.visibility === 'hidden') continue;
