@@ -127,4 +127,29 @@ class PublicPathsTest {
     assertThat(PublicPaths.isGateExempt("/manifest.webmanifest/../missions")).isFalse();
     assertThat(PublicPaths.isGateExempt("/.well-known/assetlinks.json.old")).isFalse();
   }
+
+  @ParameterizedTest
+  @DisplayName("a .map suffix outside the asset trees buys no exemption")
+  @ValueSource(
+      strings = {
+        "/missions/x.map",
+        "/bank/statement.map",
+        "/admin/users/1.map",
+        "/webjars/some-lib/thing.js.map",
+        "/.map"
+      })
+  void aMapSuffixIsNotAnExemption(String path) {
+    // The one case nothing pinned, while the Javadoc argued for it at length.
+    //
+    // `isStaticAsset` used to end in `|| path.endsWith(".map")`, which fed `isGateExempt` — so a
+    // member who had declined the terms, or whose registration was still pending, reached any route
+    // with a String path variable by appending `.map`: PathPatternParser binds the suffix into the
+    // variable and the controller renders. Both positive cases in `assetsAreGateExempt` pass
+    // through a `/sm/` or `/js/` prefix, so every one of them would still pass with the suffix
+    // clause restored and nothing here would notice. This is the assertion that fails if it comes
+    // back — including under the anchored `^/(css|js)/.*\.map$` pattern that briefly replaced it,
+    // which could never decide anything because those two prefixes already matched.
+    assertThat(PublicPaths.isStaticAsset(path)).as(path).isFalse();
+    assertThat(PublicPaths.isGateExempt(path)).as(path).isFalse();
+  }
 }

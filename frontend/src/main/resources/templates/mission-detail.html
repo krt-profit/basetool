@@ -33,10 +33,12 @@
             padding-bottom: calc(var(--krt-footer-height, 5rem) + 5rem);
         }
         /* The phone-class reserve for this page lives in styles.css's `width <= 768px` block,
-           with every other page's. It was a copy in this file and an identical copy in
-           operation-detail.html, and the comment on those copies said in so many words that
-           duplicating the reserve is what caused it to be missed the first time. */
-        }
+           with every other page's, and it has to out-specify this rule to get there: head.html
+           links styles.css at :85 and renders the per-page style block at :348, so an equal-specificity
+           `.page-wrapper` in that block loses the source-order tie and the phone class kept
+           `calc(0px + 5rem)` = 80px of dead scroll. It is written `div.page-wrapper` for exactly
+           the reason `.btn.btn-xs2` and `input.item-checkbox` are. The DESKTOP reserve stays here,
+           on the page that needs it. */
         .mission-head-sticky {
             position: sticky;
             top: 0; /* corrected at runtime to the real <header> height */
@@ -93,7 +95,7 @@
         .pane-grid-2.pane-grid--single { grid-template-columns: 1fr; }
         .pane-grid-fin { display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; align-items: start; }
         .pane-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-        @media (max-width: 980px) { .pane-grid-2, .pane-grid-fin { grid-template-columns: 1fr; } }
+        @media (width <= 980px) { .pane-grid-2, .pane-grid-fin { grid-template-columns: 1fr; } }
 
         .kpanel { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); min-width: 0; }
         .kpanel-head {
@@ -130,7 +132,7 @@
         details.more .more-body { padding: 0 14px 14px; }
         .chiprow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .navrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        @media (max-width: 880px) { .navrow { grid-template-columns: 1fr; } }
+        @media (width <= 880px) { .navrow { grid-template-columns: 1fr; } }
         .navcard { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 12px; cursor: pointer; transition: border-color 0.15s; display: flex; flex-direction: column; gap: 6px; text-align: left; font-family: var(--font-body); color: var(--color-gray-1); }
         .navcard:hover, .navcard:focus-visible { border-color: var(--color-primary); outline: none; }
         .navcard .nk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); display: flex; justify-content: space-between; gap: 6px; }
@@ -148,7 +150,7 @@
         /* Pool column widened to match the 1800px page cap — the person rows carry
            name + badges + wish/note + actions and clipped at the mock's 340px. */
         .board { display: grid; grid-template-columns: 600px 1fr; gap: 12px; align-items: start; }
-        @media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
+        @media (width <= 900px) { .board { grid-template-columns: 1fr; } }
         .board-units { display: flex; flex-direction: column; gap: 10px; }
         .unit-panel .kpanel-head { border-left: none; border-bottom: var(--border-hairline); }
         .pool-panel .kpanel-head { border-left: none; border-bottom: 2px solid var(--color-primary); }
@@ -166,7 +168,7 @@
 
         /* Finance tab */
         .sumstrip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        @media (max-width: 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
+        @media (width <= 880px) { .sumstrip { grid-template-columns: repeat(2, 1fr); } }
         .sum { background-color: var(--color-bg-dark-gray); border: var(--border-hairline); padding: 10px 14px; }
         .sum .sk { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-gray-2-text); font-weight: var(--fw-bold); }
         .sum .sv { font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 1.15rem; color: var(--color-white); font-variant-numeric: tabular-nums; margin-top: 2px; }
@@ -201,12 +203,6 @@
            solid bar + top border separate it from the scrolling content; the pane's extra
            padding-bottom keeps the last tile from hiding behind it. */
         #pane-verw.on { padding-bottom: 4rem; }
-        /* Phone class: the footer is static and scrolls, so `--krt-footer-height` is 0 and a
-           fixed bar here would cover the legal links at the end of the page. Sticky pins it to the
-           viewport bottom while the pane is in view and releases at the pane's end. */
-        @media (max-width: 768px) {
-            #pane-verw.on .footacts { position: sticky; bottom: 0; }
-        }
         #pane-verw.on .footacts {
             position: fixed;
             left: 0;
@@ -217,6 +213,21 @@
             padding: 12px 16px;
             background-color: var(--color-bg-dark-gray);
             border-top: var(--border-hairline);
+        }
+        /* Phone class: the footer is static and scrolls, so `--krt-footer-height` is 0 and the
+           fixed bar above would cover the legal links at the end of the page. Sticky pins it to the
+           viewport bottom while the pane is in view and releases at the pane's end.
+
+           AFTER the rule it overrides, not before it. A media query adds no specificity, so the two
+           selectors tie and source order decides — written first, this block lost every time and
+           the bar stayed `fixed` on the class it was written for. Same defect as org-chart.css's
+           `.oc-scrollbar`, found in the same review.
+
+           `width <= 768px`, not `max-width: 768px`: every rule in static/css uses the range form,
+           and stylelint's `media-feature-range-notation` would have said so if its glob reached
+           templates. */
+        @media (width <= 768px) {
+            #pane-verw.on .footacts { position: sticky; bottom: 0; }
         }
         .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }
 
@@ -278,7 +289,7 @@
         .ae-grip { color: var(--color-gray-2-text); cursor: grab; flex: none; letter-spacing: -1px; }
         .ae-num { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-gray-2); background: var(--color-bg-black); color: var(--color-gray-1); font-family: var(--font-headline); font-weight: var(--fw-bold); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
         .ae-fields { flex: 1; display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; min-width: 0; }
-        @media (max-width: 620px) { .ae-fields { grid-template-columns: 1fr; } }
+        @media (width <= 620px) { .ae-fields { grid-template-columns: 1fr; } }
         .ae-fields input { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }
         .ae-fields input.ae-meta { color: var(--color-gray-1); font-weight: 400; }
         .ae-fields select.ae-kind { width: 100%; box-sizing: border-box; background: var(--color-bg-dark-gray); color: var(--color-white); border: var(--border-hairline); font-family: var(--font-body); font-size: 0.78rem; padding: 7px 9px; min-height: 34px; font-weight: var(--fw-bold); }

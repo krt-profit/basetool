@@ -1233,13 +1233,10 @@ tbody tr:nth-child(even):hover {
      * gap utility on this exact element is the tell: the defect was hit before
      * and patched per page. This fixes the other 28 at the utility instead.
      *
-     * `.flex-between-mb` gets the same treatment — same shape, same trap.
+     * Both now live on their BASE rules instead — see `.flex-between` below —
+     * because this block only ever reached ≤768px, and the band this was
+     * written to close is 769-1023px.
      */
-    .flex-between,
-    .flex-between-mb {
-        flex-wrap: wrap;
-        gap: var(--space-3);
-    }
 
     /*
      * Every other action row wraps too, for the same reason and by the same
@@ -1457,8 +1454,15 @@ tbody tr:nth-child(even):hover {
      * in the app kept 80px of dead scroll where every other page has 16px. Both carried an
      * identical copy of this rule, and the comment on those copies said outright that duplicating
      * the reserve is how it came to be missed — so it is stated once, here, with every other page's.
+     *
+     * `div.page-wrapper`, not `.page-wrapper`. head.html links this file at :85 and renders the
+     * per-page `additionalLinks` at :348, so both pages' inline `.page-wrapper` is LATER at equal
+     * specificity and won the tie — this rule was written, its comment was accurate, and the two
+     * densest pages in the app kept the exact 80px it describes. The element prefix is the same
+     * technique this block already uses for `.btn.btn-xs2`, `input.item-checkbox` and
+     * `div.filters-container`, and for the same reason.
      */
-    .page-wrapper {
+    div.page-wrapper {
         padding-bottom: var(--space-4);
     }
 }
@@ -2219,6 +2223,14 @@ label:has(+ [required])::after {
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--space-4);
+    /*
+     * Same wrap and gap as `.flex-between` above, for the same reason and on the same rule. It had
+     * the phone-block half only, so the 769-1023px band that fix was written to close stayed open
+     * for the seven templates using this variant — and the phone-block copy was itself dead, since
+     * this base rule is later in the file at equal specificity.
+     */
+    flex-wrap: wrap;
+    gap: var(--space-3);
 }
 .flex-end {
     display: flex;
@@ -4810,7 +4822,15 @@ textarea:focus-visible,
        second already promised to keep them in step ("same job, same treatment") — which a selector
        list states in code instead of in prose. */
     .close-sidebar-btn,
-    .krt-modal-close {
+    .krt-modal-close,
+    /*
+     * `.close-modal` (16 templates) and `.btn-close` (6) are the same control under two more
+     * names — the enumerated-selector-list problem this block is itself an instance of.
+     * `.close-modal` is declared at :4335, earlier in this file at equal specificity, so this
+     * wins the tie; `.btn-close` carries no size rule at all and takes the floor from here.
+     */
+    .close-modal,
+    .btn-close {
         display: flex;
         align-items: center;
         justify-content: center;

@@ -69,12 +69,23 @@ server {
   # answer on the management port rather than this one, so these two are closed
   # for the same reason the /actuator deny above exists: to make the guarantee
   # independent of which port a future release decides to serve them on.
-  location /auth/health  { return 404; }
-  location /auth/metrics { return 404; }
+  #
+  # `^~` for the same reason as /auth/admin above, which is the whole point: the argument made
+  # there is about nginx precedence, not about that one path, and these three were left as bare
+  # prefixes. Nothing in hardening.conf matches them today — add the regex that comment itself
+  # names as the classic case (`~* \.(css|js|png|woff2)$ { expires 1y; }`) or a future
+  # `~ ^/(auth|api)/`, and these two stop returning the 404 that the new `blackbox-edge-deny`
+  # targets assert while `nginx -t` stays green.
+  location ^~ /auth/health  { return 404; }
+  location ^~ /auth/metrics { return 404; }
 
   # The token endpoint gets a tighter burst than the site-wide limiter: it is
   # the one anonymous POST that is worth brute-forcing.
-  location /auth/realms/iri/protocol/openid-connect/token {
+  #
+  # `^~` matters most here: a regex winning this path does not break anything visibly, it
+  # silently falls back to the site-wide `burst=80` — an 8x looser ceiling on exactly the endpoint
+  # this location exists to tighten, with no error and no alert.
+  location ^~ /auth/realms/iri/protocol/openid-connect/token {
     limit_req        zone=krt_req_perip burst=10 nodelay;
     limit_req_status 429;
 

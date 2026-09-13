@@ -46,11 +46,30 @@ public class LocaleConfig implements WebMvcConfigurer {
     return clr;
   }
 
-  /** Interceptor switching the locale when the request carries a {@code ?lang=…} query param. */
+  /**
+   * Interceptor switching the locale when the request carries a {@code ?lang=…} query param.
+   *
+   * <p>Registered for every path, so it is also the first thing every public, probed endpoint
+   * meets.
+   */
   @Bean
   public LocaleChangeInterceptor localeChangeInterceptor() {
     LocaleChangeInterceptor lci = new LocaleChangeInterceptor();
     lci.setParamName("lang");
+    // An unparseable ?lang= must not become a 500.
+    //
+    // The default is false, which makes StringUtils.parseLocale's IllegalArgumentException escape
+    // the interceptor BEFORE any handler runs, where GlobalExceptionHandler's catch-all turns it
+    // into the 500 page. That is a bad answer for every page and an actively broken one for
+    // /manifest.webmanifest, which is now probed with `valid_status_codes: [200]` behind
+    // EdgePublicSurfaceNot200: `GET /manifest.webmanifest?lang=!` would page the on-call. The
+    // controller hardens its own locale handling (allow-listed SUPPORTED_LOCALES, a defaulting
+    // getMessage) precisely so it always answers 200, and this is the half of that contract that
+    // does not live in the controller.
+    //
+    // Ignoring the invalid value keeps the resolver's current locale, which is what a visitor
+    // typing nonsense into a query parameter should get.
+    lci.setIgnoreInvalidLocale(true);
     return lci;
   }
 

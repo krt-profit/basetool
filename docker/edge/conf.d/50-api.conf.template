@@ -25,7 +25,7 @@ server {
   include /etc/nginx/edge/include/api-allowlist.conf;
 
   location / {
-    include /etc/nginx/edge/include/proxy.conf;
+    include /etc/nginx/edge/include/proxy-common.conf;
     # --- Forwarded headers: OVERWRITE, never append --------------------------
     # REQ-SEC-011: the backend walks the X-Forwarded-For chain right-to-left and
     # trusts only the pinned compose range. The inherited default is
@@ -33,12 +33,21 @@ server {
     # client-supplied chain would survive into the value the backend parses.
     # Overwriting with the real peer leaves exactly one element.
     #
-    # These sit HERE, inside `location /`, and that placement is the fix. In the
-    # NPM configuration they were at server level while `location /` defined its
-    # own proxy_set_header set through proxy.conf — and nginx inherits
+    # These sit HERE, inside `location /`, and that placement is half the fix. In
+    # the NPM configuration they were at server level while `location /` defined
+    # its own proxy_set_header set through proxy.conf — and nginx inherits
     # proxy_set_header from an outer level ONLY when the current level defines
     # none. So the overwrite never took effect in production, and the chain the
     # backend parsed was the appending one this comment was written to prevent.
+    #
+    # The other half is the include being proxy-COMMON.conf. Moving the directive
+    # into this level fixed the INHERITANCE problem and left a second one that
+    # reads the same way: proxy.conf's appending `X-Forwarded-For` was set at THIS
+    # level too, and two proxy_set_header directives for one name at one level do
+    # not replace each other — both headers are sent, appending first. Measured
+    # against nginx 1.29 with an echo upstream: `X-Forwarded-For: 8.8.8.8` arrived
+    # as `8.8.8.8, <edge>, <edge>`, so a right-to-left walk that trusts the edge
+    # range still resolved the client to 8.8.8.8 and REQ-SEC-011 was not met.
     proxy_set_header X-Forwarded-For   $remote_addr;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-Host  $host;

@@ -162,6 +162,27 @@ jobs:
       - name: Check the edge probe against the vhost allow-list
         run: python3 .github/scripts/check_probe_against_allowlist.py
 
+  e2e-device-matrix:
+    name: e2e-device-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
+      # copies of one another, and only ONE of the two drift directions is loud. A device the
+      # workflow names and the test does not fails the job with the sweep's own message; a class
+      # added to the test and forgotten in the workflow is measured by nobody, while the coverage
+      # assertion inside each runner is satisfied by the single class that runner was given. The
+      # touch-class work has already been through exactly this with `PAGES`, which was short by
+      # seventeen routes while its Javadoc and REQ-UI-009 both called it complete.
+      - name: Self-test the comparison
+        run: python3 .github/scripts/check_e2e_device_matrix.py --selftest
+
+      - name: Check the E2E device matrix against DEVICE_CLASSES
+        run: python3 .github/scripts/check_e2e_device_matrix.py
+
   sbom-coverage:
     name: sbom-coverage
     runs-on: ubuntu-latest
