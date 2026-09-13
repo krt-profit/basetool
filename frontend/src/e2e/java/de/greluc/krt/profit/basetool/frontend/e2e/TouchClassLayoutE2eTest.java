@@ -1254,14 +1254,21 @@ class TouchClassLayoutE2eTest {
         };
         const header = document.querySelector('header');
         const footer = document.querySelector('.krt-footer');
-        const main = document.querySelector('main');
+        // `main` OR `.page-wrapper`, the same pair the readiness gate above accepts:
+        // operation-detail.html renders no `<main>` at all and mission-detail.html gates its own on
+        // `th:if="${isNew}"`, so on an existing mission there is none either. Starting the walk at a
+        // null `main` runs it zero times and reports a 0px reserve, which reads exactly like the
+        // defect it is not — the reserve on those pages sits on the outer `.page-wrapper`. Letting
+        // the two pages BE measured without teaching the measurement where they keep their reserve
+        // is what turned both into standing findings on every wide device class.
+        const main = document.querySelector('main') || document.querySelector('.page-wrapper');
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
         const footerHeight = footer ? footer.getBoundingClientRect().height : 0;
         // The bottom reserve is not always on <main>. mission-detail.html (which also serves
         // /missions/new) puts it on an outer `.page-wrapper` and zeroes <main>'s own padding so the
         // two do not add up — a perfectly good arrangement that an assertion reading only <main>
-        // calls a defect. Summing the chain from <main> up to <body> measures what actually keeps
-        // content off the footer, wherever the page chose to put it.
+        // calls a defect. Summing the chain UP from the content root to <body> measures what
+        // actually keeps content off the footer, wherever the page chose to put it.
         let mainPaddingBottom = 0;
         for (let n = main; n && n !== document.body; n = n.parentElement) {
           mainPaddingBottom += parseFloat(getComputedStyle(n).paddingBottom) || 0;
