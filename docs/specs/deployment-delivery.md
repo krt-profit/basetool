@@ -125,8 +125,16 @@ down+up**: the app project *and* the monitoring project that references the shar
 on the forward apply **and** on the rollback. This is a brief full-stack outage, taken *only* on an
 actual `networks:` change; every ordinary config/app change keeps the fast rolling in-place `up`. It
 is **not** operator-gated (unlike the stateful-infra carve-out, REQ-OPS-006) — no data migration is
-involved, and the subnet pinning keeps the recreated gateways stable, so the NPM SSH-tunnel admin
+involved, and the subnet pinning keeps the recreated gateways stable, so the edge's SSH-tunnel admin
 allow-list stays valid.
+
+Pinning guarantees that an *existing* gateway keeps its address; it does not guarantee that the
+tunnel still arrives from one of the gateways the allow-list names. Adding or removing a bridge
+changes **which** leg the published ports DNAT over, and that is a `networks:` change like any other.
+`net-edge-ingress` did exactly this on 2026-09-12: every gateway in the allow-list kept its address
+and the Keycloak admin console still went dark, because the tunnel began arriving on the new bridge
+instead. **A `networks:` change that touches the edge's own attachments MUST be checked against the
+`/admin` allow-list in `docker/edge/conf.d/20-keycloak.conf.template` in the same change.**
 
 **Acceptance**
 

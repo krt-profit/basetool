@@ -700,6 +700,55 @@ val lintCssInline =
     inputs.file(".stylelintrc.templates.json")
   }
 
+// The JavaScript inside TouchClassLayoutE2eTest's Java text block, which no tool could read.
+//
+// That probe is ~500 lines evaluated in the page, and compiling the Java only proves the STRING is
+// valid. Two defects reached CI through that gap: `replaceAll("\s+", " ")`, where `\s` is a legal
+// Java escape for a space so the regex silently became `" +"`; and a guard referencing `badControls`
+// a hundred lines above its `const`, a temporal-dead-zone ReferenceError that turned all 66 routes
+// into "could not be measured" on every device class.
+//
+// `extractProbeJs` writes the script out with its format placeholders stubbed; `lintProbeJs` runs a
+// deliberately tiny rule set over it (see eslint.probe.config.mjs). Verified against the broken
+// revision: it reports `'badControls' was used before it was defined`.
+val probeSource =
+  layout.projectDirectory.file(
+    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java")
+val extractProbeScript = layout.projectDirectory.file("scripts/extract-probe-js.mjs")
+val extractedProbe = layout.buildDirectory.file("probe/probe.js")
+
+val extractProbeJs =
+  tasks.register<NodeTask>("extractProbeJs") {
+    group = "verification"
+    description = "Extracts the e2e probe script out of its Java text block so eslint can read it."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(extractProbeScript.asFile)
+    args.set(listOf(probeSource.asFile.absolutePath, extractedProbe.get().asFile.absolutePath))
+    ignoreExitValue.set(false)
+    inputs.file(probeSource)
+    inputs.file(extractProbeScript)
+    outputs.file(extractedProbe)
+  }
+
+val lintProbeJs =
+  tasks.register<NpxTask>("lintProbeJs") {
+    group = "verification"
+    description = "Lints the extracted e2e probe script (Java text blocks hide JavaScript defects)."
+    dependsOn(extractProbeJs)
+    command.set("eslint")
+    args.set(
+      listOf(
+        "--no-config-lookup",
+        "--config",
+        "eslint.probe.config.mjs",
+        extractedProbe.get().asFile.absolutePath,
+      )
+    )
+    ignoreExitValue.set(false)
+    inputs.file(extractedProbe)
+    inputs.file("eslint.probe.config.mjs")
+  }
+
 val lintHtml =
   tasks.register<NpxTask>("lintHtml") {
     group = "verification"
@@ -856,6 +905,7 @@ tasks.named("check").configure {
   dependsOn(
     lintCss,
     lintCssInline,
+    lintProbeJs,
     lintHtml,
     lintJs,
     prettierCheck,
