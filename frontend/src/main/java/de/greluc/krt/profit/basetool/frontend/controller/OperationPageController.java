@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionFinanceSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionListDto;
@@ -85,6 +86,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * by anything next to the code. A method-level gate still wins where one is present.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/operations")
 @RequiredArgsConstructor
 @Slf4j

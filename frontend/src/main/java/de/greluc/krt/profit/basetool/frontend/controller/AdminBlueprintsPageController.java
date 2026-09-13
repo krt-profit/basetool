@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,6 +47,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * list rather than a 500.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/blueprints")
 @RequiredArgsConstructor
 @Slf4j

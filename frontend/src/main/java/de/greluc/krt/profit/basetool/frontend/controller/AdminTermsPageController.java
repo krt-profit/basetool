@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsAcceptanceStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -50,6 +51,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * consent in the fleet to refresh a page that is opened a handful of times per terms change.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("hasRole('ADMIN')")

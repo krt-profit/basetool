@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAccountDetailDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankBookingDto;
@@ -54,6 +55,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * sparkline series into SVG polyline points and fills the model.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 public class BankPageController {

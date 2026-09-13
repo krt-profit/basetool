@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OrgChartDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -55,6 +56,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * prompt a reload).
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/org-chart")
 @RequiredArgsConstructor
 @Slf4j

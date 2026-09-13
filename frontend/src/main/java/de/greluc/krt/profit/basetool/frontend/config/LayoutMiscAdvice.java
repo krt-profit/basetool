@@ -45,8 +45,14 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  *
  * <p>The backend round-trip for the notification count degrades gracefully: a hiccup hides the
  * badge (count 0) rather than breaking the chrome.
+ *
+ * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
+ * they serialise through Jackson and never read a model attribute. See that annotation for why the
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
+ * is one uncached backend read ({@code /api/v1/notifications/unread-count}) per authenticated
+ * request.
  */
-@ControllerAdvice
+@ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 @Slf4j
 public class LayoutMiscAdvice {

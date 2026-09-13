@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  */
 @Slf4j
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 public class TermsController {
 

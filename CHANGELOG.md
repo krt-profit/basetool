@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Bearbeitungen in der Weboberfläche lösen weniger Serverabfragen aus.** Jeder JSON-Aufruf — also
+  jedes Speichern, Umschalten und Nachladen ohne Seitenwechsel — hat bisher zusätzlich fünf
+  Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
+  Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
+  entfallen.
+
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
 ### Fixed

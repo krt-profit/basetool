@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * (DSGVO Art. 13/14) and renders a fixed template without backend data.
  */
 @Controller
+@UsesLayoutModel
 public class PrivacyController {
 
   /**

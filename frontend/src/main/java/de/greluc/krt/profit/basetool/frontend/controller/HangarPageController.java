@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ManufacturerDto;
@@ -79,6 +80,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * the entire org's hangar into a count-per-type table.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/hangar")
 @RequiredArgsConstructor
 @Slf4j

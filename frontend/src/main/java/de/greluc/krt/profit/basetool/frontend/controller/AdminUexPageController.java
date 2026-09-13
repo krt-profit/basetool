@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OutpostDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -77,6 +78,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * next UEX sweep restores the value, {@code yes}/{@code no} pin the flag.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/uex-data")
 @RequiredArgsConstructor
 @Slf4j
