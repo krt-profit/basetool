@@ -14,6 +14,11 @@ name: Repo Lint
 #   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
 #                   SBOM end to end: plugin, committed file, regenerated at
 #                   release time, attested and attached to the Release.
+#   - adr-numbering -> no two ADRs share a number, and a new one does not take
+#                   a number the base already holds. Parallel branches each
+#                   pick "the next free number" from their own checkout, so two
+#                   of them land on the same one; 0154 named two accepted
+#                   decisions on main for eleven days before anyone noticed.
 #
 # Each linter runs from its pinned release binary (shellcheck ships
 # preinstalled on the runner), so no third-party action enters the supply
@@ -181,6 +186,50 @@ jobs:
       # whether it ships -- the decision both drifts skipped.
       - name: Check SBOM coverage of every shipped module
         run: python3 .github/scripts/check_sbom_coverage.py
+
+  adr-numbering:
+    name: adr-numbering
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # fetch-depth: 0 so the checker can compute the merge-base against the
+          # base branch; a shallow checkout has none and the base-collision
+          # check would silently degrade to "no new ADRs".
+          fetch-depth: 0
+
+      - name: Fetch base branch tip
+        if: github.event_name == 'pull_request'
+        # Brings the base into origin/<base_ref> so the checker can resolve both
+        # the ref and the merge-base against it. Compared against the freshly
+        # fetched tip rather than the PR event's base.sha, so a number that
+        # landed on main after the PR opened is caught on the next re-run.
+        run: git fetch --no-tags origin "${{ github.base_ref }}"
+
+      # The suite runs FIRST so the gate can never pass vacuously: it asserts
+      # that a duplicate, a number already held on the base, and an inherited
+      # duplicate all still fail, while a squash-merge-in-flight and an ADR
+      # filling a gap BELOW the base tip still pass. That last one is what
+      # separates this from the Flyway checker -- an open PR routinely holds a
+      # number main has already passed, and rejecting it would be churn.
+      - name: Self-test the ADR numbering checker
+        # chmod first, like the other script-backed gates: this repo is
+        # developed on Windows where core.filemode=false, so the executable bit
+        # is easy to lose on a re-add and the job would die with exit 126.
+        run: |
+          chmod +x scripts/check-adr-numbering.sh scripts/check-adr-numbering.test.sh
+          scripts/check-adr-numbering.test.sh
+
+      # On push-to-main ADR_BASE_REF is empty, so only the duplicate check runs
+      # -- which is the point: it is the one check that sees a duplicate that
+      # has already landed, and it makes main go red the same day rather than
+      # eleven days later. ADR-0171.
+      - name: Check ADR numbering
+        env:
+          ADR_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: scripts/check-adr-numbering.sh
 
   monitoring-image-pins:
     name: monitoring-image-pins

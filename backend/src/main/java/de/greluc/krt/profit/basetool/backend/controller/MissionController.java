@@ -477,7 +477,7 @@ public class MissionController {
    * 2026-09-02 so a client with a sign-up sheet no longer has to reach for {@code
    * /participants/add} to carry them: that endpoint can name anybody and is deliberately not on the
    * API vhost's allow-list, so the Android app's sign-up was refused at the edge and never reached
-   * this service at all (ADR-0154). Adding an <em>optional</em> body is the additive half of
+   * this service at all (ADR-0170). Adding an <em>optional</em> body is the additive half of
    * REQ-API-009, which freezes this operation — a bodyless {@code POST} keeps behaving exactly as
    * it did, which is what every shipped build sends.
    *

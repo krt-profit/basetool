@@ -1,4 +1,4 @@
-# ADR-0154 — Self-enrolment carries the sign-up sheet's answers, rather than borrowing the add-anybody endpoint
+# ADR-0170 — Self-enrolment carries the sign-up sheet's answers, rather than borrowing the add-anybody endpoint
 
 > **Status:** Accepted · **Date:** 2026-09-02 · **Deciders:** @greluc
 > **Related:** `REQ-API-009` (the external contract set), `REQ-MISSION-002` (the profile-default
@@ -6,6 +6,21 @@
 > [ADR-0136](0136-external-contract-set-for-shipped-clients.md),
 > `MissionController#joinMission`, `JoinMissionRequest`,
 > [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md)
+
+## Renumbered from ADR-0154 — 2026-09-13
+
+This ADR was published as **ADR-0154** from 2026-09-02 until 2026-09-13. That number named two
+different decisions on `main` at once: this one and
+[ADR-0154](0154-a-container-written-final-session-value-gets-a-forced-type-id.md), the forced type id
+for a container-written final session value, which reached `main` in the same release commit. This
+one moved because it is the less referenced of the two — the other is the subject of a follow-up
+decision chain that argues with it **by number** eleven times in
+[ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) alone.
+
+**The decision, its date, its status and its content are unchanged; only the number and the filename
+moved.** A link to `docs/adr/0154-self-enrolment-carries-the-sign-up-sheets-answers.md` held outside
+this repository no longer resolves. Why the sequence collided and what now prevents it:
+[ADR-0171](0171-an-adr-number-is-claimed-against-the-base-branch.md).
 
 ## Context
 
