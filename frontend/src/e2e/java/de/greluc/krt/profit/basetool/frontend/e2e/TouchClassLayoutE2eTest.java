@@ -25,6 +25,7 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -205,7 +206,8 @@ class TouchClassLayoutE2eTest {
   private static final String SCREENSHOT_ENGINE = "chromium";
 
   /**
-   * How many of {@link #PAGES} a device class must actually measure before the run counts.
+   * How many of {@link FrontendPageRoutes#PAGES} a device class must actually measure before the
+   * run counts.
    *
    * <p>A floor, not a target: it exists so a sweep that skipped everything cannot report clean. The
    * relative check in {@link #reportCoverage} is the real guard; this only catches the case where
@@ -264,124 +266,20 @@ class TouchClassLayoutE2eTest {
           new int[] {1280, 800},
           new int[] {1600, 900});
 
-  /**
-   * Every route the frontend answers with a page, taken from its {@code @GetMapping}s rather than
-   * chosen.
-   *
-   * <p>This is the full list of routes that need no path variable — the detail views are reached
-   * from seeded entities instead (see the detail sweep). Entries that turn out not to be pages at
-   * all are **skipped at runtime**, not guessed at here: a Basetool page is recognised by its app
-   * shell, and a fragment or JSON endpoint simply does not have one. Keeping the non-pages in the
-   * list and letting the run classify them is deliberate — it is how a route that quietly stops
-   * rendering a shell shows up, instead of being silently absent from a curated list.
-   *
-   * <p>Only three kinds of route are left out, and none of them by judgement: the {@code /api/**}
-   * proxies, the two machine descriptors ({@code assetlinks.json}, {@code manifest.webmanifest}),
-   * and {@code /csrf}.
-   *
-   * <p><b>This list is hand-maintained and was wrong once.</b> Seventeen page routes were absent
-   * until 2026-09-13 while this Javadoc and {@code REQ-UI-009}'s "Enforced by" clause both said
-   * every route was covered. {@code CorePagesSmokeE2eTest} and {@code AdminPagesSmokeE2eTest}
-   * maintain their own copies of the same information, so three lists now have to agree by hand;
-   * folding them into one home on {@code E2eSupport} is the obvious next step and is deliberately
-   * not done here, where it would ride along with an unrelated change.
-   */
-  private static final List<String> PAGES =
-      List.of(
-          "/",
-          "/missions",
-          "/missions/new",
-          "/operations",
-          "/orders",
-          "/orders/create",
-          "/orders/material-demand",
-          "/refinery-orders",
-          "/refinery-orders/create",
-          "/inventory",
-          "/inventory/all",
-          "/inventory/my",
-          "/inventory/input",
-          "/bank",
-          "/bank/requests",
-          "/bank/grants",
-          "/bank/manage",
-          "/org-unit-bank",
-          "/materialboerse",
-          "/materials",
-          "/materials/overview",
-          "/materials/profit-calculation",
-          "/hangar",
-          "/hangar/squadron",
-          "/ship-data",
-          "/blueprint-overview",
-          "/personal-inventory",
-          "/personal-inventory/blueprints",
-          "/notifications",
-          "/org-chart",
-          "/profile",
-          "/promotion/overview",
-          "/promotion/my-evaluations",
-          "/promotion/manage",
-          "/promotion/admin/topics",
-          "/promotion/admin/rank-requirements",
-          "/admin/audit-log",
-          "/admin/bank",
-          "/admin/bank-audit",
-          "/admin/sync-reports",
-          "/admin/sync-reports/uex",
-          "/admin/sync-reports/scwiki",
-          "/admin/terms",
-          // Seventeen routes were missing until 2026-09-13, each a class-level @RequestMapping plus
-          // a bare @GetMapping returning a view, and the Javadoc above claimed completeness the
-          // whole time. `/organisation/leitung` is the one that shows what that costs: this very
-          // change adds `.leitung-group-actions` and `.leitung-modal-actions` to the phone
-          // flex-wrap fix, and the page carrying them was never loaded, so the fix shipped
-          // unmeasured while the spec recorded the requirement as measured.
-          // `/members` is the member-administration table — one of the widest in the app, so
-          // exactly the shape that overflows a phone — and it was in AdminPagesSmokeE2eTest's list
-          // but not this one. Three hand-maintained lists of the same routes is the standing
-          // problem; `test-support` already ships `EndpointEnumeration.mappings(...)` and is on
-          // this
-          // compile classpath, which is the way out.
-          "/members",
-          "/admin/settings",
-          "/admin/locations",
-          "/admin/blueprints",
-          "/admin/default-blueprints",
-          "/admin/discord-registrations",
-          "/admin/material-aliases",
-          "/admin/materials",
-          "/admin/mission-data",
-          "/admin/notification-rules",
-          "/admin/org-structure",
-          "/admin/announcement",
-          "/admin/personal-inventory",
-          "/admin/personal-blueprints",
-          "/admin/special-commands",
-          "/admin/uex-data",
-          "/organisation/leitung",
-          // Measured with an APPROVED session, which this route redirects away from, so it skips
-          // at every class and cancels out of the coverage comparison. It is listed anyway: the day
-          // it stops redirecting, it is a page like any other and wants measuring.
-          "/pending-approval",
-          // NOT `/admin/p4k-import/jobs` — that is the page's JSON polling endpoint
-          // (@ResponseBody List<P4kImportJobDto>), which the first sweep proved by reporting it as
-          // having no footer at all. The page itself is this one.
-          "/admin/p4k-import",
-          "/impressum",
-          "/privacy",
-          "/terms");
-
-  /**
-   * The list routes that own a {@code /{id}} detail view.
-   *
-   * <p>Used only to say so when one of them renders no row: the detail view then goes unmeasured,
-   * and that is worth printing rather than passing over in silence. It is NOT a failure — an empty
-   * list is a legitimate state of a fresh or shared stack, and the {@code smoke} tag exists so this
-   * can run against one.
-   */
-  private static final Set<String> DETAIL_LIST_PAGES =
-      Set.of("/missions", "/operations", "/orders", "/refinery-orders");
+  // THE ROUTE LIST USED TO LIVE HERE, hand-maintained, and it was wrong once: seventeen page routes
+  // were absent until 2026-09-13 while the Javadoc in this place and REQ-UI-009's "Enforced by"
+  // clause both said every route was covered. CorePagesSmokeE2eTest and AdminPagesSmokeE2eTest kept
+  // their own copies of the same information, so three lists had to agree by hand, and did not.
+  //
+  // It is now `FrontendPageRoutes.PAGES` in the `test-support` module, and PageRouteCatalogueTest
+  // fails the build when the dispatcher answers a variable-free GET route that is in no list at
+  // all — so what was "somebody remembered" is a gate. The catalogue lives there rather than on
+  // E2eSupport because that gate has to run in `check`, which does not compile this source set.
+  //
+  // What has NOT changed is how a page is recognised: at runtime, by its app shell. An entry that
+  // turns out not to be a page is skipped by the sweep below, never filtered out of the catalogue —
+  // which is how a route that quietly stops rendering its shell surfaces here, instead of vanishing
+  // from a curated list.
 
   private static Playwright playwright;
   private static Browser browser;
@@ -459,7 +357,7 @@ class TouchClassLayoutE2eTest {
         Set<String> measuredDetails = new LinkedHashSet<>();
         measuredByDevice.put(deviceLabel, measured);
         detailsByDevice.put(deviceLabel, measuredDetails);
-        for (String path : PAGES) {
+        for (String path : FrontendPageRoutes.PAGES) {
           // One page that hangs must not end the audit: the whole point is to name every offender,
           // so a failure to measure is itself a finding and the sweep carries on.
           findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height, measured));
@@ -475,7 +373,7 @@ class TouchClassLayoutE2eTest {
           if (detail != null) {
             findings.addAll(
                 measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
-          } else if (DETAIL_LIST_PAGES.contains(path)) {
+          } else if (FrontendPageRoutes.DETAIL_LIST_PAGES.contains(path)) {
             // Named, not silently skipped - this is the half the comment above promised and the
             // code did not do. It is reported rather than failed because an empty list is a
             // legitimate state of a fresh or shared stack, which is exactly what the `smoke` tag
@@ -512,8 +410,8 @@ class TouchClassLayoutE2eTest {
    * shrinks that class's set and is named here. One absolute floor guards the degenerate case where
    * nothing is measured anywhere.
    *
-   * @param measuredByDevice per device class, the {@link #PAGES} routes that reached the
-   *     measurement
+   * @param measuredByDevice per device class, the {@link FrontendPageRoutes#PAGES} routes that
+   *     reached the measurement
    * @param detailsByDevice per device class, the detail views reached by following a list link —
    *     reported but never compared, since which one a list renders varies per run
    * @param uncoveredLists list pages that rendered no row, so their detail view went unmeasured
@@ -530,7 +428,7 @@ class TouchClassLayoutE2eTest {
                 "[touch-layout] coverage %-10s %d of %d routes measured, plus %d detail view(s)%n",
                 device,
                 measured.size(),
-                PAGES.size(),
+                FrontendPageRoutes.PAGES.size(),
                 detailsByDevice.getOrDefault(device, Set.of()).size()));
     uncoveredLists.forEach(line -> System.out.println("[touch-layout] uncovered " + line));
 
@@ -559,7 +457,7 @@ class TouchClassLayoutE2eTest {
           String.format(
               "coverage floor: no device class measured more than %d of %d routes (minimum %d) —"
                   + " the sweep did not run, it skipped",
-              widest, PAGES.size(), MIN_MEASURED_ROUTES));
+              widest, FrontendPageRoutes.PAGES.size(), MIN_MEASURED_ROUTES));
     }
     measuredByDevice.forEach(
         (device, measured) -> {

@@ -96,17 +96,8 @@ public final class EndpointEnumeration {
         context.getBean(MAPPING_BEAN, RequestMappingHandlerMapping.class);
     Set<Call> calls = new LinkedHashSet<>();
     for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
-      Set<String> patterns = new TreeSet<>();
-      if (info.getPathPatternsCondition() != null) {
-        info.getPathPatternsCondition()
-            .getPatterns()
-            .forEach(pattern -> patterns.add(pattern.getPatternString()));
-      }
-      Set<HttpMethod> verbs = new LinkedHashSet<>();
-      info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
-      if (verbs.isEmpty()) {
-        verbs.add(HttpMethod.GET);
-      }
+      Set<String> patterns = patternsOf(info);
+      Set<HttpMethod> verbs = verbsOf(info);
       for (String pattern : patterns) {
         String path = substituteVariables(pattern);
         if (path == null) {
@@ -120,6 +111,74 @@ public final class EndpointEnumeration {
     List<Call> ordered = new ArrayList<>(calls);
     ordered.sort((a, b) -> a.toString().compareTo(b.toString()));
     return ordered;
+  }
+
+  /**
+   * Every path pattern the dispatcher answers with the given verb, <b>unsubstituted</b>.
+   *
+   * <p>The counterpart to {@link #mappings}, and the difference is the whole reason it exists: that
+   * one hands back concrete paths ready for {@code MockMvc}, which is what a sweep that issues
+   * calls needs and which throws away whether the pattern had a variable at all. A caller that has
+   * to tell {@code /missions} from {@code /missions/{id}} cannot recover that from {@code
+   * /missions/00000000-0000-4000-8000-000000000000}, except by recognising the substitution values
+   * — a coupling to this class's internals that would break silently if they changed.
+   *
+   * <p>Unlike {@link #mappings}, a pattern that cannot be made concrete is <b>kept</b>: a caller
+   * asking what the dispatcher routes wants to hear about {@code /assets/**} even though no single
+   * spelling of it can be issued.
+   *
+   * <p>A mapping with no declared verb matches every verb and is therefore reported for whichever
+   * one is asked for, which is the same reading {@link #mappings} takes when it issues such a
+   * mapping as {@code GET}.
+   *
+   * @param context the web application context whose dispatcher to read
+   * @param verb the verb to report patterns for
+   * @return the matching patterns, deduplicated and in lexicographic order
+   */
+  public static List<String> patterns(WebApplicationContext context, HttpMethod verb) {
+    RequestMappingHandlerMapping handlerMapping =
+        context.getBean(MAPPING_BEAN, RequestMappingHandlerMapping.class);
+    Set<String> matched = new TreeSet<>();
+    for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
+      if (verbsOf(info).contains(verb)) {
+        matched.addAll(patternsOf(info));
+      }
+    }
+    return List.copyOf(matched);
+  }
+
+  /**
+   * The path patterns one mapping declares.
+   *
+   * @param info the mapping to read
+   * @return its pattern strings, in lexicographic order; empty when it declares none
+   */
+  private static Set<String> patternsOf(RequestMappingInfo info) {
+    Set<String> patterns = new TreeSet<>();
+    if (info.getPathPatternsCondition() != null) {
+      info.getPathPatternsCondition()
+          .getPatterns()
+          .forEach(pattern -> patterns.add(pattern.getPatternString()));
+    }
+    return patterns;
+  }
+
+  /**
+   * The verbs one mapping answers.
+   *
+   * <p>A mapping with no declared verb (rare, but legal) answers every verb; it is reported as
+   * {@code GET}, because the read is the one that would leak.
+   *
+   * @param info the mapping to read
+   * @return its verbs, never empty
+   */
+  private static Set<HttpMethod> verbsOf(RequestMappingInfo info) {
+    Set<HttpMethod> verbs = new LinkedHashSet<>();
+    info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
+    if (verbs.isEmpty()) {
+      verbs.add(HttpMethod.GET);
+    }
+    return verbs;
   }
 
   /**

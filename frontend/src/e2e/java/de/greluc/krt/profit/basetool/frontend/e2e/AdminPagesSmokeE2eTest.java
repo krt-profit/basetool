@@ -27,13 +27,14 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
+import de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.FieldSource;
 
 /**
  * Non-destructive page-load smoke for the ADMIN-only management pages that had no end-to-end
@@ -50,6 +51,14 @@ import org.junit.jupiter.params.provider.ValueSource;
  * fails loudly. Pages already covered by a dedicated flow ({@code /admin/settings}, {@code
  * /admin/materials}, {@code /admin/special-commands}, {@code /admin/default-blueprints}, {@code
  * /admin/bank}, {@code /admin/audit-log}, {@code /admin/mission-data}) are intentionally omitted.
+ *
+ * <p><b>The routes come from {@link FrontendPageRoutes#ADMIN_SMOKE}</b>, not from a list in this
+ * file. Until 2026-09-13 this class, {@code CorePagesSmokeE2eTest} and {@code
+ * TouchClassLayoutE2eTest} each enumerated the frontend's page routes by hand, and the three
+ * disagreed — the largest was short by seventeen, including {@code /members}, which was in this
+ * class's list but not in the sweep's. The omissions above remain a judgement about test value
+ * rather than a fact about the mappings, so that slice stays curated; what {@code
+ * PageRouteCatalogueTest} now guarantees is that every entry in it is a page route that exists.
  */
 @Tag("e2e")
 class AdminPagesSmokeE2eTest {
@@ -97,23 +106,7 @@ class AdminPagesSmokeE2eTest {
    * @param path the app-relative path of the admin page to load
    */
   @ParameterizedTest(name = "admin page {0} loads")
-  @ValueSource(
-      strings = {
-        "/members",
-        "/organisation/leitung",
-        "/admin/locations",
-        "/admin/material-aliases",
-        "/admin/uex-data",
-        "/admin/discord-registrations",
-        "/admin/sync-reports",
-        "/admin/p4k-import",
-        "/admin/announcement",
-        "/admin/notification-rules",
-        "/admin/org-structure",
-        "/admin/blueprints",
-        "/admin/personal-inventory",
-        "/admin/personal-blueprints"
-      })
+  @FieldSource("de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes#ADMIN_SMOKE")
   void adminPageLoads(String path) {
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =
