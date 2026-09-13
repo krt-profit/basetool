@@ -149,11 +149,20 @@ cannot read the stylesheet cannot be the thing that follows it:
    contributed the bare class `btn`, which exempted **every button in the app** down to 32px. The
    subject is now kept as a selector and matched with `Element.matches`.
 
-**Risk accepted.** The wrap rule changes behaviour on rows nobody enumerated, which is the point and
-also the exposure: a flex row that relied on the initial `nowrap` without declaring it now wraps on
-the phone class. The zero-specificity form is the mitigation — any row that must not break says
-`flex-wrap: nowrap` and wins outright — and `TouchClassLayoutE2eTest` measures overflow on every page
-at every touch width.
+**Risk accepted, and one instance of it found.** The wrap rule changes behaviour on rows nobody
+enumerated, which is the point and also the exposure: a flex row that relied on the initial `nowrap`
+without declaring it now wraps on the phone class. The zero-specificity form is the mitigation — any
+row that must not break says `flex-wrap: nowrap` and wins outright — and `TouchClassLayoutE2eTest`
+measures overflow on every page at every touch width.
+
+The case that matters is a **column** container, because a column flex container that wraps lays its
+overflow into a *second column* rather than scrolling. A sweep of every `flex-direction: column` rule
+in the stylesheets found exactly two whose height is genuinely capped rather than floored:
+`.krt-modal` (`max-height: 90vh`) and `.krt-modal > form`, which inherits that cap through the flex
+layout with its `min-height: 0` — and a form's direct children are inputs and buttons, so it matches.
+Both now say `nowrap`. Everything else (`.sidebar-content`, the search-form columns, `.drop-zone`)
+constrains itself with `min-height`, which is a floor and can never make a flex line run out of
+space.
 
 **Not done here.** `.close-modal` is a `<span>` in `admin/mission-data.html`'s three dialogs, so it
 is reached by no element selector on either side; the touch block keeps an explicit `min-height` for
