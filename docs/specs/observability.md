@@ -1777,7 +1777,7 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
 - [ ] `EdgeForceSslRedirectBroken` fires when port 80 of a public vhost stops redirecting to
   `https://`; `EdgeHstsHeaderMissing` fires when the frontend's first response drops the header.
 - [ ] The scheduled `edge-deny-probe` workflow fails when
-  `https://keycloak.profit-base.online/admin/` answers 2xx/3xx from a GitHub runner or the
+  `https://profit-base.online/auth/admin/` answers 2xx/3xx from a GitHub runner or the
   `/actuator` paths stop answering 404 externally.
 - [ ] `TargetDown` does **not** fire for any blackbox `/probe` job whose `up==0` (scrape-timeout
   artifact), but still fires for the `blackbox-exporter` self-scrape and every non-probe job

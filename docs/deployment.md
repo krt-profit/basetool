@@ -1164,10 +1164,19 @@ Nothing stored is lost. Sessions end, and members sign in again.
 
 **Order matters, because the certificate and the DNS are what break loudly.**
 
-1. **Ship the matching Android build first**, or accept that the app is dead between steps 4 and
+1. **Add the new Discord redirect URI first — this one is outside our infrastructure.** Keycloak's
+   Discord broker endpoint moves with the path, to
+   `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`, and **Discord validates the
+   redirect URI against the list in its developer portal**. An unchanged registration fails every
+   Discord login with `Invalid OAuth2 redirect_uri` — raised by Discord, before Keycloak is reached,
+   so nothing in this repository or its CI can catch it. Discord accepts several redirect URIs per
+   application: **add** the new one alongside the old rather than replacing it, and the switch is
+   seamless in both directions. Remove the old entry once step 8 is done.
+   See [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
+2. **Ship the matching Android build**, or accept that the app is dead between steps 5 and
    that build reaching its testers. `OIDC_ISSUER` moves with the server; a build pinned to
    `https://keycloak.profit-base.online/realms/iri` cannot authenticate afterwards.
-2. **Pull the new bundle** and check the edge before it serves anything:
+3. **Pull the new bundle** and check the edge before it serves anything:
 
    ```bash
    scripts/check-edge-nginx.sh
@@ -1176,21 +1185,21 @@ Nothing stored is lost. Sessions end, and members sign in again.
    It renders every vhost template and runs `nginx -t` with throwaway certificates. Four vhosts is
    the expected count now, not five.
 
-3. **Update the host `.env`:** delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from
+4. **Update the host `.env`:** delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from
    `ACME_HOSTS`. Leaving them costs nothing at run-time — the edge simply ignores an unused
    variable — but the certificate keeps a SAN for a name nothing serves.
 
-4. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
+5. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
    (`KC_HTTP_RELATIVE_PATH`), advertising `https://profit-base.online` (`KC_HOSTNAME`, origin only —
    see the ADR for why the path must *not* be repeated there), and with its management interface
    still at the root, so the container healthcheck's `/health/ready` and Prometheus's `/metrics`
    are unaffected.
 
-5. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
+6. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
    A service left on the old issuer rejects every token with a signature/issuer mismatch, which
    reads in the log as a Keycloak outage rather than as a stale container.
 
-6. **Verify, from outside:**
+7. **Verify, from outside:**
 
    ```bash
    curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration      | grep -o '"issuer":"[^"]*"'
@@ -1199,10 +1208,13 @@ Nothing stored is lost. Sessions end, and members sign in again.
    It must read `https://profit-base.online/auth/realms/iri`. A doubled `/auth/auth` here is the
    one misconfiguration this arrangement invites — see ADR-0166.
 
-7. **Sign in through the web app**, then **sign out**: the end-session redirect is the navigation
-   that used to leave the origin, and it is the half no automated test covers.
+8. **Sign in through the web app**, then **sign out**, and do it **once through Discord** as well:
+   the end-session redirect is the navigation that used to leave the origin, and the Discord broker
+   round trip is the one that depends on step 1 having been done. Neither half is covered by an
+   automated test — the e2e suite signs in with a local realm user against a stack that has no
+   Discord provider.
 
-8. **Retire `keycloak.profit-base.online` in DNS** once the above passes. Until then it resolves to
+9. **Retire `keycloak.profit-base.online` in DNS** once the above passes. Until then it resolves to
    an edge with no vhost for it, which answers from the default server block rather than serving
    Keycloak — harmless, but it will not work as a fallback and is not meant to.
 

@@ -15,12 +15,26 @@ committed. The redacted shape of the Keycloak side is in
 
 ## 0. What you will need
 
-|                   Value                   |                                                              Where it comes from                                                              |
-|-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| Discord **Client ID** + **Client Secret** | the Discord application (step 1)                                                                                                              |
-| Discord redirect URI                      | `https://<keycloak-host>/realms/iri/broker/discord/endpoint` (prod: `https://keycloak.profit-base.online/realms/iri/broker/discord/endpoint`) |
-| **Guild ID** of the das-kartell server    | Discord client → Developer Mode → right-click the server → *Copy Server ID*                                                                   |
-| **KRT-Mitglied role ID**                  | Server Settings → Roles → right-click *KRT-Mitglied* → *Copy Role ID* (numeric, **not** the name)                                             |
+|                   Value                   |                                                                                 Where it comes from                                                                                 |
+|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Discord **Client ID** + **Client Secret** | the Discord application (step 1)                                                                                                                                                    |
+| Discord redirect URI                      | `https://<keycloak-base>/realms/iri/broker/discord/endpoint` (prod: `https://profit-base.online/auth/realms/iri/broker/discord/endpoint` — note the `/auth`, see the warning below) |
+| **Guild ID** of the das-kartell server    | Discord client → Developer Mode → right-click the server → *Copy Server ID*                                                                                                         |
+| **KRT-Mitglied role ID**                  | Server Settings → Roles → right-click *KRT-Mitglied* → *Copy Role ID* (numeric, **not** the name)                                                                                   |
+
+> [!warning] The redirect URI moved on 2026-09-13 and Discord holds a copy of it
+> Keycloak used to answer on a host of its own; since
+> [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) it answers at `/auth` on the web
+> origin, so the broker endpoint it generates is now
+> `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`. **Discord validates the
+> redirect URI against the list registered in its developer portal**, so an unchanged registration
+> fails every Discord login with `Invalid OAuth2 redirect_uri` — at Discord, before Keycloak is
+> reached, which is why nothing in this repository can catch it.
+>
+> Discord accepts **several** redirect URIs per application, so add the new one **before** the
+> cutover rather than swapping it: both are then valid, the switch is seamless, and the old entry
+> can be removed afterwards. That ordering is step 1 of the cutover runbook in
+> [`deployment.md`](../deployment.md).
 
 Enable **Developer Mode** in Discord (User Settings → Advanced) to get the *Copy ID* options.
 

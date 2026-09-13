@@ -1052,8 +1052,8 @@ subnet.** There is a single public `:443` ingress: the published-port DNAT targe
 leg on `net-proxy-frontend` (`[fd00:28:3::2]` / `172.28.3.2`) and NPM selects the vhost by SNI only
 after accepting the connection, so keycloak/ingest/grafana already key on the real client IP too. The
 bridge-gateway addresses that dominate those hosts' logs are internal hairpin traffic (blackbox
-probes + the apps' OIDC hairpins to `keycloak.profit-base.online`), not masked external clients
-(verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
+probes + the apps' OIDC hairpins, which since ADR-0166 go to `profit-base.online/auth` rather than
+to a Keycloak host of its own), not masked external clients (verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
 
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
