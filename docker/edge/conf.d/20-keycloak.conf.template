@@ -19,20 +19,35 @@ server {
   # --- Admin console -------------------------------------------------------
   # The ACL matches $remote_addr, which is the TCP peer. Traffic tunnelled from
   # the host reaches the edge through docker-proxy, so its peer address is the
-  # bridge gateway, not the operator's address. That is why these four gateways
-  # are the allow list, and why the deny has to be asserted from a GitHub runner
+  # bridge gateway, not the operator's address. That is why gateways are the
+  # allow list, and why the deny has to be asserted from a GitHub runner
   # rather than the internal blackbox exporter: a probe that shares the
   # subject's network position cannot test a network-position rule.
+  #
+  # WHICH gateway is not a free choice: it is the one the published :443 DNATs
+  # over. Since the five net-proxy-* bridges became `internal: true` that is
+  # net-edge-ingress and nothing else, so the four upstream gateways are kept
+  # for an in-container caller while the operator's tunnel arrives on
+  # 172.28.15.1. Adding the ingress bridge without adding it here locked the
+  # console out completely — every tunnelled request answered 403, which reads
+  # as a broken tunnel and is not one.
+  #
+  # Both families of the dual-stack ingress bridge are listed. A tunnel written
+  # `-L 443:localhost:443` resolves to ::1 on a dual-stack host and then arrives
+  # on fd00:28:15::1; one word of difference in the ssh command must not decide
+  # whether the console opens.
   #
   # `deny all;` is load-bearing. nginx's access module denies nothing
   # implicitly — an `allow` list without the closing `deny all` reads as a
   # lockdown and is open to the internet. The 2026-07-03 audit found exactly
   # that on this location.
   location /admin {
-    allow 172.28.3.1;   # net-proxy-frontend gateway
-    allow 172.28.4.1;   # net-proxy-keycloak gateway
-    allow 172.28.7.1;   # net-proxy-ingest gateway
-    allow 172.28.13.1;  # net-proxy-api gateway
+    allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives
+    allow fd00:28:15::1; # net-edge-ingress gateway, IPv6
+    allow 172.28.3.1;    # net-proxy-frontend gateway
+    allow 172.28.4.1;    # net-proxy-keycloak gateway
+    allow 172.28.7.1;    # net-proxy-ingest gateway
+    allow 172.28.13.1;   # net-proxy-api gateway
     deny all;
 
     include /etc/nginx/edge/include/proxy.conf;

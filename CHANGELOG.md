@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Die Keycloak-Verwaltungsoberfläche ist über den SSH-Tunnel wieder erreichbar.** Seit die
+  veröffentlichten Ports auf einer eigenen Netzwerkbrücke liegen, kam der Tunnel am Edge unter einer
+  Adresse an, die nicht auf der Freigabeliste von `/admin` stand — jede Anfrage endete mit 403. Die
+  Adresse ist jetzt eingetragen, IPv4 und IPv6; von außen bleibt die Konsole gesperrt. Für
+  Mitglieder ändert sich nichts.
+
 - **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
   Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
   Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
