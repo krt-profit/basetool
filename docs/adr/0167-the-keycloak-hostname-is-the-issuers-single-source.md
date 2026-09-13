@@ -78,6 +78,30 @@ here.
 - **C** — the services within one stack agree with each other.
 - **D** — the `application*.yml` fallback defaults name the issuer `docker-compose.yml` deploys, so
   an app started without `KEYCLOAK_ISSUER_URI` does not quietly trust a retired one.
+- **E** — Grafana's three OIDC endpoints sit on that issuer. They derive from the same variable now
+  (see below), and the rule checks both that they still do and that they follow an override.
+- **F** — the four Prometheus identity probe targets name the deployed identity base, and all three
+  required probes are still present.
+
+**The monitoring stack derives from the same variable.** Grafana's `generic_oauth` has no discovery
+option, so `docker-compose.monitoring.yml` names the authorize, token and userinfo URLs one at a
+time — the realm base appeared three times, in three places that could each drift alone. All three
+now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. That works because both compose projects run
+with the same `--project-directory` (`/var/iri/code`) and compose reads `.env` from there, so one
+value feeds the app stack and the monitoring stack alike. A monitoring stack started from elsewhere
+gets the production default, exactly as before. Rendered output with the variable unset is
+byte-identical to what shipped.
+
+**`prometheus.yml` is the one identity surface that cannot be derived, so it is compared.** Nothing
+interpolates that file — it is loaded as written and validated by `promtool` — so a domain move never
+reaches it on its own. Rule F therefore checks it in **both** directions: no target under the identity
+path may sit on another base, *and* the three required probes (the discovery document, `/auth/health`,
+`/auth/metrics`) must still exist. The second half was not in the first draft, and the regression
+suite is what found the hole: a probe relocated to another host **and** another path shape leaves the
+scan entirely, so the one-directional rule reported success over a shrinking list. The path test is
+segment-exact rather than a prefix match, for the same reason the edge uses `location = /auth` plus
+`location /auth/` — a prefix swallows `/authorize` and `/authors`, and the suite keeps a negative
+control that proves an ordinary `/authors` route is not mistaken for a stray identity probe.
 
 **The gate renders, it does not parse.** It runs `docker compose config` — compose's own
 interpolation, the same code path the deploy uses — and checks the result. Re-implementing the nested
@@ -120,21 +144,28 @@ the reason given above: the thing most worth checking is compose's interpolation
 copy of it cannot check itself. `repo-lint.yml` already runs Docker for the Prometheus, edge and acme
 gates, so the cost is one more job on a runner that has it.
 
-**Extend the gate to the Grafana OIDC URLs and the blackbox probe targets.** Those also hard-code the
-identity base (`docker-compose.monitoring.yml`, `monitoring/prometheus/prometheus.yml`), and they are
-a real drift surface. Left out deliberately: the monitoring stack is a separate compose project with
-its own required variables, the probe targets are URLs rather than issuers, and folding them in would
-have widened this change past the invariant it is about. Recorded as the next step rather than
-silently skipped.
+**Template `prometheus.yml` so its probe targets could be derived too.** Rejected. It is a static
+file loaded straight by Prometheus and validated by `promtool` in CI; adding a render step would put
+a templating layer in front of the one monitoring config that is currently readable exactly as it
+runs, and would have to be threaded through `deploy.sh` and the promoted bundle. The four identity
+targets are compared against the deployed base instead — see the decision above. A literal that
+cannot be derived should at least be checked.
+
+**Derive Grafana's endpoints from a discovery URL instead of three literals.** Not available:
+Grafana's `generic_oauth` provider takes `auth_url`, `token_url` and `api_url` individually and has
+no OIDC discovery option. One expansion shared by all three is as far as that provider allows.
 
 ## Consequences
 
-**A domain move is one edit and a green gate**, instead of a hand-audited sweep across 19 files. It
-is still not *all* of them — see the alternative above — but every place where the apps and Keycloak
-have to agree is now checked.
+**A domain move is one edit and a green gate**, instead of a hand-audited sweep across 19 files.
+`IRI_KEYCLOAK_HOSTNAME` now feeds the three app issuers and Grafana's three OIDC endpoints; the
+`application*.yml` fallbacks and the four Prometheus targets cannot follow a variable, and are
+compared against it instead. Every place where something has to agree with the issuer Keycloak
+advertises is now either derived from it or checked against it.
 
-**CI gains a job that needs Docker.** It renders seven stacks and self-tests first; measured at well
-under the job's 10-minute ceiling.
+**CI gains a job that needs Docker.** It renders seven app stacks plus the monitoring project twice,
+reads `prometheus.yml` and the six Spring configs, and self-tests first; measured at well under the
+job's 10-minute ceiling.
 
 **The gate pins two deliberate asymmetries so they stay deliberate.** `docker-compose.android.yml`
 creates a split-horizon on purpose — Keycloak advertises `127.0.0.1` for the emulator and only

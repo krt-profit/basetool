@@ -86,7 +86,10 @@
   Anwendungen scheiterten beim Start an „issuer does not match“, was wie ein Fehler der Anwendung
   aussieht. Der zweite Wert wird jetzt aus dem ersten abgeleitet, und eine CI-Prüfung hält das so.
   `IRI_KEYCLOAK_ISSUER_URI` bleibt als Ausnahme für abweichende Aufbauten und wird normalerweise
-  nicht gesetzt (ADR-0167).
+  nicht gesetzt. **Dieselbe Einstellung verschiebt auch Grafanas Anmeldung mit** — deren drei
+  Keycloak-Adressen standen bisher einzeln im Monitoring-Stack. Nur die vier Prüf-Adressen in
+  `monitoring/prometheus/prometheus.yml` bleiben Handarbeit, weil diese Datei nicht ersetzt wird;
+  die CI-Prüfung meldet es, wenn sie zurückbleiben (ADR-0167).
 
 - **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
   sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
