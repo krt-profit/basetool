@@ -767,6 +767,53 @@ for the first time), `UexVehicleDto` (eleven phantom components; the crew range 
 `crew`), `UexFactionDto` / `UexJurisdictionDto` / `UexOutpostDto` / `UexPoiDto` /
 `UexSpaceStationDto` (`code`), `UexCommodityDto` (`slug`, `type`) · See ADR-0148.
 
+### REQ-DATA-016 — `db-backend` is tuned as a small, fully-cached OLTP database, and it is observable
+
+The application database is **81 MB** with a **99.984 %** buffer cache hit ratio against a 384 MB
+`shared_buffers`. It is resident in memory in its entirety. Every query is CPU work and none of it
+is I/O, and that single fact decides the server's tuning: storage-shaped settings are close to
+irrelevant here, while anything that adds CPU per query is paid in full, on every request.
+
+Three settings shipped at values that contradicted that, and are set explicitly on the `db-backend`
+`command:` line in `docker-compose.yml`:
+
+|              Setting              | Value |                                                                                             Why                                                                                              |
+|-----------------------------------|-------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `max_parallel_workers_per_gather` | `0`   | A parallel plan wants three processes against a CPU quota that is a small multiple of one. Parallelism cannot pay off on a fully cached 81 MB set, and it is a direct throttling source.     |
+| `random_page_cost`                | `1.1` | `4` is the spinning-disk default; the host is NVMe. It inflated index-scan cost, biased the planner toward sequential scans, and inflated total plan cost with it.                           |
+| `jit`                             | `off` | PostgreSQL JIT-compiles a plan once its cost exceeds 100 000. Inflated costs make that reachable, and LLVM compilation then adds tens of milliseconds to a query that should take under one. |
+
+`work_mem` stays at 8 MB — only **two** temp files have ever been written — and `max_connections`
+stays at 150 against a 100-connection Hikari ceiling.
+
+**`pg_stat_statements` is installed** (migration `V240`), so "which statement burns the CPU" is a
+measurement rather than a reconstruction. Until 2026-09-13 it was absent, and the whole analysis
+behind this requirement and `REQ-SEC-056` had to be inferred from `pg_stat_user_tables` scan
+counters and their ratios. The inference held, but the next question should not have to repeat it.
+
+Two properties of that installation are deliberate. The extension is created by a **Flyway
+migration**, because an `docker-entrypoint-initdb.d` script only runs on a fresh data directory and
+would never reach the production volume, while a manual step would reach production and no other
+environment. And the migration **catches its own failure and downgrades it to a `WARNING`**:
+`CREATE EXTENSION` needs superuser and the contrib library, and a diagnostic must never be the
+reason the backend refuses to start. The extension alone collects nothing — `shared_preload_libraries`
+must name it, which the compose `command:` does, taking effect on the next container recreate.
+
+**Acceptance**
+
+- [x] `max_parallel_workers_per_gather=0`, `random_page_cost=1.1` and `jit=off` are set on the
+  server and readable back from `pg_settings`.
+- [x] `shared_preload_libraries` names `pg_stat_statements`, and `V240` creates the extension.
+- [x] `V240` does not fail the migration chain when the extension cannot be created; it raises a
+  `WARNING` naming the reason.
+- [x] `V240` creates no schema object, so `ddl-auto=validate` is unaffected and no JPA entity can
+  drift against it.
+
+**Enforced by:** the Flyway migration chain running in every `@SpringBootTest` and the E2E stack ·
+**Code:** `V240__enable_pg_stat_statements.sql`, `docker-compose.yml` (db-backend `command:`) ·
+**Decision:** [ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md) (the
+investigation this came out of)
+
 ## Out of scope
 
 **Material-amount SCU-scale storage and rounding** (the `@PrePersist`/`@PreUpdate` HALF_UP-to-three-

@@ -187,6 +187,19 @@ app:
     # scope mapping stop deciding anything -- so the default names the client known to be partial.
     partial-role-scope:
       client-ids: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:basetool-android}
+    # How long CustomJwtGrantedAuthoritiesConverter reuses an assembled authority collection for a
+    # given (sub, token issuedAt, azp) before re-running the full resolution (REQ-SEC-056,
+    # ADR-0174). This is the knob that decides how much load the authorization path puts on the
+    # database: a MISS costs a write-capable syncUser transaction plus 5-8 SELECTs against the
+    # permission and scoping tables, one of them a role lookup PER REALM ROLE. Measured on prod
+    # 2026-09-13, that miss traffic was 84 million sequential scans across six tables and the
+    # dominant driver of CFS throttling on db-backend.
+    # Validated at startup: must be positive and at most PT15M. The ceiling exists because the TTL
+    # is also the window in which a revoked role, permission, approval or membership stays
+    # effective for an already-issued token. A fresh login always misses regardless (issuedAt is
+    # part of the key), so this bounds staleness only WITHIN one token's life.
+    authorities-cache:
+      ttl: ${APP_SECURITY_AUTHORITIES_CACHE_TTL:PT5M}
   logging:
     correlation-id-header: X-Correlation-Id
     correlation-id-mdc-key: correlationId

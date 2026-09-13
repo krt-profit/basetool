@@ -3331,6 +3331,53 @@ it) · `UserRegistrationServiceTest` (the `PENDING` path passes the waiver) ·
 `members.html`, `messages*.properties` · **Issues:** #1827, #1828 · **Decision:**
 [ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)
 
+### REQ-SEC-056 — The authorities cache TTL is configuration, bounded at both ends
+
+`CustomJwtGrantedAuthoritiesConverter` memoises the assembled authority collection per `(sub, token
+issuedAt, azp)`. That memoisation is the single control on how much load the authorization path puts
+on [`PostgreSQL`](data-persistence.md): the converter runs on **every** authenticated call, and a
+**miss** costs a write-capable `syncUser` transaction plus five to eight SELECTs — user load,
+`user_roles`, **one role lookup per realm role**, and the membership read.
+
+Measured on production 2026-09-13, at the original hard-coded 30-second window that miss traffic
+came to **84.1 million sequential scans** across `role`, `org_unit`, `role_permissions`,
+`org_unit_membership`, `app_user` and `user_roles` — tables holding five to sixty rows each — and
+was the dominant driver of CFS throttling on `db-backend` (161 s in 29 h, a 229 ms average stall per
+event, at 1.6 % of that container's own CPU quota). The ratios identify the source rather than
+merely correlating with it: `role`/`user_roles` at **3.6** is the per-realm-role N+1 the Javadoc
+describes, `app_user`/`user_roles` at **1.1** is one load per miss, and
+`org_unit`/`org_unit_membership` at **2.0** is the cascade walk.
+
+The TTL is therefore configuration — `app.security.authorities-cache.ttl`, reaching the container as
+`APP_SECURITY_AUTHORITIES_CACHE_TTL` — defaulting to **`PT5M`**.
+
+It is **bounded at both ends, and the context refuses to start outside them**. Zero or negative
+would disable the cache and silently restore the storm. Above `PT15M` widens something else: the TTL
+is also **the window in which a revoked role, a withdrawn permission, a reversed approval or a
+removed org-unit membership stays effective on an already-issued token**. A fresh login always
+misses, because `issuedAt` is part of the key, so re-authentication picks up new authorities at once
+and this bounds staleness only *within* one token's life.
+
+**Acceptance**
+
+- [x] The TTL binds from `app.security.authorities-cache.ttl` and defaults to `PT5M` when unset, in
+  every profile.
+- [x] A zero, negative or greater-than-`PT15M` value fails the application context at startup rather
+  than degrading at run time; `PT15M` exactly is accepted.
+- [x] A fresh login misses the cache regardless of the configured TTL, so re-authentication applies
+  new authorities immediately.
+- [x] The properties class sits in `support`, keeping `ArchitectureTest`'s package-cycle and
+  `support`-is-a-leaf invariants green.
+- [x] `docker-compose.yml`'s backend `environment:` allow-list names the variable, so an operator
+  override in the host `.env` actually reaches the container.
+
+**Enforced by:** `BackendPropertiesValidationTest` (default, both bounds, and the ceiling accepted
+exactly) · `CustomJwtGrantedAuthoritiesConverterTest` (the converter builds against the real
+properties) · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
+`backendPackagesShouldBeFreeOfDependencyCycles`) · **Code:** `AuthoritiesCacheProperties`,
+`CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml` · **Decision:**
+[ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
