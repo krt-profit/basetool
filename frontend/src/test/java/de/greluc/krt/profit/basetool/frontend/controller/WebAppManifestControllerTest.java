@@ -232,8 +232,11 @@ class WebAppManifestControllerTest {
   @DisplayName("is German when the URL names no locale, because German is the app's default")
   void germanByDefault() throws Exception {
     // No ?locale= means German — the application's default, not the platform's. The description is
-    // asserted through its umlauts: the bundles store them as ä-style escapes, and a broken
-    // escape surfaces here as mojibake instead of as a build failure.
+    // asserted through its umlauts: the bundles store those as backslash-u Unicode escapes and
+    // never as the literal character, so a broken escape surfaces here as mojibake rather than
+    // as a build failure. The escape cannot be spelled out even in this comment: javac resolves
+    // those sequences BEFORE tokenising, so an invalid one inside a comment is still a compile
+    // error -- which is exactly what an earlier attempt at this sentence produced.
     mockMvc
         .perform(get(MANIFEST_PATH))
         .andExpect(jsonPath("$.lang").value("de"))

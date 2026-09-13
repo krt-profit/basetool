@@ -871,6 +871,35 @@ tr.is-inert td {
     .bank-cols {
         grid-template-columns: 1fr;
     }
+
+    /*
+     * The two in-row controls of the bank tables, raised to REQ-UI-009's dense
+     * floor on the touch classes (measured by TouchClassLayoutE2eTest on seeded
+     * data, 2026-09-13: the grant flags 18px, the booking chevron 15px).
+     *
+     * They take `--touch-target-dense` (32px) and not the full 44px because both
+     * are REPEATED DENSE IN-ROW controls, which is precisely the exception
+     * REQ-UI-009 writes down — the same class of control as `.btn-xs`,
+     * `.btn-icon` and `.master-row`. 44px would be the wrong trade here in a
+     * concrete way: the grants matrix puts its three flags side by side per row,
+     * so a 44px cell either widens the table by a third or, if the hit area were
+     * faked with a transparent overlay instead, the overlay of one flag would
+     * reach over its neighbours and a mis-tap would grant the wrong banking
+     * right. 32px keeps every flag's target its own, and still clears WCAG 2.5.8
+     * AA's 24px — which 15px and 18px did not.
+     *
+     * The chevron grows the booking row with it, which on a phone is an
+     * improvement rather than a cost.
+     */
+    .matrix-flag {
+        width: var(--touch-target-dense);
+        height: var(--touch-target-dense);
+    }
+
+    .bank-row-toggle {
+        min-width: var(--touch-target-dense);
+        min-height: var(--touch-target-dense);
+    }
 }
 
 @media (width <= 768px) {

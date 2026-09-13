@@ -67,9 +67,12 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  *   <li><b>Wide tables scroll inside their own container.</b> The positive form of check 1: a table
  *       wider than the viewport is fine, provided some ancestor scrolls it.
  *   <li><b>Inputs fit.</b> A form control wider than the viewport cannot be filled in, and one
- *       shorter than the 44px touch floor cannot be hit reliably (REQ-UI-009's floor; its
- *       documented exception for {@code .btn-xs} / {@code .btn-icon} dense row actions is
- *       honoured).
+ *       whose EFFECTIVE HIT AREA is shorter than the 44px touch floor cannot be hit reliably
+ *       (REQ-UI-009's floor; its documented exception for dense row actions is honoured).
+ *       Effective, not the border box: a control may reach the floor through a positioned {@code
+ *       ::after} overlay or through the {@code <label>} that activates it, and both are real
+ *       targets to a finger. Measuring the border box alone reported 15 compliant org-chart
+ *       chevrons as defects.
  * </ol>
  *
  * <p><b>Bounding rectangles, not {@code scrollWidth} alone.</b> The same lesson {@code
@@ -145,6 +148,7 @@ class TouchClassLayoutE2eTest {
    * Dense row actions REQ-UI-009 exempts from the 44px floor at 32px.
    *
    * <p>Owner-approved 2026-08-01; density is what keeps a wide Lager or bank table readable.
+   * Mirrors {@code --touch-target-dense} in {@code styles.css}; the two must move together.
    */
   private static final int DENSE_ACTION_FLOOR = 32;
 
@@ -707,6 +711,65 @@ class TouchClassLayoutE2eTest {
           }
           return false;
         };
+
+        // The EFFECTIVE hit area, not the element's own border box.
+        //
+        // REQ-UI-009's floor is a rule about how big a target a finger has to find, and a border
+        // box is only one of the three ways this app produces one. The CI sweep proved it the
+        // expensive way: `.oc-collapse` reported 26px on 15 org-chart nodes and is not a defect at
+        // all — org-chart.css deliberately keeps the chevron 1.6rem and stretches the target to
+        // `var(--touch-target)` with a transparent centred `::after`, the standard "small glyph,
+        // fat-finger target" pattern, and a border-box measurement cannot see it. Reporting those
+        // as findings would have pushed the app to grow a control that is already compliant.
+        //
+        // Three candidate boxes, largest dimension wins:
+        //   1. the element itself;
+        //   2. a positioned `::before`/`::after` overlay it generates — skipped for form controls,
+        //      because a replaced element renders no pseudo-element, so believing a declared one
+        //      there would MASK a real defect rather than excuse a false one;
+        //   3. a `<label>` that activates it — either wrapping it (and wrapping nothing else
+        //      interactive, or the label is shared and cannot be claimed as this control's target)
+        //      or pointing at it by `for`. Clicking a label activates its control, which is what
+        //      makes the whole label row the target; /inventory/my's filter checkboxes are 20px
+        //      squares inside 44px label rows.
+        //
+        // Deliberately NOT done with elementFromPoint sampling: a point outside the viewport or
+        // under a sticky header returns null or the wrong element, which would invent findings.
+        // This can only ever widen a measurement, so it removes false positives without hiding
+        // anything.
+        const REPLACED = new Set(['input', 'select', 'textarea']);
+        const hitBox = (c) => {
+          const r = c.getBoundingClientRect();
+          let w = r.width;
+          let h = r.height;
+          if (!REPLACED.has(c.tagName.toLowerCase())) {
+            for (const which of ['::before', '::after']) {
+              const ps = getComputedStyle(c, which);
+              if (!ps || ps.content === 'none' || ps.content === 'normal') continue;
+              if (ps.position === 'static') continue;
+              const pw = parseFloat(ps.width);
+              const ph = parseFloat(ps.height);
+              if (pw > w) w = pw;
+              if (ph > h) h = ph;
+            }
+          }
+          const labels = [];
+          const wrapping = c.closest('label');
+          if (wrapping
+              && wrapping.querySelectorAll('input, select, textarea, button, a').length === 1) {
+            labels.push(wrapping);
+          }
+          if (c.id) {
+            const bound = document.querySelector('label[for="' + CSS.escape(c.id) + '"]');
+            if (bound) labels.push(bound);
+          }
+          for (const l of labels) {
+            const lr = l.getBoundingClientRect();
+            if (lr.width > w) w = lr.width;
+            if (lr.height > h) h = lr.height;
+          }
+          return { width: w, height: h };
+        };
         const header = document.querySelector('header');
         const footer = document.querySelector('.krt-footer');
         const main = document.querySelector('main');
@@ -758,17 +821,24 @@ class TouchClassLayoutE2eTest {
           if (c.type === 'hidden') continue;
           const r = c.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
-          // `.master-row` joins the dense exemption by owner decision 2026-09-13: the blueprint
-          // list rows are a scan-and-tap list where density is the point, and they were ruled
-          // equivalent to a repeated row action rather than a standalone control.
+          // The dense exemption of REQ-UI-009: a repeated IN-ROW control may stop at the dense
+          // floor, because raising every one of them would turn a scannable table into a list of
+          // cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows are a
+          // scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
+          // `bank-row-toggle` joined on the same reading once seeded data first exposed them — an
+          // inventory row's selector, a grant row's three permission flags, a booking row's
+          // disclosure chevron. Never a form button or a standalone control: `.btn-xs2` was refused
+          // this exemption for exactly that reason.
           const dense = c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
-            || c.classList.contains('master-row');
+            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
+            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle');
           const floor = dense ? %d : %d;
+          const hit = hitBox(c);
           if (r.width > vw + slack && !scrollsHorizontally(c) && badControls.length < 6) {
             badControls.push(label(c) + ' is ' + Math.round(r.width)
               + 'px wide in a ' + vw + 'px viewport');
-          } else if (r.height < floor - slack && badControls.length < 6) {
-            badControls.push(label(c) + ' is ' + Math.round(r.height)
+          } else if (hit.height < floor - slack && badControls.length < 6) {
+            badControls.push(label(c) + ' is ' + Math.round(hit.height)
               + 'px tall, floor ' + floor + 'px');
           }
         }
@@ -842,14 +912,21 @@ class TouchClassLayoutE2eTest {
               if (cs.display === 'none' || cs.visibility === 'hidden' || c.type === 'hidden') continue;
               const cr = c.getBoundingClientRect();
               if (cr.width === 0 || cr.height === 0) continue;
-              // `.master-row` joins the dense exemption by owner decision 2026-09-13: the blueprint
-          // list rows are a scan-and-tap list where density is the point, and they were ruled
-          // equivalent to a repeated row action rather than a standalone control.
+          // The dense exemption of REQ-UI-009: a repeated IN-ROW control may stop at the dense
+          // floor, because raising every one of them would turn a scannable table into a list of
+          // cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows are a
+          // scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
+          // `bank-row-toggle` joined on the same reading once seeded data first exposed them — an
+          // inventory row's selector, a grant row's three permission flags, a booking row's
+          // disclosure chevron. Never a form button or a standalone control: `.btn-xs2` was refused
+          // this exemption for exactly that reason.
           const dense = c.classList.contains('btn-xs') || c.classList.contains('btn-icon')
-            || c.classList.contains('master-row');
+            || c.classList.contains('master-row') || c.classList.contains('item-checkbox')
+            || c.classList.contains('matrix-flag') || c.classList.contains('bank-row-toggle');
               const floor = dense ? %d : %d;
-              if (cr.height < floor - slack && modalIssues.length < 12) {
-                modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(cr.height)
+              const chit = hitBox(c);
+              if (chit.height < floor - slack && modalIssues.length < 12) {
+                modalIssues.push(name + ' > ' + label(c) + ' is ' + Math.round(chit.height)
                   + 'px tall, floor ' + floor + 'px');
               }
             }

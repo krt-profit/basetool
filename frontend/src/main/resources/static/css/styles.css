@@ -170,6 +170,14 @@
     --space-8: 2rem;
 
     --touch-target: 44px; /* min hit area for every interactive control */
+
+    /* REQ-UI-009's documented exception: a REPEATED DENSE ROW control (`.btn-xs`,
+       `.btn-icon`, `.master-row`, an in-row checkbox or chevron) may stop at 32px, because
+       raising every one of them to 44px would turn a scannable table into a list of cards.
+       It is never the floor for a form control or a standalone button. A token rather than a
+       literal so the stylesheet and TouchClassLayoutE2eTest's DENSE_ACTION_FLOOR name the
+       same number. */
+    --touch-target-dense: 32px;
     --content-max: 1200px; /* main column cap */
     --measure: 80ch; /* paragraph max line length */
 }
@@ -1253,6 +1261,33 @@ tbody tr:nth-child(even):hover {
     .notification-item-actions,
     .notification-page-actions,
     .demand-actions-bar {
+        flex-wrap: wrap;
+    }
+
+    /*
+     * The generic `.flex-gap-*` row utilities wrap here too (measured 2026-09-13
+     * on seeded data, which the first sweep did not have).
+     *
+     * These are not named action rows, which is exactly why they were missed:
+     * they are the plain "put these things in a row" helpers, and the detail
+     * pages use them for their button bars. `/orders/{id}` is the case that
+     * showed it — `.greeting.flex-between` wraps since the rule above, but the
+     * `.flex-gap-sm` *inside* it holds four buttons (ZURÜCK ZUR ÜBERSICHT /
+     * BEARBEITEN / ITEMS BEARBEITEN / LÖSCHEN) and could not break, so the row
+     * stayed one unbreakable 403px block and widened the layout viewport to
+     * 404px on a 375px screen. Everything the sweep then reported as "cut off"
+     * on that page — the notification bell, the delete form, its button and its
+     * label — was that one overflow seen from four elements.
+     *
+     * Wrapping is right for every use of these utilities on a phone, including
+     * the `<label>` rows they also serve: a checkbox that drops under its own
+     * caption is still a usable checkbox, a caption sliced at the screen edge is
+     * not.
+     */
+    .flex-gap-xs,
+    .flex-gap-sm,
+    .flex-gap-md,
+    .mt-2-flex-gap {
         flex-wrap: wrap;
     }
 
@@ -4408,17 +4443,61 @@ details.hud-details[open] > summary::after {
 }
 
 /* Mission Info Grid */
+/*
+ * `minmax(0, 1fr)` for the value column, not a bare `1fr` (REQ-UI-009, measured
+ * 2026-09-13). `1fr` is shorthand for `minmax(auto, 1fr)`, and that `auto`
+ * minimum is the track's min-content width — so a long value does not wrap, it
+ * widens the track. Nested in `.grid-auto-cards` below that made the tile wider
+ * than its own grid cell and pushed the whole document out: the tablet-landscape
+ * class measured 1042px of scrollWidth on a 1024px screen, with the mission
+ * name, the unit name, the status pill and both timestamps sliced at the right
+ * edge. The phone class never showed it because its override further down
+ * collapses this grid to a single column.
+ *
+ * The label column keeps `max-content` on purpose — the German labels
+ * ("Verantwortliche Einheit:", "Treffen Teamspeak:") must stay on one line, and
+ * as a track minimum `max-content` is only ever as wide as the longest label.
+ */
 .mission-info-grid {
     display: grid;
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: max-content minmax(0, 1fr);
     gap: var(--space-2) var(--space-4);
     align-items: baseline;
 }
 
-/* Auto-fit Grid Cards */
+/*
+ * The other half of the same fix, and neither half works alone: `minmax(0, 1fr)`
+ * above lets the TRACK shrink, this lets the CONTENT break. Without it the track
+ * duly narrows to 87px and the value simply paints 149px wide straight out of it
+ * — a mission name is one unbreakable token often enough ("E2EListFilterBravoZ9",
+ * and in production any name without a space in it) and a timestamp always is.
+ * Measured: the overflow moved from the grid to the span and the document stayed
+ * 22px too wide.
+ *
+ * `anywhere` rather than `break-word` because it is the one that also lowers the
+ * element's min-content width, which is what stops the track from being pushed
+ * back out. No `hyphens: auto` here, unlike the headings: these are names,
+ * identifiers and timestamps, and a soft hyphen inside one reads as part of it.
+ * The `max-content` label column is unaffected — `overflow-wrap` changes
+ * min-content, never max-content — so the German labels stay on one line.
+ */
+.mission-info-grid > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/*
+ * Auto-fit Grid Cards.
+ *
+ * `min(300px, 100%)` rather than a bare `300px` as the track minimum: a fixed
+ * minimum is a floor the grid cannot go under, so on any container narrower than
+ * 300px (a phone in portrait once the page padding is taken off, or this grid
+ * nested one level deeper) the track overflows instead of shrinking. The `min()`
+ * lets the single remaining column fall back to the container width.
+ */
 .grid-auto-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
     gap: var(--space-4);
 }
 
@@ -4670,6 +4749,47 @@ textarea:focus-visible,
     }
 
     /*
+     * The controls the CI sweep found once the e2e stack had real rows in it
+     * (2026-09-13). None of them is a `.btn`, so the selector list at the top of
+     * this block never reached them, and the first sweep could not see them at
+     * all: every one lives on a page or in a table that is empty on a fresh
+     * stack, so there was no element to measure.
+     *
+     * Split by REQ-UI-009's own distinction, not by how small each one was:
+     *
+     *   - `.demand-sort-btn` is a column-HEADER control (one per column, not per
+     *     row) and gets the full 44px. It rendered 22px: the button is bare by
+     *     design so the whole cell reads as the hit area, but the `<th>` padding
+     *     is the cell's, not the button's, so the target really was 22px tall.
+     *     Stretching the button to the floor makes the header cell grow with it,
+     *     which is what the design comment intended in the first place.
+     *   - `.krt-livesync-pill` is a standalone floating control and gets 44px
+     *     too; it is styled for the first time just below.
+     *   - `input.item-checkbox`, `.matrix-flag` and `.bank-row-toggle` are
+     *     repeated dense in-row controls — an inventory row's selector, a grant
+     *     row's three permission flags, a booking row's disclosure chevron — and
+     *     take the documented dense floor of 32px. They measured 26px, 18px and
+     *     15px, so all three still grow; 15px was under WCAG 2.5.8 AA's 24px
+     *     minimum, not merely under this design system's.
+     *
+     * `input.item-checkbox` is written with the element prefix for the same
+     * reason `.btn.btn-xs2` is: the 20px square is declared in inventory-my.html's
+     * inline <style>, which the browser reads after this file, so an equal-
+     * specificity rule here would lose. `#personalOnly` shares the class but is
+     * wrapped in a `<label>` that is already well over the floor — the label is
+     * the hit area, and raising the box does it no harm.
+     */
+    .demand-sort-btn {
+        min-height: var(--touch-target);
+    }
+
+    input.item-checkbox {
+        width: var(--touch-target-dense);
+        height: var(--touch-target-dense);
+        min-height: var(--touch-target-dense);
+    }
+
+    /*
      * On touch devices the generic rule sets padding: 0.75rem 1rem which,
      * combined with the fixed height of 2.75rem, leaves too little room
      * for a 1rem font at line-height 1.5 and clips descenders/umlauts in
@@ -4893,7 +5013,20 @@ textarea:focus-visible,
 }
 
 /* Live multi-user sync (REQ-FE-010): the deferred-refresh pill, shown bottom-right when a peer's
-   change arrives while the local user is mid-edit. Clicking it applies the held-back refresh. */
+   change arrives while the local user is mid-edit. Clicking it applies the held-back refresh.
+
+   `.krt-livesync-pill` is the DEFAULT class krt-live-sync.js gives the pill (`pillCfg.className ||
+   'krt-livesync-pill'`); only the mission pages pass a name of their own. Until now just the
+   mission variant was styled, so on every other consumer — /bank, /bank/requests, /bank/manage —
+   the pill rendered as a bare browser-default button, 21px tall, unbranded, with no fixed position
+   and no pulse: not a small deviation from the design system but no styling at all. Found by the
+   touch-class sweep (2026-09-13), which flagged it for height; the missing branding was the larger
+   half of the bug. Both selectors share one rule so the next consumer that omits a class name is
+   styled by default instead of silently unstyled.
+
+   `min-height` is the 44px floor rather than the dense exception: this is a standalone floating
+   control, not a repeated row action. */
+.krt-livesync-pill,
 .mission-livesync-pill {
     position: fixed;
     right: var(--space-4);
@@ -4915,8 +5048,11 @@ textarea:focus-visible,
     cursor: pointer;
     box-shadow: 0 2px 12px rgb(0 0 0 / 45%);
     animation: krt-presence-pulse 2s infinite;
+    min-height: var(--touch-target);
 }
 
+.krt-livesync-pill:hover,
+.krt-livesync-pill:focus-visible,
 .mission-livesync-pill:hover,
 .mission-livesync-pill:focus-visible {
     background: rgb(231 126 35 / 12%);

@@ -326,22 +326,71 @@ measured sweep of the touch classes found both:
   measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
   to a repeated row action rather than a standalone control.
 
+**A third round of amendments, 2026-09-13**, after the guard first ran with *seeded* data. The
+first sweep could only measure what a fresh stack renders, and a fresh stack has empty lists: no
+order, refinery order, grant or booking exists, so no detail view and no populated table was ever
+loaded. Running the guard inside the destructive e2e suite — where the other flows create those
+rows — put 118 findings on surfaces that had never been measured.
+
+- **The floor is on the EFFECTIVE hit area, not on the border box.** A control reaches it just as
+  legitimately through a transparent positioned `::after` overlay ("small glyph, fat-finger target")
+  or through the `<label>` that activates it, and both are real targets to a finger. This is not a
+  relaxation: it is what "hit area" meant all along, and measuring the border box instead reported
+  15 org-chart chevrons as defects when `org-chart.css` had stretched each one to
+  `var(--touch-target)` with exactly that overlay. A pseudo-element is only counted on a
+  non-replaced element, because `<input>`, `<select>` and `<textarea>` render none.
+- **Three more in-row controls ARE exempt**, at 32px, on the same reading as `.master-row`:
+  `.item-checkbox` (the Lager tree's per-row and per-group selector), `.matrix-flag` (a grant row's
+  three permission flags) and `.bank-row-toggle` (a booking row's disclosure chevron). They measured
+  26px, 18px and 15px, so all three still had to grow — 15px was below WCAG 2.5.8 AA's 24px, not
+  merely below this design system's floor. `.matrix-flag` is the case that shows why the exception
+  is not laziness: its three flags sit side by side in one row, so 44px cells would either widen the
+  table by a third or, if the target were faked with an overlay, let one flag's overlay reach over
+  its neighbours — and a mis-tap there grants the wrong *banking* right.
+- **`.demand-sort-btn` is NOT exempt** and is raised to 44px. A column-header sort control is one
+  per column, not one per row, so the density argument does not apply to it.
+- **The dense floor is the token `--touch-target-dense` (32px)**, mirrored by
+  `TouchClassLayoutE2eTest.DENSE_ACTION_FLOOR`. The two must move together.
+
+**Structural defects found in the same run** (fixes, not exceptions): the `/bank/requests` table was
+the only `data-table` in the template tree with no `.table-responsive` wrapper, and widening the
+layout viewport to 912px on a 375px screen did more than clip the table — `position: fixed` resolves
+against the layout viewport, so all three of that page's modals then centred themselves at 456px and
+sat mostly off-screen. `.krt-livesync-pill`, the **default** class `krt-live-sync.js` gives the pill,
+had no CSS at all while only the mission variant was styled, so every non-mission consumer rendered a
+bare browser-default button. The generic `.flex-gap-*` and `.mt-2-flex-gap` row utilities could not
+wrap. And `.mission-info-grid` sized its value column `1fr` — shorthand for `minmax(auto, 1fr)`,
+whose `auto` minimum is the track's min-content width — so a long mission name widened the tile, the
+tile widened its `auto-fit` track and the tablet-landscape class scrolled sideways.
+
 **Acceptance**
 
-- [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes, except
-  `.btn-xs` / `.btn-icon` / `.master-row` dense-row actions, which are ≥ 32px on every class.
+- [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
+  a positioned `::before` / `::after` overlay, or the `<label>` that activates them) ≥ 44px on touch
+  classes, except the dense in-row controls `.btn-xs` / `.btn-icon` / `.master-row` /
+  `.item-checkbox` / `.matrix-flag` / `.bank-row-toggle`, which are ≥ `--touch-target-dense` (32px)
+  on every class.
+- [ ] Measured with rows in the tables, not only on a fresh stack: a detail view, a populated list
+  and a populated table are each a different layout from their empty state, and an empty one hides
+  every defect it has.
 - [ ] A compact variant actually renders compact — `.btn.btn-xs` out-specifies `.btn` rather
   than relying on source order, since `.btn` is declared later and again inside the ≤1024px
   touch block. A bare `.btn-xs` selector is silently inert and is a regression.
 - [ ] The page never scrolls sideways on a touch class; a table wider than the screen scrolls
-  inside a container that itself fits.
+  inside a container that itself fits, and **every** `data-table` carries that container.
+- [ ] A row of buttons wraps rather than pushing the page wide, including the ones built from the
+  generic `.flex-gap-*` / `.mt-2-flex-gap` utilities rather than a named action-row class.
+- [ ] A grid track that must hold free text is `minmax(0, 1fr)` and its content may break
+  (`overflow-wrap: anywhere`). Neither half works alone: the first lets the track shrink, the second
+  lets the text inside it wrap instead of painting straight out of the narrowed track.
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 
 **Enforced by:** [ADR-0165](../adr/0165-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five widths of the four device classes — 375×812, 768×1024, 1024×768, 1280×800, 1600×900 — over every page route the controllers expose plus a real detail view per list and every modal on the page: page-level overflow, cut-off elements, unscrollable tables, control floors,
 footer behaviour, chrome share — with a full-page screenshot per page and class) + code/design
-review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`, the
-`width <= 1024px` touch block and the `width <= 768px` block), `static/js/sidebar.js`
+review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
+`--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/js/sidebar.js`
 (`--krt-footer-height`).
 
 > **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement

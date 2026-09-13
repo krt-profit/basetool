@@ -7,8 +7,8 @@
 - **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
   über „Zum Home-Bildschirm“, auf Android und am Rechner über das Browsermenü; danach hat es ein
   eigenes Symbol und startet ohne Adressleiste. Gedacht für iPhone- und iPad-Mitglieder, für die es
-  keine eigene App gibt. Ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf dem Gerät
-  liegen bleiben.
+  keine eigene App gibt — und ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf
+  dem Gerät liegen bleiben.
 
 ### Fixed
 
@@ -19,11 +19,11 @@
 
 ### Changed
 
-- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dort
-  dauerhaft sichtbar und der Inhaltsbereich musste zusätzlich Platz für sie freihalten — zusammen
-  rund ein Fünftel des Bildschirms für drei Links. Jetzt siehst du sie, wenn du ganz nach unten
-  scrollst; der Rest der Höhe gehört dem Inhalt. Auf Tablet und Rechner bleibt sie wie bisher
-  fixiert.
+- **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
+  sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
+  des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und
+  Rechner bleibt sie fixiert.
+
 - **Die Kopfzeile ist auf dem Handy schlanker.** Der Titel brach zweizeilig um und machte die
   Kopfzeile 76px hoch; jetzt steht er einzeilig (bei Bedarf gekürzt) neben einem kleineren
   Zeichen — rund 48px. Menü, Zeichen und Glocke bleiben beim Scrollen erreichbar.
@@ -56,6 +56,20 @@
 - **Auswahlfelder waren breiter als der Bildschirm.** Ein Auswahlfeld richtet sich nach seinem
   längsten Eintrag; im Audit-Log und in der Preis-Übersicht wurde die Seite dadurch verkleinert
   dargestellt, statt zu scrollen. Sie passen sich jetzt der verfügbaren Breite an.
+- **Die Antragsliste der Bank machte die Seite auf dem Handy mehr als doppelt so breit** — und die
+  drei Dialoge dieser Seite („Bestätigen“, „Ablehnen“, „Buchung“) saßen dadurch fast vollständig
+  außerhalb des Bildschirms. Die Tabelle scrollt jetzt für sich, die Seite bleibt stehen.
+- **Auftrags- und Raffinerie-Detailseiten ließen sich auf dem Handy nur seitlich verschoben lesen.**
+  Ihre Knopfleisten brachen nicht um und zogen die ganze Seite in die Breite. Sie setzen sich jetzt
+  in die nächste Zeile.
+- **Die Startseite ließ sich auf dem Tablet quer seitlich schieben.** Ein langer Einsatzname passte
+  nicht in seine Kachel und schob das ganze Raster über den Rand; jetzt bricht er um.
+- **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
+  als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
+  Einsatzseiten sah er immer schon richtig aus.
+- **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
+  Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
+  und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
 
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
