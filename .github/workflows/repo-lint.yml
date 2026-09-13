@@ -239,6 +239,46 @@ jobs:
       - name: Check provisioned Grafana dashboards
         run: python3 scripts/check-grafana-dashboards.py
 
+  keycloak-issuer:
+    name: keycloak-issuer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The OIDC issuer the apps validate has to be the one Keycloak advertises, and until ADR-0167
+      # that was manual discipline: the identity base URL is a literal on ~36 lines across 19 files
+      # and nothing compared any two of them. .env.example simply asked the operator to keep them in
+      # agreement.
+      #
+      # The failure is measured rather than imagined (ADR-0166). Keycloak's public base URL is
+      # decided by KC_HOSTNAME *and* KC_HTTP_RELATIVE_PATH together: give the hostname as an
+      # origin-only URL while the relative path says /auth, and Keycloak SERVES under /auth while
+      # ADVERTISING root issuer links. It reports healthy, its discovery document parses, and
+      # backend, frontend and ingest all die at start-up on "The Issuer ... did not match the
+      # requested issuer" -- which reads as a backend fault. A first draft of ADR-0166 specified
+      # exactly that, on the strength of the upstream guide's wording, and only the smoke stack
+      # caught it. That is a failed deploy discovered at deploy time.
+      #
+      # The gate renders every stack through `docker compose config` -- compose's own interpolation,
+      # the same code path the deploy uses -- rather than pattern-matching the YAML, for the same
+      # reason check-edge-nginx.sh hands its rendered vhosts to a real `nginx -t`. Re-implementing
+      # the nested ${A:-${B:-default}} here would be asserting a copy of the thing under test
+      # against itself.
+      #
+      # The suite runs FIRST, as it does for the dashboards above, so the gate can never pass
+      # vacuously: it breaks the compose files each way in turn -- including removing the derivation
+      # so the issuer stops following the hostname, which today's values hide -- and requires the
+      # checker to report each one.
+      - name: Self-test the issuer checker
+        run: |
+          chmod +x scripts/check-keycloak-issuer.py scripts/check-keycloak-issuer.test.sh
+          scripts/check-keycloak-issuer.test.sh
+
+      - name: Check the Keycloak issuer agrees across every stack
+        run: python3 scripts/check-keycloak-issuer.py
+
   prometheus-rules:
     name: prometheus-rules
     runs-on: ubuntu-latest
