@@ -787,11 +787,15 @@ Binding details:
 - **The icon is emitted at its content-hashed URL**, resolved through `ResourceUrlProvider`.
   `/logos/**` is served `immutable` for a year, so a manifest naming the bare path would pin every
   installed home screen to a URL no browser revalidates — a redesigned icon would never arrive.
-- **`start_url` and `scope` are both the application root.** One entry point serves both states,
-  because `/` already answers with the landing page for a visitor and the dashboard for a member.
-  **`scope` cannot cover the login:** `/oauth2/authorization/keycloak` and the logout redirect both
-  navigate to the Keycloak origin, and a manifest scope must be same-origin with `start_url`. The
-  behaviour of an installed standalone app across that hop is **unverified** — see Open questions.
+- **`scope` and `start_url` are the application root, and sign-in is inside them.** A `scope` is one
+  URL prefix and cannot span two origins, so while Keycloak answered on a host of its own the
+  authentication hop was outside it. On iOS a navigation out of scope opens in a Safari View
+  Controller, which has its own storage; Apple keeps OAuth in the app **by heuristic** rather than by
+  rule (WWDC23) and asks for feedback when that misfires.
+  [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) moved Keycloak to `/auth` on this
+  origin, so `/oauth2/authorization/keycloak`, Keycloak's own login form, the callback and the
+  end-session redirect are all same-origin, all inside the scope, and none of them depends on that
+  heuristic.
 - **The icon is never declared `maskable`.** Android crops a maskable icon to its own shape and
   guarantees only the inner ~40 %; claiming it for artwork not drawn with that safe zone cuts into
   the mark. A dedicated maskable asset is a request to the design system — see Open questions.
@@ -843,14 +847,16 @@ This spec still governs how those fields *look*.
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated
   ESLint/Stylelint rule so they are gate-enforced, not review-enforced? (Promote to an ADR
   if yes.)
-- **REQ-UI-020: can an installed standalone app actually sign in?** `scope` is the app origin, but
-  `/oauth2/authorization/keycloak` and the logout redirect both navigate to the Keycloak origin, and
-  a manifest scope must be same-origin with `start_url`. On iOS an out-of-scope navigation goes to
-  an in-app browser whose storage is not shared with the standalone app, which would strand the
-  PKCE/state values Spring Security wrote before the hop. **Nothing in this repository verifies
-  this, and no test can** — it needs a real iPhone or iPad. If it fails, the fix is to reverse-proxy
-  Keycloak onto the app origin at the edge, which is an ADR of its own. Until it is tried, treat
-  "the installed app is the mobile client" as unproven for the signed-in half.
+- ~~**REQ-UI-020: can an installed standalone app actually sign in?**~~ **Closed 2026-09-13 by
+  [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md)**, by construction rather than by a
+  device report — and the question turned out to be less dire than it was written, which is worth
+  recording. A `scope` is one URL prefix and cannot span two origins, so the hop to a Keycloak on its
+  own host was outside it; on iOS that means a Safari View Controller with its own storage, in which
+  the PKCE verifier and `state` written before the hop are in the wrong jar. But Apple keeps OAuth
+  navigations in the web app **by heuristic** (WWDC23), so it most likely worked. What the ADR
+  removes is the dependency on that heuristic — undocumented, vendor-acknowledged as imperfect, and
+  carrying the one flow every member must pass. Keycloak now answers at `/auth` on the app origin and
+  nowhere else. A device test is still worth doing, as confirmation rather than as a gate.
 - **REQ-UI-020: a dedicated `maskable` icon.** The current artwork was not drawn with Android's
   ~40 % safe zone, so the manifest declares `purpose: any` only. A maskable variant is a request to
   the design system.

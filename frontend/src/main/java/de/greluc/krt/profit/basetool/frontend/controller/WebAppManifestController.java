@@ -268,10 +268,13 @@ public class WebAppManifestController {
    * @param dir writing direction; both shipped locales are left-to-right.
    * @param startUrl what the icon opens: the application root answers with the landing page for a
    *     visitor and the dashboard for a member, so one entry point serves both states.
-   * @param scope the application root. Note this cannot cover the login: {@code
-   *     /oauth2/authorization/keycloak} and the logout redirect both navigate to the Keycloak
-   *     origin, and a manifest scope must be same-origin with {@code start_url}. ADR-0164 records
-   *     that the installed-app sign-in has not been verified on a device.
+   * @param scope the application root — and since ADR-0166 that really is everything, sign-in
+   *     included. A scope is one URL prefix and cannot span two origins, so while Keycloak answered
+   *     on a host of its own both {@code /oauth2/authorization/keycloak} and the end-session
+   *     redirect fell outside it; iOS sends an out-of-scope navigation to a Safari View Controller
+   *     with its own storage, and keeps OAuth in the app by heuristic rather than by rule. Keycloak
+   *     now answers at {@code /auth} on this origin, so both flows stay in the window without
+   *     relying on that.
    * @param display {@code standalone} — the app window carries no browser address bar.
    * @param backgroundColor see {@link #BACKGROUND_COLOR}.
    * @param themeColor see {@link #THEME_COLOR}.

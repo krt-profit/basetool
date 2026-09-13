@@ -63,7 +63,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}
   # Truststore for the internal Keycloak Admin API call (KeycloakService / the scheduled user sync).
   # In prod the backend reaches Keycloak directly over https://keycloak:18443 (net-backend-keycloak),
   # and Keycloak presents the same bind-mounted self-signed keystore.p12 the other modules use. By
@@ -157,7 +157,7 @@ app:
       # current behaviour: keys are derived from issuer-uri (the public host). When set, the key
       # fetch reuses the keycloak-trust bundle above, so the cert's SAN must carry dns:keycloak.
       # Recommended value once verified on the host:
-      #   https://keycloak:18443/realms/iri/protocol/openid-connect/certs
+      #   https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
       # Audit L-1 / security review: enforce the JWT `aud` claim so the backend accepts only tokens
       # minted for it (aud=basetool-backend), not any validly-signed token from the realm. The value

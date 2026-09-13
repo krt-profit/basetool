@@ -175,6 +175,11 @@ Four parts, all of them in `REQ-UI-020`:
   cover this; it needs a device. If it fails, the fix is reverse-proxying Keycloak onto the app
   origin at the edge — a separate ADR. Recorded in REQ-UI-020's Open questions.
 
+  > **Superseded 2026-09-13 by [ADR-0166](0166-identity-moves-onto-the-app-origin.md).** The fix
+  > named here was taken without waiting for the device test: Keycloak serves at `/auth` on the app
+  > origin, so both navigations stay in scope. The consequence above stands as the reasoning that led
+  > there; it no longer describes the deployment.
+
 - **The tool gains no dependency**, no build step and no JavaScript. The whole feature is one
   controller, six `<head>` lines, three bundle keys, one `permitAll` entry and one access-log skip.
 

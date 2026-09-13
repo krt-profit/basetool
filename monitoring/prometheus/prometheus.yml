@@ -169,7 +169,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -307,7 +307,6 @@ scrape_configs:
           - http://profit-base.online
           - http://ingest.profit-base.online
           - http://grafana.profit-base.online
-          - http://keycloak.profit-base.online
           # A native client that ever speaks plain HTTP to the API leaks its bearer token on the
           # first request, so the per-host Force-SSL toggle is not optional here — and it lives only
           # in the NPM admin DB, which is why it is probed.
@@ -399,7 +398,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

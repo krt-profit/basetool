@@ -30,12 +30,20 @@ services:
     # the full http:// URL declares HTTP for the public hostname, so the
     # browser-side redirect works over HTTP while the issuer string stays stable
     # and identical for the host browser AND the in-Docker backend/frontend
-    # (both already use http://host.docker.internal:18080/realms/iri). Dropping
+    # (both already use http://host.docker.internal:18080/auth/realms/iri). Dropping
     # --proxy-headers (there is no reverse proxy in front of KC in this stack)
     # lets KC read the real request scheme instead of expecting X-Forwarded-Proto.
+    #
+    # THE /auth IS PART OF THE URL AND MUST STAY THERE (ADR-0166). A full URL in
+    # KC_HOSTNAME overrides the context path that a bare hostname would take from
+    # the request, so an origin-only value here makes Keycloak serve under /auth
+    # (KC_HTTP_RELATIVE_PATH, base compose) while advertising root links. Measured:
+    # the stack then comes up with a HEALTHY Keycloak and the backend dies at
+    # start-up with `The Issuer "…/realms/iri" … did not match the requested issuer
+    # "…/auth/realms/iri"` — the failure looks like a backend fault and is not one.
     command: start-dev --import-realm --cache=local
     environment:
-      KC_HOSTNAME: http://host.docker.internal:18080
+      KC_HOSTNAME: http://host.docker.internal:18080/auth
     # Resolve the issuer host to THIS container on the shared Docker network, so the in-Docker
     # backend/frontend reach Keycloak the same way on a Linux CI runner as on Docker Desktop. The
     # published port is 127.0.0.1-only, so the test stack's `extra_hosts: host.docker.internal ->

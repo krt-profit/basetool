@@ -29,7 +29,9 @@ CONF_OUT=/tmp/edge-conf.d
 # One variable per vhost. The certificate directory is derived from the same
 # name, so the layout `/etc/nginx/certs/<host>/{fullchain,privkey}.pem` holds in
 # every environment and `acme` needs to know nothing about this file.
-EDGE_VARS='EDGE_HOST_FRONTEND EDGE_HOST_KEYCLOAK EDGE_HOST_INGEST EDGE_HOST_GRAFANA EDGE_HOST_API'
+# EDGE_HOST_KEYCLOAK is gone since ADR-0166: Keycloak answers at /auth on the web
+# host and no longer has a vhost, a certificate directory or a name of its own.
+EDGE_VARS='EDGE_HOST_FRONTEND EDGE_HOST_INGEST EDGE_HOST_GRAFANA EDGE_HOST_API'
 
 missing=''
 for v in ${EDGE_VARS}; do

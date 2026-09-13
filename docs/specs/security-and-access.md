@@ -3008,6 +3008,24 @@ a method gate.
 | `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                                                                                                        |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
+> [!note] `/auth/**` is on this origin and is **not** in the table above — it never reaches Spring
+> Since [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) Keycloak answers at `/auth` on
+> the web host, so that the installed web app's sign-in stays inside its manifest `scope`
+> (`REQ-UI-020`). The edge routes the prefix to the Keycloak container before the frontend sees it,
+> so there is no `permitAll` entry to add and no session gate to exempt — the requests are not this
+> application's at all. Two properties travel with the move and are worth stating where the public
+> surface is enumerated:
+>
+> - **The admin console did not become public.** It moved from `keycloak.profit-base.online/admin`
+>   to `/auth/admin` and kept the same bridge-gateway allow-list with its closing `deny all`, which
+>   the nightly external deny probe asserts from a GitHub runner — the only vantage point that can,
+>   since an internal probe shares the network position the rule tests.
+> - **Keycloak now receives this application's `SESSION` cookie**, because a cookie scoped to `/` is
+>   sent to every path on the origin. Recorded rather than mitigated: Keycloak already holds every
+>   member's credentials and mints their tokens, so an identifier it ignores adds nothing to what a
+>   compromised Keycloak could already do, and filtering a `Cookie` header in nginx would put a
+>   fragile hand-written rule in front of the login path for no reduction in blast radius.
+>
 > [!important] `permitAll` is only half of "public" — the session gates are the other half
 > `permitAll` decides **authorisation**. It does not stop a filter further down the chain from
 > redirecting an *authenticated* caller away from the path, and two do: `TermsAcceptanceGateFilter`

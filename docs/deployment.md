@@ -1154,11 +1154,74 @@ emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` 
 
 ---
 
+## Identity cutover: Keycloak moves to /auth on the web host (ADR-0166, one-off)
+
+This is a **cutover, not a rolling change.** The issuer string changes, so every token minted under
+the old one stops validating the moment it does — which is the intended end state (the owner ruled
+out a dual path: the Android app is with testers only, who install the matching build).
+
+Nothing stored is lost. Sessions end, and members sign in again.
+
+**Order matters, because the certificate and the DNS are what break loudly.**
+
+1. **Ship the matching Android build first**, or accept that the app is dead between steps 4 and
+   that build reaching its testers. `OIDC_ISSUER` moves with the server; a build pinned to
+   `https://keycloak.profit-base.online/realms/iri` cannot authenticate afterwards.
+2. **Pull the new bundle** and check the edge before it serves anything:
+
+   ```bash
+   scripts/check-edge-nginx.sh
+   ```
+
+   It renders every vhost template and runs `nginx -t` with throwaway certificates. Four vhosts is
+   the expected count now, not five.
+
+3. **Update the host `.env`:** delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from
+   `ACME_HOSTS`. Leaving them costs nothing at run-time — the edge simply ignores an unused
+   variable — but the certificate keeps a SAN for a name nothing serves.
+
+4. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
+   (`KC_HTTP_RELATIVE_PATH`), advertising `https://profit-base.online` (`KC_HOSTNAME`, origin only —
+   see the ADR for why the path must *not* be repeated there), and with its management interface
+   still at the root, so the container healthcheck's `/health/ready` and Prometheus's `/metrics`
+   are unaffected.
+
+5. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
+   A service left on the old issuer rejects every token with a signature/issuer mismatch, which
+   reads in the log as a Keycloak outage rather than as a stale container.
+
+6. **Verify, from outside:**
+
+   ```bash
+   curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration      | grep -o '"issuer":"[^"]*"'
+   ```
+
+   It must read `https://profit-base.online/auth/realms/iri`. A doubled `/auth/auth` here is the
+   one misconfiguration this arrangement invites — see ADR-0166.
+
+7. **Sign in through the web app**, then **sign out**: the end-session redirect is the navigation
+   that used to leave the origin, and it is the half no automated test covers.
+
+8. **Retire `keycloak.profit-base.online` in DNS** once the above passes. Until then it resolves to
+   an edge with no vhost for it, which answers from the default server block rather than serving
+   Keycloak — harmless, but it will not work as a fallback and is not meant to.
+
+Grafana's own OIDC login (`docker-compose.monitoring.yml`) and the blackbox discovery probes move
+with the issuer and are already in the bundle; no separate step.
+
 ## Keycloak Admin Console via SSH tunnel
 
-The Keycloak Admin Console (`https://keycloak.profit-base.online/admin`) is served on the public
+> **Address changed 2026-09-13 (ADR-0166).** The console is now
+> `https://profit-base.online/auth/admin`. Keycloak moved onto the web origin so the installed web
+> app's sign-in stays inside its manifest scope, and `keycloak.profit-base.online` **no longer
+> exists** — no vhost, no certificate SAN, no DNS purpose. The lock-down itself is unchanged: the
+> same four bridge gateways, the same closing `deny all`, now on the `/auth/admin` location of the
+> web vhost (`docker/edge/conf.d/10-frontend.conf.template`). Substitute the new host in the tunnel
+> steps below; everything else about them still holds.
+
+The Keycloak Admin Console (`https://profit-base.online/auth/admin`) is served on the public
 vhost but must never be reachable from the open internet. It is locked to an operator SSH tunnel:
-NPM allows the console **only** for connections that originate from the host itself, and the
+the edge allows the console **only** for connections that originate from the host itself, and the
 operator reaches the host over SSH.
 
 ### How the lock-down works
@@ -1172,10 +1235,14 @@ ssh -N -L 443:127.0.0.1:443 root@178.104.94.14
 and adds a hosts entry so the browser resolves the vhost to the tunnel and SNI/cert still match:
 
 ```
-127.0.0.1  keycloak.profit-base.online
+127.0.0.1  profit-base.online
 ```
 
-Then `https://keycloak.profit-base.online/admin` reaches the console through the tunnel.
+Then `https://profit-base.online/auth/admin` reaches the console through the tunnel.
+
+> While that hosts entry is in place the **whole web app** resolves to the tunnel, not just the
+> console — which is new since ADR-0166 and worth knowing before you wonder why the app is slow or
+> logged out. Remove the line when you are done.
 
 The access control is an nginx `allow … / deny all` on the `/admin` **custom location** of the
 `keycloak.profit-base.online` proxy host, configured in the NPM admin UI (`127.0.0.1:10081` →

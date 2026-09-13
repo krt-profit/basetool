@@ -19,6 +19,12 @@
 
 ### Changed
 
+- **Die Anmeldung läuft jetzt unter derselben Adresse wie das Basetool selbst.** Keycloak sitzt
+  nicht mehr auf `keycloak.profit-base.online`, sondern unter `/auth` auf `profit-base.online`. Für
+  die installierte Web-App auf iPhone und iPad heißt das: der Login verlässt das App-Fenster nicht
+  mehr. **Du musst dich einmalig neu anmelden**, und die Android-App braucht die dazu passende neue
+  Version — ältere Installationen können sich nicht mehr anmelden.
+
 - **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
   sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
   des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und

@@ -16,7 +16,7 @@ spring:
       client:
         provider:
           keycloak:
-            issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}
   session:
     store-type: redis
     redis:
