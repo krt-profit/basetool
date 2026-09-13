@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintCraftabilityDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
@@ -67,6 +68,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * every related row without per-node DOM patching.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/personal-inventory/blueprints")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")

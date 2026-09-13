@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.BackendRoleSyncFilter;
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -52,6 +53,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * have closed the loop never went out either, leaving this page as the user's only channel.
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("isAuthenticated()")

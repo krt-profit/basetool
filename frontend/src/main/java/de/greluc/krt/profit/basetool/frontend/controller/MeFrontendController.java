@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
@@ -49,6 +50,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * pin an OrgUnit they do not belong to.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/me")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")

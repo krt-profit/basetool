@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MaterialExchangeOfferDto;
@@ -65,6 +66,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * pane (REQ-FE-005/013). The whole surface is gated on {@code KRT_MEMBER} (decision D2).
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/materialboerse")
 @RequiredArgsConstructor
 @Slf4j

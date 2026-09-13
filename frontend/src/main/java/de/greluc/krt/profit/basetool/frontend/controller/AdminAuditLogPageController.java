@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.AuditRowView;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BankAuditEventDto;
@@ -55,6 +56,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  * filtering and paging swap in place via {@code krtFetch} (epic #571 pattern).
  */
 @Controller
+@UsesLayoutModel
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

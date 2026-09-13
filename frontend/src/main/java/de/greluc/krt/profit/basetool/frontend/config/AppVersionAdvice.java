@@ -37,8 +37,13 @@ import org.springframework.web.bind.annotation.ModelAttribute;
  * ProjectInfoAutoConfiguration} (e.g. {@code @WebMvcTest}) still wire the advice cleanly; in that
  * case the model attribute degrades to a literal {@code "dev"} marker instead of {@code null} so
  * the template never renders an empty version chip.
+ *
+ * <p>Scoped to {@link UsesLayoutModel}, so it does not run ahead of the module's REST controllers:
+ * they serialise through Jackson and never read a model attribute. See that annotation for why the
+ * selector is an opt-in marker rather than the {@code Controller} stereotype or a base package. It
+ * reaches no backend, but it is layout chrome all the same and follows its four siblings.
  */
-@ControllerAdvice
+@ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 public class AppVersionAdvice {
 

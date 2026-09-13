@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.NotificationRuleWriteRequest;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -53,6 +54,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * application/problem+json} so {@code krtFetch} branches on conflicts exactly as elsewhere.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/notification-rules")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")

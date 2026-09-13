@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -47,6 +48,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  */
 @Slf4j
 @Controller
+@UsesLayoutModel
 @RequestMapping("/materials/profit-calculation")
 @RequiredArgsConstructor
 public class ProfitCalculationPageController {

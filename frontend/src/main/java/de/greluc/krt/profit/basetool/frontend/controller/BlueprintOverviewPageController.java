@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BlueprintOverviewOwnerDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
@@ -46,6 +47,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * trace.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/blueprint-overview")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")

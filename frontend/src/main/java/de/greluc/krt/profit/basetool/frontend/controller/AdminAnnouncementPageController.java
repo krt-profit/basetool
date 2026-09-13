@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
+import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
@@ -53,6 +54,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * overwriting the other person's text.
  */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/admin/announcement")
 @RequiredArgsConstructor
 @Slf4j
