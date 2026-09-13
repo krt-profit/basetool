@@ -202,6 +202,26 @@ jobs:
       - name: Check the edge probe against the vhost allow-list
         run: python3 .github/scripts/check_probe_against_allowlist.py
 
+  frontend-image-lint-exclusions:
+    name: frontend-image-lint-exclusions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
+      # the image has no Node toolchain to run them with. So a task wired into `check` is silently
+      # added to the image build too. `lintCssInline` was, on 2026-09-13, and the failure mode is as
+      # indirect as it gets: the image build failed, the e2e stack's `up --wait` never saw a healthy
+      # service, and all 94 e2e classes reported `initializationError` with the real cause visible
+      # only inside compose-up.log in the uploaded artifact. Nothing in the build output said lint.
+      - name: Self-test the comparison
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py --selftest
+
+      - name: Check the frontend image excludes every Node-based task
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py
+
   e2e-device-matrix:
     name: e2e-device-matrix
     runs-on: ubuntu-latest
