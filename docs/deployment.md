@@ -967,10 +967,13 @@ sudo -u deploy /usr/bin/docker compose \
     start frontend
 ```
 
-The page is intentionally not scoped per virtual host — any proxy host behind
-NPM (including `keycloak.profit-base.online`) will fall back to the same screen if
-its upstream ever serves a `5xx`. The wording is kept generic ("System
-maintenance") so it reads correctly for both.
+The page is intentionally not scoped per virtual host — every vhost includes
+`maintenance.conf`, so any of them falls back to the same screen if its upstream
+ever serves a `5xx`. **Identity included:** since ADR-0166 Keycloak is a set of
+locations on the web vhost rather than a host of its own, so a maintenance window
+covers the login too — which is correct, since there is nothing to log in to. The
+wording is kept generic ("System maintenance") so it reads correctly for all of
+them.
 
 ---
 
@@ -1025,6 +1028,13 @@ done | sort | uniq -c        # expect a mix of 200s and 429s, no 503
 ---
 
 ## Keycloak behind NPM over HTTPS
+
+> **Historical, on two counts — read it as a record, not as instructions.** NPM was replaced by
+> native nginx on 2026-09-12 (ADR-0162), and `keycloak.profit-base.online` was retired on
+> 2026-09-13 (ADR-0166) when identity moved to `/auth` on the web host. What still holds unchanged
+> is the part this section exists for: Keycloak serves **HTTPS only** in production, both edges
+> that reach it are TLS, and the management interface stays plain HTTP because the image ships no
+> TLS-capable CLI client. The current addresses are in *Identity cutover* above.
 
 Keycloak no longer serves plain HTTP in production. The `keycloak` service starts with
 `--http-enabled=false --https-port=18443`, so **both** edges that reach it are now TLS:
@@ -1139,8 +1149,9 @@ sudo docker run --rm --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
 # Keycloak is healthy (proves the HTTP management healthcheck still works after the HTTPS flip).
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod ps keycloak
 
-# Public OIDC discovery still resolves through NPM (NPM → keycloak:18443 re-encryption works).
-curl -fsS https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
+# Public OIDC discovery still resolves through the edge (re-encryption to keycloak:18443 works).
+# The address is post-ADR-0166; before that it was https://keycloak.profit-base.online/realms/iri/…
+curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
 
 # Backend user sync succeeds over TLS — no recurring "Failed to fetch users from Keycloak".
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
@@ -1256,9 +1267,11 @@ Then `https://profit-base.online/auth/admin` reaches the console through the tun
 > console — which is new since ADR-0166 and worth knowing before you wonder why the app is slow or
 > logged out. Remove the line when you are done.
 
-The access control is an nginx `allow … / deny all` on the `/admin` **custom location** of the
-`keycloak.profit-base.online` proxy host, configured in the NPM admin UI (`127.0.0.1:10081` →
-*Proxy Hosts → keycloak → Custom locations → `/admin` → Advanced*):
+The access control is an nginx `allow … / deny all` on the `/auth/admin` location of the web vhost,
+in `docker/edge/conf.d/10-frontend.conf.template` — in git, reviewable, and rendered at container
+start. (Until 2026-09-12 it was a *custom location* clicked into the NPM admin UI on the retired
+`keycloak.profit-base.online` proxy host; ADR-0162 moved it into the repository and ADR-0166 moved
+it to this address. The directives themselves are unchanged, which is the point:)
 
 ```nginx
 # Keycloak Admin Console — reachable only through the operator SSH tunnel.
