@@ -185,6 +185,38 @@
     --touch-target-dense: 32px;
     --content-max: 1200px; /* main column cap */
     --measure: 80ch; /* paragraph max line length */
+
+    /*
+     * The viewport height a page-level scroll container may occupy, stated ONCE.
+     *
+     * Four panels cap themselves to "the screen, minus whatever the footer covers": the
+     * Materialbörse material list, the Materialien-Übersicht and Gewinnberechnung table
+     * wrappers, and the Beförderung matrix. Each subtracts its own reserve for the chrome
+     * above it (the sticky header, the greeting, the filter row), which is why the reserve
+     * stays at the call site and only the viewport term lives here.
+     *
+     * `--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
+     * the footer is" (REQ-UI-009): `sidebar.js` publishes 0 whenever the footer is not
+     * `fixed`, which on the phone class it is not (ADR-0172). The 5rem fallback is what the
+     * value is before that JS has run.
+     *
+     * `dvh`, not `vh`: `vh` is the LARGE viewport (address bar hidden), so on a phone a `vh`
+     * calc over-estimates by the bar's height and the panel's bottom sits under it. The `vh`
+     * definition below is the fallback for an engine that does not know `dvh` — and it is an
+     * @supports test rather than the two-declaration trick the four call sites used to carry,
+     * because that trick CANNOT survive being moved into a custom property: with
+     * `max-height: var(--x)` twice, both declarations parse, the cascade keeps only the last,
+     * and if its substituted value is invalid the property falls back to `unset` — `none` for
+     * `max-height` — so the panel would get no cap at all, the exact failure the trick existed
+     * to prevent. Stated here once, the fallback cannot be forgotten at a call site either.
+     */
+    --krt-panel-viewport-rest: calc(100vh - var(--krt-footer-height, 5rem));
+}
+
+@supports (height: 1dvh) {
+    :root {
+        --krt-panel-viewport-rest: calc(100dvh - var(--krt-footer-height, 5rem));
+    }
 }
 
 body {
@@ -1233,81 +1265,72 @@ tbody tr:nth-child(even):hover {
 
 @media (width <= 768px) {
     /*
-     * The page-title row wraps on a phone (REQ-UI-009, measured 2026-09-13).
+     * Rows of controls wrap on a phone instead of widening the page (REQ-UI-009, ADR-0174).
      *
-     * `.greeting.hud-box.flex-between` is the standard page header — an <h1>
-     * beside its primary action — and it is used by 28 templates. `space-
-     * between` with no `flex-wrap` means the row cannot break: the German
-     * headings are long compounds ("AUFTRAGSVERWALTUNG") that already fill a
-     * 375px screen on their own, so the CTA beside them was pushed clean off
-     * the viewport and took the whole document width with it. Measured on the
-     * phone class: /orders overflowed by 159px, /notifications by 52px,
-     * /missions and /materials/overview by 26px, /bank by 10px — nothing was
-     * clipped, the page simply became 534px wide and every screen had to be
-     * panned sideways. REQ-UI-009 lets a wide TABLE scroll; it does not let the
-     * page do it.
+     * `space-between` with no `flex-wrap` means a row cannot break, and the German compounds
+     * this UI is built from ("AUFTRAGSVERWALTUNG") already fill a 375px screen on their own.
+     * Measured on the phone class: /orders overflowed by 159px, /notifications by 52px,
+     * /missions and /materials/overview by 26px, /bank by 10px. Nothing was clipped — the page
+     * simply became 534px wide and every screen had to be panned sideways. REQ-UI-009 lets a
+     * wide TABLE scroll; it does not let the page do it.
      *
-     * That three templates already carried a generated `flex-wrap: wrap` +
-     * gap utility on this exact element is the tell: the defect was hit before
-     * and patched per page. This fixes the other 28 at the utility instead.
+     * This was three overlapping lists of class names until 2026-09-13, and the lists could
+     * never have been complete. Ten action rows were named here by hand, and each measuring
+     * round found more; worse, the row that overflowed /orders by 403px was a `.flex-gap-sm`,
+     * and a good number of the app's rows carry a GENERATED class from inline-migration.css
+     * whose name is content-hashed (`krtm-display-flex-gap-1rem-...-6529`). A hashed name
+     * cannot be enumerated in advance by anyone, so a list-shaped fix could only ever chase
+     * this defect, never close it.
      *
-     * Both now live on their BASE rules instead — see `.flex-between` below —
-     * because this block only ever reached ≤768px, and the band this was
-     * written to close is 769-1023px.
+     * So the rule below asks what an element IS, not what it is called: a row that directly
+     * contains a control or a link is an action row, whatever its class. `:has()` reads the
+     * structure the templates already have, which is the one thing the generator cannot
+     * rename. `flex-wrap` is inert on anything that is not a flex container, so matching a
+     * `<td>` or a `<form>` that happens to hold a button costs nothing — and `.btn` itself is
+     * never matched, because a button holding an icon and a label has no control CHILD, which
+     * is what would otherwise stack the glyph above its text.
+     *
+     * `:where()` keeps it at zero specificity, so any row that must not break says so with
+     * `flex-wrap: nowrap` and wins outright.
      */
-
-    /*
-     * Every other action row wraps too, for the same reason and by the same
-     * measurement. A sweep of the stylesheets for `display: flex` rules that
-     * declare no `flex-wrap` and read like a button row turned up thirteen; the
-     * admin audit log was the one that showed what it costs — four buttons
-     * (FILTERN / ZURÜCKSETZEN / PDF EXPORTIEREN / EINTRÄGE LÖSCHEN) ran 151px
-     * past a 375px screen with the last one sliced in half.
-     *
-     * Listed here rather than patched in six files: none of those rules declares
-     * `flex-wrap` at all, so there is nothing to out-specify and this single
-     * declaration reaches all of them. Three candidates were deliberately left
-     * out — `.krt-pi-typeahead-item` and `.mb-modal-footnote` are not action rows,
-     * and `.oc-chart.editing .oc-actions` belongs to the org-chart editor, which
-     * carries its own narrow-screen block.
-     */
-    .bank-filter-actions,
-    .kpi-card-foot,
-    .leitung-group-actions,
-    .leitung-modal-actions,
-    .krt-bp-detail-actions,
-    .search-form-actions,
-    .notification-dropdown-footer,
-    .notification-item-actions,
-    .notification-page-actions,
-    .demand-actions-bar {
+    :where(:has(> :where(button, [role='button'], summary, a, input, select, textarea))) {
         flex-wrap: wrap;
     }
 
     /*
-     * The generic `.flex-gap-*` row utilities wrap here too (measured 2026-09-13
-     * on seeded data, which the first sweep did not have).
+     * The generic row utilities wrap here too, and are listed by name rather than left to the
+     * structural rule above on purpose: these are the design system's own vocabulary for "put
+     * these things in a row", so the list is closed and stable in a way a set of page-specific
+     * class names is not. They also cover the rows the structural rule cannot see — a
+     * `.flex-gap-sm` holding only `<span>`s contains no control to match on.
      *
-     * These are not named action rows, which is exactly why they were missed:
-     * they are the plain "put these things in a row" helpers, and the detail
-     * pages use them for their button bars. `/orders/{id}` is the case that
-     * showed it — `.greeting.flex-between` wraps since the rule above, but the
-     * `.flex-gap-sm` *inside* it holds four buttons (ZURÜCK ZUR ÜBERSICHT /
-     * BEARBEITEN / ITEMS BEARBEITEN / LÖSCHEN) and could not break, so the row
-     * stayed one unbreakable 403px block and widened the layout viewport to
-     * 404px on a 375px screen. Everything the sweep then reported as "cut off"
-     * on that page — the notification bell, the delete form, its button and its
-     * label — was that one overflow seen from four elements.
+     * Wrapping is right for every use of these utilities on a phone, including the `<label>`
+     * rows they also serve: a checkbox that drops under its own caption is still a usable
+     * checkbox, a caption sliced at the screen edge is not.
      *
-     * Wrapping is right for every use of these utilities on a phone, including
-     * the `<label>` rows they also serve: a checkbox that drops under its own
-     * caption is still a usable checkbox, a caption sliced at the screen edge is
-     * not.
+     * `.flex-between` and `.flex-between-mb` are NOT here — they carry their wrap on their base
+     * rules instead, because this block only ever reaches ≤768px and the band that defect was
+     * measured in is 769-1023px.
      */
     .flex-gap-xs,
     .flex-gap-sm,
     .flex-gap-md,
     .mt-2-flex-gap {
+        flex-wrap: wrap;
+    }
+
+    /*
+     * `.kpi-card-foot` is the one row from the old hand-written list that neither mechanism
+     * above reaches, and it is worth saying why rather than quietly leaving it out: it holds a
+     * delta figure and an inline sparkline — a `<span>` and an `<svg>` — so it is a row of
+     * CONTENT, not of controls, and it carries no row utility either. It still has to break on
+     * a phone for the same reason the others do.
+     *
+     * The other nine names that stood here are all covered now: eight hold a `.btn`, a
+     * `<button>` or an `<a>` as a direct child and are matched structurally, and
+     * `.notification-dropdown-footer` holds a bare `<a>`.
+     */
+    .kpi-card-foot {
         flex-wrap: wrap;
     }
 
@@ -4795,13 +4818,59 @@ textarea:focus-visible,
         padding-inline: var(--space-6);
     }
 
-    /* Touch target size optimization (fat-finger) */
+    /*
+     * REQ-UI-009's 44px floor, as a DEFAULT rather than as a list of names (ADR-0174).
+     *
+     * Every interactive control is born at the floor, and a control opts OUT by declaring a
+     * `min-height` of its own. Until 2026-09-13 this was the other way round: the floor
+     * enumerated `input, select, textarea, .btn, .hamburger-btn` plus eight hand-added
+     * exceptions, and every round of review found more that the list had missed — the
+     * language switcher at 17px, the sidebar close button at 34px, the bell at 40px; then
+     * four in-row controls; then `.krt-modal-close`, which carried no size rule in any
+     * stylesheet; then `.close-modal` and `.btn-close`; then `.pa-sort-btn` at 29x18px, which
+     * the guard could not even see, because its template hides the control behind a
+     * "more than one topic" condition and an under-seeded stack renders no sort column.
+     * A list of names cannot close that class of defect: absence from it is indistinguishable
+     * from not existing yet, so every control written after the list starts out
+     * non-compliant, and silently so.
+     *
+     * `:where()` is the whole mechanism, and it is load-bearing rather than decoration: it
+     * contributes ZERO specificity, so this selector is (0,0,0) and ANY authored rule beats
+     * it — in this file, in a per-page <style> block read after it, at any specificity. That
+     * is the property which makes a default safe to apply to every control at once, and it is
+     * why this rule cannot resurrect the specificity traps the exceptions below were written
+     * to dodge (`.btn.btn-xs2`, `input.item-checkbox`): it never competes with them.
+     *
+     * The sanctioned opt-out is `min-height: var(--touch-target-dense)`, the token REQ-UI-009
+     * names for a repeated dense in-row control. That is a DECLARED marker rather than an
+     * absence, and it is the same marker `TouchClassLayoutE2eTest` already reads out of the
+     * CSSOM to build its dense set — so the stylesheet still declares the exemption, the
+     * guard still follows it, and neither side keeps a list. A control that declares some
+     * other sub-floor height is NOT silently exempt: the guard measures it against the full
+     * 44px and fails.
+     *
+     * `min-height` only, deliberately. The floor that kept being missed is the vertical one
+     * and it is the one the guard asserts; it is also monotonic, so a default can only ever
+     * raise a control. A universal `min-width` would not be: `.pa-sort-btn` declares
+     * `width: 1.8rem` and `.matrix-flag` a 32px square, neither declares `min-width`, and a
+     * default min-width would therefore widen the very columns those two exist to keep
+     * narrow. The icon-only controls that need a square keep their own `min-width` below.
+     */
+    :where(button, [role='button'], summary, a.btn, input, select, textarea) {
+        min-height: var(--touch-target);
+    }
+
+    /*
+     * Comfort padding for form controls and buttons — separate from the floor above, and that
+     * separation is the point. Padding is a styling decision belonging to these specific
+     * controls; carrying it on the `:where()` default would have given every bare `button` in
+     * the app a 0.75rem/1rem box, which is how an icon-only control gets torn off its glyph.
+     */
     input,
     select,
     textarea,
     .btn,
     .hamburger-btn {
-        min-height: var(--touch-target);
         padding: var(--space-3) var(--space-4);
     }
 
@@ -4828,38 +4897,29 @@ textarea:focus-visible,
     }
 
     /*
-     * The three chrome controls the rule above never reached, measured on every
-     * page at 375px and 768px by TouchClassLayoutE2eTest (2026-09-13): the
-     * language switcher rendered 17px tall, the sidebar's close button 34px and
-     * the notification bell 40px — all below REQ-UI-009's 44px floor, and none
-     * of them carrying the `.btn-xs` / `.btn-icon` exemption, which covers only
-     * repeated dense ROW actions. They were missed because each is a bare
-     * `button` with its own rule and none is a `.btn`: the selector list above
-     * enumerates classes, so a control that opts out of `.btn` opts out of the
-     * floor with it. They are the controls a member reaches for first on a
-     * phone — open the menu, read a notification, switch language.
+     * The bell is a SQUARE hit area, not merely a tall one. The default above gives it the
+     * height; this gives it the matching width.
      */
     .notification-bell-btn {
         width: var(--touch-target);
         height: var(--touch-target);
     }
 
-    .dropbtn {
-        min-height: var(--touch-target);
-    }
-
-    /* One list, because the two are the same control: a dismiss button that has to be hittable.
-       They were two rules with byte-identical bodies twelve lines apart, and the comment beside the
-       second already promised to keep them in step ("same job, same treatment") — which a selector
-       list states in code instead of in prose. */
+    /*
+     * The dismiss button of the sidebar and of all three modal vocabularies — `.close-modal`
+     * (16 templates), `.btn-close` (6) and `.krt-modal-close` — is one control under four
+     * names, and none of the four declares a size of its own.
+     *
+     * `min-height` stays spelled out here even though the default above would supply it,
+     * because `.close-modal` is a `<span>` in admin/mission-data.html (three dialogs) as well
+     * as a `<button>` everywhere else, and a `<span>` is reached by no element selector. The
+     * markup is the real defect there — a dismiss control that is not a button is not
+     * keyboard-operable — but that is a separate change, and until it is made this line is
+     * what keeps those three dialogs hittable. The square and the centring are needed by all
+     * four regardless.
+     */
     .close-sidebar-btn,
     .krt-modal-close,
-    /*
-     * `.close-modal` (16 templates) and `.btn-close` (6) are the same control under two more
-     * names — the enumerated-selector-list problem this block is itself an instance of.
-     * `.close-modal` is declared at :4335, earlier in this file at equal specificity, so this
-     * wins the tie; `.btn-close` carries no size rule at all and takes the floor from here.
-     */
     .close-modal,
     .btn-close {
         display: flex;
@@ -4871,73 +4931,38 @@ textarea:focus-visible,
 
     /*
      * `.btn-xs2` is a page-local dense variant declared inline in mission-detail.html and
-     * operation-detail.html (`min-height: 32px`, 21 uses). Two of its instances are FORM actions —
-     * "Ziel hinzufügen" and "Schritt hinzufügen" on the mission create form — and REQ-UI-009 is
-     * explicit that a form button keeps the 44px floor; only repeated dense ROW actions
-     * (`.btn-xs`, `.btn-icon`) are exempt. Owner decision 2026-09-13: raise the whole variant on
-     * the touch classes and leave desktop density untouched.
+     * operation-detail.html (`min-height: 32px`, 21 uses). Two of its instances are FORM
+     * actions — "Ziel hinzufügen" and "Schritt hinzufügen" on the mission create form — and
+     * REQ-UI-009 is explicit that a form button keeps the 44px floor; only repeated dense ROW
+     * actions (`.btn-xs`, `.btn-icon`) are exempt. Owner decision 2026-09-13: raise the whole
+     * variant on the touch classes and leave desktop density untouched.
      *
-     * Written as `.btn.btn-xs2`, not `.btn-xs2`, and that is not decoration: the page's own rule
-     * lives in an inline <style> that the browser reads AFTER this file, so at equal specificity it
-     * would win. Out-specifying it is the same technique REQ-UI-009 already prescribes for
-     * `.btn.btn-xs` over `.btn` — relying on source order is what makes such a rule silently inert.
+     * This is one of the two rules the inverted default deliberately does NOT replace. The
+     * page's own rule lives in an inline <style> the browser reads AFTER this file, so it
+     * beats the (0,0,0) default outright; out-specifying it is the same technique REQ-UI-009
+     * already prescribes for `.btn.btn-xs` over `.btn`. Written `.btn.btn-xs2`, never
+     * `.btn-xs2`.
      */
     .btn.btn-xs2 {
         min-height: var(--touch-target);
     }
 
     /*
-     * The controls the CI sweep found once the e2e stack had real rows in it
-     * (2026-09-13). None of them is a `.btn`, so the selector list at the top of
-     * this block never reached them, and the first sweep could not see them at
-     * all: every one lives on a page or in a table that is empty on a fresh
-     * stack, so there was no element to measure.
+     * The inventory row selector, at REQ-UI-009's dense floor.
      *
-     * Split by REQ-UI-009's own distinction, not by how small each one was:
+     * A repeated dense in-row control — one per inventory row — so 32px rather than 44px, on
+     * the same reading as `.btn-xs`, `.matrix-flag` and `.bank-row-toggle`. It measured 26px.
      *
-     *   - `.demand-sort-btn` is a column-HEADER control (one per column, not per
-     *     row) and gets the full 44px. It rendered 22px: the button is bare by
-     *     design so the whole cell reads as the hit area, but the `<th>` padding
-     *     is the cell's, not the button's, so the target really was 22px tall.
-     *     Stretching the button to the floor makes the header cell grow with it,
-     *     which is what the design comment intended in the first place.
-     *   - `.krt-livesync-pill` is a standalone floating control and gets 44px
-     *     too; it is styled for the first time just below.
-     *   - `input.item-checkbox`, `.matrix-flag` and `.bank-row-toggle` are
-     *     repeated dense in-row controls — an inventory row's selector, a grant
-     *     row's three permission flags, a booking row's disclosure chevron — and
-     *     take the documented dense floor of 32px. They measured 26px, 18px and
-     *     15px, so all three still grow; 15px was under WCAG 2.5.8 AA's 24px
-     *     minimum, not merely under this design system's.
-     *
-     * `input.item-checkbox` is written with the element prefix for the same
-     * reason `.btn.btn-xs2` is: the 20px square is declared in inventory-my.html's
-     * inline <style>, which the browser reads after this file, so an equal-
-     * specificity rule here would lose. `#personalOnly` shares the class but is
-     * wrapped in a `<label>` that is already well over the floor — the label is
-     * the hit area, and raising the box does it no harm.
+     * The second rule the inverted default does not replace, and for the same reason as
+     * `.btn.btn-xs2`: the 20px square is declared in inventory-my.html's inline <style>, which
+     * is read after this file, so the element prefix in `input.item-checkbox` is what wins the
+     * tie. `#personalOnly` shares the class but is wrapped in a `<label>` that is already well
+     * over the floor — the label is the hit area, and raising the box does it no harm.
      */
-    .demand-sort-btn {
-        min-height: var(--touch-target);
-    }
-
     input.item-checkbox {
         width: var(--touch-target-dense);
         height: var(--touch-target-dense);
         min-height: var(--touch-target-dense);
-    }
-
-    /*
-     * The live-sync pill's floor, here rather than on the base rule.
-     *
-     * It sat outside every media query for a day, which made it the only control this work touched
-     * that also grew on desktop and ultra-wide — including `.mission-livesync-pill`, a pre-existing
-     * and already-designed element that nobody asked to change. REQ-UI-009 puts the 44px floor on
-     * the TOUCH classes, as the comment at the top of this block says; the value was argued and the
-     * scope was not.
-     */
-    .krt-livesync-pill {
-        min-height: var(--touch-target);
     }
 
     /*

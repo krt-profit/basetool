@@ -363,13 +363,56 @@ wrap. And `.mission-info-grid` sized its value column `1fr` — shorthand for `m
 whose `auto` minimum is the track's min-content width — so a long mission name widened the tile, the
 tile widened its `auto-fit` track and the tablet-landscape class scrolled sideways.
 
+**A fourth amendment, 2026-09-13: the floor is a DEFAULT, not a list** ([ADR-0174](../adr/0174-layout-floors-are-defaults-that-controls-opt-out-of.md)).
+
+Every amendment above added a name to an enumeration, and every round of review found more names the
+enumeration had missed — five rounds, ending with `.pa-sort-btn` at 29x18px, which the guard could
+not see either because its template renders no sort column unless a category has more than one topic.
+That is the shape of the defect rather than an accident of effort: **absence from a list is
+indistinguishable from not existing yet**, so every control written after the list starts out
+non-compliant, and silently so.
+
+The floor is therefore expressed as a zero-specificity default over
+`button, [role="button"], summary, a.btn, input, select, textarea`, which any authored rule beats,
+and **a control opts out by DECLARING `min-height: var(--touch-target-dense)`**. The token was
+already the marker `TouchClassLayoutE2eTest` reads out of the CSSOM to build its dense set, so the
+exemption is still declared by the design system and still followed by the guard with no list on
+either side. A control that declares some other sub-floor height is not exempt: it is measured
+against the full 44px and fails.
+
+Two consequences worth stating, because both were exemptions this requirement had granted in prose
+and no stylesheet had ever declared:
+
+- **`.master-row`'s 32px exemption existed only here.** Nothing in any stylesheet consumed the token
+  for it, so the guard's CSSOM-derived set never contained it and the class was being measured
+  against 44px the whole time. `personal-inventory.css` declares it now.
+- **`.matrix-flag` sized itself with `width`/`height` alone.** A `min-height` clamps a `height`
+  regardless of specificity — different properties never compete — so under a default floor it had
+  to declare the token to decline it.
+
+Three rules remain written out per control in the touch block, and each states a decision rather than
+filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local `<style>` rule
+that the browser reads after `styles.css`, and the dismiss-button group keeps an explicit
+`min-height` because `.close-modal` is a `<span>` in three `admin/mission-data.html` dialogs, which
+no element selector reaches.
+
+The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
+control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
+was hopeless there for an additional reason — many rows carry a generated class from
+`inline-migration.css`, and those names are content-hashed.
+
 **Acceptance**
 
 - [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
   a positioned `::before` / `::after` overlay, or the `<label>` that activates them) ≥ 44px on touch
   classes, except the dense in-row controls `.btn-xs` / `.btn-icon` / `.master-row` /
   `.item-checkbox` / `.matrix-flag` / `.bank-row-toggle`, which are ≥ `--touch-target-dense` (32px)
-  on every class.
+  on every class. That list is a reader's summary, not the mechanism: the stylesheet's
+  `--touch-target-dense` consumers are the source of truth, and the guard derives the set from them.
+- [ ] **A new control needs no edit to be compliant.** The floor is a zero-specificity default, so a
+  control added with no size rule of its own already meets it; being absent from a list must never
+  again be the same thing as being exempt from the floor. The check is the inverse: anything at 32px
+  can be shown to declare `--touch-target-dense`, and nothing else is under 44px.
 - [ ] Measured with rows in the tables, not only on a fresh stack: a detail view, a populated list
   and a populated table are each a different layout from their empty state, and an empty one hides
   every defect it has.

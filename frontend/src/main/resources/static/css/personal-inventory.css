@@ -1090,6 +1090,29 @@
     font-family: var(--font-body);
 }
 
+/*
+ * REQ-UI-009's dense exemption for the blueprint list rows, written down in CSS for the first
+ * time.
+ *
+ * The exemption itself is not new: the requirement has granted it since 2026-09-13 ("`.master-row`
+ * IS exempt, at 32px" — the rows measured 33px, and they are a scan-and-tap list where density is
+ * the point). What was missing is any DECLARATION of it. `.master-row` sized itself from its
+ * content and named `--touch-target-dense` nowhere, so the exemption existed only in prose:
+ * TouchClassLayoutE2eTest builds its dense set by reading `--touch-target-dense` consumers out of
+ * the CSSOM, and a class that consumes the token nowhere is in no such set, whatever the spec says
+ * about it.
+ *
+ * It became load-bearing with ADR-0174. `.master-row` is a `<button>`, so the inverted floor in
+ * styles.css now offers it 44px by default, and an exemption that is only written in a document
+ * cannot decline the offer. This rule is the decline — and, being a `--touch-target-dense`
+ * consumer, it is simultaneously what finally puts the class in the guard's dense set.
+ */
+@media (width <= 1024px) {
+    .master-row {
+        min-height: var(--touch-target-dense);
+    }
+}
+
 /* Right-aligned status cluster on a master row: the note pencil + the craft badge sit
    together at the row's trailing edge so the "can I build this?" signal is scannable. */
 .krt-bp-row-aside {
