@@ -80,6 +80,14 @@
   einmalig neu anmelden.** Die Android-App braucht die dazu passende neue Version — ältere
   Installationen können sich nicht mehr anmelden.
 
+- **Betrieb: Eine Umgebung unter eigener Domain braucht nur noch eine Einstellung.**
+  `IRI_KEYCLOAK_HOSTNAME` und `IRI_KEYCLOAK_ISSUER_URI` waren zwei getrennte Werte, die von Hand
+  übereinstimmen mussten — taten sie es nicht, meldete sich Keycloak als gesund und die drei
+  Anwendungen scheiterten beim Start an „issuer does not match“, was wie ein Fehler der Anwendung
+  aussieht. Der zweite Wert wird jetzt aus dem ersten abgeleitet, und eine CI-Prüfung hält das so.
+  `IRI_KEYCLOAK_ISSUER_URI` bleibt als Ausnahme für abweichende Aufbauten und wird normalerweise
+  nicht gesetzt (ADR-0167).
+
 - **Auf dem Handy scrollt die Fußzeile jetzt mit, statt unten festzukleben.** Sie war dauerhaft
   sichtbar und der Inhalt musste zusätzlich Platz für sie freihalten — zusammen rund ein Fünftel
   des Bildschirms für drei Links. Jetzt siehst du sie erst beim Scrollen ans Ende; auf Tablet und

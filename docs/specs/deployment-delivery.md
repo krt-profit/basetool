@@ -775,12 +775,29 @@ unable to verify any public certificate; and a file holding no private key can c
 off the command line where `ps` would show it.
 
 Because a non-production environment runs the **same promoted config bundle** under a different
-domain, the two public-identity values `docker-compose.yml` bakes in are variables with
-production defaults: `IRI_KEYCLOAK_HOSTNAME` (Keycloak's `KC_HOSTNAME`) and
-`IRI_KEYCLOAK_ISSUER_URI` (validated by backend, frontend and ingest). Unset, both resolve to
-the production values, so production behaviour is unchanged. `KC_HOSTNAME_STRICT` stays `true`
-in every environment — Keycloak keeps rejecting requests under any name other than the
-configured one.
+domain, the public identity `docker-compose.yml` bakes in is a variable with a production default:
+`IRI_KEYCLOAK_HOSTNAME`, which becomes Keycloak's `KC_HOSTNAME`. Unset, it resolves to the
+production value, so production behaviour is unchanged. `KC_HOSTNAME_STRICT` stays `true` in every
+environment — Keycloak keeps rejecting requests under any name other than the configured one.
+
+**That hostname is the single source, and the issuer is derived from it** (ADR-0167): the backend,
+frontend and ingest service templates each read
+`${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-<production>}/realms/iri}`. Until then the two
+were independent values that had to be kept in agreement by hand — `.env.example` said so in as many
+words, and nothing checked it. The failure when they disagree is the one ADR-0166 measured: Keycloak
+reports **healthy** while backend, frontend and ingest each die at start-up on `The Issuer "…" did
+not match the requested issuer "…"`, which reads as a backend fault and is a failed deploy.
+`IRI_KEYCLOAK_ISSUER_URI` remains as an override for a deployment whose advertised issuer genuinely
+differs from `KC_HOSTNAME`; setting it wins over the derivation.
+
+**The agreement is gated rather than documented.** `scripts/check-keycloak-issuer.py` runs in
+`repo-lint.yml` and renders every stack through `docker compose config` — compose's own
+interpolation, not a re-implementation of it — then asserts that a full-URL `KC_HOSTNAME` carries
+exactly the path `KC_HTTP_RELATIVE_PATH` serves under, that every service's issuer is the one that
+Keycloak will advertise, that the services in one stack agree with each other, and that the
+`application*.yml` fallback defaults still name the deployed issuer. Its regression suite,
+`scripts/check-keycloak-issuer.test.sh`, breaks each of those in turn and requires the gate to say
+so, and runs first so the gate cannot pass vacuously.
 
 **Acceptance**
 
@@ -793,6 +810,15 @@ configured one.
   so one deployment record is minted per run.
 - [ ] `IRI_KEYCLOAK_HOSTNAME` and `IRI_KEYCLOAK_ISSUER_URI` unset ⇒ the rendered compose is
   byte-identical to the pre-change production values.
+- [ ] `IRI_KEYCLOAK_HOSTNAME` set **alone** ⇒ the issuer of all three apps moves with it, in the
+  rendered compose. This is what distinguishes a derived value from two literals that happen to
+  agree today, and it is the case `check-keycloak-issuer.py`'s `prod-hostname-override` scenario
+  exists for.
+- [ ] `IRI_KEYCLOAK_ISSUER_URI` set as well ⇒ it wins over the derivation.
+- [ ] A full-URL `KC_HOSTNAME` whose path differs from `KC_HTTP_RELATIVE_PATH` ⇒ CI fails before
+  the configuration can be deployed (ADR-0166's measured broken row).
+- [ ] Every `application*.yml` fallback default for `KEYCLOAK_ISSUER_URI` names the issuer
+  `docker-compose.yml` deploys, so an app started without the variable does not trust a retired one.
 - [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
   which resolves to what `localhost` already resolves to.
 - [ ] `IRI_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the
