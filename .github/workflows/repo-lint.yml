@@ -14,11 +14,14 @@ name: Repo Lint
 #   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
 #                   SBOM end to end: plugin, committed file, regenerated at
 #                   release time, attested and attached to the Release.
+#   - e2e-gate-mirror -> e2e.yml states one decision twice (the job gate and the
+#                   concurrency selector that has to predict it); a selector
+#                   looser than its gate silently stops the suite from running.
 #
 # Each linter runs from its pinned release binary (shellcheck ships
 # preinstalled on the runner), so no third-party action enters the supply
 # chain and the tool version is explicit + Dependabot-free (bump the env pins
-# below). All three jobs are independent and block the PR on findings.
+# below). Every job is independent and blocks the PR on findings.
 
 on:
   push:
@@ -141,6 +144,38 @@ jobs:
 
       - name: Check PID-1 reaping invariant
         run: python3 .github/scripts/check_pid1_reaping.py
+
+  e2e-gate-mirror:
+    name: e2e-gate-mirror
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Ensure PyYAML
+        run: |
+          set -eu
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check pyyaml
+          fi
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
+
+      # REQ-OPS-027 / ADR-0169. `e2e.yml` decides "does this event run the Playwright suite?" in
+      # two places, because GitHub evaluates the concurrency group when the run is CREATED and the
+      # job gate only afterwards -- so the group has to predict the gate, and does it by embedding
+      # the gate expression verbatim. A group looser than its gate lets a run that will skip cancel
+      # the run that would have executed, and the suite silently never runs: #1537 and #1871 both
+      # reached a green board with no end-to-end coverage that way, behind cancelled runs that
+      # `gh pr checks` paints as `fail`. Nothing in a diff shows that, so it is asserted here.
+      #
+      # The self-test runs first so the gate can never pass vacuously -- a checker that stopped
+      # resolving the workflow would otherwise report "no problems" forever.
+      - name: Self-test the gate-mirror checker
+        run: python3 .github/scripts/check_e2e_gate_mirror.py --selftest
+
+      - name: Check the e2e concurrency selector against its job gate
+        run: python3 .github/scripts/check_e2e_gate_mirror.py
 
   probe-vs-allowlist:
     name: probe-vs-allowlist
