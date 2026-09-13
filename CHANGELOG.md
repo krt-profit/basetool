@@ -54,6 +54,9 @@
 - **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
   als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
   Einsatzseiten sah er immer schon richtig aus.
+- **Die Einheiten-Tabelle unter Administration → Organisationsstruktur passte auf dem Handy nicht
+  auf den Bildschirm.** Sobald Einheiten eingetragen waren, wurde sie breiter als das Gerät und
+  schob die ganze Seite samt Glocke seitlich weg. Jetzt scrollt sie für sich.
 - **Die Regel-Tabelle unter Administration → Benachrichtigungsregeln sprengte jeden Bildschirm.**
   Sie ist 1303px breit und hatte keinen eigenen Scrollbereich, sodass die ganze Seite seitlich
   verschoben werden musste — auch am Rechner. Jetzt scrollt die Tabelle für sich.

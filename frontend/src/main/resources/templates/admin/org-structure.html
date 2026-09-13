@@ -143,6 +143,12 @@
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.orgStructure.units.title}">Einheiten und Zuordnung</h2>
         <p class="text-muted" th:text="#{admin.orgStructure.units.hint}">Wähle die übergeordnete Einheit; Staffeln/Spezialkommandos gehören in einen Bereich, Bereiche in die Organisationsleitung.</p>
+        <!-- .table-responsive (REQ-UI-009): three columns of unit metadata reach 495px once the
+             table actually has rows, which is wider than a phone — it widened the layout viewport
+             to 520px and took the notification bell out of view with it. Invisible on an empty
+             stack, which is why the local sweep passed and CI did not: the e2e flows create org
+             units, the smoke run does not. -->
+        <div class="table-responsive">
         <table id="org-units-table">
             <thead>
             <tr>
@@ -181,6 +187,7 @@
             </tr>
             </tbody>
         </table>
+        </div>
     </div>
     </th:block>
     </div>
