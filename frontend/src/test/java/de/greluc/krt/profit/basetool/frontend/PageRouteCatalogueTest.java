@@ -237,6 +237,9 @@ class PageRouteCatalogueTest {
     assertThat(FrontendPageRoutes.ADMIN_SMOKE)
         .as("AdminPagesSmokeE2eTest slice")
         .allSatisfy(path -> assertThat(pages).contains(path));
+    assertThat(FrontendPageRoutes.A11Y_SMOKE)
+        .as("AccessibilitySmokeE2eTest slice")
+        .allSatisfy(path -> assertThat(pages).contains(path));
     assertThat(FrontendPageRoutes.DETAIL_LIST_PAGES)
         .as("list routes owning a detail view")
         .allSatisfy(path -> assertThat(pages).contains(path));
@@ -257,6 +260,7 @@ class PageRouteCatalogueTest {
     assertNoDuplicates("NOT_SWEPT_ROOTS", FrontendPageRoutes.NOT_SWEPT_ROOTS);
     assertNoDuplicates("CORE_SMOKE", FrontendPageRoutes.CORE_SMOKE);
     assertNoDuplicates("ADMIN_SMOKE", FrontendPageRoutes.ADMIN_SMOKE);
+    assertNoDuplicates("A11Y_SMOKE", FrontendPageRoutes.A11Y_SMOKE);
   }
 
   /**

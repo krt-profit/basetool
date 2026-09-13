@@ -290,6 +290,22 @@ public final class FrontendPageRoutes {
           "/admin/personal-blueprints");
 
   /**
+   * The slice {@code AccessibilitySmokeE2eTest} runs the axe WCAG A+AA scan over.
+   *
+   * <p>A subset of {@link #PAGES}, and the smallest of the three slices on purpose: an axe scan
+   * injects and runs the engine inside the page, so it costs far more per route than a page load.
+   * Five representative surfaces — the dashboard, a list, two different queue/create shapes and the
+   * hangar — rather than every page.
+   *
+   * <p>This was the <b>fourth</b> hand-kept copy of the frontend's routes, and it was not one of
+   * the three the 2026-09-13 review named. It is folded in here for the same reason as the other
+   * two slices: which pages are worth an axe scan stays a judgement, but every entry being a page
+   * route that actually exists is checkable, and {@code PageRouteCatalogueTest} now checks it.
+   */
+  public static final List<String> A11Y_SMOKE =
+      List.of("/", "/missions", "/orders", "/refinery-orders", "/hangar");
+
+  /**
    * The list routes that own a {@code /{id}} detail view.
    *
    * <p>Used by the touch sweep only to say so when one of them renders no row: the detail view then
