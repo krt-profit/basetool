@@ -55,11 +55,24 @@ server {
   # admin console is served past this allow-list with no error anywhere. `nginx -t` cannot see an
   # ACL that stopped applying, and the external deny probe only asks for the bare `/auth/admin/`
   # path. `^~` makes the match final and costs nothing.
+  # WHICH gateway is not a free choice: it is the one the published :443 DNATs over. Since the
+  # five net-proxy-* bridges became `internal: true` that is net-edge-ingress and nothing else, so
+  # the four upstream gateways are kept for an in-container caller while the operator's tunnel
+  # arrives on 172.28.15.1. Carried over from #1885, which found this on the retired vhost: adding
+  # the ingress bridge without adding it here locked the console out completely — every tunnelled
+  # request answered 403, which reads as a broken tunnel and is not one. ADR-0166 moves the ACL to
+  # this location, and the fix has to move with it or the cutover re-introduces the lockout.
+  #
+  # Both families of the dual-stack ingress bridge are listed. A tunnel written
+  # `-L 443:localhost:443` resolves to ::1 on a dual-stack host and then arrives on fd00:28:15::1;
+  # one word of difference in the ssh command must not decide whether the console opens.
   location ^~ /auth/admin {
-    allow 172.28.3.1;   # net-proxy-frontend gateway
-    allow 172.28.4.1;   # net-proxy-keycloak gateway
-    allow 172.28.7.1;   # net-proxy-ingest gateway
-    allow 172.28.13.1;  # net-proxy-api gateway
+    allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives
+    allow fd00:28:15::1; # net-edge-ingress gateway, IPv6
+    allow 172.28.3.1;    # net-proxy-frontend gateway
+    allow 172.28.4.1;    # net-proxy-keycloak gateway
+    allow 172.28.7.1;    # net-proxy-ingest gateway
+    allow 172.28.13.1;   # net-proxy-api gateway
     deny all;
 
     include /etc/nginx/edge/include/upstream-keycloak.conf;

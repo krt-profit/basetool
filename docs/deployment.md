@@ -1280,13 +1280,19 @@ operator reaches the host over SSH.
 
 ### How the lock-down works
 
-The operator opens a local port-forward to NPM's published `443` through the host loopback:
+The operator opens a local port-forward to the edge's published `443` through the host loopback:
 
 ```bash
 ssh -N -L 443:127.0.0.1:443 root@178.104.94.14
 ```
 
-and adds a hosts entry so the browser resolves the vhost to the tunnel and SNI/cert still match:
+**The local port must be `443`.** Keycloak runs hostname-strict and the edge forwards `Host $host`
+with the port stripped, so Keycloak emits portless URLs; a tunnel on `:8443` or anything else ends
+in redirect loops and `Invalid parameter: redirect_uri`, which reads as a broken client and is not
+one. `PermitOpen` on the host admits `127.0.0.1:443` only, so the forward cannot be pointed
+anywhere else either.
+
+Then map the vhost to the tunnel so SNI and certificate still match. Either a hosts entry:
 
 ```
 127.0.0.1  profit-base.online
@@ -1304,25 +1310,43 @@ start. (Until 2026-09-12 it was a *custom location* clicked into the NPM admin U
 `keycloak.profit-base.online` proxy host; ADR-0162 moved it into the repository and ADR-0166 moved
 it to this address. The directives themselves are unchanged, which is the point:)
 
+or — no elevation, and it leaves the machine's name resolution alone — a throwaway Chrome profile:
+
+```bash
+chrome --host-resolver-rules="MAP profit-base.online 127.0.0.1:443" --user-data-dir=/tmp/kc-admin "https://profit-base.online/auth/admin"
+```
+
+Since ADR-0166 this is the **better** of the two: the override lives in one browser profile, so the
+rest of the web app keeps resolving normally while the console is open — which the `hosts` entry
+above cannot do, because the console now shares its name with the app.
+
 ```nginx
-# Keycloak Admin Console — reachable only through the operator SSH tunnel.
-# Host-origin traffic (the tunnel hitting NPM's published 443 via 127.0.0.1) is
-# SNAT'd by Docker to the gateway of the net-proxy-* bridge, so nginx sees a
-# 172.28.x.1 source, NOT the operator's real IP. External clients keep their
-# real public IP and hit `deny all`. The gateways are stable because the bridge
-# subnets are pinned in docker-compose.yml (172.28.0.0/16).
-allow 172.28.3.1;   # net-proxy-frontend gateway
-allow 172.28.4.1;   # net-proxy-keycloak gateway
-allow 172.28.7.1;   # net-proxy-ingest gateway
+allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives
+allow fd00:28:15::1; # net-edge-ingress gateway, IPv6
+allow 172.28.3.1;    # net-proxy-frontend gateway
+allow 172.28.4.1;    # net-proxy-keycloak gateway
+allow 172.28.7.1;    # net-proxy-ingest gateway
+allow 172.28.13.1;   # net-proxy-api gateway
 deny all;
 ```
 
-Docker decides which of NPM's three proxy-network gateways the published-port DNAT resolves to,
-and that choice can differ across Docker versions or attachment order — so all three are listed.
-Equivalently you may use a single `allow 172.28.0.0/16;` (the whole pinned range); both are safe
-because no external client can present a `172.28.x` source over a completed TCP handshake, and NPM
-does not trust an inbound `X-Forwarded-For` for `allow`/`deny` (`$remote_addr` is the real TCP
-peer).
+Host-origin traffic — the tunnel hitting the published `443` via `127.0.0.1` — is DNATed in by
+Docker, so nginx sees a **bridge gateway**, not the operator's real IP. External clients keep their
+real public IP and hit `deny all`. `$remote_addr` is the real TCP peer, so an inbound
+`X-Forwarded-For` cannot influence the decision.
+
+**Which gateway is the load-bearing detail.** It is whichever bridge the published ports DNAT over,
+and that is `net-edge-ingress` alone since the five `net-proxy-*` bridges became `internal: true`
+(ADR-0162) — an internal network carries no DNAT. Both address families are listed because
+`-L 443:localhost:443` resolves to `::1` on a dual-stack host and then arrives on `fd00:28:15::1`.
+The four upstream gateways are kept for an in-container caller.
+
+> [!WARNING]
+> Adding `net-edge-ingress` on 2026-09-12 without adding its gateway here locked the console out
+> completely: every tunnelled request answered **403**, with the edge logging
+> `access forbidden by rule, client: 172.28.15.1`. Subnet pinning did not prevent it — no gateway
+> moved; the traffic simply started arriving on a different one. Any change to the edge's
+> `networks:` attachments has to be checked against this block.
 
 ### Why the allowed IP used to change — and no longer does
 
@@ -1332,7 +1356,8 @@ a `docker compose down` / restart reassigned `net-proxy-*` a fresh subnet and mo
 locked the console out until the new gateway was looked up by hand. The `ipam` blocks in
 `docker-compose.yml` now pin every bridge to a fixed `/24` under `172.28.0.0/16`, so the gateway
 the allow-list depends on is constant across restarts. **If you ever change those pinned subnets,
-update this `/admin` block to match** — they move together.
+or attach the edge to a different bridge, update this `/admin` block to match** — they move
+together.
 
 > This is an operator convenience, not a security boundary on its own: the console is still behind
 > Keycloak's own admin login. The IP lock-down is defence-in-depth so the admin login form is not
