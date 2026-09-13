@@ -5948,16 +5948,33 @@ textarea:focus-visible,
     max-width: 440px;
     max-height: 90vh;
     display: flex;
-    flex-direction: column;
     background: var(--color-bg-dark-gray);
     border: var(--border-hairline);
     border-top: 3px solid var(--color-primary);
     position: relative;
     box-shadow: var(--glow-primary-lg);
+    /*
+     * A dialog SCROLLS when it runs out of room; it never becomes two columns.
+     *
+     * This is the escape hatch the phone-class wrap rule is designed around (ADR-0174): that rule
+     * is zero-specificity, so saying `nowrap` here wins outright. It is needed because these two
+     * are the only `flex-direction: column` containers in the app whose height is genuinely CAPPED
+     * — `max-height: 90vh` here, and the form below inherits the cap through the flex layout with
+     * its `min-height: 0`. Every other column container in these stylesheets constrains itself with
+     * `min-height`, which is a floor and can never make a flex line run out of space.
+     *
+     * A column flex container that wraps lays its overflow into a SECOND COLUMN, so without these
+     * two lines a long dialog on a phone would put the rest of its fields beside the first ones
+     * inside a 440px box, rather than scrolling as `.krt-modal-body` intends.
+     *
+     * Spelled as the `flex-flow` shorthand because stylelint requires it once both halves are set.
+     */
+    flex-flow: column nowrap;
 }
 .krt-modal > form {
     display: flex;
-    flex-direction: column;
+    /* Same reason as `.krt-modal` above: capped through the flex layout by its `min-height: 0`. */
+    flex-flow: column nowrap;
     min-height: 0;
 }
 .krt-modal::before,
