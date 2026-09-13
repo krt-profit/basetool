@@ -1728,7 +1728,7 @@ services:
   # ===========================================================================
   acme:
     profiles: ["prod"]
-    image: goacme/lego:v4.27.0@sha256:f16d0c44fe9b75faffb0ed882e34dad001c0f0c4de9a215bf03ec009d8acec47
+    image: goacme/lego:v5.4.1@sha256:ac04a7aaac0270ca2c32f1e79b157087d763e78c4473551c6e093070614536e2
     container_name: acme
     restart: unless-stopped
     logging: *default-logging
@@ -1777,12 +1777,26 @@ services:
         PRIMARY="$${ACME_HOSTS%% *}"
         DOMAINS=""
         for h in $${ACME_HOSTS}; do DOMAINS="$${DOMAINS} -d $$h"; done
+        # lego v5 (migration guide: https://github.com/go-acme/lego/blob/master/docs/content/migration/cli.md):
+        #   - global flags became flags of the COMMAND (`lego --foo run` -> `lego run --foo`).
+        #   - `renew` was removed: `run` now obtains OR renews depending on whether a
+        #     certificate for the same cert ID (here: $$PRIMARY, the first -d) already
+        #     exists on disk — it also skips renewing when the certificate is not yet
+        #     due, so calling it unconditionally on every pass (below) is safe and
+        #     replaces the v4 if/else on /data/certificates.
+        #   - `--days` (the renewal window) was renamed `--renew-days`.
+        # `lego migrate` rewrites the on-disk layout (account keys move out of
+        # accounts/.../keys/, and the JSON content itself changes) and v5 refuses to
+        # operate on a still-v4 volume without it. It is idempotent — a no-op once the
+        # volume is migrated — so it stays inside the loop like every other step here
+        # rather than running once: a failed migration is retried on the next pass
+        # instead of wedging the container until a manual restart. It always asks for
+        # confirmation even when there is nothing to migrate, and this container has
+        # no TTY, hence the piped "Y".
         while true; do
-          if [ -d /data/certificates ] && [ -n "$$(ls -A /data/certificates 2>/dev/null)" ]; then
-            /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} renew --days 30 ||               echo "acme: renew failed, will retry on the next pass" >&2
-          else
-            /lego --accept-tos --email "$${ACME_EMAIL}" --path /data                  --http --http.webroot /webroot $${DOMAINS} run ||               echo "acme: initial issuance failed, will retry on the next pass" >&2
-          fi
+          echo "Y" | /lego migrate --path /data ||
+            echo "acme: migrate failed, will retry on the next pass" >&2
+          /lego run --accept-tos --email "$${ACME_EMAIL}" --path /data                --http --http.webroot /webroot --renew-days 30 $${DOMAINS} ||             echo "acme: run/renew failed, will retry on the next pass" >&2
           # Publish the material the edge consumes, under a stable per-host layout
           # it can mount read-only. Driven by ACME_HOSTS, not by the certificate
           # FILES: lego writes a SINGLE multi-SAN certificate for the whole -d list,
