@@ -31,6 +31,10 @@
 
 ### Security
 
+- **Der Edge-Proxy schließt eine TLS-Schwachstelle in nginx** (CVE-2026-1642, "NGINX
+  Rift" — ein Angreifer zwischen Proxy und Backend konnte TLS-Antworten manipulieren).
+  Das Basis-Image wurde auf die reparierte Version angehoben; für Mitglieder ändert
+  sich nichts.
 - **Eine Entwicklungs-Abhängigkeit mit einer ReDoS-Schwachstelle wurde angehoben** (`colord`,
   GHSA-2wm5-q62r-hmrv). Sie läuft nur beim Prüfen des eigenen CSS und war nie Teil der
   ausgelieferten Anwendung; für Mitglieder ändert sich nichts.

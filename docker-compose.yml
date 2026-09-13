@@ -247,6 +247,11 @@ x-db-keycloak: &db-keycloak-template
 x-keycloak: &keycloak-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7`.
+  # TODO(2026-09-13): the version catalog's Keycloak SPI libs are already on 26.7.3 (a
+  # security release fixing 20 CVEs), but this digest still resolves 26.7 and could not be
+  # refreshed from this environment — quay.io is unreachable here. Refresh to 26.7.3 with
+  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7.3` from a host that can
+  # reach quay.io.
   image: quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
@@ -618,8 +623,8 @@ x-backend: &backend-template
 x-redis: &redis-template
   # Same digest pin policy as the Postgres images. Refresh with
   # `docker buildx imagetools inspect redis:8-alpine`.
-  # Digest last refreshed 2026-08-09: 8-alpine now resolves to Redis 8.10.0 (was 8.8.0).
-  image: redis:8-alpine@sha256:978f0e01593e65eed801f2402944efcd936d43b5027e4908a7897baf88ed6241
+  # Digest last refreshed 2026-09-13: refreshed to the current `8-alpine` build (2026 CVE batch).
+  image: redis:8-alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
   # Persistence + memory policy for the Spring-Session / ingest-handoff store
   # (REQ-OPS-018, ADR-0079).
   #
@@ -1596,7 +1601,7 @@ services:
   # ===========================================================================
   edge:
     profiles: ["prod"]
-    image: nginxinc/nginx-unprivileged:1.29.3-alpine@sha256:5aea7cc516b419e3526f47dd1531be31a56a046cfe44754d94f9383e13e2ee99
+    image: nginxinc/nginx-unprivileged:1.29.5-alpine@sha256:42a7d7f2ee23e9f5a1dcdf3647ba5c585bbd18f79e79cd817e70e8cd61c55779
     container_name: edge
     restart: unless-stopped
     logging: *default-logging
