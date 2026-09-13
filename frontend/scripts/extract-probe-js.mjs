@@ -60,7 +60,13 @@ if (unknown.length > 0) {
 js = js.replaceAll('%d', '0').replaceAll('%s', 'mark: ');
 
 // A Java text block keeps its escapes; the two that appear here are the JS regex ones.
-js = js.replaceAll('\\\\', '\\').replaceAll('\\"', '"');
+//
+// ONE pass, not two. Unescaping `\\` and then `\"` in sequence is
+// DOUBLE-unescaping: the first pass can PRODUCE a backslash that the second then consumes, so
+// the content `\\"` (an escaped backslash followed by a quote) collapses to
+// `"` and the backslash is lost. A single regex whose match consumes BOTH characters
+// cannot re-read what it just wrote. CodeQL flags the two-pass form, and it is right to.
+js = js.replace(/\\([\\"])/g, '$1');
 
 mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, 'export const probe = ' + js.trim() + ';\n', 'utf8');
