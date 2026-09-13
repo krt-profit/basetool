@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Edge-Proxy kann jetzt so viele gleichzeitige Verbindungen bedienen, wie er soll.** Er war auf
+  4096 Verbindungen je Arbeitsprozess eingestellt, bekam vom Container aber nur 1024 Dateihandles —
+  und meldete das bei jedem Start. Für Mitglieder bisher folgenlos; unter Last hätte es Verbindungen
+  gekostet.
+
 ## [v1.7.18](https://github.com/krt-profit/basetool/releases/tag/v1.7.18) - 2026-09-13
 
 ### Changed
