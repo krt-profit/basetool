@@ -151,9 +151,14 @@ docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
     --trustpass - /run/secrets/keystore.p12
 
 docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443 --realm iri --client basetool-provisioner
+    --server https://localhost:18443/auth --realm iri --client basetool-provisioner
 ```
 
+> [!note] The `/auth` in `--server` is load-bearing since 2026-09-13
+> Keycloak serves under that relative path ([ADR-0166](adr/0166-identity-moves-onto-the-app-origin.md)),
+> so a base URL without it answers 404 — and kcadm surfaces that as an authentication problem rather
+> than as a wrong address, which is a long detour to take.
+>
 > [!important] `No server specified. Use --server, or 'kcadm.sh config credentials'.`
 > That message does **not** mean a flag is missing. It is what kcadm says for **every** command
 > when no session exists — including reads that carry no `--server` because they are not supposed

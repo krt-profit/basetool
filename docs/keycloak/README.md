@@ -218,7 +218,7 @@ docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
 #    'kcadm.sh config credentials'." rather than anything about being unauthenticated.
 #    Omitting --secret makes it prompt, keeping the secret out of shell history.
 docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443 --realm iri --client basetool-provisioner
+    --server https://localhost:18443/auth --realm iri --client basetool-provisioner
 
 # 3. save the current lists — this is the rollback basis, and both are expected to be empty
 docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri \

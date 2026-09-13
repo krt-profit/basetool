@@ -42,9 +42,11 @@
 #
 # USAGE
 # -----
-#   # authenticate kcadm first, inside the container, so no password reaches this process:
+#   # authenticate kcadm first, inside the container, so no password reaches this process.
+#   # NOTE THE /auth: Keycloak serves under that relative path since ADR-0166, so a --server
+#   # without it answers 404 and kcadm reports that as a credentials failure.
 #   docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-#       --server http://localhost:8080 --realm master --user <admin>
+#       --server http://localhost:8080/auth --realm master --user <admin>
 #
 #   scripts/provision-keycloak-mobile-client.py --dry-run     # print every payload, write nothing
 #   scripts/provision-keycloak-mobile-client.py               # apply
