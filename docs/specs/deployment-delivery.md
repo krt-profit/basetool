@@ -790,14 +790,27 @@ not match the requested issuer "…"`, which reads as a backend fault and is a f
 `IRI_KEYCLOAK_ISSUER_URI` remains as an override for a deployment whose advertised issuer genuinely
 differs from `KC_HOSTNAME`; setting it wins over the derivation.
 
+**The monitoring stack derives from the same variable.** Grafana's `generic_oauth` provider has no
+discovery option, so `docker-compose.monitoring.yml` names the authorize, token and userinfo URLs
+individually; all three now share one `${IRI_KEYCLOAK_HOSTNAME:-…}` expansion. Both compose projects
+run with the same `--project-directory`, so they read the same `.env` and one value moves the app
+stack and Grafana together. A monitoring stack started from elsewhere falls back to the production
+default, unchanged.
+
 **The agreement is gated rather than documented.** `scripts/check-keycloak-issuer.py` runs in
 `repo-lint.yml` and renders every stack through `docker compose config` — compose's own
 interpolation, not a re-implementation of it — then asserts that a full-URL `KC_HOSTNAME` carries
 exactly the path `KC_HTTP_RELATIVE_PATH` serves under, that every service's issuer is the one that
-Keycloak will advertise, that the services in one stack agree with each other, and that the
-`application*.yml` fallback defaults still name the deployed issuer. Its regression suite,
+Keycloak will advertise, that the services in one stack agree with each other, that the
+`application*.yml` fallback defaults still name the deployed issuer, that Grafana's three OIDC
+endpoints sit on that issuer and follow an override, and that the Prometheus identity probe targets
+name the deployed base with all three required probes present (REQ-OBS-012). Its regression suite,
 `scripts/check-keycloak-issuer.test.sh`, breaks each of those in turn and requires the gate to say
 so, and runs first so the gate cannot pass vacuously.
+
+`monitoring/prometheus/prometheus.yml` is the one identity surface that **cannot** be derived —
+nothing interpolates it — which is why it is compared instead, in both directions. See REQ-OBS-012
+for why the missing-probe half is not redundant.
 
 **Acceptance**
 
@@ -819,6 +832,11 @@ so, and runs first so the gate cannot pass vacuously.
   the configuration can be deployed (ADR-0166's measured broken row).
 - [ ] Every `application*.yml` fallback default for `KEYCLOAK_ISSUER_URI` names the issuer
   `docker-compose.yml` deploys, so an app started without the variable does not trust a retired one.
+- [ ] `IRI_KEYCLOAK_HOSTNAME` unset ⇒ the rendered `docker-compose.monitoring.yml` Grafana OIDC URLs
+  are byte-identical to the pre-change values; set ⇒ all three follow it.
+- [ ] Every `monitoring/prometheus/prometheus.yml` target under the identity path sits on the
+  deployed identity base, and the discovery document, `/auth/health` and `/auth/metrics` are all
+  still probed.
 - [ ] `IRI_KEYCLOAK_HOST_ALIAS` unset ⇒ the only `extra_hosts` entry is `localhost:127.0.0.1`,
   which resolves to what `localhost` already resolves to.
 - [ ] `IRI_EXTRA_JAVA_OPTS` unset ⇒ `JAVA_TOOL_OPTIONS` is character-identical to before, and the

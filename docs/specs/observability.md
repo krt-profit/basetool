@@ -1726,6 +1726,20 @@ The posture jobs are separate from the `blackbox-http` liveness job; `BlackboxPr
 scoped to liveness, and every posture alert carries an `and on()` guard on the main-page probe so
 a full edge outage pages once (liveness), not once per posture assertion.
 
+**The identity probe targets are gated in CI, because `prometheus.yml` cannot be derived.** Four
+targets name the identity base — the OIDC discovery document (`blackbox-http` and its IPv6 twin) and
+Keycloak's `/auth/health` and `/auth/metrics` management-surface denies. Since ADR-0167 the app stack
+and Grafana both compose that base from `IRI_KEYCLOAK_HOSTNAME`, but this file is static: nothing
+interpolates it, so a domain move never reaches it on its own. `scripts/check-keycloak-issuer.py`
+therefore compares instead, in **both** directions — no target under the identity path may sit on
+another base, **and** all three required probes must still be present. The second half is not
+redundant: a probe relocated to another host *and* another path shape
+(`https://keycloak.example/health`) leaves the scan entirely, so a one-directional check would report
+success over a shrinking list. An uncovered probe is indistinguishable from a passing one, which is
+the premise this whole requirement rests on. The path test is segment-exact rather than a prefix
+match, for the reason ADR-0166 records about the edge's `location /auth`: a prefix swallows
+`/authorize` and `/authors`.
+
 **IPv6 + public-DNS reachability.** The public vhosts carry AAAA records (owner-confirmed 2026-07-06),
 so the edge is also probed over IPv6 and for public DNS resolution: the `blackbox-http-ipv6` /
 `blackbox-http-auth-ipv6` jobs re-run the liveness probes pinned to IPv6 (no v4 fallback), and the
