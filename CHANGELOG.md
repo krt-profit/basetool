@@ -15,6 +15,10 @@
 
 ### Changed
 
+- **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: das Redis-Image, der
+  Redis-Exporter für Grafana, der ACME-Client `lego` (v4 → v5, inklusive angepasster
+  Kommandozeile) sowie Checkstyle, Node und die Frontend-Lint-Werkzeuge (ESLint,
+  Stylelint). Betrifft nur den Betrieb, nicht die Nutzung.
 - **Der Edge-Proxy ist nicht mehr auf die Produktionsadressen festgelegt.** Die Hostnamen kommen
   jetzt aus der Konfiguration des jeweiligen Servers, statt fest in den Dateien zu stehen — damit
   kann dieselbe Auslieferung auch die Testumgebung bedienen. Für Mitglieder ändert sich nichts.
