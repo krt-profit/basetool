@@ -704,7 +704,8 @@ val lintCssInline =
 //
 // That probe is ~500 lines evaluated in the page, and compiling the Java only proves the STRING is
 // valid. Two defects reached CI through that gap: `replaceAll("\s+", " ")`, where `\s` is a legal
-// Java escape for a space so the regex silently became `" +"`; and a guard referencing `badControls`
+// Java escape for a space so the regex silently became `" +"`; and a guard referencing
+// `badControls`
 // a hundred lines above its `const`, a temporal-dead-zone ReferenceError that turned all 66 routes
 // into "could not be measured" on every device class.
 //
@@ -713,7 +714,8 @@ val lintCssInline =
 // revision: it reports `'badControls' was used before it was defined`.
 val probeSource =
   layout.projectDirectory.file(
-    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java")
+    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java"
+  )
 val extractProbeScript = layout.projectDirectory.file("scripts/extract-probe-js.mjs")
 val extractedProbe = layout.buildDirectory.file("probe/probe.js")
 
