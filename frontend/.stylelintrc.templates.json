@@ -1,6 +1,9 @@
 {
   "customSyntax": "postcss-html",
-  "ignoreFiles": ["build/**", "node_modules/**"],
+  "ignoreFiles": [
+    "build/**",
+    "node_modules/**"
+  ],
   "rules": {
     "media-feature-range-notation": "context"
   }
