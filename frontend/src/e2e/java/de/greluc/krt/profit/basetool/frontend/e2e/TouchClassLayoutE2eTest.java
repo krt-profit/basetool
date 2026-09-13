@@ -706,10 +706,13 @@ class TouchClassLayoutE2eTest {
     // default, `measureSafely` turns the TimeoutError into a FINDING, and the documented
     // "SKIPPED — no app shell" line ten lines below is never reached. Two ways that bites: a route
     // that answers 403/404/500 during a run — exactly what this sweep exists to report — costs 30s
-    // per device class and reports a timeout instead of the status; and adding `/terms/accept` to
-    // PAGES, which the consent gate makes mandatory reading, would hang five classes on a page that
-    // renders perfectly. The PAGES Javadoc promises the opposite ("skipped at runtime, not guessed
-    // at here"), and the sleep this replaced did have that property.
+    // per device class and reports a timeout instead of the status; and `/terms/accept`, which the
+    // consent gate makes mandatory reading, would hang five classes on a page that renders
+    // perfectly. That one is no longer hypothetical: `FrontendPageRoutes.PAGES` carries the route,
+    // and `PageRouteCatalogueTest` fails the build if it stops carrying it, so this guard is what
+    // keeps it cheap. The catalogue promises the opposite of a hang — an entry that is not a page
+    // is skipped at runtime, never filtered out of the list — and the sleep this replaced did have
+    // that property.
     page.waitForFunction(
         "() => document.readyState === 'complete'"
             + " && (!document.fonts || document.fonts.status === 'loaded')"
