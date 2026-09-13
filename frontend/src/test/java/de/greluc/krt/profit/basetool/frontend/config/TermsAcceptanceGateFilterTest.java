@@ -243,6 +243,28 @@ class TermsAcceptanceGateFilterTest {
     verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
   }
 
+  /**
+   * Public documents skip the gate too, and this is the case that was wrong.
+   *
+   * <p>All three are {@code permitAll} in {@code SecurityConfig}, but {@code permitAll} does not
+   * stop a later filter in the chain from redirecting an <em>authenticated</em> caller — and this
+   * gate did. {@code /.well-known/assetlinks.json} shipped that way: the Android App Links
+   * descriptor answered a signed-in member with the consent page, and each hit paid a backend read
+   * for a document whose bytes are the same for everyone. They share one list with {@link
+   * BackendRoleSyncFilter} now ({@code PublicPaths}), so the next public path cannot land in one
+   * gate and not the other.
+   */
+  @Test
+  void skipsPublicDocuments() throws Exception {
+    stubStatus(false);
+
+    for (String path :
+        new String[] {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"}) {
+      assertThat(invoke(path).getRedirectedUrl()).as(path).isNull();
+    }
+    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+  }
+
   /** An anonymous visitor has no account to record consent against and is left alone. */
   @Test
   void ignoresAnAnonymousVisitor() throws Exception {

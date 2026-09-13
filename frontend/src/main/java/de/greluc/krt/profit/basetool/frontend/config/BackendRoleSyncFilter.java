@@ -369,15 +369,10 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
    * @return {@code true} when the request is exempt from the pending-approval redirect
    */
   private static boolean isApprovalExempt(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
+    String path = PublicPaths.relativePath(request);
     return path.equals(PENDING_APPROVAL_PATH)
         || path.startsWith(PENDING_APPROVAL_PATH + "/")
-        || path.startsWith("/logout")
-        || path.startsWith("/oauth2")
-        || path.startsWith("/login")
-        || path.startsWith("/error")
-        || path.startsWith("/actuator")
-        || isStaticAsset(request);
+        || PublicPaths.isGateExempt(path);
   }
 
   /**
@@ -404,25 +399,26 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether the request targets a static asset, in which case the filter skips its whole body.
+   * Whether the request targets an asset or a public document, in which case the filter skips its
+   * whole body.
    *
    * <p>The approval and role state are now refreshed on a TTL instead of once per session, so
    * without this every CSS/JS/font request of a page load would be a candidate for a backend read.
-   * Skipping assets keeps the refresh cost at roughly one read per interval per session while still
-   * letting every real navigation (and the waiting page's status poll) drive it.
+   * Skipping them keeps the refresh cost at roughly one read per interval per session while still
+   * letting every real navigation (and the waiting page's status poll) drive it. Public documents
+   * are skipped for the same reason: none of them can answer differently for a member whose roles
+   * have just changed.
+   *
+   * <p><strong>Deliberately narrower than {@link #isApprovalExempt}.</strong> It does not include
+   * {@link PublicPaths#isAuthInfrastructure}, because the OAuth callback under {@code /login} is
+   * where a member's authorities are first reconciled — skipping the body there would skip the work
+   * this filter exists to do. See the note on {@link PublicPaths}.
    *
    * @param request the current request
-   * @return {@code true} for static-asset paths the filter has nothing to do for
+   * @return {@code true} for paths the filter has nothing to do for
    */
   private static boolean isStaticAsset(HttpServletRequest request) {
-    String path = request.getRequestURI().substring(request.getContextPath().length());
-    return path.startsWith("/css/")
-        || path.startsWith("/js/")
-        || path.startsWith("/images/")
-        || path.startsWith("/logos/")
-        || path.startsWith("/fonts/")
-        || path.equals("/favicon.ico")
-        || path.endsWith(".map");
+    return PublicPaths.isAssetOrPublicDocument(PublicPaths.relativePath(request));
   }
 
   /**

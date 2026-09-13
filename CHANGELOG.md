@@ -10,6 +10,13 @@
   keine eigene App gibt. Ohne Netz funktioniert es nicht, damit keine Mitgliederdaten auf dem Gerät
   liegen bleiben.
 
+### Fixed
+
+- **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
+  auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
+  bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
+  zusätzliche Abfrage beim Server.
+
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
 ### Fixed

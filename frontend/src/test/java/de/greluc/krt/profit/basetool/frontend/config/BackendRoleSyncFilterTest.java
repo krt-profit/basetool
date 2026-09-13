@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -375,6 +376,31 @@ class BackendRoleSyncFilterTest {
     verify(backendApiClient, never()).get(anyString(), eq(RegistrationStatusDto.class));
     verify(backendApiClient, never()).get(anyString(), eq(UserDto.class));
     verify(chain).doFilter(request, response);
+  }
+
+  /**
+   * Public documents short-circuit the body as well — the half of the list that was missing.
+   *
+   * <p>None of these can answer differently for a member whose roles just changed, so a role
+   * reconciliation on them is pure cost. {@code /.well-known/assetlinks.json} paid it on every hit
+   * because it sat in {@code SecurityConfig}'s {@code permitAll} list and in neither gate's
+   * exemption list; the two lists are one now ({@code PublicPaths}).
+   */
+  @Test
+  void publicDocument_skipsFilterBodyEntirely() throws Exception {
+    for (String path :
+        new String[] {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"}) {
+      // Given — a fresh public-document request on a session that has resolved nothing yet
+      when(request.getRequestURI()).thenReturn(path);
+
+      // When
+      filter.doFilterInternal(request, response, chain);
+    }
+
+    // Then — no backend traffic at all, and every document is served
+    verify(backendApiClient, never()).get(anyString(), eq(RegistrationStatusDto.class));
+    verify(backendApiClient, never()).get(anyString(), eq(UserDto.class));
+    verify(chain, times(3)).doFilter(request, response);
   }
 
   @Test
