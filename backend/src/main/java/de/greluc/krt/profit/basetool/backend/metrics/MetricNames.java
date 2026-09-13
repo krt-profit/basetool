@@ -241,9 +241,19 @@ public final class MetricNames {
   public static final String API_CLIENT_REQUESTS = "basetool.api.client.requests";
 
   /**
-   * Counter {@code basetool_auth_failures_total} — tag {@code reason}, the RFC 6750 bearer error
+   * Counter {@code basetool_auth_failures_total} — tag {@code reason}: the RFC 6750 bearer error
    * code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link #AUTH_INVALID_REQUEST} /
-   * {@link #AUTH_INSUFFICIENT_SCOPE} / {@link #AUTH_OTHER}).
+   * {@link #AUTH_INSUFFICIENT_SCOPE}), plus {@link #AUTH_NO_CREDENTIALS} for a request that
+   * presented no credential at all and {@link #AUTH_OTHER} for anything left over.
+   *
+   * <p>The {@link #AUTH_NO_CREDENTIALS} split is what makes the counter readable. Without it every
+   * real 401 lands on {@link #AUTH_OTHER} — measured on production 2026-09-13, all 6&nbsp;618 of
+   * them — because a caller with no {@code Authorization} header never produces an {@code
+   * OAuth2AuthenticationException} to carry an RFC code. The dominant series is ordinary background
+   * traffic (the deployment's own blackbox probes answer 401 by design, REQ-OBS-018), so reading
+   * this counter's <em>total</em> as a security signal measures the monitoring plane. {@link
+   * #AUTH_INVALID_TOKEN} is the series that means somebody is presenting credentials that do not
+   * hold, and it is the one a credential-guessing alert watches.
    *
    * <p>{@link #HTTP_ERROR}{@code {code="UNAUTHENTICATED"}} already counts the 401s and drives
    * {@code BackendAuthFailureSpike}; what it cannot say is <em>why</em>. A malformed header, an
@@ -645,7 +655,32 @@ public final class MetricNames {
   /** Bearer error: the token is valid but lacks the required scope. */
   public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
 
-  /** Bearer error: anything outside the RFC set, collapsed so the label stays bounded. */
+  /**
+   * No credential was presented at all -- the caller sent no {@code Authorization} header and the
+   * chain rejected it with a plain {@link
+   * org.springframework.security.authentication.InsufficientAuthenticationException} (or the
+   * method-security equivalent) rather than an {@code OAuth2AuthenticationException}.
+   *
+   * <p>Deliberately <em>not</em> an RFC 6750 code: the spec says a resource server SHOULD omit the
+   * error code entirely when the request carries no authentication information, so there is none to
+   * map onto. Kept as its own bounded literal anyway, because it is the single most load-bearing
+   * distinction this counter draws -- a missing token is ordinary traffic (a monitoring probe, a
+   * scanner, a pre-login navigation), while a <em>rejected</em> token is somebody presenting
+   * credentials that do not hold, which is what {@link #AUTH_INVALID_TOKEN} means and what a
+   * credential-guessing alert must actually watch.
+   *
+   * <p>Added 2026-09-13 after production measurement: every one of the backend's 6&nbsp;618 401s
+   * and the ingest gateway's 4&nbsp;927 collapsed into {@link #AUTH_OTHER}, so the counter built to
+   * answer "why did authentication fail" answered nothing at all. See REQ-OBS-018.
+   */
+  public static final String AUTH_NO_CREDENTIALS = "no_credentials";
+
+  /**
+   * Bearer error: anything outside the RFC set <em>and</em> not the no-credential case above,
+   * collapsed so the label stays bounded. Since {@link #AUTH_NO_CREDENTIALS} was split out this is
+   * genuinely rare, and a sustained non-zero rate on it means a failure mode nobody enumerated --
+   * worth reading the DEBUG line for rather than ignoring.
+   */
   public static final String AUTH_OTHER = "other";
 
   /** Discord precheck outcome: an existence check ran and answered {@code 200}. */
