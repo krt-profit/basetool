@@ -1267,7 +1267,7 @@ class TouchClassLayoutE2eTest {
         // form button or a standalone control: `.btn-xs2` was refused this exemption for that
         // reason.
         //
-        // Since ADR-0174 the stylesheet's floor is a zero-specificity DEFAULT rather than a list of
+        // Since ADR-0176 the stylesheet's floor is a zero-specificity DEFAULT rather than a list of
         // selectors, which makes consuming `--touch-target-dense` the declared way to opt out of it
         // — the same token this set is already built from. So the inversion needed no new mechanism
         // on this side, and deliberately did not get one: an opt-out marker that the guard had to be
@@ -1347,7 +1347,7 @@ class TouchClassLayoutE2eTest {
         // drifted: the modal list carried `.krt-modal-close` and the page list did not, so a
         // dismiss button was measured in a dialog and not on a page.
         //
-        // It mirrors styles.css's inverted floor (ADR-0174), which is the point rather than a
+        // It mirrors styles.css's inverted floor (ADR-0176), which is the point rather than a
         // coincidence: anything that selector styles is something this sweep has to measure.
         // `summary` and `[role="button"]` arrived with that mirroring — a <summary> is a click
         // target on 26 templates and neither sweep had ever measured one, nor had either looked at

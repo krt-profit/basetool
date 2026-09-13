@@ -363,7 +363,7 @@ wrap. And `.mission-info-grid` sized its value column `1fr` — shorthand for `m
 whose `auto` minimum is the track's min-content width — so a long mission name widened the tile, the
 tile widened its `auto-fit` track and the tablet-landscape class scrolled sideways.
 
-**A fourth amendment, 2026-09-13: the floor is a DEFAULT, not a list** ([ADR-0174](../adr/0174-layout-floors-are-defaults-that-controls-opt-out-of.md)).
+**A fourth amendment, 2026-09-13: the floor is a DEFAULT, not a list** ([ADR-0176](../adr/0176-layout-floors-are-defaults-that-controls-opt-out-of.md)).
 
 Every amendment above added a name to an enumeration, and every round of review found more names the
 enumeration had missed — five rounds, ending with `.pa-sort-btn` at 29x18px, which the guard could

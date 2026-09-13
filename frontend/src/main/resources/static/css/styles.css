@@ -1265,7 +1265,7 @@ tbody tr:nth-child(even):hover {
 
 @media (width <= 768px) {
     /*
-     * Rows of controls wrap on a phone instead of widening the page (REQ-UI-009, ADR-0174).
+     * Rows of controls wrap on a phone instead of widening the page (REQ-UI-009, ADR-0176).
      *
      * `space-between` with no `flex-wrap` means a row cannot break, and the German compounds
      * this UI is built from ("AUFTRAGSVERWALTUNG") already fill a 375px screen on their own.
@@ -4819,7 +4819,7 @@ textarea:focus-visible,
     }
 
     /*
-     * REQ-UI-009's 44px floor, as a DEFAULT rather than as a list of names (ADR-0174).
+     * REQ-UI-009's 44px floor, as a DEFAULT rather than as a list of names (ADR-0176).
      *
      * Every interactive control is born at the floor, and a control opts OUT by declaring a
      * `min-height` of its own. Until 2026-09-13 this was the other way round: the floor

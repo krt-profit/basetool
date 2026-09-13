@@ -1102,7 +1102,7 @@
  * the CSSOM, and a class that consumes the token nowhere is in no such set, whatever the spec says
  * about it.
  *
- * It became load-bearing with ADR-0174. `.master-row` is a `<button>`, so the inverted floor in
+ * It became load-bearing with ADR-0176. `.master-row` is a `<button>`, so the inverted floor in
  * styles.css now offers it 44px by default, and an exemption that is only written in a document
  * cannot decline the offer. This rule is the decline — and, being a `--touch-target-dense`
  * consumer, it is simultaneously what finally puts the class in the guard's dense set.
