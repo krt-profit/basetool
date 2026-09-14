@@ -203,9 +203,14 @@
 </main>
 
 <!-- Create Modal -->
-<div id="modal-create" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal-box">
-        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.create.title}">Neue Rangvoraussetzung</div>
+<div id="modal-create" class="krt-modal-overlay" role="dialog" aria-modal="true">
+    <div class="krt-modal krt-modal--wide">
+        <div class="krt-modal-head">
+            <h2 th:text="#{promotion.admin.ranks.modal.create.title}">Neue Rangvoraussetzung</h2>
+            <button type="button" class="krt-modal-close" data-trigger="ar-close-create"
+                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+        </div>
+        <div class="krt-modal-body">
         <div class="form-row">
             <div class="form-group">
                 <label class="form-label" th:text="#{promotion.admin.ranks.from}">Von Rang</label>
@@ -255,7 +260,8 @@
             <label class="form-label" th:text="#{promotion.admin.ranks.description}">Beschreibung</label>
             <textarea id="cr-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="krt-modal-foot">
             <button class="btn btn-ghost" data-trigger="ar-close-create" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="ar-submit-create" th:text="#{promotion.admin.ranks.new}">Anlegen</button>
         </div>
@@ -263,9 +269,14 @@
 </div>
 
 <!-- Edit Modal -->
-<div id="modal-edit" class="modal-overlay" role="dialog" aria-modal="true">
-    <div class="modal-box">
-        <div class="modal-title" th:text="#{promotion.admin.ranks.modal.edit.title}">Rangvoraussetzung bearbeiten</div>
+<div id="modal-edit" class="krt-modal-overlay" role="dialog" aria-modal="true">
+    <div class="krt-modal krt-modal--wide">
+        <div class="krt-modal-head">
+            <h2 th:text="#{promotion.admin.ranks.modal.edit.title}">Rangvoraussetzung bearbeiten</h2>
+            <button type="button" class="krt-modal-close" data-trigger="ar-close-edit"
+                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+        </div>
+        <div class="krt-modal-body">
         <input id="er-id" type="hidden">
         <input id="er-version" type="hidden">
         <div class="form-row">
@@ -316,7 +327,8 @@
             <label class="form-label" th:text="#{promotion.admin.ranks.description}">Beschreibung</label>
             <textarea id="er-desc" class="form-input" rows="3" maxlength="2000"></textarea>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="krt-modal-foot">
             <button class="btn btn-ghost" data-trigger="ar-close-edit" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="ar-submit-edit"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.ranks.edit}">Speichern</span></button>
         </div>

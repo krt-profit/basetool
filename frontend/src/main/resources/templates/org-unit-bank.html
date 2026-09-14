@@ -261,7 +261,7 @@
                         <div class="krt-modal-head">
                             <h3 th:text="#{bank.request.edit.title}">Antrag bearbeiten</h3>
                             <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                                    th:attr="data-modal-id='ou-req-edit-' + ${r.id()}" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+                                    th:attr="data-modal-id='ou-req-edit-' + ${r.id()}" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
                         </div>
                         <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                               data-endpoint="/api/proxy/org-units/bank/requests/{id}" data-method="PUT">
@@ -485,7 +485,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.modal.title}">Ein-/Auszahlung beantragen</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="org-unit-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="org-unit-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
                   data-endpoint="/api/proxy/org-units/bank/requests" data-method="POST">

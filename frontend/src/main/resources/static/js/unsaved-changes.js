@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('unsaved-changes-modal');
     const leaveBtn = document.getElementById('unsaved-leave-btn');
     const stayBtn = document.getElementById('unsaved-stay-btn');
+    // The canonical modal shell carries a close-X in its head; it means the same as
+    // "Zurueck" -- abandon the pending navigation and keep the unsaved edits.
+    const closeBtn = document.getElementById('unsaved-close-btn');
 
     // Track input changes
     document.addEventListener('input', function (e) {
@@ -72,12 +75,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    if (stayBtn) {
-        stayBtn.addEventListener('click', function () {
+    [stayBtn, closeBtn].forEach(function (btn) {
+        if (!btn) return;
+        btn.addEventListener('click', function () {
             if (modal) modal.style.display = 'none';
             targetUrl = null;
         });
-    }
+    });
 
     if (leaveBtn) {
         leaveBtn.addEventListener('click', function () {

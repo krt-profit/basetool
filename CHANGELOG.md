@@ -119,6 +119,17 @@
 
 ### Changed
 
+- **Alle Dialoge passen jetzt auf den Bildschirm.** Rund die Hälfte der Dialoge konnte höher
+  werden als das Fenster, sodass die Schaltflächen unten nicht mehr erreichbar waren — auf kleinen
+  Bildschirmen und im Hochformat. Jeder Dialog ist jetzt auf 90 % der Fensterhöhe begrenzt,
+  scrollt seinen Inhalt und behält Titelzeile und Schaltflächen sichtbar. Bestätigungsdialoge
+  zeigen ihren Text dadurch linksbündig statt zentriert.
+
+- **Ein Dialog blockiert jetzt überall die automatische Aktualisierung.** Ändert jemand anderes
+  dieselbe Seite, während ein Dialog offen ist, wurde die Seite bisher bei den meisten Dialogen
+  darunter weggetauscht — das Speichern scheiterte danach mit einem Konflikthinweis. Das gilt
+  jetzt für alle Dialoge.
+
 - **Anmeldefehler sind im Betrieb erstmals unterscheidbar.** Die Kennzahl dafür kannte keinen Wert
   für „gar keine Anmeldedaten mitgeschickt" — also für genau den Fall, der praktisch immer eintritt
   — und warf deshalb sämtliche Fehlschläge in einen Topf „sonstige". Neuer Wert `no_credentials`
