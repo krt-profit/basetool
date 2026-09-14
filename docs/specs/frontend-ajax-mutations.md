@@ -1756,6 +1756,15 @@ A page whose active-filter count cannot be read from the panel's own controls re
 counter through `window.krtFilterPanel.registerCounter(panelId, fn)`; a page that filters via AJAX
 calls `refresh()` after the swap so a collapsed panel never under-reports.
 
+> [!warning] Register the counter inside `DOMContentLoaded`, never at the top level
+> `krt-filter-panel.js` is **deferred** and the page scripts are **not** — they are plain
+> `<script src>` tags at the end of the body, which execute during parsing and therefore BEFORE any
+> deferred script. A top-level `registerCounter` call in a page script runs while
+> `window.krtFilterPanel` is still undefined, is silently skipped, and the panel falls back to the
+> generic scan — which counts the wrong things on exactly the pages that needed a custom counter.
+> Mein Lager, Lager-Verwaltung and Materialbedarf all register from their `DOMContentLoaded`
+> handler, where the deferred script has run and the restored widget state is also in place.
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

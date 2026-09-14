@@ -300,7 +300,6 @@ function restoreAdminInventoryFilters() {
 //
 // persistAdminInventoryFilters() re-reads the whole object and replaces only its view slot, so the
 // two writers never clobber each other.
-const ADMIN_INVENTORY_FILTER_PANEL_KEY = 'panelCollapsed';
 
 // Number of dimensions currently narrowing the table. Derived from the very snapshot the
 // persistence layer stores, so a filter dimension added there is counted here automatically
@@ -318,55 +317,13 @@ function countActiveAdminInventoryFilters() {
     return active;
 }
 
-// Re-renders the count chip on the toggle. Called from filterInventory, which every filter change —
-// including the reset button — funnels through, so the chip cannot fall behind the widgets.
-function updateAdminFilterCountBadge() {
-    const badge = document.getElementById('globalFilterCount');
-    if (!badge) return;
-    const active = countActiveAdminInventoryFilters();
-    badge.hidden = active === 0;
-    const value = document.getElementById('globalFilterCountValue');
-    if (value) value.textContent = String(active);
-    // The bare digit reads out as "Filter 3". The visually-hidden twin spells it out instead,
-    // rather than putting the count into a dynamic aria-label — that would shadow the visible
-    // "Filter" text and break voice control's "click Filter".
-    const label = document.getElementById('globalFilterCountLabel');
-    if (!label) return;
-    const template = badge.getAttribute('data-label') || '';
-    label.textContent = active === 0 ? '' : template.replace('{0}', String(active));
-}
-
-function setAdminFilterPanelCollapsed(collapsed) {
-    const toggle = document.getElementById('globalFilterToggle');
-    const panel = document.getElementById('globalFilterPanel');
-    if (!toggle || !panel) return;
-    panel.hidden = collapsed;
-    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-}
-
-function toggleAdminFilterPanel() {
-    const panel = document.getElementById('globalFilterPanel');
-    if (!panel) return;
-    const collapsed = !panel.hidden;
-    setAdminFilterPanelCollapsed(collapsed);
-    const stored = readAdminInventoryFilterPref() || {};
-    stored[ADMIN_INVENTORY_FILTER_PANEL_KEY] = collapsed;
-    writeAdminInventoryFilterPref(stored);
-}
-
-// Applies the stored collapse preference on load. With no preference stored yet the panel
-// collapses only when nothing is filtered: opening a narrowed table with its filter row out of
-// sight would leave the user hunting for the reason, which is exactly the trap the count chip
-// exists to close.
-function initAdminFilterPanel() {
-    if (!document.getElementById('globalFilterToggle')) return;
-    updateAdminFilterCountBadge();
-    const stored = readAdminInventoryFilterPref();
-    const saved = stored ? stored[ADMIN_INVENTORY_FILTER_PANEL_KEY] : undefined;
-    setAdminFilterPanelCollapsed(
-        typeof saved === 'boolean' ? saved : countActiveAdminInventoryFilters() === 0,
-    );
-}
+// The collapse itself lives in krt-filter-panel.js (REQ-FE-021). This page supplies only
+// the COUNT, because its dimensions are not readable from the panel's own controls, and it
+// registers that counter inside DOMContentLoaded rather than here: this file is a
+// non-deferred script at the end of the body, so it executes BEFORE the deferred
+// krt-filter-panel.js and window.krtFilterPanel does not exist yet at this point. A
+// top-level registration would be silently skipped and the panel would fall back to the
+// generic scan, which counts the wrong things here.
 
 function filterInventory() {
     // REQ-INV-030: the rebuilt fragment URL is derived from the page's own filter state PLUS the
@@ -379,7 +336,7 @@ function filterInventory() {
     persistAdminInventoryFilters();
     // Same funnel, same reason: the count on the (possibly collapsed) toggle must track the
     // widgets, or a collapsed panel starts hiding an active filter.
-    updateAdminFilterCountBadge();
+    if (window.krtFilterPanel) window.krtFilterPanel.refresh('globalFilterPanel');
     const itemsView = lagerIsItemsView();
     const activeMats = collectChecked('matCheck');
     const activeGameItems = collectChecked('gameItemCheck');
@@ -635,7 +592,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // After the restore, never before it: the first-visit default ("collapsed only when nothing is
     // filtered") and the count chip both read the widgets, so they must see the restored selection
     // rather than the bare server-rendered one.
-    initAdminFilterPanel();
+    if (window.krtFilterPanel) {
+        window.krtFilterPanel.registerCounter(
+            'globalFilterPanel',
+            countActiveAdminInventoryFilters,
+        );
+        window.krtFilterPanel.refresh('globalFilterPanel');
+    }
     if (filtersRestored) filterInventory();
 });
 
@@ -1774,7 +1737,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
     window.krtEvents.on('change', 'inv-admin-filter', filterInventory);
     window.krtEvents.on('click', 'inv-admin-reset-filter', resetInventoryFilter);
-    window.krtEvents.on('click', 'inv-admin-toggle-filters', toggleAdminFilterPanel);
     window.krtEvents.on('click', 'inv-admin-toggle-group', function (el) {
         toggleGroup(el);
     });

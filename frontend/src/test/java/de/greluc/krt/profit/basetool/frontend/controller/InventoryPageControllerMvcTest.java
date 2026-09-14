@@ -226,7 +226,7 @@ class InventoryPageControllerMvcTest {
    * view. Four separate guarantees are pinned here because each fails silently on its own:
    *
    * <ul>
-   *   <li>the toggle carries its delegated {@code data-trigger} and the {@code
+   *   <li>the toggle comes from the shared {@code filterToggle} fragment and carries the {@code
    *       aria-expanded}/{@code aria-controls} pair — without them the collapse is a dead button
    *       and mute to a screen reader;
    *   <li>the panel is rendered EXPANDED. {@code hidden} is the collapse mechanism and the script
@@ -253,19 +253,21 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get(path))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("data-trigger=\"inv-my-toggle-filters\"")))
         .andExpect(content().string(containsString("aria-controls=\"myFilterPanel\"")))
         .andExpect(content().string(containsString("aria-expanded=\"true\"")))
         .andExpect(
             content()
-                .string(containsString("<div class=\"inv-filter-panel\" id=\"myFilterPanel\">")))
+                .string(
+                    containsString(
+                        "<div class=\"filter-panel\" id=\"myFilterPanel\""
+                            + " data-filter-panel=\"inventory-my\">")))
         .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
         .andExpect(
             content()
                 .string(
                     stringContainsInOrder(
                         List.of(
-                            "id=\"myFilterToggle\"",
+                            "data-testid=\"lager-filter-toggle\"",
                             "id=\"myFilterPanel\"",
                             "my-inventory-filter",
                             "id=\"bulkCheckoutBar\""))));
@@ -273,7 +275,7 @@ class InventoryPageControllerMvcTest {
 
   /**
    * REQ-INV-037 on the shared "Globales Lager", pinning the same four guarantees as its "Mein
-   * Lager" twin above — the delegated {@code data-trigger} plus the {@code aria-expanded}/{@code
+   * Lager" twin above — the shared toggle fragment plus the {@code aria-expanded}/{@code
    * aria-controls} pair, the panel rendered EXPANDED so a client without JavaScript keeps its
    * filters, the filter form INSIDE the panel, and the raw {@code {0}} placeholder the script
    * substitutes client-side.
@@ -297,20 +299,21 @@ class InventoryPageControllerMvcTest {
     mockMvc
         .perform(get(path))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("data-trigger=\"inv-admin-toggle-filters\"")))
         .andExpect(content().string(containsString("aria-controls=\"globalFilterPanel\"")))
         .andExpect(content().string(containsString("aria-expanded=\"true\"")))
         .andExpect(
             content()
                 .string(
-                    containsString("<div class=\"inv-filter-panel\" id=\"globalFilterPanel\">")))
+                    containsString(
+                        "<div class=\"filter-panel\" id=\"globalFilterPanel\""
+                            + " data-filter-panel=\"inventory-all\">")))
         .andExpect(content().string(containsString("data-label=\"Aktive Filter: {0}\"")))
         .andExpect(
             content()
                 .string(
                     stringContainsInOrder(
                         List.of(
-                            "id=\"globalFilterToggle\"",
+                            "data-testid=\"lager-filter-toggle\"",
                             "id=\"globalFilterPanel\"",
                             "global-inventory-filter",
                             "id=\"tableContainer\""))));
