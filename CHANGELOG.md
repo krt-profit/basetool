@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
+
 ### Changed
 
 - **Die Filter lassen sich auf allen großen Listenseiten zuklappen.** Bei Einsätzen, Operationen,
