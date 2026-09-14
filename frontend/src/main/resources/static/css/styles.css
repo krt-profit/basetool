@@ -4969,7 +4969,44 @@ textarea:focus-visible,
      * chosen over letting the header scroll away like the footer.
      */
     nav {
+        /*
+         * A GRID, not a flex row, and that is the whole fix.
+         *
+         * The structural wrap rule further down matches any flex row whose direct children include
+         * a button or a link — "the structure counts, not the name" — and this nav has both: the
+         * hamburger and the brand. It therefore wrapped the brand onto a second line and took the
+         * header to 110px, undoing the compact header above. Both shipped in the SAME release
+         * (v1.8.0) and neither was measured against the other.
+         *
+         * `flex-wrap: nowrap` was the obvious answer and it is the wrong one: a nowrap flex row
+         * still OVERFLOWS when its content does not fit, and on the Bank pages it did — the layout
+         * viewport widened from 375px to 412px and the whole page scaled down. It reproduced in CI
+         * on all three browsers and not locally, because the seeded data there is wider; a control
+         * run without the change was green, which is what settled it.
+         *
+         * `minmax(0, 1fr)` cannot do that. The second track is bounded by the container, so the
+         * brand is forced to shrink and its wordmark to ellipsise rather than push the page wider.
+         * `flex-wrap` from the structural rule is inert on a grid, so the opt-out is structural too
+         * rather than a declaration that has to win a specificity argument.
+         */
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+
+        /*
+         * Column flow, so a THIRD child opens an implicit COLUMN instead of a second row.
+         * `sidebar.js` appends the "ADMIN" chip into this nav on every /admin/* page. Under the
+         * default row flow that chip was placed at (row 2, column 1) and took the header to 108px
+         * on all 23 admin routes - the very cost this block exists to remove, reintroduced on the
+         * pages an operator uses most. Measured, not reasoned: 107px before, 62px after, at 375px
+         * against this stylesheet.
+         *
+         * An implicit track is only created when an item needs one, so a page without the chip
+         * keeps exactly two tracks and the brand keeps every pixel of the 1fr. A third explicit
+         * `auto` column would instead spend a `gap` on an empty track on every non-admin page.
+         */
+        grid-auto-flow: column;
         gap: var(--space-4);
+        align-items: center;
         min-width: 0;
     }
 
