@@ -4971,6 +4971,18 @@ textarea:focus-visible,
     nav {
         gap: var(--space-4);
         min-width: 0;
+        /*
+         * The structural wrap rule further down matches ANY flex row whose direct children
+         * include a button or a link — "the structure counts, not the name" — and this nav has
+         * both: the hamburger and the brand. It therefore wrapped the brand onto a second line
+         * and took the header back to 110px, undoing the compact header above. The two shipped
+         * in the SAME release (v1.8.0) and neither was measured against the other.
+         *
+         * A header row is not a button row: it has exactly two items, one of which already
+         * truncates. Opting out here rather than narrowing the structural rule keeps that rule
+         * deliberately broad, which is the property that made it worth having.
+         */
+        flex-wrap: nowrap;
     }
 
     nav .brand {

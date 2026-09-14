@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Kopfzeile ist auf dem Handy wieder einzeilig.** Titel und Staffel rutschten unter das
+  Menüsymbol, wodurch die Kopfzeile fast doppelt so hoch wurde wie vorgesehen (110 statt 62 Pixel)
+  und entsprechend Platz vom Inhalt nahm. Sie steht jetzt wieder in einer Zeile neben Menü und
+  Glocke.
+
 ## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
 
 ### Changed

@@ -168,6 +168,22 @@ class TouchClassLayoutE2eTest {
    */
   private static final int MAX_CHROME_SHARE_PERCENT = 33;
 
+  /**
+   * Ceiling for the header's own height on the phone class, in px.
+   *
+   * <p>Separate from {@link #MAX_CHROME_SHARE_PERCENT} because that ceiling cannot see this: a
+   * header of 110px on an 812px phone is 13% of the viewport and sails through, which is exactly
+   * what happened. The compact header (REQ-UI-009, owner decision 2026-09-13) took it from 76px to
+   * about 48px by putting the wordmark on one line; a later structural wrap rule then matched the
+   * header's own nav — it has a button and a link as direct children — and wrapped the brand onto a
+   * second line again, undoing it silently in the same release.
+   *
+   * <p>72px is measured-plus-slack: the fixed header renders at 62px at both 375px and 412px, and
+   * the ceiling sits below the 76px the compact-header change removed, so this guard would have
+   * caught the state before that change AND the regression after it.
+   */
+  private static final int MAX_PHONE_HEADER_HEIGHT_PX = 72;
+
   /** Minimum touch target per REQ-UI-009, in CSS pixels. */
   private static final int TOUCH_TARGET_FLOOR = 44;
 
@@ -1121,6 +1137,16 @@ class TouchClassLayoutE2eTest {
               "%s: header (%.0fpx) + pinned footer (%.0fpx) take %.0f%% of the %dpx viewport"
                   + " (ceiling %d%%).",
               where, headerH, footerH, sharePercent, height, MAX_CHROME_SHARE_PERCENT));
+    }
+
+    // The header's own height, bounded rather than merely measured. See the constant's Javadoc for
+    // why the share ceiling above cannot stand in for this.
+    if (phone && headerH > MAX_PHONE_HEADER_HEIGHT_PX) {
+      findings.add(
+          String.format(
+              "%s: the header is %.0fpx tall on a phone (ceiling %dpx) — the wordmark has most"
+                  + " likely wrapped onto a second line again.",
+              where, headerH, MAX_PHONE_HEADER_HEIGHT_PX));
     }
 
     for (Object offender : list(probe.get("cutOff"))) {
