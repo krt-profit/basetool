@@ -108,9 +108,9 @@ class InventoryFilterPanelCollapseE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/my");
         page.waitForLoadState();
 
-        // Fresh context => no stored preference, and an untouched Lager has no active filter, so
-        // the default applies: collapsed. The toggle itself must of course be visible, or the
-        // filters would be unreachable rather than merely tidied away.
+        // Fresh context => no stored preference, so the default applies: collapsed (REQ-FE-021;
+        // it no longer depends on whether anything is filtered). The toggle itself must of course
+        // be visible, or the filters would be unreachable rather than merely tidied away.
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#myFilterPanel")).isHidden();
@@ -165,15 +165,15 @@ class InventoryFilterPanelCollapseE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
 
         // Nothing filtered yet: the chip must be absent rather than showing a zero.
-        assertThat(page.locator("[data-testid='lager-filter-count']")).isHidden();
+        assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
         page.locator("[data-testid='lager-filter-toggle']").click();
         assertThat(page.locator("#myFilterPanel")).isVisible();
         page.locator("#personalOnly").check();
 
-        assertThat(page.locator("[data-testid='lager-filter-count']"))
+        assertThat(page.locator(".filter-toggle [data-filter-count]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
-        assertThat(page.locator("#myFilterCountValue")).hasText("1");
+        assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-filter-count-chip");
         throw failure;
@@ -211,7 +211,7 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#globalFilterPanel")).isHidden();
-        assertThat(page.locator("[data-testid='lager-filter-count']")).isHidden();
+        assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
         page.locator("[data-testid='lager-filter-toggle']").click();
         assertThat(page.locator("#globalFilterPanel")).isVisible();
@@ -232,9 +232,9 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("#globalFilterPanel")).isVisible();
         page.locator("#minQuality").selectOption("500");
 
-        assertThat(page.locator("[data-testid='lager-filter-count']"))
+        assertThat(page.locator(".filter-toggle [data-filter-count]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
-        assertThat(page.locator("#globalFilterCountValue")).hasText("1");
+        assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "inventory-global-filter-panel-collapse");
         throw failure;

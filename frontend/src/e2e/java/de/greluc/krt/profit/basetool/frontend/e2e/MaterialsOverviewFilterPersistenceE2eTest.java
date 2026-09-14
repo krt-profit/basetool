@@ -97,6 +97,7 @@ class MaterialsOverviewFilterPersistenceE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, baseUrl + "/materials/overview");
+        E2eSupport.openFilterPanel(page);
         assertThat(page.locator("#tableContainer"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
@@ -131,6 +132,7 @@ class MaterialsOverviewFilterPersistenceE2eTest {
             page.waitForRequest(
                 request -> isFilteredDataUrl(request.url()),
                 () -> E2eSupport.navigate(page, baseUrl + "/materials/overview"));
+        E2eSupport.openFilterPanel(page);
         if (narrowMaterials && !initialFetch.url().contains("materials=")) {
           throw new AssertionError(
               "initial post-reload data request must carry the restored material subset, but"

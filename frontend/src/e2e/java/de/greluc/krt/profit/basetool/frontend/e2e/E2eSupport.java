@@ -687,4 +687,33 @@ final class E2eSupport {
       System.out.println("[E2E][FAIL] diagnostics dump failed: " + e);
     }
   }
+
+  /**
+   * Expands the page's filter panel if it is collapsed, and waits until its controls are reachable.
+   *
+   * <p>Every list page's filters ship collapsed (REQ-FE-021), so any test that touches a filter
+   * widget must open the panel first or Playwright will wait out its timeout against a {@code
+   * hidden} subtree. That is not a test artefact: a member has to make the same click, which is
+   * what the collapsed default costs and what this helper makes visible at the call site.
+   *
+   * <p>Idempotent, and a no-op on a page that has no collapsible panel — the pages whose filter is
+   * a single search input keep theirs permanently visible, deliberately.
+   *
+   * @param page the page under test
+   */
+  /** How long to wait for a filter panel to become reachable after the toggle click. */
+  private static final double FILTER_PANEL_TIMEOUT_MS = 10_000;
+
+  static void openFilterPanel(Page page) {
+    Locator toggle = page.locator(".filter-toggle").first();
+    if (toggle.count() == 0) {
+      return;
+    }
+    if ("false".equals(toggle.getAttribute("aria-expanded"))) {
+      toggle.click();
+    }
+    page.locator(".filter-panel")
+        .first()
+        .waitFor(new Locator.WaitForOptions().setTimeout(FILTER_PANEL_TIMEOUT_MS));
+  }
 }
