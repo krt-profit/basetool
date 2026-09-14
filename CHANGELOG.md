@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.0](https://github.com/krt-profit/basetool/releases/tag/v1.8.0) - 2026-09-14
+
 ### Added
 
 - **Das Basetool lässt sich als App auf dem Startbildschirm installieren.** Auf iPhone und iPad
