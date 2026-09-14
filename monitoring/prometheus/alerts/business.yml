@@ -1275,8 +1275,27 @@ groups:
       # (#1041 item 6) KeycloakLoginErrorSpike reads keycloak_user_events_total; if Keycloak's event
       # metrics subsystem stops exporting while Keycloak itself is up, that alert goes silent (not
       # firing) with no other signal. This catches the absence directly.
+      #
+      # The absence alone does NOT mean misconfigured, and reading it that way is what made this
+      # alert fire after every deploy (three times on 2026-09-14). `keycloak_user_events_total` is
+      # a TAGGED Micrometer counter: it does not exist until the first matching event, and a
+      # Keycloak restart empties the registry. So a freshly restarted Keycloak that nobody has
+      # signed in to yet looks exactly like one whose event listener is switched off.
+      #
+      # Waiting longer does not separate them either — a quiet night can pass without a single
+      # login. What separates them is OPPORTUNITY: if the token/auth endpoints have actually been
+      # exercised and the counter is still missing, the subsystem really is not recording. That is
+      # the third clause. `(/auth)?` because the public surface moved under /auth with ADR-0166
+      # while the management surface stayed at the root, and Keycloak's own uri label carries the
+      # resolved route.
       - alert: KeycloakEventMetricsAbsent
-        expr: absent(keycloak_user_events_total) and on() (up{job="keycloak"} == 1)
+        expr: >-
+          absent(keycloak_user_events_total)
+          and on() (up{job="keycloak"} == 1)
+          and on() (
+            sum(increase(http_server_requests_seconds_count{job="keycloak",
+              uri=~"(/auth)?/realms/.*/protocol/openid-connect/(token|auth)"}[1h])) > 0
+          )
         for: 15m
         labels:
           severity: warning

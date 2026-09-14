@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Betrieb: ein Alarm meldete sich nach jedem Deploy, ohne dass etwas kaputt war.** Die Überwachung
+  der Keycloak-Anmeldeereignisse schlug an, sobald die Kennzahl fehlte — die entsteht aber erst mit
+  der ersten Anmeldung und wird von jedem Neustart zurückgesetzt. Sie meldet sich jetzt nur noch,
+  wenn tatsächlich Anmeldungen stattfinden und trotzdem nichts aufgezeichnet wird. Für Mitglieder
+  ändert sich nichts.
+
 ## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
 
 ### Changed
