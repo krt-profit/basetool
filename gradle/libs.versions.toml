@@ -44,6 +44,7 @@ testcontainers = "2.0.5"
 # `enabled` + `locations`). The rest of the release is debug-log and dry-run polish plus Jackson
 # and MariaDB-driver bumps, with no documented bug fixes.
 flyway = "13.5.0"
+##  ⬆ = "13.6.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
