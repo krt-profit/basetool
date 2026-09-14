@@ -1188,9 +1188,24 @@ Nothing stored is lost. Sessions end, and members sign in again.
    application: **add** the new one alongside the old rather than replacing it, and the switch is
    seamless in both directions. Remove the old entry once step 8 is done.
    See [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
-2. **Ship the matching Android build**, or accept that the app is dead between steps 5 and
-   that build reaching its testers. `OIDC_ISSUER` moves with the server; a build pinned to
-   `https://keycloak.profit-base.online/realms/iri` cannot authenticate afterwards.
+2. **Ship the matching Android build, and raise the version floor with it** — or accept that the
+   app is dead between step 5 and that build reaching its testers. `OIDC_ISSUER` moves with the
+   server; a build pinned to `https://keycloak.profit-base.online/realms/iri` cannot authenticate
+   afterwards. Two things follow, and the second decides what a member actually sees:
+   - The new build must carry a **new `versionCode`**. Shipping the new issuer under the old code
+     leaves the server unable to tell the two builds apart, which disarms the wall below.
+   - **Raise `APP_ANDROID_MINIMUM_VERSION_CODE` to that code in the host `.env`**, and
+     `APP_ANDROID_LATEST_VERSION_CODE` with it. This is the difference between „install the new
+     version" and an unexplained login failure, and it keeps working *during* an auth outage on
+     purpose: the app's update wall reads `GET /api/v1/app/version-policy`, which is `permitAll()`,
+     and it is mounted **in front of** the auth flow rather than behind it — see the comment above
+     `UpdateGate(` in the app's `MainActivity`. Left at the old floor the wall never appears, for
+     exactly the case it was built for.
+
+   Neither number lives in the promoted bundle: `docker-compose.yml` passes
+   `${APP_ANDROID_MINIMUM_VERSION_CODE:-0}`, so a recreate cannot supply them and the host `.env`
+   is their only live value — the same trap as `IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI` in step 4.
+
 3. **Pull the new bundle** and check the edge before it serves anything:
 
    ```bash
