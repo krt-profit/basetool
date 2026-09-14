@@ -689,6 +689,26 @@ main.oc-page .oc-greeting .oc-edit-toggle {
     display: block;
 }
 
+.oc-modal-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--color-gray-2-text);
+    font-size: 1.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.oc-modal-close:hover {
+    color: var(--color-primary);
+}
+
 /* Holder-mode chooser in the assign/reassign dialog: pick a Basetool account or type a free-text
    name for a member who has none yet. A plain stacked radio group in the HUD style. */
 .oc-holder-mode {

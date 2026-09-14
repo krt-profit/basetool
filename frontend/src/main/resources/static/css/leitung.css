@@ -86,3 +86,10 @@
     color: var(--color-gray-2-text);
     margin: 0 0 1rem;
 }
+
+.leitung-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}

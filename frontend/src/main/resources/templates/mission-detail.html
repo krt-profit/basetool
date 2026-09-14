@@ -1555,7 +1555,7 @@
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.participant.add}">Anmelden</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-participant-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-participant-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="add-participant-form" th:action="@{/missions/{id}/participant(id=${mission.id})}" method="post" th:object="${participantForm}">
                 <div class="krt-modal-body">
@@ -1619,7 +1619,7 @@
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 id="edit-participant-title" th:text="#{members.edit}">Bearbeiten</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-edit-participant-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-edit-participant-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="edit-participant-form" method="post" th:action="${modalAction != null && openModal == 'edit-participant-modal'} ? ${modalAction} : @{/missions}">
                 <div class="krt-modal-body">
@@ -1710,7 +1710,7 @@
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.unit.add}">Einheit hinzuf&uuml;gen</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-add-unit-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-add-unit-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="add-unit-form" th:action="@{/missions/{id}/units(id=${mission.id})}" method="post" th:object="${unitForm}">
                 <div class="krt-modal-body">
@@ -1778,7 +1778,7 @@
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{admin.mission_data.frequency_types}">Frequenz zuweisen</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-frequency-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-frequency-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="frequency-form" method="post" th:action="@{/missions}">
                 <div class="krt-modal-body">
@@ -1804,7 +1804,7 @@
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 id="custom-frequency-modal-title" th:text="#{mission.frequency.custom.add}">Frequenz hinzuf&uuml;gen</h2>
-                <button type="button" class="btn btn-ghost btn-icon" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="custom-frequency-form">
                 <div class="krt-modal-body">
@@ -1835,7 +1835,7 @@
              th:data-init-ship="${unitForm.shipId != null ? unitForm.shipId : ''}">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.unit.edit}">Einheit bearbeiten</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-edit-unit-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-edit-unit-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="edit-unit-form" method="post" th:action="${modalAction != null && openModal == 'edit-unit-modal'} ? ${modalAction} : @{/missions}" th:object="${unitForm}">
                 <div class="krt-modal-body">
@@ -1901,7 +1901,7 @@
         <div class="krt-modal">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.unit.edit_crew}">Crew bearbeiten</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-edit-crew-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-edit-crew-modal close-modal" data-modal-dismiss th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="edit-crew-form" method="post" th:action="${modalAction != null && openModal == 'edit-crew-modal'} ? ${modalAction} : @{/missions}" th:object="${crewForm}">
                 <div class="krt-modal-body">
@@ -1927,7 +1927,7 @@
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.add}">Finanzeintrag hinzuf&uuml;gen</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-finance-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="finance-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="finance-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="add-finance-form" th:action="@{/missions/{id}/finance-entries(id=${mission.id})}" method="post" th:object="${financeForm}">
                 <div class="krt-modal-body">
@@ -1977,7 +1977,7 @@
         <div class="krt-modal krt-modal--wide">
             <div class="krt-modal-head">
                 <h2 th:text="#{mission.finance.edit}">Finanzeintrag bearbeiten</h2>
-                <button type="button" class="btn btn-ghost btn-icon close-edit-finance-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="edit-finance-entry-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
+                <button type="button" class="btn btn-ghost btn-icon close-edit-finance-modal close-modal" data-modal-dismiss data-trigger="close-modal-display" data-modal-id="edit-finance-entry-modal" th:title="#{general.cancel}" th:aria-label="#{general.cancel}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></button>
             </div>
             <form id="edit-finance-form" method="post" th:action="${modalAction != null && openModal == 'edit-finance-entry-modal'} ? ${modalAction} : @{/missions}">
                 <div class="krt-modal-body">

@@ -159,23 +159,7 @@ app-wide; new AJAX call sites inherit it for free.
 
 **Enforced by:** code/design review + ESLint (mechanical grep-able rule).
 
-### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918; one shape, #1891)
-
-> [!important] There is exactly ONE dialog shape (#1891, ADR-0177)
-> The app used to render dialogs in three: this one, legacy A (`.modal` / `.modal-content`) and
-> legacy B (`.modal-overlay` / `.modal-box`, opened by an `active` class). All 54 legacy dialogs
-> are ported onto the shell below and **both legacy shapes are deleted** — markup, CSS rule sets
-> and open/close contracts. `.modal`, `.modal-content`, `.close-modal`, `.modal-overlay`,
-> `.modal-box`, `.modal-title` and `.modal-actions` no longer exist; neither do the `open-modal` /
-> `close-modal` (`active`-class) handlers in `common-handlers.js`. A new dialog uses this shape or
-> it is wrong — a second shape is the defect, not a style choice.
->
-> Two guards hold it, and they ask different questions. `MODAL_SHAPES` in
-> `TouchClassLayoutE2eTest` (now a **single** entry) drives the browser sweep that measures each
-> dialog's real geometry at five widths. `SingleModalShapeTest` reads templates and stylesheets as
-> text on every push — no browser, no `e2e` label needed — and fails if any legacy dialog class
-> reappears, if an overlay does not carry exactly one frame, or if a footer's submit button sits
-> outside the form it submits.
+### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918)
 
 The KRT HUD modal — `.krt-modal-overlay` scrim > `.krt-modal` frame (orange top edge + corner
 brackets) > `.krt-modal-head` (title + close-X) — is extracted as the reusable Thymeleaf fragment
@@ -204,38 +188,6 @@ alone, or the inline `display:flex` outranks `krtm-hidden` and the modal stays o
 `delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
-
-**Three sanctioned widths, and no fourth.** `.krt-modal` is 440 px (confirms and single-field
-prompts), `.krt-modal--wide` is 600 px (form-heavy: 3+ stacked fields) and `.krt-modal--xwide` is
-800 px, reserved for dialogs whose body carries a **table** rather than a form — the Auftrag
-material/item pickers and the refinery store sheet. A dialog that needs a width none of these gives
-is a signal to revisit its content, not to add a per-page `max-width`.
-
-**The head's parts are styled, and both heading levels count.** `.krt-modal-close` carries the
-`.close-sidebar-btn` treatment (its already-approved sibling — same job, an ✕ that dismisses a
-surface), squared and floored to 44 px in the touch block, with `flex-shrink: 0` so a long German
-title cannot squeeze it narrower than its glyph and a `:focus-visible` ring because it is the first
-Tab stop inside a dialog. It had **no rule at all** until #1884 found it by measurement, and the
-port would have moved the legacy dialogs onto something worse than the styled `.close-modal` they
-came from. The head's title rule covers **`h2` and `h3`**: hand-written shells use `h2` and
-the `modal-wrapper` fragment emits `h3`, and while only `h2` was styled a fragment-rendered title
-fell through to the global heading rule and rendered orange at the browser's default `h3` size
-instead of white at `0.85rem`. The close button's accessible name is **`general.a11y.closeModal`**
-(it was `bank.a11y.closeModal`, on fifteen pages that have nothing to do with the Bank).
-
-**A wrapper between the frame and its form needs `.krt-modal-flow`.** The frame caps itself at
-`90vh` and lets only `.krt-modal-body` scroll, which holds as long as head/body/foot are flex items
-of `.krt-modal`. A dialog whose body and footer live inside a live-sync swap container — the
-refinery store dialog's `#refinery-store-results`, the `?fragment=store` seam — has a plain `<div>`
-in between that would otherwise absorb the column layout and leave the body unscrollable. That
-wrapper carries `.krt-modal-flow`.
-
-**One shape means one busy probe.** `krt-live-sync.js` asks "is any dialog open?" by querying
-`.krt-modal-overlay`, and that guard is what stops a peer's change from swapping the DOM out from
-under an open form and 409-ing the next submit. While three shapes existed the probe saw only one of
-them, so 54 dialogs had no such protection and org-chart hand-rolled a `busyTest` to compensate. A
-dialog in a new shape would silently lose this again — which is the second reason the shape is
-singular.
 
 **No inline `style=""` attributes (CSP hardening).** Templates must not use inline `style=""`
 attributes: the CSP pins `style-src-attr 'none'`, so an inline style attribute is blocked by the
@@ -286,17 +238,6 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
 
 - [ ] A new/migrated `.krt-modal-overlay` modal renders through `modal-wrapper :: modal(...)` with
   its body projected exactly once and closes via `close-modal-display` (no `data-modal-dismiss`).
-- [ ] **Exactly one dialog shape exists.** `.modal`, `.modal-content`, `.close-modal`,
-  `.modal-overlay`, `.modal-box`, `.modal-title` and `.modal-actions` appear in **no** template and
-  **no** stylesheet, and no dialog is opened or closed by an `active` class.
-- [ ] Every dialog is a `.krt-modal-overlay`, so `krt-live-sync.js`'s busy probe sees it and a
-  peer's change cannot swap the DOM out from under it.
-- [ ] The frame's width is one of the three sanctioned variants (default / `--wide` / `--xwide`),
-  not a per-page `max-width`.
-- [ ] The head carries a `.krt-modal-close` labelled `general.a11y.closeModal`, and its title is an
-  `h2` or `h3` (both are styled).
-- [ ] A swap container between `.krt-modal` and its `<form>` carries `.krt-modal-flow`, so the body
-  still scrolls under the `90vh` cap.
 - [ ] `.krt-modal-overlay` is `display:none` by default in the global `styles.css` (not only in a
   page-scoped stylesheet); a modal is shown by adding the `krtm-modal-open` class (`display:flex`),
   never an inline `style.display`.

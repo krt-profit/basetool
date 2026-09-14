@@ -545,15 +545,11 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bookout.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-bookout"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="bookOutModal" class="modal" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-admin-close-bookout">&times;</span>
+        <h2 class="mt-0" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
-            <div class="krt-modal-body">
             <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
                 <ul class="text-danger">
                     <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
@@ -619,8 +615,8 @@
                 <p class="herkunft-help" th:text="#{inventory.herkunft.help}">Auswahl der Herkunft</p>
                 <div class="herkunft-body" data-herkunft-body></div>
             </div>
-            </div>
-            <div class="krt-modal-foot">
+
+            <div class="mt-2-flex-gap">
                 <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
@@ -634,15 +630,11 @@
 <!-- Umbuchen (rebooking) modal — the transfer (Ort/Nutzer) mode relocated out of the Ausbuchen
      dialog so the two share the Lager's Umbuchen concept. The squadron-wide /all view rebooks only
      between Ort/Nutzer/OrgUnit; the personal<->shared toggle lives on the owner-scoped /my view. -->
-<div id="umbuchenModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.rebook.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.rebook.title}">Umbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-umbuchen"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="umbuchenModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-admin-close-umbuchen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.rebook.title}">Umbuchen</h2>
         <form id="umbuchenForm">
-            <div class="krt-modal-body">
             <input type="hidden" id="umbuchenVersion">
             <input type="hidden" id="umbuchenMaxAmount">
 
@@ -706,8 +698,8 @@
                     <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
                 </div>
             </div>
-            </div>
-            <div class="krt-modal-foot">
+
+            <div class="mt-2-flex-gap">
                 <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
                 <button type="button" class="btn btn-ghost" data-trigger="inv-admin-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
             </div>
@@ -715,14 +707,10 @@
     </div>
 </div>
 
-<div id="noteModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.note.label}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.note.label}">Notiz</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-admin-close-note"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="noteModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-admin-close-note">&times;</span>
+        <h2 class="mt-0" th:text="#{inventory.note.label}">Notiz</h2>
         <div class="form-group mb-1">
             <label for="noteModalTextarea" class="form-label" th:text="#{inventory.note.label}">Notiz</label>
             <textarea id="noteModalTextarea" maxlength="1000" rows="6"
@@ -731,8 +719,7 @@
                       class="w-full"></textarea>
             <div id="noteModalCounter" class="krtm-text-align-right-color-var-color-gray-2-font-6d96">0 / 1000</div>
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d">
             <button type="button" class="btn btn--cta" data-trigger="inv-admin-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.note.save}">Speichern</span></button>
             <button type="button" class="btn btn-quiet-danger" data-trigger="inv-admin-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
             <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-admin-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
@@ -740,17 +727,11 @@
     </div>
 </div>
 
-<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="krt-modal-overlay krtm-display-none-z-index-3300-c2c8">
-    <div class="krt-modal krt-modal--wide krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{inventory.deleteAll.modal.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.deleteAll.modal.title}">Globales Lager leeren</h2>
-            <button type="button" class="krt-modal-close" data-trigger="close-modal-display" data-modal-id="delete-all-global-inventory-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)" id="delete-all-global-inventory-modal" class="modal krtm-display-none-z-index-3300-c2c8">
+    <div class="modal-content hud-box krtm-max-width-520px-text-align-center-b4d9">
+        <h2 th:text="#{inventory.deleteAll.modal.title}" class="mt-0">Globales Lager leeren</h2>
         <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereinträge wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden. Persönliche Lagereinträge bleiben erhalten.</p>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="flex-center-gap">
             <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" id="delete-all-global-inventory-confirm-btn" class="btn btn-danger" th:text="#{inventory.deleteAll.modal.confirm}">Ja, alle löschen</button>
         </div>

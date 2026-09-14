@@ -216,9 +216,50 @@
     margin-top: 0.25rem;
 }
 
+/* Modal layout: relative parent so the close-X can sit absolutely top-right. */
+#krt-pi-modal .modal-content,
+#krt-pi-delete-modal .modal-content {
+    position: relative;
+    padding-top: 3rem;
+}
+
+#krt-pi-modal .modal-content > .close,
+#krt-pi-delete-modal .modal-content > .close {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.9rem;
+    color: var(--color-gray-1, #d2d2d2);
+    font-size: 1.8rem;
+    line-height: 1;
+    font-weight: bold;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    z-index: 2;
+}
+
+#krt-pi-modal .modal-content > .close:hover,
+#krt-pi-modal .modal-content > .close:focus,
+#krt-pi-delete-modal .modal-content > .close:hover,
+#krt-pi-delete-modal .modal-content > .close:focus {
+    color: var(--color-primary, #e77e23);
+    outline: none;
+}
+
 #krt-pi-modal #krt-pi-form,
 #krt-pi-modal #krt-pi-form .form-group {
     text-align: left;
+}
+
+.krt-pi-modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+.krt-pi-modal-actions .btn {
+    min-height: 44px;
 }
 
 .krt-danger {

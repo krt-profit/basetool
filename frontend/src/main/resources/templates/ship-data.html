@@ -164,17 +164,11 @@
 <!-- Modals -->
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
     <!-- Reset Fitted Confirmation Modal -->
-    <div id="reset-fitted-confirm-modal" class="krt-modal-overlay">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{hangar.ship.reset_fitted.confirm.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{hangar.ship.reset_fitted.confirm.title}">Zurücksetzen bestätigen</h2>
-                <button type="button" class="krt-modal-close" data-trigger="ship-close-modal"
-                        data-modal-id="reset-fitted-confirm-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
-            <div class="krt-modal-body">
-                <p class="m-0" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
-            </div>
-            <div class="krt-modal-foot">
+    <div id="reset-fitted-confirm-modal" class="modal krtm-display-none-5790">
+        <div class="modal-content krtm-max-width-480px-text-align-center-2fdb">
+            <h2 th:text="#{hangar.ship.reset_fitted.confirm.title}">Zurücksetzen bestätigen</h2>
+            <p class="krtm-margin-1-5rem-0-font-family-var-font-body-co-9e0f" th:text="#{hangar.ship.reset_fitted.confirm.message}">Möchten Sie wirklich alle Schiffe aller Spieler auf "nicht einsatzbereit" (unfitted) setzen?</p>
+            <div class="krtm-display-flex-gap-1rem-justify-content-center-c890">
                 <button type="button" class="btn btn-ghost" data-trigger="ship-close-modal" data-modal-id="reset-fitted-confirm-modal" th:text="#{info.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" data-trigger="shipdata-reset" th:text="#{hangar.ship.reset_fitted.button}">Zurücksetzen</button>
             </div>

@@ -4358,6 +4358,77 @@ input[type='radio']:focus {
     color: var(--color-danger-text);
 }
 
+/*
+ * Modal Styles — KRT canonical modal pattern.
+ *
+ * Toggle convention: the element starts with inline `style="display:none"` and
+ * pages flip it to `display:flex` to open (either via Thymeleaf `th:style` or via
+ * JS `element.style.display = 'flex'`). The flex layout centres `.modal-content`
+ * inside the viewport without any margin maths.
+ *
+ * Two sister patterns exist for specific use cases and share this visual language:
+ *   - `.modal-overlay` / `.modal-box` (promotion-admin.css) — toggled by adding the
+ *     `.active` class instead of touching inline styles; used when JS only manages
+ *     class state.
+ *   - `.krt-confirm-overlay` / `.krt-confirm-dialog` (fragments/toast.html) —
+ *     fully JS-generated, ephemeral confirm dialog injected on demand.
+ */
+.modal {
+    position: fixed;
+    z-index: 3000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0 0 0 / 80%);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--color-bg-dark-gray);
+    margin: auto;
+    padding: var(--space-8);
+    border: var(--border-accent);
+    width: 80%;
+    max-width: 800px;
+    box-shadow: var(--glow-primary-lg);
+
+    /*
+     * A dialog SCROLLS when it runs out of room — the legacy shape too, not just `.krt-modal`.
+     *
+     * `.modal` above is a full-viewport overlay with `overflow: auto`, which looks like it already
+     * covers this. It does not: the overlay centres its child with `align-items: center`, and a
+     * child taller than the overlay is then centred by pushing its TOP above the scroll origin,
+     * which no amount of scrolling brings back. The dialog's head — its title and, on the refinery
+     * store dialog, its first rows — is simply unreachable.
+     *
+     * So the cap belongs on the box, with the same 90vh `.krt-modal` uses, and the box scrolls
+     * itself. `#storeModal` measured 881px in an 800px viewport and 1325px in an 812px one; every
+     * legacy dialog with more rows than the screen has the same shape.
+     */
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.close-modal {
+    color: var(--color-gray-1);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: var(--color-primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
 /* Collapsible Details in Forms */
 details.hud-details {
     margin-bottom: var(--space-8);
@@ -4851,21 +4922,22 @@ textarea:focus-visible,
     }
 
     /*
-     * The dismiss button of the sidebar and of the dialog shell is one control under two
-     * names, and neither declares a size of its own.
+     * The dismiss button of the sidebar and of all three modal vocabularies — `.close-modal`
+     * (16 templates), `.btn-close` (6) and `.krt-modal-close` — is one control under four
+     * names, and none of the four declares a size of its own.
      *
-     * It used to be one control under FOUR names: `.close-modal` (16 templates) and
-     * `.btn-close` (6) were the legacy shapes' spellings of the same ✕. Both are gone with
-     * those shapes (#1891), and so is the reason `min-height` was spelled out here rather
-     * than left to the zero-specificity default above — `.close-modal` was a `<span>` in
-     * admin/mission-data.html, and a `<span>` is reached by no element selector. That comment
-     * called the markup "the real defect there … but that is a separate change"; the port was
-     * that change, so every dismiss control in the app is now a `<button>` and keyboard-
-     * operable. The line is kept anyway: it costs nothing and it does not depend on the
-     * element being a button. The square and the centring are needed regardless.
+     * `min-height` stays spelled out here even though the default above would supply it,
+     * because `.close-modal` is a `<span>` in admin/mission-data.html (three dialogs) as well
+     * as a `<button>` everywhere else, and a `<span>` is reached by no element selector. The
+     * markup is the real defect there — a dismiss control that is not a button is not
+     * keyboard-operable — but that is a separate change, and until it is made this line is
+     * what keeps those three dialogs hittable. The square and the centring are needed by all
+     * four regardless.
      */
     .close-sidebar-btn,
-    .krt-modal-close {
+    .krt-modal-close,
+    .close-modal,
+    .btn-close {
         display: flex;
         align-items: center;
         justify-content: center;
@@ -5921,23 +5993,6 @@ textarea:focus-visible,
     flex-flow: column nowrap;
     min-height: 0;
 }
-/* Pass-through wrapper. The frame caps itself at 90vh and lets only
-   `.krt-modal-body` scroll, which works as long as the head/body/foot are flex
-   ITEMS of the frame. A modal whose body+foot live inside a live-sync swap
-   container (refinery-orders-details' `#refinery-store-results`, the
-   `?fragment=store` seam) has one plain <div> in between, and that div would
-   otherwise absorb the column layout and leave the body unscrollable. Put this
-   class on such a wrapper so the frame's column passes through it. */
-.krt-modal > .krt-modal-flow {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-.krt-modal-flow > form {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
 .krt-modal::before,
 .krt-modal::after {
     content: '';
@@ -5963,13 +6018,6 @@ textarea:focus-visible,
 .krt-modal--wide {
     max-width: 600px;
 }
-/* Third and last sanctioned width, for the dialogs that carry a TABLE rather
-   than a form (the Auftrag material/item pickers, the refinery store sheet).
-   Squeezing those into --wide's 600px reflows their columns; anything that is
-   merely form-heavy stays at --wide. */
-.krt-modal--xwide {
-    max-width: 800px;
-}
 .krt-modal--danger {
     border-top-color: var(--color-danger);
     box-shadow: var(--glow-danger-lg);
@@ -5987,14 +6035,7 @@ textarea:focus-visible,
     border-bottom: var(--border-hairline);
     flex-shrink: 0;
 }
-/* The shell's title is an <h2> in hand-written markup and an <h3> in the
-   `modal-wrapper :: modal(...)` fragment, so both must carry the head style.
-   Until now only `h2` did: an <h3> title fell through to the global heading
-   rule and rendered orange at the browser's default h3 size instead of white
-   at 0.85rem, which is why the fragment-rendered modals never matched the
-   hand-written ones. */
-.krt-modal-head h2,
-.krt-modal-head h3 {
+.krt-modal-head h2 {
     font-family: var(--font-headline);
     font-weight: var(--fw-bold);
     font-size: 0.85rem;
@@ -6003,8 +6044,7 @@ textarea:focus-visible,
     letter-spacing: 0.06em;
     margin: 0;
 }
-.krt-modal--danger .krt-modal-head h2,
-.krt-modal--danger .krt-modal-head h3 {
+.krt-modal--danger .krt-modal-head h2 {
     color: var(--color-danger-text);
 }
 .krt-modal-body {
@@ -6034,25 +6074,9 @@ textarea:focus-visible,
     font-size: var(--fs-h3);
     line-height: 1;
     cursor: pointer;
-    /*
-     * The head is a flex row and the title is the growing item, so a long German
-     * title would otherwise squeeze the ✕ narrower than its own glyph.
-     */
-    flex-shrink: 0;
 }
 
 .krt-modal-close:hover {
-    color: var(--color-accent-light);
-}
-
-/*
- * Keyboard affordance. The control is reachable by Tab (it is the first focusable
- * element in the dialog, which the org-chart focus-trap test asserts), and the
- * colour change alone does not say so on a dark HUD.
- */
-.krt-modal-close:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: -2px;
     color: var(--color-accent-light);
 }
 

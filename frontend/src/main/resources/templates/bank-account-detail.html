@@ -336,7 +336,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.reverse.title}">Buchung stornieren</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-reverse-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="bank-reverse-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="accountBody"
                   data-livesync="bank:@account/account,bookings,chart bank/grid orgunit-bank/orgUnitBank"
@@ -368,7 +368,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-statement-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="bank-statement-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">

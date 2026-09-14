@@ -249,27 +249,23 @@
 </main>
 
 <!-- Shared add-member modal (Bereich / OL): user picker + optional role -->
-<div id="leitung-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="leitung-modal-title">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 id="leitung-modal-title" th:text="#{leitung.modal.title}">Mitglied hinzufügen</h2>
-            <button type="button" class="krt-modal-close" data-leitung-cancel th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+<div id="leitung-modal" class="modal krtm-display-none-5790" role="dialog" aria-modal="true" aria-labelledby="leitung-modal-title">
+    <div class="modal-content hud-box">
+        <button type="button" class="close-modal" data-leitung-cancel th:aria-label="#{leitung.action.cancel}">&times;</button>
+        <h2 id="leitung-modal-title" th:text="#{leitung.modal.title}">Mitglied hinzufügen</h2>
+        <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
+        <div class="form-group">
+            <label for="leitung-modal-user" th:text="#{leitung.modal.user}">Nutzer</label>
+            <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+            <select id="leitung-modal-user" data-krt-combobox="remote-users">
+                <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
+            </select>
         </div>
-        <div class="krt-modal-body">
-            <p class="leitung-modal-unit" id="leitung-modal-unit"></p>
-            <div class="form-group">
-                <label for="leitung-modal-user" th:text="#{leitung.modal.user}">Nutzer</label>
-                <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
-                <select id="leitung-modal-user" data-krt-combobox="remote-users">
-                    <option value="" th:text="#{leitung.modal.user.placeholder}">-- Bitte wählen --</option>
-                </select>
-            </div>
-            <div class="form-group" id="leitung-modal-role-group">
-                <label for="leitung-modal-role" th:text="#{leitung.modal.role}">Rang</label>
-                <select id="leitung-modal-role"></select>
-            </div>
+        <div class="form-group" id="leitung-modal-role-group">
+            <label for="leitung-modal-role" th:text="#{leitung.modal.role}">Rang</label>
+            <select id="leitung-modal-role"></select>
         </div>
-        <div class="krt-modal-foot">
+        <div class="leitung-modal-actions">
             <button type="button" class="btn btn-ghost" data-leitung-cancel th:text="#{leitung.action.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" id="leitung-modal-submit" th:text="#{leitung.action.assign}">Zuweisen</button>
         </div>

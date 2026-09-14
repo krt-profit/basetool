@@ -217,7 +217,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.confirm.modal.title}">Antrag best&auml;tigen</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-confirm-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="bank-confirm-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank bank:@account/account,bookings,chart bank:@destination/account,bookings,chart"
@@ -324,7 +324,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.request.reject.modal.title}">Antrag ablehnen</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="bank-reject-request-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="bank-reject-request-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
                   data-livesync="bank/requestQueue,grid orgunit-bank/orgUnitBank"

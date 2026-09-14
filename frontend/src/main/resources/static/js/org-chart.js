@@ -55,7 +55,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
     const chart = document.getElementById('oc-chart');
     const editHint = document.getElementById('oc-edit-hint');
     const modal = document.getElementById('oc-modal');
-    const modalContent = modal ? modal.querySelector('.krt-modal') : null;
+    const modalContent = modal ? modal.querySelector('.modal-content') : null;
     let lastTrigger = null;
 
     // In-place chart refresh after a successful edit (epic #571 / REQ-FE-005). The whole tree
@@ -126,11 +126,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
             refresh: function () {
                 refreshChart();
             },
-            // Keeps the tree — and every data-version in it — from being swapped out from
-            // under an open dialog, which would make the admin's next submit 409 on a stale
-            // version. The dialog is a `.krt-modal-overlay` now, so krtLiveSync's generic
-            // "any modal open" probe covers this too; the explicit test stays because this
-            // module owns the guarantee rather than inheriting it.
+            // The edit dialog is a plain `.modal` toggled through inline display, NOT a
+            // `.krt-modal-overlay`, so krtLiveSync's generic "any modal open" probe does not see
+            // it. Without this the tree — and every data-version in it — would be swapped out from
+            // under an open dialog, and the admin's next submit would 409 on a stale version.
             busyTest: function () {
                 return !!modal && window.getComputedStyle(modal).display !== 'none';
             },
@@ -555,7 +554,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 closeModal();
             }
         });
-        // Esc closes the dialog; Tab/Shift+Tab cycle focus within the .krt-modal frame.
+        // Esc closes the dialog; Tab/Shift+Tab cycle focus within .modal-content.
         modal.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 event.preventDefault();

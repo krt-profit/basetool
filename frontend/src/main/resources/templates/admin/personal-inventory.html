@@ -130,17 +130,14 @@
     </div>
 </main>
 
-<div id="krt-pi-modal" class="krt-modal-overlay" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.modal.create.title}">
-        <div class="krt-modal-head">
-            <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pi-close-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="krt-pi-modal" class="modal" th:classappend="${showItemModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="pi-close-modal">&times;</span>
+        <h2 id="krt-pi-modal-title" th:text="#{personalInventory.modal.create.title}">Eintrag anlegen</h2>
         <form id="krt-pi-form"
               th:action="${modalAction != null ? modalAction : '/admin/personal-inventory'}"
               method="post"
               th:object="${personalInventoryForm}">
-            <div class="krt-modal-body">
             <div th:if="${#fields.hasErrors('*')}" class="krt-pi-error-box">
                 <ul>
                     <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
@@ -172,29 +169,24 @@
                 <label for="krt-pi-note" th:text="#{personalInventory.field.note}">Notiz</label>
                 <textarea id="krt-pi-note" maxlength="2000" rows="4" th:field="*{note}"></textarea>
             </div>
-            </div>
-            <div class="krt-modal-foot">
-                <button type="button" class="btn btn-ghost" data-trigger="pi-close-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            <div class="krt-pi-modal-actions">
                 <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{personalInventory.action.save}">Speichern</span></button>
+                <button type="button" class="btn btn-ghost" data-trigger="pi-close-modal" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="krt-pi-delete-modal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{personalInventory.action.delete.confirm.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pi-close-delete" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="krt-pi-delete-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="pi-close-delete">&times;</span>
+        <h2 th:text="#{personalInventory.action.delete.confirm.title}">Eintrag loeschen</h2>
+        <p id="krt-pi-delete-message" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
         <form id="krt-pi-delete-form" method="post">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <div class="krt-modal-body">
-                <p id="krt-pi-delete-message" class="m-0" th:text="#{personalInventory.action.delete.confirm.body}">Wirklich loeschen?</p>
-            </div>
-            <div class="krt-modal-foot">
-                <button type="button" class="btn btn-ghost" data-trigger="pi-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+            <div class="krt-pi-modal-actions">
                 <button type="submit" class="btn krt-danger" th:text="#{personalInventory.action.delete.confirm.ok}">Loeschen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="pi-close-delete" th:text="#{personalInventory.action.cancel}">Abbrechen</button>
             </div>
         </form>
     </div>

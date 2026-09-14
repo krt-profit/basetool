@@ -319,19 +319,14 @@ function openCreateMaterialModal() {
     document.getElementById('cm-illegal').checked = false;
     document.getElementById('cm-volatile-qt').checked = false;
     document.getElementById('cm-volatile-time').checked = false;
-    // Canonical shell: visibility is the shared krtm-modal-open / krtm-hidden pair.
-    const createOverlay = document.getElementById('modal-create-material');
-    createOverlay.classList.add('krtm-modal-open');
-    createOverlay.classList.remove('krtm-hidden');
+    document.getElementById('modal-create-material').classList.add('active');
     // Focus the first input so keyboard users can type immediately
     setTimeout(function () {
         document.getElementById('cm-name').focus();
     }, 50);
 }
 function closeCreateMaterialModal() {
-    const createOverlay = document.getElementById('modal-create-material');
-    createOverlay.classList.remove('krtm-modal-open');
-    createOverlay.classList.add('krtm-hidden');
+    document.getElementById('modal-create-material').classList.remove('active');
 }
 function submitCreateMaterial(btn) {
     const name = document.getElementById('cm-name').value.trim();
@@ -401,7 +396,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('modal-create-material');
-        if (overlay && overlay.classList.contains('krtm-modal-open')) {
+        if (overlay && overlay.classList.contains('active')) {
             closeCreateMaterialModal();
         }
     }

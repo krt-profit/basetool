@@ -304,14 +304,9 @@
 </main>
 
 <!-- Create Topic Modal -->
-<div id="modal-create-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 th:text="#{promotion.admin.topics.modal.create.title}">Neuen Themenbereich anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pa-close-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="modal-create-topic" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.topics.modal.create.title}">Neuen Themenbereich anlegen</div>
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
             <input id="ct-name" class="form-input" type="text" maxlength="120">
@@ -325,8 +320,7 @@
             <input id="ct-sort" class="form-input" type="number" value="0">
             <span class="form-hint" th:text="#{promotion.admin.topics.sort.hint}">Niedrigere Werte erscheinen weiter oben. Die Position kann später per Pfeiltasten in der Liste angepasst werden.</span>
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-topic" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="pa-create-topic" th:text="#{promotion.admin.topics.new}">Anlegen</button>
         </div>
@@ -334,14 +328,9 @@
 </div>
 
 <!-- Edit Topic Modal -->
-<div id="modal-edit-topic" class="krt-modal-overlay" role="dialog" aria-modal="true">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 th:text="#{promotion.admin.topics.modal.edit.title}">Themenbereich bearbeiten</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pa-close-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="modal-edit-topic" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.topics.modal.edit.title}">Themenbereich bearbeiten</div>
         <input id="et-id" type="hidden">
         <input id="et-version" type="hidden">
         <div class="form-group">
@@ -356,8 +345,7 @@
             <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="et-sort" class="form-input" type="number">
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-topic" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="pa-update-topic"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>
@@ -365,14 +353,9 @@
 </div>
 
 <!-- Create Category Modal -->
-<div id="modal-create-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 th:text="#{promotion.admin.category.modal.create.title}">Neue Kategorie anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pa-close-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="modal-create-category" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.category.modal.create.title}">Neue Kategorie anlegen</div>
         <input id="cc-topic-id" type="hidden">
         <div class="form-group">
             <label class="form-label" th:text="#{promotion.admin.topics.name.label}">Name</label>
@@ -386,8 +369,7 @@
             <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="cc-sort" class="form-input" type="number" value="0">
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-create-category" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="pa-create-category" th:text="#{promotion.admin.topics.category.new}">Anlegen</button>
         </div>
@@ -395,14 +377,9 @@
 </div>
 
 <!-- Edit Category Modal -->
-<div id="modal-edit-category" class="krt-modal-overlay" role="dialog" aria-modal="true">
-    <div class="krt-modal krt-modal--wide">
-        <div class="krt-modal-head">
-            <h2 th:text="#{promotion.admin.category.modal.edit.title}">Kategorie bearbeiten</h2>
-            <button type="button" class="krt-modal-close" data-trigger="pa-close-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="modal-edit-category" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <div class="modal-title" th:text="#{promotion.admin.category.modal.edit.title}">Kategorie bearbeiten</div>
         <input id="ec-id" type="hidden">
         <input id="ec-version" type="hidden">
         <input id="ec-topic-id" type="hidden">
@@ -418,8 +395,7 @@
             <label class="form-label" th:text="#{promotion.admin.topics.sort.label}">Sortierung</label>
             <input id="ec-sort" class="form-input" type="number">
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="modal-actions">
             <button class="btn btn-ghost" data-trigger="pa-close-modal" data-pa-modal="modal-edit-category" th:text="#{general.cancel}">Abbrechen</button>
             <button class="btn btn--cta" data-trigger="pa-update-category"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{promotion.admin.topics.edit}">Speichern</span></button>
         </div>

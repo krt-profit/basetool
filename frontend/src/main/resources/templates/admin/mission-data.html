@@ -264,131 +264,105 @@
     </div>
 
     <!-- Squadron Modal -->
-    <div id="squadron-modal" class="krt-modal-overlay" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.squadron.create}">
-            <div class="krt-modal-head">
-                <h2 id="squadron-modal-title" th:text="#{admin.squadron.create}">Staffel</h2>
-                <button type="button" class="krt-modal-close close-squadron-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <div id="squadron-modal" class="modal" th:classappend="${openModal == 'squadron-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+        <div class="modal-content hud-box">
+            <span class="close-squadron-modal close-modal">&times;</span>
+            <h2 id="squadron-modal-title" th:text="#{admin.squadron.create}">Staffel</h2>
             <form id="squadron-form" method="post" th:action="${modalAction != null && openModal == 'squadron-modal'} ? ${modalAction} : @{/admin/mission-data/squadrons}" th:object="${squadronForm}">
-                <div class="krt-modal-body">
-                    <input type="hidden" name="version" id="edit-squadron-version" th:value="*{version}">
-                    <div class="form-group">
-                        <label th:text="#{admin.squadron.name}">Name</label>
-                        <input type="text" name="name" id="sq-name" th:value="*{name}" required>
-                        <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{admin.squadron.shorthand}">Kürzel</label>
-                        <input type="text" name="shorthand" id="sq-shorthand" th:value="*{shorthand}" required>
-                        <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{admin.squadron.description}">Beschreibung</label>
-                        <textarea name="description" id="sq-desc" rows="3" th:text="*{description}"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                    </div>
+                <input type="hidden" name="version" id="edit-squadron-version" th:value="*{version}">
+                <div class="form-group">
+                    <label th:text="#{admin.squadron.name}">Name</label>
+                    <input type="text" name="name" id="sq-name" th:value="*{name}" required>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost close-squadron-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+                <div class="form-group">
+                    <label th:text="#{admin.squadron.shorthand}">Kürzel</label>
+                    <input type="text" name="shorthand" id="sq-shorthand" th:value="*{shorthand}" required>
+                    <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
                 </div>
+                <div class="form-group">
+                    <label th:text="#{admin.squadron.description}">Beschreibung</label>
+                    <textarea name="description" id="sq-desc" rows="3" th:text="*{description}"></textarea>
+                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                </div>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>
 
     <!-- JobType Modal -->
-    <div id="jobtype-modal" class="krt-modal-overlay" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.job_type.create}">
-            <div class="krt-modal-head">
-                <h2 id="jobtype-modal-title" th:text="#{admin.job_type.create}">Job</h2>
-                <button type="button" class="krt-modal-close close-jobtype-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <div id="jobtype-modal" class="modal" th:classappend="${openModal == 'jobtype-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+        <div class="modal-content hud-box">
+            <span class="close-jobtype-modal close-modal">&times;</span>
+            <h2 id="jobtype-modal-title" th:text="#{admin.job_type.create}">Job</h2>
             <form id="jobtype-form" method="post" th:action="${modalAction != null && openModal == 'jobtype-modal'} ? ${modalAction} : @{/admin/mission-data/job-types}" th:object="${jobTypeForm}">
-                <div class="krt-modal-body">
-                    <input type="hidden" name="version" id="edit-jobtype-version" th:value="*{version}">
-                    <div class="form-group">
-                        <label th:text="#{admin.job_type.name}">Name</label>
-                        <input type="text" name="name" id="jt-name" th:value="*{name}" required>
-                        <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{admin.job_type.archetype}">Archetyp</label>
-                        <select name="archetype" id="jt-archetype">
-                            <option value="MISSION" th:selected="*{archetype == 'MISSION'}">MISSION</option>
-                            <option value="CREW" th:selected="*{archetype == 'CREW'}">CREW</option>
-                        </select>
-                        <div th:if="${#fields.hasErrors('archetype')}" th:errors="*{archetype}" class="field-error"></div>
-                    </div>
-                    <div class="form-group" id="jt-leadership-group">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
-                            <input type="checkbox" name="isLeadershipRole" id="jt-leadership" th:checked="*{isLeadershipRole}">
-                            <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
-                        </label>
-                        <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
-                    </div>
-                    <div class="form-group" id="jt-missionlead-group">
-                        <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
-                            <input type="checkbox" name="isMissionLead" id="jt-missionlead" th:checked="*{isMissionLead}">
-                            <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
-                        </label>
-                        <small class="form-hint" th:text="#{admin.job_type.is_mission_lead.hint}">Nur eine Mission-F&uuml;hrungsposition kann der Einsatzleiter sein.</small>
-                        <div th:if="${#fields.hasErrors('isMissionLead')}" th:errors="*{isMissionLead}" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{admin.job_type.description}">Beschreibung</label>
-                        <textarea name="description" id="jt-desc" rows="3" th:text="*{description}"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                    </div>
+                <input type="hidden" name="version" id="edit-jobtype-version" th:value="*{version}">
+                <div class="form-group">
+                    <label th:text="#{admin.job_type.name}">Name</label>
+                    <input type="text" name="name" id="jt-name" th:value="*{name}" required>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost close-jobtype-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+                <div class="form-group">
+                    <label th:text="#{admin.job_type.archetype}">Archetyp</label>
+                    <select name="archetype" id="jt-archetype">
+                        <option value="MISSION" th:selected="*{archetype == 'MISSION'}">MISSION</option>
+                        <option value="CREW" th:selected="*{archetype == 'CREW'}">CREW</option>
+                    </select>
+                    <div th:if="${#fields.hasErrors('archetype')}" th:errors="*{archetype}" class="field-error"></div>
                 </div>
+                <div class="form-group" id="jt-leadership-group">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <input type="checkbox" name="isLeadershipRole" id="jt-leadership" th:checked="*{isLeadershipRole}">
+                        <span th:text="#{admin.job_type.is_leadership_role}">Führungsposition</span>
+                    </label>
+                    <div th:if="${#fields.hasErrors('isLeadershipRole')}" th:errors="*{isLeadershipRole}" class="field-error"></div>
+                </div>
+                <div class="form-group" id="jt-missionlead-group">
+                    <label class="krtm-display-flex-align-items-center-gap-0-5rem-f-8e71">
+                        <input type="checkbox" name="isMissionLead" id="jt-missionlead" th:checked="*{isMissionLead}">
+                        <span th:text="#{admin.job_type.is_mission_lead}">Einsatzleiter</span>
+                    </label>
+                    <small class="form-hint" th:text="#{admin.job_type.is_mission_lead.hint}">Nur eine Mission-F&uuml;hrungsposition kann der Einsatzleiter sein.</small>
+                    <div th:if="${#fields.hasErrors('isMissionLead')}" th:errors="*{isMissionLead}" class="field-error"></div>
+                </div>
+                <div class="form-group">
+                    <label th:text="#{admin.job_type.description}">Beschreibung</label>
+                    <textarea name="description" id="jt-desc" rows="3" th:text="*{description}"></textarea>
+                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+                </div>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>
 
     <!-- FrequencyType Modal -->
-    <div id="frequency-type-modal" class="krt-modal-overlay" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.frequency_type.create}">
-            <div class="krt-modal-head">
-                <h2 id="freqtype-modal-title" th:text="#{admin.frequency_type.create}">Frequenztyp</h2>
-                <button type="button" class="krt-modal-close close-freqtype-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
+    <div id="frequency-type-modal" class="modal" th:classappend="${openModal == 'frequency-type-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+        <div class="modal-content hud-box">
+            <span class="close-freqtype-modal close-modal">&times;</span>
+            <h2 id="freqtype-modal-title" th:text="#{admin.frequency_type.create}">Frequenztyp</h2>
             <form id="freqtype-form" method="post" th:action="${modalAction != null && openModal == 'frequency-type-modal'} ? ${modalAction} : @{/admin/mission-data/frequency-types}" th:object="${frequencyTypeForm}">
-                <div class="krt-modal-body">
-                    <input type="hidden" name="version" id="edit-freqtype-version" th:value="*{version}">
-                    <div class="form-group">
-                        <label th:text="#{admin.job_type.name}">Name</label>
-                        <input type="text" name="name" id="ft-name" th:value="*{name}" required>
-                        <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label th:text="#{admin.job_type.description}">Beschreibung</label>
-                        <textarea name="description" id="ft-desc" rows="3" th:text="*{description}"></textarea>
-                        <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                    </div>
+                <input type="hidden" name="version" id="edit-freqtype-version" th:value="*{version}">
+                <div class="form-group">
+                    <label th:text="#{admin.job_type.name}">Name</label>
+                    <input type="text" name="name" id="ft-name" th:value="*{name}" required>
+                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
                 </div>
-                <div class="krt-modal-foot">
-                    <button type="button" class="btn btn-ghost close-freqtype-modal" th:text="#{general.cancel}">Abbrechen</button>
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+                <div class="form-group">
+                    <label th:text="#{admin.job_type.description}">Beschreibung</label>
+                    <textarea name="description" id="ft-desc" rows="3" th:text="*{description}"></textarea>
+                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
                 </div>
+                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
             </form>
         </div>
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
-        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
-            <div class="krt-modal-head">
-                <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
-                <button type="button" class="krt-modal-close close-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-            </div>
-            <div class="krt-modal-body">
-                <p th:text="#{info.delete.confirm.message}" class="m-0">Wirklich löschen?</p>
-            </div>
-            <div class="krt-modal-foot">
+    <div id="delete-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
+        <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
+            <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+            <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
+            <div class="flex-center-gap">
                 <button type="button" class="btn btn-ghost close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="delete-confirm-form" th:action="@{/admin/mission-data}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>

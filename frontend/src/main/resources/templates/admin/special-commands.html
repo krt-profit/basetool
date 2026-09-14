@@ -136,35 +136,28 @@
 </main>
 
 <!-- SpecialCommand Modal (create + edit, action URL toggled by JS) -->
-<div id="specialcommand-modal" class="krt-modal-overlay" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.create}">
-        <div class="krt-modal-head">
-            <h2 id="sc-modal-title" th:text="#{admin.specialcommands.create}">Spezialkommando</h2>
-            <button type="button" class="krt-modal-close close-sc-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="specialcommand-modal" class="modal" th:classappend="${openModal == 'specialcommand-modal'} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <div class="modal-content hud-box">
+        <span class="close-sc-modal close-modal">&times;</span>
+        <h2 id="sc-modal-title" th:text="#{admin.specialcommands.create}">Spezialkommando</h2>
         <form id="sc-form" method="post" th:action="${modalAction != null and openModal == 'specialcommand-modal'} ? ${modalAction} : @{/admin/special-commands}" th:object="${specialCommandForm}">
             <input type="hidden" name="version" id="edit-sc-version" th:value="*{version}">
-            <div class="krt-modal-body">
-                <div class="form-group">
-                    <label th:text="#{admin.specialcommands.column.name}">Name</label>
-                    <input type="text" name="name" id="sc-name" th:value="*{name}" required>
-                    <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
-                </div>
-                <div class="form-group">
-                    <label th:text="#{admin.specialcommands.column.shorthand}">Kürzel</label>
-                    <input type="text" name="shorthand" id="sc-shorthand" th:value="*{shorthand}" required>
-                    <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
-                </div>
-                <div class="form-group">
-                    <label th:text="#{admin.specialcommands.column.description}">Beschreibung</label>
-                    <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
-                    <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
-                </div>
+            <div class="form-group">
+                <label th:text="#{admin.specialcommands.column.name}">Name</label>
+                <input type="text" name="name" id="sc-name" th:value="*{name}" required>
+                <div th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="field-error"></div>
             </div>
-            <div class="krt-modal-foot">
-                <button type="button" class="btn btn-ghost close-sc-modal" th:text="#{general.cancel}">Abbrechen</button>
-                <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
+            <div class="form-group">
+                <label th:text="#{admin.specialcommands.column.shorthand}">Kürzel</label>
+                <input type="text" name="shorthand" id="sc-shorthand" th:value="*{shorthand}" required>
+                <div th:if="${#fields.hasErrors('shorthand')}" th:errors="*{shorthand}" class="field-error"></div>
             </div>
+            <div class="form-group">
+                <label th:text="#{admin.specialcommands.column.description}">Beschreibung</label>
+                <textarea name="description" id="sc-desc" rows="3" th:text="*{description}"></textarea>
+                <div th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="field-error"></div>
+            </div>
+            <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{members.save}">Speichern</span></button>
         </form>
     </div>
 </div>
@@ -172,17 +165,12 @@
 <!-- Delete confirmation modal — the per-row trash button is a soft-delete (deactivate, reversible
      via "Aktivieren"); the form action is set to the clicked SK's delete URL by the script below.
      No native confirm() per the design system's "no native browser dialogs" rule. -->
-<div id="sc-delete-modal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
-            <button type="button" class="krt-modal-close close-sc-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
-            <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
-            <p class="m-0"><strong id="sc-delete-name" class="krtm-color-var-color-primary-473b"></strong></p>
-        </div>
-        <div class="krt-modal-foot">
+<div id="sc-delete-modal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
+        <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
+        <p th:text="#{admin.specialcommands.delete.confirm}" class="mb-2">Möchten Sie dieses Spezialkommando wirklich löschen?</p>
+        <p class="mb-2"><strong id="sc-delete-name" class="krtm-color-var-color-primary-473b"></strong></p>
+        <div class="flex-center-gap">
             <button type="button" class="btn btn-ghost close-sc-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
             <form id="sc-delete-form" th:action="@{/admin/special-commands}" method="post" class="m-0">
                 <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>

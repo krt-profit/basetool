@@ -65,15 +65,15 @@
             border-radius: var(--radius-none);
             vertical-align: middle;
         }
-        .krt-modal-create-material {
+        .modal-box-create-material {
             max-width: 640px;
         }
-        .krt-modal-create-material .form-checkboxes {
+        .modal-box-create-material .form-checkboxes {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 0.5rem;
         }
-        .krt-modal-create-material .form-checkboxes label {
+        .modal-box-create-material .form-checkboxes label {
             display: flex;
             align-items: center;
             gap: 0.4rem;
@@ -85,7 +85,7 @@
             min-height: 44px;
         }
         @media (width <= 768px) {
-            .krt-modal-create-material .form-checkboxes {
+            .modal-box-create-material .form-checkboxes {
                 grid-template-columns: 1fr;
             }
         }
@@ -253,14 +253,9 @@
 </main>
 
 <!-- Create Material Modal -->
-<div id="modal-create-material" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
-    <div class="krt-modal krt-modal--wide krt-modal-create-material">
-        <div class="krt-modal-head">
-            <h2 id="modal-create-material-title" th:text="#{admin.materials.create.modal.title}">Neues Material anlegen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="materials-close-create-modal"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="modal-create-material" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-create-material-title">
+    <div class="modal-box modal-box-create-material">
+        <div id="modal-create-material-title" class="modal-title" th:text="#{admin.materials.create.modal.title}">Neues Material anlegen</div>
         <p class="form-hint krtm-margin-bottom-1rem-c2c0" th:text="#{admin.materials.create.modal.intro}">Für Materialien, die noch nicht in UEX vorhanden sind.</p>
 
         <div class="form-group">
@@ -321,8 +316,7 @@
             </div>
         </div>
 
-        </div>
-        <div class="krt-modal-foot">
+        <div class="modal-actions">
             <button type="button" class="btn btn-ghost" data-trigger="materials-close-create-modal" th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" data-trigger="materials-submit-create" th:text="#{admin.materials.create.submit}">Anlegen</button>
         </div>

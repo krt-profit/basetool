@@ -578,15 +578,11 @@
     </div>
 </main>
 
-<div id="bookOutModal" class="krt-modal-overlay" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bookout.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-my-close-bookout"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="bookOutModal" class="modal" th:classappend="${showBookOutModal != null} ? 'krtm-modal-open' : 'krtm-hidden'">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-bookout"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.bookout.title}">Eintrag ausbuchen</h2>
         <form id="bookOutForm" th:action="@{/inventory/{id}/book-out(id=${showBookOutModal != null ? showBookOutModal : ''})}" method="post" th:object="${inventoryBookOutForm}">
-            <div class="krt-modal-body">
             <div th:if="${#fields.hasErrors('*')}" class="hud-box hud-box-error">
                 <ul class="text-danger">
                     <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Fehler</li>
@@ -652,8 +648,8 @@
                 <p class="herkunft-help" th:text="#{inventory.herkunft.help}">Auswahl der Herkunft</p>
                 <div class="herkunft-body" data-herkunft-body></div>
             </div>
-            </div>
-            <div class="krt-modal-foot">
+
+            <div class="mt-2-flex-gap">
                 <button type="submit" id="bookOutSubmitBtn" class="btn btn--cta"
                         th:data-text-discard="#{inventory.bookout.btn.discard}"
                         th:data-text-sell="#{inventory.bookout.btn.sell}"
@@ -670,15 +666,11 @@
      PERSONAL mode is inferred from the source row's personal flag. All inputs are plain (no
      th:field) with umbuchen-prefixed ids so they never collide with the Ausbuchen modal; the write
      is JS-driven through krtFetch. -->
-<div id="umbuchenModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.rebook.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.rebook.title}">Umbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-my-close-umbuchen"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
+<div id="umbuchenModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-umbuchen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.rebook.title}">Umbuchen</h2>
         <form id="umbuchenForm">
-            <div class="krt-modal-body">
             <input type="hidden" id="umbuchenVersion">
             <input type="hidden" id="umbuchenMaxAmount">
             <input type="hidden" id="umbuchenSourcePersonal">
@@ -762,8 +754,8 @@
                     <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
                 </div>
             </div>
-            </div>
-            <div class="krt-modal-foot">
+
+            <div class="mt-2-flex-gap">
                 <button type="submit" id="umbuchenSubmitBtn" class="btn btn--cta" th:text="#{inventory.rebook.submit}">Umbuchen</button>
                 <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-umbuchen" th:text="#{inventory.rebook.cancel}">Abbrechen</button>
             </div>
@@ -771,14 +763,10 @@
     </div>
 </div>
 
-<div id="noteModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.note.label}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.note.label}">Notiz</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-my-close-note"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="noteModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.note.label}">Notiz</h2>
         <div class="form-group mb-1">
             <label for="noteModalTextarea" class="form-label" th:text="#{inventory.note.label}">Notiz</label>
             <textarea id="noteModalTextarea" maxlength="1000" rows="6"
@@ -787,8 +775,7 @@
                       class="w-full"></textarea>
             <div id="noteModalCounter" class="krtm-text-align-right-color-var-color-gray-2-font-6d96">0 / 1000</div>
         </div>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="krtm-margin-top-1-5rem-display-flex-gap-1rem-flex-767d">
             <button type="button" class="btn btn--cta" data-trigger="inv-my-save-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{inventory.note.save}">Speichern</span></button>
             <button type="button" class="btn btn-quiet-danger" data-trigger="inv-my-remove-note"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg> <span th:text="#{inventory.note.remove}">Entfernen</span></button>
             <button type="button" class="btn btn-ghost krtm-min-height-44px-margin-left-auto-85bf" data-trigger="inv-my-close-note" th:text="#{inventory.note.cancel}">Abbrechen</button>
@@ -796,17 +783,12 @@
     </div>
 </div>
 
-<div id="bulkCheckoutModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bulk.checkout.modal.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.bulk.checkout.modal.title}">Massenausbuchung bestätigen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-my-close-bulk"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <div class="krt-modal-body">
+<div id="bulkCheckoutModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-bulk"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.bulk.checkout.modal.title}">Massenausbuchung bestätigen</h2>
         <p id="bulkCheckoutModalMessage" class="krtm-color-var-color-gray-1-font-family-lato-sans-e55d"></p>
-        </div>
-        <div class="krt-modal-foot">
+        <div class="krtm-display-flex-gap-1rem-flex-wrap-wrap-9acc">
             <button type="button" class="btn btn--cta" data-trigger="inv-my-execute-bulk"
                     th:text="#{inventory.bulk.checkout.modal.confirm}">Ausbuchen</button>
             <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bulk"
@@ -821,16 +803,12 @@
      and the two personal directions are OWN radio options instead of one direction inferred from the
      source row — a bulk selection can mix personal and shared stock, so the target state is stated
      explicitly and rows already in it are skipped server-side. -->
-<div id="bulkRebookModal" class="krt-modal-overlay">
-    <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{inventory.bulk.rebook.modal.title}">
-        <div class="krt-modal-head">
-            <h2 th:text="#{inventory.bulk.rebook.modal.title}">Markierte umbuchen</h2>
-            <button type="button" class="krt-modal-close" data-trigger="inv-my-close-bulk-rebook"
-                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
-        </div>
-        <form id="bulkRebookForm">
-        <div class="krt-modal-body">
+<div id="bulkRebookModal" class="modal krtm-display-none-5790">
+    <div class="modal-content hud-box">
+        <span class="close" data-trigger="inv-my-close-bulk-rebook"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-close"/></svg></span>
+        <h2 class="mt-0" th:text="#{inventory.bulk.rebook.modal.title}">Markierte umbuchen</h2>
         <p id="bulkRebookModalMessage" class="krtm-color-var-color-gray-1-font-family-lato-sans-e55d"></p>
+        <form id="bulkRebookForm">
             <div class="form-group mb-1">
                 <label class="form-label" th:text="#{inventory.rebook.mode}">Umbuchungsart</label>
                 <div class="krtm-display-flex-gap-1-5rem-flex-wrap-wrap-82c0">
@@ -885,11 +863,11 @@
                     <p class="form-hint" th:text="#{inventory.merge.help}">Fügt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen. Gilt nur für diese Buchung.</p>
                 </div>
             </div>
-        </div>
-        <div class="krt-modal-foot">
-            <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bulk-rebook" th:text="#{inventory.bulk.rebook.modal.cancel}">Abbrechen</button>
-            <button type="submit" id="bulkRebookSubmitBtn" class="btn btn--cta" th:text="#{inventory.bulk.rebook.modal.confirm}">Umbuchen</button>
-        </div>
+
+            <div class="mt-2-flex-gap">
+                <button type="submit" id="bulkRebookSubmitBtn" class="btn btn--cta" th:text="#{inventory.bulk.rebook.modal.confirm}">Umbuchen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-bulk-rebook" th:text="#{inventory.bulk.rebook.modal.cancel}">Abbrechen</button>
+            </div>
         </form>
     </div>
 </div>

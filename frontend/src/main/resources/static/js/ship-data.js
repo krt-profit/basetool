@@ -92,7 +92,7 @@ window.filterTable = filterTable;
 window.openModal = openModal;
 
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.krt-modal-overlay').forEach((m) => {
+    document.querySelectorAll('.modal').forEach((m) => {
         m.addEventListener('click', function (e) {
             if (e.target === this) {
                 this.style.display = 'none';
