@@ -158,19 +158,26 @@
 </main>
 
 <!-- Add-Member Modal -->
-<div id="add-member-modal" class="modal krtm-display-none-5790">
-    <div class="modal-content hud-box">
-        <span class="close-add-member-modal close-modal">&times;</span>
-        <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>
+<div id="add-member-modal" class="krt-modal-overlay">
+    <div class="krt-modal" role="dialog" aria-modal="true" th:aria-label="#{admin.specialcommands.members.add}">
+        <div class="krt-modal-head">
+            <h2 th:text="#{admin.specialcommands.members.add}">Mitglied hinzufügen</h2>
+            <button type="button" class="krt-modal-close close-add-member-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+        </div>
         <form th:action="@{/admin/special-commands/{id}/members(id=${specialCommand.id()})}" method="post">
-            <div class="form-group">
-                <label for="add-member-userid" th:text="#{admin.specialcommands.members.user_picker}">Nutzer</label>
-                <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
-                <select id="add-member-userid" name="userId" required data-krt-combobox="remote-users">
-                    <option value="" th:text="#{admin.specialcommands.members.user_picker.placeholder}">-- Bitte wählen --</option>
-                </select>
+            <div class="krt-modal-body">
+                <div class="form-group">
+                    <label for="add-member-userid" th:text="#{admin.specialcommands.members.user_picker}">Nutzer</label>
+                    <!-- Server-side searchable combobox (remote-users, #1193): roster is searched on demand, not preloaded. -->
+                    <select id="add-member-userid" name="userId" required data-krt-combobox="remote-users">
+                        <option value="" th:text="#{admin.specialcommands.members.user_picker.placeholder}">-- Bitte wählen --</option>
+                    </select>
+                </div>
             </div>
-            <button type="submit" class="btn btn--cta" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost close-add-member-modal" th:text="#{general.cancel}">Abbrechen</button>
+                <button type="submit" class="btn btn--cta" th:text="#{admin.specialcommands.members.add.submit}">Hinzufügen</button>
+            </div>
         </form>
     </div>
 </div>

@@ -132,12 +132,18 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="purge-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
-        <div class="modal-content hud-box krtm-max-width-520px-text-align-center-b4d9">
-            <h2 th:text="#{admin.syncReports.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
-            <p id="purge-confirm-message" class="mb-2"
-               th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
-            <div class="flex-center-gap">
+    <div id="purge-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{admin.syncReports.delete.confirm.title}">
+            <div class="krt-modal-head">
+                <h2 th:text="#{admin.syncReports.delete.confirm.title}">Löschen bestätigen</h2>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="purge-confirm-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+            </div>
+            <div class="krt-modal-body">
+                <p id="purge-confirm-message" class="m-0"
+                   th:data-template="#{admin.syncReports.delete.confirm.message}">Wirklich löschen?</p>
+            </div>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost" id="purge-cancel"
                         th:text="#{general.cancel}">Abbrechen</button>
                 <button type="button" class="btn btn-danger" id="purge-confirm"

@@ -480,7 +480,7 @@
             <div class="krt-modal-head">
                 <h3 th:text="#{bank.modal.statement.title}">Kontoauszug exportieren</h3>
                 <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
-                        data-modal-id="org-unit-statement-modal" th:aria-label="#{bank.a11y.closeModal}">&#10005;</button>
+                        data-modal-id="org-unit-statement-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
             </div>
             <form class="bank-download-form no-track"
                   th:attr="data-endpoint='/api/proxy/org-units/bank/accounts/' + ${acct.id()} + '/statement',data-filename='kontoauszug-' + ${acct.accountNo()} + '.pdf',data-period-required=#{bank.error.periodRequired}">

@@ -41,11 +41,20 @@ function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
 }
 
+// The dialogs moved from the legacy `.modal-overlay`/`.modal-box` shape (opened
+// by an `active` class) onto the canonical `.krt-modal-overlay` shell, whose
+// hidden default lives in styles.css. Visibility therefore rides the shared
+// krtm-modal-open / krtm-hidden pair (inline-migration.css, loaded last) that
+// the rest of the app already uses -- `active` styles nothing any more.
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    const el = document.getElementById(id);
+    el.classList.remove('krtm-modal-open');
+    el.classList.add('krtm-hidden');
 }
 function openModal(id) {
-    document.getElementById(id).classList.add('active');
+    const el = document.getElementById(id);
+    el.classList.add('krtm-modal-open');
+    el.classList.remove('krtm-hidden');
 }
 
 // CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag

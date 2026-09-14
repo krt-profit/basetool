@@ -372,7 +372,10 @@ tr.is-inert td {
     border-bottom: var(--border-hairline);
 }
 
-.krt-modal-head h2 {
+/* Mirrors styles.css: the shell's title is an <h2> hand-written and an <h3>
+   from `modal-wrapper :: modal(...)`, so both carry the head style. */
+.krt-modal-head h2,
+.krt-modal-head h3 {
     font-family: var(--font-headline);
     font-weight: var(--fw-bold);
     font-size: 0.85rem;
@@ -382,7 +385,8 @@ tr.is-inert td {
     margin: 0;
 }
 
-.krt-modal--danger .krt-modal-head h2 {
+.krt-modal--danger .krt-modal-head h2,
+.krt-modal--danger .krt-modal-head h3 {
     color: var(--color-danger-text);
 }
 
