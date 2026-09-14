@@ -1710,7 +1710,7 @@ services:
   # ===========================================================================
   edge:
     profiles: ["prod"]
-    image: nginxinc/nginx-unprivileged:1.29.5-alpine@sha256:42a7d7f2ee23e9f5a1dcdf3647ba5c585bbd18f79e79cd817e70e8cd61c55779
+    image: nginxinc/nginx-unprivileged:1.31.5-alpine@sha256:19c132c9ab02d3b783f478743dafc7a7f42e27aa7d2bdcbec1bb1128ca8f2a07
     container_name: edge
     restart: unless-stopped
     logging: *default-logging
