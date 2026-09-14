@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- **Im Lager rutschten die aufgeklappten Einträge aus dem Bild, sobald man nach rechts scrollte.**
+  Auf dem Handy ist die Lager-Tabelle breiter als der Bildschirm und wird seitlich gescrollt — die
+  Eintragszeilen mit Auftrag, Einsatz, Lagerplatz und den Knöpfen liefen dabei aber nur über die
+  Bildschirmbreite und blieben links liegen, während rechts neben ihnen nichts stand. Sie füllen
+  jetzt dieselbe Breite wie die übrigen Zeilen, und ihre Knöpfe stehen unter „Aktion".
+
+### Fixed
+
 - **Nach der Umstellung der Anmeldeadresse zeigte die Seite einen Fehler statt der Anmeldung.** Wer
   vor der Umstellung angemeldet war, bekam beim nächsten Aufruf einen Serverfehler und kam nur
   weiter, indem er die Website-Daten im Browser löschte — von selbst wäre der Zustand 30 Tage

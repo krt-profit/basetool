@@ -579,7 +579,29 @@ tbody tr:nth-child(even):hover {
  * (das-kartell-design/krt-components.css -> .tree-table); see its README
  * "Tree table (nested data)" + proposals/inventory-table-readability.html.
  */
+/* Sized to the WIDEST row, never narrower than the scroll container.
+ *
+ * Without this the element is an ordinary block and takes the scroller's
+ * content width — the viewport on a phone. The head/group/mid rows are grids
+ * whose --tree-cols minimums add up to ~844px, so they overflow it and are what
+ * produces the horizontal scrollbar; but the leaf rows collapse to `1fr auto`
+ * below 1024px (see the media query further down) and therefore have no minimum
+ * at all. They stayed at the viewport width, pinned to the left of an 844px
+ * scroll area: scrolling right to read Menge/Aktion moved every expanded entry
+ * out of the frame and left dead space beside it. Reported from a phone on
+ * 2026-09-14.
+ *
+ * `max-content` makes the table as wide as its widest row, so a collapsed leaf's
+ * `1fr` resolves against that same width and its amount and actions land under
+ * the columns they belong to; `min-width: 100%` keeps it filling the container
+ * when the rows happen to be narrower. This restores the invariant this block
+ * comment already claims — "every row ... sharing one column template so values
+ * stay aligned across depths" — which the mobile leaf collapse had quietly
+ * broken for the one row type that carries the actions.
+ */
 .tree-table {
+    width: max-content;
+    min-width: 100%;
     border: var(--border-hairline);
     background-color: var(--color-bg-dark-gray);
 }
