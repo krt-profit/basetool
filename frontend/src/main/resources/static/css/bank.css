@@ -41,11 +41,26 @@
 
 .bank-acc-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+
+    /*
+     * `minmax(0, 1fr)`, not `1fr` — the same reason `.bank-detail-panels` further down states it.
+     *
+     * `1fr` is `minmax(auto, 1fr)`, and `auto` resolves to the item's MIN-CONTENT width, so a card
+     * that cannot shrink pushes its own track past the container and the PAGE scrolls sideways
+     * instead of the card adapting. On the phone class a seeded account name took /bank to a 408px
+     * document in a 375px viewport and /org-unit-bank to 445px.
+     *
+     * The track is only the first of three links: the card must be allowed to shrink as well
+     * (`min-width: 0` below), and so must the row inside it that sits beside the fixed-width
+     * sparkline. Fixing only the track moves the overflow one level down.
+     */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
 }
 
 .kpi-card {
+    /* Link 2 of the chain above: a grid item's automatic minimum size is its min-content. */
+    min-width: 0;
     background: var(--color-bg-dark-gray);
     border: var(--border-hairline);
     padding: 12px 14px;
@@ -71,6 +86,9 @@
     font-weight: var(--fw-bold);
     color: var(--color-white);
     font-size: 0.85rem;
+
+    /* A long account name is otherwise one unbreakable run holding the row open. */
+    overflow-wrap: anywhere;
 }
 
 .kpi-card .kpi-sub {
@@ -88,6 +106,14 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
+
+    /* Link 3: the title block is a flex item beside a fixed-width sparkline, and flex items carry
+       the same automatic minimum size as grid items. */
+    min-width: 0;
+}
+
+.kpi-card-top > * {
+    min-width: 0;
 }
 
 .kpi-card-foot {
@@ -364,13 +390,13 @@ tr.is-inert td {
     padding: 14px 16px;
 }
 
-.krt-modal-foot {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 16px;
-    border-top: var(--border-hairline);
-}
+/* `.krt-modal-foot` is NOT redeclared here any more.
+ *
+ * This file loads after styles.css, so a copy of the selector wins every property it names — and
+ * the copy named six of the canonical rule's seven, silently dropping `flex-shrink: 0`. A tall bank
+ * modal's button row could therefore be squeezed while every other modal's could not. Deleting the
+ * copy gives the bank pages the canonical rule, wrap included, and ends the obligation to keep two
+ * declarations of one thing in step. */
 
 .krt-modal .confirm-input {
     width: 100%;
@@ -809,12 +835,6 @@ tr.is-inert td {
     margin-bottom: 12px;
 }
 
-.bank-filterbar .bank-filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
 .bank-filterbar label {
     font-size: 0.6rem;
     text-transform: uppercase;
@@ -856,11 +876,45 @@ tr.is-inert td {
 /* ---- Responsive: tablet and smartphone device classes ---- */
 @media (width <= 1024px) {
     .bank-acc-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .bank-cols {
         grid-template-columns: 1fr;
+    }
+
+    /*
+     * The two in-row controls of the bank tables, raised to REQ-UI-009's dense
+     * floor on the touch classes (measured by TouchClassLayoutE2eTest on seeded
+     * data, 2026-09-13: the grant flags 18px, the booking chevron 15px).
+     *
+     * They take `--touch-target-dense` (32px) and not the full 44px because both
+     * are REPEATED DENSE IN-ROW controls, which is precisely the exception
+     * REQ-UI-009 writes down — the same class of control as `.btn-xs`,
+     * `.btn-icon` and `.master-row`. 44px would be the wrong trade here in a
+     * concrete way: the grants matrix puts its three flags side by side per row,
+     * so a 44px cell either widens the table by a third or, if the hit area were
+     * faked with a transparent overlay instead, the overlay of one flag would
+     * reach over its neighbours and a mis-tap would grant the wrong banking
+     * right. 32px keeps every flag's target its own, and still clears WCAG 2.5.8
+     * AA's 24px — which 15px and 18px did not.
+     *
+     * The chevron grows the booking row with it, which on a phone is an
+     * improvement rather than a cost.
+     */
+    .matrix-flag {
+        width: var(--touch-target-dense);
+        height: var(--touch-target-dense);
+        /* `min-height`, not only `height`: styles.css puts the 44px floor on every `button` by
+           default now (ADR-0176), and a min-height clamps a height regardless of specificity —
+           different properties never compete. Declaring the dense token is what opts this flag
+           out, and it is also what puts it in TouchClassLayoutE2eTest's CSSOM-derived dense set. */
+        min-height: var(--touch-target-dense);
+    }
+
+    .bank-row-toggle {
+        min-width: var(--touch-target-dense);
+        min-height: var(--touch-target-dense);
     }
 }
 
@@ -870,7 +924,7 @@ tr.is-inert td {
     }
 
     .bank-acc-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .bank-form-row {
@@ -884,7 +938,7 @@ tr.is-inert td {
 
 @media (width >= 1600px) {
     .bank-acc-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
 
@@ -1126,6 +1180,8 @@ tr.is-inert td {
    name and the "Details" action are the click targets — so it carries no pointer cursor, only the
    same hover-border affordance. */
 .ou-card {
+    /* Same three-link chain as `.kpi-card` above — this card shares `.bank-acc-grid`. */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1144,6 +1200,11 @@ tr.is-inert td {
     justify-content: space-between;
     align-items: flex-start;
     gap: 10px;
+    min-width: 0;
+}
+
+.ou-card-top > * {
+    min-width: 0;
 }
 
 .ou-card-name {
@@ -1151,6 +1212,9 @@ tr.is-inert td {
     color: var(--color-white);
     font-size: 0.95rem;
     text-decoration: none;
+
+    /* As `.kpi-title` above. */
+    overflow-wrap: anywhere;
 }
 
 .ou-card-name:hover {
@@ -1388,7 +1452,7 @@ tr.is-inert td {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 32px;
+    min-height: var(--touch-target-dense);
     padding: 0 0.75rem;
     font-size: 0.75rem;
     color: var(--color-gray-1);

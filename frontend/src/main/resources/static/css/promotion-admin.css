@@ -197,6 +197,30 @@
     line-height: 1;
 }
 
+/*
+ * Touch classes: the dense floor, not the full 44px.
+ *
+ * 1.8rem x 1.1rem is 28.8 x 17.6px, which is under WCAG 2.5.8 AA's 24px minimum and not merely
+ * under this design system's — rendered four times on /promotion/admin/topics, a swept route. It
+ * is the same control shape as `.demand-sort-btn`, and a repeated dense in-row control like
+ * `.matrix-flag` and `.bank-row-toggle`, so it takes `--touch-target-dense` (32px): two stacked
+ * 44px buttons would be an 88px column in a table cell.
+ *
+ * The sweep did not find it because promotion-admin-topics.html:157 gates the sort controls behind
+ * `th:if="${#lists.size(topics) gt 1}"` — an under-seeded stack hides them. It is declared here
+ * rather than in styles.css because `.pa-sort-controls .pa-sort-btn` is two classes and this file
+ * loads after styles.css.
+ *
+ * No list to keep in step: TouchClassLayoutE2eTest's `floorFor()` reads the dense set out of
+ * the CSSOM, so declaring the token here is what grants the exemption.
+ */
+@media (width <= 1024px) {
+    .pa-sort-controls .pa-sort-btn {
+        min-height: var(--touch-target-dense);
+        height: var(--touch-target-dense);
+    }
+}
+
 .pa-sort-controls .pa-sort-btn:hover:not(:disabled) {
     border-color: var(--color-primary);
     color: var(--color-primary);

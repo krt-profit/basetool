@@ -25,7 +25,7 @@ split is what lets the backend stay unchanged.
 Run it against a **test** realm — it performs a real login and needs a password:
 
     python scripts/verify-dpop-binding.py \\
-        --issuer http://127.0.0.1:18080/realms/iri \\
+        --issuer http://127.0.0.1:18080/auth/realms/iri \\
         --username test-member --password test-member-pw
 
 Exit code 0 when all measurements match, 1 otherwise, so it can gate a release once the client is
@@ -193,7 +193,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--issuer", required=True,
-                        help="realm base URL, e.g. http://127.0.0.1:18080/realms/iri")
+                        help="realm base URL, e.g. http://127.0.0.1:18080/auth/realms/iri")
     parser.add_argument("--client-id", default="basetool-android")
     parser.add_argument("--redirect-uri", default="http://127.0.0.1/callback",
                         help="must be registered on the client; the response is read, never followed")

@@ -91,8 +91,17 @@ class AnonymousSurfaceSweepMvcTest {
    * and the login callback opened in the browser instead of the app — the member landed on the 404
    * page mid-login. Asked for as HTML it answers {@code 500}, which is why it is swept in the
    * background shape only.
+   *
+   * <p>The web app manifest is here for the same reason (REQ-UI-020, ADR-0164): a browser reads it
+   * on the landing page with no session, and a {@code 302} would make the installed app's name and
+   * icon come from the login page. <strong>Listing it is not a formality.</strong> Until it was
+   * added, the sweep did issue it — and passed only because the mapping's {@code produces} made
+   * both sweep shapes fail content negotiation, so a status that meant "I could not represent this"
+   * was read as "the gate refused you". A path can be enumerated by this sweep and still have no
+   * coverage at all; the entry is what turns that into a real assertion.
    */
-  private static final Set<String> PUBLIC_RESOURCES = Set.of("/.well-known/assetlinks.json");
+  private static final Set<String> PUBLIC_RESOURCES =
+      Set.of("/.well-known/assetlinks.json", "/manifest.webmanifest");
 
   /**
    * <b>The enumeration below is duplicated in the sibling sweep of the other module</b> ({@code
@@ -202,6 +211,35 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       if (PUBLIC_RESOURCES.contains(call.path())) {
+        // An ASSERTION, not a skip — which is what this set's own Javadoc, SecurityConfig:249 and
+        // WebAppManifestController all say it is. It was a bare `continue`, so adding a path here
+        // REMOVED it from the sweep instead of covering it, and the `permitAll` entry those
+        // comments
+        // point at could have been deleted with every test still green.
+        //
+        // Asked for with `*/*` rather than `text/html`, which is why it could not simply go through
+        // `issue()`: both of these mappings declare `produces`, so an HTML Accept header fails
+        // content negotiation and returns a status that means "I cannot represent this" — read, in
+        // the shape this sweep uses, as "the gate refused you". `*/*` matches any `produces`, so a
+        // 200 here means served, and a 3xx means the gate redirected a resource that must never
+        // redirect.
+        int rendered =
+            mockMvc
+                .perform(
+                    MockMvcRequestBuilders.request(call.method(), call.path())
+                        .accept(MediaType.ALL)
+                        .with(csrf()))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+        if (rendered != 200) {
+          served.add(
+              call
+                  + " -> "
+                  + rendered
+                  + " (a REQ-SEC-052 public resource must be served anonymously, never"
+                  + " redirected)");
+        }
         continue;
       }
       if (PUBLIC_PAGES.contains(call.path())) {
@@ -274,6 +312,11 @@ class AnonymousSurfaceSweepMvcTest {
     for (Call call : allCalls()) {
       if (call.method() == HttpMethod.GET
           && (PUBLIC_PAGES.contains(call.path()) || PUBLIC_RESOURCES.contains(call.path()))) {
+        // A genuine exclusion here, unlike the one in `navigationIsSentToTheLogin` above: this test
+        // asserts that a background call is REFUSED, and a public path is the one kind that must
+        // not
+        // be. That it is served anonymously is asserted there, so the entry is covered once rather
+        // than nowhere.
         continue;
       }
       int status = issue(call, MediaType.APPLICATION_JSON);

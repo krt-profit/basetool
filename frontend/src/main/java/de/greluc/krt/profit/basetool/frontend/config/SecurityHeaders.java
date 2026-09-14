@@ -139,12 +139,18 @@ public final class SecurityHeaders {
   /**
    * Builds the per-request CSP header writer. The nonce is substituted per request; the {@code
    * form-action} source list is computed once here (this method runs a single time while the filter
-   * chain is assembled). {@code 'self'} covers every same-origin form in the app. The Keycloak
-   * origin is appended because exactly one form submits cross-origin: the POST {@code /logout},
-   * whose success redirect targets Keycloak's {@code end_session_endpoint}. Without the Keycloak
-   * origin in {@code form-action}, Chromium blocks that redirect — the local Spring session is
-   * cleared but the Keycloak SSO session survives, so the next login silently re-authenticates
-   * instead of prompting for credentials.
+   * chain is assembled). {@code 'self'} covers every same-origin form in the app, and the
+   * configured Keycloak origin is appended to it.
+   *
+   * <p>Since ADR-0166 that appended origin is normally the app's own: Keycloak serves at {@code
+   * /auth} on this host, so the POST {@code /logout} whose success redirect targets the {@code
+   * end_session_endpoint} no longer leaves the origin, and the directive collapses to the
+   * equivalent of {@code 'self'}. The derivation is kept rather than hardcoded for the reason it
+   * was written this way in the first place: it states the RULE — the end-session endpoint's origin
+   * must be a permitted form target — so a deployment configuring an issuer elsewhere stays correct
+   * without an edit. Before that ADR the two really did differ, and without this entry Chromium
+   * blocked the redirect: the local Spring session was cleared but the Keycloak SSO session
+   * survived, so the next login silently re-authenticated instead of prompting.
    *
    * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
    *     origin

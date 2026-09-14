@@ -169,7 +169,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -218,7 +218,8 @@ scrape_configs:
       module: [http_deny_404]
     static_configs:
       - targets:
-          # The whole `/actuator` prefix is denied at the NPM edge (`location /actuator` → 404),
+          # The whole `/actuator` prefix is denied at the edge (`location /actuator` → 404,
+          # `docker/edge/conf.d/10-frontend.conf.template` since ADR-0162 replaced NPM),
           # so NEITHER the metrics endpoint NOR the health endpoint is internet-reachable. Both are
           # asserted per public host: `/actuator/prometheus` (the credentialed metrics surface) and
           # `/actuator/health` (liveness/readiness/build info — a passive info leak if it drifts
@@ -226,6 +227,15 @@ scrape_configs:
           # HEALTHCHECK over localhost, so neither needs any edge exposure (REQ-OBS-005/-012).
           - https://profit-base.online/actuator/prometheus
           - https://profit-base.online/actuator/health
+          # Keycloak's management surface, denied at the edge since ADR-0166 mounted identity on
+          # this host. They answer on the management port rather than the public one, so these
+          # denies are defence in depth — but `KC_HTTP_MANAGEMENT_RELATIVE_PATH` is what keeps them
+          # off the public connector, and if it is ever cleared, or either location is dropped or
+          # shadowed by a longer prefix, Keycloak's readiness detail and its full metric set (realm
+          # names, user and session counts, client ids) become internet-readable with nothing
+          # reporting it. A new public surface without a probe is incomplete (REQ-OBS-012).
+          - https://profit-base.online/auth/health
+          - https://profit-base.online/auth/metrics
           - https://ingest.profit-base.online/actuator/prometheus
           - https://ingest.profit-base.online/actuator/health
           # The backend's actuator already moved to the internal-only management port 11271
@@ -265,6 +275,38 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
+  # The public posture, asserted from outside — the inverse of blackbox-members-only and the half
+  # REQ-SEC-052 never had a probe for. Every path here is a deliberate permitAll entry that must
+  # answer 200 on the FIRST response; a 302 means it fell behind anyRequest().authenticated(), and
+  # http_2xx would have hidden exactly that by following the redirect to a Keycloak 200.
+  #
+  # The manifest is the one with a user-visible failure mode: a browser reads it before any login,
+  # so a redirect makes the installed app take its name and icon from the login page (REQ-UI-020,
+  # ADR-0164). assetlinks.json is the same trap on the Android side, and it is the one that has
+  # already sprung. ?locale=de is passed because the manifest keys its cache on it — probing the
+  # bare path would exercise a URL no page ever links.
+  - job_name: blackbox-public-surface
+    metrics_path: /probe
+    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    params:
+      module: [http_public_200_no_redirect]
+    static_configs:
+      - targets:
+          - https://profit-base.online/
+          - https://profit-base.online/impressum
+          - https://profit-base.online/privacy
+          - https://profit-base.online/terms
+          - https://profit-base.online/robots.txt
+          - https://profit-base.online/.well-known/assetlinks.json
+          - https://profit-base.online/manifest.webmanifest?locale=de
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
   - job_name: blackbox-force-ssl
     metrics_path: /probe
     scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
@@ -275,7 +317,6 @@ scrape_configs:
           - http://profit-base.online
           - http://ingest.profit-base.online
           - http://grafana.profit-base.online
-          - http://keycloak.profit-base.online
           # A native client that ever speaks plain HTTP to the API leaks its bearer token on the
           # first request, so the per-host Force-SSL toggle is not optional here — and it lives only
           # in the NPM admin DB, which is why it is probed.
@@ -367,7 +408,7 @@ scrape_configs:
       - targets:
           - https://profit-base.online
           - https://grafana.profit-base.online
-          - https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration
+          - https://profit-base.online/auth/realms/iri/.well-known/openid-configuration
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

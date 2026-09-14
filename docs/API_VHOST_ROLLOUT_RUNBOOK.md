@@ -68,7 +68,13 @@ it.
 
    then browse to `http://127.0.0.1:10081`.
 
-2. *Proxy Hosts → `keycloak.profit-base.online` → Edit → Custom locations → `/admin` → Advanced.*
+2. **Since ADR-0166 this step is `docker/edge/conf.d/10-frontend.conf.template`, `location ^~
+   /auth/admin`** — the console moved onto the web host with identity and NPM was replaced by
+   native nginx (ADR-0162), so the allow-list is a file in git rather than a form. Add the gateway
+   there and redeploy the edge. The historical click-path is kept below because the *reasoning*
+   about which gateways to allow is unchanged.
+
+   *Proxy Hosts → `keycloak.profit-base.online` → Edit → Custom locations → `/admin` → Advanced.*
    Add the new gateway to the existing list:
 
    ```nginx
@@ -83,7 +89,7 @@ it.
    are safe: no external client can present a `172.28.x` source over a completed TCP handshake, and
    NPM matches on `$remote_addr`, never on a client-supplied `X-Forwarded-For`.
 
-3. Save, then reload `https://keycloak.profit-base.online/admin` through the 443 tunnel and confirm
+3. Save, then reload `https://profit-base.online/auth/admin` through the 443 tunnel and confirm
    the console still loads. A `403` here means the edit did not save — fix it now, while the old
    gateway is still the one in use.
 
@@ -1187,7 +1193,7 @@ REQ-SEC-023 already applies to this host, keyed per IPv4 address and per IPv6 `/
 
 ### D.4 The Keycloak token endpoint
 
-The app authenticates against `keycloak.profit-base.online`, which is now reachable by a wider
+The app authenticates against `profit-base.online/auth` (ADR-0166; it was `keycloak.profit-base.online`), which is now reachable by a wider
 audience than a browser on a desktop. Give the token endpoint its own, tighter budget on the
 **Keycloak** proxy host (*Custom locations → `/realms/iri/protocol/openid-connect/token` →
 Advanced*):

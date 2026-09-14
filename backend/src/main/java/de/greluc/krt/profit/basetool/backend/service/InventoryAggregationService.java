@@ -266,9 +266,9 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, Integer, List,
-   * List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
-   * personal-/non-personal-only narrowing).
+   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer,
+   * List, List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
+   * personal-/non-personal-only narrowing) and no location narrowing.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -286,7 +286,7 @@ public class InventoryAggregationService {
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
     return getMyAggregatedInventory(
-        userId, materialIds, minQuality, jobOrderIds, missionIds, false, false);
+        userId, materialIds, null, minQuality, jobOrderIds, missionIds, false, false);
   }
 
   /**
@@ -296,6 +296,8 @@ public class InventoryAggregationService {
    *
    * @param userId owner id
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter — the Lager location filter; an empty or
+   *     {@code null} list means "every location" (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -312,6 +314,7 @@ public class InventoryAggregationService {
       getMyAggregatedInventory(
           UUID userId,
           List<UUID> materialIds,
+          List<UUID> locationIds,
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds,
@@ -320,6 +323,7 @@ public class InventoryAggregationService {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
     List<InventoryStackAggregate> stacks =
@@ -327,6 +331,8 @@ public class InventoryAggregationService {
             user.getId(),
             hasMaterials,
             hasMaterials ? materialIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             minQuality,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
@@ -339,8 +345,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Convenience overload of {@link #getAllAggregatedInventory(List, Integer, List, List)} without
-   * job-order/mission filters.
+   * Convenience overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List)}
+   * without location, job-order and mission filters.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -348,7 +354,7 @@ public class InventoryAggregationService {
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(List<UUID> materialIds, Integer minQuality) {
-    return getAllAggregatedInventory(materialIds, minQuality, null, null);
+    return getAllAggregatedInventory(materialIds, null, minQuality, null, null);
   }
 
   /**
@@ -356,6 +362,8 @@ public class InventoryAggregationService {
    * #getMyAggregatedInventory} but scopes to all users (admin/logistician view).
    *
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter — the Lager location filter; an empty or
+   *     {@code null} list means "every location" (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -364,10 +372,12 @@ public class InventoryAggregationService {
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
       getAllAggregatedInventory(
           List<UUID> materialIds,
+          List<UUID> locationIds,
           Integer minQuality,
           List<UUID> jobOrderIds,
           List<UUID> missionIds) {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
@@ -375,6 +385,8 @@ public class InventoryAggregationService {
         inventoryItemRepository.findGlobalStacks(
             hasMaterials,
             hasMaterials ? materialIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             minQuality,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
@@ -388,16 +400,19 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, Integer, List, List, boolean,
-   * boolean)} — the {@code catalog=ITEM} variant of the "my inventory" {@code /grouped} view
-   * (REQ-INV-029): the caller's game-item stock rolled up GameItem → Stack over the quality-less
-   * item stack key. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}) plus the
-   * mutually exclusive {@code personalOnly} / {@code nonPersonalOnly} narrowing toggles; the
-   * quality floor and mission filter of the material variant do not exist for items (REQ-INV-031)
-   * and are rejected upstream by the controller.
+   * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
+   * boolean, boolean)} — the {@code catalog=ITEM} variant of the "my inventory" {@code /grouped}
+   * view (REQ-INV-029): the caller's game-item stock rolled up GameItem → Stack over the
+   * quality-less item stack key. Item filter surface only ({@code gameItemIds}, {@code
+   * locationIds}, {@code jobOrderIds}) plus the mutually exclusive {@code personalOnly} / {@code
+   * nonPersonalOnly} narrowing toggles; the quality floor and mission filter of the material
+   * variant do not exist for items (REQ-INV-031) and are rejected upstream by the controller. The
+   * location filter is catalog-agnostic — item stacks carry a location like material stacks do
+   * (REQ-INV-040).
    *
    * @param userId owner id
    * @param gameItemIds optional game-item filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
    * @param personalOnly when {@code true}, narrows to the caller's private stock rows
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
@@ -408,18 +423,22 @@ public class InventoryAggregationService {
       getMyAggregatedItemInventory(
           UUID userId,
           List<UUID> gameItemIds,
+          List<UUID> locationIds,
           List<UUID> jobOrderIds,
           boolean personalOnly,
           boolean nonPersonalOnly) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     List<InventoryItemStackAggregate> stacks =
         inventoryItemRepository.findUserItemStacks(
             user.getId(),
             hasGameItems,
             hasGameItems ? gameItemIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
             personalOnly,
@@ -428,8 +447,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Flat companion of {@link #getMyAggregatedInventory(UUID, List, Integer, List, List, boolean,
-   * boolean)} (REQ-INV-034): returns the ids of <em>every</em> material {@link
+   * Flat companion of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
+   * boolean, boolean)} (REQ-INV-034): returns the ids of <em>every</em> material {@link
    * de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches the
    * same "Mein Lager" material filter surface — across all stacks and unbounded by the lazy
    * per-stack pagination. Backs the frontend "Alle markieren" (select-all) so a bulk check-out can
@@ -441,6 +460,7 @@ public class InventoryAggregationService {
    *
    * @param userId owner id
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -452,6 +472,7 @@ public class InventoryAggregationService {
   public List<UUID> getMyEntryIds(
       UUID userId,
       List<UUID> materialIds,
+      List<UUID> locationIds,
       Integer minQuality,
       List<UUID> jobOrderIds,
       List<UUID> missionIds,
@@ -460,12 +481,15 @@ public class InventoryAggregationService {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
     return inventoryItemRepository.findUserEntryIds(
         user.getId(),
         hasMaterials,
         hasMaterials ? materialIds : null,
+        hasLocations,
+        hasLocations ? locationIds : null,
         minQuality,
         hasJobOrders,
         hasJobOrders ? jobOrderIds : null,
@@ -479,12 +503,13 @@ public class InventoryAggregationService {
    * Game-item companion of {@link #getMyEntryIds} (REQ-INV-034): returns the ids of every game-item
    * {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches
    * the {@code view=items} filter surface, so the "Alle markieren" select-all covers the whole
-   * filtered item tree. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}) plus
-   * the mutually exclusive personal toggles; no quality floor and no mission filter exist for items
-   * (REQ-INV-031). Owner-scoped from the JWT.
+   * filtered item tree. Item filter surface only ({@code gameItemIds}, {@code locationIds}, {@code
+   * jobOrderIds}) plus the mutually exclusive personal toggles; no quality floor and no mission
+   * filter exist for items (REQ-INV-031). Owner-scoped from the JWT.
    *
    * @param userId owner id
    * @param gameItemIds optional game-item filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
    * @param personalOnly when {@code true}, narrows to the caller's private stock rows
    * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
@@ -494,17 +519,21 @@ public class InventoryAggregationService {
   public List<UUID> getMyItemEntryIds(
       UUID userId,
       List<UUID> gameItemIds,
+      List<UUID> locationIds,
       List<UUID> jobOrderIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     return inventoryItemRepository.findUserItemEntryIds(
         user.getId(),
         hasGameItems,
         hasGameItems ? gameItemIds : null,
+        hasLocations,
+        hasLocations ? locationIds : null,
         hasJobOrders,
         hasJobOrders ? jobOrderIds : null,
         personalOnly,
@@ -512,24 +541,30 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllAggregatedInventory(List, Integer, List, List)} — the {@code
-   * catalog=ITEM} variant of the squadron-wide {@code /grouped} view (REQ-INV-029), scoped by the
-   * caller's org-unit predicate exactly like the material variant. Item filter surface only ({@code
-   * gameItemIds}, {@code jobOrderIds}); no quality floor, no mission filter (REQ-INV-031).
+   * Game-item sibling of {@link #getAllAggregatedInventory(List, List, Integer, List, List)} — the
+   * {@code catalog=ITEM} variant of the squadron-wide {@code /grouped} view (REQ-INV-029), scoped
+   * by the caller's org-unit predicate exactly like the material variant. Item filter surface only
+   * ({@code gameItemIds}, {@code locationIds}, {@code jobOrderIds}); no quality floor, no mission
+   * filter (REQ-INV-031).
    *
    * @param gameItemIds optional game-item filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
    * @return item groups, each carrying its sorted stacks and item-wide total
    */
   public List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      getAllAggregatedItemInventory(List<UUID> gameItemIds, List<UUID> jobOrderIds) {
+      getAllAggregatedItemInventory(
+          List<UUID> gameItemIds, List<UUID> locationIds, List<UUID> jobOrderIds) {
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     List<InventoryItemStackAggregate> stacks =
         inventoryItemRepository.findGlobalItemStacks(
             hasGameItems,
             hasGameItems ? gameItemIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
             scope.adminAllScope(),
@@ -864,7 +899,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Convenience overload without job-order/mission filters.
+   * Convenience overload without location, job-order and mission filters.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -873,7 +908,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds, Integer minQuality, Pageable pageable) {
-    return getAllInventory(materialIds, minQuality, null, null, pageable);
+    return getAllInventory(materialIds, null, minQuality, null, null, pageable);
   }
 
   /**
@@ -881,6 +916,7 @@ public class InventoryAggregationService {
    * InventoryItem}.
    *
    * @param materialIds optional material filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -889,11 +925,13 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getAllInventory(
       List<UUID> materialIds,
+      List<UUID> locationIds,
       Integer minQuality,
       List<UUID> jobOrderIds,
       List<UUID> missionIds,
       Pageable pageable) {
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     boolean hasMissions = missionIds != null && !missionIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
@@ -901,6 +939,8 @@ public class InventoryAggregationService {
         .findGlobalByFilters(
             hasMaterials,
             hasMaterials ? materialIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             minQuality,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
@@ -914,26 +954,30 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllInventory(List, Integer, List, List, Pageable)} — the flat
-   * squadron-wide list for {@code catalog=ITEM} (REQ-INV-029), scoped by the caller's org-unit
-   * predicate. Item filter surface only ({@code gameItemIds}, {@code jobOrderIds}); the quality
-   * floor and mission filter of the material variant do not exist for items (REQ-INV-031). Not
-   * aggregated — one row per {@code InventoryItem}.
+   * Game-item sibling of {@link #getAllInventory(List, List, Integer, List, List, Pageable)} — the
+   * flat squadron-wide list for {@code catalog=ITEM} (REQ-INV-029), scoped by the caller's org-unit
+   * predicate. Item filter surface only ({@code gameItemIds}, {@code locationIds}, {@code
+   * jobOrderIds}); the quality floor and mission filter of the material variant do not exist for
+   * items (REQ-INV-031). Not aggregated — one row per {@code InventoryItem}.
    *
    * @param gameItemIds optional game-item filter
+   * @param locationIds optional storage-location filter (REQ-INV-040)
    * @param jobOrderIds optional job-order filter
    * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
    * @return paged game-item inventory rows
    */
   public Page<InventoryItemDto> getAllItemInventory(
-      List<UUID> gameItemIds, List<UUID> jobOrderIds, Pageable pageable) {
+      List<UUID> gameItemIds, List<UUID> locationIds, List<UUID> jobOrderIds, Pageable pageable) {
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
+    boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findGlobalItemsByFilters(
             hasGameItems,
             hasGameItems ? gameItemIds : null,
+            hasLocations,
+            hasLocations ? locationIds : null,
             hasJobOrders,
             hasJobOrders ? jobOrderIds : null,
             scope.adminAllScope(),

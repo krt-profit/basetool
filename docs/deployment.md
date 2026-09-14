@@ -696,11 +696,15 @@ behave exactly as they do in production — the only thing that changed is which
 is resolved.
 
 > A testing environment serves the app under its own domain from the **same**
-> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` and
-> `IRI_KEYCLOAK_ISSUER_URI` override the two public-identity values baked into
-> `docker-compose.yml`. **Set both or neither** — a half-set pair fails every
-> request with `issuer does not match`, which reads like a token bug and is in fact
-> a configuration one. Production sets neither and is unaffected.
+> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` overrides the
+> public identity baked into `docker-compose.yml` — **set that one value**, with its
+> `/auth` path, and the issuer the three apps validate is derived from it
+> (ADR-0167). It used to be a second variable, `IRI_KEYCLOAK_ISSUER_URI`, that you
+> had to keep in agreement by hand: a half-set pair failed every request with
+> `issuer does not match`, which reads like a token bug and was in fact a
+> configuration one. That variable still exists as an override for a deployment
+> whose advertised issuer genuinely differs, and is otherwise left unset.
+> Production sets neither and is unaffected.
 
 ### Forcing an immediate run
 
@@ -967,10 +971,13 @@ sudo -u deploy /usr/bin/docker compose \
     start frontend
 ```
 
-The page is intentionally not scoped per virtual host — any proxy host behind
-NPM (including `keycloak.profit-base.online`) will fall back to the same screen if
-its upstream ever serves a `5xx`. The wording is kept generic ("System
-maintenance") so it reads correctly for both.
+The page is intentionally not scoped per virtual host — every vhost includes
+`maintenance.conf`, so any of them falls back to the same screen if its upstream
+ever serves a `5xx`. **Identity included:** since ADR-0166 Keycloak is a set of
+locations on the web vhost rather than a host of its own, so a maintenance window
+covers the login too — which is correct, since there is nothing to log in to. The
+wording is kept generic ("System maintenance") so it reads correctly for all of
+them.
 
 ---
 
@@ -1025,6 +1032,13 @@ done | sort | uniq -c        # expect a mix of 200s and 429s, no 503
 ---
 
 ## Keycloak behind NPM over HTTPS
+
+> **Historical, on two counts — read it as a record, not as instructions.** NPM was replaced by
+> native nginx on 2026-09-12 (ADR-0162), and `keycloak.profit-base.online` was retired on
+> 2026-09-13 (ADR-0166) when identity moved to `/auth` on the web host. What still holds unchanged
+> is the part this section exists for: Keycloak serves **HTTPS only** in production, both edges
+> that reach it are TLS, and the management interface stays plain HTTP because the image ships no
+> TLS-capable CLI client. The current addresses are in *Identity cutover* above.
 
 Keycloak no longer serves plain HTTP in production. The `keycloak` service starts with
 `--http-enabled=false --https-port=18443`, so **both** edges that reach it are now TLS:
@@ -1139,8 +1153,9 @@ sudo docker run --rm --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
 # Keycloak is healthy (proves the HTTP management healthcheck still works after the HTTPS flip).
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod ps keycloak
 
-# Public OIDC discovery still resolves through NPM (NPM → keycloak:18443 re-encryption works).
-curl -fsS https://keycloak.profit-base.online/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
+# Public OIDC discovery still resolves through the edge (re-encryption to keycloak:18443 works).
+# The address is post-ADR-0166; before that it was https://keycloak.profit-base.online/realms/iri/…
+curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
 
 # Backend user sync succeeds over TLS — no recurring "Failed to fetch users from Keycloak".
 sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
@@ -1154,9 +1169,111 @@ emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` 
 
 ---
 
+## Identity cutover: Keycloak moves to /auth on the web host (ADR-0166, one-off)
+
+This is a **cutover, not a rolling change.** The issuer string changes, so every token minted under
+the old one stops validating the moment it does — which is the intended end state (the owner ruled
+out a dual path: the Android app is with testers only, who install the matching build).
+
+Nothing stored is lost. Sessions end, and members sign in again.
+
+**Order matters, because the certificate and the DNS are what break loudly.**
+
+1. **Add the new Discord redirect URI first — this one is outside our infrastructure.** Keycloak's
+   Discord broker endpoint moves with the path, to
+   `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`, and **Discord validates the
+   redirect URI against the list in its developer portal**. An unchanged registration fails every
+   Discord login with `Invalid OAuth2 redirect_uri` — raised by Discord, before Keycloak is reached,
+   so nothing in this repository or its CI can catch it. Discord accepts several redirect URIs per
+   application: **add** the new one alongside the old rather than replacing it, and the switch is
+   seamless in both directions. Remove the old entry once step 8 is done.
+   See [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
+2. **Ship the matching Android build**, or accept that the app is dead between steps 5 and
+   that build reaching its testers. `OIDC_ISSUER` moves with the server; a build pinned to
+   `https://keycloak.profit-base.online/realms/iri` cannot authenticate afterwards.
+3. **Pull the new bundle** and check the edge before it serves anything:
+
+   ```bash
+   scripts/check-edge-nginx.sh
+   ```
+
+   It renders every vhost template and runs `nginx -t` with throwaway certificates. Four vhosts is
+   the expected count now, not five.
+
+4. **Update the host `.env`.** Three edits, and the third is the one a recreate cannot do for you:
+
+   - delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from `ACME_HOSTS` — leaving them costs
+     nothing at run-time (the edge ignores an unused variable) but the certificate keeps a SAN for a
+     name nothing serves;
+   - **repoint `IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI`** to
+     `https://profit-base.online/auth/realms/iri/protocol/openid-connect/token`. It has **no default
+     anywhere** — `docker-compose.yml` passes `${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}` and the
+     ingest binding is empty-by-default — so the host `.env` is its only live value, and recreating a
+     container does not rewrite `.env`. Miss this and the ingest gateway keeps asking the retired
+     host for its token, which none of the verification steps below would notice;
+   - if `IRI_KEYCLOAK_HOSTNAME` is set (it is an optional override), move it and **include the
+     `/auth` path** — the issuer follows from it (ADR-0167), so there is no second value to keep in
+     step with. See step 5. If this host also sets `IRI_KEYCLOAK_ISSUER_URI` — which it should not
+     need to — that value overrides the derivation and has to be moved by hand as well;
+   - **and if `IRI_KEYCLOAK_HOST_ALIAS` is set, repoint it at the WEB host.** It exists for a host
+     whose NAT does not hairpin (REQ-OPS-022): the apps load their OIDC metadata from the issuer at
+     start-up, so the issuer's hostname has to resolve to something that answers from inside. After
+     ADR-0166 that name is `profit-base.online`, not a Keycloak host — an alias left on the old name
+     resolves nothing, backend, frontend and ingest time out fetching metadata, all three fail the
+     health gate and `docker compose up -d --wait` rolls the deploy back. Steps 7-9 would not catch
+     it earlier because they run after that.
+5. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
+   (`KC_HTTP_RELATIVE_PATH`) **and advertising `https://profit-base.online/auth`** — the path belongs
+   in `KC_HOSTNAME` as well, and the two must agree. Its management interface stays at the root
+   (`KC_HTTP_MANAGEMENT_RELATIVE_PATH`), so the container healthcheck's `/health/ready` and
+   Prometheus's `/metrics` are unaffected. The shipped compose already carries all three; you only
+   have to touch them if the host `.env` overrides `IRI_KEYCLOAK_HOSTNAME`.
+
+   > **The failure this invites is silent, and it is the one to watch for.** Setting only the
+   > relative path — leaving `KC_HOSTNAME` at the bare origin — produces a Keycloak that ANSWERS on
+   > `/auth` and ADVERTISES root issuer links. It reports **healthy**, its discovery document parses,
+   > and `backend`, `frontend` and `ingest` then die at start-up on
+   > `The Issuer "…/realms/iri" did not match the requested issuer "…/auth/realms/iri"` — which reads
+   > as a backend fault. ADR-0166 carries the measurement of all three combinations.
+
+6. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
+   A service left on the old issuer rejects every token with a signature/issuer mismatch, which
+   reads in the log as a Keycloak outage rather than as a stale container.
+7. **Verify, from outside:**
+
+   ```bash
+   curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration      | grep -o '"issuer":"[^"]*"'
+   ```
+
+   It must read `https://profit-base.online/auth/realms/iri`. **A root issuer** — `https://profit-base.online/realms/iri`,
+   with no `/auth` — is the misconfiguration this arrangement invites, and it means `KC_HOSTNAME` is
+   missing the path while `KC_HTTP_RELATIVE_PATH` has it (step 5). The doubled `/auth/auth` shape is
+   *not* what happens when the two agree; ADR-0166 has the measured table.
+
+8. **Sign in through the web app**, then **sign out**, and do it **once through Discord** as well:
+   the end-session redirect is the navigation that used to leave the origin, and the Discord broker
+   round trip is the one that depends on step 1 having been done. Neither half is covered by an
+   automated test — the e2e suite signs in with a local realm user against a stack that has no
+   Discord provider.
+
+9. **Retire `keycloak.profit-base.online` in DNS** once the above passes. Until then it resolves to
+   an edge with no vhost for it, which answers from the default server block rather than serving
+   Keycloak — harmless, but it will not work as a fallback and is not meant to.
+
+Grafana's own OIDC login (`docker-compose.monitoring.yml`) and the blackbox discovery probes move
+with the issuer and are already in the bundle; no separate step.
+
 ## Keycloak Admin Console via SSH tunnel
 
-The Keycloak Admin Console (`https://keycloak.profit-base.online/admin`) is served on the public
+> **Address changed 2026-09-13 (ADR-0166).** The console is now
+> `https://profit-base.online/auth/admin`. Keycloak moved onto the web origin so the installed web
+> app's sign-in stays inside its manifest scope, and `keycloak.profit-base.online` **no longer
+> exists** — no vhost, no certificate SAN, no DNS purpose. The lock-down itself is unchanged: the
+> same four bridge gateways, the same closing `deny all`, now on the `/auth/admin` location of the
+> web vhost (`docker/edge/conf.d/10-frontend.conf.template`). Substitute the new host in the tunnel
+> steps below; everything else about them still holds.
+
+The Keycloak Admin Console (`https://profit-base.online/auth/admin`) is served on the public
 vhost but must never be reachable from the open internet. It is locked to an operator SSH tunnel:
 the edge allows the console **only** for connections that originate from the host itself, and the
 operator reaches the host over SSH.
@@ -1178,19 +1295,30 @@ anywhere else either.
 Then map the vhost to the tunnel so SNI and certificate still match. Either a hosts entry:
 
 ```
-127.0.0.1  keycloak.profit-base.online
+127.0.0.1  profit-base.online
 ```
+
+Then `https://profit-base.online/auth/admin` reaches the console through the tunnel.
+
+> While that hosts entry is in place the **whole web app** resolves to the tunnel, not just the
+> console — which is new since ADR-0166 and worth knowing before you wonder why the app is slow or
+> logged out. Remove the line when you are done.
+
+The access control is an nginx `allow … / deny all` on the `/auth/admin` location of the web vhost,
+in `docker/edge/conf.d/10-frontend.conf.template` — in git, reviewable, and rendered at container
+start. (Until 2026-09-12 it was a *custom location* clicked into the NPM admin UI on the retired
+`keycloak.profit-base.online` proxy host; ADR-0162 moved it into the repository and ADR-0166 moved
+it to this address. The directives themselves are unchanged, which is the point:)
 
 or — no elevation, and it leaves the machine's name resolution alone — a throwaway Chrome profile:
 
 ```bash
-chrome --host-resolver-rules="MAP keycloak.profit-base.online 127.0.0.1:443" --user-data-dir=/tmp/kc-admin "https://keycloak.profit-base.online/admin"
+chrome --host-resolver-rules="MAP profit-base.online 127.0.0.1:443" --user-data-dir=/tmp/kc-admin "https://profit-base.online/auth/admin"
 ```
 
-The access control is an nginx `allow … / deny all` on the `/admin` location of the
-`keycloak.profit-base.online` server block, in
-[`docker/edge/conf.d/20-keycloak.conf.template`](../docker/edge/conf.d/20-keycloak.conf.template)
-— promoted with the config bundle, never hand-edited on the host (REQ-OPS-004):
+Since ADR-0166 this is the **better** of the two: the override lives in one browser profile, so the
+rest of the web app keeps resolving normally while the console is open — which the `hosts` entry
+above cannot do, because the console now shares its name with the app.
 
 ```nginx
 allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives

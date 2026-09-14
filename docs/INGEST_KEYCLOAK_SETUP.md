@@ -511,7 +511,7 @@ All four, together. Each is inert on its own.
 
 ```
 IRI_INGEST_PUBLIC_BASE_URL=https://ingest.profit-base.online
-IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI=https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/token
+IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI=https://profit-base.online/auth/realms/iri/protocol/openid-connect/token
 IRI_INGEST_SERVICE_ACCOUNT_CLIENT_ID=basetool-ingest-gateway
 IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET=<the secret from 9a>
 IRI_INGEST_GATEWAY_CLIENT_IDS=basetool-ingest-gateway

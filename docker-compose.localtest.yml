@@ -1,7 +1,7 @@
 # Local manual-browser override (NOT for CI / e2e — that harness remaps host.docker.internal
 # inside its automated browser instead).
 #
-# The OIDC issuer is http://host.docker.internal:18080/realms/iri. On Docker Desktop the host
+# The OIDC issuer is http://host.docker.internal:18080/auth/realms/iri. On Docker Desktop the host
 # resolves host.docker.internal to the host's LAN IP (e.g. 10.1.0.30), but the base compose
 # publishes Keycloak only on 127.0.0.1:18080 — so the host browser's redirect to the issuer is
 # refused. Re-publishing on all interfaces makes host.docker.internal:18080 reach Keycloak from

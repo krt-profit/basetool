@@ -32,7 +32,7 @@
                 margin-bottom: 1rem;
                 align-items: flex-end;
             }
-            @media (max-width: 768px) {
+            @media (width <= 768px) {
                 .material-row {
                     flex-direction: column;
                     align-items: stretch;
@@ -372,7 +372,7 @@
 
             </form>
 
-            <div class="krtm-margin-top-2rem-display-flex-gap-1rem-align-52fa">
+            <div class="mt-2-flex-gap krtm-align-items-center-6a4e">
                 <th:block th:if="${canEdit}">
                     <button type="submit" form="refineryOrderMainForm" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{orders.create.save}">Speichern</span></button>
                 </th:block>

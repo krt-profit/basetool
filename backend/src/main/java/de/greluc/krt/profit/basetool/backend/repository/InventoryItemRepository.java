@@ -243,8 +243,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /**
    * Optional multi-filter search across non-personal inventory items. Each filter is gated by a
    * boolean / nullable flag so callers can omit dimensions without building a dynamic query: {@code
-   * hasMaterials}, {@code hasJobOrders} and {@code hasMissions} turn the corresponding {@code IN
-   * :ids} clause on or off; a {@code null minQuality} skips the quality floor.
+   * hasMaterials}, {@code hasLocations}, {@code hasJobOrders} and {@code hasMissions} turn the
+   * corresponding {@code IN :ids} clause on or off; a {@code null minQuality} skips the quality
+   * floor.
    *
    * <p>Multi-tenant: this method is the <em>Lager-View</em> entry point (MULTI_SQUADRON_PLAN.md
    * section 4.4). {@code owningSquadronId} restricts to the caller's squadron stock; {@code null}
@@ -266,10 +267,12 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
           + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
-          + " :missionIds))")
+          + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)")
   Page<InventoryItem> findGlobalByFilters(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("minQuality") Integer minQuality,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
@@ -297,11 +300,14 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasMissions =
       false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
       i AND ma.mission.id IN :missionIds))
+      AND (:hasLocations = false OR i.location.id IN :locationIds)
       """)
   Page<InventoryItem> findUserByFilters(
       @Param("user") User user,
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("minQuality") Integer minQuality,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
@@ -312,13 +318,16 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
   /**
    * Game-item sibling of {@link #findGlobalByFilters} — the flat squadron-wide list for {@code
    * catalog=ITEM} (REQ-INV-029). Same scope-triple + gated-filter contract, reduced to the item
-   * filter surface: {@code gameItemIds} and {@code jobOrderIds}. There is deliberately no quality
-   * floor (items carry no quality) and no mission filter (item rows are never mission-allocated,
-   * REQ-INV-031). {@code gameItem.manufacturer} is graphed because the item reference DTO renders
-   * the manufacturer name.
+   * filter surface: {@code gameItemIds}, {@code locationIds} and {@code jobOrderIds}. There is
+   * deliberately no quality floor (items carry no quality) and no mission filter (item rows are
+   * never mission-allocated, REQ-INV-031). {@code gameItem.manufacturer} is graphed because the
+   * item reference DTO renders the manufacturer name.
    *
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
+   * @param hasLocations gates the {@code locationIds} clause.
+   * @param locationIds the storage locations to narrow to; ignored when {@code hasLocations} is
+   *     false.
    * @param hasJobOrders gates the {@code jobOrderIds} clause.
    * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
    *     false.
@@ -335,10 +344,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + ScopeSpecifications.INVENTORY_ITEM_SCOPE_TRIPLE
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
-          + " ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))")
+          + " ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds)) AND (:hasLocations = false"
+          + " OR i.location.id IN :locationIds)")
   Page<InventoryItem> findGlobalItemsByFilters(
       @Param("hasGameItems") boolean hasGameItems,
       @Param("gameItemIds") List<UUID> gameItemIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -376,10 +388,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " FROM InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id"
           + " IN :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM"
           + " InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN"
-          + " :missionIds)) GROUP BY m, i.user, i.location, i.quality, i.personal, oou")
+          + " :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)"
+          + " GROUP BY m, i.user, i.location, i.quality, i.personal, oou")
   List<InventoryStackAggregate> findGlobalStacks(
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("minQuality") Integer minQuality,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
@@ -420,12 +435,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
       InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
-      :missionIds)) GROUP BY m, i.user, i.location, i.quality, i.personal, oou
+      :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
+      GROUP BY m, i.user, i.location, i.quality, i.personal, oou
       """)
   List<InventoryStackAggregate> findUserStacks(
       @Param("userId") UUID userId,
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("minQuality") Integer minQuality,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
@@ -445,6 +463,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    *
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
+   * @param hasLocations gates the {@code locationIds} clause.
+   * @param locationIds the storage locations to narrow to; ignored when {@code hasLocations} is
+   *     false.
    * @param hasJobOrders gates the {@code jobOrderIds} clause.
    * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
    *     false.
@@ -465,10 +486,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
           + " AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds) AND (:hasJobOrders ="
           + " false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja WHERE"
           + " ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))"
+          + " AND (:hasLocations = false OR i.location.id IN :locationIds)"
           + " GROUP BY gi, i.user, i.location, i.personal, oou")
   List<InventoryItemStackAggregate> findGlobalItemStacks(
       @Param("hasGameItems") boolean hasGameItems,
       @Param("gameItemIds") List<UUID> gameItemIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("isAdminAllScope") boolean isAdminAllScope,
@@ -486,6 +510,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param userId the owning user whose stacks to aggregate.
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
+   * @param hasLocations gates the {@code locationIds} clause.
+   * @param locationIds the storage locations to narrow to; ignored when {@code hasLocations} is
+   *     false.
    * @param hasJobOrders gates the {@code jobOrderIds} clause.
    * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
    *     false.
@@ -505,12 +532,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds)
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
       WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))
+      AND (:hasLocations = false OR i.location.id IN :locationIds)
       GROUP BY gi, i.user, i.location, i.personal, oou
       """)
   List<InventoryItemStackAggregate> findUserItemStacks(
       @Param("userId") UUID userId,
       @Param("hasGameItems") boolean hasGameItems,
       @Param("gameItemIds") List<UUID> gameItemIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("personalOnly") boolean personalOnly,
@@ -536,6 +566,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param userId the owning user whose entry ids to collect.
    * @param hasMaterials gates the {@code materialIds} clause.
    * @param materialIds the materials to narrow to; ignored when {@code hasMaterials} is false.
+   * @param hasLocations gates the {@code locationIds} clause.
+   * @param locationIds the storage locations to narrow to; ignored when {@code hasLocations} is
+   *     false.
    * @param minQuality optional quality floor, or {@code null} for no floor.
    * @param hasJobOrders gates the {@code jobOrderIds} clause.
    * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
@@ -558,12 +591,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       InventoryJobOrderAllocation ja WHERE ja.inventoryItem = i AND ja.jobOrder.id IN
       :jobOrderIds)) AND (:hasMissions = false OR EXISTS (SELECT 1 FROM
       InventoryMissionAllocation ma WHERE ma.inventoryItem = i AND ma.mission.id IN
-      :missionIds)) ORDER BY i.createdAt ASC
+      :missionIds)) AND (:hasLocations = false OR i.location.id IN :locationIds)
+      ORDER BY i.createdAt ASC
       """)
   List<UUID> findUserEntryIds(
       @Param("userId") UUID userId,
       @Param("hasMaterials") boolean hasMaterials,
       @Param("materialIds") List<UUID> materialIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("minQuality") Integer minQuality,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
@@ -584,6 +620,9 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
    * @param userId the owning user whose item entry ids to collect.
    * @param hasGameItems gates the {@code gameItemIds} clause.
    * @param gameItemIds the game items to narrow to; ignored when {@code hasGameItems} is false.
+   * @param hasLocations gates the {@code locationIds} clause.
+   * @param locationIds the storage locations to narrow to; ignored when {@code hasLocations} is
+   *     false.
    * @param hasJobOrders gates the {@code jobOrderIds} clause.
    * @param jobOrderIds the earmarked orders to narrow to; ignored when {@code hasJobOrders} is
    *     false.
@@ -600,12 +639,15 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
       AND (:hasGameItems = false OR i.gameItem.id IN :gameItemIds)
       AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
       WHERE ja.inventoryItem = i AND ja.jobOrder.id IN :jobOrderIds))
+      AND (:hasLocations = false OR i.location.id IN :locationIds)
       ORDER BY i.createdAt ASC
       """)
   List<UUID> findUserItemEntryIds(
       @Param("userId") UUID userId,
       @Param("hasGameItems") boolean hasGameItems,
       @Param("gameItemIds") List<UUID> gameItemIds,
+      @Param("hasLocations") boolean hasLocations,
+      @Param("locationIds") List<UUID> locationIds,
       @Param("hasJobOrders") boolean hasJobOrders,
       @Param("jobOrderIds") List<UUID> jobOrderIds,
       @Param("personalOnly") boolean personalOnly,

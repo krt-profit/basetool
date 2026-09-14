@@ -57,11 +57,22 @@ class InventoryItemStackQueryTest {
 
     assertThat(
             inventoryItemRepository.findGlobalStacks(
-                false, null, null, false, null, false, null, true, null, Set.of()))
+                false, null, false, null, null, false, null, false, null, true, null, Set.of()))
         .isEmpty();
     assertThat(
             inventoryItemRepository.findUserStacks(
-                UUID.randomUUID(), false, null, null, false, null, false, null, false, false))
+                UUID.randomUUID(),
+                false,
+                null,
+                false,
+                null,
+                null,
+                false,
+                null,
+                false,
+                null,
+                false,
+                false))
         .isEmpty();
     assertThat(
             inventoryItemRepository

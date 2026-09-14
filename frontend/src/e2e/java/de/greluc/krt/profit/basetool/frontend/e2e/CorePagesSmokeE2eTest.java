@@ -25,18 +25,27 @@ import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.FieldSource;
 
 /**
  * Non-destructive smoke subset: log in once and confirm each core page renders the authenticated
  * app shell. Unlike the {@code @Tag("e2e")} flows, this suite is target-agnostic and read-only — it
  * creates and mutates nothing, so it is safe to run against a shared staging deployment.
+ *
+ * <p><b>The routes come from {@link FrontendPageRoutes#CORE_SMOKE}</b>, not from a list in this
+ * file. Until 2026-09-13 this class, {@code AdminPagesSmokeE2eTest} and {@code
+ * TouchClassLayoutE2eTest} each enumerated the frontend's page routes by hand, and the three
+ * disagreed — the largest was short by seventeen. Which pages belong in <i>this</i> slice is still
+ * a judgement (they must render for a member who may not be an administrator, because the base URL
+ * can be a shared staging deployment), but every entry is now checked against the one catalogue by
+ * {@code PageRouteCatalogueTest}, so a renamed route cannot leave this suite loading nothing.
  *
  * <p>Tagged {@code @Tag("smoke")}: the {@code smokeTest} Gradle task selects it, and it runs
  * against whatever {@link E2eStackExtension} resolves as the base URL — the ephemeral local stack
@@ -89,24 +98,7 @@ class CorePagesSmokeE2eTest {
    * @param path the app-relative path of the core page to load
    */
   @ParameterizedTest(name = "core page {0} loads")
-  @ValueSource(
-      strings = {
-        "/",
-        "/missions",
-        "/orders",
-        "/refinery-orders",
-        "/hangar",
-        "/operations",
-        "/materials",
-        "/materials/overview",
-        "/materials/profit-calculation",
-        "/ship-data",
-        "/blueprint-overview",
-        "/org-chart",
-        "/notifications",
-        "/personal-inventory",
-        "/personal-inventory/blueprints"
-      })
+  @FieldSource("de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes#CORE_SMOKE")
   void corePageLoads(String path) {
     String baseUrl = STACK.baseUrl();
     try (BrowserContext context =

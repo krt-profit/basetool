@@ -289,16 +289,206 @@ since they were introduced: `.btn` is declared after them in `styles.css` and re
 the ≤1024px touch block, so it won every shared property and each "dense" button had in fact
 been rendering full-size.
 
+**The header is compact on the Smartphone class** (owner decision 2026-09-13). It measured 76px on
+a 375px screen — 16px padding plus 60px of content — and the 60px came from the wordmark wrapping to
+two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-010) and
+„Profit Basetool – Alle Staffeln" is simply longer than a phone is wide. The phone class therefore
+renders the mark at 32px and the wordmark on one line with an ellipsis, for roughly 48px. It stays
+**sticky**: menu, mark and bell remain reachable without scrolling, which is why this was chosen
+over letting the header scroll away like the footer. Scaling the mark's box is not a REQ-UI-019
+deviation — the asset keeps its own proportions and its specified breathing room; nothing is cropped
+or forked.
+
+**On the Smartphone class the page footer scrolls with the content** (owner decision 2026-09-13);
+on every wider class it stays pinned to the viewport bottom. Pinned, it cost the phone twice: the
+column-stacked footer is two rows tall and `main` reserved that height *again* as `padding-bottom`
+so the last line could clear it — roughly a fifth of an 812px screen spent on three legal links, on
+the class with the least room and the one the app now ships to as its mobile client (REQ-UI-020).
+
+The mechanism is `position: static` inside the `width <= 768px` block, and one consequence is not
+optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
+the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because eight
+places read that property — `main`'s reserve, the Materialbörse / Materialien-Übersicht / Beförderung
+`max-height` calcs, the org-chart proxy scrollbar's `bottom`, and the mission- and operation-detail
+paddings — and every one of them would otherwise reserve space for a footer that is not there.
+
+**Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
+measured sweep of the touch classes found both:
+
+- **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in an inline `<style>` by
+  `mission-detail.html` and `operation-detail.html` (21 uses), and two of its instances are *form*
+  actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
+  explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
+  classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
+  page's inline rule is read *after* `styles.css`: at equal specificity the page would win and the
+  fix would be silently inert — the same trap this requirement already records for `.btn.btn-xs`.
+- **`.master-row` IS exempt**, at 32px. The blueprint list rows on `/personal-inventory/blueprints`
+  measured 33px; they are a scan-and-tap list where density is the point, and were ruled equivalent
+  to a repeated row action rather than a standalone control.
+
+**A third round of amendments, 2026-09-13**, after the guard first ran with *seeded* data. The
+first sweep could only measure what a fresh stack renders, and a fresh stack has empty lists: no
+order, refinery order, grant or booking exists, so no detail view and no populated table was ever
+loaded. Running the guard inside the destructive e2e suite — where the other flows create those
+rows — put 118 findings on surfaces that had never been measured.
+
+- **The floor is on the EFFECTIVE hit area, not on the border box.** A control reaches it just as
+  legitimately through a transparent positioned `::after` overlay ("small glyph, fat-finger target")
+  or through the `<label>` that activates it, and both are real targets to a finger. This is not a
+  relaxation: it is what "hit area" meant all along, and measuring the border box instead reported
+  15 org-chart chevrons as defects when `org-chart.css` had stretched each one to
+  `var(--touch-target)` with exactly that overlay. A pseudo-element is only counted on a
+  non-replaced element, because `<input>`, `<select>` and `<textarea>` render none.
+- **Three more in-row controls ARE exempt**, at 32px, on the same reading as `.master-row`:
+  `.item-checkbox` (the Lager tree's per-row and per-group selector), `.matrix-flag` (a grant row's
+  three permission flags) and `.bank-row-toggle` (a booking row's disclosure chevron). They measured
+  26px, 18px and 15px, so all three still had to grow — 15px was below WCAG 2.5.8 AA's 24px, not
+  merely below this design system's floor. `.matrix-flag` is the case that shows why the exception
+  is not laziness: its three flags sit side by side in one row, so 44px cells would either widen the
+  table by a third or, if the target were faked with an overlay, let one flag's overlay reach over
+  its neighbours — and a mis-tap there grants the wrong *banking* right.
+- **`.demand-sort-btn` is NOT exempt** and is raised to 44px. A column-header sort control is one
+  per column, not one per row, so the density argument does not apply to it.
+- **The dense floor is the token `--touch-target-dense` (32px)**, mirrored by
+  `TouchClassLayoutE2eTest.DENSE_ACTION_FLOOR`. The two must move together.
+
+**Structural defects found in the same run** (fixes, not exceptions): the `/bank/requests` table was
+the only `data-table` in the template tree with no `.table-responsive` wrapper, and widening the
+layout viewport to 912px on a 375px screen did more than clip the table — `position: fixed` resolves
+against the layout viewport, so all three of that page's modals then centred themselves at 456px and
+sat mostly off-screen. `.krt-livesync-pill`, the **default** class `krt-live-sync.js` gives the pill,
+had no CSS at all while only the mission variant was styled, so every non-mission consumer rendered a
+bare browser-default button. The generic `.flex-gap-*` and `.mt-2-flex-gap` row utilities could not
+wrap. And `.mission-info-grid` sized its value column `1fr` — shorthand for `minmax(auto, 1fr)`,
+whose `auto` minimum is the track's min-content width — so a long mission name widened the tile, the
+tile widened its `auto-fit` track and the tablet-landscape class scrolled sideways.
+
+**A fourth amendment, 2026-09-13: the floor is a DEFAULT, not a list** ([ADR-0176](../adr/0176-layout-floors-are-defaults-that-controls-opt-out-of.md)).
+
+Every amendment above added a name to an enumeration, and every round of review found more names the
+enumeration had missed — five rounds, ending with `.pa-sort-btn` at 29x18px, which the guard could
+not see either because its template renders no sort column unless a category has more than one topic.
+That is the shape of the defect rather than an accident of effort: **absence from a list is
+indistinguishable from not existing yet**, so every control written after the list starts out
+non-compliant, and silently so.
+
+The floor is therefore expressed as a zero-specificity default over
+`button, [role="button"], summary, a.btn, input, select, textarea`, which any authored rule beats,
+and **a control opts out by DECLARING `min-height: var(--touch-target-dense)`**. The token was
+already the marker `TouchClassLayoutE2eTest` reads out of the CSSOM to build its dense set, so the
+exemption is still declared by the design system and still followed by the guard with no list on
+either side. A control that declares some other sub-floor height is not exempt: it is measured
+against the full 44px and fails.
+
+Two consequences worth stating, because both were exemptions this requirement had granted in prose
+and no stylesheet had ever declared:
+
+- **`.master-row`'s 32px exemption existed only here.** Nothing in any stylesheet consumed the token
+  for it, so the guard's CSSOM-derived set never contained it and the class was being measured
+  against 44px the whole time. `personal-inventory.css` declares it now.
+- **`.matrix-flag` sized itself with `width`/`height` alone.** A `min-height` clamps a `height`
+  regardless of specificity — different properties never compete — so under a default floor it had
+  to declare the token to decline it.
+
+Three rules remain written out per control in the touch block, and each states a decision rather than
+filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local `<style>` rule
+that the browser reads after `styles.css`, and the dismiss-button group keeps an explicit
+`min-height` because `.close-modal` is a `<span>` in three `admin/mission-data.html` dialogs, which
+no element selector reaches.
+
+The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
+control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
+was hopeless there for an additional reason — many rows carry a generated class from
+`inline-migration.css`, and those names are content-hashed.
+
 **Acceptance**
 
-- [ ] Verified at all four breakpoints; interactive targets ≥ 44px on touch classes, except
-  `.btn-xs` / `.btn-icon` dense-row actions, which are ≥ 32px on every class.
+- [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
+  a positioned `::before` / `::after` overlay, or the `<label>` that activates them) ≥ 44px on touch
+  classes, except the dense in-row controls `.btn-xs` / `.btn-icon` / `.master-row` /
+  `.item-checkbox` / `.matrix-flag` / `.bank-row-toggle`, which are ≥ `--touch-target-dense` (32px)
+  on every class. That list is a reader's summary, not the mechanism: the stylesheet's
+  `--touch-target-dense` consumers are the source of truth, and the guard derives the set from them.
+- [ ] **A new control needs no edit to be compliant.** The floor is a zero-specificity default, so a
+  control added with no size rule of its own already meets it; being absent from a list must never
+  again be the same thing as being exempt from the floor. The check is the inverse: anything at 32px
+  can be shown to declare `--touch-target-dense`, and nothing else is under 44px.
+- [ ] Measured with rows in the tables, not only on a fresh stack: a detail view, a populated list
+  and a populated table are each a different layout from their empty state, and an empty one hides
+  every defect it has.
+- [ ] **The sweep's route list is complete, and its coverage is asserted rather than assumed.**
+  The list was hand-maintained and was short by seventeen routes for a day while this clause claimed
+  otherwise — `/organisation/leitung` among them, whose action rows the same change was fixing. The
+  guard now requires every device class to have measured the same set of routes (a class that goes
+  quiet mid-sweep is what an expired session looks like) over a floor, and names any list page that
+  rendered no row so its detail view is known to be unmeasured. Adding the missing routes found a
+  1303px table with no scroll container on `/admin/notification-rules`, broken at **every** class
+  including desktop, the first time it ran.
+- [ ] **Completeness is gated, not remembered** (2026-09-13). The three E2E classes that each kept
+  their own copy of the route list now share one — `FrontendPageRoutes` — and `PageRouteCatalogueTest`
+  asks the dispatcher for every mapping it knows, failing when a variable-free `GET` route appears in
+  neither `PAGES` nor `NOT_PAGES`. It runs in `check` rather than in the stack-bound `e2e` suite, so
+  a controller added on a pull request without the `e2e` label still cannot slip past it. What it
+  deliberately does **not** do is decide which of the two lists a route belongs in: a page is
+  recognised by its app shell at runtime, and `/inventory/my/stack/entries` (a fragment) and
+  `/inventory/my` (a page) are both a `@GetMapping` returning a view name. Its first run found
+  `/terms/accept`, which had been in none of the three lists.
 - [ ] A compact variant actually renders compact — `.btn.btn-xs` out-specifies `.btn` rather
   than relying on source order, since `.btn` is declared later and again inside the ≤1024px
   touch block. A bare `.btn-xs` selector is silently inert and is a regression.
+- [ ] The page never scrolls sideways on a touch class; a table wider than the screen scrolls
+  inside a container that itself fits, and **every** `data-table` carries that container.
+- [ ] A row of buttons wraps rather than pushing the page wide, including the ones built from the
+  generic `.flex-gap-*` / `.mt-2-flex-gap` utilities rather than a named action-row class.
+- [ ] A grid track that must hold free text is `minmax(0, 1fr)` and its content may break
+  (`overflow-wrap: anywhere`). Neither half works alone: the first lets the track shrink, the second
+  lets the text inside it wrap instead of painting straight out of the narrowed track.
+- [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
+  `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** code/design review · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
-`.btn.btn-icon`, the `width <= 1024px` touch block).
+**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page — all three shapes, the canonical `.krt-modal-overlay` shell and the legacy `.modal` / `.modal-overlay` ones, 96 roots in all: page-level overflow, cut-off elements, unscrollable tables, control floors,
+footer behaviour, chrome share — with a full-page screenshot per page and class) ·
+`PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
+dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
+`PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
+in `check`, not in the stack-bound `e2e` suite) + code/design
+review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
+`--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/js/sidebar.js`
+(`--krt-footer-height`).
+
+> **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement
+> read "Enforced by: code/design review", the only other geometric guard
+> (`MissionDatetimeSplitLayoutE2eTest`) sweeps 1280–1800px, and the smoke suite loads pages at the
+> default desktop viewport. The first run of the new guard found five pages overflowing the phone
+> viewport (`/orders` by 159px) and three chrome controls below the 44px floor on every page: the
+> language switcher at 17px, the sidebar close button at 34px and the notification bell at 40px.
+> None carried the `.btn-xs` / `.btn-icon` exemption; each was a bare `button` with its own rule,
+> and the touch block's selector list enumerates classes, so a control that opts out of `.btn` opted
+> out of the floor with it.
+>
+> **Corrected 2026-09-13: "every modal on the page" was true of one shape out of three.** The sweep
+> selected `.krt-modal-overlay` only — 42 roots — while the template tree also carries two legacy
+> shapes that predate the canonical shell: `.modal` / `.modal-content` (47) and its promotion-admin
+> sister `.modal-overlay` / `.modal-box` (7). **54 of the 96 modal roots went unmeasured**, eight of
+> them in `orders-detail.html` alone, and a comment in the guard called 42 "the full set". None of
+> that markup is dead — all 54 roots are reachable from a trigger or a script — so the sweep was
+> widened rather than the markup deleted.
+>
+> The selector is now declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`) and used at all four
+> sites that have to agree — the count, the probe's measurement loop, and the un-hide and restore
+> around the screenshot — because **widening one alone buys nothing**: a modal the probe measures
+> but the un-hide never reveals is still `display: none`, every rect it returns is 0×0, and every
+> zero-rect guard skips it. The change would look harmless and cost the same time.
+>
+> Revealing is per shape, and that is the part worth remembering: an inline `display: flex` outranks
+> every class and opens the two display-toggled families, but `.modal-overlay` takes its **centring**
+> from `.active` alone — so display by itself would have measured a stretched, left-aligned dialog
+> that no user is ever shown. A tool that reveals hidden markup has to reproduce what the markup's
+> own JS does, not merely make the box visible.
+>
+> Nothing detects a **fourth** shape. `MODAL_SHAPES` is hand-maintained exactly like the guard's
+> `PAGES` list, and it failed the same way that list did.
 
 ### REQ-UI-010 — Standard action-button icons
 
@@ -629,6 +819,104 @@ Binding details:
 every page template, `META-INF/resources/logos/basetool-*`,
 `keycloak-theme/krt-theme/login/login.ftl` · **Related:** REQ-UI-002, REQ-UI-018.
 
+### REQ-UI-020 — The web app is installable, and installs without a service worker
+
+The tool is installable to a phone or tablet home screen as a standalone app. This exists **for
+iPhone and iPad**: those members have no native client and cannot get one — the Android app's channel
+(a signed artifact from GitHub Releases) has no Apple equivalent a fan project can reach, so a
+home-screen web app is the whole mobile story on that platform. The analysis behind that sentence is
+`docs/APPLE_PLATFORM_FEASIBILITY.md` in the `basetool-android` repository; the decision is
+[ADR-0164](../adr/0164-an-installable-web-app-without-a-service-worker.md).
+
+Binding surface:
+
+|            Piece             |                                                    What it is                                                    |
+|------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json`, **no `produces` on the mapping** |
+| `<link rel="manifest">`      | In `fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
+| `theme-color`                | `#141414` — the header fill, not the black page background                                                       |
+| `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship                                          |
+| `apple-mobile-web-app-title` | From `pwa.short_name` — short, and the **same in both locales**, because the product name is a proper noun       |
+| `apple-touch-icon`           | Already shipped by REQ-UI-019; the manifest reuses the same tile, at its **content-hashed** URL                  |
+
+Binding details:
+
+- **No service worker, by decision.** A worker caching navigations would copy member data — balances,
+  rosters, stock — into a second store outside every path that clears the first, while the backend
+  marks those reads `no-store` (REQ-SEC-031) precisely so they are not copied. iOS needs no worker
+  for „Zum Home-Bildschirm". **The cost is accepted and stated:** Chromium requires a fetch-handling
+  worker before it offers its own install prompt, so on Android and desktop the app installs only
+  through the browser menu. Adding a worker later is an ADR, not a refactor.
+- **The manifest is a controller, not a file under `static/`.** Four of its properties belong to the
+  response rather than to a file: the localised `description`, the content-hashed icon URL, the
+  media type Spring's resource handler does not know, and `200`-never-`302`. The last is the same
+  trap `/.well-known/assetlinks.json` was written for, and both paths sit in the same
+  `SecurityConfig` allow-list.
+- **The locale travels in the URL, and the fetch carries no credentials.** The page is
+  server-rendered and already knows the reader's locale, so the link is
+  `@{/manifest.webmanifest(locale=${#locale.language})}` and the response is a pure function of its
+  URL. **`crossorigin="use-credentials"` is expressly rejected** — it makes the fetch an
+  *authenticated* request, and the unscoped layout `@ControllerAdvice` beans run before every
+  handler, `@RestController`s included, so one manifest fetch cost **five** backend round trips and
+  needed carve-outs in `TermsAcceptanceGateFilter` and `BackendRoleSyncFilter` for a public
+  document. It bought nothing measurable: `name` and `short_name` are identical in both bundles,
+  Safari implements neither `lang` nor `description`, and the iOS home-screen label comes from
+  `apple-mobile-web-app-title` on the page. Re-adding it needs an ADR.
+- **An unsupported `?locale=` renders the default, never a mismatched `lang`.** The controller
+  clamps to the shipped bundles. `spring.messages.fallback-to-system-locale` is `false` and the base
+  bundle holds **German** copy, so passing a client value through produced a manifest declaring e.g.
+  `"lang": "fr"` over German text — and an empty `lang`, which the specification forbids, for a
+  malformed value.
+- **No `produces` on the mapping.** It makes content negotiation part of the match, and
+  `application/json` is not compatible with `application/manifest+json`, so a caller asking for JSON
+  — `krtFetch`'s shape, and a blackbox probe with a header set — got a `500` and an `ERROR` log line
+  from the `Exception` catch-all. The content type is set on the response instead.
+- **The icon is emitted at its content-hashed URL**, resolved through `ResourceUrlProvider`.
+  `/logos/**` is served `immutable` for a year, so a manifest naming the bare path would pin every
+  installed home screen to a URL no browser revalidates — a redesigned icon would never arrive.
+- **`scope` and `start_url` are the application root, and sign-in is inside them.** A `scope` is one
+  URL prefix and cannot span two origins, so while Keycloak answered on a host of its own the
+  authentication hop was outside it. On iOS a navigation out of scope opens in a Safari View
+  Controller, which has its own storage; Apple keeps OAuth in the app **by heuristic** rather than by
+  rule (WWDC23) and asks for feedback when that misfires.
+  [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) moved Keycloak to `/auth` on this
+  origin, so `/oauth2/authorization/keycloak`, Keycloak's own login form, the callback and the
+  end-session redirect are all same-origin, all inside the scope, and none of them depends on that
+  heuristic.
+- **The icon is never declared `maskable`.** Android crops a maskable icon to its own shape and
+  guarantees only the inner ~40 %; claiming it for artwork not drawn with that safe zone cuts into
+  the mark. A dedicated maskable asset is a request to the design system — see Open questions.
+- **`display: standalone`, and `orientation` is deliberately unset.** The layout is responsive;
+  locking orientation would make a tablet worse.
+- **Status bar `black`, not `black-translucent`.** Translucent draws the page under the status bar and
+  needs safe-area padding throughout the layout, which this requirement does not ship.
+
+**Acceptance**
+
+- [ ] `GET /manifest.webmanifest` answers `200` as `application/manifest+json` to an **anonymous**
+  request, with no redirect, **for every `Accept` header**.
+- [ ] Its `name`, `short_name` and `description` come from the bundles and follow `?locale=`; an
+  unsupported or malformed value renders German with `"lang": "de"`, never a mismatched pair.
+- [ ] `display` is `standalone`; `start_url`, `scope` and `id` are the application root.
+- [ ] `icons` holds **exactly one** entry: the opaque 512 px tile at its **content-hashed** URL,
+  `purpose` `any`, never `maskable`.
+- [ ] `Cache-Control: max-age=3600, public` and **no** `Vary`, because the body depends only on the
+  URL.
+- [ ] The rendered page carries the manifest link **with `?locale=` and without any `crossorigin`
+  attribute**, the `theme-color` meta matching both the controller constant **and**
+  `--color-bg-dark-gray` in `styles.css`, and both standalone hints.
+- [ ] No service worker is registered anywhere in the frontend.
+- [ ] The path is probed from outside by `blackbox-public-surface` with `follow_redirects: false`,
+  and `EdgePublicSurfaceNot200` alerts when it stops answering `200` (REQ-OBS-012).
+
+**Enforced by:** `WebAppManifestControllerTest` (including the no-service-worker sweep and the
+stylesheet colour pin), `SecurityConfigStaticAssetPermitAllTest` (the no-redirect contract),
+`AnonymousSurfaceSweepMvcTest` (the REQ-SEC-052 registry) · **Code:** `WebAppManifestController`,
+`fragments/head.html`, `SecurityConfig`, `RequestLoggingFilter`, `pwa.*` in the three message
+bundles, `monitoring/blackbox/blackbox.yml` + `prometheus.yml` + `alerts/infrastructure.yml` ·
+**Related:** REQ-UI-019 (the icon family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path
+table), REQ-OBS-012 (the edge posture probes).
+
 ## Out of scope
 
 The brand assets themselves — their artwork, variants and rasters — are authored and versioned in
@@ -646,4 +934,21 @@ This spec still governs how those fields *look*.
 - Should REQ-UI-008 (no native dialogs) and REQ-UI-005 (frozen hex values) get a dedicated
   ESLint/Stylelint rule so they are gate-enforced, not review-enforced? (Promote to an ADR
   if yes.)
+- ~~**REQ-UI-020: can an installed standalone app actually sign in?**~~ **Closed 2026-09-13 by
+  [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md)**, by construction rather than by a
+  device report — and the question turned out to be less dire than it was written, which is worth
+  recording. A `scope` is one URL prefix and cannot span two origins, so the hop to a Keycloak on its
+  own host was outside it; on iOS that means a Safari View Controller with its own storage, in which
+  the PKCE verifier and `state` written before the hop are in the wrong jar. But Apple keeps OAuth
+  navigations in the web app **by heuristic** (WWDC23), so it most likely worked. What the ADR
+  removes is the dependency on that heuristic — undocumented, vendor-acknowledged as imperfect, and
+  carrying the one flow every member must pass. Keycloak now answers at `/auth` on the app origin and
+  nowhere else. A device test is still worth doing, as confirmation rather than as a gate.
+- **REQ-UI-020: a dedicated `maskable` icon.** The current artwork was not drawn with Android's
+  ~40 % safe zone, so the manifest declares `purpose: any` only. A maskable variant is a request to
+  the design system.
+- **REQ-UI-020: a 192 px icon.** Chromium's documented install criteria name a 192 px and a 512 px
+  entry; the implementation constant is a 144 px minimum, which the single 512 px tile satisfies.
+  One extra entry would remove the question rather than leave it resting on an implementation
+  detail.
 

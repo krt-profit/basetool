@@ -1052,8 +1052,8 @@ subnet.** There is a single public `:443` ingress: the published-port DNAT targe
 leg on `net-proxy-frontend` (`[fd00:28:3::2]` / `172.28.3.2`) and NPM selects the vhost by SNI only
 after accepting the connection, so keycloak/ingest/grafana already key on the real client IP too. The
 bridge-gateway addresses that dominate those hosts' logs are internal hairpin traffic (blackbox
-probes + the apps' OIDC hairpins to `keycloak.profit-base.online`), not masked external clients
-(verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
+probes + the apps' OIDC hairpins, which since ADR-0166 go to `profit-base.online/auth` rather than
+to a Keycloak host of its own), not masked external clients (verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
 
 Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
 from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
@@ -1468,11 +1468,38 @@ original; `PathSegment#valueToMatch()`, which `PathPattern` matches on, is the d
 **Direction matters, and only one direction is a defect.** A raw test that decides *inclusion in a
 protective scope* fails **open** — this is the defect. A raw test that decides an *exemption from* a
 gate fails **closed**: encoding can only break such a match, so the caller gets more enforcement,
-not less. Converting an exemption list to decoded matching would *widen* it, so the two frontend
-UX-routing filters deliberately keep their raw string tests — `BackendRoleSyncFilter` (waiting-page
-redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter` (consent-page redirect
-exemptions) — as do the deny-list bot filters and the backend access log's skip list. The boundary
-in both those cases is the backend gate, which does match on the decoded path.
+not less. The deny-list bot filters and the backend access log's skip list therefore keep their raw
+string tests; the boundary in each of those cases is the backend gate, which does match on the
+decoded path.
+
+> [!important] Amended 2026-09-13 — the frontend's gate-exemption list is no longer carved out
+> This requirement used to name two more deliberate exceptions: `BackendRoleSyncFilter`
+> (waiting-page redirect exemptions, static-asset skip) and `TermsAcceptanceGateFilter`
+> (consent-page redirect exemptions), on the ground that decoding an exemption list only *widens*
+> it. Two things undid that. Both filters now read one list, `frontend/config/PublicPaths`
+> (REQ-SEC-052), so the exception no longer described where the code was; and the widening argument
+> proved too coarse to be right.
+>
+> `PublicPaths` answers the same question `SecurityConfig`'s `permitAll` list answers, and Spring
+> Security matches that list with a `PathPatternRequestMatcher` — on the **decoded** segment.
+> Matching raw therefore made the two layers disagree about the same path:
+> `/.well-known/assetlink%73.json` (`%73` is `s`) was `permitAll` and gate-exempt in neither filter,
+> so the URL layer admitted the request and the gate below it redirected. Fail-closed, and a
+> redirect rather than an exposure — but `PublicPaths` exists to be the *one* answer to "may a
+>
+>> session gate redirect this path", and it was not the one answer for encoded spellings. That is the
+>> same defect as the two drifted `isStaticAsset` copies the class was extracted to replace, one
+>> layer down.
+>
+> **The widening is bounded, and that is what makes it safe.** A `PathPattern` decodes per segment
+> and never re-joins them, so a spelling can only reach an entry `SecurityConfig` already
+> `permitAll`s under that same spelling: the set of exempt **resources** is unchanged, and only the
+> set of spellings that map onto them grows. Decoding the whole string instead — the shape this
+> paragraph was right to fear — would have been fail-**open**: `/css%2f../missions` decodes to
+> `/css/../missions`, which passes a `startsWith("/css/")` that Spring Security's own `/css/**`
+> refuses, because a decoded `%2F` stays inside its segment.
+>
+> Found in the review of PR #1870 and fixed as its own change. Owner-approved 2026-09-13.
 
 The rule is enforced by tests, not by review: each converted site carries a **direct filter test**
 driving an encoded spelling. It cannot be a MockMvc test — MockMvc normalises the path before the
@@ -1492,14 +1519,18 @@ filter runs, so such a test passes against the broken code.
   member only on the two import endpoints, in both directions — an encoded spelling of an unbound
   path stays refused, and an encoded spelling of a bound one still acts (ADR-0129).
 - [x] Every converted site has a direct filter regression test that fails against the raw idiom.
+- [x] The frontend's gate-exemption list decides on the decoded path, so `permitAll` and both
+  session gates accept the same spellings of a public document (REQ-SEC-052). The exempt
+  **resource** set is unchanged; an encoded slash cannot manufacture an asset prefix, and a
+  double-encoded spelling is not decoded a second time.
 
 **Enforced by:** `PendingApprovalAccessFilterTest`, `TermsAcceptanceAccessFilterTest`,
 `ActingMemberFilterPathMatchingTest`, `IngestPathScopeTest`, `ClientIdentityFilterTest`,
 `FiltersTest`, `RequestLoggingFilterTest` (ingest), `RequestBodySizeLimitFilterTest`,
-`ApiCacheControlFilterTest` · **Code:** `IngestPathScope`, `PendingApprovalAccessFilter`,
-`TermsAcceptanceAccessFilter`, `ActingMemberFilter`, `RequestBodySizeLimitFilter`,
-`ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest), `PayloadSizeLimitFilter`,
-`RequestLoggingFilter` (ingest)
+`ApiCacheControlFilterTest`, `PublicPathsTest` · **Code:** `IngestPathScope`,
+`PendingApprovalAccessFilter`, `TermsAcceptanceAccessFilter`, `ActingMemberFilter`,
+`RequestBodySizeLimitFilter`, `ApiCacheControlFilter`, `RateLimitingFilter` (backend + ingest),
+`PayloadSizeLimitFilter`, `RequestLoggingFilter` (ingest), `PublicPaths` (frontend)
 
 ### REQ-SEC-030 — The native mobile client's refresh token MUST be sender-constrained, its access token MUST NOT be
 
@@ -2997,15 +3028,69 @@ a method gate.
 
 **Frontend** — the only `permitAll()` matchers:
 
-|                                      Path                                       |                                                                Why it stays public                                                                 |
-|---------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/`                                                                             | The landing page. Product name, one paragraph, the two login entries, the legal links, the Fan Kit band. **No backend call, no data, no session.** |
-| `/impressum`, `/privacy`, `/terms`                                              | Legal obligation: Impressumspflicht, DSGVO information duties, terms readable before agreeing.                                                     |
-| `/error`, `/error/**`                                                           | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.                                          |
-| the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                       |
-| `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                           |
-| `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                           |
-| `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                    |
+|                                      Path                                       |                                                                                                                                                       Why it stays public                                                                                                                                                       |
+|---------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/`                                                                             | The landing page. Product name, one paragraph, the two login entries, the legal links, the Fan Kit band. **No backend call, no data, no session.**                                                                                                                                                                              |
+| `/impressum`, `/privacy`, `/terms`                                              | Legal obligation: Impressumspflicht, DSGVO information duties, terms readable before agreeing.                                                                                                                                                                                                                                  |
+| `/error`, `/error/**`                                                           | Error pages carry no data, and an error view that needs a session cannot render the outage that broke it.                                                                                                                                                                                                                       |
+| the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                                                                                                                                                                                                    |
+| `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                                                                                                                                                                                                        |
+| `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page. Same class as the entry above it. |
+| `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                                                                                                        |
+| `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
+
+> [!note] `/auth/**` is on this origin and is **not** in the table above — it never reaches Spring
+> Since [ADR-0166](../adr/0166-identity-moves-onto-the-app-origin.md) Keycloak answers at `/auth` on
+> the web host, so that the installed web app's sign-in stays inside its manifest `scope`
+> (`REQ-UI-020`). The edge routes the prefix to the Keycloak container before the frontend sees it,
+> so there is no `permitAll` entry to add and no session gate to exempt — the requests are not this
+> application's at all. Two properties travel with the move and are worth stating where the public
+> surface is enumerated:
+>
+> - **The admin console did not become public.** It moved from `keycloak.profit-base.online/admin`
+>   to `/auth/admin` and kept the same bridge-gateway allow-list with its closing `deny all`, which
+>   the nightly external deny probe asserts from a GitHub runner — the only vantage point that can,
+>   since an internal probe shares the network position the rule tests.
+> - **Keycloak now receives this application's `SESSION` cookie**, because a cookie scoped to `/` is
+>   sent to every path on the origin. Recorded rather than mitigated: Keycloak already holds every
+>   member's credentials and mints their tokens, so an identifier it ignores adds nothing to what a
+>   compromised Keycloak could already do, and filtering a `Cookie` header in nginx would put a
+>   fragile hand-written rule in front of the login path for no reduction in blast radius.
+>
+> [!important] `permitAll` is only half of "public" — the session gates are the other half
+> `permitAll` decides **authorisation**. It does not stop a filter further down the chain from
+> redirecting an *authenticated* caller away from the path, and two do: `TermsAcceptanceGateFilter`
+> sends an unconsented member to the consent page, and `BackendRoleSyncFilter` sends an unapproved
+> one to the waiting page and reconciles roles against the backend on the way.
+>
+> For a **page** that is correct. For a **document** — one an external verifier or a browser fetches
+> on its own schedule — it turns the document into a login page. `/.well-known/assetlinks.json`
+> shipped exactly that way: `permitAll` here, exempt in neither gate, so a signed-in member was
+> answered with the consent page and each hit paid a `/api/v1/users/me` round trip.
+>
+> The exemption therefore lives in **one** place, `frontend/config/PublicPaths`, which both gates
+> read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
+> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`) and `isAuthInfrastructure`
+> (login, logout, OAuth, error, actuator). **A new public document goes in both this table and
+> `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
+>
+> **Both halves match the same way, so both accept the same spellings.** Spring Security matches
+> `permitAll` with a `PathPatternRequestMatcher`, which decides on the percent-**decoded**
+> segment. `PublicPaths` compared the raw `getRequestURI()`, so `/.well-known/assetlink%73.json`
+> was `permitAll` here and exempt in neither gate — admitted by the URL layer, then redirected by
+> the one below it. Fail-closed, so a consistency defect rather than a hole, but the same defect
+> as the drifted copies above, one layer down. Every predicate in `PublicPaths` matches a parsed
+> `PathPattern` now: **Spring Security is the reference and `PublicPaths` follows it.**
+>
+> Decoding widens the *spellings*, never the set of exempt *resources* — nothing becomes exempt
+> that this table does not already list. Decoding the whole string instead would have been
+> fail-**open**: `/css%2f../missions` decodes to `/css/../missions` and passes a
+> `startsWith("/css/")` that Spring Security's own `/css/**` refuses, because a decoded `%2F`
+> stays inside its segment. Matching per segment cannot make that mistake. `PublicPathsTest` pins
+> `%73`, `%2E`, `%2e%2e`, `%252e` and `%2f`; the default `StrictHttpFirewall` refuses all but the
+> first of those with a `400` before any of it is reached. Same defect, same fix and same
+> reasoning as the backend's `TermsAcceptanceAccessFilter`, `PendingApprovalAccessFilter` and
+> `RequestBodySizeLimitFilter`.
 
 **Backend** — the only `permitAll()` matchers on the main chain:
 

@@ -1061,6 +1061,86 @@ re-reads exactly the shape the page was rendered with.
 `InventoryItemRepository#findGameItemStockRowsByJobOrderIds` · **Issues:** #1740, #1742 ·
 **ADR:** — (extends REQ-INV-027 / REQ-ORDERS-034)
 
+### REQ-INV-040 — Both Lager pages filter by storage location
+
+A location is part of the stock identity on both Lager pages — it is a grouping dimension of the
+material stack key (REQ-INV-002) and of the quality-less item stack key
+([`inventory-items.md`](inventory-items.md) REQ-INV-029) — so everything a member holds at one place
+is spread across every material group of the tree. Before this, neither page could narrow by it: the
+filter panel (REQ-INV-037) offered Material / quality floor / Auftrag / Einsatz / the personal flags
+on "Mein Lager" and the same minus the personal flags on the shared "Globales Lager". The everyday
+question *"what is still sitting at this station, and is it worth flying there"* therefore cost an
+expand-and-read pass over the whole tree — several fetches, because stacks are lazy and paginated
+(REQ-INV-005 / REQ-INV-033).
+
+Both Lager pages therefore carry a **location multi-select in the filter panel, in both the Material
+and the Items view** — `/inventory/my` and `/inventory/all`, four views in total. It behaves like
+every other multi-select on these pages: all boxes ticked means no filter, the selection is mirrored
+into the URL, persisted per browser (REQ-UI-017) and counted by the collapsed panel's active-filter
+chip (REQ-INV-037), which needs no extra wiring because that count is derived from the persisted
+snapshot.
+
+- **The options are in-scope stock, never the catalog.** The location catalog is the whole Star
+  Citizen universe, which is why every location *picker* on these pages (the Umbuchen target, the
+  book-out transfer target) searches server-side instead of rendering a list. A filter multi-select
+  cannot search, so its options are built from the grouped result's own stack keys — the same rule
+  the gameItem filter follows (REQ-INV-030): only locations that currently hold stock in that view's
+  scope (the caller's own rows on "Mein Lager", the org-unit-scoped rows on the shared page).
+- **An active filter must not narrow its own options.** Deriving the options from the filtered result
+  would leave the dropdown holding only the locations already picked, and the selection could never
+  be widened again — the filter would be a one-way door. So when any filter dimension is active, a
+  full (non-fragment) render re-reads the view unfiltered for the option list alone. A failed re-read
+  degrades to the displayed groups' locations rather than to an empty dropdown.
+- **The filter is catalog-agnostic.** `locationIds` is accepted on **both** catalogs and must never
+  join the material-only rejection set of REQ-INV-029/031 (`minQuality` / `missionIds` /
+  `materialIds`): an item stack carries a location exactly like a material stack does. It is relayed
+  on the four filter-carrying backend endpoints — `GET /my-inventory/grouped`,
+  `GET /my-inventory/entry-ids`, `GET /all/grouped` and `GET /all`. The two stack-entry endpoints
+  need nothing: a stack row is already location-pinned through their mandatory `locationId`, so the
+  lazily loaded leaf rows follow the filter for free.
+- **"Alle markieren" resolves the same set the table shows.** The select-all id query (REQ-INV-034)
+  carries the location filter too. Without that parity a bulk check-out would reach past the location
+  the user is looking at — the precise failure the server-resolved select-all exists to prevent.
+
+**Acceptance criteria**
+
+- [ ] All four of `/inventory/my`, `/inventory/my?view=items`, `/inventory/all` and
+  `/inventory/all?view=items` render the location multi-select inside the filter panel.
+- [ ] Its options are only the locations that currently hold stock in that view's scope — never the
+  location catalog.
+- [ ] With a location filter active, the option list still offers the locations the filter excludes,
+  so the selection can be widened again.
+- [ ] Selecting locations narrows the grouped table in place via `krtFetch` (no full page reload),
+  and an expanded stack's lazily loaded entries show only rows at the selected locations.
+- [ ] "Alle markieren" on "Mein Lager" resolves exactly the id set the location-filtered table shows,
+  on both catalogs.
+- [ ] The parameter is accepted under `catalog=ITEM` (never 400-rejected as a material-only filter)
+  and narrows the item tree the same way.
+- [ ] The selection survives a reload per page and per view (REQ-UI-017) and is counted by the
+  active-filter chip (REQ-INV-037); every box ticked counts as no filter.
+- [ ] The two pages' stored selections stay independent (`inventory_my_filters` /
+  `inventory_admin_filters`).
+
+**Enforced by:** `InventoryItemStackQueryDataTest`
+(`findUserStacks_locationIds_narrowToThePickedLocation`,
+`findUserItemStacks_locationIds_narrowToThePickedLocation`,
+`findUserEntryIds_locationIds_matchTheFilteredStacks`), `InventoryItemControllerTest`
+(`getMyGroupedInventory_catalogMaterial_forwardsLocationIds`,
+`getMyGroupedInventory_catalogItem_forwardsLocationIdsInsteadOfRejectingThem`,
+`getMyEntryIds_forwardsLocationIdsOnBothCatalogs`,
+`getAllGroupedInventory_forwardsLocationIdsOnBothCatalogs`), `InventoryPageControllerMvcTest`
+(`lagerViews_renderTheLocationFilterWithInScopeOptions`), `InventoryPageControllerTest`
+(`viewMyInventory_locationFilter_forwardedToBackendAndOptionsComeFromTheStacks`,
+`viewMyInventory_locationOptions_areNotNarrowedByTheActiveLocationFilter`,
+`viewAllInventory_locationFilter_forwardedToBackendAndModel`,
+`myEntryIds_locationFilter_forwardedOnBothViews`) · **Code:**
+`InventoryItemRepository` (`hasLocations` / `locationIds` gate on the stack, entry-id and flat
+queries), `InventoryAggregationService`, `InventoryItemService`, `InventoryItemController`,
+`InventoryPageController` (`resolveLocationFilterOptions`, `fetchGroupedMaterialInventory`),
+`templates/inventory-my.html`, `templates/inventory-admin.html`, `static/js/inventory-my.js`,
+`static/js/inventory-admin.js` · **Issues:** #1879 · **ADR:** — (extends REQ-INV-030 / REQ-INV-034 /
+REQ-INV-037)
+
 ## Out of scope
 
 - Tenancy / visibility scope of inventory (strict-staffel Lager-View) is governed by

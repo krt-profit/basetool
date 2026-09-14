@@ -604,7 +604,14 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
-  listOf("e2e.baseUrl", "e2e.browser", "e2e.username", "e2e.password", "e2e.hostResolverRules")
+  listOf(
+      "e2e.baseUrl",
+      "e2e.browser",
+      "e2e.device",
+      "e2e.username",
+      "e2e.password",
+      "e2e.hostResolverRules",
+    )
     .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }
 
@@ -655,6 +662,93 @@ val lintCss =
     inputs.files(fileTree("src/main/resources/static/css") { include("**/*.css") })
     inputs.file("package.json")
     inputs.file(".stylelintrc.json")
+  }
+
+// The CSS inside a Thymeleaf <style> block, which no gate read until 2026-09-13.
+//
+// `lintCss` globs `static/css/**`, `prettierCheck` the same plus `static/js` and `types/`, and
+// HTMLHint does not parse CSS at all — so roughly 2,000 lines of inline CSS across 110 templates
+// were unlinted. A review found what that costs: two templates carried a STRAY `}` after a rule
+// that was already closed, and per CSS Syntax 3 the parser consumes the next rule as part of an
+// invalid prelude and drops it — `.mission-head-sticky` was deleted on three pages at every
+// viewport width, with `nginx -t`-grade confidence from every green check in CI.
+//
+// Stylelint reads inline CSS with `postcss-html`. This task runs with a DELIBERATELY TINY rule set
+// (see .stylelintrc.templates.json) rather than the stylesheet config, because the value is almost
+// all in the parse: run against the broken revision with NO rules enabled at all, it reports
+// `Unexpected }` at mission-detail.html:39:9 — exactly the defect, exactly the line. Adopting the
+// full `stylelint-config-standard` here would instead surface hundreds of pre-existing findings
+// and the gate would never be enabled. `media-feature-range-notation` is the one style rule worth
+// its cost: it is what keeps `@media (max-width: 768px)` from reappearing beside the range form
+// every rule in static/css uses, and it auto-fixes.
+val lintCssInline =
+  tasks.register<NpxTask>("lintCssInline") {
+    group = "verification"
+    description = "Lints the CSS inside Thymeleaf <style> blocks (Stylelint + postcss-html)."
+    dependsOn(tasks.named("npmInstall"))
+    command.set("stylelint")
+    args.set(
+      listOf(
+        "--config",
+        ".stylelintrc.templates.json",
+        "src/main/resources/templates/**/*.html",
+      )
+    )
+    ignoreExitValue.set(false)
+    inputs.files(fileTree("src/main/resources/templates") { include("**/*.html") })
+    inputs.file("package.json")
+    inputs.file(".stylelintrc.templates.json")
+  }
+
+// The JavaScript inside TouchClassLayoutE2eTest's Java text block, which no tool could read.
+//
+// That probe is ~500 lines evaluated in the page, and compiling the Java only proves the STRING is
+// valid. Two defects reached CI through that gap: `replaceAll("\s+", " ")`, where `\s` is a legal
+// Java escape for a space so the regex silently became `" +"`; and a guard referencing
+// `badControls`
+// a hundred lines above its `const`, a temporal-dead-zone ReferenceError that turned all 66 routes
+// into "could not be measured" on every device class.
+//
+// `extractProbeJs` writes the script out with its format placeholders stubbed; `lintProbeJs` runs a
+// deliberately tiny rule set over it (see eslint.probe.config.mjs). Verified against the broken
+// revision: it reports `'badControls' was used before it was defined`.
+val probeSource =
+  layout.projectDirectory.file(
+    "src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/TouchClassLayoutE2eTest.java"
+  )
+val extractProbeScript = layout.projectDirectory.file("scripts/extract-probe-js.mjs")
+val extractedProbe = layout.buildDirectory.file("probe/probe.js")
+
+val extractProbeJs =
+  tasks.register<NodeTask>("extractProbeJs") {
+    group = "verification"
+    description = "Extracts the e2e probe script out of its Java text block so eslint can read it."
+    dependsOn(tasks.named("npmSetup"))
+    script.set(extractProbeScript.asFile)
+    args.set(listOf(probeSource.asFile.absolutePath, extractedProbe.get().asFile.absolutePath))
+    ignoreExitValue.set(false)
+    inputs.file(probeSource)
+    inputs.file(extractProbeScript)
+    outputs.file(extractedProbe)
+  }
+
+val lintProbeJs =
+  tasks.register<NpxTask>("lintProbeJs") {
+    group = "verification"
+    description = "Lints the extracted e2e probe script (Java text blocks hide JavaScript defects)."
+    dependsOn(extractProbeJs)
+    command.set("eslint")
+    args.set(
+      listOf(
+        "--no-config-lookup",
+        "--config",
+        "eslint.probe.config.mjs",
+        extractedProbe.get().asFile.absolutePath,
+      )
+    )
+    ignoreExitValue.set(false)
+    inputs.file(extractedProbe)
+    inputs.file("eslint.probe.config.mjs")
   }
 
 val lintHtml =
@@ -810,5 +904,14 @@ val testGenApiTypes =
   }
 
 tasks.named("check").configure {
-  dependsOn(lintCss, lintHtml, lintJs, prettierCheck, typecheckJs, testGenApiTypes)
+  dependsOn(
+    lintCss,
+    lintCssInline,
+    lintProbeJs,
+    lintHtml,
+    lintJs,
+    prettierCheck,
+    typecheckJs,
+    testGenApiTypes,
+  )
 }

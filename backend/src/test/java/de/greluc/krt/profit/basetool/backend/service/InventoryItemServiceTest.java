@@ -221,6 +221,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -253,6 +255,8 @@ class InventoryItemServiceTest {
     when(inventoryItemRepository.findGlobalByFilters(
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(true),
             eq(jobOrderIds),
@@ -268,7 +272,7 @@ class InventoryItemServiceTest {
     // When
     Page<InventoryItemDto> result =
         inventoryItemService.getAllInventory(
-            null, null, jobOrderIds, missionIds, Pageable.unpaged());
+            null, null, null, jobOrderIds, missionIds, Pageable.unpaged());
 
     // Then
     assertNotNull(result);
@@ -277,6 +281,8 @@ class InventoryItemServiceTest {
         .findGlobalByFilters(
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(true),
             eq(jobOrderIds),
@@ -304,6 +310,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(true),
             eq(jobOrderIds),
@@ -324,6 +332,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(true),
             eq(jobOrderIds),
@@ -343,6 +353,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -360,6 +372,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -384,6 +398,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(true),
             eq(materialIds),
+            eq(false),
+            isNull(),
             eq(minQuality),
             eq(false),
             eq(null),
@@ -404,6 +420,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(true),
             eq(materialIds),
+            eq(false),
+            isNull(),
             eq(minQuality),
             eq(false),
             eq(null),
@@ -425,6 +443,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -436,7 +456,8 @@ class InventoryItemServiceTest {
 
     // When
     List<GroupedInventoryDto> result =
-        inventoryItemService.getMyAggregatedInventory(userId, null, null, null, null, true, false);
+        inventoryItemService.getMyAggregatedInventory(
+            userId, null, null, null, null, null, true, false);
 
     // Then
     assertNotNull(result);
@@ -445,6 +466,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -466,6 +489,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),
@@ -477,7 +502,8 @@ class InventoryItemServiceTest {
 
     // When
     List<GroupedInventoryDto> result =
-        inventoryItemService.getMyAggregatedInventory(userId, null, null, null, null, false, true);
+        inventoryItemService.getMyAggregatedInventory(
+            userId, null, null, null, null, null, false, true);
 
     // Then
     assertNotNull(result);
@@ -486,6 +512,8 @@ class InventoryItemServiceTest {
             eq(userId),
             eq(false),
             eq(null),
+            eq(false),
+            isNull(),
             eq(null),
             eq(false),
             eq(null),

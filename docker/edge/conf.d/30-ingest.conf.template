@@ -22,10 +22,7 @@ server {
 
   location / {
     include /etc/nginx/edge/include/proxy.conf;
-    proxy_ssl_verify              on;
-    proxy_ssl_verify_depth        2;
-    proxy_ssl_trusted_certificate /etc/nginx/upstream-ca.crt;
-    proxy_ssl_server_name         on;
+    include /etc/nginx/edge/include/upstream-tls.conf;
     proxy_ssl_name                ingest;
     # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
     # once at startup and caches the address forever, so a recreated container

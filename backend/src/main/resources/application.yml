@@ -243,7 +243,10 @@ app:
       # disabling the sync.
       cron: ${APP_KEYCLOAK_SYNC_CRON:0 0 5 * * *}
       zone: ${APP_KEYCLOAK_SYNC_ZONE:Europe/Berlin}
-      admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080}
+      # /auth: Keycloak's relative path (ADR-0166). This base carries both the token POST and
+      # the /admin/realms calls, and a base without it 404s the token POST — which fetchUsers
+      # swallows, so the sync fails silently.
+      admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:18080/auth}
       realm: ${KEYCLOAK_REALM:iri}
       client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:backend-service}
       client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}

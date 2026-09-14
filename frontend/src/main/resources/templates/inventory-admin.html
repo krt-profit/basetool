@@ -45,7 +45,7 @@
             margin-bottom: 1rem;
         }
 
-        @media (max-width: 768px) {
+        @media (width <= 768px) {
             .global-inventory-filter {
                 flex-direction: column;
                 align-items: stretch !important;
@@ -130,10 +130,10 @@
             display: block;
             color: var(--color-gray-1);
         }
-        @media (max-width: 1024px) {
+        @media (width <= 1024px) {
             .inventory-note-preview { max-width: 100%; font-size: 1rem; }
         }
-        @media (max-width: 768px) {
+        @media (width <= 768px) {
             .inventory-note-preview { max-width: 100%; font-size: 1rem; padding: 0.6rem 0.75rem; }
         }
 
@@ -243,6 +243,29 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Location filter (REQ-INV-040): the options are the locations that
+                         currently hold stock in this view's scope, never the location catalog —
+                         that is the whole universe, which is why every location PICKER on this
+                         page searches server-side instead. A filter multi-select cannot search,
+                         so the controller derives these from the grouped result's stack keys. -->
+                    <div class="flex-gap-sm">
+                        <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
+                        <div class="multi-select-container" id="locationFilterContainer">
+                            <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="locationOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="locationHeader">
+                                <span class="selected-text" id="locationSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="locationOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="locAll" value="ALL" data-trigger="inv-admin-toggle-all" data-all-id="locAll" data-check-class="locCheck" data-header-id="locationHeader">
+                                </label>
+                                <label class="multi-select-option" th:each="loc : ${locations}">
+                                    <span th:text="${loc.name}">Standort</span>
+                                    <input type="checkbox" class="locCheck" name="locationIds" th:value="${loc.id}" th:checked="${selectedLocationIds != null and selectedLocationIds.contains(loc.id)}" data-trigger="inv-admin-update-state" data-all-id="locAll" data-check-class="locCheck" data-header-id="locationHeader">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="flex-gap-sm">
                         <label for="minQuality" class="form-label-xs" th:text="#{inventory.filter.minQuality}">Qualität &ge;:</label>
                         <select id="minQuality" name="minQuality" class="krtm-padding-0-375rem-2-5rem-0-375rem-0-75rem-min-caea" data-trigger="inv-admin-filter">
@@ -310,6 +333,29 @@
                                 <label class="multi-select-option" th:each="gi : ${gameItems}">
                                     <span th:text="${gi.name}">Item</span>
                                     <input type="checkbox" class="gameItemCheck" name="gameItemIds" th:value="${gi.id}" th:checked="${selectedGameItemIds != null and selectedGameItemIds.contains(gi.id)}" data-trigger="inv-admin-update-state" data-all-id="gameItemAll" data-check-class="gameItemCheck" data-header-id="gameItemHeader">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Location filter (REQ-INV-040): the options are the locations that
+                         currently hold stock in this view's scope, never the location catalog —
+                         that is the whole universe, which is why every location PICKER on this
+                         page searches server-side instead. A filter multi-select cannot search,
+                         so the controller derives these from the grouped result's stack keys. -->
+                    <div class="flex-gap-sm">
+                        <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
+                        <div class="multi-select-container" id="itemLocationFilterContainer">
+                            <div class="multi-select-header" data-trigger="inv-admin-toggle-multi" data-multi-target="itemLocationOptions" th:data-all="#{filter.all}" th:data-selected="#{filter.selected}" id="itemLocationHeader">
+                                <span class="selected-text" id="itemLocationSelectedText" th:text="#{filter.all}">Alle</span>
+                            </div>
+                            <div class="multi-select-options" id="itemLocationOptions">
+                                <label class="multi-select-option">
+                                    <span th:text="#{filter.all}">Alle</span>
+                                    <input type="checkbox" id="itemLocAll" value="ALL" data-trigger="inv-admin-toggle-all" data-all-id="itemLocAll" data-check-class="locCheck" data-header-id="itemLocationHeader">
+                                </label>
+                                <label class="multi-select-option" th:each="loc : ${locations}">
+                                    <span th:text="${loc.name}">Standort</span>
+                                    <input type="checkbox" class="locCheck" name="locationIds" th:value="${loc.id}" th:checked="${selectedLocationIds != null and selectedLocationIds.contains(loc.id)}" data-trigger="inv-admin-update-state" data-all-id="itemLocAll" data-check-class="locCheck" data-header-id="itemLocationHeader">
                                 </label>
                             </div>
                         </div>

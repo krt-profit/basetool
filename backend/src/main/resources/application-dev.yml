@@ -15,7 +15,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}
           # NOTE: do NOT add `jwk-set-uri` here. Spring's own key must be either absent or a real
           # URL -- an empty value is not "unset": Boot binds it as PRESENT-but-empty, takes the
           # jwk-set-uri branch of the resource-server auto-configuration and fails the context with

@@ -71,6 +71,12 @@
 
     <div class="hud-box mt-2">
         <h2 th:text="#{admin.notificationRules.existing}">Vorhandene Regeln</h2>
+        <!-- .table-responsive (REQ-UI-009): seven columns of rule metadata measure 1303px, which
+             is wider than every device class this app supports — the page scrolled SIDEWAYS even at
+             1280px, and on a phone it widened the layout viewport to 1329px and took the header and
+             the notification bell out of view with it. Found the day /admin/notification-rules was
+             added to the touch-class sweep, having never been measured before. -->
+        <div class="table-responsive">
         <table id="rules-table">
             <thead>
             <tr>
@@ -105,6 +111,7 @@
             </tr>
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="hud-box mt-2">

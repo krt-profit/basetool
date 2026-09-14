@@ -86,8 +86,26 @@
                data-testid="bank-requests-empty" th:text="#{bank.requests.empty}">
                 Keine Antr&auml;ge in diesem Status.
             </p>
-            <table class="data-table" th:if="${requests != null and !#lists.isEmpty(requests.content())}"
-                   data-testid="bank-requests-table">
+            <!-- .table-responsive (REQ-UI-009): six columns plus the expand chevron do not fit a
+                 phone, and REQ-UI-009 lets a wide TABLE scroll inside its own container — it does
+                 not let the page scroll. Without the wrapper this table widened the layout viewport
+                 to 912px on a 375px screen, which is worse than a clipped table: `position: fixed`
+                 resolves against the layout viewport, so all three confirm/reject/movement modals
+                 then centred themselves at 456px and sat almost entirely off-screen, and the header
+                 bell was pushed out with them. Measured 2026-09-13; this was the only data-table in
+                 the whole template tree without the wrapper. -->
+            <!-- The wrapper carries the SAME condition as the table it wraps. Every sibling
+                 gates the wrapper this way (admin/audit-log.html, admin-settings.html); an
+                 unconditional one emits a stray empty scroll container after the "Keine
+                 Anträge" paragraph on an empty queue, in a fragment that is swapped on
+                 every filter toggle. The condition is stated ONCE, here — the table inside
+                 carried a verbatim copy of it, evaluated a second time per render, and a
+                 later change relaxing one and not the other yields either a wrapper with no
+                 table or a table with no scroll container, the latter re-introducing the
+                 912px overflow this wrapper exists to fix. -->
+            <div class="table-responsive"
+                 th:if="${requests != null and !#lists.isEmpty(requests.content())}">
+            <table class="data-table" data-testid="bank-requests-table">
                 <thead>
                 <tr>
                     <th class="bank-expand-cell"></th>
@@ -189,6 +207,7 @@
                 </th:block>
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 

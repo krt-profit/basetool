@@ -82,5 +82,5 @@ app:
       # REQ-SEC-024: opt-in. Fetch the JWT signing keys from the INTERNAL Keycloak instead of
       # hairpinning through the public edge. Empty (default) derives the JWKS from issuer-uri. When
       # set, the key fetch uses the keycloak-trust bundle above (cert SAN dns:keycloak). Recommended:
-      #   https://keycloak:18443/realms/iri/protocol/openid-connect/certs
+      #   https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}

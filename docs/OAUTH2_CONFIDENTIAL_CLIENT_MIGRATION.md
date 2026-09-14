@@ -165,7 +165,7 @@ Im `### Security`-Block unter `## [Unreleased]` ergänzen. Form analog zu L-4:
 
 **B.1 — Anmelden in der Keycloak Admin Console**
 
-URL prod: `https://keycloak.profit-base.online/admin/`. Mit Admin-Credentials einloggen (aus `.env`: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`).
+URL prod: `https://profit-base.online/auth/admin/` (moved 2026-09-13, ADR-0166). Mit Admin-Credentials einloggen (aus `.env`: `KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`).
 
 **B.2 — Client `basetool-frontend` auf confidential umstellen**
 

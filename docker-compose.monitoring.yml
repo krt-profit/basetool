@@ -243,9 +243,27 @@ services:
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OAUTH_CLIENT_ID:-grafana}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OAUTH_CLIENT_SECRET:?GRAFANA_OAUTH_CLIENT_SECRET must be set for the monitoring stack}
       GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
-      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/auth
-      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/token
-      GF_AUTH_GENERIC_OAUTH_API_URL: https://keycloak.profit-base.online/realms/iri/protocol/openid-connect/userinfo
+      # DERIVED from the same single source as the app stack, not restated three times (ADR-0167).
+      #
+      # Grafana's generic_oauth provider has no discovery option — it takes the three endpoints
+      # literally — so the realm URL used to appear here three times, in three places that could each
+      # drift alone. They now share one `${IRI_KEYCLOAK_HOSTNAME:-...}` expansion, which is exactly
+      # the variable docker-compose.yml derives the apps' issuer from. Move the identity domain and
+      # all three follow, along with the issuer, in one edit.
+      #
+      # It reaches this file because BOTH compose projects run with the same project directory —
+      # `docker compose -p iri-monitoring --project-directory /var/iri/code` (MONITORING_ROLLOUT_
+      # RUNBOOK) — and compose reads `.env` from there. So one value in one .env feeds the app stack
+      # and this one. A monitoring stack started from somewhere else simply gets the production
+      # default, which is what it got before this change.
+      #
+      # The `/auth` path lives in the variable itself (ADR-0166), so it is NOT repeated below; the
+      # realm segment is. scripts/check-keycloak-issuer.py asserts all three still agree with the
+      # issuer the apps validate, which is the property that matters: a Grafana pointed at a
+      # different realm than the one minting the tokens fails login with nothing wrong in any log.
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/userinfo
       GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
       GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
       GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username

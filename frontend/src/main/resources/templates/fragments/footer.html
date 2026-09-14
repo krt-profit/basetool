@@ -5,7 +5,11 @@
   Global page footer. Included once from `fragments/sidebar.html` so every
   page that renders the sidebar (i.e. every page) also renders the footer.
   CSS (.krt-footer in styles.css) uses flex `order: 999` to push the footer
-  to the bottom of the body regardless of DOM position.
+  to the bottom of the body regardless of DOM position — on the phone class,
+  where the footer is `position: static` and in flow. Above 768px it is
+  `position: fixed; bottom: 0`, so DOM position is irrelevant there and no
+  order is needed. sidebar.js additionally moves the element to the end of
+  <body> for reading order; that is not what places it.
 
   Why a visible footer when the same links live in the sidebar?  Standard
   web convention: users looking for Impressum / Datenschutz /

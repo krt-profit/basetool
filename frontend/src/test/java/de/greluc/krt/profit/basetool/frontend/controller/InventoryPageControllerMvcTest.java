@@ -2222,4 +2222,76 @@ class InventoryPageControllerMvcTest {
         .andExpect(content().string(containsString("#1042 " + NEED_SEPARATOR + " noch 5")))
         .andExpect(content().string(containsString("value=\"" + orderId + "\"")));
   }
+
+  /**
+   * REQ-INV-040: both Lager pages carry the location multi-select, in both the Material and the
+   * Items view. The options are the locations that actually hold stock in the viewer's scope — they
+   * are derived from the grouped result's stack keys, so a stocked location renders as an option
+   * and the widget never falls back to the location catalog.
+   *
+   * @param path the Lager view under test
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/inventory/my",
+        "/inventory/my?view=items",
+        "/inventory/all",
+        "/inventory/all?view=items"
+      })
+  @WithMockUser(roles = "ADMIN")
+  void lagerViews_renderTheLocationFilterWithInScopeOptions(String path) throws Exception {
+    UUID locationId = UUID.randomUUID();
+    LocationReferenceDto location = new LocationReferenceDto(locationId, "Everus Harbor");
+    InventoryStackDto stack =
+        new InventoryStackDto(
+            new UserReferenceDto(UUID.randomUUID(), "pilot", null, null, null),
+            location,
+            700,
+            false,
+            null,
+            10.0,
+            700.0,
+            700,
+            1);
+    // A group carries either a material or a game item, never both — so the fixture follows the
+    // view under test; the location filter itself is the same widget on both.
+    boolean itemsView = path.contains("view=items");
+    GroupedInventoryDto group =
+        itemsView
+            ? new GroupedInventoryDto(
+                null,
+                new InventoryGameItemReferenceDto(
+                    UUID.randomUUID(), "Quantum Drive", "RSI", "SHIP_ITEM"),
+                10.0,
+                null,
+                null,
+                List.of(stack))
+            : new GroupedInventoryDto(
+                new MaterialReferenceDto(UUID.randomUUID(), "Quantanium", "SCU"),
+                null,
+                10.0,
+                700.0,
+                700,
+                List.of(stack));
+    // Only the grouped reads return stock; every other lookup on the page (job orders, missions,
+    // users, …) keeps its own empty list, or the stack rows would be handed to the wrong widget.
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(
+            invocation ->
+                ((String) invocation.getArgument(0)).contains("/grouped")
+                    ? List.of(group)
+                    : Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get(path))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("name=\"locationIds\"")))
+        .andExpect(content().string(containsString("class=\"locCheck\"")))
+        .andExpect(content().string(containsString("Everus Harbor")))
+        .andExpect(content().string(containsString("Standort")));
+  }
 }

@@ -39,7 +39,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.FieldSource;
 
 /**
  * Accessibility smoke check: logs in once and runs the axe-core WCAG 2.0/2.1 A+AA ruleset against
@@ -107,7 +107,7 @@ class AccessibilitySmokeE2eTest {
    * @param path the app-relative path of the core page to scan
    */
   @ParameterizedTest(name = "a11y scan of {0}")
-  @ValueSource(strings = {"/", "/missions", "/orders", "/refinery-orders", "/hangar"})
+  @FieldSource("de.greluc.krt.profit.basetool.testsupport.web.FrontendPageRoutes#A11Y_SMOKE")
   void corePageHasNoCriticalOrSeriousAccessibilityViolations(String path) {
     String slug = path.equals("/") ? "home" : path.substring(1).replace('/', '-');
     try (BrowserContext context =

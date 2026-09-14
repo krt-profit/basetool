@@ -238,6 +238,16 @@ public class SecurityConfig {
                         // login callback opened in the browser instead of the app — the member
                         // landed on the 404 page mid-login. Same class as the /sm/** entry below.
                         "/.well-known/assetlinks.json",
+                        // The web app manifest (REQ-UI-020, ADR-0164), same class as the entry
+                        // above it. A browser fetches this on the LANDING page, before anyone has
+                        // signed in, and WITHOUT credentials — the locale travels in ?locale=
+                        // instead, so nothing here depends on a session. Behind the catch-all it
+                        // would answer 302 into the OAuth entry point and the "manifest" would be
+                        // the login page — the install would then either fail or name the app
+                        // after whatever the redirect returned. It exposes no data: three strings,
+                        // two colours and the path of an icon already public under /logos/**.
+                        // Pinned by AnonymousSurfaceSweepMvcTest's PUBLIC_RESOURCES entry.
+                        "/manifest.webmanifest",
                         // Browser-side asset paths that must never trigger an OAuth2 entry-point
                         // (and therefore must never land in HttpSessionRequestCache as a saved
                         // request). Background sourcemap lookups fired by DevTools and browser

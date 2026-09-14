@@ -1695,9 +1695,26 @@ instead of trusting the one-time rollout verification:
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
   design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
   contract.
+- **Public surface stays public** — the `blackbox-public-surface` job probes the seven frontend
+  paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/robots.txt`,
+  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`) with
+  `http_public_200_no_redirect` — exactly `200`, **redirects not followed**;
+  `EdgePublicSurfaceNot200` (warning, 15 min) fires on drift. This is the inverse of the
+  members-only probe and, until 2026-09-13, the half that had none. **`follow_redirects: false` is
+  the entire point:** `http_2xx` follows them, so a target there stays green after the path has
+  regressed into the OAuth entry point — the probe follows the `302`, Keycloak answers `200`, and
+  the module reports success on an endpoint that is now the login page. That reads as coverage and
+  is worse than no probe, which is why these targets do not live in `blackbox-http`. The manifest is
+  the one with a user-visible failure mode: a browser reads it before any login, so a redirect makes
+  every new home-screen install take its name and icon from the login page (REQ-UI-020, ADR-0164);
+  `assetlinks.json` is the same trap on the Android side and is the one that has already sprung. No
+  `Accept` header is sent, because the targets span HTML, a manifest, JSON and plain text and a
+  probe naming one type would assert content negotiation rather than reachability. The probe
+  declares itself with `X-Basetool-Probe: public-surface` so the frontend's request cache does not
+  mint a Redis session per hit, for the same reason as the members-only probe.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
-  `EdgeHstsHeaderMissing` (warning). Extended to the keycloak/grafana/ingest vhosts once their
+  `EdgeHstsHeaderMissing` (warning). Extended to the grafana/ingest vhosts once their
   header posture is verified in the NPM UI.
 - **Keycloak `/admin` allow-list** — asserted **externally** by the daily
   `.github/workflows/edge-deny-probe.yml` run. The internal blackbox exporter cannot carry this
@@ -1708,6 +1725,20 @@ instead of trusting the one-time rollout verification:
 The posture jobs are separate from the `blackbox-http` liveness job; `BlackboxProbeFailed` is
 scoped to liveness, and every posture alert carries an `and on()` guard on the main-page probe so
 a full edge outage pages once (liveness), not once per posture assertion.
+
+**The identity probe targets are gated in CI, because `prometheus.yml` cannot be derived.** Four
+targets name the identity base — the OIDC discovery document (`blackbox-http` and its IPv6 twin) and
+Keycloak's `/auth/health` and `/auth/metrics` management-surface denies. Since ADR-0167 the app stack
+and Grafana both compose that base from `IRI_KEYCLOAK_HOSTNAME`, but this file is static: nothing
+interpolates it, so a domain move never reaches it on its own. `scripts/check-keycloak-issuer.py`
+therefore compares instead, in **both** directions — no target under the identity path may sit on
+another base, **and** all three required probes must still be present. The second half is not
+redundant: a probe relocated to another host *and* another path shape
+(`https://keycloak.example/health`) leaves the scan entirely, so a one-directional check would report
+success over a shrinking list. An uncovered probe is indistinguishable from a passing one, which is
+the premise this whole requirement rests on. The path test is segment-exact rather than a prefix
+match, for the reason ADR-0166 records about the edge's `location /auth`: a prefix swallows
+`/authorize` and `/authors`.
 
 **IPv6 + public-DNS reachability.** The public vhosts carry AAAA records (owner-confirmed 2026-07-06),
 so the edge is also probed over IPv6 and for public DNS resolution: the `blackbox-http-ipv6` /
@@ -1760,7 +1791,7 @@ off the probe jobs removes only the false page, not any real signal. (2026-07-12
 - [ ] `EdgeForceSslRedirectBroken` fires when port 80 of a public vhost stops redirecting to
   `https://`; `EdgeHstsHeaderMissing` fires when the frontend's first response drops the header.
 - [ ] The scheduled `edge-deny-probe` workflow fails when
-  `https://keycloak.profit-base.online/admin/` answers 2xx/3xx from a GitHub runner or the
+  `https://profit-base.online/auth/admin/` answers 2xx/3xx from a GitHub runner or the
   `/actuator` paths stop answering 404 externally.
 - [ ] `TargetDown` does **not** fire for any blackbox `/probe` job whose `up==0` (scrape-timeout
   artifact), but still fires for the `blackbox-exporter` self-scrape and every non-probe job

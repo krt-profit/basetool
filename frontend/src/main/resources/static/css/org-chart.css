@@ -84,6 +84,24 @@ main.oc-page .oc-greeting .oc-edit-toggle {
     border-top: 1px solid var(--color-gray-3);
 }
 
+/* On the phone class the footer is `position: static` and scrolls with the page, so
+   `--krt-footer-height` publishes 0 and the bar above would sit at `bottom: 0` — painting over the
+   legal links once the reader reaches the end, with the footer's own `z-index: 999` no longer
+   applying because a static element has no stacking position. `sticky` keeps the same
+   viewport-pinned feel while the chart is in view and releases at the end of the flow, which is
+   where the footer is. The bar is inserted `afterend` of the chart by org-chart.js, so it is in
+   flow and sticky works.
+
+   AFTER the rule it overrides. A media query adds no specificity: written before it, the two
+   `.oc-scrollbar` selectors tied and `position: fixed` won on the very class this block exists
+   for, so the 14px proxy bar sat at `bottom: 0` over the legal links at z-index 998. */
+@media (width <= 768px) {
+    .oc-scrollbar {
+        position: sticky;
+        bottom: 0;
+    }
+}
+
 .oc-scrollbar--active {
     display: block;
 }

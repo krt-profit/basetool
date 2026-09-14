@@ -309,13 +309,45 @@ x-keycloak: &keycloak-template
         # working thread set, so it is a runaway ceiling rather than a limit hit under normal load.
         pids: 2048
   environment:
-    # The public hostname Keycloak stamps into issuer URLs, redirect validation and its own
-    # absolute links. Overridable so a non-production environment (the PVE testing stack) can run
-    # the SAME promoted config bundle under its own domain; the default is production, so an .env
-    # that does not set it behaves exactly as before. KC_HOSTNAME_STRICT stays "true" — Keycloak
-    # must keep rejecting requests arriving under any other name, whichever name that is.
-    KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-keycloak.profit-base.online}
+    # The public BASE URL Keycloak stamps into issuer URLs, redirect validation and its own absolute
+    # links. Since ADR-0166 that is the web app's origin WITH the /auth path, because identity moved
+    # onto that origin so the installed web app's sign-in stays inside its manifest scope.
+    #
+    # THE PATH BELONGS IN BOTH OF THESE, and it is measured rather than reasoned. Keycloak 26.7 was
+    # run with the exact env below and the discovery document read back, three ways (2026-09-13):
+    #
+    #   KC_HOSTNAME                       KC_HTTP_RELATIVE_PATH   serves      advertised issuer
+    #   https://host                      /auth                   /auth       https://host/realms/…   BROKEN
+    #   https://host/auth                 /auth                   /auth       https://host/auth/…     CORRECT
+    #   https://host/auth                 (unset)                 /           —                       needs a
+    #                                                                                                 stripping proxy
+    #
+    # So the two are a PAIR after all: the hostname's path sets what Keycloak advertises, the
+    # relative path sets where it serves, and they do NOT double when they agree. Setting only the
+    # relative path produces a server that answers on /auth and hands out root links — a login that
+    # dies at the first redirect, with nothing wrong in any log. The reverse-proxy guide's three
+    # "alternatives" describe proxy shapes, not this; ours passes the prefix through unrewritten.
+    #
+    # Overridable so a non-production environment (the PVE testing stack) can run the SAME promoted
+    # config bundle under its own domain — including its own path, which must then match the edge's.
+    KC_HOSTNAME: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}
+    # Kept, and it does nothing while KC_HOSTNAME is set: upstream states `hostname-strict` is
+    # IGNORED once `hostname` is configured — a fixed hostname already means no dynamic resolution
+    # from request headers, which is what strict mode buys. It stays so that clearing KC_HOSTNAME in
+    # some future environment cannot silently re-enable header-derived hostnames.
     KC_HOSTNAME_STRICT: "true"
+    # Where Keycloak actually SERVES. Must agree with the path in KC_HOSTNAME above and with the
+    # edge's `location /auth` — see docker/edge/include/upstream-keycloak.conf for why the edge
+    # passes the prefix through instead of rewriting it away.
+    KC_HTTP_RELATIVE_PATH: /auth
+    # …but NOT the management interface. `http-relative-path` moves port 9000's endpoints with it
+    # unless `http-management-relative-path` says otherwise, which would have taken /health/ready
+    # (this file's healthcheck) and /metrics (Prometheus's `keycloak` job) to /auth/... and broken
+    # both silently at the next deploy. Pinning it to `/` confines the path change to the public
+    # surface, which is the only place that needs it, and leaves the monitoring plane untouched.
+    # Verified on 26.7 with the pinned image: :9000/health/ready answers 200 and
+    # :9000/auth/health/ready answers 404, which is the arrangement the healthcheck below expects.
+    KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
     KC_HEALTH_ENABLED: "true"
     # Keep the root log level at INFO but mute io.vertx.core.net.impl.ConnectionBase, which logs an
     # empty-message ERROR (<missing-log-message>) on every abrupt client TCP reset (browser closed
@@ -528,12 +560,20 @@ x-backend: &backend-template
     SPRING_DATASOURCE_URL: jdbc:postgresql://db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set in .env}
     SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
-    # Must resolve to the SAME issuer string Keycloak stamps into its tokens, i.e. it has to track
-    # KC_HOSTNAME above — a mismatch fails JWT validation on every request with a confusing
-    # "issuer does not match" rather than an obvious configuration error. Both default to
-    # production, so an .env that sets neither is unchanged; a non-production environment sets
-    # both. The frontend and ingest templates below carry the same variable for the same reason.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
+    # DERIVED from KC_HOSTNAME rather than restated beside it.
+    #
+    # This must resolve to the same issuer string Keycloak stamps into its tokens, and for as long
+    # as it was a second independent variable that was manual discipline — `.env.example` said so in
+    # so many words ("The two values below must agree"). The failure when they do not is the one
+    # ADR-0166 measured: Keycloak reports HEALTHY while backend, frontend and ingest die at start-up
+    # on "issuer does not match", which reads as a backend fault. The identity base URL was a
+    # literal on 36 lines across 19 files with nothing checking that any two agreed.
+    #
+    # `IRI_KEYCLOAK_HOSTNAME` is the one source now: set it alone and the issuer follows.
+    # `IRI_KEYCLOAK_ISSUER_URI` still overrides, so nothing that sets it today changes behaviour —
+    # verified against compose's nested interpolation for all three cases (neither set, hostname
+    # only, issuer overridden). The frontend and ingest templates below derive it the same way.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
     # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
     # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
@@ -561,8 +601,15 @@ x-backend: &backend-template
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
     # (backend application-prod.yml); hostname verification stays ON, so the cert's SAN MUST include
     # `dns:keycloak` (see the README keytool recipe). The dev/test stack overrides this back to
-    # http://keycloak:18080 in docker-compose.test.yml.
-    KEYCLOAK_ADMIN_URL: https://keycloak:18443
+    # http://keycloak:18080/auth in docker-compose.test.yml.
+    # THE /auth IS PART OF THE BASE URL (ADR-0166). `KC_HTTP_RELATIVE_PATH` moves Keycloak's WHOLE
+    # HTTP surface, `/realms/**` and `/admin/realms/**` alike, and this value is the base for both:
+    # KeycloakService POSTs the client-credentials token to `/realms/{realm}/protocol/openid-connect/
+    # token` and then pages `/admin/realms/{realm}/users`. Without the prefix the token POST 404s,
+    # so the daily UserSyncTask, the "Sync now" button, the Discord link back-fill and the deletion
+    # probe all fail — and `fetchUsers` swallows it and returns an empty list, so the sync fails
+    # SILENTLY until the fetch-failure alert fires.
+    KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
     # Optional (REQ-SEC-022): shared secret guarding the internal /internal/discord/account-existence
     # endpoint the Keycloak Discord SPI calls. Blank → the endpoint is disabled (503) and the SPI
@@ -877,8 +924,8 @@ x-frontend: &frontend-template
   environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
-    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
+    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
     # The frontend->backend transport levers (ADR-0161 8.1 / 8.5, REQ-API-011). Listed here because
     # this block is a CLOSED ALLOW-LIST and there is no `env_file:` anywhere: a variable that is not
@@ -981,8 +1028,8 @@ x-ingest: &ingest-template
   environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
-    # Tracks KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
-    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-https://keycloak.profit-base.online/realms/iri}
+    # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
+    KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
     # Public frontend URL the extractor's browser is sent to (…?handoff=<id>). Override per
     # deployment in .env; the local dev stack should point this at http://localhost:18081.
@@ -1622,7 +1669,7 @@ services:
 # restarts.
 #
 # That gateway IP is load-bearing. The Keycloak Admin Console is exposed on the
-# public `keycloak.profit-base.online` vhost but locked to an SSH tunnel via an
+# public `/auth/admin` path on the web vhost but locked to an SSH tunnel via an
 # nginx `allow … / deny all` on the `/admin` location in NPM. Host-origin traffic
 # (the operator's `ssh -N -L 443:127.0.0.1:443 …` tunnel hitting NPM's published
 # 443 through the host loopback) is SNAT'd by Docker to the gateway of whichever
@@ -1720,7 +1767,6 @@ services:
       # certificate on a test host produce the same layout and this file needs no
       # second variable per vhost.
       EDGE_HOST_FRONTEND: ${EDGE_HOST_FRONTEND:-}
-      EDGE_HOST_KEYCLOAK: ${EDGE_HOST_KEYCLOAK:-}
       EDGE_HOST_INGEST: ${EDGE_HOST_INGEST:-}
       EDGE_HOST_GRAFANA: ${EDGE_HOST_GRAFANA:-}
       EDGE_HOST_API: ${EDGE_HOST_API:-}

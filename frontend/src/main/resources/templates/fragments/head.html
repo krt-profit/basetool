@@ -33,6 +33,47 @@
     <link rel="icon" type="image/png" sizes="32x32" th:href="@{/logos/basetool-favicon-32.png}">
     <link rel="icon" type="image/png" sizes="16x16" th:href="@{/logos/basetool-favicon-16.png}">
     <link rel="apple-touch-icon" th:href="@{/logos/basetool-appicon-512.png}">
+    <!--/* Installable web app (REQ-UI-020, ADR-0164). This block plus the `apple-touch-icon` above
+           is the whole iPhone/iPad story: Safari's Add to Home Screen needs no service worker,
+           and this app deliberately ships none — a worker caching navigations would copy member
+           data into a second store outside every path that wipes the first, which is the same
+           reason the backend marks those reads `no-store`. See WebAppManifestController.
+
+           This is a Thymeleaf PARSER-LEVEL comment, not an HTML one: everything here is for a
+           developer, and a plain comment is emitted into every page of every response. The block
+           right above this one predates that distinction. Never write the two characters that
+           close a Java block comment inside here — they end this block early and dump the rest of
+           the text into the page, which is how the previous revision leaked an attribute name into
+           the rendered output and satisfied a test that was supposed to check the tag below.
+
+           `?locale=` carries the language IN THE URL. This page is server-rendered and already
+           knows the reader's locale, so the manifest never has to read a cookie — which keeps the
+           fetch anonymous. The earlier revision set crossorigin=use-credentials instead; that made
+           every fetch authenticated, cost five backend round trips through the layout
+           @ControllerAdvice beans, and needed carve-outs in the consent gate and the role-sync
+           filter for a public document. It bought nothing: pwa.name and pwa.short_name are
+           identical in both bundles, Safari implements neither `lang` nor `description`, and the
+           iOS home-screen label comes from `apple-mobile-web-app-title` below.
+
+           `theme-color` is the HEADER fill (--color-bg-dark-gray), not the black page background:
+           on a phone the status bar sits directly above that header, and matching it is what
+           removes the seam. It is a literal hex because a meta tag cannot read a CSS custom
+           property; WebAppManifestControllerTest pins it against both the controller constant AND
+           the custom property in styles.css, so all three move together.
+
+           `apple-mobile-web-app-capable` is the legacy spelling of `mobile-web-app-capable`. Both
+           ship: iOS still honours the prefixed one, and dropping it would silently downgrade older
+           iPhones from a standalone window back to a Safari tab.
+
+           Status bar `black`, not `black-translucent`: translucent draws the page UNDER the status
+           bar and needs safe-area padding throughout the layout, which is a separate piece of
+           work. Opaque black matches the page background and needs none. */-->
+    <link rel="manifest" th:href="@{/manifest.webmanifest(locale=${#locale.language})}">
+    <meta name="theme-color" content="#141414">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" th:content="#{pwa.short_name}">
     <!--
       Preload the critical body font weight so the browser starts the request before stylesheet
       parsing. Without this hint, @font-face requests sit behind styles.css and a `font-display:

@@ -202,6 +202,47 @@ jobs:
       - name: Check the edge probe against the vhost allow-list
         run: python3 .github/scripts/check_probe_against_allowlist.py
 
+  frontend-image-lint-exclusions:
+    name: frontend-image-lint-exclusions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # frontend/Dockerfile runs `:frontend:build` with every lint task excluded BY NAME, because
+      # the image has no Node toolchain to run them with. So a task wired into `check` is silently
+      # added to the image build too. `lintCssInline` was, on 2026-09-13, and the failure mode is as
+      # indirect as it gets: the image build failed, the e2e stack's `up --wait` never saw a healthy
+      # service, and all 94 e2e classes reported `initializationError` with the real cause visible
+      # only inside compose-up.log in the uploaded artifact. Nothing in the build output said lint.
+      - name: Self-test the comparison
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py --selftest
+
+      - name: Check the frontend image excludes every Node-based task
+        run: python3 .github/scripts/check_frontend_image_lint_exclusions.py
+
+  e2e-device-matrix:
+    name: e2e-device-matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The E2E matrix's `device:` axis and TouchClassLayoutE2eTest's DEVICE_CLASSES are verbatim
+      # copies of one another, and only ONE of the two drift directions is loud. A device the
+      # workflow names and the test does not fails the job with the sweep's own message; a class
+      # added to the test and forgotten in the workflow is measured by nobody, while the coverage
+      # assertion inside each runner is satisfied by the single class that runner was given. The
+      # touch-class work has already been through exactly this with `PAGES`, which was short by
+      # seventeen routes while its Javadoc and REQ-UI-009 both called it complete.
+      - name: Self-test the comparison
+        run: python3 .github/scripts/check_e2e_device_matrix.py --selftest
+
+      - name: Check the E2E device matrix against DEVICE_CLASSES
+        run: python3 .github/scripts/check_e2e_device_matrix.py
+
   sbom-coverage:
     name: sbom-coverage
     runs-on: ubuntu-latest
@@ -322,6 +363,46 @@ jobs:
 
       - name: Check provisioned Grafana dashboards
         run: python3 scripts/check-grafana-dashboards.py
+
+  keycloak-issuer:
+    name: keycloak-issuer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The OIDC issuer the apps validate has to be the one Keycloak advertises, and until ADR-0167
+      # that was manual discipline: the identity base URL is a literal on ~36 lines across 19 files
+      # and nothing compared any two of them. .env.example simply asked the operator to keep them in
+      # agreement.
+      #
+      # The failure is measured rather than imagined (ADR-0166). Keycloak's public base URL is
+      # decided by KC_HOSTNAME *and* KC_HTTP_RELATIVE_PATH together: give the hostname as an
+      # origin-only URL while the relative path says /auth, and Keycloak SERVES under /auth while
+      # ADVERTISING root issuer links. It reports healthy, its discovery document parses, and
+      # backend, frontend and ingest all die at start-up on "The Issuer ... did not match the
+      # requested issuer" -- which reads as a backend fault. A first draft of ADR-0166 specified
+      # exactly that, on the strength of the upstream guide's wording, and only the smoke stack
+      # caught it. That is a failed deploy discovered at deploy time.
+      #
+      # The gate renders every stack through `docker compose config` -- compose's own interpolation,
+      # the same code path the deploy uses -- rather than pattern-matching the YAML, for the same
+      # reason check-edge-nginx.sh hands its rendered vhosts to a real `nginx -t`. Re-implementing
+      # the nested ${A:-${B:-default}} here would be asserting a copy of the thing under test
+      # against itself.
+      #
+      # The suite runs FIRST, as it does for the dashboards above, so the gate can never pass
+      # vacuously: it breaks the compose files each way in turn -- including removing the derivation
+      # so the issuer stops following the hostname, which today's values hide -- and requires the
+      # checker to report each one.
+      - name: Self-test the issuer checker
+        run: |
+          chmod +x scripts/check-keycloak-issuer.py scripts/check-keycloak-issuer.test.sh
+          scripts/check-keycloak-issuer.test.sh
+
+      - name: Check the Keycloak issuer agrees across every stack
+        run: python3 scripts/check-keycloak-issuer.py
 
   prometheus-rules:
     name: prometheus-rules

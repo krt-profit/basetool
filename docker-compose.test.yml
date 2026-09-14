@@ -1,6 +1,6 @@
 # Override for spinning up the dev stack with test-only credentials from
 # .env.test. The base docker-compose.yml hardcodes the production-facing
-# KEYCLOAK_ISSUER_URI (https://keycloak.profit-base.online/realms/iri) into all
+# KEYCLOAK_ISSUER_URI (https://profit-base.online/auth/realms/iri) into all
 # three of the x-backend, x-frontend and x-ingest templates; this file points
 # everything at the locally-imported `iri` realm on the host-mapped Keycloak
 # port 18080 instead, using host.docker.internal so that the same URL works both
@@ -46,10 +46,25 @@ services:
       # host.docker.internal) and from the host browser (Docker Desktop
       # resolves host.docker.internal to localhost). KC_HOSTNAME_STRICT=false
       # also tolerates plain http://localhost:18080 access during testing.
+      # A BARE hostname on purpose: with no full URL configured Keycloak resolves
+      # scheme, port and context path from the request, which is exactly what
+      # makes one value work from both sides.
       KC_HOSTNAME: host.docker.internal
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_PORT: "18080"
+      # KC_HOSTNAME_PORT is GONE (2026-09-13): it is not an option of Keycloak 26 at all — the
+      # hostname v2 rewrite replaced it, and the current reference lists only `hostname`,
+      # `hostname-admin`, `hostname-backchannel-dynamic`, `hostname-debug` and `hostname-strict`.
+      # It has therefore been doing nothing here, while the comment above claimed it was what made
+      # the issuer resolve identically inside and outside Docker. What actually does that is the
+      # bare hostname: with no full URL configured Keycloak resolves scheme, port AND context path
+      # from the request, so :18080 and /auth come back on their own.
       KC_HTTP_ENABLED: "true"
+      # The SAME relative path production serves under (ADR-0166). The test stack has no edge, so
+      # it cannot reproduce production's same-ORIGIN arrangement — but it can and does reproduce the
+      # same PATH, which is the half that config gets wrong: a realm export, a discovery URL or a
+      # redirect that assumes Keycloak sits at the root breaks here exactly as it would there, and
+      # the e2e login exercises it on every run.
+      KC_HTTP_RELATIVE_PATH: /auth
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_DB_USERNAME: ${KC_POSTGRES_USER}
@@ -98,10 +113,12 @@ services:
       # the fan-out on with host=redis).
       APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: "false"
       # Override the prod-target issuer URI baked into the base template.
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
       # Admin-API calls stay on the internal Docker network — no need to go
-      # via host.docker.internal for service-to-service traffic.
-      KEYCLOAK_ADMIN_URL: http://keycloak:18080
+      # via host.docker.internal for service-to-service traffic. The /auth is the
+      # server's relative path and applies to the internal hop exactly as it does
+      # to the public one (ADR-0166); see the base template for what 404s without it.
+      KEYCLOAK_ADMIN_URL: http://keycloak:18080/auth
       KEYCLOAK_REALM: iri
       KEYCLOAK_ADMIN_CLIENT_ID: backend-service
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
@@ -124,7 +141,7 @@ services:
       # The committed test keystore's password. Pinned here rather than read from
       # .env.test so every test stack opens the same file with the same value.
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
       # application-prod.yml hardcodes `spring.data.redis.host: redis`, but
       # application-dev.yml (activated by the SPRING_PROFILES_ACTIVE override
       # above) reads `${REDIS_HOST:localhost}` instead. Inside the container
@@ -161,7 +178,7 @@ services:
       # fetch that would follow is an outbound call from a developer machine to prod. Tokens carry
       # the issuer the browser saw (localhost:18080), so this is also the only value that can
       # validate them. The fetch is lazy, so an unreachable Keycloak does not block start-up.
-      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/realms/iri
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
       # The base template defaults this to https://profit-base.online — the gateway hands it to the
       # desktop extractor as the "open the pre-filled page" target, so in an isolated stack it would
       # send a developer's browser to PRODUCTION. Pin it to this stack's own frontend.

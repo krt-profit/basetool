@@ -127,7 +127,9 @@
          */
         .pm-matrix-wrapper {
             overflow: auto;
-            max-height: max(16rem, calc(100vh - var(--krt-footer-height, 5rem) - 25rem));
+            /* The viewport term and its dvh fallback are --krt-panel-viewport-rest in
+               styles.css; 25rem is this panel's own reserve for the chrome above it. */
+            max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
             border: 1px solid var(--color-gray-3);
             background-color: var(--color-bg-dark-gray);
         }
@@ -455,7 +457,7 @@
         /* ================================================================
            RESPONSIVE: tablet/smartphone
            ================================================================ */
-        @media (max-width: 1024px) {
+        @media (width <= 1024px) {
             .pm-matrix .pm-member-col {
                 width: 11rem;
                 min-width: 11rem;

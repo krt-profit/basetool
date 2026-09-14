@@ -3,21 +3,25 @@
 groups:
   - name: infrastructure-critical
     rules:
-      # Scoped OFF the 12 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
-      # -members-only, -hsts, -internal-tls*, -dns-*). On a /probe job `up==0` does NOT mean the probed target is down — it
+      # Scoped OFF the 16 blackbox /probe jobs (blackbox-http*, -edge-deny, -force-ssl,
+      # -members-only, -public-surface, -hsts*, -internal-tls*, -dns-*). Prometheus anchors label
+      # regexes FULLY, so every job name has to be reachable from one of the alternatives — adding a
+      # probe job without adding its prefix here puts it back in scope and pages critical on a
+      # scrape timeout. `-public-surface` was exactly that on 2026-09-13, caught in review.
+      # On a /probe job `up==0` does NOT mean the probed target is down — it
       # means the Prometheus->exporter scrape itself timed out, because the blackbox module timeout
       # equalled scrape_timeout (2026-07-12 false-critical: blackbox-internal-tls + blackbox-http-ipv6
       # paged critical for backend/frontend/ingest + all three public hosts at once, while every
       # service was healthy). Those probes now carry scrape_timeout:15s, and a genuine failure surfaces
       # FAST as `probe_success==0` (up stays 1) via the dedicated probe alerts — BlackboxProbeFailed,
       # EdgeActuatorDenyBroken, EdgeForceSslRedirectBroken, EdgeMembersOnlyRedirectBroken,
-      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable,
+      # EdgeHstsHeaderMissing, EdgeIpv6Unreachable, EdgePublicSurfaceNot200,
       # DnsResolutionFailed, CertificateExpiringSoon — and app-down liveness for the internal-tls
       # targets is already paged by the basetool-backend/frontend/ingest scrape jobs. The `!~` regex
       # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
       # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
-        expr: up{job!~"blackbox-(http|edge|force|members|hsts|internal|dns).*"} == 0
+        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns).*"} == 0
         for: 3m
         labels:
           severity: critical
@@ -47,8 +51,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Edge /actuator deny broken: {{ $labels.instance }}"
-          description: "{{ $labels.instance }} no longer answers 404 — the `location /actuator` deny on the NPM proxy host has drifted (ADR-0072 compensating control). Re-add it in the proxy host's Advanced config."
+          summary: "Edge deny broken: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} no longer answers 404 — the edge `location` that denies it has drifted. The instance label names the path, and it is no longer only `/actuator`: since ADR-0166 this job also probes `/auth/health` and `/auth/metrics`, so a firing alert may mean Keycloak's readiness detail and its full metric set (realm names, user and session counts, client ids) are internet-readable. Fix it in `docker/edge/conf.d/10-frontend.conf.template` and promote — the edge is nginx configured from this repository, NOT the retired NPM proxy host whose Advanced config this alert used to name (ADR-0162, ADR-0166). ADR-0072 is the compensating control for the `/actuator` half."
 
       - alert: HostDiskCritical
         expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.90
@@ -524,6 +528,27 @@ groups:
         annotations:
           summary: "Members-only redirect broken: {{ $labels.instance }}"
           description: "{{ $labels.instance }} no longer answers a browser navigation with a 302 into /oauth2/authorization/keycloak. REQ-SEC-052 requires every page except /, /impressum, /privacy and /terms to need a login; a 200 here means the page is being served to anonymous visitors. Check the NPM proxy host for a cache or location rule ahead of the app, and confirm the frontend image carries the members-only SecurityConfig."
+
+      # The inverse posture: the paths that must STAY public. Same shape and same outage guard as
+      # EdgeMembersOnlyRedirectBroken above, and the same reason for existing — the app's own
+      # sweeps run in-process and cannot see an edge rule, a cache, or a permitAll entry lost in a
+      # merge. The one that had no probe until now is the manifest, where the failure is silent and
+      # lands on members rather than on a dashboard: a browser reads it before any login, so a 302
+      # makes every new home-screen install take its name and icon from the login page.
+      #
+      # `warning`, not `critical`: unlike its sibling, a failure here exposes nothing — it denies
+      # access to pages that are supposed to be open, and for the legal pages that is a compliance
+      # problem on a slower clock than a data leak. 15m absorbs a deploy.
+      - alert: EdgePublicSurfaceNot200
+        expr: >-
+          probe_success{job="blackbox-public-surface"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Public path no longer answers 200: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} stopped answering 200 on its first response. REQ-SEC-052 lists it as permitAll, so this is either a lost SecurityConfig entry (the path now 302s into /oauth2/authorization/keycloak) or an edge rule ahead of the app. For /manifest.webmanifest this is user-visible: new installs take their name and icon from whatever the redirect returns (REQ-UI-020, ADR-0164). Note http_2xx would NOT catch this — it follows redirects and would report the Keycloak 200 as success."
 
       # Regex, not the bare job name: blackbox-hsts-auth (the API vhost, whose probeable paths
       # answer 401 and therefore need the http_2xx_or_401_hsts module) is a separate job.

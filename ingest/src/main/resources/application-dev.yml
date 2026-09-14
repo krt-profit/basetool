@@ -3,7 +3,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://keycloak.profit-base.online/realms/iri}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}
 
 app:
   ingest:

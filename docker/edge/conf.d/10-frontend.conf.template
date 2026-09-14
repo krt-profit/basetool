@@ -1,4 +1,12 @@
-# The web application. Everything a member sees.
+# The web application. Everything a member sees — and, since ADR-0166, the
+# identity provider too, at /auth on this same host.
+#
+# Keycloak used to answer on a host of its own. It was moved here because an
+# installed web app (REQ-UI-020) has a manifest `scope`, a scope must be
+# same-origin with `start_url`, and iOS treats a navigation that leaves the scope
+# as leaving the app: the login was the one navigation that did, every time, on
+# the platform the PWA exists for. Same-origin identity is the only arrangement
+# that keeps sign-in inside the installed window.
 server {
   listen 8443 ssl;
   listen [::]:8443 ssl;
@@ -20,12 +28,100 @@ server {
   # inside and outside).
   location /actuator { return 404; }
 
+  # --- Identity (ADR-0166) ---------------------------------------------------
+  # Keycloak is mounted at /auth on THIS host, so every authentication
+  # navigation — the authorization redirect, the login form's own POST, the
+  # callback and the end-session redirect — stays inside the manifest scope.
+  #
+  # nginx picks the LONGEST matching prefix, so the three special cases below
+  # outrank the catch-all `/auth` regardless of the order they are written in.
+  # (The regex locations in hardening.conf still outrank all four, which is
+  # intended and harmless: Keycloak serves no .php, and its
+  # `.well-known/openid-configuration` does not start with a dot segment.)
+
+  # The admin console, restricted to the four bridge gateways exactly as it was
+  # on the retired vhost. The ACL matches $remote_addr, which is the TCP peer:
+  # traffic tunnelled from the host reaches the edge through docker-proxy, so
+  # its peer address is the bridge gateway and not the operator's address.
+  #
+  # `deny all;` is load-bearing. nginx's access module denies nothing
+  # implicitly — an `allow` list without the closing `deny all` reads as a
+  # lockdown and is open to the internet. The 2026-07-03 audit found exactly
+  # that on this location, on the old host.
+  # `^~`, not a bare prefix. nginx precedence is `=` > `^~` > regex in file order > longest
+  # prefix, so a plain `location /auth/admin` still lets every regex location in hardening.conf be
+  # evaluated first — and the day one of them proxies instead of returning 404 (the classic
+  # `location ~* \.(css|js|png|woff2)$ { expires 1y; ... }`, or a future `~ ^/(auth|api)/`), the
+  # admin console is served past this allow-list with no error anywhere. `nginx -t` cannot see an
+  # ACL that stopped applying, and the external deny probe only asks for the bare `/auth/admin/`
+  # path. `^~` makes the match final and costs nothing.
+  # WHICH gateway is not a free choice: it is the one the published :443 DNATs over. Since the
+  # five net-proxy-* bridges became `internal: true` that is net-edge-ingress and nothing else, so
+  # the four upstream gateways are kept for an in-container caller while the operator's tunnel
+  # arrives on 172.28.15.1. Carried over from #1885, which found this on the retired vhost: adding
+  # the ingress bridge without adding it here locked the console out completely — every tunnelled
+  # request answered 403, which reads as a broken tunnel and is not one. ADR-0166 moves the ACL to
+  # this location, and the fix has to move with it or the cutover re-introduces the lockout.
+  #
+  # Both families of the dual-stack ingress bridge are listed. A tunnel written
+  # `-L 443:localhost:443` resolves to ::1 on a dual-stack host and then arrives on fd00:28:15::1;
+  # one word of difference in the ssh command must not decide whether the console opens.
+  location ^~ /auth/admin {
+    allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives
+    allow fd00:28:15::1; # net-edge-ingress gateway, IPv6
+    allow 172.28.3.1;    # net-proxy-frontend gateway
+    allow 172.28.4.1;    # net-proxy-keycloak gateway
+    allow 172.28.7.1;    # net-proxy-ingest gateway
+    allow 172.28.13.1;   # net-proxy-api gateway
+    deny all;
+
+    include /etc/nginx/edge/include/upstream-keycloak.conf;
+  }
+
+  # Keycloak's own health and metrics have no caller on the public side. They
+  # answer on the management port rather than this one, so these two are closed
+  # for the same reason the /actuator deny above exists: to make the guarantee
+  # independent of which port a future release decides to serve them on.
+  #
+  # `^~` for the same reason as /auth/admin above, which is the whole point: the argument made
+  # there is about nginx precedence, not about that one path, and these three were left as bare
+  # prefixes. Nothing in hardening.conf matches them today — add the regex that comment itself
+  # names as the classic case (`~* \.(css|js|png|woff2)$ { expires 1y; }`) or a future
+  # `~ ^/(auth|api)/`, and these two stop returning the 404 that the new `blackbox-edge-deny`
+  # targets assert while `nginx -t` stays green.
+  location ^~ /auth/health  { return 404; }
+  location ^~ /auth/metrics { return 404; }
+
+  # The token endpoint gets a tighter burst than the site-wide limiter: it is
+  # the one anonymous POST that is worth brute-forcing.
+  #
+  # `^~` matters most here: a regex winning this path does not break anything visibly, it
+  # silently falls back to the site-wide `burst=80` — an 8x looser ceiling on exactly the endpoint
+  # this location exists to tighten, with no error and no alert.
+  location ^~ /auth/realms/iri/protocol/openid-connect/token {
+    limit_req        zone=krt_req_perip burst=10 nodelay;
+    limit_req_status 429;
+
+    include /etc/nginx/edge/include/upstream-keycloak.conf;
+  }
+
+  # `/auth/` WITH the trailing slash, plus an exact match for the bare path — never a plain
+  # `location /auth`, which is a PREFIX and would swallow `/authorize`, `/authors`, `/authenticate`
+  # and anything else beginning with those five letters. Nothing in the app answers on such a path
+  # today (the closest is `/author`, an entry in BotProtectionFilter's scanner deny-list, which
+  # would merely have been answered by Keycloak's 404 instead of the filter's), so this costs
+  # nothing now and prevents a future route from being silently routed to the identity provider.
+  location = /auth {
+    include /etc/nginx/edge/include/upstream-keycloak.conf;
+  }
+
+  location /auth/ {
+    include /etc/nginx/edge/include/upstream-keycloak.conf;
+  }
+
   location / {
     include /etc/nginx/edge/include/proxy.conf;
-    proxy_ssl_verify              on;
-    proxy_ssl_verify_depth        2;
-    proxy_ssl_trusted_certificate /etc/nginx/upstream-ca.crt;
-    proxy_ssl_server_name         on;
+    include /etc/nginx/edge/include/upstream-tls.conf;
     proxy_ssl_name                frontend;
     # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
     # once at startup and caches the address forever, so a recreated container

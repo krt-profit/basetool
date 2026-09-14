@@ -181,12 +181,25 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
 
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    String uri = request.getRequestURI();
+    // CONTEXT-RELATIVE, not the raw URI. `/actuator/` and `/webjars/` are anchored with
+    // `startsWith`, so under a non-root context path they matched nothing and both were logged
+    // after all — the quiet-asset exemption silently off. `PublicPaths.relativePath` is the one
+    // place that arithmetic lives; this method was the last caller still doing it by hand.
+    String uri = PublicPaths.relativePath(request);
     return uri.endsWith(".css")
         || uri.endsWith(".js")
         || uri.endsWith(".ico")
         || uri.endsWith(".woff")
         || uri.endsWith(".woff2")
+        // NOT `/manifest.webmanifest` — it is logged like any other page.
+        //
+        // It was suppressed here as one more quiet asset, and then given a blackbox probe and the
+        // `EdgePublicSurfaceNot200` alert in the same change. That combination is the worst of
+        // both: when the alert fires, a Loki query for the path around the window returns nothing
+        // at all — not the 302 into OAuth, not a 404, not a 500 out of GlobalExceptionHandler — and
+        // the same blank answers a member reporting a failed home-screen install. The `.css`/`.js`
+        // precedents are quiet because nothing watches them; this one is watched. REQ-OBS-001 says
+        // one line per request, and a ~30s probe interval is not a volume argument.
         || uri.contains("/images/")
         || uri.contains("/logos/")
         || uri.contains("/fonts/")

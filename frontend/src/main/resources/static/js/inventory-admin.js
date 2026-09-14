@@ -158,6 +158,7 @@ const ADMIN_INVENTORY_FILTER_KEY = 'inventory_admin_filters';
 const ADMIN_INVENTORY_FILTER_PARAMS = [
     'materialIds',
     'gameItemIds',
+    'locationIds',
     'minQuality',
     'jobOrderIds',
     'missionIds',
@@ -199,12 +200,14 @@ function snapshotAdminInventoryFilters() {
     if (lagerIsItemsView()) {
         return {
             gameItems: adminInventoryFilterSelection('gameItemCheck'),
+            locations: adminInventoryFilterSelection('locCheck'),
             jobOrders: adminInventoryFilterSelection('jobOrderCheck'),
         };
     }
     const minQualitySelect = document.getElementById('minQuality');
     return {
         materials: adminInventoryFilterSelection('matCheck'),
+        locations: adminInventoryFilterSelection('locCheck'),
         minQuality: minQualitySelect ? minQualitySelect.value : '',
         jobOrders: adminInventoryFilterSelection('jobOrderCheck'),
         missions: adminInventoryFilterSelection('missionCheck'),
@@ -265,11 +268,13 @@ function restoreAdminInventoryFilters() {
     if (lagerIsItemsView()) {
         families = [
             [saved.gameItems, 'gameItemCheck', 'gameItemAll', 'gameItemHeader'],
+            [saved.locations, 'locCheck', 'itemLocAll', 'itemLocationHeader'],
             [saved.jobOrders, 'jobOrderCheck', 'itemJobOrderAll', 'itemJobOrderHeader'],
         ];
     } else {
         families = [
             [saved.materials, 'matCheck', 'matAll', 'materialHeader'],
+            [saved.locations, 'locCheck', 'locAll', 'locationHeader'],
             [saved.jobOrders, 'jobOrderCheck', 'jobOrderAll', 'jobOrderHeader'],
             [saved.missions, 'missionCheck', 'missionAll', 'missionHeader'],
         ];
@@ -306,7 +311,7 @@ const ADMIN_INVENTORY_FILTER_PANEL_KEY = 'panelCollapsed';
 function countActiveAdminInventoryFilters() {
     const snapshot = snapshotAdminInventoryFilters();
     let active = 0;
-    ['materials', 'gameItems', 'jobOrders', 'missions'].forEach(function (dimension) {
+    ['materials', 'gameItems', 'locations', 'jobOrders', 'missions'].forEach(function (dimension) {
         if (Array.isArray(snapshot[dimension]) && snapshot[dimension].length > 0) active++;
     });
     if (typeof snapshot.minQuality === 'string' && snapshot.minQuality !== '') active++;
@@ -378,6 +383,7 @@ function filterInventory() {
     const itemsView = lagerIsItemsView();
     const activeMats = collectChecked('matCheck');
     const activeGameItems = collectChecked('gameItemCheck');
+    const activeLocations = collectChecked('locCheck');
     const activeJobOrders = collectChecked('jobOrderCheck');
     const activeMissions = collectChecked('missionCheck');
 
@@ -396,6 +402,7 @@ function filterInventory() {
     if (itemsView) url.searchParams.append('view', 'items');
     activeMats.forEach((m) => url.searchParams.append('materialIds', m));
     activeGameItems.forEach((g) => url.searchParams.append('gameItemIds', g));
+    activeLocations.forEach((l) => url.searchParams.append('locationIds', l));
     if (minQuality) url.searchParams.append('minQuality', minQuality);
     activeJobOrders.forEach((j) => url.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => url.searchParams.append('missionIds', m));
@@ -405,6 +412,7 @@ function filterInventory() {
     if (itemsView) visibleUrl.searchParams.append('view', 'items');
     activeMats.forEach((m) => visibleUrl.searchParams.append('materialIds', m));
     activeGameItems.forEach((g) => visibleUrl.searchParams.append('gameItemIds', g));
+    activeLocations.forEach((l) => visibleUrl.searchParams.append('locationIds', l));
     if (minQuality) visibleUrl.searchParams.append('minQuality', minQuality);
     activeJobOrders.forEach((j) => visibleUrl.searchParams.append('jobOrderIds', j));
     activeMissions.forEach((m) => visibleUrl.searchParams.append('missionIds', m));
@@ -555,22 +563,34 @@ if (
 }
 
 function resetInventoryFilter() {
-    ['matCheck', 'gameItemCheck', 'jobOrderCheck', 'missionCheck'].forEach(function (cls) {
-        const boxes = document.getElementsByClassName(cls);
-        for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
-    });
-    ['matAll', 'gameItemAll', 'jobOrderAll', 'itemJobOrderAll', 'missionAll'].forEach(
-        function (id) {
-            const el = document.getElementById(id);
-            if (el) el.checked = false;
+    ['matCheck', 'gameItemCheck', 'locCheck', 'jobOrderCheck', 'missionCheck'].forEach(
+        function (cls) {
+            const boxes = document.getElementsByClassName(cls);
+            for (let i = 0; i < boxes.length; i++) boxes[i].checked = false;
         },
     );
+    [
+        'matAll',
+        'gameItemAll',
+        'locAll',
+        'itemLocAll',
+        'jobOrderAll',
+        'itemJobOrderAll',
+        'missionAll',
+    ].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+    });
     const minQualitySelect = document.getElementById('minQuality');
     if (minQualitySelect) minQualitySelect.value = '';
     if (document.getElementById('materialHeader'))
         updateSelectState('matAll', 'matCheck', 'materialHeader');
     if (document.getElementById('gameItemHeader'))
         updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+    if (document.getElementById('locationHeader'))
+        updateSelectState('locAll', 'locCheck', 'locationHeader');
+    if (document.getElementById('itemLocationHeader'))
+        updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
     if (document.getElementById('jobOrderHeader'))
         updateSelectState('jobOrderAll', 'jobOrderCheck', 'jobOrderHeader');
     if (document.getElementById('itemJobOrderHeader'))
@@ -590,6 +610,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (document.getElementsByClassName('gameItemCheck').length > 0) {
         updateSelectState('gameItemAll', 'gameItemCheck', 'gameItemHeader');
+    }
+    if (document.getElementsByClassName('locCheck').length > 0) {
+        // Same shared-class / per-view-ids shape as jobOrderCheck below: the location filter
+        // renders in both views, with item-prefixed ids in the items view.
+        if (document.getElementById('itemLocationHeader')) {
+            updateSelectState('itemLocAll', 'locCheck', 'itemLocationHeader');
+        } else {
+            updateSelectState('locAll', 'locCheck', 'locationHeader');
+        }
     }
     if (document.getElementsByClassName('jobOrderCheck').length > 0) {
         // The material and the items view render different header/all ids for the shared

@@ -17,7 +17,8 @@
  *   cfg.events     { changed, resync }: DOM event names to listen on. `changed` carries
  *                  detail.sections; `resync` refreshes everything visible (post-reconnect). Used by
  *                  the mission adapter, which owns its own socket and re-dispatches these events.
- *   cfg.pill       { id, className, label() }: the "updates available" deferred-refresh pill.
+ *   cfg.pill       { id, label() }: the "updates available" deferred-refresh pill. The class
+ *                  is fixed (`krt-livesync-pill`) so the helper cannot emit an unstyled one.
  *   cfg.busyTest   optional fn(sectionKey, container) -> boolean, OR-ed with the default busy test
  *                  (any open modal, or focus inside the section container) to hold back a refresh
  *                  the local user would experience as a yank (e.g. a drag in progress).
@@ -327,7 +328,11 @@
         const coalesceMs = cfg && cfg.coalesceMs ? cfg.coalesceMs : DEFAULT_COALESCE_MS;
         const pillCfg = (cfg && cfg.pill) || {};
         const pillId = pillCfg.id || 'krt-livesync-pill';
-        const pillClassName = pillCfg.className || 'krt-livesync-pill';
+        // The class is FIXED, not configurable. `pillCfg.className` is how /bank, /bank/requests
+        // and /bank/manage came to render a browser-default button: only the one class a caller
+        // happened to pass was ever styled, and every other consumer emitted a class no stylesheet
+        // defined. A helper that can emit an unstyled element will eventually emit one.
+        const pillClassName = 'krt-livesync-pill';
         const extraBusyTest = cfg && cfg.busyTest;
 
         const sectionContainers = {};
