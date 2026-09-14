@@ -65,7 +65,7 @@ jobs:
   owasp:
     name: OWASP Dependency-Check
     runs-on: ubuntu-latest
-    # 150 since 2026-09-11, and the history matters because this number has been wrong in both
+    # 150 since 2026-09-14, and the history matters because this number has been wrong in both
     # directions. It was raised to 120 on 2026-09-04 on a WRONG diagnosis - runs dying at the
     # ceiling were read as slow cold starts when they were stalled on unbounded outbound HTTP reads
     # - and returned to 60 the next day once those reads were bounded (see `setReadTimeout` /
@@ -84,6 +84,13 @@ jobs:
     # reached by the once-per-eviction rebuild. If warm runs start approaching it, that is a real
     # signal and not something to raise again.
     #
+    # This comment claimed "150 since 2026-09-11" for three days while the value below still read
+    # 60, because `3c6c94cb4` rewrote the prose and never touched the number - in a commit titled
+    # "two settings fought their own comments". The decision above was made then; only the edit is
+    # from 2026-09-14. It was not cosmetic: every cold run in between was killed at 60 with no
+    # verdict, including the `main` push and both dependency PRs open on 2026-09-14. When this
+    # number is changed, change it here AND on the `timeout-minutes` line.
+    #
     # The stalls were unbounded outbound HTTP reads inside dependency-check; they are fixed where
     # they belong, by `setReadTimeout` / `setConnectionTimeout` in the root `build.gradle.kts` (see
     # the block there for the evidence). If runs start hitting this ceiling again, that is the thing
@@ -96,7 +103,7 @@ jobs:
     # keys" and rebuilt from zero. That is a real cost - it is the difference between a ~1-minute
     # and a ~14-minute scan - but it is a nuisance, not the reason runs were dying, and it resolves
     # itself as soon as one `main` run completes and saves the dataset under the default branch.
-    timeout-minutes: 60
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
