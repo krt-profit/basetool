@@ -5699,7 +5699,13 @@ textarea:focus-visible,
 }
 
 .filter-panel {
-    margin-top: 0.75rem;
+    /* Space on BOTH sides. The top gap separates the panel from the toggle above it; the bottom one
+       keeps the last filter row off whatever follows — on the Lager that is the table head, which
+       the expanded filters otherwise sit directly on top of. The material-demand panel this
+       component replaced carried `margin-bottom: var(--space-3)`; consolidating the three page-local
+       copies kept the top margin and dropped that one, which is how the gap went missing. */
+    margin-top: var(--space-3);
+    margin-bottom: var(--space-3);
 }
 
 @media (width <= 768px) {

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Im Lager klebten die aufgeklappten Filter an der Tabelle.** Zwischen der letzten Filterzeile und
+  der Kopfzeile der Tabelle fehlte der Abstand. Er ist wieder da, auf allen Seiten mit
+  einklappbaren Filtern.
+
 ## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
 
 ### Changed
