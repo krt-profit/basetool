@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -422,6 +423,83 @@ class TermsAcceptanceGateFilterTest {
   private void stubStatus(boolean accepted) {
     when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
         .thenReturn(new TermsStatusDto(accepted, "v1"));
+  }
+
+  /**
+   * A navigation whose token can no longer be refreshed goes to the login, not to a 500.
+   *
+   * <p>This is the ADR-0166 cutover, reproduced. Every session created before identity moved to
+   * {@code /auth} carries an {@code OAuth2AuthorizedClient} whose SERIALISED {@code
+   * ClientRegistration} still names the retired token endpoint, so the refresh this gate triggers
+   * on its own {@code /api/v1/terms/status} read fails — and an exception thrown from a servlet
+   * FILTER never reaches {@code GlobalExceptionHandler}, whose whole job is to turn this exception
+   * into the redirect below. Production answered 500 on the first page load after the cutover and
+   * stayed there: an authenticated session idles out after 720h, so nothing healed it, and the only
+   * escape a member found was clearing the site data.
+   */
+  @Test
+  void redirectsToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
+    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+        .thenThrow(new ReauthenticationRequiredException("token gone", null));
+
+    MockHttpServletResponse response = invoke("/missions");
+
+    assertThat(response.getRedirectedUrl()).isEqualTo("/oauth2/authorization/keycloak");
+    assertThat(response.getStatus()).isEqualTo(302);
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * An AJAX caller in the same state gets the established 401-plus-header contract, never a 302.
+   *
+   * <p>Same reasoning as the consent gate's own AJAX branch: {@code krtFetch} sees {@code
+   * res.redirected} and stalls with only a dev-console warning, so a redirect here is a section
+   * that silently stops updating. The header name is the one {@code GlobalExceptionHandler} already
+   * writes, so no client-side listener has to learn anything new.
+   */
+  @Test
+  void signalsReauthenticationToAnAjaxCallerInsteadOfRedirecting() throws Exception {
+    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+        .thenThrow(new ReauthenticationRequiredException("token gone", null));
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/missions/x/ajax");
+    request.setRequestURI("/missions/x/ajax");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getStatus()).isEqualTo(401);
+    assertThat(response.getHeader("X-Reauthenticate")).isEqualTo("/oauth2/authorization/keycloak");
+    assertThat(response.getRedirectedUrl()).isNull();
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  /**
+   * An SSE subscription is handed off on its own channel, for the same reason the consent path is.
+   *
+   * <p>An {@code EventSource} reads neither status nor header, so both branches above are invisible
+   * to it and any error status is an opaque {@code onerror} it answers by reconnecting. The event
+   * name is the one {@code NotificationPageController} already writes when the stream itself loses
+   * its token, so {@code notifications.js} needs no new listener.
+   */
+  @Test
+  void handsTheSseStreamOffToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
+    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+        .thenThrow(new ReauthenticationRequiredException("token gone", null));
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/notifications/stream");
+    request.setRequestURI("/notifications/stream");
+    request.addHeader("Accept", "text/event-stream");
+    request.setSession(new org.springframework.mock.web.MockHttpSession());
+    MockHttpServletResponse response = new MockHttpServletResponse();
+
+    filter.doFilter(request, response, filterChain);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getContentType()).startsWith("text/event-stream");
+    assertThat(response.getContentAsString())
+        .isEqualTo("event: reauth\ndata: /oauth2/authorization/keycloak\n\n");
+    verify(filterChain, never()).doFilter(any(), any());
   }
 
   /**

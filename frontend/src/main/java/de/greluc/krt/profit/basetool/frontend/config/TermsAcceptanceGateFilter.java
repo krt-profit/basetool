@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.exception.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.model.dto.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
@@ -82,6 +83,20 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    */
   public static final String SSE_GATE_EVENT = "terms-gate";
 
+  /**
+   * Name of the one-shot SSE event that hands an {@code EventSource} off to the login flow. The
+   * same name {@code NotificationPageController} writes when the stream itself loses its token, so
+   * {@code notifications.js} needs no new listener.
+   */
+  static final String SSE_REAUTH_EVENT = "reauth";
+
+  /**
+   * Response header carrying the login URL to an AJAX caller. The established contract for a lost
+   * OAuth2 token (REQ-SEC-012), written here verbatim as {@code GlobalExceptionHandler} writes it,
+   * because {@code krtFetch} keys on the exact name.
+   */
+  static final String REAUTH_HEADER = "X-Reauthenticate";
+
   /** Session attribute holding the epoch millis at which the cached "accepted" was read. */
   static final String SESSION_CHECKED_AT = "krt.terms.checkedAt";
 
@@ -106,7 +121,41 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    if (isTestProfile() || isExempt(request) || !isAuthenticated() || hasAccepted(request)) {
+    boolean mayProceed;
+    try {
+      mayProceed =
+          isTestProfile() || isExempt(request) || !isAuthenticated() || hasAccepted(request);
+    } catch (ReauthenticationRequiredException e) {
+      // An exception thrown from a SERVLET FILTER never reaches @ExceptionHandler — that advice
+      // only sees exceptions raised during controller handling. So the redirect
+      // GlobalExceptionHandler implements for exactly this exception does not apply here, and
+      // before this catch existed the request died as a 500 instead.
+      //
+      // It is not hypothetical: the ADR-0166 identity cutover (2026-09-14) retired the old Keycloak
+      // host, and every session created before it carries an OAuth2AuthorizedClient whose
+      // SERIALISED ClientRegistration still names the retired token endpoint. The refresh attempted
+      // on this gate's own /api/v1/terms/status read is the first thing most members touch after a
+      // cutover, so the first page load answered 500 and stayed broken — authenticated sessions
+      // idle out after 720h, so it would not have healed on its own, and the only way out a member
+      // could find was clearing the site data.
+      //
+      // The sibling BackendRoleSyncFilter has caught this exception since it was introduced; this
+      // filter simply never did. Redirecting into the authorization flow replaces the stale
+      // authorized client from the CURRENT registration repository, which is what makes the
+      // redirect a fix and not just a friendlier error.
+      if (isWebSocketUpgrade(request)) {
+        // The one transport with no good answer at this point, and the reason is the same one the
+        // consent path documents below: a refused upgrade reaches the browser as close 1006, which
+        // is indistinguishable from a dropped connection, so krt-live-sync.js reconnects forever.
+        // Letting the handshake through is the lesser evil — the socket closes on its own once it
+        // tries to use the token, and the member's next navigation takes the redirect.
+        filterChain.doFilter(request, response);
+        return;
+      }
+      sendReauthentication(request, response);
+      return;
+    }
+    if (mayProceed) {
       filterChain.doFilter(request, response);
       return;
     }
@@ -124,7 +173,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       // then close. This mirrors the `reauth` handoff the stream already implements for a lost
       // OAuth2 token (REQ-SEC-012, REQ-NOTIF-010).
       log.debug("Consent missing; handing the SSE stream off to the consent page");
-      writeTermsGateEvent(response, consentUrl);
+      writeOneShotEvent(response, SSE_GATE_EVENT, consentUrl);
       return;
     }
     if (isAjax(request)) {
@@ -167,6 +216,45 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     }
     log.debug("Consent missing; routing {} to the consent page", request.getRequestURI());
     response.sendRedirect(consentUrl);
+  }
+
+  /**
+   * Answers a request whose OAuth2 token can no longer be refreshed, in the shape the caller can
+   * act on.
+   *
+   * <p>Three transports, the same three distinctions the consent path above draws and for the same
+   * reasons: an {@code EventSource} can read neither a status code nor a header, so it is handed a
+   * named event on its own channel; an XHR must not be 302'd, because {@code krtFetch} sees {@code
+   * res.redirected} and stalls silently; a navigation simply goes to the login.
+   *
+   * <p>Every value here is the one the codebase already uses for a lost token — the {@code reauth}
+   * event name from {@code NotificationPageController}, the {@code X-Reauthenticate} header from
+   * {@code GlobalExceptionHandler} — so no client-side listener has to learn anything new.
+   *
+   * @param request the request whose session can no longer produce a token; never {@code null}
+   * @param response the response to write the handoff onto; never {@code null}
+   * @throws IOException if the response cannot be written
+   */
+  private static void sendReauthentication(
+      @NotNull HttpServletRequest request, @NotNull HttpServletResponse response)
+      throws IOException {
+    String reauthUrl = request.getContextPath() + ReauthenticationRequiredException.REAUTH_PATH;
+    if (isEventStream(request)) {
+      log.debug("Token unrefreshable; handing the SSE stream off to the login flow");
+      writeOneShotEvent(response, SSE_REAUTH_EVENT, reauthUrl);
+      return;
+    }
+    if (isAjax(request)) {
+      log.debug("Token unrefreshable; signalling re-authentication to the AJAX caller");
+      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      response.setHeader(REAUTH_HEADER, reauthUrl);
+      return;
+    }
+    log.warn(
+        "Token unrefreshable for {} {}; redirecting to the login flow.",
+        request.getMethod(),
+        request.getRequestURI());
+    response.sendRedirect(reauthUrl);
   }
 
   /**
@@ -218,20 +306,26 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Answers an SSE subscription with a single {@code terms-gate} event naming the consent page,
-   * then lets the response complete so the stream closes.
+   * Answers an SSE subscription with a single named event carrying one URL, then lets the response
+   * complete so the stream closes.
    *
    * <p>Deliberately a {@code 200}: an {@code EventSource} surfaces any error status as an opaque
    * {@code onerror} that is indistinguishable from a dropped connection, which is precisely what
    * makes it reconnect. A well-formed event is the only way to tell the client something it can act
    * on rather than retry.
    *
+   * <p>Two callers, one shape: {@link #SSE_GATE_EVENT} hands the stream to the consent page, {@link
+   * #SSE_REAUTH_EVENT} hands it to the login flow. {@code notifications.js} listens for both and
+   * stops reconnecting on either.
+   *
    * @param response the response to write the event into
-   * @param consentUrl the context-relative consent-page path the client should navigate to
+   * @param eventName the SSE event name the client listens for
+   * @param url the context-relative path the client should navigate to
    * @throws IOException if writing the event fails
    */
-  private static void writeTermsGateEvent(
-      @NotNull HttpServletResponse response, @NotNull String consentUrl) throws IOException {
+  private static void writeOneShotEvent(
+      @NotNull HttpServletResponse response, @NotNull String eventName, @NotNull String url)
+      throws IOException {
     response.setStatus(HttpServletResponse.SC_OK);
     response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
@@ -239,7 +333,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     // no-cache keeps an intermediary from serving this one-shot answer to a later subscription.
     response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
     PrintWriter writer = response.getWriter();
-    writer.write("event: " + SSE_GATE_EVENT + "\ndata: " + consentUrl + "\n\n");
+    writer.write("event: " + eventName + "\ndata: " + url + "\n\n");
     writer.flush();
   }
 

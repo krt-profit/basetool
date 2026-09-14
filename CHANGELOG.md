@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Nach der Umstellung der Anmeldeadresse zeigte die Seite einen Fehler statt der Anmeldung.** Wer
+  vor der Umstellung angemeldet war, bekam beim nächsten Aufruf einen Serverfehler und kam nur
+  weiter, indem er die Website-Daten im Browser löschte — von selbst wäre der Zustand 30 Tage
+  geblieben. Jetzt führt er zur normalen Anmeldung.
+
 ## [v1.8.0](https://github.com/krt-profit/basetool/releases/tag/v1.8.0) - 2026-09-14
 
 ### Added
