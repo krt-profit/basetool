@@ -41,11 +41,26 @@
 
 .bank-acc-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+
+    /*
+     * `minmax(0, 1fr)`, not `1fr` — the same reason `.bank-detail-panels` further down states it.
+     *
+     * `1fr` is `minmax(auto, 1fr)`, and `auto` resolves to the item's MIN-CONTENT width, so a card
+     * that cannot shrink pushes its own track past the container and the PAGE scrolls sideways
+     * instead of the card adapting. On the phone class a seeded account name took /bank to a 408px
+     * document in a 375px viewport and /org-unit-bank to 445px.
+     *
+     * The track is only the first of three links: the card must be allowed to shrink as well
+     * (`min-width: 0` below), and so must the row inside it that sits beside the fixed-width
+     * sparkline. Fixing only the track moves the overflow one level down.
+     */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
 }
 
 .kpi-card {
+    /* Link 2 of the chain above: a grid item's automatic minimum size is its min-content. */
+    min-width: 0;
     background: var(--color-bg-dark-gray);
     border: var(--border-hairline);
     padding: 12px 14px;
@@ -71,6 +86,9 @@
     font-weight: var(--fw-bold);
     color: var(--color-white);
     font-size: 0.85rem;
+
+    /* A long account name is otherwise one unbreakable run holding the row open. */
+    overflow-wrap: anywhere;
 }
 
 .kpi-card .kpi-sub {
@@ -88,6 +106,14 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
+
+    /* Link 3: the title block is a flex item beside a fixed-width sparkline, and flex items carry
+       the same automatic minimum size as grid items. */
+    min-width: 0;
+}
+
+.kpi-card-top > * {
+    min-width: 0;
 }
 
 .kpi-card-foot {
@@ -850,7 +876,7 @@ tr.is-inert td {
 /* ---- Responsive: tablet and smartphone device classes ---- */
 @media (width <= 1024px) {
     .bank-acc-grid {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .bank-cols {
@@ -898,7 +924,7 @@ tr.is-inert td {
     }
 
     .bank-acc-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .bank-form-row {
@@ -912,7 +938,7 @@ tr.is-inert td {
 
 @media (width >= 1600px) {
     .bank-acc-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
 
@@ -1154,6 +1180,8 @@ tr.is-inert td {
    name and the "Details" action are the click targets — so it carries no pointer cursor, only the
    same hover-border affordance. */
 .ou-card {
+    /* Same three-link chain as `.kpi-card` above — this card shares `.bank-acc-grid`. */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1172,6 +1200,11 @@ tr.is-inert td {
     justify-content: space-between;
     align-items: flex-start;
     gap: 10px;
+    min-width: 0;
+}
+
+.ou-card-top > * {
+    min-width: 0;
 }
 
 .ou-card-name {
@@ -1179,6 +1212,9 @@ tr.is-inert td {
     color: var(--color-white);
     font-size: 0.95rem;
     text-decoration: none;
+
+    /* As `.kpi-title` above. */
+    overflow-wrap: anywhere;
 }
 
 .ou-card-name:hover {
