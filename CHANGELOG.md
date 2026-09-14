@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Im Lager klebten die aufgeklappten Filter an der Tabelle.** Zwischen der letzten Filterzeile und
+  der Kopfzeile der Tabelle fehlte der Abstand. Er ist wieder da, auf allen Seiten mit
+  einklappbaren Filtern.
+  
 - **Betrieb: ein Alarm meldete sich nach jedem Deploy, ohne dass etwas kaputt war.** Die Überwachung
   der Keycloak-Anmeldeereignisse schlug an, sobald die Kennzahl fehlte — die entsteht aber erst mit
   der ersten Anmeldung und wird von jedem Neustart zurückgesetzt. Sie meldet sich jetzt nur noch,
