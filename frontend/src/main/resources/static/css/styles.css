@@ -4991,6 +4991,20 @@ textarea:focus-visible,
          */
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
+
+        /*
+         * Column flow, so a THIRD child opens an implicit COLUMN instead of a second row.
+         * `sidebar.js` appends the "ADMIN" chip into this nav on every /admin/* page. Under the
+         * default row flow that chip was placed at (row 2, column 1) and took the header to 108px
+         * on all 23 admin routes - the very cost this block exists to remove, reintroduced on the
+         * pages an operator uses most. Measured, not reasoned: 107px before, 62px after, at 375px
+         * against this stylesheet.
+         *
+         * An implicit track is only created when an item needs one, so a page without the chip
+         * keeps exactly two tracks and the brand keeps every pixel of the 1fr. A third explicit
+         * `auto` column would instead spend a `gap` on an empty track on every non-admin page.
+         */
+        grid-auto-flow: column;
         gap: var(--space-4);
         align-items: center;
         min-width: 0;

@@ -181,6 +181,12 @@ class TouchClassLayoutE2eTest {
    * <p>72px is measured-plus-slack: the fixed header renders at 62px at both 375px and 412px, and
    * the ceiling sits below the 76px the compact-header change removed, so this guard would have
    * caught the state before that change AND the regression after it.
+   *
+   * <p>It has since caught a second, unrelated way into the same 108px: {@code sidebar.js} appends
+   * an "ADMIN" chip into the header nav on every {@code /admin/*} page, and the two-column grid
+   * that fixed the wrap above placed that third child in row 2. Worth knowing because the height is
+   * the only symptom the two share — the ceiling is deliberately a bound on the outcome, not a test
+   * for either cause.
    */
   private static final int MAX_PHONE_HEADER_HEIGHT_PX = 72;
 
@@ -1144,8 +1150,9 @@ class TouchClassLayoutE2eTest {
     if (phone && headerH > MAX_PHONE_HEADER_HEIGHT_PX) {
       findings.add(
           String.format(
-              "%s: the header is %.0fpx tall on a phone (ceiling %dpx) — the wordmark has most"
-                  + " likely wrapped onto a second line again.",
+              "%s: the header is %.0fpx tall on a phone (ceiling %dpx) — something in its nav"
+                  + " has been pushed onto a second row. The two ways that happens: the brand"
+                  + " wrapping, or a third nav child landing in a new grid row.",
               where, headerH, MAX_PHONE_HEADER_HEIGHT_PX));
     }
 
