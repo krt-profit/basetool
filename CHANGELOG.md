@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
+
 ### Fixed
 
 - **Im Lager rutschten die aufgeklappten Einträge aus dem Bild, sobald man nach rechts scrollte.**
