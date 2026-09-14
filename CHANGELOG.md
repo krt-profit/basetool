@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.2](https://github.com/krt-profit/basetool/releases/tag/v1.8.2) - 2026-09-14
+
 ### Changed
 
 - **Die Filter lassen sich auf allen großen Listenseiten zuklappen.** Bei Einsätzen, Operationen,
@@ -12,8 +14,6 @@
   („Neuer Auftrag" und ähnliche) bleibt immer sichtbar. Seiten mit nur einem Suchfeld — Hangar,
   Staffel-Hangar, Mein Inventar — bleiben bewusst wie sie sind.
 
-## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
-
 ### Fixed
 
 - **Im Lager rutschten die aufgeklappten Einträge aus dem Bild, sobald man nach rechts scrollte.**
@@ -21,6 +21,9 @@
   Eintragszeilen mit Auftrag, Einsatz, Lagerplatz und den Knöpfen liefen dabei aber nur über die
   Bildschirmbreite und blieben links liegen, während rechts neben ihnen nichts stand. Sie füllen
   jetzt dieselbe Breite wie die übrigen Zeilen, und ihre Knöpfe stehen unter „Aktion".
+
+## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
+
 
 ### Fixed
 
