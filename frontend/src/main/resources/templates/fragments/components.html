@@ -97,5 +97,31 @@
     </table>
 </div>
 
+
+<!-- Filter toggle (REQ-FE-021) — the one control that collapses a list page's filter block.
+     Pair it with `data-filter-panel` on the block it controls; `krt-filter-panel.js` wires the two
+     through `aria-controls` alone, so a toggle that does not announce what it controls is also one
+     the script will not find.
+
+     Rendered EXPANDED: `hidden` is the collapse mechanism and the script applies it on load, which
+     is what keeps the filters reachable when JavaScript never runs. The count chip starts hidden
+     and the script fills it.
+
+     `panelId` is the id of the panel; `testid` is optional and only exists so the e2e suite can
+     address a specific page's toggle. -->
+<button th:fragment="filterToggle(panelId, testid)"
+        type="button" class="btn btn-ghost filter-toggle"
+        th:attr="aria-controls=${panelId},data-testid=${testid}"
+        aria-expanded="true">
+    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
+    <span th:text="#{filter.toggle}">Filter</span>
+    <span class="chip chip--primary filter-count" data-filter-count hidden
+          th:data-label="#{filter.activeCount}">
+        <span data-filter-count-value aria-hidden="true">0</span>
+        <span data-filter-count-label class="visually-hidden"></span>
+    </span>
+    <svg class="krt-icon filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
+</button>
+
 </body>
 </html>

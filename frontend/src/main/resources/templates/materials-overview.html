@@ -45,6 +45,13 @@
           localStorage and restored before the initial fetch (REQ-UI-016), so it survives reloads
           and later visits.
         -->
+        <!-- Filters collapse behind one toggle (REQ-FE-021): this block carries two
+             multi-selects plus the boolean filters and fills a phone viewport on its own. -->
+        <div class="actions-bar">
+            <div th:replace="~{fragments/components :: filterToggle('materials-filter-panel', 'materials-filter-toggle')}"></div>
+        </div>
+
+        <div class="filter-panel" id="materials-filter-panel" data-filter-panel="materials-overview">
         <div class="filters-container">
             <div class="form-group">
                 <label th:text="#{filter.material}">Material filtern</label>
@@ -55,7 +62,7 @@
                     <div class="multi-select-options" id="materialOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="matAll" value="ALL" checked class="mtx-select-all" data-check-class="matCheck" data-header-id="materialHeader">
+                            <input type="checkbox" id="matAll" value="ALL" checked class="mtx-select-all" data-filter-ignore data-check-class="matCheck" data-header-id="materialHeader">
                         </label>
                         <label class="multi-select-option" th:each="mat : ${materialNames}">
                             <span th:text="${mat}">Material</span>
@@ -73,7 +80,7 @@
                     <div class="multi-select-options" id="systemOptions">
                         <label class="multi-select-option">
                             <span th:text="#{filter.all}">Alle</span>
-                            <input type="checkbox" id="sysAll" value="ALL" checked class="mtx-select-all" data-check-class="sysCheck" data-header-id="systemHeader">
+                            <input type="checkbox" id="sysAll" value="ALL" checked class="mtx-select-all" data-filter-ignore data-check-class="sysCheck" data-header-id="systemHeader">
                         </label>
                         <label class="multi-select-option" th:each="sys : ${starSystems}">
                             <span th:text="${sys}">System</span>
@@ -97,9 +104,10 @@
               /js/materials-matrix.js and persisted per browser in localStorage.
             -->
             <div class="form-group krtm-display-flex-align-items-center-gap-0-5rem-m-dd56">
-                <input type="checkbox" id="filterGroupByCategory" checked>
+                <input type="checkbox" id="filterGroupByCategory" checked data-filter-ignore>
                 <label for="filterGroupByCategory" class="krtm-margin-bottom-0-margin-top-0-acac" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>
             </div>
+        </div>
         </div>
 
         <!--

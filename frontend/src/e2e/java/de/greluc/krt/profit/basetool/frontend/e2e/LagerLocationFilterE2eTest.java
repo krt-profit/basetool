@@ -128,7 +128,7 @@ class LagerLocationFilterE2eTest {
         assertThat(page.locator("div.tree-row--mid[data-location-id='" + locationBId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
 
-        // An unfiltered first visit renders the panel collapsed (REQ-INV-037), so open it.
+        // Every filter panel starts collapsed (REQ-FE-021), so open it before picking.
         if (page.locator("#myFilterPanel").isHidden()) {
           page.locator("[data-testid='lager-filter-toggle']").click();
         }
@@ -149,7 +149,7 @@ class LagerLocationFilterE2eTest {
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
 
         // One dimension narrows the view, and the chip that keeps a collapsed panel honest says so.
-        assertThat(page.locator("#myFilterCountValue")).hasText("1");
+        assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
 
         // The excluded location must remain offerable, or the filter would be a one-way door.
         assertThat(page.locator("#locationOptions input.locCheck[value='" + locationBId + "']"))

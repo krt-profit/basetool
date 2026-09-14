@@ -59,6 +59,16 @@
 
     <div class="hud-box mt-2">
 
+        <!-- Primary action and the filter toggle share one bar; the filters collapse below it
+             (REQ-FE-021). The create action stays OUTSIDE the panel on purpose. -->
+        <div class="actions-bar">
+            <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)"
+                    type="button" class="btn btn--cta" th:text="#{operation.create}"
+                    data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
+            <div th:replace="~{fragments/components :: filterToggle('operations-filter-panel', 'operations-filter-toggle')}"></div>
+        </div>
+
+        <div class="filter-panel" id="operations-filter-panel" data-filter-panel="operations">
         <form id="operations-filter-form" method="get" th:action="@{/operations}" class="search-form no-track">
             <div class="search-form-flex-1">
                 <label for="operation-search" th:text="#{operation.search}">Search</label>
@@ -93,9 +103,9 @@
 
             <div class="search-form-actions">
                 <button type="button" id="operations-filter-reset" class="btn btn-ghost" th:text="#{general.reset}">Reset</button>
-                <button sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER)" type="button" class="btn btn--cta" th:text="#{operation.create}" data-trigger="open-modal-display" data-modal-id="create-operation-modal">Create New</button>
             </div>
         </form>
+        </div>
 
         <div id="operations-loading-indicator" class="krtm-display-none-text-align-center-padding-1rem-faea">
             <span class="krt-loading-indicator"></span>

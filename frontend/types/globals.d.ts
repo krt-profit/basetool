@@ -516,6 +516,31 @@ interface HTMLElement {
 
 // ------------------------------------------------------- window augmentation
 
+/**
+ * Collapsible filter panels (`krt-filter-panel.js`, REQ-FE-021).
+ *
+ * Panels wire themselves from markup — `data-filter-panel` plus a toggle carrying `aria-controls`.
+ * This API exists only for the two things markup cannot express: a page whose active-filter count
+ * is not readable from the panel's own controls, and a page that filters via AJAX and must
+ * re-state the count after a swap.
+ */
+interface KrtFilterPanelApi {
+    /**
+     * Replaces the generic active-filter count for one panel.
+     *
+     * @param panelId the panel's element id
+     * @param counter returns how many filters are currently active
+     */
+    registerCounter(panelId: string, counter: () => number): void;
+
+    /**
+     * Re-renders the count chips.
+     *
+     * @param panelId a single panel, or every panel when omitted
+     */
+    refresh(panelId?: string): void;
+}
+
 interface Window {
     // --- installed by krt-fetch.js
     krtFetch: KrtFetchApi;
@@ -526,6 +551,7 @@ interface Window {
     // --- installed by the shared foundation modules
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
+    krtFilterPanel: KrtFilterPanelApi;
     escapeHtml: typeof escapeHtml;
     escapeAttr: typeof escapeAttr;
 

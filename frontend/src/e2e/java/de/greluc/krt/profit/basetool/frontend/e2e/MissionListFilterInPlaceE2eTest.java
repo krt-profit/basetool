@@ -103,6 +103,7 @@ class MissionListFilterInPlaceE2eTest {
         // showPast=true so a seeded mission whose planned start is not in the future still lists.
         E2eSupport.navigate(page, baseUrl + "/missions?showPast=true");
         page.waitForLoadState();
+        E2eSupport.openFilterPanel(page);
 
         // Mark the live document: a full navigation/reload wipes it.
         page.evaluate("() => { window.__krtNoReload = true; }");

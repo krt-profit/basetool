@@ -39,21 +39,10 @@
          is simply never in the exclusion set, so it stays visible rather than being silently
          filtered away. -->
     <div class="demand-actions-bar">
-        <button type="button" class="btn btn-ghost demand-filter-toggle" id="demandFilterToggle"
-                data-trigger="demand-toggle-filters" data-testid="demand-filter-toggle"
-                aria-expanded="true" aria-controls="demandFilterPanel">
-            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-filter"/></svg>
-            <span th:text="#{orders.demand.filter.toggle}">Filter</span>
-            <span class="chip chip--primary demand-filter-count" id="demandFilterCount" hidden
-                  th:data-label="#{orders.demand.filter.activeCount}" data-testid="demand-filter-count">
-                <span id="demandFilterCountValue" aria-hidden="true">0</span>
-                <span id="demandFilterCountLabel" class="visually-hidden"></span>
-            </span>
-            <svg class="krt-icon demand-filter-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg>
-        </button>
+        <div th:replace="~{fragments/components :: filterToggle('demandFilterPanel', 'demand-filter-toggle')}"></div>
     </div>
 
-    <div class="demand-filter-panel" id="demandFilterPanel">
+    <div class="filter-panel" id="demandFilterPanel" data-filter-panel="material-demand">
         <div class="demand-filter-form">
             <div class="demand-filter-field">
                 <span class="demand-filter-label" th:text="#{orders.demand.col.material}">Material</span>

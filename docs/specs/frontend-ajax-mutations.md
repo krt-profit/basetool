@@ -1720,6 +1720,51 @@ hot path.
 - [ ] `GlobalBindingAdvice` remains unscoped, and a `String` `@RequestParam`/`@PathVariable` on a
   proxy is still trimmed and length-capped.
 
+### REQ-FE-021 — A list page's filters collapse behind one toggle
+
+Every list page whose filter block carries **more than a single control** must render that block as
+a collapsible panel: the block gets `data-filter-panel="<page>"`, and the shared
+`fragments/components :: filterToggle` sits beside it in an `actions-bar` that also carries the
+page's primary action. `krt-filter-panel.js` wires the two through `aria-controls` alone and is
+loaded globally; a page adds no script of its own.
+
+**A single search field is explicitly out of scope.** Hangar, Staffel-Hangar and Mein Inventar
+filter through one input; putting that behind a toggle costs a tap and saves one row of height,
+which is a worse screen, not a tidier one. The rule is about blocks that push the list itself off a
+phone — the Einsatz, Operationen, Auftrags, Raffinerie, Mitglieder and Materialübersicht filters
+each fill a viewport on their own.
+
+Three properties are load-bearing:
+
+- **The panel renders EXPANDED and the script collapses it.** `hidden` is the collapse mechanism, so
+  a client that never runs the script keeps working filters. Shipping them collapsed in the markup
+  would hide them permanently.
+- **The toggle states how many filters are active**, as a chip on the button itself. A collapsed
+  panel that is silently narrowing a list is the failure mode this whole requirement invites, and
+  the count is the only thing standing between "tidy" and "silently filtered". A control that is a
+  display option rather than a narrowing filter — a grouping toggle, a select-all — opts out with
+  `data-filter-ignore`.
+- **The default is collapsed, and the member's own choice overrides it from the first toggle on**
+  (owner decision, 2026-09-14). Collapsing only when nothing is active was considered and rejected:
+  several pages ship with filters pre-selected, so that rule would have left exactly the pages that
+  prompted the requirement fully expanded.
+
+The primary action stays **outside** the panel. Collapsing a filter block must never take "Neuer
+Auftrag" with it.
+
+A page whose active-filter count cannot be read from the panel's own controls registers its own
+counter through `window.krtFilterPanel.registerCounter(panelId, fn)`; a page that filters via AJAX
+calls `refresh()` after the swap so a collapsed panel never under-reports.
+
+> [!warning] Register the counter inside `DOMContentLoaded`, never at the top level
+> `krt-filter-panel.js` is **deferred** and the page scripts are **not** — they are plain
+> `<script src>` tags at the end of the body, which execute during parsing and therefore BEFORE any
+> deferred script. A top-level `registerCounter` call in a page script runs while
+> `window.krtFilterPanel` is still undefined, is silently skipped, and the panel falls back to the
+> generic scan — which counts the wrong things on exactly the pages that needed a custom counter.
+> Mein Lager, Lager-Verwaltung and Materialbedarf all register from their `DOMContentLoaded`
+> handler, where the deferred script has run and the restored widget state is also in place.
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract

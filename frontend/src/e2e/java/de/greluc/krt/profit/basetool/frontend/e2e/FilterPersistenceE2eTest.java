@@ -119,10 +119,12 @@ class FilterPersistenceE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
+        E2eSupport.openFilterPanel(page);
         page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']").check();
         page.locator("#refinery-filter-form input[name='onlyMine']").check();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/refinery-orders");
+        E2eSupport.openFilterPanel(page);
         assertThat(page.locator("#refinery-filter-form input[name='status'][value='COMPLETED']"))
             .isChecked();
         assertThat(page.locator("#refinery-filter-form input[name='status'][value='OPEN']"))
@@ -145,9 +147,11 @@ class FilterPersistenceE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+        E2eSupport.openFilterPanel(page);
         page.locator("input[name='showPast']").check();
 
         E2eSupport.navigate(page, STACK.baseUrl() + "/missions");
+        E2eSupport.openFilterPanel(page);
         assertThat(page.locator("input[name='showPast']")).isChecked();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "filter-persistence-missions");

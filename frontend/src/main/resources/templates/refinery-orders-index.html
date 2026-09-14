@@ -27,6 +27,12 @@
     </div>
 
     <div class="hud-box mt-2">
+        <!-- Filters collapse behind one toggle (REQ-FE-021); "Neuer Auftrag" stays in the page head above. -->
+        <div class="actions-bar">
+            <div th:replace="~{fragments/components :: filterToggle('refinery-filter-panel', 'refinery-filter-toggle')}"></div>
+        </div>
+
+        <div class="filter-panel" id="refinery-filter-panel" data-filter-panel="refinery-orders">
         <form id="refinery-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/refinery-orders}">
             <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
             <label class="flex-gap-2xs">
@@ -51,6 +57,7 @@
             </label>
             <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
+        </div>
 
         <div id="refinery-orders-results">
         <th:block th:fragment="refineryOrdersResults">

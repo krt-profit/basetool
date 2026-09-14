@@ -116,6 +116,7 @@ class OrdersSquadronFilterE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + QUEUE_URL_SUFFIX);
         page.waitForLoadState();
+        E2eSupport.openFilterPanel(page);
         assertThat(page.getByTestId("nav-logout")).isVisible();
         // The multi-select renders for the full queue (admin is not the requester-only view), and
         // with every squadron checked (the default) the IRIDIUM order is visible.
@@ -132,6 +133,7 @@ class OrdersSquadronFilterE2eTest {
         // so the IRIDIUM order stays hidden without any manual re-filtering.
         E2eSupport.navigate(page, baseUrl + QUEUE_URL_SUFFIX);
         page.waitForLoadState();
+        E2eSupport.openFilterPanel(page);
         assertAbsent(page, iridiumOrderId);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "orders-squadron-filter");

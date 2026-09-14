@@ -156,59 +156,13 @@ function countActiveDemandFilters() {
 
 // ---- Filter panel ------------------------------------------------------------------------------
 
-/**
- * Syncs the active-filter chip on the toggle, including its screen-reader twin, so a shortened
- * table is never left unexplained.
- *
- * @returns {void}
- */
-function updateDemandFilterCount() {
-    const badge = document.getElementById('demandFilterCount');
-    const value = document.getElementById('demandFilterCountValue');
-    const label = document.getElementById('demandFilterCountLabel');
-    if (!badge || !value || !label) return;
-    const active = countActiveDemandFilters();
-    if (active === 0) {
-        badge.setAttribute('hidden', '');
-    } else {
-        badge.removeAttribute('hidden');
-    }
-    value.textContent = String(active);
-    const template = badge.getAttribute('data-label') || '';
-    label.textContent = template.replace('{0}', String(active));
-}
-
-/**
- * Shows or hides the filter panel and keeps the toggle's `aria-expanded` in step.
- *
- * @param {boolean} collapsed whether the panel should be hidden.
- * @returns {void}
- */
-function setDemandPanelCollapsed(collapsed) {
-    const panel = document.getElementById('demandFilterPanel');
-    const toggle = document.getElementById('demandFilterToggle');
-    if (!panel || !toggle) return;
-    if (collapsed) {
-        panel.setAttribute('hidden', '');
-    } else {
-        panel.removeAttribute('hidden');
-    }
-    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-}
-
-/**
- * Toggles the panel and remembers the explicit choice, so it wins over the "collapsed when nothing
- * is filtered" default from then on.
- *
- * @returns {void}
- */
-function toggleDemandPanel() {
-    const toggle = document.getElementById('demandFilterToggle');
-    const collapsed = toggle ? toggle.getAttribute('aria-expanded') === 'true' : false;
-    demandState.panelCollapsed = collapsed;
-    setDemandPanelCollapsed(collapsed);
-    writeDemandState();
-}
+// The collapse itself lives in krt-filter-panel.js (REQ-FE-021). This page supplies only
+// the COUNT, because its dimensions are not readable from the panel's own controls, and it
+// registers that counter inside DOMContentLoaded rather than here: this file is a
+// non-deferred script at the end of the body, so it executes BEFORE the deferred
+// krt-filter-panel.js and window.krtFilterPanel does not exist yet at this point. A
+// top-level registration would be silently skipped and the panel would fall back to the
+// generic scan, which counts the wrong things here.
 
 // ---- Material multi-select ---------------------------------------------------------------------
 
@@ -530,7 +484,7 @@ function applyDemandView() {
 
     applyDemandSort();
     restoreBucketStates(document);
-    updateDemandFilterCount();
+    if (window.krtFilterPanel) window.krtFilterPanel.refresh('demandFilterPanel');
 }
 
 /**
@@ -670,7 +624,6 @@ function restoreBucketStates(root) {
 // Document-delegated so every control survives the results fragment's swaps.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
-    window.krtEvents.on('click', 'demand-toggle-filters', toggleDemandPanel);
     window.krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
     window.krtEvents.on('change', 'demand-toggle-material-all', toggleDemandMaterialAll);
     window.krtEvents.on('change', 'demand-update-material-state', syncDemandMaterialSelection);
@@ -694,13 +647,12 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', function () {
     readDemandState();
     restoreDemandControls();
-    // Panel default: an explicit choice always wins; otherwise it starts collapsed only when
-    // nothing is filtered, so an active filter is never hidden behind a closed panel.
-    setDemandPanelCollapsed(
-        typeof demandState.panelCollapsed === 'boolean'
-            ? demandState.panelCollapsed
-            : countActiveDemandFilters() === 0,
-    );
+    // The panel's own state is krt-filter-panel.js's and was applied before this ran; only the
+    // count needs restating, because restoreDemandControls just repopulated the widgets it reads.
+    if (window.krtFilterPanel) {
+        window.krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
+        window.krtFilterPanel.refresh('demandFilterPanel');
+    }
     applyDemandView();
 
     if (

@@ -239,9 +239,10 @@ class JobOrderMaterialDemandE2eTest {
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
         Locator toggle = page.locator("[data-testid='demand-filter-toggle']");
         Locator panel = page.locator("#demandFilterPanel");
-        Locator count = page.locator("[data-testid='demand-filter-count']");
+        Locator count = page.locator(".filter-toggle [data-filter-count]");
 
-        // Nothing is filtered on a first visit, so the panel starts collapsed and the chip is off.
+        // Every filter panel starts collapsed (REQ-FE-021); nothing is filtered yet, so the chip
+        // is off as well.
         assertThat(panel).isHidden();
         assertThat(toggle).hasAttribute("aria-expanded", "false");
         assertThat(count).isHidden();
@@ -256,7 +257,7 @@ class JobOrderMaterialDemandE2eTest {
         E2eSupport.navigate(page, STACK.baseUrl() + "/orders/material-demand");
         assertThat(page.locator("#demandFilterPanel")).isVisible();
         assertThat(page.locator("[data-testid='demand-hide-covered']")).isChecked();
-        assertThat(page.locator("[data-testid='demand-filter-count']")).containsText("1");
+        assertThat(page.locator(".filter-toggle [data-filter-count]")).containsText("1");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "material-demand-filter-panel");
         throw failure;

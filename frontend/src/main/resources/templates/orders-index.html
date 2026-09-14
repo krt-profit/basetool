@@ -27,6 +27,13 @@
     </div>
 
     <div class="hud-box mt-2">
+        <!-- Filters collapse behind one toggle (REQ-FE-021). "Neuer Auftrag" already lives in the
+             page head above, so this bar carries the toggle alone. -->
+        <div class="actions-bar">
+            <div th:replace="~{fragments/components :: filterToggle('orders-filter-panel', 'orders-filter-toggle')}"></div>
+        </div>
+
+        <div class="filter-panel" id="orders-filter-panel" data-filter-panel="orders">
         <form id="orders-filter-form" class="no-track krtm-display-flex-gap-1rem-margin-bottom-1rem-ali-e265" method="get" th:action="@{/orders}">
             <span th:text="#{orders.index.filter.status}" class="krtm-font-weight-700-font-size-0-8rem-color-var-c-eed8">Status:</span>
             <label class="flex-gap-2xs">
@@ -63,7 +70,7 @@
                 <div class="multi-select-options" id="squadronOptions">
                     <label class="multi-select-option">
                         <span th:text="#{filter.all}">Alle</span>
-                        <input type="checkbox" id="sqAll" value="ALL"
+                        <input type="checkbox" id="sqAll" value="ALL" data-filter-ignore
                                data-trigger="ord-toggle-squadron-all"
                                data-all-id="sqAll" data-check-class="sqCheck" data-header-id="squadronHeader">
                     </label>
@@ -79,6 +86,7 @@
             </th:block>
             <button type="submit" class="btn btn-ghost krtm-padding-0-25rem-0-75rem-font-size-0-8rem-e5f2" th:text="#{orders.index.filter.apply}">Filtern</button>
         </form>
+        </div>
 
         <div th:if="${error}" class="hud-box hud-box-error">
             <p th:text="#{__${error}__}">Fehler</p>
