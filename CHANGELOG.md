@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
+
 ### Fixed
 
 - **Nach der Umstellung der Anmeldeadresse zeigte die Seite einen Fehler statt der Anmeldung.** Wer
