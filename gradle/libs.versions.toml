@@ -37,13 +37,27 @@ testcontainers = "2.0.5"
 # replacement hits nothing (no profile sets it; all three set only enabled + locations). Note the
 # Redgate release-notes page lists NO breaking changes for 13.0.0 — they are documented only in the
 # "Looking forward to Flyway V13" blog post, so do not clear a future major from that page alone.
-# 13.5.0 (2026-09): `jackson-databind` became an OPTIONAL dependency and JSON support moved
-# into a new `flyway-core-utilities` module. A no-op here -- Spring Boot's web starter puts
-# `jackson-databind` on the compile and runtime classpath regardless, and nothing in this repo
-# asks Flyway for JSON (no `flyway.toml`, no JSON-configured callbacks; every profile sets only
-# `enabled` + `locations`). The rest of the release is debug-log and dry-run polish plus Jackson
-# and MariaDB-driver bumps, with no documented bug fixes.
-flyway = "13.5.0"
+# 13.5.0 (2026-09-03): `jackson-databind` became an OPTIONAL dependency and JSON support moved
+# into a new `flyway-core-utilities` module. Still a no-op here, but NOT for the reason this
+# comment gave when the bump was taken -- corrected 2026-09-14 against the resolved classpath.
+# It claimed Spring Boot's web starter supplies `jackson-databind` regardless; under Boot 4 that
+# starter supplies Jackson **3** (`tools.jackson.core`), a different artifact in a different
+# package, which cannot satisfy a Flyway built against Jackson 2. `flyway-core` now pulls only
+# `jackson-annotations`, and every `com.fasterxml.jackson.core:jackson-databind` on the backend
+# runtime classpath arrives under `springdoc-openapi-starter-webmvc-api` instead. What actually
+# makes this safe is the other half of the original note: nothing here asks Flyway for JSON -- no
+# `flyway.toml`, no JSON-configured callbacks, and all three profiles set only `enabled` +
+# `locations`. Do not re-derive the safety from the classpath; derive it from that.
+# The rest of the release is debug-log and dry-run polish plus Jackson and MariaDB-driver bumps,
+# with no documented bug fixes.
+# 13.6.0 (2026-09-10): nothing in it reaches this build, and it is taken to keep the drift small
+# rather than for anything it fixes. The whole release is surface this repo does not use -- the
+# dry-run report, `flyway check` rule profiles, `flyway deploy` publishing to Flyway Pipelines, the
+# `flyway auth` credential cache and the Docker image's move to a JRE 25 base, plus DB2, SQL Server
+# and Databricks fixes and Snowflake-Postgres recognition on databases it does not target.
+# `flyway-core` and `flyway-database-postgresql` carry no behaviour change, no deprecation and no
+# breaking change; verified by running the migration tests, not on the notes alone.
+flyway = "13.6.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
