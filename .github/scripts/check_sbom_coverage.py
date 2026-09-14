@@ -20,6 +20,13 @@ SBOM end to end, or listed in ``NOT_SHIPPED`` with the reason it ships nothing.
 A new module is a failure until somebody decides which it is -- that decision
 being the whole point, since both drifts above were silence, not a wrong answer.
 
+The **release notes** were added as a fifth place (v1.8.3) after the same failure
+happened one step further downstream: ``extract_release_notes.py`` announced two
+images while the pipeline built, scanned, signed and pushed three, so ``ingest``
+shipped unmentioned for three releases. What a release says it contains is part
+of what it publishes, so the notes are checked against the build matrix and the
+shipped-module set rather than maintained by hand beside them.
+
 Exit codes:
   0  -> every shipped module is wired end to end.
   1  -> at least one gap; each is printed with the file that must change.
@@ -38,6 +45,8 @@ REPO = Path(__file__).resolve().parents[2]
 SETTINGS = REPO / "settings.gradle.kts"
 PREPARE = REPO / ".github" / "workflows" / "release-prepare.yml"
 PUBLISH = REPO / ".github" / "workflows" / "release-publish.yml"
+IMAGES = REPO / ".github" / "workflows" / "release-images.yml"
+NOTES = REPO / ".github" / "scripts" / "extract_release_notes.py"
 
 # Modules that deliberately publish no SBOM, with the reason. A module lands here
 # only when nothing it produces reaches a consumer; "we forgot" is not a reason,
@@ -136,6 +145,85 @@ def check_module(module: str, prepare: str, publish: str) -> list[str]:
     return problems
 
 
+def check_release_notes(shipped: list[str], images: str) -> list[str]:
+    """Assert the release-notes footer announces everything the release ships.
+
+    The fifth place, and the one that drifted after the other four were pinned:
+    ``extract_release_notes.py`` writes the "Docker Images" and "SBOM" sections
+    of the GitHub Release body from two hand-written tuples. Those are the only
+    description of the release most readers ever see, so a module missing there
+    is not a documentation gap -- it is an artifact that, as far as any consumer
+    can tell, was not published. ``ingest`` sat in the build matrix, the scan
+    matrix, the signing matrix and the SBOM asset list while the notes named two
+    images; nothing failed, and three releases went out understating themselves.
+
+    Both directions are checked. A tuple that lists something the release does
+    not build is as wrong as one that omits what it does, and points a reader at
+    a tag that cannot be pulled.
+
+    :param shipped: the Gradle modules that publish an SBOM, in declaration order.
+    :param images: full text of ``release-images.yml``.
+    :return: one human-readable problem per gap; empty when the footer is sound.
+    """
+    problems: list[str] = []
+    notes = NOTES.read_text(encoding="utf-8")
+
+    def tuple_entries(name: str) -> set[str] | None:
+        """Return the string members of a module-level tuple, or None if absent."""
+        match = re.search(rf"^{name}: tuple\[str, \.\.\.\] = \(([^)]*)\)", notes, re.MULTILINE)
+        return None if match is None else set(re.findall(r'"([^"]+)"', match.group(1)))
+
+    # The build matrix is the authority on which modules become an image; the
+    # notes must mirror it exactly. Read rather than restated, so this checker
+    # cannot become the fifth list that quietly disagrees with the other four.
+    matrix = re.search(r"^\s*module: \[([^\]]+)\]", images, re.MULTILINE)
+    declared_images = tuple_entries("SERVICE_IMAGES")
+    if matrix is None:
+        problems.append(
+            "could not find the `module: [...]` build matrix in release-images.yml -- this "
+            "checker needs updating alongside whatever replaced it"
+        )
+    elif declared_images is None:
+        problems.append(
+            f"{NOTES.relative_to(REPO)} has no SERVICE_IMAGES tuple -- the release notes' image "
+            f"list can no longer be checked against the build matrix"
+        )
+    else:
+        built = {m.strip() for m in matrix.group(1).split(",")}
+        for missing in sorted(built - declared_images):
+            problems.append(
+                f"{missing}: release-images.yml builds, signs and pushes it, but "
+                f"{NOTES.relative_to(REPO)}'s SERVICE_IMAGES omits it -- the GitHub Release will "
+                f"not mention the image at all (add it to the tuple)"
+            )
+        for phantom in sorted(declared_images - built):
+            problems.append(
+                f"{phantom}: listed in {NOTES.relative_to(REPO)}'s SERVICE_IMAGES but not in "
+                f"release-images.yml's build matrix -- the notes would advertise an image tag "
+                f"nobody can pull"
+            )
+
+    declared_boms = tuple_entries("SBOM_MODULES")
+    if declared_boms is None:
+        problems.append(
+            f"{NOTES.relative_to(REPO)} has no SBOM_MODULES tuple -- the release notes can no "
+            f"longer be checked against the set of published SBOMs"
+        )
+    else:
+        for missing in sorted(set(shipped) - declared_boms):
+            problems.append(
+                f"{missing}: publishes an SBOM but {NOTES.relative_to(REPO)}'s SBOM_MODULES omits "
+                f"it, so the release body tells a reader to audit fewer components than it ships"
+            )
+        for phantom in sorted(declared_boms - set(shipped)):
+            problems.append(
+                f"{phantom}: listed in {NOTES.relative_to(REPO)}'s SBOM_MODULES but publishes no "
+                f"SBOM -- the release body would point at a directory with nothing in it"
+            )
+
+    return problems
+
+
 def main() -> None:
     """Check every module and exit non-zero with the full list of gaps.
 
@@ -164,18 +252,22 @@ def main() -> None:
     for module in shipped:
         problems.extend(check_module(module, prepare, publish))
 
+    problems.extend(check_release_notes(shipped, IMAGES.read_text(encoding="utf-8")))
+
     if problems:
         print("SBOM coverage gaps:\n")
         for problem in problems:
             print(f"  - {problem}")
         print(
-            "\nEvery module that reaches a consumer publishes an SBOM. If this one ships nothing, "
-            "add it to NOT_SHIPPED in this script with the reason."
+            "\nEvery module that reaches a consumer publishes an SBOM, and every artifact the "
+            "pipeline pushes is named in the release notes. If this one ships nothing, add it to "
+            "NOT_SHIPPED in this script with the reason."
         )
         raise SystemExit(1)
 
     exempt = ", ".join(sorted(NOT_SHIPPED)) or "none"
     print(f"SBOM coverage OK: {', '.join(shipped)} (not shipped: {exempt})")
+    print("Release-notes footer OK: image list matches the build matrix, SBOM list matches above")
 
 
 if __name__ == "__main__":

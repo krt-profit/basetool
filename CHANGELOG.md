@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Release-Notes nannten nur zwei der drei Container-Images.** Das Ingest-Image wird bei jedem
+  Release mitgebaut, geprüft, signiert und veröffentlicht, fehlte aber in der automatisch erzeugten
+  Liste — ebenso zwei der vier SBOM-Verzeichnisse. Beide Listen werden jetzt aus der Build-Matrix
+  abgeleitet, und eine CI-Prüfung schlägt an, sobald sie auseinanderlaufen (REQ-OPS-029).
+
 ## [v1.8.3](https://github.com/krt-profit/basetool/releases/tag/v1.8.3) - 2026-09-14
 
 ### Fixed

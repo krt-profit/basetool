@@ -50,6 +50,22 @@ RUBRIC: dict[str, str] = {
     "Deprecated": "Veraltet",
 }
 
+# The modules whose production image is built, scanned, signed and pushed on every
+# release. This must stay in lock-step with the ``module:`` build matrix in
+# ``release-images.yml``, and ``check_sbom_coverage.py`` asserts that it does --
+# the list here silently lost ``ingest`` while the matrix kept building, scanning
+# and signing it, so three releases announced two of the three images they ship.
+# An image missing from the notes does not read as an omission; it reads as an
+# image the release does not have, which is the same failure mode the SBOM
+# checker was written for.
+SERVICE_IMAGES: tuple[str, ...] = ("backend", "frontend", "ingest")
+
+# The modules whose CycloneDX SBOMs are attached to the release and committed
+# under ``<module>/docs/`` (REQ-OPS-025). Deliberately NOT the same set as the
+# images above: ``keycloak-spi`` ships a provider-JAR bundle rather than a
+# service image, and is still a component a consumer has to be able to audit.
+SBOM_MODULES: tuple[str, ...] = ("backend", "frontend", "ingest", "keycloak-spi")
+
 
 def changelog_section(tag: str, path: str) -> str:
     """Return the tag's CHANGELOG section with skill-style rubric headings.
@@ -98,18 +114,27 @@ def image_and_sbom_footer(version: str, registry: str, owner: str) -> str:
     :return: a markdown block linking the signed multi-arch images and noting the
              attached CycloneDX SBOMs.
     """
+    pulls = "".join(
+        f"- {module.capitalize()}: `{registry}/{owner}/basetool-{module}:{version}`\n"
+        for module in SERVICE_IMAGES
+    )
+    pages = "".join(
+        f"- [{module}](https://github.com/{owner}/basetool/pkgs/container/basetool-{module})\n"
+        for module in SERVICE_IMAGES
+    )
+    dirs = [f"`{module}/docs/`" for module in SBOM_MODULES]
+    sbom_dirs = f"{', '.join(dirs[:-1])} and {dirs[-1]}" if len(dirs) > 1 else dirs[0]
+
     return (
         "## Docker Images\n\n"
         "Multi-arch (linux/amd64, linux/arm64), cosign-signed (keyless / Sigstore). "
         "Pull by version tag:\n\n"
-        f"- Backend: `{registry}/{owner}/basetool-backend:{version}`\n"
-        f"- Frontend: `{registry}/{owner}/basetool-frontend:{version}`\n\n"
+        f"{pulls}\n"
         "Also tagged `:latest`. Package pages:\n\n"
-        f"- [backend](https://github.com/{owner}/basetool/pkgs/container/basetool-backend)\n"
-        f"- [frontend](https://github.com/{owner}/basetool/pkgs/container/basetool-frontend)\n\n"
+        f"{pages}\n"
         "## SBOM\n\n"
         "CycloneDX SBOMs for this release are attached below and committed under "
-        "`backend/docs/` and `frontend/docs/`."
+        f"{sbom_dirs}."
     )
 
 
