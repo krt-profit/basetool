@@ -4969,20 +4969,31 @@ textarea:focus-visible,
      * chosen over letting the header scroll away like the footer.
      */
     nav {
-        gap: var(--space-4);
-        min-width: 0;
         /*
-         * The structural wrap rule further down matches ANY flex row whose direct children
-         * include a button or a link — "the structure counts, not the name" — and this nav has
-         * both: the hamburger and the brand. It therefore wrapped the brand onto a second line
-         * and took the header back to 110px, undoing the compact header above. The two shipped
-         * in the SAME release (v1.8.0) and neither was measured against the other.
+         * A GRID, not a flex row, and that is the whole fix.
          *
-         * A header row is not a button row: it has exactly two items, one of which already
-         * truncates. Opting out here rather than narrowing the structural rule keeps that rule
-         * deliberately broad, which is the property that made it worth having.
+         * The structural wrap rule further down matches any flex row whose direct children include
+         * a button or a link — "the structure counts, not the name" — and this nav has both: the
+         * hamburger and the brand. It therefore wrapped the brand onto a second line and took the
+         * header to 110px, undoing the compact header above. Both shipped in the SAME release
+         * (v1.8.0) and neither was measured against the other.
+         *
+         * `flex-wrap: nowrap` was the obvious answer and it is the wrong one: a nowrap flex row
+         * still OVERFLOWS when its content does not fit, and on the Bank pages it did — the layout
+         * viewport widened from 375px to 412px and the whole page scaled down. It reproduced in CI
+         * on all three browsers and not locally, because the seeded data there is wider; a control
+         * run without the change was green, which is what settled it.
+         *
+         * `minmax(0, 1fr)` cannot do that. The second track is bounded by the container, so the
+         * brand is forced to shrink and its wordmark to ellipsise rather than push the page wider.
+         * `flex-wrap` from the structural rule is inert on a grid, so the opt-out is structural too
+         * rather than a declaration that has to win a specificity argument.
          */
-        flex-wrap: nowrap;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--space-4);
+        align-items: center;
+        min-width: 0;
     }
 
     nav .brand {
