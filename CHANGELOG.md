@@ -16,107 +16,6 @@
   erhalten und zählt im Filter-Zähler mit; „Alle markieren“ erfasst genau den gefilterten
   Bestand.
 
-### Fixed
-
-- **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
-  auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
-  bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
-  zusätzliche Abfrage beim Server. Das gilt auch für kodierte Schreibweisen derselben
-  Adresse.
-
-- **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
-  (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
-  Alle drei erfüllen jetzt das 44px-Mindestmaß.
-- **Das 44px-Mindestmaß gilt jetzt für jedes Bedienelement, auch für die, an die niemand gedacht
-  hat.** Bisher galt es nur für eine Liste namentlich aufgeführter Elemente, und jede Prüfrunde fand
-  weitere, die darin fehlten — zuletzt die Sortierpfeile der Beförderungs-Themen mit 29x18px, die
-  nur erscheinen, wenn eine Kategorie mehr als ein Thema hat. Umgedreht: Knöpfe, Aufklapp-Titel,
-  Eingabefelder und Auswahllisten erfüllen das Maß von sich aus; dichte Tabellenzeilen behalten ihre
-  32px. Neue Bedienelemente sind damit von Anfang an groß genug, statt erst beim nächsten Fund
-  nachgetragen zu werden.
-- **Die „Details"-Schalter in den Übersichtstabellen waren zu klein.** In der Blueprint-Übersicht
-  und im Staffel-Hangar maßen sie 29px statt der geforderten 44px, ebenso zwei Schalter in der
-  Auftragsansicht. Ursache war eine alte Formatierungsanweisung, die das Mindestmaß gezielt
-  aufhob — auf Touch-Geräten sind sie jetzt normal groß.
-- **Knopfzeilen brechen auf dem Telefon zuverlässig um.** Auch das war eine Namensliste, und sie
-  konnte nie vollständig sein: ein Teil der Zeilen trägt automatisch erzeugte Klassennamen, die sich
-  bei jeder Änderung mitändern. Jetzt zählt der Aufbau der Zeile, nicht ihr Name.
-- **Auf schmalen Bildschirmen lief der Seitenkopf über.** Wo neben der Überschrift ein Knopf steht
-  („Neuer Auftrag“ und ähnliche), wurde er aus dem Bild geschoben und die ganze Seite musste
-  seitlich gescrollt werden — auf der Auftragsseite um 159px. Der Knopf rutscht jetzt in die
-  nächste Zeile.
-- **Das Schließkreuz in Dialogen sah aus wie ein fremder Knopf** — es hatte als einziges
-  Bedienelement gar keine Gestaltung und war auf Touch-Geräten zu klein. Es passt sich jetzt dem
-  übrigen Bild an; die Knopfzeile eines Dialogs bricht auf schmalen Bildschirmen um, statt den
-  letzten Knopf abzuschneiden.
-- **Die Navigationsschublade war auf dem Handy unten abgeschnitten.** Ihre Höhe richtete sich nach
-  dem Bildschirm ohne Browserleiste, sodass die letzten Einträge — darunter „Abmelden“ — hinter
-  der Leiste lagen und nicht erreichbar waren.
-- **Überschriften liefen auf dem Handy über den Rand.** Lange deutsche Komposita wie
-  „Nutzungsbedingungen“ passen nicht auf eine Handybreite und hatten keine Umbruchstelle; die
-  Rechtsseiten ragten dadurch bis zu 88px, die Audit-Seiten 151px hinaus. Sie werden jetzt mit
-  Trennstrich umbrochen.
-- **Knopfleisten brachen nicht um.** In dreizehn Fällen — am deutlichsten im Audit-Log mit vier
-  Knöpfen — wurde der letzte Knopf aus dem Bild geschoben. Sie setzen sich jetzt in die nächste
-  Zeile.
-- **Die Glocke überdeckte den Titel.** Sie schwebt über der Kopfzeile, die deshalb keinen Platz
-  für sie freihielt — der Titel endete unlesbar unter ihr. Jetzt ist ihr Platz reserviert.
-- **Auswahlfelder waren breiter als der Bildschirm.** Ein Auswahlfeld richtet sich nach seinem
-  längsten Eintrag; im Audit-Log und in der Preis-Übersicht wurde die Seite dadurch verkleinert
-  dargestellt, statt zu scrollen. Sie passen sich jetzt der verfügbaren Breite an.
-- **Die Antragsliste der Bank machte die Seite auf dem Handy mehr als doppelt so breit** — und die
-  drei Dialoge dieser Seite („Bestätigen“, „Ablehnen“, „Buchung“) saßen dadurch fast vollständig
-  außerhalb des Bildschirms. Die Tabelle scrollt jetzt für sich, die Seite bleibt stehen.
-- **Auftrags- und Raffinerie-Detailseiten ließen sich auf dem Handy nur seitlich verschoben lesen.**
-  Ihre Knopfleisten brachen nicht um und zogen die ganze Seite in die Breite. Sie setzen sich jetzt
-  in die nächste Zeile.
-- **Die Startseite ließ sich auf dem Tablet quer seitlich schieben.** Ein langer Einsatzname passte
-  nicht in seine Kachel und schob das ganze Raster über den Rand; jetzt bricht er um.
-- **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
-  als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
-  Einsatzseiten sah er immer schon richtig aus.
-- **Wer auf seine Freigabe wartete, kam nicht an Impressum und Datenschutz.** Ein angemeldetes
-  Mitglied mit noch offener Registrierung wurde von beiden Seiten auf die Wartesseite geschickt und
-  musste sich abmelden, um sie zu lesen. Beide Seiten sind jetzt erreichbar, wie die
-  Nutzungsbedingungen es schon waren.
-- **Auf kurzen Seiten hing die Fußzeile auf dem Handy mitten im Bild** statt am Seitenende — etwa
-  auf einer leeren Benachrichtigungsliste. Sie sitzt jetzt wieder unten.
-- **Die Aktionsleiste der Einsatz-Verwaltung und der Balken des Organigramms überdeckten auf dem
-  Handy die Fußzeilen-Links**, seit die Fußzeile dort mitscrollt. Beide geben sie jetzt frei, wenn
-  man ans Seitenende kommt.
-- **Die Einheiten-Tabelle unter Administration → Organisationsstruktur passte auf dem Handy nicht
-  auf den Bildschirm.** Sobald Einheiten eingetragen waren, wurde sie breiter als das Gerät und
-  schob die ganze Seite samt Glocke seitlich weg. Jetzt scrollt sie für sich.
-- **Die Regel-Tabelle unter Administration → Benachrichtigungsregeln sprengte jeden Bildschirm.**
-  Sie ist 1303px breit und hatte keinen eigenen Scrollbereich, sodass die ganze Seite seitlich
-  verschoben werden musste — auch am Rechner. Jetzt scrollt die Tabelle für sich.
-- **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
-  Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
-  und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
-- **Auch die Sortierknöpfe unter Beförderung → Themen waren zu klein** — 29x18px, viermal auf der
-  Seite. Sie waren dem Test entgangen, weil sie erst ab zwei Themen überhaupt erscheinen.
-- **Eine unsinnige Sprachangabe in der Adresse führte auf die Fehlerseite.** Ein `?lang=`-Wert, den
-  der Server nicht lesen kann, beendete den Seitenaufruf mit einem Fehler, statt ihn einfach zu
-  übergehen. Betraf jede Seite, auch das Web-App-Manifest.
-
-- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
-  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
-  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
-  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
-  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
-
-- **Die Keycloak-Verwaltungsoberfläche ist über den SSH-Tunnel wieder erreichbar.** Seit die
-  veröffentlichten Ports auf einer eigenen Netzwerkbrücke liegen, kam der Tunnel am Edge unter einer
-  Adresse an, die nicht auf der Freigabeliste von `/admin` stand — jede Anfrage endete mit 403. Die
-  Adresse ist jetzt eingetragen, IPv4 und IPv6; von außen bleibt die Konsole gesperrt. Für
-  Mitglieder ändert sich nichts.
-
-- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
-  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
-  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
-  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
-  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
-
 ### Changed
 
 - **Alle Dialoge passen jetzt auf den Bildschirm.** Rund die Hälfte der Dialoge konnte höher
@@ -135,22 +34,133 @@
   — und warf deshalb sämtliche Fehlschläge in einen Topf „sonstige". Neuer Wert `no_credentials`
   in Backend und Ingest.
 
-- **Bearbeitungen in der Weboberfläche lösen weniger Serverabfragen aus.** Jeder JSON-Aufruf — also
-  jedes Speichern, Umschalten und Nachladen ohne Seitenwechsel — hat bisher zusätzlich fünf
-  Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
-  Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
-  entfallen.
 - **Die Datenbank wird bei vielen gleichzeitigen Mitgliedern nicht mehr ausgebremst.** Rollen und
   Berechtigungen wurden je Mitglied alle 30 Sekunden vollständig neu aus der Datenbank gelesen; das
   verursachte den Großteil der Datenbanklast und kurze, spürbare Verzögerungen. Der Zwischenspeicher
   hält sie jetzt 5 Minuten — eine entzogene Rolle wirkt dadurch bis zu 5 Minuten später, sofern sich
   das Mitglied nicht neu anmeldet.
+
 - **Mehr CPU für Datenbank, Backend und Keycloak, und eine passendere Datenbankkonfiguration.** Die
   Grenzen waren so eng gesetzt, dass kurze Lastspitzen ausgebremst wurden, obwohl der Server fast
   ungenutzt ist. Neue optionale Servervariable `IRI_AUTHORITIES_CACHE_TTL` (Standard `PT5M`,
   zulässig bis `PT15M`) steuert den oben genannten Zwischenspeicher.
 
 ### Fixed
+
+- **Robots-Datei, App-Links-Datei und Web-App-Manifest werden angemeldeten Mitgliedern nicht mehr
+  auf die Nutzungsbedingungen umgeleitet.** Wer die Bedingungen noch nicht bestätigt hatte, bekam
+  bei diesen drei Dateien die Zustimmungsseite statt der Datei, und jeder Abruf kostete eine
+  zusätzliche Abfrage beim Server. Das gilt auch für kodierte Schreibweisen derselben
+  Adresse.
+
+- **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
+  (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
+  Alle drei erfüllen jetzt das 44px-Mindestmaß.
+
+- **Das 44px-Mindestmaß gilt jetzt für jedes Bedienelement, auch für die, an die niemand gedacht
+  hat.** Bisher galt es nur für eine Liste namentlich aufgeführter Elemente, und jede Prüfrunde fand
+  weitere, die darin fehlten — zuletzt die Sortierpfeile der Beförderungs-Themen mit 29x18px, die
+  nur erscheinen, wenn eine Kategorie mehr als ein Thema hat. Umgedreht: Knöpfe, Aufklapp-Titel,
+  Eingabefelder und Auswahllisten erfüllen das Maß von sich aus; dichte Tabellenzeilen behalten ihre
+  32px. Neue Bedienelemente sind damit von Anfang an groß genug, statt erst beim nächsten Fund
+  nachgetragen zu werden.
+
+- **Die „Details"-Schalter in den Übersichtstabellen waren zu klein.** In der Blueprint-Übersicht
+  und im Staffel-Hangar maßen sie 29px statt der geforderten 44px, ebenso zwei Schalter in der
+  Auftragsansicht. Ursache war eine alte Formatierungsanweisung, die das Mindestmaß gezielt
+  aufhob — auf Touch-Geräten sind sie jetzt normal groß.
+
+- **Knopfzeilen brechen auf dem Telefon zuverlässig um.** Auch das war eine Namensliste, und sie
+  konnte nie vollständig sein: ein Teil der Zeilen trägt automatisch erzeugte Klassennamen, die sich
+  bei jeder Änderung mitändern. Jetzt zählt der Aufbau der Zeile, nicht ihr Name.
+
+- **Auf schmalen Bildschirmen lief der Seitenkopf über.** Wo neben der Überschrift ein Knopf steht
+  („Neuer Auftrag“ und ähnliche), wurde er aus dem Bild geschoben und die ganze Seite musste
+  seitlich gescrollt werden — auf der Auftragsseite um 159px. Der Knopf rutscht jetzt in die
+  nächste Zeile.
+
+- **Das Schließkreuz in Dialogen sah aus wie ein fremder Knopf** — es hatte als einziges
+  Bedienelement gar keine Gestaltung und war auf Touch-Geräten zu klein. Es passt sich jetzt dem
+  übrigen Bild an; die Knopfzeile eines Dialogs bricht auf schmalen Bildschirmen um, statt den
+  letzten Knopf abzuschneiden.
+
+- **Die Navigationsschublade war auf dem Handy unten abgeschnitten.** Ihre Höhe richtete sich nach
+  dem Bildschirm ohne Browserleiste, sodass die letzten Einträge — darunter „Abmelden“ — hinter
+  der Leiste lagen und nicht erreichbar waren.
+
+- **Überschriften liefen auf dem Handy über den Rand.** Lange deutsche Komposita wie
+  „Nutzungsbedingungen“ passen nicht auf eine Handybreite und hatten keine Umbruchstelle; die
+  Rechtsseiten ragten dadurch bis zu 88px, die Audit-Seiten 151px hinaus. Sie werden jetzt mit
+  Trennstrich umbrochen.
+
+- **Knopfleisten brachen nicht um.** In dreizehn Fällen — am deutlichsten im Audit-Log mit vier
+  Knöpfen — wurde der letzte Knopf aus dem Bild geschoben. Sie setzen sich jetzt in die nächste
+  Zeile.
+
+- **Die Glocke überdeckte den Titel.** Sie schwebt über der Kopfzeile, die deshalb keinen Platz
+  für sie freihielt — der Titel endete unlesbar unter ihr. Jetzt ist ihr Platz reserviert.
+
+- **Auswahlfelder waren breiter als der Bildschirm.** Ein Auswahlfeld richtet sich nach seinem
+  längsten Eintrag; im Audit-Log und in der Preis-Übersicht wurde die Seite dadurch verkleinert
+  dargestellt, statt zu scrollen. Sie passen sich jetzt der verfügbaren Breite an.
+
+- **Die Antragsliste der Bank machte die Seite auf dem Handy mehr als doppelt so breit** — und die
+  drei Dialoge dieser Seite („Bestätigen“, „Ablehnen“, „Buchung“) saßen dadurch fast vollständig
+  außerhalb des Bildschirms. Die Tabelle scrollt jetzt für sich, die Seite bleibt stehen.
+
+- **Auftrags- und Raffinerie-Detailseiten ließen sich auf dem Handy nur seitlich verschoben lesen.**
+  Ihre Knopfleisten brachen nicht um und zogen die ganze Seite in die Breite. Sie setzen sich jetzt
+  in die nächste Zeile.
+
+- **Die Startseite ließ sich auf dem Tablet quer seitlich schieben.** Ein langer Einsatzname passte
+  nicht in seine Kachel und schob das ganze Raster über den Rand; jetzt bricht er um.
+
+- **Der Hinweis „Aktualisierungen verfügbar“ war auf den Bank-Seiten ungestaltet.** Er erschien dort
+  als nackter grauer Knopf mitten im Inhalt statt als Hinweisfeld unten rechts — auf den
+  Einsatzseiten sah er immer schon richtig aus.
+
+- **Wer auf seine Freigabe wartete, kam nicht an Impressum und Datenschutz.** Ein angemeldetes
+  Mitglied mit noch offener Registrierung wurde von beiden Seiten auf die Wartesseite geschickt und
+  musste sich abmelden, um sie zu lesen. Beide Seiten sind jetzt erreichbar, wie die
+  Nutzungsbedingungen es schon waren.
+
+- **Auf kurzen Seiten hing die Fußzeile auf dem Handy mitten im Bild** statt am Seitenende — etwa
+  auf einer leeren Benachrichtigungsliste. Sie sitzt jetzt wieder unten.
+
+- **Die Aktionsleiste der Einsatz-Verwaltung und der Balken des Organigramms überdeckten auf dem
+  Handy die Fußzeilen-Links**, seit die Fußzeile dort mitscrollt. Beide geben sie jetzt frei, wenn
+  man ans Seitenende kommt.
+
+- **Die Einheiten-Tabelle unter Administration → Organisationsstruktur passte auf dem Handy nicht
+  auf den Bildschirm.** Sobald Einheiten eingetragen waren, wurde sie breiter als das Gerät und
+  schob die ganze Seite samt Glocke seitlich weg. Jetzt scrollt sie für sich.
+
+- **Die Regel-Tabelle unter Administration → Benachrichtigungsregeln sprengte jeden Bildschirm.**
+  Sie ist 1303px breit und hatte keinen eigenen Scrollbereich, sodass die ganze Seite seitlich
+  verschoben werden musste — auch am Rechner. Jetzt scrollt die Tabelle für sich.
+
+- **Vier weitere Bedienelemente waren zum Antippen zu klein**: die Sortierknöpfe der
+  Materialbedarfsliste, die Auswahlkästchen im Lager, die Rechte-Schalter der Bank-Berechtigungen
+  und der Aufklapp-Pfeil einer Buchung — letzterer mit 15px deutlich unter jedem Mindestmaß.
+
+- **Auch die Sortierknöpfe unter Beförderung → Themen waren zu klein** — 29x18px, viermal auf der
+  Seite. Sie waren dem Test entgangen, weil sie erst ab zwei Themen überhaupt erscheinen.
+
+- **Eine unsinnige Sprachangabe in der Adresse führte auf die Fehlerseite.** Ein `?lang=`-Wert, den
+  der Server nicht lesen kann, beendete den Seitenaufruf mit einem Fehler, statt ihn einfach zu
+  übergehen. Betraf jede Seite, auch das Web-App-Manifest.
+
+- **Die Alarmierung bei Anmeldefehlern misst wieder Angreifer statt der eigenen Überwachung.** Der
+  Alarm „Möglicher JWT-Brute-Force" zählte jeden abgewiesenen Aufruf — und rund drei Viertel seiner
+  Schwelle waren von den eigenen Verfügbarkeitsprüfungen belegt, die absichtlich ein 401 erwarten. Er
+  achtet jetzt auf *zurückgewiesene Token*, was eine Prüfung nie auslösen kann; die reine Menge
+  überwacht ein eigener Alarm. Für Mitglieder ändert sich nichts.
+
+- **Die Keycloak-Verwaltungsoberfläche ist über den SSH-Tunnel wieder erreichbar.** Seit die
+  veröffentlichten Ports auf einer eigenen Netzwerkbrücke liegen, kam der Tunnel am Edge unter einer
+  Adresse an, die nicht auf der Freigabeliste von `/admin` stand — jede Anfrage endete mit 403. Die
+  Adresse ist jetzt eingetragen, IPv4 und IPv6; von außen bleibt die Konsole gesperrt. Für
+  Mitglieder ändert sich nichts.
 
 - **Der Speicherverbrauch der Weboberfläche steigt nicht mehr den ganzen Tag an.** Der Dienst lief
   unbemerkt mit der einfachsten Speicherbereinigung der Java-Laufzeit, weil seine Speichergrenze
@@ -201,11 +211,6 @@
   Abfragen ausgelöst, um die Seitenumgebung (Staffel-Auswahl, Berechtigungen,
   Benachrichtigungszähler) aufzubauen, die ein JSON-Aufruf gar nicht verwenden kann. Diese Abfragen
   entfallen.
-
-- **Seiten werden schneller ausgeliefert.** Beim Aufbau jeder Seite sah der Server für jeden Link
-  in Menü und Fußzeile erst noch nach, ob dahinter vielleicht eine Datei liegt — und merkte sich
-  das Ergebnis nie, sodass er bei jedem Seitenaufruf von vorn suchte. Er sieht jetzt nur noch dort
-  nach, wo tatsächlich Dateien liegen. Am Aussehen und an der Bedienung ändert sich nichts.
 
 ## [v1.7.19](https://github.com/krt-profit/basetool/releases/tag/v1.7.19) - 2026-09-13
 
