@@ -1691,18 +1691,53 @@ session to the production host and is where the deploy alert annotations point.
 `/var/log/iri-deploy.log` remains the on-host equivalent, and is the only place the
 GHCR account name is unmasked.
 
-|                         Symptom                          |                               Where to look                               |                                                                                                                                  Common cause                                                                                                                                   |
-|----------------------------------------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Timer fires but image never updates                      | Loki `{app="ops-deploy"}` (or `/var/log/iri-deploy.log`)                  | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                                                                                                   |
-| `docker login` fails                                     | Loki `{app="ops-deploy"} \|~ "logging in to\|docker login"`               | Expired or revoked PAT. See *Token rotation*. The GHCR account name is masked in Loki (REQ-OBS-004); the unmasked line is in `/var/log/iri-deploy.log`.                                                                                                                         |
-| Health check times out                                   | `docker compose ps`, `docker logs <service>`                              | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                                                                                                    |
-| Service stays "unhealthy" after rollback                 | `docker logs db-backend` etc.                                             | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                                                                                               |
-| Keystore mount fails / Keycloak `AccessDeniedException`  | `docker compose logs keycloak`, `getfacl /var/iri/secrets/keystore.p12`   | Keystore missing, or the uid-1000 ACL entry is gone. The file is `0640 root:10001` (JVM services read via the group) plus `user:1000:r--` for Keycloak. Re-add it: `sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12`. A rewrite that dropped the ACL is the usual cause. |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present | `.env`                                                                    | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                                                                                                      |
-| Compose pulls but does not restart                       | Loki `{app="ops-deploy"}`                                                 | All target digests match the last-deployed digests **and** the running stack was verified against them — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                                                      |
-| Stack comes back up on its own after a manual `down`     | Loki `{app="ops-deploy"} \|~ "drift:"` (`drift: <service>: no container`) | The drift verification (REQ-OPS-013) self-heals a down/drifted stack on the next tick. For planned downtime, `systemctl stop iri-deploy.timer` first and wait for an in-flight run. See *Restarting the stack manually*.                                                        |
-| `CARVE-OUT: postgres/Keycloak image pin changed`         | Loki `{app="ops-deploy"} \|~ "CARVE-OUT"`, `config-blocked.marker`        | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                                                                                                              |
-| Redis pin bump on `main` never reaches prod              | Loki `{app="ops-deploy"}`                                                 | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                                                                                               |
+|                              Symptom                              |                               Where to look                               |                                                                                                                                  Common cause                                                                                                                                   |
+|-------------------------------------------------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Timer fires but image never updates                               | Loki `{app="ops-deploy"}` (or `/var/log/iri-deploy.log`)                  | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                                                                                                   |
+| `docker login` fails                                              | Loki `{app="ops-deploy"} \|~ "logging in to\|docker login"`               | Expired or revoked PAT. See *Token rotation*. The GHCR account name is masked in Loki (REQ-OBS-004); the unmasked line is in `/var/log/iri-deploy.log`.                                                                                                                         |
+| Health check times out                                            | `docker compose ps`, `docker logs <service>`                              | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                                                                                                    |
+| Service stays "unhealthy" after rollback                          | `docker logs db-backend` etc.                                             | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                                                                                               |
+| Keystore mount fails / Keycloak `AccessDeniedException`           | `docker compose logs keycloak`, `getfacl /var/iri/secrets/keystore.p12`   | Keystore missing, or the uid-1000 ACL entry is gone. The file is `0640 root:10001` (JVM services read via the group) plus `user:1000:r--` for Keycloak. Re-add it: `sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12`. A rewrite that dropped the ACL is the usual cause. |
+| `IRI_KEYSTORE_HOST_PATH` referenced but file not present          | `.env`                                                                    | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                                                                                                      |
+| Compose pulls but does not restart                                | Loki `{app="ops-deploy"}`                                                 | All target digests match the last-deployed digests **and** the running stack was verified against them — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                                                      |
+| Stack comes back up on its own after a manual `down`              | Loki `{app="ops-deploy"} \|~ "drift:"` (`drift: <service>: no container`) | The drift verification (REQ-OPS-013) self-heals a down/drifted stack on the next tick. For planned downtime, `systemctl stop iri-deploy.timer` first and wait for an in-flight run. See *Restarting the stack manually*.                                                        |
+| `CARVE-OUT: postgres/Keycloak image pin changed`                  | Loki `{app="ops-deploy"} \|~ "CARVE-OUT"`, `config-blocked.marker`        | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                                                                                                              |
+| Redis pin bump on `main` never reaches prod                       | Loki `{app="ops-deploy"}`                                                 | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                                                                                               |
+| `WARN volume "code_edge-certs" ... not created by Docker Compose` | every deploy                                                              | Expected and harmless. **Do not "fix" it** — see below.                                                                                                                                                                                                                         |
+
+### The `code_edge-certs` warning is expected — leave it alone
+
+Every `deploy.sh` run prints:
+
+```
+WARN[0000] volume "code_edge-certs" already exists but was not created by Docker Compose.
+Use `external: true` to use an existing volume
+```
+
+The volume carries no `com.docker.compose.*` labels because it was created by hand at 12:29:42 on
+2026-09-12 — eleven minutes before `edge-acme-webroot` and `edge-acme-state`, which the first
+`compose up` created and labelled. It was pre-seeded during the ADR-0162 edge migration so the edge
+had a certificate to start with. Compose cannot label an existing volume and Docker offers no way to
+add labels afterwards, so the warning is permanent.
+
+**The unlabelled state protects the certificates rather than endangering them.** `docker compose
+down --volumes` removes volumes by *project label*, not by the names declared in the file —
+reproduced locally on 2026-09-14 with a throwaway two-volume project: `down --volumes` deleted the
+compose-created volume and left the hand-made one untouched. So on this host a `down --volumes`
+would destroy `edge-acme-state` (the **ACME account key**) and `edge-acme-webroot` while the
+certificates survive. That is the opposite of what the warning suggests, and it is the part worth
+remembering.
+
+Both fixes the warning invites are worse than the warning:
+
+- **`external: true`** makes compose refuse to *create* the volume, so a fresh host — the
+  disaster-recovery path — fails its first `compose up` until somebody runs `docker volume create`
+  by hand.
+- **Adopting it** means deleting the volume and letting compose recreate it, with the certificates
+  copied out and back across a window in which the edge has no TLS material.
+
+Nothing in `deploy.sh`, this runbook or any workflow runs `down --volumes`; it takes a human typing
+`-v`. Leave it, and do not touch it during an incident.
 
 ---
 
