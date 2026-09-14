@@ -10,7 +10,7 @@
  * so the JS stays declarative and free of hard-coded selectors.
  *
  * Naming: the prefix is left off for actions that are genuinely page-agnostic
- * ("navigate-href", "close-modal"). Page-specific actions still live in
+ * ("navigate-href", "close-modal-display"). Page-specific actions still live in
  * dedicated `<template>.js` modules with their own short prefix
  * (e.g. `pi-` for personal-inventory) so a refactor of one page cannot trip a
  * collision across the codebase.
@@ -249,42 +249,6 @@
     }
     on('input', 'filter-table', filterTableHandler);
     on('keyup', 'filter-table', filterTableHandler);
-
-    /**
-     * Open a modal by id. Element declares {@code data-modal-id} naming the modal's
-     * {@code id}; the modal element receives the {@code .active} class (matches the KRT modal
-     * convention from {@code fragments/toast.html} / {@code personal-inventory.html}).
-     */
-    on('click', 'open-modal', function (el, event) {
-        let id = el.getAttribute('data-modal-id');
-        if (!id) return;
-        let modal = document.getElementById(id);
-        if (!modal) return;
-        event.preventDefault();
-        modal.classList.add('active');
-    });
-
-    /**
-     * Close a modal. {@code data-modal-id} explicitly names the modal to close; falling back
-     * to the nearest {@code .modal-overlay} or {@code .modal} ancestor when omitted (covers
-     * close-buttons living inside the modal itself).
-     */
-    on('click', 'close-modal', function (el, event) {
-        event.preventDefault();
-        let id = el.getAttribute('data-modal-id');
-        if (id) {
-            let modal = document.getElementById(id);
-            if (modal) modal.classList.remove('active');
-            return;
-        }
-        let ancestor = el.closest('.modal-overlay, .modal, .modal-box');
-        if (!ancestor) return;
-        // `.modal-box` is the inner element — climb one level to the overlay if needed.
-        if (ancestor.classList.contains('modal-box')) {
-            ancestor = ancestor.closest('.modal-overlay, .modal') || ancestor;
-        }
-        ancestor.classList.remove('active');
-    });
 
     /**
      * Toggle a target element's visibility via the {@code krtm-hidden} class ({@code display:none}

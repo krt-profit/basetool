@@ -45,7 +45,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * <ol>
  *   <li>the roving tabindex — exactly one treeitem is tabbable at a time — and arrow-key / Home /
  *       End focus movement through the tree;
- *   <li>the editor dialog's focus trap (Tab / Shift+Tab cycle within {@code .modal-content}), its
+ *   <li>the editor dialog's focus trap (Tab / Shift+Tab cycle within {@code .krt-modal}), its
  *       Esc-to-close, the focus return to the triggering control, and the {@code inert} + {@code
  *       aria-hidden} page chrome while it is open;
  *   <li>the preservation of the chart's horizontal scroll position across the full-page reload that
@@ -160,7 +160,7 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Opens the editor dialog and verifies it is modal in the keyboard sense: the page chrome behind
-   * it is {@code inert} + {@code aria-hidden}, Tab / Shift+Tab wrap within {@code .modal-content}
+   * it is {@code inert} + {@code aria-hidden}, Tab / Shift+Tab wrap within {@code .krt-modal}
    * (never escaping to the background), Esc closes it, and focus returns to the control that opened
    * it.
    */
@@ -193,7 +193,7 @@ class OrgChartKeyboardA11yE2eTest {
         // The trap wraps at both ends: from the first focusable Shift+Tab lands on the last, and
         // from the last focusable Tab lands on the first. The "×" close button is the first
         // focusable in DOM order; the submit button is the last.
-        Locator firstFocusable = page.locator("#oc-modal .oc-modal-close");
+        Locator firstFocusable = page.locator("#oc-modal .krt-modal-close");
         Locator lastFocusable = page.locator("#oc-modal [data-trigger='oc-modal-submit']");
 
         firstFocusable.focus();
@@ -412,16 +412,15 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Reports whether keyboard focus currently rests on an element inside the dialog's {@code
-   * .modal-content} — the assertion that proves the Tab focus-trap is holding.
+   * .krt-modal} — the assertion that proves the Tab focus-trap is holding.
    *
    * @param page the page to inspect
-   * @return {@code true} if {@code document.activeElement} is within {@code #oc-modal
-   *     .modal-content}
+   * @return {@code true} if {@code document.activeElement} is within {@code #oc-modal .krt-modal}
    */
   private static boolean focusInsideModalContent(Page page) {
     return Boolean.TRUE.equals(
         page.evaluate(
-            "() => { const mc = document.querySelector('#oc-modal .modal-content');"
+            "() => { const mc = document.querySelector('#oc-modal .krt-modal');"
                 + " return !!mc && mc.contains(document.activeElement); }"));
   }
 

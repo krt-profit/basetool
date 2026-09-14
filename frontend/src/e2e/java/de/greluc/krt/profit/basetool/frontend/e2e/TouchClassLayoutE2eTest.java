@@ -230,23 +230,19 @@ class TouchClassLayoutE2eTest {
   private static final String HIT_AREA_MARK = "hit-area: ";
 
   /**
-   * The modal ROOT selectors the templates actually use, and the inner parts to measure in each.
+   * The modal ROOT selector the templates use, and the inner parts to measure in it.
    *
-   * <p><b>There are three shapes, and this sweep knew one.</b> The canonical {@code
-   * .krt-modal-overlay} shell ({@code fragments/modal-wrapper.html}, 42 instances), and two legacy
-   * shapes that predate it: {@code .modal} / {@code .modal-content} (47 instances, {@code
-   * styles.css}) and its promotion-admin sister {@code .modal-overlay} / {@code .modal-box} (7,
-   * {@code promotion-admin.css}). <b>54 of the 96 modal roots in the template tree are legacy</b>,
-   * and this sweep saw none of them until 2026-09-13, while the comment on the measurement loop
-   * called 42 "the full set". {@code orders-detail.html} alone carries eight.
+   * <p><b>There is one shape, and this list is how that is visible from the test side.</b> It held
+   * three until #1891: the canonical {@code .krt-modal-overlay} shell (42 instances) and two legacy
+   * shapes that predated it — {@code .modal} / {@code .modal-content} (47) and its promotion-admin
+   * sister {@code .modal-overlay} / {@code .modal-box} (7). This sweep saw none of the 54 legacy
+   * roots until 2026-09-13, while the comment on the measurement loop called 42 "the full set".
    *
-   * <p>Counting them is as easy to get wrong in the other direction. A grep for class attributes
-   * containing "modal" over the templates returns ~418, but most of those are inner elements
-   * ({@code .modal-content} 47, {@code .krt-modal-head} 42, {@code .modal-title} 7 and so on). Only
-   * a ROOT may be un-hidden and measured as an overlay: un-hiding a {@code .modal-content} would
-   * measure a box in a layout context it never has, and would report on it as if it were a dialog.
-   * None of the legacy markup is dead — all 54 roots are reachable from a trigger or a script — so
-   * the sweep is widened rather than the markup deleted.
+   * <p>All 54 were ported onto the canonical shell and both legacy shapes deleted (ADR-0177), so
+   * the entry that used to be "canonical first" is now the only one. The list stays a list, and the
+   * four call sites still derive from it, because that is what makes a second shape cheap to
+   * measure on the day one is deliberately introduced — the point was never that three was too many
+   * to write down, it was that each one multiplied every dialog fix.
    *
    * <p>Declared ONCE because the selector has to agree at four sites — {@code modalCount}, the
    * probe's own measurement loop, and the Java-side un-hide and restore around the screenshot.
@@ -254,38 +250,31 @@ class TouchClassLayoutE2eTest {
    * the extra modals are still {@code display: none}, are skipped by the zero-rect guards, and the
    * change looks harmless while buying nothing.
    *
-   * <p><b>Nothing detects a FOURTH shape.</b> This list is hand-maintained, exactly like {@link
-   * #PAGES}, and it failed the same way: a family nobody listed is not reported, it is silently not
-   * measured. A {@code check}-time guard over the template tree would catch it on every push
-   * instead of only on a PR carrying the {@code e2e} label — and it cannot live here, because the
-   * frontend's {@code test} source set does not compile against its {@code e2e} one. The home is
-   * {@code test-support} ({@code e2eImplementation} extends {@code testImplementation}), which is
-   * where {@code EndpointEnumeration} already went for the identical problem on {@code PAGES}.
+   * <p><b>A FOURTH shape is now detected, but not here.</b> This list is still hand-maintained and
+   * still cannot report a family nobody entered — the failure mode {@link #PAGES} had. What closed
+   * it is {@code SingleModalShapeTest} in the frontend {@code test} source set: it reads the
+   * templates and the stylesheets as text and fails the build when any dialog class outside this
+   * shape appears, on every push rather than only on a PR carrying the {@code e2e} label. That is
+   * the {@code check}-time guard this comment used to ask for; it did not need {@code test-support}
+   * after all, because reading templates as text needs no browser.
    *
    * @param root the overlay or scrim element — the thing that is hidden and shown
    * @param box the framed dialog inside it, whose geometry is the assertion
    * @param body the scrolling region, or {@code null} where the family has no such class
    * @param foot the button row, or {@code null} where the family has no such class
    * @param openClass a class the family's own JS adds to open it, or {@code null} when display
-   *     alone opens it. {@code .modal-overlay} centres its box in {@code .active} only, so
-   *     revealing it with display alone would stretch the dialog and measure a shape no user sees.
+   *     alone opens it. No current shape needs one — it existed for {@code .modal-overlay}, which
+   *     centred its box in {@code .active} only, so revealing it with display alone would have
+   *     stretched the dialog and measured a shape no user is ever shown. The parameter stays for
+   *     the next shape that opens by a class rather than by display.
    */
   private record ModalShape(String root, String box, String body, String foot, String openClass) {}
 
-  /**
-   * The shapes, canonical first — the one new work is written against.
-   *
-   * <p>Order is not load-bearing: the three selectors are disjoint, so the {@code find} that
-   * resolves an element to its shape can match at most one of them. It would become load-bearing
-   * the day a shape's selector is a subset of another's, and the more specific would then have to
-   * come first.
-   */
+  /** The one shape. New work is written against it; there is no other to choose from. */
   private static final List<ModalShape> MODAL_SHAPES =
       List.of(
           new ModalShape(
-              ".krt-modal-overlay", ".krt-modal", ".krt-modal-body", ".krt-modal-foot", null),
-          new ModalShape(".modal", ".modal-content", null, null, null),
-          new ModalShape(".modal-overlay", ".modal-box", null, ".modal-actions", "active"));
+              ".krt-modal-overlay", ".krt-modal", ".krt-modal-body", ".krt-modal-foot", null));
 
   /**
    * {@link #MODAL_SHAPES} as one selector, for the three sites that only need to find the roots.
@@ -741,7 +730,7 @@ class TouchClassLayoutE2eTest {
       // the measurement and this lookup — and every remaining route and device class went
       // unmeasured, reported as one Playwright stack trace rather than as findings.
       //
-      // Widening the modal sweep to all three shapes made this far likelier without being its
+      // Widening the modal sweep from 42 dialogs to all 96 made this far likelier without being its
       // cause: the phone class now reveals and photographs ~138 dialogs per page instead of ~24, so
       // the window between landing on a list and asking it for a detail link grew several-fold.
       //
@@ -1516,20 +1505,20 @@ class TouchClassLayoutE2eTest {
           }
         }
 
-        // EVERY modal on this page, in ALL THREE SHAPES, measured without knowing how any opens.
+        // EVERY modal on this page, measured without knowing how any of them opens.
         //
-        // 96 modal instances live across the templates — 42 canonical `.krt-modal-overlay` and 54
-        // legacy (`.modal` and `.modal-overlay`, see MODAL_SHAPES) — and each has its own trigger:
-        // a row action, a menu entry, a server-rendered flag. Driving all of them would mean
-        // encoding 96 click paths and would still miss the ones a fixture cannot reach. Every one
-        // of them is instead in the DOM already and hidden — by the family's default `display`, or
-        // by a generated `krtm-display-none-*` class on the legacy shape. Revealing one, taking its
-        // geometry and putting the previous state back measures it in its real layout context.
-        // One at a time, so two overlays never stack.
+        // 96 modal instances live across the templates, all of them `.krt-modal-overlay` since
+        // #1891 (they were 42 canonical and 54 legacy before the port), and each has its own
+        // trigger: a row action, a menu entry, a server-rendered flag. Driving all of them would
+        // mean encoding 96 click paths and would still miss the ones a fixture cannot reach. Every
+        // one is instead in the DOM already and hidden by the shape's default `display`. Revealing
+        // one, taking its geometry and putting the previous state back measures it in its real
+        // layout context. One at a time, so two overlays never stack.
         //
-        // Revealing it is per family, not one trick: an inline `display: flex` outranks every class
-        // and is enough for the two display-toggled families, but `.modal-overlay` takes its
-        // centring from `.active` alone, so display by itself would stretch the box and measure a
+        // Revealing it is an inline `display: flex`, which outranks every class. That is enough for
+        // this shape; MODAL_SHAPES still carries an `openClass` for a future shape that opens by a
+        // class instead, which is how the deleted `.modal-overlay` had to be revealed — it took its
+        // centring from `.active` alone, so display by itself stretched the box and measured a
         // dialog no user is ever shown.
         //
         // What this can NOT see, stated rather than implied: a modal whose body is filled by script

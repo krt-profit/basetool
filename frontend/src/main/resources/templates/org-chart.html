@@ -207,12 +207,15 @@
 </main>
 
 <!-- Assign / reassign / add-staff modal (admins only) -->
-<div id="oc-modal" class="modal krtm-display-none-5790" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
+<div id="oc-modal" class="krt-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="oc-modal-title"
      sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-    <div class="modal-content hud-box">
-        <button type="button" class="oc-modal-close" data-trigger="oc-modal-cancel"
-                th:aria-label="#{general.cancel}">&times;</button>
-        <h2 id="oc-modal-title" th:text="#{orgChart.modal.title}">Position besetzen</h2>
+    <div class="krt-modal krt-modal--wide">
+        <div class="krt-modal-head">
+            <h2 id="oc-modal-title" th:text="#{orgChart.modal.title}">Position besetzen</h2>
+            <button type="button" class="krt-modal-close" data-trigger="oc-modal-cancel"
+                    th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+        </div>
+        <div class="krt-modal-body">
         <input type="hidden" id="oc-mode">
         <input type="hidden" id="oc-position-type">
         <input type="hidden" id="oc-org-unit-id">
@@ -242,7 +245,8 @@
                    th:placeholder="#{orgChart.modal.displayNamePlaceholder}">
             <p class="oc-modal-hint" th:text="#{orgChart.modal.accountHint}">Konten werden unter Leitung verwaltet.</p>
         </div>
-        <div class="krtm-display-flex-gap-0-75rem-justify-content-fle-d079">
+        </div>
+        <div class="krt-modal-foot">
             <button type="button" class="btn btn-ghost" data-trigger="oc-modal-cancel"
                     th:text="#{general.cancel}">Abbrechen</button>
             <button type="button" class="btn btn--cta" data-trigger="oc-modal-submit"

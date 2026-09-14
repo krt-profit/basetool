@@ -42,11 +42,20 @@ function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
 }
 
+// The dialogs moved from the legacy `.modal-overlay`/`.modal-box` shape (opened
+// by an `active` class) onto the canonical `.krt-modal-overlay` shell, whose
+// hidden default lives in styles.css. Visibility therefore rides the shared
+// krtm-modal-open / krtm-hidden pair (inline-migration.css, loaded last) that
+// the rest of the app already uses -- `active` styles nothing any more.
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    const el = document.getElementById(id);
+    el.classList.remove('krtm-modal-open');
+    el.classList.add('krtm-hidden');
 }
 function openModal(id) {
-    document.getElementById(id).classList.add('active');
+    const el = document.getElementById(id);
+    el.classList.add('krtm-modal-open');
+    el.classList.remove('krtm-hidden');
 }
 
 // CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
@@ -84,7 +93,7 @@ function arRefresh() {
 
 function syncToRank(fromInput) {
     if (!fromInput) return;
-    const form = fromInput.closest('.modal-box');
+    const form = fromInput.closest('.krt-modal');
     if (!form) return;
     const toInput = form.querySelector('.rank-to-input');
     if (!toInput) return;
@@ -99,7 +108,7 @@ function syncToRank(fromInput) {
  * dropdown to "-" only.
  */
 function rebuildCategoryDropdown(topicSelect) {
-    const form = topicSelect.closest('.modal-box');
+    const form = topicSelect.closest('.krt-modal');
     if (!form) return;
     const catSelect = form.querySelector('.ar-category-select');
     if (!catSelect) return;

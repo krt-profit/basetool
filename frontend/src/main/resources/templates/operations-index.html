@@ -142,10 +142,15 @@
     </div>
 
     <!-- Create Modal -->
-    <div id="create-operation-modal" class="modal krtm-display-none-5790">
-        <div class="modal-content hud-box krtm-max-width-500px-2141">
-            <h2 class="mt-0" th:text="#{operation.create}">Create Operation</h2>
+    <div id="create-operation-modal" class="krt-modal-overlay">
+        <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{operation.create}">
+            <div class="krt-modal-head">
+                <h2 th:text="#{operation.create}">Create Operation</h2>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="create-operation-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+            </div>
             <form id="create-operation-form" th:action="@{/operations/create}" method="post">
+                <div class="krt-modal-body">
                 <div class="form-group">
                     <label for="create-name" class="form-label" th:text="#{operation.name}">Name</label>
                     <input type="text" id="create-name" name="name" class="w-full" required>
@@ -165,21 +170,28 @@
                 </div>
                 <!-- R5.d.e owner-picker: hidden when the caller has ≤1 OrgUnit membership. -->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=false)}"></th:block>
-                <div class="mt-2-flex-gap">
-                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Save</span></button>
+                </div>
+                <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="create-operation-modal" th:text="#{general.cancel}">Cancel</button>
+                    <button type="submit" class="btn btn--cta"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{general.save}">Save</span></button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Delete Modal -->
-    <div id="delete-operation-modal" class="modal krtm-display-none-5790">
-        <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
-            <h2 class="mt-0" th:text="#{general.confirm}">Confirm Delete</h2>
-            <p class="mb-2" th:text="#{operation.delete.confirm}">Confirm that you want to delete this operation.</p>
+    <div id="delete-operation-modal" class="krt-modal-overlay">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{general.confirm}">
+            <div class="krt-modal-head">
+                <h2 th:text="#{general.confirm}">Confirm Delete</h2>
+                <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                        data-modal-id="delete-operation-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+            </div>
             <form id="delete-operation-form" th:action="@{/operations/delete}" method="post">
-                <div class="flex-center-gap">
+                <div class="krt-modal-body">
+                    <p class="m-0" th:text="#{operation.delete.confirm}">Confirm that you want to delete this operation.</p>
+                </div>
+                <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" data-trigger="close-modal-display" data-modal-id="delete-operation-modal" th:text="#{general.cancel}">Cancel</button>
                     <button type="submit" class="btn btn-danger" th:text="#{general.delete}">Delete</button>
                 </div>
