@@ -130,16 +130,22 @@
              only (ADR-0140) and the action guards on PENDING in the service too. Same
              server-searched account picker as the queue's dialogs -- they differ in what moves, not
              in how the account is chosen. -->
-        <div id="consolidate-modal" class="modal krtm-display-none-z-index-3100-25fb">
-            <div class="modal-content hud-box krtm-max-width-520px-acb4">
-                <h2 class="mt-0" th:text="#{members.consolidate.modal.title}">Konten zusammenführen</h2>
-                <label for="consolidate-target" th:text="#{members.consolidate.modal.targetLabel}">Konto, das bleibt</label>
-                <select id="consolidate-target" data-krt-combobox="remote-users"
-                        th:attr="data-combobox-placeholder=#{members.consolidate.modal.targetPlaceholder}">
-                    <option value="" th:text="#{members.consolidate.modal.targetPlaceholder}">-- Konto wählen --</option>
-                </select>
-                <p class="reg-when mt-2" th:text="#{members.consolidate.modal.hint}"></p>
-                <div class="flex-center-gap krtm-margin-top-1rem-a6cb">
+        <div id="consolidate-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+            <div class="krt-modal krt-modal--wide" role="dialog" aria-modal="true" th:aria-label="#{members.consolidate.modal.title}">
+                <div class="krt-modal-head">
+                    <h2 th:text="#{members.consolidate.modal.title}">Konten zusammenführen</h2>
+                    <button type="button" class="krt-modal-close" data-trigger="close-modal-display"
+                            data-modal-id="consolidate-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+                </div>
+                <div class="krt-modal-body">
+                    <label for="consolidate-target" th:text="#{members.consolidate.modal.targetLabel}">Konto, das bleibt</label>
+                    <select id="consolidate-target" data-krt-combobox="remote-users"
+                            th:attr="data-combobox-placeholder=#{members.consolidate.modal.targetPlaceholder}">
+                        <option value="" th:text="#{members.consolidate.modal.targetPlaceholder}">-- Konto wählen --</option>
+                    </select>
+                    <p class="reg-when mt-2" th:text="#{members.consolidate.modal.hint}"></p>
+                </div>
+                <div class="krt-modal-foot">
                     <button type="button" class="btn btn-ghost" id="consolidate-cancel" th:text="#{general.cancel}">Abbrechen</button>
                     <button type="button" class="btn btn--cta" id="consolidate-confirm" th:text="#{members.consolidate}">Zusammenführen</button>
                 </div>

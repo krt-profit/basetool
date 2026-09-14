@@ -54,11 +54,16 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="modal krtm-display-none-z-index-3100-25fb">
-        <div class="modal-content hud-box krtm-max-width-500px-text-align-center-ff4b">
-            <h2 th:text="#{info.delete.confirm.title}" class="mt-0">Löschen bestätigen</h2>
-            <p th:text="#{info.delete.confirm.message}" class="mb-2">Wirklich löschen?</p>
-            <div class="flex-center-gap">
+    <div id="delete-confirm-modal" class="krt-modal-overlay krtm-display-none-z-index-3100-25fb">
+        <div class="krt-modal krt-modal--danger" role="dialog" aria-modal="true" th:aria-label="#{info.delete.confirm.title}">
+            <div class="krt-modal-head">
+                <h2 th:text="#{info.delete.confirm.title}">Löschen bestätigen</h2>
+                <button type="button" class="krt-modal-close close-delete-modal" th:aria-label="#{general.a11y.closeModal}">&#10005;</button>
+            </div>
+            <div class="krt-modal-body">
+                <p th:text="#{info.delete.confirm.message}" class="m-0">Wirklich löschen?</p>
+            </div>
+            <div class="krt-modal-foot">
                 <button type="button" class="btn btn-ghost close-delete-modal" th:text="#{general.cancel}">Abbrechen</button>
                 <form id="announcement-delete-form" th:action="@{/admin/announcement/delete}" method="post" class="m-0">
                     <button type="submit" class="btn btn-danger" th:text="#{info.delete}">Löschen</button>

@@ -38,7 +38,11 @@
 
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('ship-modal');
-    const closeBtn = document.querySelector('.close-modal');
+    // The ship dialog's close-X. It used to be the page's first `.close-modal`
+    // span, which was the legacy modal shape's own class; the canonical shell
+    // styles its close button via `.krt-modal-close`, so the JS hook is now an
+    // explicit, page-scoped class rather than a shared visual one.
+    const closeBtn = document.querySelector('.close-ship-modal');
     const form = document.getElementById('ship-form');
     const modalTitle = document.getElementById('modal-title');
 
@@ -175,6 +179,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const statusEl = document.getElementById('fleetview-status');
         const resultModal = document.getElementById('import-result-modal');
         const closeResultBtn = document.getElementById('import-result-close');
+        // Same action as the footer's "Schliessen": the shell's head close-X.
+        const closeResultX = document.getElementById('import-result-close-x');
 
         function showStatus(msg, color) {
             statusEl.textContent = msg;
@@ -216,15 +222,16 @@ document.addEventListener('DOMContentLoaded', function () {
             resultModal.style.display = 'flex';
         }
 
-        if (closeResultBtn) {
-            closeResultBtn.addEventListener('click', function () {
+        [closeResultBtn, closeResultX].forEach(function (btn) {
+            if (!btn) return;
+            btn.addEventListener('click', function () {
                 resultModal.style.display = 'none';
                 // In-place: re-render the ship table instead of reloading the page (REQ-FE-001).
                 if (document.getElementById('import-res-imported').textContent !== '0') {
                     reswapHangar();
                 }
             });
-        }
+        });
 
         window.addEventListener('click', function (e) {
             if (e.target === resultModal) {
