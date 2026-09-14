@@ -1041,7 +1041,8 @@ Recorded here rather than left to look like an oversight.
 
 **Enforced by:** `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml`
 (`sbom-coverage`) · `.github/workflows/release-prepare.yml` · `.github/workflows/release-publish.yml`
-· **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned)
+· **Related:** REQ-OPS-023 (their provenance), REQ-OPS-024 (what is scanned), REQ-OPS-029 (the
+release notes that have to name this same set)
 
 ### REQ-OPS-026 — A renewed certificate is not delivered until the edge can open it
 
@@ -1183,6 +1184,48 @@ whole reason the flag is mandatory rather than advisory.
 **Code:** `docker-compose.yml` (the `JVM CONTAINER SIZING` block and each service's
 `JAVA_TOOL_OPTIONS`) · **Decision:**
 [ADR-0175](../adr/0175-jvm-garbage-collectors-are-set-explicitly.md)
+
+### REQ-OPS-029 — A release announces every artifact it publishes
+
+The GitHub Release body is **generated**, not written: `.github/scripts/extract_release_notes.py`
+slices the dated CHANGELOG section and appends a footer naming the container images to pull and the
+SBOMs to audit. That footer is the only description of the release most readers ever see, so an
+artifact missing from it is not a documentation gap — it is, to every consumer, an artifact the
+release does not have.
+
+**The footer's two lists are therefore derived from the pipeline and asserted against it**, not kept
+by hand beside it:
+
+- `SERVICE_IMAGES` must equal the `module:` build matrix in `release-images.yml` — the modules whose
+  image is actually built, scanned, signed and pushed.
+- `SBOM_MODULES` must equal the shipped-module set of REQ-OPS-025 — the modules whose BOM is
+  attached and committed under `<module>/docs/`.
+
+Both are checked in **both directions**. A list that omits what the release ships understates it; a
+list that names something the release does not build advertises a tag nobody can pull, which is the
+worse failure because it looks like a broken registry rather than a stale file.
+
+**Why this is its own requirement.** REQ-OPS-025 made the *set of SBOMs* an assertion across four
+places, and the same drift then happened one step further downstream in the fifth. `ingest` was in
+the build matrix, the scan matrix, the signing matrix and the SBOM asset list, and absent from the
+notes — so **v1.8.1, v1.8.2 and v1.8.3 each announced two of the three images they shipped**, and
+pointed readers at two of their four SBOM directories. Nothing failed; the release simply
+understated itself three times. The lesson REQ-OPS-025 drew — that a hand-kept list beside a
+generated one is a silent-drift machine — did not stop at the artifacts themselves.
+
+**Acceptance**
+
+- [ ] `extract_release_notes.py` builds the image and SBOM lists from `SERVICE_IMAGES` /
+  `SBOM_MODULES` rather than from literal lines, so the two sections cannot disagree with each other.
+- [ ] `check_sbom_coverage.py` reads `release-images.yml`'s build matrix and fails when it and
+  `SERVICE_IMAGES` differ in either direction.
+- [ ] The same check fails when `SBOM_MODULES` and the REQ-OPS-025 shipped set differ in either
+  direction.
+- [ ] Both run on every pull request through `repo-lint.yml` (`sbom-coverage`).
+
+**Enforced by:** `.github/scripts/extract_release_notes.py` ·
+`.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml` (`sbom-coverage`) ·
+**Related:** REQ-OPS-025 (the set it mirrors), REQ-OPS-023 (provenance for those same assets)
 
 ## Open questions
 
