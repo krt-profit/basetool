@@ -4396,6 +4396,22 @@ input[type='radio']:focus {
     width: 80%;
     max-width: 800px;
     box-shadow: var(--glow-primary-lg);
+
+    /*
+     * A dialog SCROLLS when it runs out of room — the legacy shape too, not just `.krt-modal`.
+     *
+     * `.modal` above is a full-viewport overlay with `overflow: auto`, which looks like it already
+     * covers this. It does not: the overlay centres its child with `align-items: center`, and a
+     * child taller than the overlay is then centred by pushing its TOP above the scroll origin,
+     * which no amount of scrolling brings back. The dialog's head — its title and, on the refinery
+     * store dialog, its first rows — is simply unreachable.
+     *
+     * So the cap belongs on the box, with the same 90vh `.krt-modal` uses, and the box scrolls
+     * itself. `#storeModal` measured 881px in an 800px viewport and 1325px in an 812px one; every
+     * legacy dialog with more rows than the screen has the same shape.
+     */
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .close-modal {
