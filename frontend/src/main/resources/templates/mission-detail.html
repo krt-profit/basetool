@@ -231,9 +231,16 @@
         }
         .manager-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--color-surface-input); border: var(--border-hairline); padding: 0.2rem 0.5rem; }
 
-        /* Finance type segment control */
+        /* Finance type segment control.
+
+           `min-height` is the 44px floor token, not a number. It used to be 34px, and an
+           explicit declaration beats the zero-specificity default of ADR-0176 — so these four
+           buttons ("Einnahme"/"Ausgabe" in both finance modals) were the floor's only
+           remaining escapees, and stood as findings on every touch-class run at 810x1080.
+           REQ-UI-009 grants the dense exception to repeated in-row controls; a form button in
+           a modal is not one. */
         .seg { display: inline-flex; border: var(--border-hairline); }
-        .seg button { background: none; border: none; color: var(--color-gray-2-text); font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.06em; padding: 8px 14px; cursor: pointer; min-height: 34px; }
+        .seg button { background: none; border: none; color: var(--color-gray-2-text); font-family: var(--font-body); font-weight: var(--fw-bold); text-transform: uppercase; font-size: 0.66rem; letter-spacing: 0.06em; padding: 8px 14px; cursor: pointer; min-height: var(--touch-target); }
         .seg button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
         .seg button.on-pos { background: var(--color-success); color: #fff; }
         .seg button.on-neg { background: var(--color-danger); color: #fff; }

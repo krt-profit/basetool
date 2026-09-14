@@ -1148,6 +1148,17 @@ class TouchClassLayoutE2eTest {
         // form button or a standalone control: `.btn-xs2` was refused this exemption for that
         // reason.
         //
+        // Since ADR-0176 the stylesheet's floor is a zero-specificity DEFAULT rather than a list of
+        // selectors, which makes consuming `--touch-target-dense` the declared way to opt out of it
+        // — the same token this set is already built from. So the inversion needed no new mechanism
+        // on this side, and deliberately did not get one: an opt-out marker that the guard had to be
+        // told about separately would be a hand-kept list again, wearing a different name.
+        //
+        // It did surface one thing the old shape had hidden. `.master-row` is exempt per REQ-UI-009
+        // and consumed the token NOWHERE, so it was never in this set and was being measured against
+        // the full 44px — the exemption lived only in the requirement's prose. personal-inventory.css
+        // now declares it, which is what both honours the exemption and puts the class in here.
+        //
         // It was two byte-identical copies, one for page controls and one for controls inside a
         // dialog, and the list has taken four separate additions — so update one copy and the same
         // control is a defect in a dialog and compliant on a page, or the reverse. `hitBox` in this
@@ -1193,6 +1204,7 @@ class TouchClassLayoutE2eTest {
                 // cheaper than special-casing.
                 if (sel) out.add(sel);
               }
+              if (rule.cssRules) walk(rule.cssRules);
             }
           };
           for (const sheet of Array.from(document.styleSheets)) {
@@ -1219,6 +1231,24 @@ class TouchClassLayoutE2eTest {
         // measured", and EVERY page of the class came back unmeasurable. A guard that cannot run
         // is worse than no guard: it converted a precise diagnosis into a blanket failure.
         const DENSE_SET_EMPTY = DENSE_SELECTORS.length === 0;
+        // The control vocabulary, as ONE constant, for the same reason `floorFor` is one helper.
+        // The page sweep and the modal sweep below kept their own copies, and they had already
+        // drifted: the modal list carried `.krt-modal-close` and the page list did not, so a
+        // dismiss button was measured in a dialog and not on a page.
+        //
+        // It mirrors styles.css's inverted floor (ADR-0176), which is the point rather than a
+        // coincidence: anything that selector styles is something this sweep has to measure.
+        // `summary` and `[role="button"]` arrived with that mirroring — a <summary> is a click
+        // target on 26 templates and neither sweep had ever measured one, nor had either looked at
+        // a div carrying a button role. It found a real defect immediately: six
+        // `<summary class="btn btn-ghost">` disclosures at 29px, because a migrated inline style in
+        // `inline-migration.css` cancelled the floor with `min-height: unset`.
+        //
+        // The three dismiss classes are here by NAME rather than by element, because `.close-modal`
+        // is a `<span>` in admin/mission-data.html's three dialogs — a control no element selector
+        // reaches, on either side.
+        const CONTROLS = 'input, select, textarea, button, a.btn, summary, [role="button"],'
+          + ' .krt-modal-close, .close-modal, .btn-close';
         const REPLACED = new Set(['input', 'select', 'textarea']);
         const hitBox = (c) => {
           const r = c.getBoundingClientRect();
@@ -1325,7 +1355,7 @@ class TouchClassLayoutE2eTest {
             + ' --touch-target-dense was readable, so every floor below is the full 44px and'
             + ' every dense control will read as a defect');
         }
-        for (const c of document.querySelectorAll('input, select, textarea, button, a.btn')) {
+        for (const c of document.querySelectorAll(CONTROLS)) {
           const cs = getComputedStyle(c);
           if (cs.display === 'none' || cs.visibility === 'hidden') continue;
           if (c.type === 'hidden') continue;
@@ -1414,8 +1444,7 @@ class TouchClassLayoutE2eTest {
                 modalIssues.push(name + ' body is taller than its box but does not scroll');
               }
             }
-            for (const c of modal.querySelectorAll(
-                'button, input, select, textarea, a.btn, .krt-modal-close')) {
+            for (const c of modal.querySelectorAll(CONTROLS)) {
               const cs = getComputedStyle(c);
               if (cs.display === 'none' || cs.visibility === 'hidden' || c.type === 'hidden') continue;
               const cr = c.getBoundingClientRect();

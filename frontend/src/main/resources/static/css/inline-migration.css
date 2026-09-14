@@ -14,6 +14,15 @@
  * silently win over a migrated declaration. Lets the CSP drop `style-src-attr 'unsafe-inline'`.
  * Names: `krtm-<slug>-<hash>`; the rule body is source of truth. GENERATED — regenerate if the
  * template inline styles change; do not hand-edit rules.
+ *
+ * TWO RULES ARE A DELIBERATE EXCEPTION TO THAT, marked at their call sites below. Each carried a
+ * `min-height` that CANCELLED REQ-UI-009's 44px touch floor — `unset` in one, `auto` in the other —
+ * faithfully migrated from an inline style that should never have been written. This file loads
+ * LAST, so at equal specificity those beat `.btn`'s floor in `styles.css` and won silently. The
+ * declarations are removed rather than out-specified from elsewhere: a rule that says "no floor
+ * here" is a trap for the next reader even when something else overrules it, and the header above
+ * says the rule body is the source of truth now that the inline styles are gone. If this file is
+ * ever regenerated, do not let them come back (ADR-0176).
  */
 
 /* 56x */
@@ -469,11 +478,15 @@
     color: var(--data-fg);
 }
 /* 2x */
+/* `min-height: unset` removed — see the header. It cancelled the 44px floor on the six
+   `<summary class="btn btn-ghost">` "Details" disclosures of /blueprint-overview and
+   /hangar/squadron, which TouchClassLayoutE2eTest measured at 29px once <summary> entered its
+   control set. They are `.btn`, and REQ-UI-009 keeps the full floor on `.btn` itself; the dense
+   32px exemption is granted per class by the owner and has never named this one. */
 .krtm-cursor-pointer-display-inline-flex-align-ite-c175 {
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    min-height: unset;
     padding: 0.25rem 0.75rem;
     font-size: 0.8rem;
     width: auto;
@@ -718,9 +731,13 @@
     font-size: 0.8rem;
 }
 /* 2x */
+/* `min-height: auto` removed — same defect as the rule above, and found by reading rather than by
+   measuring: it sits on two `.btn.btn-ghost.btn-claim-add` buttons on /orders/{id}, which carry no
+   dense class, so their floor is the full 44px. 0.2rem of padding around a 0.85rem line box is
+   roughly 25px. The guard did not report it because this run measured a stack with no order data
+   and the claim controls never rendered — the blind spot REQ-UI-009 already records. */
 .krtm-padding-0-2rem-0-5rem-min-height-auto-font-s-ae33 {
     padding: 0.2rem 0.5rem;
-    min-height: auto;
     font-size: 0.85rem;
 }
 /* 2x */

@@ -21,6 +21,20 @@
 - **Drei Bedienelemente waren auf Touch-Geräten zu klein zum Treffen**: der Sprachumschalter
   (17px hoch), der Schließen-Knopf der Seitenleiste (34px) und die Benachrichtigungsglocke (40px).
   Alle drei erfüllen jetzt das 44px-Mindestmaß.
+- **Das 44px-Mindestmaß gilt jetzt für jedes Bedienelement, auch für die, an die niemand gedacht
+  hat.** Bisher galt es nur für eine Liste namentlich aufgeführter Elemente, und jede Prüfrunde fand
+  weitere, die darin fehlten — zuletzt die Sortierpfeile der Beförderungs-Themen mit 29x18px, die
+  nur erscheinen, wenn eine Kategorie mehr als ein Thema hat. Umgedreht: Knöpfe, Aufklapp-Titel,
+  Eingabefelder und Auswahllisten erfüllen das Maß von sich aus; dichte Tabellenzeilen behalten ihre
+  32px. Neue Bedienelemente sind damit von Anfang an groß genug, statt erst beim nächsten Fund
+  nachgetragen zu werden.
+- **Die „Details"-Schalter in den Übersichtstabellen waren zu klein.** In der Blueprint-Übersicht
+  und im Staffel-Hangar maßen sie 29px statt der geforderten 44px, ebenso zwei Schalter in der
+  Auftragsansicht. Ursache war eine alte Formatierungsanweisung, die das Mindestmaß gezielt
+  aufhob — auf Touch-Geräten sind sie jetzt normal groß.
+- **Knopfzeilen brechen auf dem Telefon zuverlässig um.** Auch das war eine Namensliste, und sie
+  konnte nie vollständig sein: ein Teil der Zeilen trägt automatisch erzeugte Klassennamen, die sich
+  bei jeder Änderung mitändern. Jetzt zählt der Aufbau der Zeile, nicht ihr Name.
 - **Auf schmalen Bildschirmen lief der Seitenkopf über.** Wo neben der Überschrift ein Knopf steht
   („Neuer Auftrag“ und ähnliche), wurde er aus dem Bild geschoben und die ganze Seite musste
   seitlich gescrollt werden — auf der Auftragsseite um 159px. Der Knopf rutscht jetzt in die
