@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: ein Alarm meldete sich nach jedem Deploy, ohne dass etwas kaputt war.** Die Überwachung
+  der Keycloak-Anmeldeereignisse schlug an, sobald die Kennzahl fehlte — die entsteht aber erst mit
+  der ersten Anmeldung und wird von jedem Neustart zurückgesetzt. Sie meldet sich jetzt nur noch,
+  wenn tatsächlich Anmeldungen stattfinden und trotzdem nichts aufgezeichnet wird. Für Mitglieder
+  ändert sich nichts.
+  
 - **Die Kopfzeile ist auf dem Handy wieder einzeilig.** Titel und Staffel rutschten unter das
   Menüsymbol, wodurch die Kopfzeile fast doppelt so hoch wurde wie vorgesehen (110 statt 62 Pixel)
   und entsprechend Platz vom Inhalt nahm. Sie steht jetzt wieder in einer Zeile neben Menü und
