@@ -30,7 +30,19 @@ export MSYS2_ARG_CONV_EXCL='/CN='
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EDGE_DIR="${REPO_ROOT}/docker/edge"
-IMAGE="nginxinc/nginx-unprivileged:1.29.3-alpine"
+# DERIVED from docker-compose.yml, for exactly the reason the NOFILE ceiling
+# below is: a second, hand-written copy of a production value drifts, and it
+# drifts silently. This one already had - it still read 1.29.3-alpine while
+# compose had moved on - so the gate was proving that a DIFFERENT nginx than the
+# one production runs accepts this configuration, which is the single thing it
+# exists to rule out. A directive removed or tightened upstream would then have
+# surfaced at deploy time instead, as a container that refuses to start.
+#
+# The digest is kept when compose pins one, so this validates the exact image
+# rather than merely the same tag.
+IMAGE="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(nginxinc\/nginx-unprivileged:[^[:space:]]*\).*/\1/p' "${REPO_ROOT}/docker-compose.yml" | head -1)"
+[[ -n "${IMAGE}" ]] \
+  || { echo "FAIL: no nginx-unprivileged image in docker-compose.yml - the edge service changed"; exit 1; }
 
 [[ -d "${EDGE_DIR}" ]] || { echo "FAIL: ${EDGE_DIR} does not exist"; exit 1; }
 command -v openssl >/dev/null || { echo "FAIL: openssl not on PATH"; exit 1; }
