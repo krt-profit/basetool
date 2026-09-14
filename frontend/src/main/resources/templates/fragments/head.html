@@ -337,6 +337,15 @@
     -->
     <script th:src="@{/js/inline-style-apply.js}" defer th:attr="nonce=${cspNonce}"></script>
 
+    <!--
+      Collapsible filter panels (REQ-FE-021). Global rather than per-page: every list page has a
+      filter block, and the three pages that collapsed theirs before this existed each carried their
+      own copy of the same script and stylesheet. Deferred — it only reads the DOM and installs
+      listeners, so nothing on the page waits for it, and the panels stay usable if it never
+      arrives.
+    -->
+    <script th:src="@{/js/krt-filter-panel.js}" defer th:attr="nonce=${cspNonce}"></script>
+
     <title th:replace="${titleContent}"></title>
     <!--
       Per-page extra <head> links. th:if must NOT share an element with th:replace: th:replace

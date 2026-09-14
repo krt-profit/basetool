@@ -5668,6 +5668,60 @@ textarea:focus-visible,
    commit ea56d7c): tab nav, facts bar, KRT modal, assign board, chip select.
    ========================================================================== */
 
+/* ------------------------------------------------------ FILTER PANEL ----- */
+/* Collapsible filter block, shared by every list page (REQ-FE-021).
+ *
+ * Ported from the three near-identical page-local copies that preceded it (Mein Lager,
+ * Lager-Verwaltung, Materialbedarf); the eight other list pages had no collapse at all and their
+ * filter blocks filled a phone viewport before a single row was visible.
+ *
+ * Collapsing uses `hidden`, which takes the panel out of the flow entirely rather than merely
+ * hiding it — a `visibility` or opacity collapse would keep its height and defeat the purpose.
+ */
+.filter-toggle {
+    /* Sits at the END of the actions bar it shares with the page's primary actions, so the
+       collapse control never competes with "Neuer Auftrag" for the first position. */
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Chevron points right when collapsed and rotates down when open — the same idiom as the bank
+   panels and the tree table, so the affordance reads identically across the app. */
+.filter-chevron {
+    transition: transform 0.15s ease;
+}
+
+[aria-expanded='true'] .filter-chevron {
+    transform: rotate(90deg);
+}
+
+/* The active-filter count is what keeps a collapsed panel honest: it says how many dimensions are
+   narrowing the list, so a short list is never left unexplained. The explicit [hidden] rule is
+   REQUIRED — .chip sets display:inline-flex, which would otherwise beat the user-agent
+   `[hidden] { display: none }`. */
+.filter-count[hidden] {
+    display: none;
+}
+
+.filter-panel {
+    margin-top: 0.75rem;
+}
+
+@media (width <= 768px) {
+    /* Full width rather than an inline chip: stacked, the toggle would otherwise sit on a line of
+       its own at whatever width its label happens to need. 44px is the touch floor
+       (REQ-FE-013). */
+    .filter-toggle {
+        justify-content: center;
+        width: 100%;
+        min-height: 44px;
+        /* Stacked, the auto-margin would strand the toggle on a line of its own. */
+        margin-left: 0;
+    }
+}
+
 /* -------------------------------------------------------------- TAB NAV -- */
 /* Page-level tab navigation (e.g. mission detail). Surface row; active tab =
    white text + 3px orange underline; counts orange. Use role="tablist"/"tab"

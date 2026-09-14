@@ -27,6 +27,12 @@
 
     <div class="hud-box mt-2">
 
+        <!-- Filters collapse behind one toggle (REQ-FE-021). -->
+        <div class="actions-bar">
+            <div th:replace="~{fragments/components :: filterToggle('members-filter-panel', 'members-filter-toggle')}"></div>
+        </div>
+
+        <div class="filter-panel" id="members-filter-panel" data-filter-panel="members">
         <form id="members-filter-form" method="get" th:action="@{/members}" class="search-form no-track krtm-display-flex-gap-0-5rem-align-items-center-m-f4c7">
             <label for="member-search" th:text="#{members.search}">Mitglied suchen</label>
             <div class="krtm-flex-1-min-width-12rem-position-relative-21fc">
@@ -40,6 +46,7 @@
             </div>
             <button type="submit" class="btn btn-ghost" th:text="#{general.search}">Suche</button>
         </form>
+        </div>
         <div class="members-toolbar krtm-display-flex-justify-content-flex-end-margin-63bc"
              sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
             <button type="button" class="btn btn-ghost" data-trigger="members-sync"

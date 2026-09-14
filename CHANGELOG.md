@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Die Filter lassen sich auf allen großen Listenseiten zuklappen.** Bei Einsätzen, Operationen,
+  Aufträgen, Raffinerie-Aufträgen, Mitgliedern und der Materialübersicht füllten die Filter auf dem
+  Handy den halben Bildschirm, bevor die erste Zeile zu sehen war. Sie starten jetzt zugeklappt
+  hinter einem Schalter, der anzeigt, wie viele Filter gerade greifen — wer sie offen haben will,
+  klappt sie einmal auf, das merkt sich der Browser. Die Haupt-Schaltfläche der Seite
+  („Neuer Auftrag" und ähnliche) bleibt immer sichtbar. Seiten mit nur einem Suchfeld — Hangar,
+  Staffel-Hangar, Mein Inventar — bleiben bewusst wie sie sind.
+
 ## [v1.8.1](https://github.com/krt-profit/basetool/releases/tag/v1.8.1) - 2026-09-14
 
 ### Fixed
