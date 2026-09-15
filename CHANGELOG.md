@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Footer zeigte nach einem Release die vorherige Versionsnummer.** Statt „v1.8.4" stand dort
+  „v1.8.3-9-g…" — die Zeichenkette wurde eingebacken, bevor der Release-Tag überhaupt existierte, und
+  das Image wird beim Taggen bewusst wiederverwendet statt neu gebaut. Die Version wird jetzt aus dem
+  Changelog des Release-Commits gelesen, wo sie zu diesem Zeitpunkt schon feststeht (REQ-OPS-021).
+  
 ### Changed
 
 - **Testing fällt nicht mehr hinter Produktion zurück.** Eine Promotion nach Produktion zieht das

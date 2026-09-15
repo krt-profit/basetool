@@ -689,6 +689,23 @@ for `:stable` (REQ-OPS-002). The release tags then point at the exact digest tha
 and signed on `main`, which is a **stronger** guarantee than two independent builds of one source
 tree: `:1.5.53` and `:sha-<short>` can no longer be two different images.
 
+**One consequence has to be handled rather than inherited: the baked version string.** Because the
+tag run does not build, everything baked into the image is fixed while `main` builds — *before*
+`release-publish.yml` creates the tag. `git describe --tags` on the release commit therefore
+answers with the PREVIOUS release plus a commit count, and the footer of v1.8.4 read
+`v1.8.3-9-gc2f77a5cb` — a correct description of the commit, and the wrong name for the release
+sitting on it. Measured 2026-09-15: main build 12:50:47, tag run 12:51:14 with the build skipped.
+This workflow's own comment promised "tag pushes resolve to the tag name verbatim", which had
+quietly stopped being true; a version string cannot be wrong loudly, and it was reported twice by
+the owner before it was chased.
+
+Rebuilding on the tag would fix it and is the wrong trade: it is the entire saving above, and it
+gives up the byte-identity guarantee that makes a rollback to `:1.8.4` or `:sha-<short>` land on the
+same content. **The release version is knowable without the tag** — `release-prepare.yml` writes it
+into the CHANGELOG, on the very commit being built. `.github/scripts/app_version.py` therefore
+prefers the newest dated CHANGELOG section *when it carries no tag yet*, and falls back to
+`git describe` in every other case, so only the release commit is affected.
+
 Reuse is an optimisation, never a weakening of the supply chain. It applies only when **every** gate
 passes, and the doubt case is always a full build:
 
@@ -724,6 +741,9 @@ produced artifact.
 - [ ] On a reuse run the `merge` job re-tags the digest `plan` **verified** (no second resolution
   between check and use) and signs it; `build` and `scan` are skipped.
 - [ ] A `workflow_dispatch` run always builds, on any ref.
+- [ ] The version baked on the release commit is the release being cut, not the previous tag plus a
+  commit count. `app_version.py --selftest` asserts every branch, including that one, and runs in
+  `repo-lint.yml`.
 - [ ] `release-images.yml` declares no `cache-from` / `cache-to` for the app images. Before any cache
   is reintroduced, `gh api repos/{owner}/{repo}/actions/cache/usage` is checked against the 10 GB
   limit — at the quota, a new cache consumer only degrades every existing one.

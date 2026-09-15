@@ -243,6 +243,27 @@ jobs:
       - name: Check the E2E device matrix against DEVICE_CLASSES
         run: python3 .github/scripts/check_e2e_device_matrix.py
 
+  app-version:
+    name: app-version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The resolver asks whether a tag exists, so a shallow clone with no
+          # tags would make every case look like "not released yet".
+          fetch-depth: 0
+
+      # The version string in the footer is the one kind of output that cannot be
+      # wrong loudly, and it WAS wrong: since ADR-0137 the tag run re-tags instead
+      # of rebuilding, so `git describe` is evaluated on `main` before the release
+      # tag exists and the release commit described itself as the PREVIOUS release
+      # plus nine commits. The resolver reads the version from the CHANGELOG in
+      # that one case; this asserts every branch of it, including that one.
+      - name: Self-test the version resolver
+        run: python3 .github/scripts/app_version.py --selftest
+
   sbom-coverage:
     name: sbom-coverage
     runs-on: ubuntu-latest
