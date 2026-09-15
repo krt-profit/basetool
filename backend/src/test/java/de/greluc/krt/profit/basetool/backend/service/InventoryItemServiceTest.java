@@ -60,7 +60,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -68,7 +67,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceTest {
@@ -91,7 +89,10 @@ class InventoryItemServiceTest {
   @Mock private JobOrderItemService jobOrderItemService;
 
   @Mock private AuditService auditService;
-  @InjectMocks private InventoryItemService inventoryItemService;
+  // Constructed in wireDelegates() rather than by @InjectMocks: two of its collaborators are
+  // REAL sub-services built from the same mocks, and Mockito injects neither one @InjectMocks
+  // target into another nor an object it did not create.
+  private InventoryItemService inventoryItemService;
 
   private InventoryAggregationService realAggregationService;
   private InventoryCheckoutService realCheckoutService;
@@ -124,10 +125,25 @@ class InventoryItemServiceTest {
             inventoryItemMapper,
             ownerScopeService,
             auditService);
-    ReflectionTestUtils.setField(
-        inventoryItemService, "inventoryAggregationService", realAggregationService);
-    ReflectionTestUtils.setField(
-        inventoryItemService, "inventoryCheckoutService", realCheckoutService);
+    // Arg order matches the facade's @RequiredArgsConstructor field order. The two sub-services
+    // used
+    // to be patched into an @InjectMocks facade with ReflectionTestUtils.setField; its fields are
+    // `private final`, the mutation JEP 500 (JDK 26) warns about and a later release will refuse.
+    inventoryItemService =
+        new InventoryItemService(
+            inventoryItemRepository,
+            userRepository,
+            materialRepository,
+            gameItemRepository,
+            locationRepository,
+            jobOrderRepository,
+            missionRepository,
+            inventoryItemMapper,
+            ownerScopeService,
+            jobOrderItemService,
+            auditService,
+            realAggregationService,
+            realCheckoutService);
   }
 
   @Test

@@ -66,7 +66,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Coverage for {@link MissionService} lifecycle / ownership methods that the existing focused test
@@ -102,14 +101,38 @@ class MissionServiceLifecycleTest {
   @Mock private AuditService auditService;
 
   @InjectMocks private MissionParticipantService missionParticipantService;
-  @InjectMocks private MissionService service;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL participant sub-service
+  // is one of its arguments
+  private MissionService service;
 
   @BeforeEach
   void wireExtractedParticipantService() {
     // MissionService delegates the participant methods to the extracted MissionParticipantService
     // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
     // reflection, since Mockito does not inject one @InjectMocks target into another.
-    ReflectionTestUtils.setField(service, "missionParticipantService", missionParticipantService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    service =
+        new MissionService(
+            missionRepository,
+            missionParticipantRepository,
+            userRepository,
+            frequencyTypeRepository,
+            missionFrequencyRepository,
+            missionOwnershipRepository,
+            operationRepository,
+            userService,
+            ownerScopeService,
+            authHelperService,
+            auditService,
+            null, // missionTimelineService
+            missionParticipantService,
+            null // missionStructureService
+            );
   }
 
   private static final UUID MISSION_ID = UUID.randomUUID();

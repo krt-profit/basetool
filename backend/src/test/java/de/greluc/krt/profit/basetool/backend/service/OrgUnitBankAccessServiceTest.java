@@ -74,7 +74,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -112,7 +111,9 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankAuditService bankAuditService;
 
-  @InjectMocks private OrgUnitBankAccessService service;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
+  // co-built sub-services
+  private OrgUnitBankAccessService service;
 
   @BeforeEach
   void defaultStubs() {
@@ -143,8 +144,28 @@ class OrgUnitBankAccessServiceTest {
     OrgUnitBankApprovalLimitService approvalLimitService =
         new OrgUnitBankApprovalLimitService(
             bankAccountRepository, approvalLimitRepository, userRepository, bankAuditService);
-    ReflectionTestUtils.setField(service, "orgUnitBankVisibilityService", visibilityService);
-    ReflectionTestUtils.setField(service, "orgUnitBankApprovalLimitService", approvalLimitService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    service =
+        new OrgUnitBankAccessService(
+            ownerScopeService,
+            authHelperService,
+            bankAccountRepository,
+            bankPostingRepository,
+            viewGrantRepository,
+            approvalLimitRepository,
+            bankBookingRequestRepository,
+            bereichRepository,
+            userRepository,
+            bankAccountService,
+            bankApprovalLimitService,
+            bankStatementReportService,
+            bankBookingRequestService,
+            bankAuditService,
+            visibilityService,
+            approvalLimitService);
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {

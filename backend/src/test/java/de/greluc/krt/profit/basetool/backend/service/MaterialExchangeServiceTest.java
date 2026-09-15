@@ -83,7 +83,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit coverage for the material-exchange domain's security-critical behaviour across the
@@ -111,7 +110,9 @@ class MaterialExchangeServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
-  @InjectMocks private MaterialExchangeService service;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL board service is one of
+  // its arguments
+  private MaterialExchangeService service;
 
   // Read/write split (#14): the board/detail/counts/picker reads plus the interessenten-anonymity
   // redaction moved to MaterialExchangeBoardService, built from the same mocks and co-wired into
@@ -128,10 +129,25 @@ class MaterialExchangeServiceTest {
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
   void setUp() {
-    // Mockito passes null for the board-service constructor arg (no @Mock of that type); wire the
-    // real co-built board service so the write service's write→read projection runs the real
-    // redaction/DTO mapping.
-    ReflectionTestUtils.setField(service, "boardService", boardService);
+    // The REAL co-built board service goes in through the constructor so the write->read
+    // projection runs the real redaction/DTO mapping.
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    service =
+        new MaterialExchangeService(
+            offerRepository,
+            interestRepository,
+            inventoryItemRepository,
+            userRepository,
+            authHelperService,
+            auditService,
+            boardService,
+            blueprintProductService,
+            ownerScopeService,
+            eventPublisher,
+            selfProvider);
     owner = user(ownerId, "Anbieter");
     Material material = material("Agricium");
     InventoryItem item = item(owner, material, 796, 340.0);

@@ -59,7 +59,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceTest {
@@ -107,14 +106,20 @@ class JobOrderServiceTest {
   // create/update/delete/read paths keep exercising the real logic.
   @InjectMocks private JobOrderOrgUnitResolver jobOrderOrgUnitResolver;
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
-  @InjectMocks private JobOrderPriorityService jobOrderPriorityService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
+  // of its arguments
+  private JobOrderPriorityService jobOrderPriorityService;
 
-  @InjectMocks private JobOrderService jobOrderService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: three of its collaborators are
+  // real, co-built services
+  private JobOrderService jobOrderService;
 
   // Read/write split (#14): the list/detail/picker reads moved to JobOrderQueryService, built from
   // the same mocks with the real stock projection wired in below, so the moved read paths keep
   // exercising the real logic from this fixture.
-  @InjectMocks private JobOrderQueryService jobOrderQueryService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
+  // of its arguments
+  private JobOrderQueryService jobOrderQueryService;
 
   private Material material;
   private MaterialDto materialDto;
@@ -127,16 +132,42 @@ class JobOrderServiceTest {
 
   @BeforeEach
   void setUp() {
-    ReflectionTestUtils.setField(
-        jobOrderService, "jobOrderOrgUnitResolver", jobOrderOrgUnitResolver);
-    ReflectionTestUtils.setField(
-        jobOrderService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
-    ReflectionTestUtils.setField(
-        jobOrderPriorityService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
-    ReflectionTestUtils.setField(
-        jobOrderService, "jobOrderPriorityService", jobOrderPriorityService);
-    ReflectionTestUtils.setField(
-        jobOrderQueryService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    jobOrderPriorityService =
+        new JobOrderPriorityService(
+            jobOrderRepository, auditService, jobOrderStockProjectionService);
+    jobOrderService =
+        new JobOrderService(
+            jobOrderRepository,
+            materialRepository,
+            inventoryItemRepository,
+            null, // jobOrderAssigneeService
+            orgUnitRepository,
+            jobOrderOrgUnitResolver,
+            authHelperService,
+            eventPublisher,
+            materialClaimService,
+            auditService,
+            jobOrderItemService,
+            jobOrderStockProjectionService,
+            jobOrderPriorityService);
+    jobOrderQueryService =
+        new JobOrderQueryService(
+            jobOrderRepository,
+            materialRepository,
+            inventoryItemRepository,
+            ownerScopeService,
+            jobOrderMapper,
+            squadronMapper,
+            jobOrderItemService,
+            jobOrderStockProjectionService,
+            null, // materialRequirementResolver
+            inventoryItemMapper);
     orderId = UUID.randomUUID();
     materialId = UUID.randomUUID();
 

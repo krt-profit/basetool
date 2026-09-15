@@ -60,7 +60,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Covers the outstanding per-material need the order lookup projects for the Lager allocation
@@ -107,16 +106,34 @@ class JobOrderReferenceNeedsTest {
   /** Real: the two-kind normalisation is the thing under test. */
   @InjectMocks private JobOrderMaterialRequirementResolver requirementResolver;
 
-  @InjectMocks private JobOrderQueryService queryService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
+  // co-built services
+  private JobOrderQueryService queryService;
 
   /** Swaps the two behaviour-under-test collaborators in and opens the visibility gates. */
   @BeforeEach
   void wireRealCollaborators() {
     // @InjectMocks fills every collaborator with a MOCK; the two whose behaviour is asserted are
     // replaced by the real instances afterwards.
-    ReflectionTestUtils.setField(
-        queryService, "jobOrderStockProjectionService", stockProjectionService);
-    ReflectionTestUtils.setField(queryService, "materialRequirementResolver", requirementResolver);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    queryService =
+        new JobOrderQueryService(
+            jobOrderRepository,
+            null, // materialRepository
+            inventoryItemRepository,
+            ownerScopeService,
+            jobOrderMapper,
+            squadronMapper,
+            jobOrderItemService,
+            stockProjectionService,
+            requirementResolver,
+            null // inventoryItemMapper
+            );
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());

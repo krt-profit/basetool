@@ -48,10 +48,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
@@ -82,7 +80,9 @@ class InventoryItemServiceVersionFlushTest {
 
   @Mock private AuditService auditService;
   @Mock private OwnerScopeService ownerScopeService;
-  @InjectMocks private InventoryItemService inventoryItemService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL checkout sub-service is
+  // one of its arguments
+  private InventoryItemService inventoryItemService;
 
   private InventoryCheckoutService realCheckoutService;
 
@@ -102,8 +102,27 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             auditService);
-    ReflectionTestUtils.setField(
-        inventoryItemService, "inventoryCheckoutService", realCheckoutService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    inventoryItemService =
+        new InventoryItemService(
+            inventoryItemRepository,
+            userRepository,
+            materialRepository,
+            null, // gameItemRepository
+            locationRepository,
+            jobOrderRepository,
+            missionRepository,
+            inventoryItemMapper,
+            ownerScopeService,
+            null, // jobOrderItemService
+            auditService,
+            null, // inventoryAggregationService
+            realCheckoutService);
   }
 
   private User userWithId(UUID id) {
