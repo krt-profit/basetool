@@ -126,4 +126,20 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
   @Query("DELETE FROM AuditEvent e WHERE e.domain = :domain AND e.occurredAt < :before")
   int deleteByDomainAndOccurredAtBefore(
       @Param("domain") AuditDomain domain, @Param("before") Instant before);
+
+  /**
+   * Whether one domain holds any audit row older than a cutoff. Asked by the scheduled retention
+   * sweep (REQ-AUDIT-006) before it purges that domain.
+   *
+   * <p>The sweep needs this because {@code purgeBefore} writes its {@code *_AUDIT_PURGED} marker
+   * unconditionally, which is right for an admin's deliberate act — "I purged, and nothing matched"
+   * is a fact worth recording — and wrong for a daily job, which would otherwise mint ten markers a
+   * day forever and turn the retention mechanism into its own retention problem. Asking first keeps
+   * the manual purge's semantics untouched.
+   *
+   * @param domain the area to check
+   * @param before the exclusive cutoff
+   * @return {@code true} when at least one row of that domain is older than the cutoff
+   */
+  boolean existsByDomainAndOccurredAtBefore(AuditDomain domain, Instant before);
 }

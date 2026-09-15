@@ -46,6 +46,12 @@ public enum ScheduledJob {
    */
   REJECTED_REGISTRATION_RETENTION("rejected_registration_retention"),
 
+  /**
+   * The daily retention sweep over the activity and bank audit trails ({@code AuditRetentionTask},
+   * REQ-AUDIT-006).
+   */
+  AUDIT_RETENTION("audit_retention"),
+
   /** The hourly default-blueprint back-fill ({@code DefaultBlueprintProvisioningTask}). */
   DEFAULT_BLUEPRINT_PROVISIONING("default_blueprint_provisioning"),
 

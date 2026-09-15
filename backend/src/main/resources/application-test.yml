@@ -81,6 +81,11 @@ app:
     integrity:
       # Same rationale as the bank sweep: JobOrderIntegrityServiceTest drives verify() directly.
       enabled: false
+  audit:
+    retention:
+      # Disabled under @SpringBootTest so the sweep can never delete audit rows an assertion is
+      # about; the purge itself is exercised directly by its own tests.
+      enabled: false
   registrations:
     rejected-retention:
       # The scheduled purge is disabled under @SpringBootTest so it can never delete a seeded
