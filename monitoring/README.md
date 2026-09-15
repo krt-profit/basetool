@@ -283,6 +283,12 @@ sum by (application,area) (jvm_memory_committed_bytes)
 sum by (application) (jvm_memory_used_bytes{area="heap"})
 ```
 
+Since **2026-09-15** all three JVMs run `-XX:+UseCompactObjectHeaders` (64-bit object headers,
+ADR-0180), so every heap figure recorded before that date was taken on a different object layout and
+is the *before* side of that change — exactly as every pre-2026-09-13 frontend/ingest figure was
+taken on a different collector (ADR-0175). A re-measurement under the new layout is owed
+(`REQ-OPS-030`) and no limit may be re-derived from the older numbers.
+
 Three traps, all of which have produced a wrong fix here (see the **JVM CONTAINER SIZING** block in
 `docker-compose.yml`):
 
