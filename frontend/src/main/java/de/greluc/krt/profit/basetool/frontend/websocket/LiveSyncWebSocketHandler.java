@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +55,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
@@ -126,12 +128,44 @@ import tools.jackson.databind.node.ObjectNode;
  * ConcurrentWebSocketSessionDecorator} (send-time and buffer-size bounded, TERMINATE on overflow)
  * so a slow/dead consumer is dropped rather than blocking the serial broadcast loop; broadcasts
  * iterate a defensive {@code List.copyOf}.
+ *
+ * <p><b>Keepalive.</b> Every open socket is pinged on a fixed {@link #KEEPALIVE_INTERVAL} sweep.
+ * Without it a room that nobody is writing to carries no bytes at all, and the edge proxy closes an
+ * idle upgraded connection at its 90 s {@code proxy_read_timeout} — which turned every open tab
+ * into a reconnect-and-refetch loop on a 90-second cadence.
  */
 @Slf4j
 public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /** How often the reaper runs to drop expired presence entries and broadcast updates. */
   public static final Duration REAPER_INTERVAL = Duration.ofSeconds(10);
+
+  /**
+   * How often every open socket is sent a WebSocket ping frame so the edge proxy does not tear the
+   * connection down as idle.
+   *
+   * <p>A live-sync room is usually silent for minutes at a time — a {@code changed} frame only
+   * flies when a peer actually writes, presence gossip only reaches presence-enabled rooms, and the
+   * client sends nothing on its own. The edge's {@code proxy_read_timeout} is 90 s ({@code
+   * docker/edge/nginx.conf}) and nginx applies it to an upgraded connection as well, so a silent
+   * socket was torn down almost exactly 90 s after it opened, every time, for every tab. The client
+   * dutifully reconnected, re-subscribed every topic — re-running one backend authorization probe
+   * per room — and fired its post-reconnect resync, which re-fetches every section the page
+   * renders. What looks like a live socket was a full page-wide refetch loop on a 90-second
+   * cadence, and it was found from the outside: a bank-account viewer whose {@code bank:{id}}
+   * subscribe legitimately fails its primary probe produced 114 backend {@code 403 WARN} lines in
+   * three hours from a single open tab.
+   *
+   * <p>Pinging from the <em>server</em> is what fixes it, and the direction is not interchangeable:
+   * {@code proxy_read_timeout} times out reading from the upstream, so only a frame travelling
+   * server → client resets it. This is the remedy nginx's own WebSocket guide names. At 30 s three
+   * pings fit inside the 90 s window, so a delayed or lost tick is not a lost socket, and the cost
+   * is one empty frame per socket per half minute. A browser answers a ping with a pong at the
+   * protocol level, so no client code participates; {@code handlePongMessage} is inherited as a
+   * no-op. {@code LiveSyncKeepaliveEdgeTimeoutParityTest} pins the two numbers together, requiring
+   * the sweep to fire at least twice inside whatever the edge's timeout currently is.
+   */
+  public static final Duration KEEPALIVE_INTERVAL = Duration.ofSeconds(30);
 
   /** Hard cap on the number of section keys relayed per {@code changed} frame (abuse guard). */
   private static final int MAX_CHANGED_SECTIONS = 16;
@@ -345,6 +379,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private static final String ATTR_USER_COUNTED = "livesync.userCounted";
 
+  /**
+   * Session-attribute key ({@link Long}) holding the monotonic nanosecond reading taken when the
+   * socket was accepted, so the close path can record its lifetime.
+   */
+  private static final String ATTR_OPENED_NANOS = "livesync.openedNanos";
+
   private static final String ATTR_DISPLAY_NAME = "livesync.displayName";
   private static final String ATTR_CHANGED_RATE = "livesync.changedRate";
   private static final String ATTR_PRESENCE_RATE = "livesync.presenceRate";
@@ -375,7 +415,25 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   private final LongSupplier nanoClock;
 
+  /**
+   * Records how long each closing socket had been open (see {@link
+   * MetricNames#LIVESYNC_SOCKET_LIFETIME}).
+   */
+  private final Timer socketLifetime;
+
   private final Map<String, Set<WebSocketSession>> sessionsByTopic = new ConcurrentHashMap<>();
+
+  /**
+   * Every open socket's decorator, regardless of which rooms it has joined — the set the keepalive
+   * sweep pings.
+   *
+   * <p>Deliberately not derived from {@link #sessionsByTopic}: that map holds only
+   * <em>subscribed</em> sockets, and a tab that merely publishes ({@code /orders/create} announcing
+   * to a queue room it may not read) or that has not finished its first subscribe holds a socket in
+   * no room at all. Those are exactly the sockets whose silence is total, so pinging only the rooms
+   * would have left the quietest connections to time out.
+   */
+  private final Set<WebSocketSession> liveSessions = ConcurrentHashMap.newKeySet();
 
   /**
    * Live multiplexed-socket count per user (Keycloak {@code sub}), backing the per-user socket cap
@@ -397,7 +455,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * across all rooms) and, per topic class, one {@code
    * basetool_livesync_subscriptions{topic_class}} gauge (sockets in that class) plus one {@code
    * basetool_livesync_peer_rooms{topic_class}} gauge (rooms of that class holding two or more
-   * sockets); the reaper starts ticking immediately.
+   * sockets) plus the {@code basetool_livesync_socket_lifetime_seconds} timer; the presence reaper
+   * and the keepalive sweep start ticking immediately.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
@@ -473,6 +532,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
           .description("Live rooms of this topic class holding two or more subscribers.")
           .register(meterRegistry);
     }
+    this.socketLifetime =
+        Timer.builder(MetricNames.LIVESYNC_SOCKET_LIFETIME)
+            .description("How long a live-sync WebSocket session stayed open before closing.")
+            .register(meterRegistry);
     this.reaper =
         Executors.newSingleThreadScheduledExecutor(
             r -> {
@@ -485,9 +548,20 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         REAPER_INTERVAL.toSeconds(),
         REAPER_INTERVAL.toSeconds(),
         TimeUnit.SECONDS);
+    // Shares the reaper's thread rather than taking one of its own: both sweeps are short, neither
+    // blocks (the decorator buffers instead of waiting on a slow peer), and one daemon thread per
+    // handler is enough.
+    this.reaper.scheduleAtFixedRate(
+        this::tickKeepalive,
+        KEEPALIVE_INTERVAL.toSeconds(),
+        KEEPALIVE_INTERVAL.toSeconds(),
+        TimeUnit.SECONDS);
   }
 
-  /** Shuts the reaper thread down cleanly on application shutdown. */
+  /**
+   * Shuts the shared scheduler thread down cleanly on application shutdown, stopping both the
+   * presence reaper and the keepalive sweep.
+   */
   @PreDestroy
   public void shutdown() {
     reaper.shutdownNow();
@@ -577,10 +651,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     session.getAttributes().put(ATTR_USER_COUNTED, Boolean.TRUE);
     session.getAttributes().put(ATTR_USER_ID, userId);
+    session.getAttributes().put(ATTR_OPENED_NANOS, nanoClock.getAsLong());
     session.getAttributes().put(ATTR_DISPLAY_NAME, resolveDisplayName(principal));
     session.getAttributes().put(ATTR_SUBSCRIPTIONS, ConcurrentHashMap.<String>newKeySet());
     WebSocketSession decorated = wrap(session);
     session.getAttributes().put(ATTR_DECORATED, decorated);
+    liveSessions.add(decorated);
   }
 
   /**
@@ -685,6 +761,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   @Override
   public void afterConnectionClosed(
       @NotNull WebSocketSession session, @NotNull CloseStatus status) {
+    recordSocketLifetime(session);
     String userId = (String) session.getAttributes().get(ATTR_USER_ID);
     // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
     // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
@@ -694,6 +771,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       releaseUserSocket(userId);
     }
     WebSocketSession decorated = decorated(session);
+    // Before the subscription-set check, like the socket-slot release above: a socket that closed
+    // before its first subscribe has no subscription set, and would otherwise stay in the keepalive
+    // sweep for the life of the process.
+    liveSessions.remove(decorated);
     Set<String> subs = subscriptions(session);
     if (subs == null) {
       return;
@@ -1355,6 +1436,46 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       gossipTrackedPresence(mirrored);
     } catch (RuntimeException e) {
       log.warn("Live-sync reaper tick failed", e);
+    }
+  }
+
+  /**
+   * Records a closing socket's lifetime, if it ever got one — a socket refused at connect (consent
+   * gate, missing principal, per-user cap) never carries the open stamp and is skipped, so a
+   * refusal cannot masquerade as a zero-second connection and pull the distribution down.
+   *
+   * @param session the closing raw session
+   */
+  private void recordSocketLifetime(@NotNull WebSocketSession session) {
+    if (session.getAttributes().get(ATTR_OPENED_NANOS) instanceof Long openedNanos) {
+      socketLifetime.record(nanoClock.getAsLong() - openedNanos, TimeUnit.NANOSECONDS);
+    }
+  }
+
+  /**
+   * Pings every open socket so the edge proxy sees traffic on an otherwise silent connection and
+   * does not close it as idle (see {@link #KEEPALIVE_INTERVAL} for why this is server-originated
+   * and why 30 s).
+   *
+   * <p>A failure is per socket, never per sweep: a peer that has gone away throws on the write, and
+   * the one socket is dropped from the registry while the rest of the sweep continues. Dropping it
+   * here is belt-and-braces — the container still delivers {@code afterConnectionClosed}, which
+   * removes it as well — but a socket that can no longer be written to must not be pinged again in
+   * 30 seconds either way. A closed session is skipped without a write attempt, so the ordinary
+   * close race costs nothing.
+   */
+  void tickKeepalive() {
+    for (WebSocketSession session : List.copyOf(liveSessions)) {
+      try {
+        if (!session.isOpen()) {
+          liveSessions.remove(session);
+          continue;
+        }
+        session.sendMessage(new PingMessage());
+      } catch (IOException | RuntimeException e) {
+        liveSessions.remove(session);
+        log.debug("Live-sync keepalive ping failed; dropping socket from the sweep", e);
+      }
     }
   }
 

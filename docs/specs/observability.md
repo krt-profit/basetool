@@ -1436,7 +1436,19 @@ the gossip is *periodic* while the changed relay is *event-driven*: folded toget
 gossip floor would swamp the changed-relay rate the fan-out panel exists to show. Gossip failures
 count under `op=presence_publish` / `presence_consume` on the shared errors counter and are
 deliberately **outside** the `LiveSyncRedisFanoutBroken` expression — a lost `changed` publish costs
-correctness, a lost gossip costs a cosmetic dot. Together with the backend
+correctness, a lost gossip costs a cosmetic dot. The unlabelled timer
+`basetool_livesync_socket_lifetime_seconds` records how long each `/ws/sync` socket stayed open,
+sampled when it closes (a socket refused at connect records nothing, so a refusal cannot read as a
+zero-second connection). It exists because every meter above counts *events on* a socket and none of
+them measured the socket itself: the edge proxy closing every idle connection at its 90 s
+`proxy_read_timeout` — turning each open tab into a reconnect, a re-subscribe per room and a
+page-wide resync every ninety seconds — raised the subscribe counter, left the session gauge flat,
+and was invisible from the inside until it surfaced as a repeated `403` in the backend log. The
+signature is `max`, or the windowed mean `rate(_sum) / rate(_count)`, collapsing toward a fixed value
+near a proxy timeout. **Deliberately not alerted**: an ordinary page navigation also ends a socket
+after a few seconds, so no threshold separates it from a proxy teardown — the same unsoundness that
+keeps the `changed`-flatline rule off the board. The keepalive that prevents the condition is pinned
+to the edge timeout by a parity test instead (REQ-FE-015). Together with the backend
 `basetool_sse_redis_*` counters above, a sustained `publish`-error stream on either fan-out drives the
 `LiveSyncRedisFanoutBroken` alert (both fire only where the Redis fan-out is enabled, i.e. prod). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`

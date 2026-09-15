@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Die Live-Aktualisierung baute ihre Verbindung alle 90 Sekunden neu auf.** Auf einer ruhigen Seite
+  floss über die Live-Verbindung minutenlang nichts, und der Edge-Proxy trennte sie deshalb als
+  untätig — jeder geöffnete Tab verband sich danach neu und lud im Hintergrund alle Abschnitte
+  seiner Seite erneut. Der Server hält die Verbindung jetzt mit einem stillen Signal alle 30 Sekunden
+  offen (REQ-FE-015).
+
 ## [v1.8.5](https://github.com/krt-profit/basetool/releases/tag/v1.8.5) - 2026-09-15
 
 ### Changed
