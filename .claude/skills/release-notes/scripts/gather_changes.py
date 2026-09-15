@@ -252,18 +252,21 @@ def ddmm(value: str) -> str:
 
 
 def suggested_title(log: str, since: str) -> str:
-    """Build the release-notes H1 ``Release Notes (DD.MM. -> DD.MM.)`` from the window.
+    """Build the release-notes H1 ``<h1>Release Notes (DD.MM. -> DD.MM.)</h1>``.
 
     The left date is the start the user asked for (the ``--since`` date itself when
     it is a date or date+time, otherwise the oldest change actually in range). The
     right date is the newest change in range -- i.e. the last thing the notes cover.
     The title stays date-only even when ``--since`` carries a time.
+
+    Returned wrapped in ``<h1>`` because the notes ship as CKEditor-ready HTML, so
+    the printed line can be pasted into the document as-is.
     """
     dates = sorted(line.split("\t")[1] for line in log.splitlines() if line.count("\t") >= 2)
     if not dates:
-        return "Release Notes"
+        return "<h1>Release Notes</h1>"
     left = ddmm(since) if as_git_date(since) is not None else ddmm(dates[0])
-    return f"Release Notes ({left} → {ddmm(dates[-1])})"
+    return f"<h1>Release Notes ({left} → {ddmm(dates[-1])})</h1>"
 
 
 def ddmmyyyy(value: str) -> str:
@@ -305,17 +308,20 @@ def newest_release_tag(repo: str, until: str) -> str | None:
 def suggested_subtitle(repo: str, until: str, log: str) -> str | None:
     """Build the mandatory italic version subtitle, or ``None`` if it cannot.
 
-    Form: ``_Version <current released version> · Stand <DD.MM.YYYY>_``. The version
-    is :func:`newest_release_tag` at the window end; ``Stand`` is the date of the last
-    change in range (the same date the title's right bound uses), carrying the year.
-    Both inputs must exist -- an empty window or a tag-less repo yields ``None`` and
-    the caller falls back to a planned-version hint.
+    Form: ``<p><em>Version <current released version> · Stand <DD.MM.YYYY></em></p>``.
+    The version is :func:`newest_release_tag` at the window end; ``Stand`` is the date
+    of the last change in range (the same date the title's right bound uses), carrying
+    the year. Both inputs must exist -- an empty window or a tag-less repo yields
+    ``None`` and the caller falls back to a planned-version hint.
+
+    Like :func:`suggested_title` this comes back as the finished HTML block, so it can
+    be pasted straight into the CKEditor-ready document.
     """
     dates = sorted(line.split("\t")[1] for line in log.splitlines() if line.count("\t") >= 2)
     tag = newest_release_tag(repo, until)
     if not dates or not tag:
         return None
-    return f"_Version {tag} · Stand {ddmmyyyy(dates[-1])}_"
+    return f"<p><em>Version {tag} · Stand {ddmmyyyy(dates[-1])}</em></p>"
 
 
 # Path (relative to the repo root) the model copies to advance the pointer; kept
@@ -412,13 +418,15 @@ def main() -> None:
 
     print("=" * 78)
     print(f"RELEASE-NOTES SOURCE DIGEST   since={shown_since}  until={args.until}")
-    print(f"SUGGESTED TITLE (use verbatim as the H1): {suggested_title(log, since)}")
+    print(f"SUGGESTED TITLE (use verbatim as the first HTML block): {suggested_title(log, since)}")
     subtitle = suggested_subtitle(repo, args.until, log)
     if subtitle:
-        print(f"SUGGESTED SUBTITLE (mandatory 2nd line, use verbatim): {subtitle}")
+        print(f"SUGGESTED SUBTITLE (mandatory 2nd block, use verbatim): {subtitle}")
     elif log:
         print("SUGGESTED SUBTITLE: no release tag reachable at the window end -- use the "
-              "planned next version, e.g. _Version vX.Y.Z · Stand DD.MM.YYYY_")
+              "planned next version, e.g. <p><em>Version vX.Y.Z · Stand DD.MM.YYYY</em></p>")
+    print("OUTPUT FORMAT: CKEditor-ready HTML fragment -- h1/h2/p/ul/li/strong/em only, "
+          "no attributes, no wrapper element. See SKILL.md 'Ausgabeformat'.")
     if resumed:
         print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)
