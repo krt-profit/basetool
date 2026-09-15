@@ -28,6 +28,12 @@ name: Promote to testing
 #     the answer to "which version has been on testing since when". Adding the
 #     reviewer later is a repo setting, not a workflow change.
 #
+# WHEN TO RUN IT (changed — REQ-OPS-022). Testing no longer needs a manual run to
+# keep up: promoting to production carries `:testing` forward whenever it would
+# otherwise fall behind, so `testing >= stable` holds without anyone remembering.
+# What is left for this workflow is the case that invariant cannot produce —
+# putting testing AHEAD of production, to try a version out without touching prod.
+#
 # Trigger: workflow_dispatch only. Nothing reaches the testing host on a `main`
 # merge either — the operator decides what gets tested, same principle as prod.
 
@@ -41,10 +47,12 @@ on:
 
 concurrency:
   # Serialise testing promotions among themselves so two simultaneous flips cannot
-  # leave the app images and the config bundle on different versions. Deliberately a
-  # DIFFERENT group from promote.yml's `promote-stable`: a testing promotion must
-  # never queue behind (or cancel) a production one, and vice versa — they touch
-  # disjoint tags.
+  # leave the app images and the config bundle on different versions. Still a
+  # DIFFERENT group from promote.yml's `promote-stable`, so a testing promotion
+  # never queues behind a whole production run — but no longer because the two
+  # touch disjoint tags. They stopped being disjoint when promote.yml gained its
+  # `sync-testing` job, and that job joins THIS group rather than `promote-stable`,
+  # which is what keeps the two writers of `:testing` from interleaving.
   group: promote-testing
   cancel-in-progress: false
 
