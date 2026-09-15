@@ -1,0 +1,393 @@
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap">
+<style>
+  :root {
+    --orange: #E77E23;
+    --orange-light: #EEB64B;
+    --black: #000000;
+    --surface: #141414;
+    --hairline: #282828;
+    --gray-1: #D2D2D2;
+    --gray-2: #8A8A8A;
+    --white: #FFFFFF;
+    --font: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    background: var(--black);
+    color: var(--gray-1);
+    font-family: var(--font);
+    font-weight: 300;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: 860px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 40px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* ---------------------------------------------------------- HUD frame -- */
+  .hud {
+    position: relative;
+    border: 1px solid var(--hairline);
+    background: rgba(20, 20, 20, 0.5);
+    padding: 24px;
+  }
+  .hud::before,
+  .hud::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+  }
+  .hud::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid var(--orange);
+    border-left: 2px solid var(--orange);
+  }
+  .hud::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid var(--orange);
+    border-right: 2px solid var(--orange);
+  }
+
+  /* ------------------------------------------------------------- header -- */
+  .masthead {
+    border-left: 4px solid var(--orange);
+    padding: 4px 0 4px 20px;
+    background: linear-gradient(90deg, rgba(20, 20, 20, 1) 0%, rgba(0, 0, 0, 0) 100%);
+  }
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin: 0;
+  }
+  .masthead h1 {
+    font-size: clamp(26px, 5vw, 38px);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    margin: 6px 0 0;
+    text-wrap: balance;
+  }
+  .masthead .sub {
+    margin: 8px 0 0;
+    color: var(--gray-2);
+    font-size: 14px;
+  }
+
+  /* ------------------------------------------------------------ actions -- */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  button {
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 0;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+  }
+  button:focus-visible {
+    outline: 2px solid var(--orange-light);
+    outline-offset: 2px;
+  }
+  .btn-cta {
+    background: var(--orange);
+    color: var(--black);
+    border: 1px solid var(--orange);
+    box-shadow: 0 0 18px rgba(231, 126, 35, 0.28);
+  }
+  .btn-cta:hover { background: var(--orange-light); border-color: var(--orange-light); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--gray-1);
+    border: 1px solid var(--hairline);
+  }
+  .btn-ghost:hover { border-color: var(--gray-2); color: var(--white); }
+
+  .hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--gray-2);
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  /* -------------------------------------------------------------- panel -- */
+  .panel-label {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--orange);
+  }
+  .panel-label span {
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: var(--gray-2);
+    font-size: 12px;
+  }
+
+  /* ------------------------------------------------- the post, previewed -- */
+  .post h2 {
+    font-size: 24px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    margin: 0 0 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--hairline);
+    text-wrap: balance;
+  }
+  .post h3 {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--orange);
+    margin: 30px 0 10px;
+  }
+  .post p { margin: 0 0 14px; }
+  .post p:last-child { margin-bottom: 0; }
+  .post strong { font-weight: 700; color: var(--white); }
+  .post a { color: var(--orange); text-decoration: underline; text-underline-offset: 3px; }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 14px; }
+  .post table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    min-width: 440px;
+  }
+  .post th,
+  .post td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--hairline);
+    text-align: right;
+  }
+  .post th:first-child,
+  .post td:first-child { text-align: left; }
+  .post thead th {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gray-2);
+    border-bottom: 1px solid var(--gray-2);
+  }
+  .post tbody th {
+    font-weight: 300;
+    color: var(--gray-1);
+  }
+  .post tbody tr:last-child th,
+  .post tbody tr:last-child td {
+    border-bottom: none;
+    font-weight: 700;
+    color: var(--white);
+  }
+
+  /* ------------------------------------------------------------- source -- */
+  details {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gray-1);
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '▸ '; color: var(--orange); }
+  details[open] summary::before { content: '▾ '; }
+  summary:focus-visible { outline: 2px solid var(--orange-light); outline-offset: -2px; }
+  pre {
+    margin: 0;
+    padding: 0 20px 20px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--gray-2);
+    white-space: pre;
+  }
+
+  /* -------------------------------------------------------------- toast -- */
+  #toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface);
+    border: 1px solid var(--orange);
+    color: var(--white);
+    padding: 12px 22px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+
+  @media (max-width: 520px) {
+    .hud { padding: 18px; }
+    .actions button { flex: 1 1 100%; }
+  }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow">KRT-Bank &middot; Monatsbericht</p>
+    <h1>{{TITLE}}</h1>
+    <p class="sub">{{SUBLINE}}</p>
+  </header>
+
+  <section class="hud">
+    <div class="actions">
+      <button type="button" id="copyRich" class="btn-cta">Formatiert kopieren</button>
+      <button type="button" id="copySource" class="btn-ghost">HTML-Quelltext kopieren</button>
+      <p class="hint">„Formatiert“ direkt in den CKEditor einfügen. Der Quelltext ist für die Quelltext-Ansicht, falls das Einfügen gefiltert wird.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="panel-label">Vorschau <span>Struktur und Inhalt — die Farben stellt euer Forum</span></p>
+    <div class="hud">
+      <article class="post" id="preview"></article>
+    </div>
+  </section>
+
+  <details>
+    <summary>HTML-Quelltext ansehen</summary>
+    <pre id="source"></pre>
+  </details>
+
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<template id="postTemplate">{{POST}}</template>
+
+<script>
+  (function () {
+    var tpl = document.getElementById('postTemplate');
+    var html = tpl.innerHTML.trim();
+
+    document.getElementById('preview').appendChild(tpl.content.cloneNode(true));
+    document.getElementById('source').textContent = html;
+
+    var toast = document.getElementById('toast');
+    var toastTimer;
+    function say(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2400);
+    }
+
+    // Fallback for browsers that refuse the async clipboard inside a frame: put the
+    // clean markup in an offscreen node, select it, and let execCommand copy it as
+    // rich text. The node carries no styles, so the paste stays forum-safe.
+    function copyViaSelection(markup, asPlainText) {
+      var holder = document.createElement(asPlainText ? 'textarea' : 'div');
+      holder.style.position = 'fixed';
+      holder.style.left = '-9999px';
+      holder.style.top = '0';
+      holder.setAttribute('aria-hidden', 'true');
+      if (asPlainText) {
+        holder.value = markup;
+        document.body.appendChild(holder);
+        holder.select();
+      } else {
+        holder.innerHTML = markup;
+        holder.contentEditable = 'true';
+        document.body.appendChild(holder);
+        var range = document.createRange();
+        range.selectNodeContents(holder);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(holder);
+      return ok;
+    }
+
+    document.getElementById('copyRich').addEventListener('click', function () {
+      var done = function () { say('Formatiert kopiert'); };
+      var fail = function () {
+        if (copyViaSelection(html, false)) { done(); }
+        else { say('Kopieren blockiert — Quelltext unten nehmen'); }
+      };
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        var item = new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([html], { type: 'text/plain' })
+        });
+        navigator.clipboard.write([item]).then(done, fail);
+      } else {
+        fail();
+      }
+    });
+
+    document.getElementById('copySource').addEventListener('click', function () {
+      var done = function () { say('Quelltext kopiert'); };
+      var fail = function () {
+        if (copyViaSelection(html, true)) { done(); }
+        else { say('Kopieren blockiert — Quelltext unten markieren'); }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(html).then(done, fail);
+      } else {
+        fail();
+      }
+    });
+  }());
+</script>
