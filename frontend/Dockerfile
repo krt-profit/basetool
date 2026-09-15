@@ -196,7 +196,20 @@ COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
 # flags, training fails silently and the runtime ENTRYPOINT below detects
 # the missing .jsa file and falls back to a non-CDS startup. Build logs
 # carry the JVM stack trace so CI can surface the regression.
+#
+# -XX:+UseCompactObjectHeaders (2026-09-15, ADR-0180) MUST equal the runtime flag that
+# docker-compose.yml passes in JAVA_TOOL_OPTIONS, and this line is the only place that can make the
+# two agree: the training run happens during the image build, where JAVA_TOOL_OPTIONS is not set.
+# The archive records the object layout it was dumped with, and a mismatch is NOT caught by the
+# ENTRYPOINT fallback below — the .jsa exists, so the launcher passes -XX:SharedArchiveFile, and the
+# JVM answers "The shared archive file's UseCompactObjectHeaders setting (disabled) does not equal
+# the current UseCompactObjectHeaders setting (enabled)" followed by "Loading dynamic archive
+# failed", then starts normally WITHOUT CDS. Nothing fails; the startup saving is simply gone.
+# Verified 2026-09-15 on eclipse-temurin:25-jdk-alpine in both directions. The dump itself needs a
+# base archive in the same layout and the Temurin image ships one (`classes_coh.jsa` beside
+# `classes.jsa`). Change one of the two flags and you change both.
 RUN java -XX:ArchiveClassesAtExit=/app/application.jsa \
+        -XX:+UseCompactObjectHeaders \
         -Dspring.context.exit=onRefresh \
         -Dspring.main.lazy-initialization=true \
         -Dspring.security.oauth2.client.provider.keycloak.issuer-uri= \

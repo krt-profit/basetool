@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
+  Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
+  Voreinstellung, hier wird es auf Java 25 vorgezogen. Die Speichergrenzen der Container bleiben
+  bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
+
+### Fixed
+
+- **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
+  Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend
+  aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
+  Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
+
 ## [v1.8.6](https://github.com/krt-profit/basetool/releases/tag/v1.8.6) - 2026-09-15
 
 ### Fixed

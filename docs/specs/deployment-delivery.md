@@ -1220,6 +1220,12 @@ whole reason the flag is mandatory rather than advisory.
 **Acceptance**
 
 - [x] `frontend`, `backend` and `ingest` each pass an explicit collector flag.
+  **Corrected 2026-09-15:** this box was ticked when the requirement was written, and for the
+  `backend` it was wrong. `e401742db` wrote the flag onto `frontend` and `ingest` only, so the
+  busiest JVM stayed on ergonomics — which picks G1 at its 2048M limit and would have picked Serial
+  the moment the limit dropped below 1792M, i.e. exactly the silent switch this requirement exists to
+  prevent. Found while evaluating JDK 27 (whose JEP 523 would have made the ergonomics half moot) and
+  closed in the same change as REQ-OPS-030.
 - [x] The frontend's limit is at or above 1792M, so ergonomics and the explicit flag agree rather
   than contradict each other.
 - [x] The sum of limits over all prod-profile services stays under ADR-0085's ~14 GB review trigger
@@ -1272,6 +1278,54 @@ generated one is a silent-drift machine — did not stop at the artifacts themse
 **Enforced by:** `.github/scripts/extract_release_notes.py` ·
 `.github/scripts/check_sbom_coverage.py` · `.github/workflows/repo-lint.yml` (`sbom-coverage`) ·
 **Related:** REQ-OPS-025 (the set it mirrors), REQ-OPS-023 (provenance for those same assets)
+
+### REQ-OPS-030 — The object layout is set once and matched by the baked CDS archive
+
+All three application JVMs run **`-XX:+UseCompactObjectHeaders`** (64-bit object headers instead of
+96-bit), a product option since JDK 25 (JEP 519) and the default from JDK 27 (JEP 534). It is taken
+on the LTS the stack already runs rather than waited for, because the stack is memory-constrained:
+14 160 MiB of declared limits against a 15.24 GiB host, inside ADR-0085's ~14 GB review trigger.
+
+**The flag is set in two places and both are mandatory:**
+
+|                            Place                            |                              Why                              |
+|-------------------------------------------------------------|---------------------------------------------------------------|
+| `docker-compose.yml` → each `JAVA_TOOL_OPTIONS`             | The runtime layout; beside the collector flag of REQ-OPS-028  |
+| `<module>/Dockerfile` → the `-XX:ArchiveClassesAtExit` line | The AppCDS training run, which cannot see `JAVA_TOOL_OPTIONS` |
+
+A CDS archive records the object layout it was dumped with and the JVM validates it at startup, so
+the two settings must agree. They cannot be kept in step by accident: the training run happens during
+the **image build**, where `JAVA_TOOL_OPTIONS` is not set, and a mismatch is **not** caught by the
+`ENTRYPOINT`'s fallback — that tests whether the `.jsa` *exists*, and it does. The JVM prints
+`The shared archive file's UseCompactObjectHeaders setting (disabled) does not equal the current
+UseCompactObjectHeaders setting (enabled)` followed by `Loading dynamic archive failed`, and then
+**starts normally without CDS**. Setting the flag on one side only therefore trades the 30–50 %
+startup saving away silently, with nothing failing anywhere. The check rules in both directions.
+
+**The heap saving does not license a smaller budget until it is measured.** Every figure in the
+`JVM CONTAINER SIZING` block of `docker-compose.yml` was measured with 96-bit headers and is the
+*before* side of this change. Limits and `MaxRAMPercentage` values stay exactly as REQ-OPS-020 and
+ADR-0175 left them until a post-deploy re-measurement replaces the table — the same one-variable-at-
+a-time rule the collector change had to learn (ADR-0175: the previous table compared figures taken
+on two different collectors).
+
+**Acceptance**
+
+- [x] `backend`, `frontend` and `ingest` each pass `-XX:+UseCompactObjectHeaders` in
+  `JAVA_TOOL_OPTIONS`.
+- [x] Each module's `Dockerfile` passes the same flag on its AppCDS training run, and both sides
+  carry a comment naming the other.
+- [x] No memory limit and no `MaxRAMPercentage` changed in the same unit of work.
+- [x] No monitoring change is required: `jvm_memory_*` and the container working-set alert are the
+  measurement instrument, and the 90 % `ContainerMemoryHigh` line can only move further away.
+- [ ] Re-measured on production after a full week under the new layout, with the snapshot queries in
+  `monitoring/README.md`, and the new table written into the `JVM CONTAINER SIZING` block. Freed
+  headroom may be spent only after that.
+
+**Code:** `docker-compose.yml` (each service's `JAVA_TOOL_OPTIONS`) · `backend/Dockerfile` ·
+`frontend/Dockerfile` · `ingest/Dockerfile` · **Decision:**
+[ADR-0180](../adr/0180-compact-object-headers-on-java-25.md) · **Related:** REQ-OPS-028 (the other
+JVM flag, same file, same failure class), REQ-OPS-020 (the measured limits this must not pre-empt)
 
 ## Open questions
 
