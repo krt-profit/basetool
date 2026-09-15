@@ -278,6 +278,18 @@ app:
       # drifted away from the ordered item after an SC-Wiki re-sync. Disable or retune per env.
       enabled: ${APP_JOBORDER_INTEGRITY_ENABLED:true}
       interval: ${APP_JOBORDER_INTEGRITY_INTERVAL:PT1H}
+  audit:
+    retention:
+      # Scheduled retention sweep over the activity and bank audit trails (REQ-AUDIT-006). Every
+      # audit row carries a denormalised actor-handle snapshot that outlives the user's deletion by
+      # design, so an unbounded trail is a permanent record of a named person. No statutory
+      # retention obligation applies here; 730 days (two years) outlasts the organisation's own
+      # operating cycles and then stops. Days, not months: Duration has no month unit.
+      # This does NOT replace the admin purge (REQ-AUDIT-004), which stays available for a shorter,
+      # deliberate cutoff.
+      enabled: ${APP_AUDIT_RETENTION_ENABLED:true}
+      max-age: ${APP_AUDIT_RETENTION_MAX_AGE:P730D}
+      interval: ${APP_AUDIT_RETENTION_INTERVAL:PT24H}
   registrations:
     rejected-retention:
       # Scheduled purge of registrations refused longer ago than max-age (REQ-SEC-057). A rejection

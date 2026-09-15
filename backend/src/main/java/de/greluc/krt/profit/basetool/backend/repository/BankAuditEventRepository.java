@@ -124,4 +124,14 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   @Modifying
   @Query("DELETE FROM BankAuditEvent e WHERE e.occurredAt < :before")
   int deleteByOccurredAtBefore(@Param("before") Instant before);
+
+  /**
+   * Whether any bank audit row is older than a cutoff. Asked by the scheduled retention sweep
+   * (REQ-AUDIT-006) before it purges, so the unconditional {@code AUDIT_LOG_PURGED} marker that is
+   * right for an admin's deliberate purge is not minted daily by a job that found nothing.
+   *
+   * @param before the exclusive cutoff
+   * @return {@code true} when at least one row is older than the cutoff
+   */
+  boolean existsByOccurredAtBefore(Instant before);
 }
