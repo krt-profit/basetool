@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
@@ -35,11 +34,10 @@ public class ImpressumController {
   /**
    * Returns the {@code impressum} view name.
    *
-   * @param model Thymeleaf model (unused; the template is static)
    * @return the {@code impressum} view name
    */
   @GetMapping("/impressum")
-  public String showImpressum(Model model) {
+  public String showImpressum() {
     return "impressum";
   }
 }

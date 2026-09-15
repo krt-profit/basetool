@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.servlet.view.RedirectView;
 
@@ -103,11 +102,13 @@ public class AppLinkController {
    * never resolved, may have no web session at all. Behind the authenticated catch-all this page
    * would redirect into the OAuth2 entry point, which is the very loop it exists to break.
    *
-   * @param model Thymeleaf model (unused; the template is static)
+   * <p>No {@code Model} parameter: the template is static, and the layout attributes come from the
+   * {@link UsesLayoutModel} advices, which populate the model whether or not a handler asks for it.
+   *
    * @return the {@code app-link-help} view name
    */
   @GetMapping(HELP_PATH)
-  public String linkHelp(Model model) {
+  public String linkHelp() {
     return "app-link-help";
   }
 }
