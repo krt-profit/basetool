@@ -153,6 +153,24 @@ public final class MetricNames {
   public static final String LIVESYNC_PRESENCE_REMOTE_PARTITIONS =
       "basetool.livesync.presence.remote.partitions";
 
+  /**
+   * Timer {@code basetool_livesync_socket_lifetime_seconds} — how long each {@code /ws/sync} socket
+   * stayed open, recorded when it closes. Unlabelled (REQ-OBS-011): every room and user shares the
+   * one distribution.
+   *
+   * <p>Diagnostic, not alertable. It exists because the subsystem had no measure of how long a
+   * connection <em>lives</em>, and the edge proxy silently closing every idle socket at its 90 s
+   * {@code proxy_read_timeout} was therefore invisible from the inside — the subscribe counter
+   * rose, the session gauge held steady, and nothing said the same tabs were reconnecting all day.
+   * The {@code max} and the windowed mean ({@code rate(_sum) / rate(_count)}) collapsing toward a
+   * fixed value near a proxy timeout is the signature to look for.
+   *
+   * <p>No alert is wired on it deliberately: an ordinary page navigation also closes a socket after
+   * a few seconds, so no threshold separates "the proxy tore it down" from "the member clicked a
+   * link" — the same unsoundness that keeps a {@code changed}-frame flatline alert off the board.
+   */
+  public static final String LIVESYNC_SOCKET_LIFETIME = "basetool.livesync.socket.lifetime";
+
   /** Gauge {@code basetool_active_sessions} — active Spring Session sessions (frontend). */
   public static final String ACTIVE_SESSIONS = "basetool.active.sessions";
 

@@ -32,12 +32,14 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.service.LiveSyncPresenceService;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.security.Principal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
@@ -58,6 +61,7 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.PingMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketExtension;
 import org.springframework.web.socket.WebSocketMessage;
@@ -1559,6 +1563,98 @@ class LiveSyncWebSocketHandlerTest {
     JsonNode frame = lastBroadcast(bob);
     assertThat(frame.get("type").asString()).isEqualTo("denied");
     assertThat(frame.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_INDETERMINATE);
+  }
+
+  @Test
+  void keepaliveSweep_pingsEverySocket_includingOneThatJoinedNoRoom() throws Exception {
+    // The publisher-only tab (`/orders/create` announcing into a queue room it may not read) is the
+    // quietest socket there is: it subscribes to nothing, so it never appears in a room map and
+    // never receives a broadcast. It is therefore the first one an idle-timeout would reap, and the
+    // reason the sweep iterates its own registry rather than the rooms.
+    FakeSession subscribed = openSubscribed(missionTopic(), oidcUser("user-1", "Alice"));
+    FakeSession roomless = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    subscribed.sent.clear();
+    roomless.sent.clear();
+
+    handler.tickKeepalive();
+
+    assertThat(subscribed.sent).singleElement().isInstanceOf(PingMessage.class);
+    assertThat(roomless.sent).singleElement().isInstanceOf(PingMessage.class);
+  }
+
+  @Test
+  void keepaliveSweep_skipsAClosedSocket_andStopsPingingItAfterTheCloseCallback() throws Exception {
+    FakeSession session = openSubscribed(missionTopic(), oidcUser("user-1", "Alice"));
+    session.sent.clear();
+    session.open = false;
+
+    handler.tickKeepalive();
+    assertThat(session.sent).isEmpty();
+
+    // Reopening proves the sweep dropped it rather than merely skipping it this once: the registry
+    // entry is gone, so even an open socket the handler no longer knows about is not written to.
+    session.open = true;
+    handler.tickKeepalive();
+    assertThat(session.sent).isEmpty();
+  }
+
+  @Test
+  void keepaliveSweep_dropsABrokenSocket_andKeepsPingingTheRest() throws Exception {
+    FakeSession broken = openSubscribed(missionTopic(), oidcUser("user-1", "Alice"));
+    FakeSession healthy = openSubscribed(missionTopic(), oidcUser("user-2", "Bob"));
+    broken.sent.clear();
+    healthy.sent.clear();
+    broken.failSend = true;
+
+    handler.tickKeepalive();
+
+    // One peer that has gone away must not cost the sweep the sockets behind it in the iteration.
+    assertThat(broken.sent).isEmpty();
+    assertThat(healthy.sent).singleElement().isInstanceOf(PingMessage.class);
+
+    broken.failSend = false;
+    handler.tickKeepalive();
+    assertThat(broken.sent).isEmpty();
+    assertThat(healthy.sent).hasSize(2);
+  }
+
+  @Test
+  void closedSocket_isRemovedFromTheKeepaliveSweep() throws Exception {
+    String topic = missionTopic();
+    FakeSession session = openSubscribed(topic, oidcUser("user-1", "Alice"));
+
+    handler.afterConnectionClosed(session, CloseStatus.NORMAL);
+    session.sent.clear();
+    handler.tickKeepalive();
+
+    assertThat(session.sent).isEmpty();
+  }
+
+  @Test
+  void socketLifetime_isRecordedWhenTheSocketCloses() throws Exception {
+    FakeSession session = openSubscribed(missionTopic(), oidcUser("user-1", "Alice"));
+    nanoClock.addAndGet(Duration.ofMinutes(7).toNanos());
+
+    handler.afterConnectionClosed(session, CloseStatus.NORMAL);
+
+    Timer timer = registry.find(MetricNames.LIVESYNC_SOCKET_LIFETIME).timer();
+    assertThat(timer).isNotNull();
+    assertThat(timer.count()).isEqualTo(1L);
+    assertThat(timer.totalTime(TimeUnit.SECONDS)).isEqualTo(Duration.ofMinutes(7).toSeconds());
+  }
+
+  @Test
+  void socketRefusedAtConnect_recordsNoLifetime() throws Exception {
+    // A refusal is not a connection that ended; counting it as a zero-second one would drag the
+    // distribution the metric exists to read.
+    FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
+    session.principal = null;
+    handler.afterConnectionEstablished(session);
+
+    handler.afterConnectionClosed(session, CloseStatus.NOT_ACCEPTABLE);
+
+    Timer timer = registry.find(MetricNames.LIVESYNC_SOCKET_LIFETIME).timer();
+    assertThat(timer == null ? 0L : timer.count()).isZero();
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────────────────────

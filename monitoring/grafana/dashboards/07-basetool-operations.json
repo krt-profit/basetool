@@ -2565,6 +2565,65 @@
       ]
     },
     {
+      "id": 55,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 160
+      },
+      "type": "timeseries",
+      "title": "Live-sync socket lifetime",
+      "description": "How long each /ws/sync socket stayed open, sampled when it closes (basetool_livesync_socket_lifetime_seconds). Every other live-sync meter counts events ON a socket; this one measures the socket. The signature to read is the mean or max collapsing toward a fixed value near a proxy timeout — that is an intermediary closing idle connections, and each close costs a reconnect, one subscribe-authorization probe per subscribed room and a page-wide resync, for every open tab. It happened: the edge's proxy_read_timeout is 90 s and the socket sent nothing at all, so every tab reconnected on a 90-second cadence and no meter here could see it. The handler now pings every socket every 30 s, and a parity test pins that interval to the edge timeout. NOT alertable — an ordinary navigation also ends a socket after seconds, so no threshold separates it from a teardown; read the panel, do not wait for a page.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(basetool_livesync_socket_lifetime_seconds_sum[1h])) / sum(rate(basetool_livesync_socket_lifetime_seconds_count[1h]))",
+          "refId": "A",
+          "legendFormat": "mean (1h)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "max(basetool_livesync_socket_lifetime_seconds_max)",
+          "refId": "B",
+          "legendFormat": "max",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
       "id": 48,
       "gridPos": {
         "h": 8,

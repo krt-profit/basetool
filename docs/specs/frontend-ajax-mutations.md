@@ -1241,6 +1241,22 @@ re-validated (presence-enabled class only, section-key shape, ≤16 origins per 
 section) rather than trusted. The browser wire format is unchanged — a peer's dots simply appear in
 the same `presence` frame — so no client change was needed.
 
+**The socket is kept alive from the server, and the interval is pinned to the edge's read timeout.**
+A live-sync room is silent most of the time — a `changed` frame only flies when a peer writes,
+presence gossip reaches presence-enabled rooms only, and the client sends nothing unprompted — while
+the edge proxy closes an upgraded connection after `proxy_read_timeout` (90 s) without a byte from
+upstream. The handler therefore sends a WebSocket **ping to every open socket every 30 s**
+(`LiveSyncWebSocketHandler.KEEPALIVE_INTERVAL`), including sockets in no room at all: a
+publish-only tab (`/orders/create` announcing into a queue room it may not read) is the quietest
+socket there is and would time out first. The direction is **not** interchangeable — a read timeout
+is only reset by a frame travelling server → client — and the margin is **at least 2x**, so one
+delayed sweep cannot reach the ceiling. Without it every tab's socket died on a 90-second cadence
+and each death cost a reconnect, one subscribe-authorization probe **per subscribed room** and a
+full page-wide resync; the symptom reached the logs only as an unexplained repeated `403` from a
+room whose probe legitimately falls back. `basetool_livesync_socket_lifetime_seconds` records how
+long each socket lived, so the condition is visible from the inside; no alert is wired on it,
+because an ordinary navigation also ends a socket after seconds and no threshold separates the two.
+
 **Acceptance**
 
 - [ ] On every covered surface, a mutation by user A appears on user B's view in place — including
@@ -1265,13 +1281,18 @@ the same `presence` frame — so no client change was needed.
   `/org-chart`, and an org-chart position edit refreshes another admin's open editor.
 - [ ] A backend write that failed publishes nothing — peers do not re-fetch for a change that
   never happened.
+- [ ] A tab left open on a silent surface keeps **one** socket for as long as it is open: no
+  reconnect, no re-subscribe and no background resync while nothing changes.
+- [ ] Raising the keepalive interval past half the edge's `proxy_read_timeout`, or lowering that
+  timeout below twice the interval, fails `:frontend:test`.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
 F2/#1243 abuse bounds: per-user socket cap accept/refuse/decrement/per-user, per-topic publish
-throttle across publishers, idle-bucket reaping) ·
+throttle across publishers, idle-bucket reaping, the keepalive sweep and the socket-lifetime timer) ·
 `LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
-parity) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
+parity) · `LiveSyncKeepaliveEdgeTimeoutParityTest` (the keepalive interval against the edge's
+`proxy_read_timeout`) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.
 requester-refused queue + bank dual-auth matrix) · `RedisLiveSyncFanoutTest` +
 `RedisLiveSyncFanoutIntegrationTest` (publish-once, origin skip, Redis-down degradation, plus the
 presence channel: snapshot serialisation, channel-based dispatch, empty-snapshot forwarding,
