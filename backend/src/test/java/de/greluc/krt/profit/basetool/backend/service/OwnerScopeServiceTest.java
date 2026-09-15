@@ -69,11 +69,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link OwnerScopeService}. Inherits the test scenarios that previously
@@ -112,7 +110,10 @@ class OwnerScopeServiceTest {
 
   @Mock private HttpServletRequest request;
 
-  @InjectMocks private OwnerScopeService service;
+  // Built in wireDelegates() rather than by @InjectMocks: its three collaborators are real
+  // instances, and Mockito injects neither one @InjectMocks target into another nor an object it
+  // did not create. See wireDelegates().
+  private OwnerScopeService service;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
   private static final UUID SQUADRON_A_ID = UUID.randomUUID();
@@ -182,12 +183,14 @@ class OwnerScopeServiceTest {
   /**
    * Wires the L3-split (#922) collaborators into the {@link OwnerScopeService} facade under test.
    * Mockito does not inject one {@code @InjectMocks} target into another, so the facade's three
-   * sub-service fields are built here as REAL instances fed with the same mocks the scenarios stub,
-   * then set via {@link ReflectionTestUtils}. A single {@link RequestScopeResolver} instance is
-   * shared by the facade, the gates and the stamping service so the request-scoped memoisation
-   * (backed by the shared {@code request} mock) collapses repeated reads exactly as in production.
-   * Constructor-arg order matches each service's {@code @RequiredArgsConstructor} field-declaration
-   * order.
+   * sub-services are built here as REAL instances fed with the same mocks the scenarios stub, and
+   * the facade is then constructed from them. They used to be patched into an {@code @InjectMocks}
+   * facade with {@code ReflectionTestUtils.setField}; its fields are {@code private final}, which
+   * JEP 500 (JDK 26) warns about and a later release will refuse. A single {@link
+   * RequestScopeResolver} instance is shared by the facade, the gates and the stamping service so
+   * the request-scoped memoisation (backed by the shared {@code request} mock) collapses repeated
+   * reads exactly as in production. Constructor-arg order matches each service's
+   * {@code @RequiredArgsConstructor} field-declaration order.
    */
   private void wireDelegates() {
     RequestScopeResolver requestScopeResolver =
@@ -218,9 +221,8 @@ class OwnerScopeServiceTest {
             authHelper,
             orgUnitMembershipRepository,
             orgUnitRepository);
-    ReflectionTestUtils.setField(service, "requestScopeResolver", requestScopeResolver);
-    ReflectionTestUtils.setField(service, "accessGateService", accessGateService);
-    ReflectionTestUtils.setField(service, "orgUnitStampingService", orgUnitStampingService);
+    service =
+        new OwnerScopeService(requestScopeResolver, accessGateService, orgUnitStampingService);
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */

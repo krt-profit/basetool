@@ -60,7 +60,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit-Tests fuer die Section-Patch-Methoden in {@link MissionService}.
@@ -100,17 +99,37 @@ class MissionServiceSectionPatchTest {
   // rationale as the participant service above.
   @InjectMocks private MissionStructureService missionStructureService;
 
-  @InjectMocks private MissionService missionService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
+  // co-built sub-services
+  private MissionService missionService;
 
   private UUID missionId;
   private Mission existing;
 
   @BeforeEach
   void setUp() {
-    ReflectionTestUtils.setField(
-        missionService, "missionParticipantService", missionParticipantService);
-    ReflectionTestUtils.setField(
-        missionService, "missionStructureService", missionStructureService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    missionService =
+        new MissionService(
+            missionRepository,
+            missionParticipantRepository,
+            userRepository,
+            null, // frequencyTypeRepository
+            null, // missionFrequencyRepository
+            missionOwnershipRepository,
+            null, // operationRepository
+            null, // userService
+            ownerScopeService,
+            null, // authHelperService
+            auditService,
+            null, // missionTimelineService
+            missionParticipantService,
+            missionStructureService);
     missionId = UUID.randomUUID();
     existing = new Mission();
     existing.setId(missionId);
