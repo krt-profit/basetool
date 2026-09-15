@@ -371,11 +371,28 @@ jobs:
       # image's `META-INF/build-info.properties` (and, transitively, the
       # sidebar's discreet version chip rendered by `AppVersionAdvice`).
       #   - Tag pushes resolve to the tag name verbatim (e.g. `v0.2.3`).
-      #   - Branch pushes resolve to `vX.Y.Z-<n>-g<sha>` where `n` is the
+      #   - The RELEASE COMMIT resolves to the release it is cutting, read from
+      #     the CHANGELOG section `release-prepare.yml` wrote, because its tag
+      #     does not exist yet when this job runs — see below.
+      #   - Other branch pushes resolve to `vX.Y.Z-<n>-g<sha>` where `n` is the
       #     number of commits since the last reachable tag — auditable
       #     reference back to a release boundary plus the exact commit.
       #   - Initial-state repositories without any tag yet fall back to the
       #     bare short SHA via `--always`.
+      #
+      # THE RELEASE-COMMIT CASE IS WHY THIS IS A SCRIPT. This step used to be a
+      # bare `git describe --tags --always`, and the bullet above it promised
+      # tag pushes the tag verbatim. That promise stopped holding the day
+      # REQ-OPS-021 / ADR-0137 landed: an image is built once per commit and the
+      # tag run RE-TAGS that digest instead of rebuilding, so this job does not
+      # run on the tag at all and the string is fixed while `main` is building —
+      # before `release-publish.yml` creates the tag. Measured on 2026-09-15: the
+      # main build at 12:50:47, the tag run at 12:51:14 with the build skipped,
+      # and a footer reading `v1.8.3-9-gc2f77a5cb` for the commit `v1.8.4` sits
+      # on. Rebuilding on the tag would fix it and give back all of ADR-0137's
+      # saving, plus the guarantee that `:1.8.4` and `:sha-<short>` are the same
+      # bytes. The version is knowable without the tag instead.
+      #
       # `--dirty` is intentionally omitted here: a GitHub Actions runner
       # always builds from a clean checkout, so an unexpected `-dirty`
       # suffix would point at a CI bug, not a legitimate state. The
@@ -384,7 +401,7 @@ jobs:
       # worktree are a normal flow.
       - name: Compute application version
         id: app-version
-        run: echo "version=$(git describe --tags --always)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(python3 .github/scripts/app_version.py)" >> "$GITHUB_OUTPUT"
 
       # No QEMU here — the matrix already runs each platform on its own
       # native runner. setup-qemu-action would only add overhead.
