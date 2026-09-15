@@ -19,11 +19,11 @@ Nothing else in the system ever touches the row again.
 
 What it leaves behind, for a person who never became a member:
 
-| Where | What |
-|-------|------|
-| `app_user` | e-mail address, username / display name, `discord_user_id`, `discord_guild_nickname` |
-| `user_approval_event` | `decision`, the deciding admin, and `reason` — a free-text `TEXT` column |
-| Keycloak | the full user, including the federated Discord identity |
+|         Where         |                                         What                                         |
+|-----------------------|--------------------------------------------------------------------------------------|
+| `app_user`            | e-mail address, username / display name, `discord_user_id`, `discord_guild_nickname` |
+| `user_approval_event` | `decision`, the deciding admin, and `reason` — a free-text `TEXT` column             |
+| Keycloak              | the full user, including the federated Discord identity                              |
 
 `user_approval_event.reason` is the sharpest of these. It is where an admin writes *why* an
 application was refused: an assessment of a named natural person, in prose, retained indefinitely,
