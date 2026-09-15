@@ -660,7 +660,20 @@ iri-deploy.service` will **not** show it — see the note under *First deploy*.
 ### Promoting to testing
 
 The PVE testing stack (`basetool.greluc.me`) is fed by its own tag and its own
-workflow (REQ-OPS-022). Nothing reaches it on a `main` merge either:
+workflow (REQ-OPS-022). Nothing reaches it on a `main` merge either.
+
+> **You usually do not need this.** Since 2026-09-15 a production promotion carries
+> `:testing` forward whenever it would otherwise fall behind, so `testing >= stable`
+> holds without anyone remembering to run anything. What is left for this workflow
+> is the case that invariant cannot produce: putting testing **ahead** of
+> production, to try a version out without touching prod.
+>
+> The decision is an ancestry question, not a timestamp one — the job compares the
+> `org.opencontainers.image.revision` labels with `git merge-base --is-ancestor`,
+> because the full-rebuild escape hatch below gives *old* code a *new* timestamp. A
+> testing tag it cannot place in history (a squashed or deleted branch build) is
+> left alone and reported, never moved on a guess.
+
 
 ```bash
 gh workflow run promote-testing.yml -f version=sha-abc1234

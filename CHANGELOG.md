@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Testing fällt nicht mehr hinter Produktion zurück.** Eine Promotion nach Produktion zieht das
+  Testing-System jetzt mit, sofern es sonst älter wäre — steht dort schon eine neuere Version, bleibt
+  sie stehen. Der Workflow „Promote to testing" wird damit nur noch gebraucht, um Testing bewusst
+  **vor** Produktion zu bringen (REQ-OPS-022).
+
 ## [v1.8.4](https://github.com/krt-profit/basetool/releases/tag/v1.8.4) - 2026-09-15
 
 ### Fixed

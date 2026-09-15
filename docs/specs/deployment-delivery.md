@@ -758,6 +758,27 @@ because it mints one deployment record per promotion — the durable answer to *
 been on testing since when*. Adding the reviewer later is a repository setting, not a workflow
 change.
 
+**Testing is never behind production — `testing >= stable` is an invariant, not a habit.**
+Until 2026-09-15 the two tags were flipped by two workflows nobody was required to run in order,
+so a production promotion could move `:stable` past `:testing` and testing silently became the
+**older** environment. Nothing failed, and every "try it on testing first" instruction quietly
+meant "try an older build". `promote.yml`'s `sync-testing` job therefore carries `:testing`
+forward whenever it would otherwise fall behind — and **only** then. A testing tag deliberately
+placed ahead of production is left where it is, which is what `promote-testing.yml` is now for:
+putting testing ahead, not keeping it level.
+
+**The ordering signal is the source commit, not the image's timestamp.** Each image carries
+`org.opencontainers.image.revision`; the job reads it from both `:testing` and the promoted tag
+and asks `git merge-base --is-ancestor`. Creation time looks like an equivalent signal and is not:
+the `workflow_dispatch` escape hatch rebuilds an **old** version, giving old code a new timestamp,
+and a timestamp comparison would then march testing backwards while reporting success.
+
+**On an unanswerable question, testing is left alone.** If either revision is missing, or
+testing's commit is not in this repository's history — a squashed or deleted branch build, which
+is exactly the shape of a deliberately experimental testing deployment — the job warns and does
+not move the tag. The failure direction is chosen: moving on a guess can only be wrong by
+destroying an ahead state, which is the one thing this must never do.
+
 A non-production environment usually sits behind a NAT that does not hairpin, so the **public**
 Keycloak name resolves to a WAN address its own containers cannot reach. Backend, frontend and
 ingest load the OIDC metadata from that name at startup, so they never become healthy and the
@@ -825,7 +846,12 @@ for why the missing-probe half is not redundant.
 - [ ] `promote-testing.yml` is `workflow_dispatch`-only, writes **only** the `:testing` tag, and
   never touches `:stable`.
 - [ ] Its concurrency group is distinct from `promote-stable`, so a testing promotion neither
-  queues behind nor cancels a production one.
+  queues behind nor cancels a production one — and `promote.yml`'s `sync-testing` job joins the
+  **testing** group, so the two writers of `:testing` cannot interleave.
+- [ ] A production promotion leaves `testing >= stable`: it moves `:testing` when testing's source
+  commit is an ancestor of the promoted one, and leaves it untouched when testing is ahead.
+- [ ] The comparison reads `org.opencontainers.image.revision`, never the image timestamp.
+- [ ] An unreadable or unknown revision leaves `:testing` untouched and emits a warning.
 - [ ] It cosign-verifies against the **same** release-images identity regexp as `promote.yml`.
 - [ ] The `approve` job declares `environment: testing` on its own single job (not the matrix),
   so one deployment record is minted per run.
