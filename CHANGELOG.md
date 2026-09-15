@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.4](https://github.com/krt-profit/basetool/releases/tag/v1.8.4) - 2026-09-15
+
 ### Fixed
 
 - **Wenn die App-Anmeldung im Browser landete, kam eine 404-Seite mitten im Login.** Öffnet Android
