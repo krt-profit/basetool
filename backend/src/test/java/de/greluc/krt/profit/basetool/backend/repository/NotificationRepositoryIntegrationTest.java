@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.model.Notification;
 import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
@@ -49,6 +51,8 @@ class NotificationRepositoryIntegrationTest {
   @Autowired private NotificationRepository repository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private UserRepository userRepository;
+
+  @PersistenceContext private EntityManager entityManager;
 
   /** Ids of the {@code app_user} rows this class created, removed again after each test. */
   private final Set<UUID> seededRecipients = new HashSet<>();
@@ -194,6 +198,63 @@ class NotificationRepositoryIntegrationTest {
     assertThat(repository.findByIdAndRecipientUserId(old.getId(), a)).isEmpty();
     assertThat(repository.findByIdAndRecipientUserId(recent.getId(), a)).isPresent();
     assertThat(repository.findByIdAndRecipientUserId(unread.getId(), a)).isPresent();
+  }
+
+  /**
+   * Backdates a row's {@code created_at} through native SQL.
+   *
+   * <p>{@code AbstractEntity.createdAt} is {@code @CreationTimestamp} + {@code updatable = false},
+   * so Hibernate stamps it at insert and ignores any value set on the entity — an aged unread
+   * notification cannot be produced through the mapping at all, only underneath it.
+   *
+   * @param id the notification to age
+   * @param createdAt the creation instant to write
+   */
+  private void backdateCreatedAt(UUID id, Instant createdAt) {
+    transactionTemplate.executeWithoutResult(
+        status ->
+            entityManager
+                .createNativeQuery("update notification set created_at = :ts where id = :id")
+                .setParameter("ts", createdAt)
+                .setParameter("id", id)
+                .executeUpdate());
+  }
+
+  // covers REQ-NOTIF-009 — the unread half of the sweep ages from createdAt, not readAt
+  @Test
+  void deleteUnreadOlderThanDeletesOnlyOldUnreadRows() {
+    UUID a = UUID.randomUUID();
+    Instant now = Instant.now();
+    Notification oldUnread = save(a, false, null);
+    Notification recentUnread = save(a, false, null);
+    Notification oldRead = save(a, true, now.minus(1, ChronoUnit.DAYS));
+    backdateCreatedAt(oldUnread.getId(), now.minus(200, ChronoUnit.DAYS));
+    backdateCreatedAt(oldRead.getId(), now.minus(200, ChronoUnit.DAYS));
+
+    int deleted =
+        transactionTemplate.execute(
+            status -> repository.deleteUnreadOlderThan(now.minus(180, ChronoUnit.DAYS)));
+
+    assertThat(deleted).isEqualTo(1);
+    assertThat(repository.findByIdAndRecipientUserId(oldUnread.getId(), a)).isEmpty();
+    assertThat(repository.findByIdAndRecipientUserId(recentUnread.getId(), a)).isPresent();
+    // A read row of the same age belongs to the other window and must survive this statement.
+    assertThat(repository.findByIdAndRecipientUserId(oldRead.getId(), a)).isPresent();
+  }
+
+  // covers REQ-NOTIF-009 — the unread backlog that used to outlive every stated retention period
+  // is now bounded; this is the regression the two-window sweep was built for
+  @Test
+  void anUnreadBacklogNoLongerSurvivesIndefinitely() {
+    UUID a = UUID.randomUUID();
+    Instant now = Instant.now();
+    Notification neverRead = save(a, false, null);
+    backdateCreatedAt(neverRead.getId(), now.minus(3650, ChronoUnit.DAYS));
+
+    transactionTemplate.execute(
+        status -> repository.deleteUnreadOlderThan(now.minus(180, ChronoUnit.DAYS)));
+
+    assertThat(repository.findByIdAndRecipientUserId(neverRead.getId(), a)).isEmpty();
   }
 
   @Test

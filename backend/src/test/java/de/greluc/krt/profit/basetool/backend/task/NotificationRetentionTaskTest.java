@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
@@ -34,37 +36,79 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/** Unit tests for the two-window notification retention sweep (REQ-NOTIF-009). */
 @ExtendWith(MockitoExtension.class)
 class NotificationRetentionTaskTest {
+
+  private static final Duration READ_MAX_AGE = Duration.ofDays(90);
+  private static final Duration UNREAD_MAX_AGE = Duration.ofDays(180);
 
   @Mock private NotificationService notificationService;
 
   private final TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
+  private NotificationRetentionTask task() {
+    return new NotificationRetentionTask(
+        notificationService, taskMetrics, READ_MAX_AGE, UNREAD_MAX_AGE);
+  }
+
+  // covers REQ-NOTIF-009 — read notifications age from readAt against the read window
   @Test
   void purgesReadNotificationsOlderThanMaxAge() {
-    Duration maxAge = Duration.ofDays(90);
-    NotificationRetentionTask task =
-        new NotificationRetentionTask(notificationService, taskMetrics, maxAge);
-    when(notificationService.purgeReadOlderThan(org.mockito.ArgumentMatchers.any())).thenReturn(3);
+    when(notificationService.purgeReadOlderThan(any())).thenReturn(3);
 
-    task.purgeExpiredReadNotifications();
+    task().purgeExpiredNotifications();
 
     ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
-    org.mockito.Mockito.verify(notificationService).purgeReadOlderThan(cutoff.capture());
+    verify(notificationService).purgeReadOlderThan(cutoff.capture());
     // Cutoff is "now - 90d"; allow a small window around the captured value.
     assertThat(cutoff.getValue()).isBeforeOrEqualTo(Instant.now().minus(89, ChronoUnit.DAYS));
     assertThat(cutoff.getValue()).isAfter(Instant.now().minus(91, ChronoUnit.DAYS));
   }
 
+  // covers REQ-NOTIF-009 — unread notifications are bounded too, on their own longer window
+  @Test
+  void purgesUnreadNotificationsOlderThanUnreadMaxAge() {
+    when(notificationService.purgeUnreadOlderThan(any())).thenReturn(2);
+
+    task().purgeExpiredNotifications();
+
+    ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
+    verify(notificationService).purgeUnreadOlderThan(cutoff.capture());
+    assertThat(cutoff.getValue()).isBeforeOrEqualTo(Instant.now().minus(179, ChronoUnit.DAYS));
+    assertThat(cutoff.getValue()).isAfter(Instant.now().minus(181, ChronoUnit.DAYS));
+  }
+
+  // covers REQ-NOTIF-009 — one run sweeps both windows, never only the read half
+  @Test
+  void sweepsBothWindowsInOneRun() {
+    when(notificationService.purgeReadOlderThan(any())).thenReturn(3);
+    when(notificationService.purgeUnreadOlderThan(any())).thenReturn(2);
+
+    task().purgeExpiredNotifications();
+
+    verify(notificationService).purgeReadOlderThan(any());
+    verify(notificationService).purgeUnreadOlderThan(any());
+  }
+
+  // covers REQ-NOTIF-009 — the unread cutoff is strictly older than the read one, so a notification
+  // is never reaped sooner for being unread than it would have been for being read
+  @Test
+  void unreadCutoffIsOlderThanReadCutoff() {
+    task().purgeExpiredNotifications();
+
+    ArgumentCaptor<Instant> readCutoff = ArgumentCaptor.forClass(Instant.class);
+    ArgumentCaptor<Instant> unreadCutoff = ArgumentCaptor.forClass(Instant.class);
+    verify(notificationService).purgeReadOlderThan(readCutoff.capture());
+    verify(notificationService).purgeUnreadOlderThan(unreadCutoff.capture());
+    assertThat(unreadCutoff.getValue()).isBefore(readCutoff.getValue());
+  }
+
   @Test
   void swallowsFailuresSoSchedulerSurvives() {
-    NotificationRetentionTask task =
-        new NotificationRetentionTask(notificationService, taskMetrics, Duration.ofDays(90));
-    when(notificationService.purgeReadOlderThan(org.mockito.ArgumentMatchers.any()))
-        .thenThrow(new RuntimeException("db down"));
+    when(notificationService.purgeReadOlderThan(any())).thenThrow(new RuntimeException("db down"));
 
     // Must not propagate.
-    task.purgeExpiredReadNotifications();
+    task().purgeExpiredNotifications();
   }
 }

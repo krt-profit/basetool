@@ -35,8 +35,16 @@ public enum ScheduledJob {
   /** The 5-minute Keycloak directory mirror ({@code UserSyncTask#syncUsers}). */
   USER_SYNC("user_sync"),
 
-  /** The daily read-notification retention purge ({@code NotificationRetentionTask}). */
+  /**
+   * The daily notification retention purge, read and unread ({@code NotificationRetentionTask}).
+   */
   NOTIFICATION_RETENTION("notification_retention"),
+
+  /**
+   * The daily purge of registrations refused past the retention window ({@code
+   * RejectedRegistrationRetentionTask}, REQ-SEC-057).
+   */
+  REJECTED_REGISTRATION_RETENTION("rejected_registration_retention"),
 
   /** The hourly default-blueprint back-fill ({@code DefaultBlueprintProvisioningTask}). */
   DEFAULT_BLUEPRINT_PROVISIONING("default_blueprint_provisioning"),

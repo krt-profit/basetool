@@ -3435,6 +3435,65 @@ properties) · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
 `CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml` · **Decision:**
 [ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md)
 
+### REQ-SEC-057 — A refused registration is purged once its retention window expires
+
+A registration in `REJECTED` MUST be removed automatically — the `app_user` row, its
+`user_approval_event` rows and its Keycloak user — once the rejection is older than a configured
+retention window. The window is configuration (`app.registrations.rejected-retention.max-age`,
+default `P90D`), the sweep runs daily, and the whole job is disableable
+(`app.registrations.rejected-retention.enabled`).
+
+Deciding on an application is the only purpose a rejected registration ever served, and the
+rejection fulfils it. What the row holds afterwards is not incidental: an e-mail address, a handle,
+a Discord snowflake, a guild nickname, and — in `user_approval_event.reason`, a free-text `TEXT`
+column — an admin's written assessment of a natural person who never became a member and has no
+account to see it with. Nothing removed any of that. The member list's delete action offers itself
+only for a user already gone from Keycloak (`!user.inKeycloak`), and a rejection deliberately leaves
+the Keycloak user in place, so a refused registration was unreachable by every deletion affordance
+the application had; the only remedy was a manual Keycloak-console deletion followed by a second
+click nobody was prompted to make. Retaining it indefinitely also has no basis to rest on once the
+decision is made.
+
+**The window is not zero on purpose.** REQ-SEC-034 makes a rejection reversible because approval is
+fallible, and purging the row ends that possibility — so the retention period is simultaneously the
+period in which an erroneous rejection can still be reopened. Shortening one shortens the other.
+
+**The purge reuses the account-deletion path** (`UserDeletionService`, REQ-DATA-008) rather than
+issuing its own deletes, so it cannot drift from the foreign-key ordering that path owns. `decide`
+admits `REJECTED` only from `PENDING`, so such an account never held authorities and owns nothing —
+but should one arrive holding data anyway, that service reassigns the shared aggregates instead of
+destroying them.
+
+**Ordering is load-bearing.** Per row the database half commits *first* and the Keycloak user is
+deleted *last*, the ordering REQ-SEC-026 / [ADR-0111](../adr/0111-account-consolidation-deletes-the-keycloak-user-last.md)
+established for the same reason: a rolled-back database half leaves the Keycloak user intact, so the
+next run re-reads a whole registration. The reverse order would strand the exact thing this sweep
+exists to delete — an `app_user` row whose Keycloak account is already gone. Each row commits in its
+own transaction, so one unpurgeable registration cannot roll back the rows already swept.
+
+**No new audit event type.** The purge records `USER_DELETED` through `AuditService` like any other
+deletion (REQ-AUDIT-001); running without a security context, the actor resolves to `null` /
+`"system"`, which is what distinguishes a retention purge from an admin's. One real-world act keeps
+one event type.
+
+**Acceptance**
+
+- [ ] A registration rejected longer ago than `max-age` is removed from `app_user`,
+  `user_approval_event` and Keycloak by the daily sweep.
+- [ ] A registration reopened (REQ-SEC-034) between the candidate query and the purge transaction
+  survives: the re-read inside the transaction re-asserts `REJECTED` and the cutoff.
+- [ ] A rejection inside the window is untouched.
+- [ ] The Keycloak user is deleted only after the database half has committed.
+- [ ] One failing registration does not abort the run; an unreachable Keycloak does not undo or mask
+  the committed local purge.
+- [ ] The sweep publishes `basetool_scheduled_job_*{task="rejected_registration_retention"}` and is
+  covered by `ScheduledJobStale`.
+
+**Enforced by:** `RejectedRegistrationRetentionServiceTest`, `RejectedRegistrationRetentionTaskTest`
+· **Code:** `RejectedRegistrationRetentionService`, `RejectedRegistrationRetentionTask`,
+`UserRepository.findRejectedDecidedBefore`, `ScheduledJob`, `application.yml` · **Decision:**
+[ADR-0178](../adr/0178-a-refused-registration-is-purged-on-a-retention-window.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
