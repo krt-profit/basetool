@@ -60,7 +60,7 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write    # push the :stable tag
+  packages: write    # push the :stable tag, and :testing when it would fall behind
   id-token: write    # cosign verify against Sigstore Fulcio
 
 env:
@@ -468,4 +468,188 @@ jobs:
             echo "| Source tag | \`${VERSION}\` |"
             echo "| Digest | \`${DIGEST}\` |"
             echo "| New tag | \`stable\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Keep `:testing` at or ahead of `:stable` (REQ-OPS-022).
+  #
+  # Testing exists to see a version BEFORE production does. It stopped doing that
+  # the moment a production promotion moved `:stable` past it: the two tags are
+  # flipped by two workflows that nobody was required to run in order, so testing
+  # could silently become the OLDER environment and every "verify it on testing
+  # first" instruction would quietly mean "verify an older build".
+  #
+  # A production promotion therefore carries testing along — but only when testing
+  # would otherwise fall behind. A testing tag deliberately placed AHEAD of
+  # production (the whole remaining purpose of `promote-testing.yml`) is left
+  # exactly where it is. After this job the invariant `testing >= stable` holds.
+  # ---------------------------------------------------------------------------
+  sync-testing:
+    name: Keep testing at or ahead of stable
+    needs: promote
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Serialised against `promote-testing.yml`, which uses this same group. The two
+    # used to be deliberately separate "because they touch disjoint tags" — that
+    # stopped being true here, and without this an operator promoting testing by
+    # hand and a production promotion could interleave their writes to `:testing`
+    # and leave the five modules on two different versions.
+    concurrency:
+      group: promote-testing
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout (full history — the decision is an ancestry question)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Decide whether testing is behind
+        id: decide
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/basetool-backend
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          # ONE decision for all five modules. They are built from a single commit
+          # in lock-step by release-images.yml and promoted in lock-step above, so
+          # asking five times could only surface a disagreement that would mean the
+          # promotion was already broken. `backend` is the arbitrary representative.
+          #
+          # The ordering signal is the SOURCE COMMIT, read from the image's
+          # `org.opencontainers.image.revision` label, and NOT the image's creation
+          # time. The two look equivalent and are not: the runbook's
+          # `workflow_dispatch` escape hatch rebuilds an OLD version, which gives old
+          # code a new timestamp — and a timestamp comparison would then march
+          # testing backwards while reporting success.
+          REV_JQ='[.[] | .config.Labels["org.opencontainers.image.revision"]] | map(select(. != null)) | unique | .[0] // ""'
+
+          revision_of() {
+            # Retried for the reason `Resolve source digest` above is: GHCR answers
+            # 403 for a read it cannot serve, so a blip is indistinguishable from a
+            # missing image. An empty result is returned rather than a failure — a
+            # genuinely absent `:testing` tag is an answer here, not an error.
+            ref="$1"
+            out=""
+            for attempt in 1 2 3; do
+              if out=$(docker buildx imagetools inspect "$ref" --format '{{json .Image}}' 2>/dev/null | jq -r "$REV_JQ"); then
+                if [ -n "$out" ]; then break; fi
+              fi
+              sleep $((attempt * 5))
+            done
+            printf '%s' "$out"
+          }
+
+          TESTING_REV="$(revision_of "${IMAGE}:testing")"
+          PROMOTED_REV="$(revision_of "${IMAGE}:${VERSION}")"
+
+          echo "testing revision : ${TESTING_REV:-<none>}"
+          echo "promoted revision: ${PROMOTED_REV:-<none>}"
+
+          # Fail-safe, and the DIRECTION of it is the point. Whenever the question
+          # cannot be answered, testing is left alone: moving it on a guess can only
+          # be wrong by destroying a deliberately-ahead testing state, which is the
+          # one thing this job must never do. An unanswerable question is reported.
+          if [ -z "$PROMOTED_REV" ]; then
+            echo "::warning::the promoted image carries no source-commit label, so testing cannot be compared and is left untouched"
+            echo "move=false" >> "$GITHUB_OUTPUT"
+            echo "reason=the promoted image carries no org.opencontainers.image.revision label" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "$TESTING_REV" ]; then
+            # No `:testing` tag at all, or one without the label. Nothing can be
+            # behind nothing, and the invariant is satisfied by setting it.
+            echo "move=true" >> "$GITHUB_OUTPUT"
+            echo "reason=testing carried no comparable image, so it is set to the promoted version" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! git cat-file -e "${TESTING_REV}^{commit}" 2>/dev/null; then
+            # The commit testing was built from is not in this repository's history:
+            # a squashed or deleted branch build, which is the exact shape of a
+            # deliberately experimental testing deployment.
+            echo "::warning::testing is built from ${TESTING_REV}, which is not in this repository's history; leaving it untouched"
+            echo "move=false" >> "$GITHUB_OUTPUT"
+            echo "reason=testing's source commit is not in this repository's history (a branch build?), so it cannot be shown to be behind" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # `--is-ancestor X X` is TRUE, so an identical revision takes this branch
+          # and the re-tag below is a no-op — which keeps the summary honest instead
+          # of adding a special case that has to be read twice.
+          if git merge-base --is-ancestor "$TESTING_REV" "$PROMOTED_REV"; then
+            echo "move=true" >> "$GITHUB_OUTPUT"
+            echo "reason=testing's commit is an ancestor of the promoted one, so testing was at or behind production" >> "$GITHUB_OUTPUT"
+          else
+            echo "move=false" >> "$GITHUB_OUTPUT"
+            echo "reason=testing is ahead of the promoted version and stays where it is" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Move testing to the promoted digests
+        if: steps.decide.outputs.move == 'true'
+        env:
+          REGISTRY_HOST: ${{ env.REGISTRY }}
+          OWNER: ${{ env.IMAGE_OWNER }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Every module is resolved FIRST, then written. Neither loop is atomic
+          # across five repositories — nothing in a registry is — but resolving up
+          # front means a missing or unreadable tag fails before any tag has moved,
+          # so the common failure leaves testing consistent rather than half-moved.
+          MODULES="backend frontend ingest config keycloak-spi"
+          declare -A DIGESTS
+
+          for module in $MODULES; do
+            image="${REGISTRY_HOST}/${OWNER}/basetool-${module}"
+            digest=""
+            for attempt in 1 2 3; do
+              if digest=$(docker buildx imagetools inspect "${image}:${VERSION}" --format '{{.Manifest.Digest}}'); then
+                if [ -n "$digest" ]; then break; fi
+              fi
+              echo "::warning::digest lookup attempt ${attempt} failed for ${image}:${VERSION}; retrying" >&2
+              sleep $((attempt * 10))
+            done
+            if [ -z "$digest" ]; then
+              echo "::error::could not resolve ${image}:${VERSION} after 3 attempts" >&2
+              exit 1
+            fi
+            DIGESTS[$module]="$digest"
+          done
+
+          for module in $MODULES; do
+            image="${REGISTRY_HOST}/${OWNER}/basetool-${module}"
+            docker buildx imagetools create \
+              --tag "${image}:testing" \
+              "${image}@${DIGESTS[$module]}"
+            echo "Promoted ${DIGESTS[$module]} -> ${image}:testing"
+          done
+
+      - name: Summarise
+        env:
+          MOVED: ${{ steps.decide.outputs.move }}
+          REASON: ${{ steps.decide.outputs.reason }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo "### Testing tag"
+            echo ""
+            if [ "$MOVED" = "true" ]; then
+              echo "Moved to \`${VERSION}\`, alongside \`stable\`."
+            else
+              echo "**Left untouched.**"
+            fi
+            echo ""
+            echo "${REASON}."
           } >> "$GITHUB_STEP_SUMMARY"
