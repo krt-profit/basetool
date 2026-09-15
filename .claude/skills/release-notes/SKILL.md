@@ -1,6 +1,6 @@
 ---
 name: release-notes
-description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes". When the user gives no start point at all, the skill automatically resumes from where the last release notes ended, using a local progress marker (.release-notes-state.json) kept in the shared git directory so it is shared across all worktrees and nobody has to remember the last covered point. The finished notes are delivered as a CKEditor-ready HTML fragment (h1/h2/p/ul/li/strong/em/a, href the only attribute), handed over as a rendered HTML file the user copies from the browser — a plain code block would paste into CKEditor as visible markup. The Markdown form is produced only when the user explicitly asks for it, e.g. for the wiki or a GitHub release.
+description: Use this skill to write user-facing release notes / "Was ist neu" / Änderungsübersicht / Patch Notes / Update-Ankündigung for the Profit Basetool app, starting from a given point in time (a date, a git tag like v0.3.40, a release, or a commit). It turns the technical German CHANGELOG.md and git history into friendly, non-technical release notes for the squadron's normal members, grouped into Neu / Verbesserungen / Fehlerbehebungen. As part of the same run it also tidies CHANGELOG.md itself: entries still sitting under `[Unreleased]` that have already shipped under a git tag (`vX.Y.Z`) are moved into that tag's own dated section. Trigger this whenever the user wants to communicate recent changes to end users — e.g. "schreib Release Notes seit v0.3.40", "was ist neu seit dem 15.05 für die Nutzer", "fasse die letzten Änderungen für die Mitglieder zusammen", "Update-Ankündigung für die letzten zwei Wochen" — even when they don't say the words "release notes". When the user gives no start point at all, the skill automatically resumes from where the last release notes ended, using a local progress marker (.release-notes-state.json) kept in the shared git directory so it is shared across all worktrees and nobody has to remember the last covered point. The finished notes are delivered as a CKEditor-ready HTML fragment for the KRT forum post (h2/h3/p/ul/li/strong/em/a, href the only attribute; headings start at h2 because CKEditor 5 offers no h1), handed over as a rendered HTML file the user copies from the browser — a plain code block would paste into CKEditor as visible markup. The Markdown form is produced only when the user explicitly asks for it, e.g. for the wiki or a GitHub release.
 user-invocable: true
 ---
 
@@ -13,7 +13,8 @@ Wort Code lesen und nicht wissen, was eine „Migration", ein „Endpoint" oder 
 repariert** — und was das für sie im Alltag bedeutet.
 
 Das Ergebnis ist ein fertiges **HTML-Fragment auf Deutsch**, das ohne Nacharbeit in
-den **CKEditor** der Ankündigungsseite wandert. Ausgeliefert wird es als
+den Beitrag im **KRT-Forum** (`das-kartell.org`, WoltLab Suite Core 6.2 mit CKEditor 5)
+wandert. Ausgeliefert wird es als
 **gerenderte HTML-Datei zum Kopieren** — nur eine gerenderte Seite legt formatierten
 Text in die Zwischenablage; ein reiner Codeblock landet im CKEditor als sichtbares
 Markup (siehe »Ausgabeformat → Übergabe an den Nutzer«). Markdown ist **nicht** mehr
@@ -262,17 +263,20 @@ Reine Token-Umbenennung — komplett raus:
 
 Liefere die Release Notes als **ein zusammenhängendes HTML-Fragment**, das ohne
 Nacharbeit in den **CKEditor** eingefügt werden kann (leere Abschnitte weglassen).
+Das Ziel ist konkret: der Beitrag im **KRT-Forum auf `das-kartell.org`**, das auf
+**WoltLab Suite Core 6.2** läuft und für Eingaben einen angepassten CKEditor 5
+verwendet.
 **Fragment heißt:** kein `<!DOCTYPE>`, kein `<html>`, `<head>` oder `<body>`, kein
 umschließendes `<div>` — das Dokument beginnt mit der Titel-Überschrift und endet
 mit dem letzten `</ul>`.
 
 **Der erste Block ist immer der Titel in genau dieser Form:**
 
-    <h1>Release Notes (TT.MM. → TT.MM.)</h1>
+    <h2>Release Notes (TT.MM. → TT.MM.)</h2>
 
 Das **linke** Datum ist der Startpunkt des Fensters, das **rechte** das Datum der
 letzten enthaltenen Änderung — beide im Format `TT.MM.` (mit Punkt am Ende), mit
-dem Pfeil „→" dazwischen. Beispiel: `<h1>Release Notes (31.05. → 02.06.)</h1>`. Das
+dem Pfeil „→" dazwischen. Beispiel: `<h2>Release Notes (31.05. → 02.06.)</h2>`. Das
 Hilfsskript gibt diese Zeile oben als `SUGGESTED TITLE` bereits fertig ausgezeichnet
 aus — übernimm sie wörtlich (nicht „01.06.-02.06." o. Ä., nicht ohne Pfeil, nicht
 mit Jahr).
@@ -289,9 +293,9 @@ Damit jede Release Note **immer gleich aussieht** und der CKEditor beim Einfüge
 nichts verwerfen muss, gelten diese Format-Vorgaben fest — nicht von Lauf zu Lauf
 abweichen:
 
-- **Erlaubt sind genau acht Tags:** `<h1>`, `<h2>`, `<p>`, `<ul>`, `<li>`,
-  `<strong>`, `<em>` — und `<a>`. Sonst nichts: kein `<div>`, `<span>`, `<br>`,
-  `<hr>`, `<table>`, `<img>`, `<blockquote>`, `<code>`, kein `<b>`/`<i>`. Der
+- **Erlaubt sind genau acht Tags:** `<h2>`, `<h3>`, `<p>`, `<ul>`, `<li>`,
+  `<strong>`, `<em>` — und `<a>`. Sonst nichts: kein `<h1>`, `<div>`, `<span>`,
+  `<br>`, `<hr>`, `<table>`, `<img>`, `<blockquote>`, `<code>`, kein `<b>`/`<i>`. Der
   CKEditor filtert beim Einfügen alles heraus, was seine Konfiguration nicht kennt —
   was hier nicht steht, geht dabei verloren oder landet als Fremdkörper im Text.
 - **Genau ein Attribut ist erlaubt: `href` an einem `<a>`.** Kein `class`, `id`,
@@ -301,13 +305,18 @@ abweichen:
   klicken". Das ist **kein** Widerspruch zu »keine internen Referenzen«: verboten
   bleiben PR-/Issue-Nummern, Dateinamen, Migrations-IDs und API-Pfade; ein Ziel,
   das der Nutzer selbst ansteuern soll, ist Handlungsbedarf und gehört genannt.
-- **Überschriften-Ebenen (die „Schriftgrößen"):** Genau **ein** `<h1>` — der Titel,
-  immer der erste Block. Jede Rubrik ist ein `<h2>`, mit exakt diesem Namen und in
-  dieser Reihenfolge: `<h2>Highlights</h2>`, `<h2>Neu</h2>`,
-  `<h2>Verbesserungen</h2>`, `<h2>Fehlerbehebungen</h2>` (Rubriknamen nie übersetzen
-  oder umbenennen). **Kein `<h3>` oder tiefer.** Eine lange Rubrik wird nicht über
-  weitere Überschriften untergliedert, sondern über die fett gesetzten Schlagwörter
-  der Punkte — so bleibt die Größenhierarchie in jeder Note identisch.
+- **Überschriften-Ebenen — und warum sie bei `<h2>` anfangen:** Genau **ein**
+  `<h2>` — der Titel, immer der erste Block. Jede Rubrik ist ein `<h3>`, mit exakt
+  diesem Namen und in dieser Reihenfolge: `<h3>Highlights</h3>`, `<h3>Neu</h3>`,
+  `<h3>Verbesserungen</h3>`, `<h3>Fehlerbehebungen</h3>` (Rubriknamen nie übersetzen
+  oder umbenennen). **Kein `<h1>`, kein `<h4>` oder tiefer.** Eine lange Rubrik wird
+  nicht über weitere Überschriften untergliedert, sondern über die fett gesetzten
+  Schlagwörter der Punkte — so bleibt die Größenhierarchie in jeder Note identisch.
+  Der Grund für den Start bei `<h2>`: CKEditor 5 bietet in seiner Überschriften-
+  Funktion **h2, h3 und h4** an (beschriftet als „Überschrift 1–3") und bewusst
+  **kein `<h1>`** — das gehört dem Seitentitel, im Forum also dem Titel des Themas.
+  Ein `<h1>` im Beitrag wäre demnach auch dort falsch, wo er überlebt; in der Regel
+  überlebt er nicht und landet als gewöhnlicher Absatz.
 - **Pflicht-Unterzeile (Version):** direkt unter dem Titel steht **immer** der Block
   `<p><em>Version <Version> · Stand <TT.MM.JJJJ></em></p>`. `<Version>` ist die
   aktuelle released Version (das neueste `vX.Y.Z`-Tag am Fenster-Ende), `Stand` das
@@ -315,7 +324,7 @@ abweichen:
   `SUGGESTED SUBTITLE`-Zeile des Hilfsskripts; nur wenn der Nutzer ein eigenes Label
   vorgibt, ersetzt dieses die Version. Niemals weglassen — nur falls das Repository
   noch gar kein Release-Tag hat, ausnahmsweise die geplante Version eintragen.
-- **Highlights = ein `<p>`-Absatz, keine Liste.** Unter `<h2>Highlights</h2>` steht
+- **Highlights = ein `<p>`-Absatz, keine Liste.** Unter `<h3>Highlights</h3>` steht
   **ein** `<p>` aus 1–3 ganzen Sätzen, der die größten Neuerungen nennt; die
   wichtigsten Bereiche darin in `<strong>`. Nur bei längeren Notes (Faustregel: ab
   etwa sechs Punkten insgesamt), bei kurzen Notes die ganze Rubrik weglassen.
@@ -343,24 +352,24 @@ abweichen:
   Schritt 5).
 
 ```html
-<h1>Release Notes (TT.MM. → TT.MM.)</h1>
+<h2>Release Notes (TT.MM. → TT.MM.)</h2>
 
 <p><em>Version v0.4.0 · Stand TT.MM.JJJJ</em></p>
 
-<h2>Highlights</h2>
+<h3>Highlights</h3>
 <p>Kurzer Fließtext-Absatz, keine Liste: 1–3 ganze Sätze zu den größten Neuerungen, die wichtigsten Bereiche <strong>fett</strong> — nur bei längeren Notes.</p>
 
-<h2>Neu</h2>
+<h3>Neu</h3>
 <ul>
 <li><strong>Funktion oder Bereich:</strong> Was jetzt möglich ist, in einfachen Worten.</li>
 </ul>
 
-<h2>Verbesserungen</h2>
+<h3>Verbesserungen</h3>
 <ul>
 <li><strong>Bereich:</strong> Was jetzt besser oder anders ist.</li>
 </ul>
 
-<h2>Fehlerbehebungen</h2>
+<h3>Fehlerbehebungen</h3>
 <ul>
 <li><strong>Bereich:</strong> Was wieder zuverlässig funktioniert.</li>
 </ul>
@@ -389,14 +398,17 @@ wurde. Liefere deshalb beides, in dieser Reihenfolge:
    Ergebnis heraus. Das ist die Ausweich-, nicht die Hauptroute: viele
    CKEditor-Installationen blenden den Knopf gar nicht ein.
 
-Weise kurz darauf hin, dass manche CKEditor-Konfigurationen keine „Überschrift 1"
-anbieten — landet der Titel dann als normaler Absatz, genügt ein Klick auf die
-oberste verfügbare Überschriftenebene.
+Im Forum erscheinen Titel und Rubriken damit als „Überschrift 1" und „Überschrift 2"
+des Editors — das ist so gewollt (siehe die Überschriften-Regel oben). Sollte eine
+Überschrift dennoch flach ankommen, ist die Überschriften-Konfiguration dieses
+CKEditors enger als angenommen: dann melden, nicht raten.
 
 Biete danach an, das Fragment zu speichern (z. B. unter `docs/`) oder in eine andere
 Form zu bringen. **Markdown fürs Wiki oder für einen GitHub-Release gibt es nur auf
 ausdrücklichen Wunsch** — dann gelten dieselben Regeln, nur mit `#` / `##` statt
-`<h1>` / `<h2>`, `- ` statt `<li>`, `**…**` statt `<strong>` und `_…_` statt `<em>`.
+`<h2>` / `<h3>`, `- ` statt `<li>`, `**…**` statt `<strong>` und `_…_` statt `<em>`.
+(In Markdown darf der Titel wieder `#` sein: die Ebenen-Absenkung ist eine Regel des
+Forums-Editors, nicht des Wikis.)
 Lege darüber hinaus keine Dateien an und poste nichts nach außen, wenn der Nutzer
 das nicht ausdrücklich will.
 
@@ -514,21 +526,21 @@ triffst du auch in Grenzfällen die richtige Entscheidung:
 - [ ] Startpunkt korrekt aufgelöst (Datum vs. Tag vs. Commit), Zeitfenster stimmt.
 - [ ] Nur nutzersichtbare Punkte; alle „Rendering unverändert"/intern-Einträge raus.
 - [ ] Kein Jargon mehr: keine Pfade, `V###`, Framework-Namen, HTTP-Codes, PR-Nummern.
-- [ ] Erster Block = `<h1>Release Notes (TT.MM. → TT.MM.)</h1>` mit korrektem Fenster.
+- [ ] Erster Block = `<h2>Release Notes (TT.MM. → TT.MM.)</h2>` mit korrektem Fenster.
 - [ ] Zweiter Block = Pflicht-Unterzeile `<p><em>Version <aktuelle released Version> · Stand <TT.MM.JJJJ></em></p>` (Wortlaut aus SUGGESTED SUBTITLE).
 - [ ] Drei Rubriken, Wichtigstes zuerst, verwandte Punkte gebündelt.
-- [ ] Einheitliches Format (verbindliche Stil- und Formatregeln): genau ein `<h1>`,
-      Rubriken als `<h2>` (kein `<h3>`+), Highlights als ein `<p>`, jeder Punkt als
+- [ ] Einheitliches Format (verbindliche Stil- und Formatregeln): genau ein `<h2>`,
+      Rubriken als `<h3>` (kein `<h1>`, kein `<h4>`+), Highlights als ein `<p>`, jeder Punkt als
       `<li><strong>Schlagwort:</strong> …</li>`; keine Trennlinien, Tabellen,
       Code-Auszeichnung oder Emojis.
-- [ ] CKEditor-tauglich: nur `h1 h2 p ul li strong em a`, als einziges Attribut
+- [ ] CKEditor-tauglich: nur `h2 h3 p ul li strong em a`, als einziges Attribut
       `href` an einem `<a>` (mit `https://`), kein Wrapper-Element, kein `<br>`;
       `&` als `&amp;` maskiert, Umlaute als echte Zeichen (keine Entities).
 - [ ] **Gerenderte HTML-Datei geliefert** (Doctype + `charset=utf-8`, Lesbarkeits-CSS
       nur auf `body`) samt dem Satz „im Browser öffnen, Strg+A, Strg+C, im CKEditor
       einfügen" — ein Codeblock allein reicht nicht, er landet als Markup.
 - [ ] Fragment zusätzlich als Codeblock mit der Sprachmarkierung `html` für die
-      Quelltext-Ansicht, plus der Hinweis zum H1-Fallstrick.
+      Quelltext-Ansicht.
 - [ ] Durchgängig unpersönlich (keine direkte Anrede „du"/„Sie").
 - [ ] **Kein einziges Emoji** — Überschriften und Punkte rein als Text.
 - [ ] Echte Umlaute (ä/ö/ü/ß, kein ue/oe/ae/ss), keine Mojibake aus den Quelldaten.

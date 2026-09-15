@@ -252,21 +252,22 @@ def ddmm(value: str) -> str:
 
 
 def suggested_title(log: str, since: str) -> str:
-    """Build the release-notes H1 ``<h1>Release Notes (DD.MM. -> DD.MM.)</h1>``.
+    """Build the release-notes title ``<h2>Release Notes (DD.MM. -> DD.MM.)</h2>``.
 
     The left date is the start the user asked for (the ``--since`` date itself when
     it is a date or date+time, otherwise the oldest change actually in range). The
     right date is the newest change in range -- i.e. the last thing the notes cover.
     The title stays date-only even when ``--since`` carries a time.
 
-    Returned wrapped in ``<h1>`` because the notes ship as CKEditor-ready HTML, so
-    the printed line can be pasted into the document as-is.
+    Returned wrapped in ``<h2>`` -- not ``<h1>`` -- because the notes ship as a post in
+    the WoltLab forum, whose CKEditor 5 offers h2/h3/h4 and no h1: that level belongs to
+    the thread title. The printed line can be pasted into the document as-is.
     """
     dates = sorted(line.split("\t")[1] for line in log.splitlines() if line.count("\t") >= 2)
     if not dates:
-        return "<h1>Release Notes</h1>"
+        return "<h2>Release Notes</h2>"
     left = ddmm(since) if as_git_date(since) is not None else ddmm(dates[0])
-    return f"<h1>Release Notes ({left} → {ddmm(dates[-1])})</h1>"
+    return f"<h2>Release Notes ({left} → {ddmm(dates[-1])})</h2>"
 
 
 def ddmmyyyy(value: str) -> str:
@@ -425,8 +426,9 @@ def main() -> None:
     elif log:
         print("SUGGESTED SUBTITLE: no release tag reachable at the window end -- use the "
               "planned next version, e.g. <p><em>Version vX.Y.Z · Stand DD.MM.YYYY</em></p>")
-    print("OUTPUT FORMAT: CKEditor-ready HTML fragment -- h1/h2/p/ul/li/strong/em only, "
-          "no attributes, no wrapper element. See SKILL.md 'Ausgabeformat'.")
+    print("OUTPUT FORMAT: CKEditor-ready HTML fragment for the WoltLab forum post -- "
+          "h2/h3/p/ul/li/strong/em/a only, href the only attribute, no wrapper element. "
+          "See SKILL.md 'Ausgabeformat'.")
     if resumed:
         print(f"RESUMED from local pointer {state.STATE_FILENAME}: {anchor_desc}")
     print("=" * 78)
