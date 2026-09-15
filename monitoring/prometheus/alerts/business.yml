@@ -330,13 +330,15 @@ groups:
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
-      # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
+      # blueprint back-fill had no staleness guard. The daily rejected-registration purge
+      # (REQ-SEC-057) joined them: a retention sweep that silently stops running is exactly the
+      # failure nobody notices from the outside, because its whole job is that nothing is left over. No absent() — the last-success gauge is registered
       # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
       # has not yet completed a run in this process) never publishes it and cannot report a false
       # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
         for: 10m
         labels:
           severity: warning

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Abgelehnte Registrierungen werden nicht mehr dauerhaft gespeichert.** Wurde eine Anmeldung von
+  einem Administrator abgelehnt, blieben Konto, Anmeldedaten und die Ablehnungsbegründung bisher
+  unbegrenzt liegen — im Tool gab es keinen Weg, sie zu entfernen. Sie werden jetzt 90 Tage nach der
+  Ablehnung automatisch und vollständig gelöscht; bis dahin lässt sich eine irrtümliche Ablehnung
+  weiterhin zurücknehmen (REQ-SEC-057).
+
+### Changed
+
+- **Ungelesene Benachrichtigungen werden jetzt ebenfalls gelöscht.** Die automatische Löschung
+  erfasste bisher nur gelesene Benachrichtigungen; ein Postfach, das niemand öffnete, behielt seine
+  Einträge dauerhaft. Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene
+  unverändert 90 Tage nach dem Lesen. Die Datenschutzerklärung nennt beide Fristen (REQ-NOTIF-009).
+
 ### Fixed
 
 - **Im Organigramm standen Gleichrangige untereinander statt nebeneinander.** Die Bereichskoordinatoren und Bereichsoperatoren eines Bereichs hängten in einer einzigen senkrechten Kette — der dritte Operator sah aus, als unterstünde er dem zweiten. Jeder Rang bekommt jetzt seine eigene Reihe: Koordinatoren nebeneinander, Operatoren nebeneinander darunter (REQ-ORG-018).

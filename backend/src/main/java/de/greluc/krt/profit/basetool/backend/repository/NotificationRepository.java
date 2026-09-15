@@ -121,6 +121,25 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   int deleteReadOlderThan(@Param("cutoff") Instant cutoff);
 
   /**
+   * Deletes <em>unread</em> notifications created before the cutoff; the second half of the
+   * scheduled retention sweep (REQ-NOTIF-009).
+   *
+   * <p>Anchored on {@code createdAt} rather than {@code readAt}, which is {@code null} precisely
+   * because the row was never read — so an unread notification's only age is how long ago it was
+   * raised. Without this statement the sweep reached read rows only, and an inbox nobody opens kept
+   * the triggering member's handle indefinitely: the retention promise made to members applied to
+   * the diligent and not to the absent. The window is deliberately longer than the read one (a
+   * notification still waiting to be seen is worth more than one already consumed), but it is
+   * finite.
+   *
+   * @param cutoff delete unread notifications created before this instant
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query("delete from Notification n where n.read = false and n.createdAt < :cutoff")
+  int deleteUnreadOlderThan(@Param("cutoff") Instant cutoff);
+
+  /**
    * Deletes the complete notification history of one recipient, read and unread alike, as part of
    * the hard account deletion (REQ-DATA-008). {@code recipient_user_id} is a loose reference with
    * no foreign key to {@code app_user} (V155 says so explicitly and defers row lifetime to

@@ -85,6 +85,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   List<User> findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus approvalStatus);
 
   /**
+   * Returns the ids of registrations rejected longer ago than {@code cutoff}, backing the scheduled
+   * rejected-registration retention sweep (REQ-SEC-057).
+   *
+   * <p>Anchored on {@code approvedAt} — the column {@code decide} stamps for both verdicts — rather
+   * than on {@code createdAt}: the retention clock starts when the decision was made, not when the
+   * person applied, so a registration that sat in the queue for months still gets its full window
+   * after being refused. {@code approvedAt} is non-null for every {@code REJECTED} row by
+   * construction, and {@code reopenRegistration} clears it when returning a row to {@code PENDING},
+   * so a reopened registration drops out of this result on both counts.
+   *
+   * <p>Returns ids rather than entities: each is purged in its own transaction by a caller that
+   * re-reads and re-checks the row, so hydrating a batch of {@link User} aggregates here would be
+   * work thrown away — and stale by the time it is used.
+   *
+   * @param cutoff return registrations rejected strictly before this instant
+   * @return the matching user ids, oldest rejection first
+   */
+  @Query(
+      "SELECT u.id FROM User u WHERE u.approvalStatus ="
+          + " de.greluc.krt.profit.basetool.backend.model.ApprovalStatus.REJECTED"
+          + " AND u.approvedAt IS NOT NULL AND u.approvedAt < :cutoff ORDER BY u.approvedAt ASC")
+  List<UUID> findRejectedDecidedBefore(@Param("cutoff") Instant cutoff);
+
+  /**
    * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective
    * name with username fallback, rank) ordered by display name. Used to populate user pickers
    * without pulling the full User aggregate.
