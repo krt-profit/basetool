@@ -2,19 +2,21 @@
 
 ## [Unreleased]
 
-### Fixed
+## [v1.8.5](https://github.com/krt-profit/basetool/releases/tag/v1.8.5) - 2026-09-15
 
-- **Der Footer zeigte nach einem Release die vorherige Versionsnummer.** Statt „v1.8.4" stand dort
-  „v1.8.3-9-g…" — die Zeichenkette wurde eingebacken, bevor der Release-Tag überhaupt existierte, und
-  das Image wird beim Taggen bewusst wiederverwendet statt neu gebaut. Die Version wird jetzt aus dem
-  Changelog des Release-Commits gelesen, wo sie zu diesem Zeitpunkt schon feststeht (REQ-OPS-021).
-  
 ### Changed
 
 - **Testing fällt nicht mehr hinter Produktion zurück.** Eine Promotion nach Produktion zieht das
   Testing-System jetzt mit, sofern es sonst älter wäre — steht dort schon eine neuere Version, bleibt
   sie stehen. Der Workflow „Promote to testing" wird damit nur noch gebraucht, um Testing bewusst
   **vor** Produktion zu bringen (REQ-OPS-022).
+
+### Fixed
+
+- **Der Footer zeigte nach einem Release die vorherige Versionsnummer.** Statt „v1.8.4" stand dort
+  „v1.8.3-9-g…" — die Zeichenkette wurde eingebacken, bevor der Release-Tag überhaupt existierte, und
+  das Image wird beim Taggen bewusst wiederverwendet statt neu gebaut. Die Version wird jetzt aus dem
+  Changelog des Release-Commits gelesen, wo sie zu diesem Zeitpunkt schon feststeht (REQ-OPS-021).
 
 ## [v1.8.4](https://github.com/krt-profit/basetool/releases/tag/v1.8.4) - 2026-09-15
 
