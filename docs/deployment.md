@@ -674,7 +674,6 @@ workflow (REQ-OPS-022). Nothing reaches it on a `main` merge either.
 > testing tag it cannot place in history (a squashed or deleted branch build) is
 > left alone and reported, never moved on a guess.
 
-
 ```bash
 gh workflow run promote-testing.yml -f version=sha-abc1234
 ```
