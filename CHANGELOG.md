@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Im Organigramm standen Gleichrangige untereinander statt nebeneinander.** Die Bereichskoordinatoren und Bereichsoperatoren eines Bereichs hängten in einer einzigen senkrechten Kette — der dritte Operator sah aus, als unterstünde er dem zweiten. Jeder Rang bekommt jetzt seine eigene Reihe: Koordinatoren nebeneinander, Operatoren nebeneinander darunter (REQ-ORG-018).
+
 - **Die Live-Aktualisierung baute ihre Verbindung alle 90 Sekunden neu auf.** Auf einer ruhigen Seite
   floss über die Live-Verbindung minutenlang nichts, und der Edge-Proxy trennte sie deshalb als
   untätig — jeder geöffnete Tab verband sich danach neu und lud im Hintergrund alle Abschnitte

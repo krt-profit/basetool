@@ -176,16 +176,25 @@
                         th:data-rank-label="#{orgChart.rank.AREA_LEAD}"
                         th:text="#{orgChart.add.areaLead}">Bereichsleiter zuweisen</button>
 
-                <!-- Stab: Bereichskoordinatoren then Bereichsoperatoren hang straight under the
-                     Bereichsleiter (the area level has no Commander) -->
-                <th:block th:each="n : ${area.coordinators()}">
-                    <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                </th:block>
-                <th:block th:each="n : ${area.operators()}">
-                    <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                </th:block>
+                <!-- Stab: one row per rank under the Bereichsleiter (the area level has no
+                     Commander) — Koordinatoren side by side, Operatoren as a second row beneath
+                     them. Kept identical to the Bereich tier's Stab in org-chart-node.html
+                     (`ocBereich`): the two render the same concept and must not drift into two
+                     different pictures of one organisation. -->
+                <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(area.coordinators())}">
+                    <li th:each="n : ${area.coordinators()}">
+                        <div class="oc-col">
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                        </div>
+                    </li>
+                </ul>
+                <ul class="oc-fan" role="group" th:if="${!#lists.isEmpty(area.operators())}">
+                    <li th:each="n : ${area.operators()}">
+                        <div class="oc-col">
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                        </div>
+                    </li>
+                </ul>
 
                 <!-- one button to add a Stab member (Koordinator/Operator; the modal picks the type) -->
                 <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"

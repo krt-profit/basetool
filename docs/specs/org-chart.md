@@ -129,9 +129,15 @@ an `aria-level` that matches its depth in that tier's reporting chain (within a 
 legacy tier: 1 = Bereichsleiter / Area Lead, 2 = Stab member / Staffel- or SK-unit box,
 3 = Staffel-/SK-Leiter, 4 = Kommandogruppe header / direct Ensign, 5 = Kommandoleiter,
 6 = Stv. Kommandoleiter / Ensign within a Kommando; within the OL tree: 1 = OL root box,
-2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). The OL members
-fan out **side by side** beneath the OL root box (a `role="group"` peer fan, the same horizontal
-grouping the Staffeln/SKs use under a Staffelleiter), not as a vertical spine. Parents are
+2 = OL member) and an `aria-label` of "rank, name" (or "rank, nicht besetzt"). **Equals are drawn
+as equals: every peer group fans out side by side, never as a vertical spine.** That covers the OL
+members beneath the OL root box, the Staffeln/SKs under a Staffelleiter, and a Bereich's Stab —
+which renders **one `role="group"` peer row per rank**, the Bereichskoordinatoren side by side and
+the Bereichsoperatoren as a second row beneath them. The two Stab ranks keep separate rows because
+they are peers *within* a rank, not across one; a rank with no holder draws no row at all, so an
+empty rank leaves no connector hanging and Operatoren without a Koordinator join straight to the
+Bereichsleiter. Chaining the Stab vertically was the original shape and it misread as a reporting
+line — the third Operator appeared to report to the second. Parents are
 `aria-expanded`; each Bereich additionally carries a collapse toggle that folds it to just its
 Bereichsleiter (flipping the toggle's + the Bereichsleiter's `aria-expanded` and hiding the Bereich
 body), and the keyboard nav skips the now-hidden treeitems.
