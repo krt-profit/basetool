@@ -159,6 +159,10 @@ public final class FrontendPageRoutes {
           // first sweep put it by reporting a route with no footer at all.
           "/admin/p4k-import",
           "/impressum",
+          // The Android App Link's fallback page (REQ-SEC-038), reached when the link did not
+          // resolve to the app. A real page with the app shell, and worth sweeping: the member who
+          // sees it is on a phone mid-login, which is exactly the class the touch sweep measures.
+          "/app/link-help",
           "/privacy",
           // The terms gate itself. Like `/pending-approval` it is measured with a session that has
           // already accepted, so it redirects and skips — and, like it, it is a page again on the
@@ -168,8 +172,8 @@ public final class FrontendPageRoutes {
           "/terms");
 
   /**
-   * Routes that are accounted for and are <b>not</b> pages: HTML fragments, JSON read models, and
-   * the notification SSE stream.
+   * Routes that are accounted for and are <b>not</b> pages: HTML fragments, JSON read models, the
+   * notification SSE stream, and one redirect.
    *
    * <p>They are enumerated rather than matched by a predicate so that {@link #PAGES} and this list
    * together have to cover everything the dispatcher routes. That totality is the gate: a new
@@ -182,6 +186,12 @@ public final class FrontendPageRoutes {
    */
   public static final List<String> NOT_PAGES =
       List.of(
+          // A redirect, and deliberately nothing else. `/app/callback` is the Android App Link
+          // (REQ-SEC-038); the browser only reaches it when the link did not resolve to the app,
+          // and it answers 303 to `/app/link-help` so the OAuth authorization code in the query
+          // leaves the address bar instead of being rendered into a page. Sweeping it as a page
+          // would measure the page it redirects to, twice, and say nothing about this route.
+          "/app/callback",
           // HTML fragments: a view name, rendered without the app shell, swapped into a page by
           // `krtFetch`. Indistinguishable from a page by return type, which is why neither list is
           // derived from one.

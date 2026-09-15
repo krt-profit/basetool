@@ -194,8 +194,19 @@ class ArchitectureTest {
         .isEmpty();
   }
 
+  /**
+   * The controllers that carry no {@code @PreAuthorize}, each because it must answer without a
+   * session.
+   *
+   * <p>{@code AppLinkController} is the Android App Link's web-side fallback (REQ-SEC-038). It is
+   * reached only when the link did not resolve to the app, which happens to a device whose domain
+   * verification is in the sticky failed state and to any desktop browser — in both cases the
+   * member is mid-login and may hold no session at all. A gate here would redirect into the OAuth2
+   * entry point, which is the loop the route exists to break.
+   */
   private static final Set<String> PUBLIC_BY_DESIGN =
       Set.of(
+          "AppLinkController",
           "AssetLinksController",
           "HomeController",
           "ImpressumController",
