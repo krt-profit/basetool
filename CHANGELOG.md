@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.6](https://github.com/krt-profit/basetool/releases/tag/v1.8.6) - 2026-09-15
+
 ### Fixed
 
 - **Im Organigramm standen Gleichrangige untereinander statt nebeneinander.** Die Bereichskoordinatoren und Bereichsoperatoren eines Bereichs hängten in einer einzigen senkrechten Kette — der dritte Operator sah aus, als unterstünde er dem zweiten. Jeder Rang bekommt jetzt seine eigene Reihe: Koordinatoren nebeneinander, Operatoren nebeneinander darunter (REQ-ORG-018).
