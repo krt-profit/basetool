@@ -51,9 +51,16 @@ class LiveSyncKeepaliveEdgeTimeoutParityTest {
   /** The edge's main nginx configuration, relative to the frontend module directory. */
   private static final Path EDGE_NGINX_CONF = Path.of("..", "docker", "edge", "nginx.conf");
 
-  /** Matches the http-level {@code proxy_read_timeout 90s;} directive and captures the seconds. */
+  /**
+   * Matches the http-level {@code proxy_read_timeout 90s;} directive and captures the seconds.
+   *
+   * <p>The digit run is bounded at nine — some 31 years, far above any timeout anyone would write —
+   * so the capture can never overflow {@link Long#parseLong(String)}. A longer run simply does not
+   * match, and the {@code find()} assertion below then fails saying the directive was not found,
+   * which is a better answer than a {@code NumberFormatException} stack trace.
+   */
   private static final Pattern PROXY_READ_TIMEOUT =
-      Pattern.compile("^\\s*proxy_read_timeout\\s+(\\d+)s\\s*;", Pattern.MULTILINE);
+      Pattern.compile("^\\s*proxy_read_timeout\\s+(\\d{1,9})s\\s*;", Pattern.MULTILINE);
 
   /**
    * The keepalive sweep must fire at least twice within the edge's idle-read window, so a socket
