@@ -22,9 +22,10 @@ either a missing contract or a missing paragraph in the privacy policy.
 - **Reaches:** everything, by the nature of hosting.
 - **Location:** Germany (EU) — no third-country transfer.
 - **Named in the privacy policy:** yes, with address, in the *External hosting* section.
-- **Processing agreement:** the privacy policy states one is in place. **Keep the executed copy
-  filed outside this repository** and note its date below when reviewing this document.
-- **Last confirmed:** _to be filled by the controller._
+- **Processing agreement:** in place — **data processing agreement dated 2026-07-20 with Hetzner as
+  the host of the virtual machine**. The executed copy is filed outside this repository; only its
+  existence and date are recorded here.
+- **Last confirmed:** 2026-09-15.
 
 ### Outbound e-mail relay
 
@@ -40,7 +41,10 @@ either a missing contract or a missing paragraph in the privacy policy.
   2. the relay named as a recipient in the privacy policy,
   3. the privacy policy's notification section corrected — it currently states that notifications are
      *not* dispatched by e-mail or to third parties, which is true only while the channel is off.
-- **Last confirmed inactive:** 2026-09-15.
+- **Last confirmed inactive:** 2026-09-15, by the controller. Activation is **not currently
+  planned**, which is why the privacy policy carries no e-mail section: writing one for a channel
+  that does not run would describe a processing that does not happen. The checklist above is what
+  turns that from an omission into a deferred decision.
 
 ---
 

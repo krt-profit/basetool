@@ -102,6 +102,10 @@ requires it and duplicating it into further files spreads personal data for no g
   personal data. Traces carry the path with ids reduced to placeholders and no account id
   (`ObservationPrivacyFilter`).
 - **Legal basis:** Art. 6(1)(f).
+- **Keycloak's own event store** (login and admin events) is a separate record from the log stream
+  above. The hardening runbook documents it as disabled with the enablement step carrying a 30-day
+  expiry; **whether it is enabled in production is to be verified on the host** and this entry
+  corrected accordingly (see the handover). If it is enabled, its expiry belongs in the table below.
 - **Retention:** see [Retention](#retention).
 
 ### A8 — Backups

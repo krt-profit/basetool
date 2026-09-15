@@ -12,6 +12,16 @@
 
 ### Changed
 
+- **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
+  nur Mitgliedern der Organisation gewährt, für die dasselbe Mindestalter gilt — bisher stand das
+  aber nirgends. Weil sich der Text der Bedingungen ändert, müssen alle Mitglieder ihnen einmalig
+  erneut zustimmen; bis dahin ruht auch die Desktop-Anwendung (REQ-SEC-028).
+
+- **Die Datenschutzerklärung erklärt jetzt, wie lange Daten in Sicherungskopien verbleiben.** Nach
+  einer Löschung sind die Daten bis zu etwa sechs Monate in verschlüsselten Sicherungen weiterhin
+  vorhanden, bis diese auslaufen. Das stand bisher nicht dort. Ergänzt wurde außerdem der Hinweis,
+  dass wissentlich keine Daten von Personen unter 18 Jahren verarbeitet werden.
+
 - **Ungelesene Benachrichtigungen werden jetzt ebenfalls gelöscht.** Die automatische Löschung
   erfasste bisher nur gelesene Benachrichtigungen; ein Postfach, das niemand öffnete, behielt seine
   Einträge dauerhaft. Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene
