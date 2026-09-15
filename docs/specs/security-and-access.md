@@ -2114,10 +2114,51 @@ to `anyRequest().authenticated()` and answered `302` into the OAuth entry point 
 `/sm/**` and `/**/*.map` entries beside it were added for.
 
 **Failure is silent and looks like a server fault.** Verification fails, Android declines to open
-the link in the app, the browser follows it instead, the frontend has no such route, and the member
-lands on the 404 page in the middle of signing in. Nothing in either build can see it: the app is
-correct, the server is correct, and only their agreement is missing. This shipped in the app's
+the link in the app, and the browser follows it instead. Nothing in either build can see it: the app
+is correct, the server is correct, and only their agreement is missing. This shipped in the app's
 v0.1.0 and was found by a member on a phone.
+
+**Serving the file correctly does not end that failure, and the frontend MUST carry a fallback
+route.** This paragraph used to say the member "lands on the 404 page", as though the 404 were
+purely a symptom of the file answering `302`. It is not. Verified on 2026-09-15 — the file answers
+`200` as `application/json` with zero redirects and the fingerprint matching both the app's README
+and `application.yml`, the prod manifest carries `autoVerify` on the right host and path — and
+requests still arrive at `/app/callback`. Two ways in survive a correct file, and **neither can be
+closed from the server**:
+
+- **A device whose domain verification already failed keeps that state.** On Android 12+ it is
+  sticky: the member has to re-enable the link by hand under *Einstellungen → Apps → Standardmäßig
+  öffnen*. Every phone that installed the app while the file still redirected is in that state.
+- **A desktop browser has no app to hand the link to at all.**
+
+Both appeared in one 24-hour window (5 requests, 3 distinct clients), so `/app/callback` is a route
+the frontend answers by design rather than by accident:
+
+|                  |                                                                               |
+|------------------|-------------------------------------------------------------------------------|
+| `/app/callback`  | `303` to `/app/link-help`, **anonymous**, and the query is dropped            |
+| `/app/link-help` | a page, **anonymous**, explaining what happened and how to re-enable the link |
+
+**The redirect is the security half, not a convenience.** The URL carries a live authorization
+code. Rendering a page at `/app/callback` leaves that code in the address bar, in the history entry
+and — the response being `Referrer-Policy: strict-origin-when-cross-origin` — in the `Referer` of
+every same-origin subresource the page pulls. A redirect leaves none of it: the intermediate URL
+does not become a history entry, and the page the member reaches has a clean address. The code is
+single-use and PKCE-bound, so what this prevents is exposure rather than an exploit, which is
+exactly the reasoning RFC 9700 applies to codes in URLs. It was not theoretical: on 2026-09-15 a
+`Google-Read-Aloud` fetch from `66.249.0.0/16` requested the full callback URL, code included,
+within one second of each attempt.
+
+**Anonymous, for two separate reasons.** The member is mid-login and may hold no session, so behind
+the authenticated catch-all the page would redirect into the OAuth2 entry point — the loop it
+exists to break. And the catch-all would put the callback URL into `HttpSessionRequestCache`, to be
+replayed by `SavedRequestAwareAuthenticationSuccessHandler` after the next login, landing the member
+back on a dead code.
+
+Both paths stay behind the pending-approval and consent gates (they are **not** in `PublicPaths`).
+The precedent is `/`: `permitAll` but still gate-eligible, because it is a page rather than a
+machine-fetched document. A member who owes consent is told that instead, and their login could not
+have completed anyway.
 
 **The digest list is a list, and that is load-bearing.** A signing-key rotation must publish the
 new digest **before** the rotated APK ships, while the old key is still installed on every device;
@@ -2125,10 +2166,26 @@ both must therefore be servable at once. Configuration:
 `app.android-app-link.sha256-cert-fingerprints`, overridable per environment. A rotation that
 replaces rather than appends breaks every installed copy for the length of the rollout.
 
+**Acceptance**
+
+- [x] `/.well-known/assetlinks.json` answers `200`, `application/json`, with no redirect, to a
+  caller with no session (`AssetLinksControllerTest`).
+- [x] The digests are published as an array, so a rotation can name two at once (same test).
+- [x] `/app/callback` answers `303` to `/app/link-help` anonymously, and the target carries no part
+  of the query (`AppLinkControllerTest`).
+- [x] `/app/link-help` renders anonymously and resolves every `appLink.*` key rather than printing
+  them (same test).
+- [x] Neither path can quietly lose its `permitAll`: the anonymous sweep asserts the redirect
+  target rather than skipping the route (`AnonymousSurfaceSweepMvcTest`), and the fallback page is
+  swept at every device class (`FrontendPageRoutes.PAGES`).
+
 **Code:** `frontend/…/controller/AssetLinksController.java`,
-`frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers).
+`frontend/…/controller/AppLinkController.java`,
+`frontend/…/config/AndroidAppLinkProperties.java`, `SecurityConfig` (anonymous matchers),
+`frontend/…/templates/app-link-help.html`.
 **Test:** `AssetLinksControllerTest` — asserts the three response conditions through the real
-security chain, and that the digests are an array.
+security chain, and that the digests are an array. `AppLinkControllerTest` — the fallback's redirect,
+its dropped query and the page behind it. `AnonymousSurfaceSweepMvcTest` — that both stay anonymous.
 
 ---
 

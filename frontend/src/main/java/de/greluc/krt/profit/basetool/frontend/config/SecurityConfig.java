@@ -248,6 +248,21 @@ public class SecurityConfig {
                         // two colours and the path of an icon already public under /logos/**.
                         // Pinned by AnonymousSurfaceSweepMvcTest's PUBLIC_RESOURCES entry.
                         "/manifest.webmanifest",
+                        // The Android App Link's web-side fallback and the page it redirects to
+                        // (REQ-SEC-038). Reached only when the link did NOT resolve to the app —
+                        // a device whose domain verification is in the sticky failed state, or a
+                        // desktop browser, which has no app to hand it to. Serving a correct
+                        // assetlinks.json does not remove either case.
+                        //
+                        // Anonymous for two separate reasons, and both are load-bearing. The
+                        // member is mid-login and may have no session at all, so behind the
+                        // catch-all this page would redirect into the OAuth2 entry point — the
+                        // very loop it exists to break. And the catch-all would put the callback
+                        // URL, authorization code and all, into HttpSessionRequestCache, to be
+                        // replayed by SavedRequestAwareAuthenticationSuccessHandler after the next
+                        // login — landing the member back on a dead code.
+                        "/app/callback",
+                        "/app/link-help",
                         // Browser-side asset paths that must never trigger an OAuth2 entry-point
                         // (and therefore must never land in HttpSessionRequestCache as a saved
                         // request). Background sourcemap lookups fired by DevTools and browser

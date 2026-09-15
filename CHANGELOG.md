@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- **Wenn die App-Anmeldung im Browser landete, kam eine 404-Seite mitten im Login.** Öffnet Android
+  den Anmelde-Rücksprung nicht in der App — etwa weil das Gerät die Verknüpfung vergessen hat, oder
+  weil man am Rechner sitzt — erklärt jetzt eine eigene Seite, was passiert ist, und führt Schritt
+  für Schritt zurück. Der Anmeldecode verschwindet dabei sofort aus der Adresszeile (REQ-SEC-038).
+
 - **Die Release-Notes nannten nur zwei der drei Container-Images.** Das Ingest-Image wird bei jedem
   Release mitgebaut, geprüft, signiert und veröffentlicht, fehlte aber in der automatisch erzeugten
   Liste — ebenso zwei der vier SBOM-Verzeichnisse. Beide Listen werden jetzt aus der Build-Matrix

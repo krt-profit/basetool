@@ -80,7 +80,26 @@ class AnonymousSurfaceSweepMvcTest {
    * this sweep can express. {@code SecurityConfigStaticAssetPermitAllTest} owns the asset paths and
    * their "must not redirect" contract, which is a different assertion from "must not serve data".
    */
-  private static final Set<String> PUBLIC_PAGES = Set.of("/", "/impressum", "/privacy", "/terms");
+  private static final Set<String> PUBLIC_PAGES =
+      Set.of("/", "/impressum", "/privacy", "/terms", "/app/link-help");
+
+  /**
+   * Public, and a redirect — so neither of the two sets above describes it.
+   *
+   * <p>{@code /app/callback} is the Android App Link's web-side fallback (REQ-SEC-038). It is
+   * reached only when the link did not resolve to the app, and it answers {@code 303} to {@link
+   * #APP_LINK_HELP} so the authorization code in the query leaves the address bar, the history
+   * entry and the {@code Referer} of the page that follows.
+   *
+   * <p>It needs its own branch rather than an entry in either set: the sweep's default expectation
+   * for a {@code 3xx} is the OAuth2 entry point, which this must never be — that redirect is the
+   * loop this path exists to break, and it would also put the callback URL into {@code
+   * HttpSessionRequestCache} to be replayed after the next login.
+   */
+  private static final String APP_LINK_CALLBACK = "/app/callback";
+
+  /** Where {@link #APP_LINK_CALLBACK} must send an anonymous caller. */
+  private static final String APP_LINK_HELP = "/app/link-help";
 
   /**
    * Public, but not a page — so the navigation shape does not apply to it.
@@ -242,6 +261,30 @@ class AnonymousSurfaceSweepMvcTest {
         }
         continue;
       }
+      if (APP_LINK_CALLBACK.equals(call.path())) {
+        // An ASSERTION, not a skip, for the same reason the PUBLIC_RESOURCES branch above is one:
+        // listing the path without checking it would remove it from the sweep, and the permitAll
+        // entry it depends on could then be deleted with every test still green.
+        String target =
+            mockMvc
+                .perform(
+                    MockMvcRequestBuilders.request(call.method(), call.path())
+                        .accept(MediaType.TEXT_HTML)
+                        .with(csrf()))
+                .andReturn()
+                .getResponse()
+                .getRedirectedUrl();
+        if (!APP_LINK_HELP.equals(target)) {
+          served.add(
+              call
+                  + " -> "
+                  + target
+                  + " (REQ-SEC-038: the App Link fallback must redirect anonymously to "
+                  + APP_LINK_HELP
+                  + ", never into the OAuth2 entry point and never with the query attached)");
+        }
+        continue;
+      }
       if (PUBLIC_PAGES.contains(call.path())) {
         // NOT through issue(): that reports a render failure as 200 so a template which threw
         // still counts as "served" for the refusal check below. Applied to a public page it turns
@@ -311,7 +354,12 @@ class AnonymousSurfaceSweepMvcTest {
     List<String> served = new ArrayList<>();
     for (Call call : allCalls()) {
       if (call.method() == HttpMethod.GET
-          && (PUBLIC_PAGES.contains(call.path()) || PUBLIC_RESOURCES.contains(call.path()))) {
+          && (PUBLIC_PAGES.contains(call.path())
+              || PUBLIC_RESOURCES.contains(call.path())
+              // Same exclusion, same reason: this one must NOT be refused either. That it
+              // redirects anonymously to the help page — and nowhere else — is asserted in
+              // navigationIsSentToTheLogin above, so it is covered once rather than nowhere.
+              || APP_LINK_CALLBACK.equals(call.path()))) {
         // A genuine exclusion here, unlike the one in `navigationIsSentToTheLogin` above: this test
         // asserts that a background call is REFUSED, and a public path is the one kind that must
         // not
