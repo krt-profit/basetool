@@ -599,6 +599,137 @@ class OrgChartPageRenderTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
+  void bereichStab_rendersOneRowPerRank_peersSideBySide() throws Exception {
+    // Given: a Bereich whose Stab holds one Koordinator and three Operatoren. Equals must read as
+    // equals: each rank fans out as its own horizontal row, the way the OL members and the
+    // Staffeln/SKs already do. They used to hang off one another in a single `.oc-v` spine, which
+    // drew the third Operator as reporting to the second.
+    BereichChartDto bereich =
+        bereichWithStab(
+            List.of(stabNode("BEREICHSKOORDINATOR", "Koordinator Eins")),
+            List.of(
+                stabNode("BEREICHSOPERATOR", "Operator Eins"),
+                stabNode("BEREICHSOPERATOR", "Operator Zwei"),
+                stabNode("BEREICHSOPERATOR", "Operator Drei")));
+
+    String html = renderChartWith(bereich);
+
+    assertThat(html).as("every Stab member rendered").contains("Koordinator Eins");
+    assertThat(html).contains("Operator Eins").contains("Operator Zwei").contains("Operator Drei");
+    assertThat(countOf(html, "class=\"oc-fan\" role=\"group\""))
+        .as("exactly two peer rows — one per Stab rank, Operatoren beneath Koordinatoren")
+        .isEqualTo(2);
+    assertThat(html)
+        .as(
+            "the Stab spine is gone: with no Staffel/SK and no Kommando in this fixture the Stab"
+                + " was the only `.oc-v` consumer, so any left would be a stacked peer")
+        .doesNotContain("class=\"oc-v\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bereichStab_withoutKoordinatoren_drawsNoEmptyRow() throws Exception {
+    // A Bereich may hold Operatoren and no Koordinator. The empty rank must draw no row at all —
+    // an unguarded `<ul class="oc-fan">` would emit its own drop from the Bereichsleiter and leave
+    // a connector hanging into nothing.
+    BereichChartDto bereich =
+        bereichWithStab(List.of(), List.of(stabNode("BEREICHSOPERATOR", "Operator Solo")));
+
+    String html = renderChartWith(bereich);
+
+    assertThat(html).as("the Operator still renders").contains("Operator Solo");
+    assertThat(countOf(html, "class=\"oc-fan\" role=\"group\""))
+        .as("only the Operatoren row — the empty Koordinatoren rank draws nothing")
+        .isEqualTo(1);
+  }
+
+  /**
+   * Builds a chart node for a Stab seat, account-held so it renders as an ordinary node rather than
+   * a free-text placeholder.
+   *
+   * @param positionType the chart position type ({@code BEREICHSKOORDINATOR} / {@code
+   *     BEREICHSOPERATOR}).
+   * @param name the holder's effective name, asserted on by the callers.
+   * @return the node.
+   */
+  private static OrgChartNodeDto stabNode(String positionType, String name) {
+    return new OrgChartNodeDto(
+        UUID.randomUUID(), positionType, UUID.randomUUID(), name, null, 0, 0L);
+  }
+
+  /**
+   * Builds a single PROFIT Bereich carrying the given Stab and nothing else — no Staffel, no SK, no
+   * Kommando. That emptiness is load-bearing for {@link
+   * #bereichStab_rendersOneRowPerRank_peersSideBySide()}: it leaves the Stab as the only possible
+   * source of a {@code .oc-v} connector in the rendered page.
+   *
+   * @param coordinators the Bereichskoordinatoren.
+   * @param operators the Bereichsoperatoren.
+   * @return the Bereich.
+   */
+  private static BereichChartDto bereichWithStab(
+      List<OrgChartNodeDto> coordinators, List<OrgChartNodeDto> operators) {
+    OrgChartNodeDto lead =
+        new OrgChartNodeDto(
+            UUID.randomUUID(), "BEREICHSLEITER", UUID.randomUUID(), "Area Boss", null, 0, 0L);
+    return new BereichChartDto(
+        UUID.randomUUID(),
+        "Profit-Bereich",
+        "PRF",
+        "PROFIT",
+        new AreaLeadershipDto(lead, List.of(), coordinators, operators),
+        List.of(),
+        List.of());
+  }
+
+  /**
+   * Renders {@code /org-chart} for a chart holding exactly {@code bereich} — no OL and an empty
+   * legacy area tier, so the Bereich subtree is the only thing on the page.
+   *
+   * @param bereich the single Bereich to render.
+   * @return the rendered HTML.
+   * @throws Exception if the request fails.
+   */
+  private String renderChartWith(BereichChartDto bereich) throws Exception {
+    when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
+        .thenReturn(
+            new OrgChartDto(
+                null,
+                List.of(bereich),
+                new AreaLeadershipDto(null, List.of(), List.of(), List.of()),
+                List.of(),
+                List.of()));
+    when(backendApiClient.get(eq("/api/v1/users/lookup"), anyTypeRef()))
+        .thenReturn(List.of(Map.of("id", UUID.randomUUID().toString(), "effectiveName", "Pilot")));
+    return mockMvc
+        .perform(get("/org-chart"))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  /**
+   * Counts non-overlapping occurrences of {@code needle} in {@code haystack} — the peer rows are
+   * asserted by count, because "rendered side by side" is a statement about how many rows exist,
+   * not about any one of them being present.
+   *
+   * @param haystack the rendered HTML.
+   * @param needle the literal to count.
+   * @return the number of occurrences.
+   */
+  private static int countOf(String haystack, String needle) {
+    int count = 0;
+    for (int i = haystack.indexOf(needle);
+        i >= 0;
+        i = haystack.indexOf(needle, i + needle.length())) {
+      count++;
+    }
+    return count;
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
   void olWithBereiche_admin_rendersConnectorFanSideBySide() throws Exception {
     // Given: an OL plus two Bereiche. The Bereiche must fan out side by side beneath the OL via the
     // oc-fan--bereiche connector (epic #692) — each its own collapsible Bereich subtree.

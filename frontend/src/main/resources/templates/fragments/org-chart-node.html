@@ -107,14 +107,30 @@
 
             <!-- Collapsible body: the Stab + the Bereich's Staffeln/SKs -->
             <div class="oc-bereich-body" th:id="'oc-bbody-' + ${b.orgUnitId()}">
-                <th:block th:each="n : ${b.leadership().coordinators()}">
-                    <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                </th:block>
-                <th:block th:each="n : ${b.leadership().operators()}">
-                    <div class="oc-v"></div>
-                    <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
-                </th:block>
+                <!-- Stab: one row per rank. The Koordinatoren fan out side by side, the Operatoren
+                     as a second row beneath them — the same horizontal peer grouping the OL members
+                     and the Staffeln/SKs already use. They used to hang off one another in a single
+                     vertical spine, which drew equals as a chain of command: the third Operator read
+                     as reporting to the second. The two ranks stay on separate rows because they are
+                     peers *within* a rank, not across one. Each fan draws its own drop from whatever
+                     sits above it, so a Bereich with no Koordinator connects its Operatoren straight
+                     to the Bereichsleiter and neither row leaves a stray connector when empty. -->
+                <ul class="oc-fan" role="group"
+                    th:if="${!#lists.isEmpty(b.leadership().coordinators())}">
+                    <li th:each="n : ${b.leadership().coordinators()}">
+                        <div class="oc-col">
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                        </div>
+                    </li>
+                </ul>
+                <ul class="oc-fan" role="group"
+                    th:if="${!#lists.isEmpty(b.leadership().operators())}">
+                    <li th:each="n : ${b.leadership().operators()}">
+                        <div class="oc-col">
+                            <th:block th:replace="~{fragments/org-chart-node :: ocNode(${n}, 2)}"></th:block>
+                        </div>
+                    </li>
+                </ul>
                 <button type="button" class="oc-add" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)"
                         data-trigger="oc-add" data-position-type="BEREICHSKOORDINATOR"
                         th:data-org-unit-id="${b.orgUnitId()}"
