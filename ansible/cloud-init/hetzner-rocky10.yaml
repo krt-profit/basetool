@@ -1,7 +1,7 @@
 #cloud-config
 # =====================================================================================
 # The ONLY thing cloud-init does for this deployment: make the machine reachable by
-# Ansible. Everything else is the role's (ADR-0186), and that boundary is the point.
+# Ansible. Everything else is the role's (ADR-0188), and that boundary is the point.
 #
 # The migration's safety argument is that the testing host and the production host come
 # out of the SAME procedure -- testing first, production afterwards, same role, same
@@ -11,6 +11,25 @@
 # what the sequence was supposed to guarantee.
 #
 # So: one user, two keys, sudo. Nothing else.
+#
+# NO HOSTNAME IS SET HERE, and that is a decision rather than an omission. Hetzner's datasource
+# supplies `local-hostname` from the server name, so the machine comes up named after the thing the
+# console calls it and the two cannot drift. Setting `hostname:` here would pin a second copy of
+# that name and they would diverge the first time the server is renamed.
+#
+# The trap, for anyone reusing this template on another platform (reported by the PVE operator
+# 2026-09-16, after it bit them): **RHEL-family images default to `prefer_fqdn_over_hostname: true`
+# and Debian does not.** On a datasource that provides no `local-hostname` -- Proxmox with
+# `cicustom` is one -- cloud-init can derive no FQDN, prefers it anyway, and the host comes up
+# called `localhost`. It boots, it serves, and nothing says so. A template that carries `hostname:`
+# alone is correct on Debian and wrong on Rocky for the same reason this one is silent: it depends
+# on what the datasource hands over. If this is ever used somewhere that hands over nothing, set
+# `fqdn:` AND `prefer_fqdn_over_hostname: false`, not `hostname:` on its own.
+#
+# Nothing in the role reads the hostname -- verified, not assumed: `ansible_hostname`,
+# `inventory_hostname`, `ansible_fqdn` and `ansible_nodename` have no hits across the role, the
+# playbook or ansible.cfg, and every host is addressed by IP. So a wrong name here is a cosmetic
+# defect and a confusing one, not a broken provisioning run.
 #
 # Paste into Hetzner's "Cloud config" field when creating the server. Check the two keys
 # against their fingerprints below before it is the only way in.
