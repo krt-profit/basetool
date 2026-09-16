@@ -349,6 +349,89 @@ Five things, each of which changes the files rather than being tuned afterwards:
 Questions 3 and 4 are measurements, and they are Phase 1's. Questions 1, 2 and 5 are decisions, and
 they belong to the same sitting.
 
+## 10. Container hardening — what is already there, and what the migration adds
+
+Measured across all twenty translated services on 2026-09-16, from the compose files rather than
+from impressions:
+
+|       Control       |                                  Coverage today                                  |
+|---------------------|----------------------------------------------------------------------------------|
+| `no-new-privileges` | **20 of 20**                                                                     |
+| `cap_drop: ALL`     | 19 of 20 — the exception is `node-exporter`, which becomes a host service anyway |
+| `pids` cap          | 20 of 20 (and the generator lost all of them once — see below)                   |
+| `oom_score_adj`     | the 9 monitoring containers, deliberately                                        |
+| `read_only`         | **1 of 20** — the edge, and nothing else                                         |
+| explicit `user:`    | the edge (101) and the three app modules (10001); elsewhere the entrypoint drops |
+
+So the posture is already strong on capabilities and privilege escalation, and the one wide-open
+surface is the **writable root filesystem**.
+
+### What rootless Podman adds for free
+
+Three things that are not configuration and cannot be forgotten:
+
+- **A user namespace.** Container root is a subuid on the host, not root. A container escape lands
+  on an unprivileged uid with no host presence rather than on uid 0.
+- **SELinux**, enforcing, in place of AppArmor — a second confinement layer under the namespace,
+  and the reason the bootstrap document gives it its own section.
+- **No daemon, and therefore no socket.** `socket-proxy` exists today only to hand two monitoring
+  components a GET-only view of a root-equivalent socket. Both it and the socket disappear.
+
+### `read_only` — measured, and honestly only indicative
+
+Fifteen of the images are public, so they were run on the CentOS Stream 10 host with `--read-only`
+to see which tolerate it.
+
+**Six start with no writable path whatsoever** — redis, prometheus, alertmanager,
+blackbox-exporter, redis-exporter and postgres-exporter. For those, `ReadOnly=true` is free.
+
+The others need one writable path each, and **in production they already have it**: `--read-only`
+makes the *image's* filesystem read-only and leaves mounted volumes writable, and loki, tempo,
+grafana and the databases all mount their data directory. Grafana confirmed the shape directly: it
+failed with no writable path and started once `/var/lib/grafana` was writable, which is exactly the
+mount it has in production.
+
+> [!warning] That experiment was indicative, not conclusive, and the difference matters
+> The containers were started **without their real volumes and configuration**, so a failure there
+> means "needed a writable path", not "cannot run read-only". The `postgres` row is a test defect
+> rather than a finding at all — it was run with `--version`, which exits immediately.
+>
+> Turning `read_only: true` on for a production container on this evidence is precisely the kind of
+> change that looks proven and breaks at an awkward hour. It is a **Phase 2 task**: bring each
+> service up read-only *with* its real mounts on the testing host, and let the conformance suite
+> say whether the stack still works. The measurement above says the task is worth doing and roughly
+> how much of it is free; it does not say it is done.
+
+### What is deliberately not changed
+
+`redis`, `db-backend` and `db-keycloak` add back `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID` and
+`SETUID` so their entrypoints can take ownership of the data directory and drop to the service user.
+The Ansible role now pre-owns those directories, so in principle the chown is a no-op and the
+capabilities could go — but "in principle" is not a reason to remove a capability an entrypoint
+asks for. It is a Phase 2 experiment on the testing host with an easy verdict: the container either
+starts or it does not.
+
+### 10.1 Two controls the generator lost, and the guard that now prevents a third
+
+Worth recording because the mistake is instructive rather than embarrassing.
+
+`PidsLimit` was missing from **all nineteen units**. The caps are real — edge 512, the JVMs and
+Keycloak 2048, acme 128, measured by reading `/sys/fs/cgroup` on production — but compose spells
+them under `deploy.resources.limits.pids`, and the generator read only `memory` and `cpus` there
+while checking the top-level `pids_limit` key this repository does not use. That cap is what
+stopped the 2026-07-12 native-thread-OOM, and `ContainerPidsHigh` measures against it.
+
+`oom_score_adj: 500` was missing from the nine monitoring containers. It makes the monitoring plane
+**more** attractive to the OOM killer than the application, so the kernel takes Grafana before the
+backend. Quadlet has no key for it; `podman run --oom-score-adj` does, and a positive adjustment is
+what an unprivileged process may set, so it survives rootless.
+
+The durable fix is neither of those two keys. The generator now carries an allow-list of the
+compose keys it understands and **refuses** on anything else — because a generator that drops what
+it does not recognise is worse than no generator, its output being indistinguishable from complete.
+Its own drift check cannot help here: that compares generated against generated. The allow-list
+found `oom_score_adj` on its first run, minutes after `pids` had been found by hand.
+
 ## 9. Acceptance
 
 The Phase 0 conformance suite, green against the host running these units — with
