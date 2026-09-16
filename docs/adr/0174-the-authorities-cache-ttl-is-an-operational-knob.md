@@ -113,4 +113,3 @@ key — so re-authentication picks up new authorities immediately and this bound
 - The next question about this path becomes measurable rather than reconstructible:
   `pg_stat_statements` is installed alongside (`REQ-DATA-016`, V240), because this whole analysis
   had to be inferred from table counters for want of it.
-

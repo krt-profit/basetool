@@ -297,4 +297,3 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
 - **STOMP/SockJS or a message broker for the client channel.** Rejected as in ADR-0031: the
   hand-rolled frame protocol is tiny, shipped and hardened; a broker adds dependency and
   operational surface without changing any bound that matters at 200 concurrent users.
-

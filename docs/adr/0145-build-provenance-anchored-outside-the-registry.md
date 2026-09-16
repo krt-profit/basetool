@@ -128,4 +128,3 @@ host gate is not the gap this ADR found.
   exposed to, and there is no reason to walk into it now.
 - **Teach `deploy.sh` to verify GitHub attestations.** Rejected on REQ-OPS-001: it puts a GitHub
   credential on the production host in order to improve a check the host already performs.
-

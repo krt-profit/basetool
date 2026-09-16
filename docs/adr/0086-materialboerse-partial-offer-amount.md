@@ -95,4 +95,3 @@ only a part of it. This **amends ADR-0082 decision D1**: material and quality st
   back; `availableAmount` is owner-only.
 - **A separate "edit amount" endpoint/event.** Rejected — the offered amount rides the existing
   owner-only edit and its audit event; a second surface would duplicate the optimistic-lock plumbing.
-

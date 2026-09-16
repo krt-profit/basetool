@@ -175,4 +175,3 @@ migration ever happens. Phases 4–6 only pay off with a trigger.
   answer depends on what caused it.
 - Should Phase 6's per-page entry bundles be one bundle per Thymeleaf page or a shared core plus
   page chunks? Depends on measured cache behaviour at that point, not on principle.
-

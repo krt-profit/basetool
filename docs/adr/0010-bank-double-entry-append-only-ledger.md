@@ -85,4 +85,3 @@ We will model the ledger as **append-only double-entry**:
   a problem the relational ledger already solves; no replay consumer exists.
 - **Hard reset on wipe (truncate ledger)** — rejected: violates the explicit
   requirement that history and audit trail survive a wipe (REQ-BANK-013).
-

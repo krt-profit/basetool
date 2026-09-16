@@ -116,4 +116,3 @@ We will:
   user's org units — dropped as ambiguous and noisy; (c) reusing the holder concept — wrong, the
   custodian and the external party are distinct; (d) a mandatory counterparty — dropped to avoid
   breaking internal corrections and to keep the common quick-booking flow light.
-

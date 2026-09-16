@@ -68,4 +68,3 @@ a data-driven view. It cannot loop — the fresh document the reload produces fi
 - **Targeted fragment re-render on `pageshow`** — would honour the no-reload spirit, but the restored
   document is an arbitrary page with no single swap target; it would mean a fragment endpoint and a
   bespoke restore handler per page, re-rendering the whole page anyway. Disproportionate. Rejected.
-

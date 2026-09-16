@@ -87,4 +87,3 @@ ever routed back to themselves.
   flag**. They are cleared the normal way (holder grants approval, or the bank employee ticks the
   checkbox); no backfill migration is run, since the snapshot is an audit record of the rule that
   applied when the request was raised.
-

@@ -36,4 +36,3 @@ Nach jedem Wechsel zeigt `#status-select` den persistierten Status. Der terminal
 - **AJAX + Reload:** Bei Erfolg lädt der Client nach ~1 s selbst neu (frischer `@Version`). Der Test navigiert stattdessen explizit nach jedem POST-Settle neu — so liest der nächste Wechsel einen aktuellen Stand und es gibt keinen Stale-Version-409. Auf den `…/status`-POST wird per `waitForResponse` gewartet.
 - **Terminal vs. nicht-terminal:** Nur `COMPLETED`/`REJECTED` öffnen das Warn-Modal (sie trennen Inventar — irreversibel); `IN_PROGRESS` postet direkt.
 - **Gating:** `#status-select` ist `hasRole('LOGISTICIAN')`-gegatet; ein einfaches Mitglied sieht nur den statischen Status-Badge (kein Dropdown). Das Frontend-Gate ist `isAuthenticated()`, das Backend-Gate `hasRole('LOGISTICIAN')`.
-

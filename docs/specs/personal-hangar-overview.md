@@ -99,4 +99,3 @@ audit item 10), #772 (orders/refinery pagination).
   reflects the filtered match count, while the home-location/delete-all actions still operate on the
   caller's whole fleet. Accepted as a minor display nuance — these global affordances are normally
   used without a filter, and the delete-all confirmation shows no count.
-

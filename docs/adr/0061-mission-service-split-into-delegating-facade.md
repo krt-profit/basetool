@@ -74,4 +74,3 @@ policy constant — a benign compile-time static read, left on the facade as a m
   reads as an orchestration facade rather than a god-class.
 - **Future slices** (frequencies, owner) can extract the same way if the facade grows again; the pattern
   and the shared guard are in place.
-

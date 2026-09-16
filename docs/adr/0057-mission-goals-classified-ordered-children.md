@@ -98,4 +98,3 @@ presence-socket live-sync stack (ADR-0044), so the goals reuse them rather than 
   fine-grained-locking invariant.
 - **A shared `done`/achieved flag per goal (like Ablauf).** Rejected for now: a goal is a scope statement,
   not a checklist item; the owner modelled goals purely by classification. Deferred, not foreclosed.
-

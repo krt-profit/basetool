@@ -109,4 +109,3 @@ let each peer re-render the affected section through the mechanism it already us
   appears.
 - **Short-interval polling of the mission.** Rejected: wasteful (most missions are idle), laggy, and
   multiplies backend load per open tab — the presence socket already gives us push for free.
-

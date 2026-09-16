@@ -815,4 +815,3 @@ lower-severity ones were folded in after a manual check. What the review changed
   machine identifier), a fourteenth "unannotated" handler (`updateParticipantAjax` is in the list),
   treating `OrgUnitController:77` as stale (it is live and closed at both layers), moving the
   redirect probe to the second hop, and re-listing carve-outs the plan already deletes.
-

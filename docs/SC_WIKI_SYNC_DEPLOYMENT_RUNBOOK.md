@@ -1472,4 +1472,3 @@ item before approving the deploy.
   match.
 - [ ] On-call rotation knows the rollback playbook for this phase
   (link the §X.5 subsection in the Slack / e-mail notification).
-

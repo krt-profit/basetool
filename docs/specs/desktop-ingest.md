@@ -672,4 +672,3 @@ None outstanding — epic #639 has shipped. The two questions from the decision 
 resolved during implementation: the blueprint-preview forwarding shape in #642 (the gateway
 forwards, it does not reshape the contract, ADR-0008) and the hostname / NPM proxy entry + CI
 deployment shape in #643.
-

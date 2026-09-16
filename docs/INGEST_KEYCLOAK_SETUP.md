@@ -605,4 +605,3 @@ is the defect being fixed, and those installs must update.
   ADR-0019 amendment #4).
 - [ ] No client secret, refresh token, or user name/email is written to any config file or
   log (project-wide logging rule).
-

@@ -39,4 +39,3 @@ Der User öffnet die Einsatz-Detailseite `/missions/{id}` und darin im Finanz-Pa
 - **Teilnehmer ist Pflicht:** Das Finanz-Modal erzwingt eine Teilnehmer-Auswahl. Ohne geseedeten Teilnehmer hat das `required`-`<select>` nur den deaktivierten Platzhalter und der Browser blockiert den Submit stumm — daher der externer Teilnehmer als Vorbedingung.
 - **Ganzzahlige Beträge:** Das Eingabefeld ist `step="1"` + `@WholeNumber`; die HALF_UP-Rundung ist hier ein No-op (fraktionale Rundung deckt der Unit-Test ab). Das `data-amount` trägt den blanken Integer (keine Tausender-Trennung), die Tabellenzelle dagegen den gruppierten Wert.
 - **Status über `navigate`:** `E2eSupport.navigate` gibt die `Response` der erfolgreichen Navigation zurück, sodass der Test den 200 direkt prüft; der WebKit-Abbruch-Retry der Methode bleibt dabei erhalten.
-

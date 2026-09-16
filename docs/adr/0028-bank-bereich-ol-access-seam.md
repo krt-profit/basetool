@@ -101,4 +101,3 @@ Consequence: zero bank-domain change again — the new predicate lives in `Owner
 non-`Bank*` class, already the seam's collaborator) and the seam consumes it; `BankSecurityService`,
 the ledger and the grant model stay org-unit-blind. The asymmetry from the base decision holds: the
 special-account view, like the subordinate drill-down, is view-only.
-

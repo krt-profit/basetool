@@ -39,4 +39,3 @@ Die ausstehende Menge sinkt pro Übergabe um die gelieferte Stückzahl; nach vol
 - **Item-Edit nur vor der ersten Übergabe:** `viewEditItemForm` blockt, sobald `itemHandovers` nicht leer ist (Phase 3) — die Zeilen sind dann gefroren.
 - **Item-Picker = Such-Combobox:** `krtSearchableSelect` lädt die Optionen per Live-Suche (`/orders/item-search`); der Test öffnet die Combobox, nimmt die erste Option und wartet, bis Blueprint + Derivation die Qualitätssteuerung gerendert haben. Eine Mengenänderung löst eine Re-Derivation aus, auf die erneut gewartet wird.
 - **Übergabezeit:** Datum/Zeit-Split-Felder (`#item-handover-modal .date-part` / `.time-part`) syncen in das versteckte `#itemHandoverTime` (UTC-ISO); Vergangenheit ist hier erlaubt.
-

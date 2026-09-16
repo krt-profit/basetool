@@ -58,4 +58,3 @@ and `ORGANISATIONSLEITUNG`, plus a **nullable self-referential `parent_org_unit_
 - **Bereich as a free-form tag/attribute** (as the bank's `AREA.areaName` is today) — rejected: a tag
   cannot own aggregates (ADR-0027) or anchor a cascade; the free-form `areaName` is exactly the
   cardinality/typo weakness ADR-0028 removes.
-

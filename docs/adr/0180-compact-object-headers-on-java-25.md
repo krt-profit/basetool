@@ -140,4 +140,3 @@ on the AppCDS training run of every image in the same change.**
   when run bare. Rejected: a command-line flag beats `JAVA_TOOL_OPTIONS`, so it would remove the
   operator's rollback lever and turn a flag flip into an image rebuild — and it would split JVM
   decisions across two surfaces, when REQ-OPS-028 just finished collecting them in one.
-

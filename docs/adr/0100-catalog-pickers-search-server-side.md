@@ -76,4 +76,3 @@ pickers — and **no complete-list endpoint carries a silent cap**.
 - **Threshold auto-switch (local below N, remote above)** — rejected: permanent dual-mode
   complexity in every template, JS call site and test for a latency win of one debounced fetch;
   the item/user pickers set the single-mode precedent.
-

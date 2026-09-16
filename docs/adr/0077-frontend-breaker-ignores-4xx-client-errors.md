@@ -72,4 +72,3 @@ where `BackendApiClient.handleWebClientException` renders the proper per-call us
   frontend: a sustained 5xx genuinely signals backend ill-health, where shedding load via the
   breaker is protective; keeping 5xx as a breaker signal preserves that guard. The ingest gateway
   serves a single trusted extractor, so it can afford the stricter transport-only rule.
-

@@ -71,4 +71,3 @@ constants in this slice; the broad `@Size` rollout is incremental.
 - Frontend request mirrors that mirror a collapsed pair (only `MaterialExternalAlias`) collapse to
   one record too, kept in lockstep by the cross-module DTO contract test (S9, #915).
 - Future write DTOs and the remaining naming outliers migrate onto this convention per feature slice.
-

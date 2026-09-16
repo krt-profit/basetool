@@ -89,4 +89,3 @@ already exists — Keycloak realm roles sync into `user_roles` on every login
 - **Keep holder rebooking per-account (the status-quo intra-account rebook)** — rejected:
   superseded by the global holder ledger (ADR-0039); custody is no longer per-account, so a
   single global Umbuchung replaces it.
-

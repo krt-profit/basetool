@@ -66,4 +66,3 @@ An **external** auth-server outage is deliberately not one of them.
   behaviour: an auth-server outage should degrade logins, not cycle the app containers.
 - `application-test.yml` on both modules already excluded `keycloak`/`ssl` from readiness, so tests
   are unaffected by this change.
-

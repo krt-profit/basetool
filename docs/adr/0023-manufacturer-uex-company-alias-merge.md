@@ -74,4 +74,3 @@ keep their own row".
 - **Drop `external_uuid`/`uex_company_id` uniqueness and resolve purely by name** — rejected:
   `uex_company_id` and the cross-source UUID keys are load-bearing identity (the §3.6 invariant, the
   SC Wiki / P4K join); names are the least stable signal.
-

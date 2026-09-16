@@ -183,4 +183,3 @@ protective); a per-member release flag (rejected by the owner — every member m
 - **A bespoke long-lived personal access token.** Rejected: Keycloak has no native PAT;
   building one means a custom long-lived-secret store with its own revocation and rotation
   machinery — strictly more attack surface than a rotating refresh token in the OS keystore.
-

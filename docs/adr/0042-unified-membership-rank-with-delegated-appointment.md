@@ -68,4 +68,3 @@ visibility / booking-request permissions, in a later session.
   cardinality and optimistic locking that other features can reference.
 - **Promote the org chart to grant rights** — rejected: breaks the ArchUnit-pinned grant-nothing
   invariant and would rewire the security cascade onto a descriptive surface.
-

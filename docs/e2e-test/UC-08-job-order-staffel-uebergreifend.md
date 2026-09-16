@@ -40,4 +40,3 @@ Staffel A braucht Material, das Staffel B liefern soll.
 - **Zwei OrgUnit-Referenzen:** `responsible_org_unit_id` (die **bearbeitende** Einheit — muss profit-eligible sein, steuert die Sichtbarkeit) vs. `requesting_org_unit_id` (Auftraggeber, editierbar — akzeptiert jede aktive OrgUnit). Das frühere `creating_org_unit_id` ist entfallen.
 - **Profit-Eligibility-Pflicht:** `POST /api/v1/orders` verlangt ein `responsibleOrgUnitId`, das auf eine profit-eligible Einheit auflöst (sonst 400). Der Stack-Bootstrap schaltet IRIDIUM einmalig profit-eligible — siehe UC-06/Seeder.
 - **Split-Repository** ist der Kern der Isolation: ungegated im Auftrags-Kontext, gegated in der Lager-View.
-

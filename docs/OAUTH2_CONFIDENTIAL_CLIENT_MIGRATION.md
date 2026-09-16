@@ -411,4 +411,3 @@ dann den Operator-Runbook-Block.
 - [`README.md`](README.md) — Sektion "Running the Local Test Stack" / Env-Vars.
 - [`CHANGELOG.md`](CHANGELOG.md) — Audit-Findings 2026-05-20, `### Security`-Block.
 - [`frontend/src/main/resources/application.yml`](frontend/src/main/resources/application.yml) — Ausgangs-Konfiguration.
-

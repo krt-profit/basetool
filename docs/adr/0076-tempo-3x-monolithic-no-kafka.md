@@ -129,4 +129,3 @@ span-metrics-as-non-goal stance:
 status (a failed DB/outbound span that didn't surface as 5xx) — but that broader view stays visible in
 the **Error traces** Tempo table. `local-blocks` remains the option if per-span-level RED
 (DB/outbound/ad-hoc grouping, client-perceived latency) is ever wanted, at the documented memory cost.
-

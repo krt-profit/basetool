@@ -100,4 +100,3 @@ accounts and the blueprint-availability overview, while the new **own-level** co
 - **Contextual authority at the Bereich id + parent-walk at evaluation time** — rejected for v1: adds a
   DB read per `hasRoleInOrgUnit` call and breaks its current pure value-equality match; pre-expanded
   authorities keep the gate cheap.
-

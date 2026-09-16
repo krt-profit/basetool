@@ -36,4 +36,3 @@ Der Browser ruft den Spring-OAuth2-Login-Einstieg `/oauth2/authorization/keycloa
 - Die Browser-Session trägt **kein Bearer-Token**; Token-Injection brächte nichts — es muss einmal echt durch die UI eingeloggt werden.
 - Der Flow zeichnet einen Playwright-Trace nach `build/e2e/trace.zip` auf (`npx playwright show-trace build/e2e/trace.zip`).
 - `storageState` wird **nicht** über Testklassen hinweg memoisiert — jede Klasse loggt frisch ein (Isolation; Cross-Class-Session-Sharing verursachte sonst nicht-deterministische Fehlschläge).
-

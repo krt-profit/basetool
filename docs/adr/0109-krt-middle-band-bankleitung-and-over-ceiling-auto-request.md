@@ -78,4 +78,3 @@ The two hard bank invariants are unchanged: `bankClassesMustNotConsultOrgUnitSco
   the one seam.
 - Out of scope (unchanged from ADR-0066): cumulative/period budgets, per-approver quotas, configurable
   approver graphs, and carrying holder/Empfänger onto an auto-filed request.
-

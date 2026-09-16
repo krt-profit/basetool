@@ -954,4 +954,3 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    one `@PreAuthorize`; Staffel-scoped services must inject `OwnerScopeService` /
    `AuthHelperService`; controllers never return JPA entities. A
    new violation breaks the build (`./gradlew test`).
-

@@ -86,4 +86,3 @@ surfaces; whoever touches such a surface converts it.
   client-side-filtered admin catalogue breaks its filter. The right remedy is surface-dependent.
 - **Raise the single-request bound (e.g. `size=100000`)** — rejected: moves the cliff instead of
   removing it, still lies past the new bound, and worsens single-response latency/memory.
-

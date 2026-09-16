@@ -79,4 +79,3 @@ separate artifact.
 - **Build the JAR multi-arch inside the Dockerfile** (Gradle per platform) — rejected: the JAR is
   architecture-independent bytecode, so per-arch compilation (emulated under QEMU for the non-native
   arch) is pure waste. Build once natively, package the identical layer.
-
