@@ -230,7 +230,7 @@ Every answer below was established on 2026-09-16 from vendor documentation and f
 inspection of both hosts. Nothing here is recalled, and nothing is inferred from another
 deployment's result. Where a question still needs an experiment, it says so.
 
-### 3.1 Does the edge see the client's source address? — **NO. This rejects ADR-0163 as written.**
+### 3.1 Does the edge see the client's source address? — **NO, and it is now measured.**
 
 The plan asked the wrong question, and asking it correctly answers it without a host.
 
@@ -277,6 +277,58 @@ for pesto): **no current Debian or Ubuntu stable release ships a Podman that can
 newest Podman is 6.1.2, released 2026-09-16; 6.0.0 landed on 2026-06-24, after Debian 13 froze. The
 `podman` column was re-verified on the testing host itself with `apt-cache policy` — trixie/main
 offers 5.4.2 and **trixie-backports carries no podman at all**, only the newer passt.
+
+#### Measured on a host, 2026-09-16 — and it was right to measure it
+
+Everything above is documentation. The PVE operator challenged the premise, correctly, on the
+grounds that a distribution change for the whole stack should not rest on an unmeasured claim —
+and offered a counter-measurement: rootless Podman 5.4.2 on Debian 13, in production for four
+days, preserving the real client address.
+
+**Their measurement is sound, and it does not contradict this one.** Their container is on the
+**pasta default network**; the edge here is on user-defined bridges. They said so themselves. The
+two facts sit side by side, and the experiment they proposed settles it in a quarter of an hour.
+
+It was run on the Debian 13 testing guest with `podman 5.4.2` freshly installed: two containers of
+the **same image** (`nginxinc/nginx-unprivileged:1.31.5-alpine`), started in the same minute,
+probed from the **same client** in the same second — one attached to a user-defined bridge, one on
+the pasta default.
+
+|               Network mode                | Published port |   What the container logged as the client    |
+|-------------------------------------------|----------------|----------------------------------------------|
+| `--network srctest` (user-defined bridge) | `18080:8080`   | **`10.89.0.2`** — the rootlessport forwarder |
+| default (pasta)                           | `18081:8080`   | **`10.1.0.30`** — the real client address    |
+
+One variable, two answers. The finding is no longer documentary.
+
+> [!quote] Debian 13's own `containers.conf(5)`, shipped with podman 5.4.2, states it outright
+>
+> ```
+> port_handler=rootlesskit: Use rootlesskit for port forwarding. Default.
+> Note: Rootlesskit changes the source IP address of incoming packets to a IP address in
+> the container network namespace, usually 10.0.2.100. If your application requires the
+> real source IP address, e.g. web server logs, use the slirp4netns port handler. The
+> rootlesskit port handler is also used for rootless containers when connected to
+> user-defined networks.
+> ```
+>
+> The last sentence is the whole finding, in the shipped documentation of the very version
+> under discussion.
+
+The slirp4netns escape that sentence points at is not available to a bridge-networked container,
+and podman refuses the combination rather than silently ignoring it:
+
+```
+Error: can only set extra network names, selected mode slirp4netns conflicts with bridge
+```
+
+`rootless_port_forwarder` matches **zero** times in that man page, and `port_handler` matches twice
+— both in the slirp4netns section. So on the version Debian 13 ships there is no knob for this at
+all, which is what Podman 6.0's release notes describe adding.
+
+Four independent lines now agree: the shipped man page, the live measurement, podman's own refusal
+of the workaround, and the upstream release notes. The testing guest was left as it was found —
+the two containers and the test network removed, the nine-container Docker stack untouched.
 
 #### What it costs here, specifically
 
@@ -325,9 +377,9 @@ It does not say rootless Podman cannot do this. It says **the version Debian 13 
 that ADR-0163's choice 2 ("the distribution's own Podman, no third-party repository") is what
 makes choice 1 fail. The paths out are in §7 and the choice between them belongs to @greluc.
 
-It also does not close the *empirical* half. Once a platform is chosen, the behaviour is still
-measured before anything is built on it — the documentation says what is supposed to happen, and
-this project's own history is a list of things that were supposed to happen.
+The *empirical* half is closed as of 2026-09-16 — see the measurement above. The documentation
+said what was supposed to happen, and this project's own history is a list of things that were
+supposed to happen, so it was measured.
 
 ### 3.2 Can the edge bind :80 and :443 rootless, and at what cost? — open, and now cheaper
 

@@ -204,6 +204,28 @@ jobs:
       - name: Self-test the conformance suite
         run: bash scripts/check-conformance.test.sh
 
+  cgroup-metrics-selftest:
+    name: cgroup-metrics-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Phase 4 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/cgroup-container-metrics.py` reads
+      # container metrics straight out of cgroup v2 and writes them for node_exporter's textfile
+      # collector -- because under rootless Podman there is no cAdvisor, and the exporter that
+      # replaces it publishes no OOM counter, no CPU-throttling series and no pids ceiling. All
+      # three are in the kernel and always were.
+      #
+      # The values feed alerts, so a silent parsing bug is an alert that never fires, which looks
+      # exactly like a healthy system. The self-test builds a fake cgroup tree carrying the states
+      # a healthy host never shows -- a prior OOM kill, a throttled cgroup, an unlimited one -- and
+      # asserts the output, then has promtool confirm Prometheus accepts it rather than trusting
+      # that it looks like exposition format. No kernel, no containers, no privileges.
+      - name: Self-test the cgroup metrics collector
+        run: bash scripts/cgroup-container-metrics.test.sh
+
   probe-vs-allowlist:
     name: probe-vs-allowlist
     runs-on: ubuntu-latest

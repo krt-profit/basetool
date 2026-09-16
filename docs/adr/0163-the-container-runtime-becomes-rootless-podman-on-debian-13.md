@@ -307,6 +307,23 @@ namespace, trading five segments for a correct source address; (C) the hybrid wi
 this ADR rejected, which is worth re-reading now; (D) stay on Docker, which is what this ADR's own
 closing sentence prescribes for a negative result.
 
+**Measured on a host, 2026-09-16, after the PVE operator challenged the premise.** They were right
+to: a distribution change for the whole stack should not rest on documentation alone, and they
+offered a counter-measurement — rootless Podman 5.4.2 on Debian 13 preserving the real client
+address in production. Their container is on the **pasta default network**; this deployment's edge
+is on user-defined bridges, so both facts hold at once. The experiment they proposed settled it in
+a quarter of an hour, on the Debian 13 testing guest with podman 5.4.2 freshly installed: the same
+image, started in the same minute, probed by the same client in the same second, differing only in
+network mode. On a **user-defined bridge** the container logged `10.89.0.2`, the rootlessport
+forwarder. On **pasta** it logged `10.1.0.30`, the real client. One variable, two answers.
+
+Debian 13's own shipped `containers.conf(5)` says the same thing in one sentence — *"The rootlesskit
+port handler is also used for rootless containers when connected to user-defined networks"*, in a
+paragraph that explicitly warns it rewrites the source address for web-server logs — and podman
+refuses the slirp4netns escape it points at (`can only set extra network names, selected mode
+slirp4netns conflicts with bridge`). Four independent lines agree: the shipped man page, the live
+measurement, podman's refusal of the workaround, and the upstream release notes.
+
 **Path A was examined on 2026-09-16 and is feasible — on a different distribution.** Podman 6.1.0,
 `passt 0^20260728` and `/usr/bin/pesto` all ship in the **base repositories of CentOS Stream 10**,
 and `rootless_port_forwarder` is present in its shipped `containers.conf` and documented in its
