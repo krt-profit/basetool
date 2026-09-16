@@ -1391,24 +1391,91 @@ planned*.
 > platform specifically to obtain the pasta forwarder; that premise now holds only for IPv4 — and
 > it holds only for IPv4 because of a **defect**, not because the feature was never meant to do it.
 
-#### The options, stated honestly
+#### The options — two are closed, two are live
 
-1. **Report it upstream.** Stronger than it first looked: this is a **defect against a documented
-   feature** of the installed version, with a traced cause and a one-line reproducer, not a
-   request for something unbuilt. Still no timeline, so it is not a plan on its own — but it is
-   worth filing whichever option is chosen, and the evidence for it already exists.
-2. **Ship with `rootlessport` and stop depending on `$remote_addr`.** That means rebuilding the
-   rate limiter's key and replacing the Keycloak admin allow-list with something that is not a peer
-   address — a real redesign of two security controls, not a configuration change.
-3. **Re-open the platform question.** ADR-0163's choice 1 was already amended once on evidence;
-   this is new evidence against the amended version.
-4. ~~**Split the edge out of the bridge topology**~~ — **measured 2026-09-16 and dead.** Taking the
-   edge off the bridges and giving it pasta as its network mode would have solved both halves at
-   once. It does not, because pasta-as-network-mode **does not deliver IPv6 on Podman 6.1.0
-   either**. See below. The option is closed on evidence, not on the separate objection that it
-   would have cost the edge the five internal networks it reaches every backend through.
+**Closed: re-open the platform question.** The defect is in the combination of Podman 6.1.x and
+netavark 2.1.0, not in the distribution. Fedora 45 carries the **same netavark 2.1.0**, and its
+Podman 6.1.1 fixes `rootlessport` on WSL rather than pesto on Linux. No distribution escapes this.
 
-Nothing here should be chosen on this page. The measurement is the deliverable; the choice is not.
+**Closed: split the edge out of the bridge topology.** Measured 2026-09-16 and dead — pasta as the
+network mode does not deliver IPv6 on Podman 6.1.0 either.
+
+> [!note] One honest distinction that an earlier revision blurred
+> Host networking and pasta-as-network-mode were listed as one option and then declared dead on a
+> pasta measurement. They are different mechanisms. **Host networking was never measured**; it dies
+> on a topology argument — the edge would sit in the host namespace while every backend sits in the
+> rootless one, and it would reach none of them without publishing every backend port on the host,
+> which is what the five internal networks exist to prevent. That is a strong argument. It is still
+> an argument and not a measurement, and it is labelled as one.
+
+That leaves **A** (file the defect upstream), which is worth doing whichever path is chosen but is
+no plan on its own, and the two that actually decide the migration. Both **B and C abandon the pasta
+forwarder**; they differ in whether the client address is recovered by another route or lived
+without.
+
+#### B — ship on `rootlessport` and rebuild the two controls
+
+|                                                                           For                                                                           |                                      Against                                      |
+|---------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| No new moving part; the default forwarder is the best-tested path Podman has                                                                            | **The rate limiter cannot be replaced equivalently** — see below                  |
+| Immediately actionable, nothing to measure                                                                                                              | The obvious "fix" to the admin ACL opens the console to the internet              |
+| Independent of an experimental feature that just failed its own promise                                                                                 | The client address is lost on IPv4 **and** IPv6 — on IPv6 even the address family |
+| The admin ACL fails **closed**, not open                                                                                                                | The access log stops being usable as a forensic record                            |
+| The admin ACL can be replaced by something **better**: stop exposing `/auth/admin` publicly and reach it through an SSH forward, which prod already has | §3.2 stays open — the edge must still bind :80/:443 itself                        |
+
+**The rate limiter is the whole cost, and it is permanent.** There is no usable substitute for a
+client address at the edge. A session cookie only keys authenticated routes, and the login endpoint
+that most needs limiting is unauthenticated; `X-Forwarded-For` does not exist because nothing sits
+in front, and would be forgeable if it did. REQ-SEC-023 / ADR-0112 therefore becomes **one bucket
+for the entire internet**, by construction rather than by accident — which is the permanent form of
+an outage this deployment has already had once.
+
+#### C — an L4 front end on the host speaking PROXY protocol
+
+|                                                                                      For                                                                                       |                                                                 Against                                                                  |
+|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| **Every control keeps working unchanged** — rate limiter, admin ACL, API allow-list, access log                                                                                | A new host service to package, configure, monitor and patch, and to carry in the promotable config artifact (`REQ-OPS-004`)              |
+| Both address families, with no special case                                                                                                                                    | It sits **in front of everything** and is a single point of failure outside the Quadlet lifecycle                                        |
+| The edge stays in the bridge topology; the nineteen segments are untouched                                                                                                     | **A forgeable PROXY header** if the container's port is reachable directly — see below                                                   |
+| Entirely independent of the pasta defect; it does not matter whether upstream ever fixes it                                                                                    | An nginx listener with `proxy_protocol` rejects header-less connections, so a misconfiguration breaks everything (fail-closed, at least) |
+| PROXY protocol is old, dull and deployed everywhere — the opposite of the experimental path that led here                                                                      | The migration wanted fewer moving parts, and this adds one                                                                               |
+| **It closes §3.2 in passing**: the host service binds the privileged ports, the container publishes on a high one — no `ip_unprivileged_port_start`, no `CAP_NET_BIND_SERVICE` | **Unmeasured**                                                                                                                           |
+| TLS stays at the edge; the front end is pure TCP pass-through, so §3.4's certificate handover is untouched and no key exists in a second place                                 |                                                                                                                                          |
+
+**The forgeable header is the serious objection.** `set_real_ip_from` must trust the front end and
+nothing else. If the container's published port is reachable directly, a client can bypass the front
+end and invent the header — defeating exactly the admin ACL and rate limiter that C exists to
+preserve. It closes with one property, publishing the container on loopback only, and that property
+is assertable by the conformance suite rather than left to memory.
+
+#### Weighing them
+
+The two costs are not the same kind of thing, and that is what decides it.
+
+**B costs security, permanently.** The rate limiter afterwards is not a rate limiter; it is a switch
+with which a single attacker locks out everyone else. That is not residual risk, it is a regression
+behind what runs today, and no amount of care shrinks it — the information the control rests on
+simply stops arriving.
+
+**C costs operational complexity.** That is real, but it is bounded, inspectable, and the same kind
+of cost this migration has already accepted deliberately for node-exporter and alloy, for the same
+reason: something that does not work inside a container works on the host.
+
+C also settles two things at once. §3.2 has been open since the beginning and stays open under B;
+under C it disappears, because a host service may bind privileged ports anyway. An option that
+closes a standing question alongside its own is worth more than the list suggests.
+
+> [!important] The verdict, and it is a recommendation rather than a decision
+> **C, with B as the fallback.** Not because C is more elegant — it is not — but because B gives up
+> a security property the deployment has today, and C only costs work.
+>
+> Two things get measured before this becomes a decision, and both fit in an afternoon on the
+> testing host: whether a rootless container can publish **on loopback only, on both families**,
+> which is what the whole forgery argument rests on; and whether HTTP/3 is in play, since QUIC is
+> UDP and would pass a TCP front end by.
+
+A middle path — keep pasta for IPv4, where it does preserve the address, and front only IPv6 — is
+rejected: two paths with different trust configuration, and one of them stays the experimental one.
 
 > [!warning] What the neighbouring deployment's measurement does and does not establish
 > The PVE operator reached their own rootless Caddy over IPv6 from an external client and got a
