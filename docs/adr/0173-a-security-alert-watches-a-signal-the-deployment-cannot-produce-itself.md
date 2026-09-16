@@ -115,4 +115,3 @@ An operator asking "which endpoint, from whom, why" about 8.5 % of all traffic h
   surface label on the counter or moving `RequestLoggingFilter` outside the security chain, and both
   are larger changes than the defect at hand justifies. Stated here so the next reader does not
   rediscover it as a surprise.
-

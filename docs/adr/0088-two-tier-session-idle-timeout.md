@@ -93,4 +93,3 @@ Codified as **REQ-SEC-025**.
   out-of-band by adding an explicit password-bearing `default` entry to the ACL file. The
   `docker-compose.yml` comment claiming the ACL file "MUST NOT define a `default` user" is backwards
   and is corrected alongside this change.
-

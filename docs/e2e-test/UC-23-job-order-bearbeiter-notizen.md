@@ -41,4 +41,3 @@ Nach jedem Schritt spiegelt der per Backend gelesene `assignees[]`-Stand (`GET /
 - **Versions-Durchreichung:** Das Notiz-Modal liest `data-version` vom angeklickten `oa-edit-note`-Button; weil der ganze Abschnitt nach jedem Save neu gerendert wird, trägt der Button immer die aktuelle Kanten-Version — kein manueller `data-version`-Sync, kein Stale-409 bei aufeinanderfolgenden Edits.
 - **Delegierte Handler überleben den Swap:** Alle Controls hängen über `data-trigger` am `document`; das Neu-Lokalisieren der Buttons in jedem Schritt beweist nebenbei, dass die Bindings nach dem `outerHTML`-Tausch weiter funktionieren.
 - **Gating:** Self-Eintrag/-Notiz funktioniert ohne Logistiker-Rolle; fremde Einträge erfordern LOGISTICIAN+ (Backend-Gate). Hier deckt `test-admin` den Self-Pfad ab.
-

@@ -434,4 +434,3 @@ The SC `Game.log` cannot provide the materials breakdown (verified: the only ref
 - **Quoted / un-quoted** — the SETUP panel state after / before the in-game **GET QUOTE** action; un-quoted panels show `--` yields and no cost/time and cannot produce a complete order.
 - **Derived confidence** — per-row confidence computed from deterministic validation (numeric cell plausibility, REFINE-toggle fallback) + the one-sided header-total checksum (never the model's verbalized self-estimate; the originally planned two-pass agreement was rejected by the Phase 0 data).
 - **Strict-staffel aggregate** — a basetool org-unit-scoped entity (Refinery Order is one); scope is enforced in the service layer via `OwnerScopeService`.
-

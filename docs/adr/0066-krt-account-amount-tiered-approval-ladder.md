@@ -75,4 +75,3 @@ Two hard constraints are unchanged: the ArchUnit invariants `bankClassesMustNotC
 - Both ArchUnit pins stay green: threshold storage/editing is org-unit-blind (`BankAccountService`,
   two columns), all org-unit-aware routing stays in the one seam.
 - Cumulative/period budgets, per-approver quotas and configurable approver graphs remain out of scope.
-

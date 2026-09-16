@@ -127,4 +127,3 @@ available" placeholder rather than a partial list.
 - If the matrix ever needs paged infinite-scroll on the client (rather than one complete assembly of
   the filtered slice), promote that to a follow-up ADR. Not needed while a filtered slice fits a
   single virtualised grid.
-

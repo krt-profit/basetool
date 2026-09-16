@@ -134,4 +134,3 @@ and we will not convert the sources to TypeScript.**
 - **Doing nothing and relying on E2E.** The Playwright suite catches DTO drift only where a test
   walks the affected path, and reports it as a UI failure far from the cause. It remains the
   behavioural gate; it is not a substitute for a contract check.
-

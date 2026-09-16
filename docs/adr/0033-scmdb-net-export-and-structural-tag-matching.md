@@ -84,4 +84,3 @@ ahead of the name chain.
 - **A separate scmdb.net importer / endpoint:** rejected — the resolution, ownership, alias-learning,
   and preview/apply machinery are identical; forking them would duplicate the concurrency-sensitive
   apply path for no benefit.
-

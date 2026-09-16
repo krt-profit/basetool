@@ -101,4 +101,3 @@ security boundary, *fail open* on cosmetic enrichment.
 - **Map Discord roles to app roles/units at login** — deferred to Track 2: Track 1 deliberately
   keeps Basetool roles manual so login (the membership guarantee) ships first and the role-sync
   machinery is not on its critical path.
-

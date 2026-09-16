@@ -129,4 +129,3 @@ TypeScript 7 problem, and is out of scope here.
   90-line script.
 - **Turn on `noImplicitAny` to clear the 179 errors.** Rejected: 514 pre-existing errors, unrelated
   to this decision, and a change to the opt-in model ADR-0125 chose deliberately.
-

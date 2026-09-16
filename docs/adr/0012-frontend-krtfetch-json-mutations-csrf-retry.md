@@ -84,4 +84,3 @@ foundation + exemplars and this ADR + the `REQ-FE-*` spec.
   orphaned, inert dependency and was removed; see the cleanup preceding this epic.) Rejected.
 - **Full SPA / client framework** — a disproportionate rewrite of a server-rendered app for a
   no-reload goal that DOM patching already achieves. Rejected.
-

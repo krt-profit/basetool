@@ -75,4 +75,3 @@ group there is narrowed to `readinessState, diskSpace`).
 - This addresses the readiness-hang strand of the 2026-07-20 reactive degradation. It is independent
   of the SSE relay fix (ADR-0113) and the Keycloak-backchannel connection-pool hardening tracked
   separately — those close different reactive failure modes on the same serving path.
-

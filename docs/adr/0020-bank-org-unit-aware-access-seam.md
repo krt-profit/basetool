@@ -52,4 +52,3 @@ bank role.
   already in `OwnerScopeService` and drift from it.
 - **Several bridging classes** — rejected: the containment pin keeps the blast radius to one
   auditable seam.
-

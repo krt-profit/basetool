@@ -55,4 +55,3 @@ Redis that cannot `PING` cannot serve sessions).
 - **Backend counterpart** — the backend's prod-enabled Redis indicator has no Lettuce timeout at
   all, but sits outside its readiness group (ADR-0084) and only slows the visibility aggregate;
   covered by the new `HealthContributorHanging` alert and deferred until it misbehaves in practice.
-

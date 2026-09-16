@@ -174,4 +174,3 @@ the in-memory head that replay reconstructs. The stateless exporters, the socket
 and Alloy keep the 10s default (no persistent write path that an abrupt stop can corrupt). No alert,
 metric, dashboard or scrape target changes — this is a shutdown-timing hardening of the compose
 definition only.
-

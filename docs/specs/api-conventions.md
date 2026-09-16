@@ -790,4 +790,3 @@ body would skip `NormalizedStringDeserializer` entirely: no trim, no NFC normali
 **Related:** REQ-API-004, REQ-API-007, REQ-API-009, REQ-SEC-031, ADR-0161
 
 ---
-

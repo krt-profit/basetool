@@ -75,4 +75,3 @@ members-or-above, keeping the list and the per-row detail gate consistent.
 - **Leave the list queries unchanged and rely on the detail gate.** Rejected: a member-or-above could
   open an internal ownerless mission by URL but never see it in the list — exactly the list/detail
   divergence the codebase has been bitten by before.
-

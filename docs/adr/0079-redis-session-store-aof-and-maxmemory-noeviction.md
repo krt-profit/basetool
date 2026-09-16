@@ -95,4 +95,3 @@ indicator (it becomes functional once `maxmemory > 0`), and `RedisEvictions` is 
   `RedisMemoryHigh` permanently inert, i.e. no warning before the cliff.
 - **Redis replication / HA for durability.** Out of scope: single-instance by construction (ADR-0074);
   session loss is recoverable by re-login, so HA is unjustified here.
-

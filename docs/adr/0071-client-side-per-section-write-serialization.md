@@ -73,4 +73,3 @@ centralised in `krtFetch`:
   violating the REQ-ORG-018 fine-grained-lock invariant (a Ziele edit blocking an Ablauf edit).
 - **Debounce the inline handlers.** Only widens the race window; two interactions still ship the same
   version, just later, and it delays every save.
-

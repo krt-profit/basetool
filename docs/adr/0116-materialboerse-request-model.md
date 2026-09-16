@@ -89,4 +89,3 @@ Concrete choices:
 - **Item requests over the whole game-item catalogue (not just craftable items).** Rejected for now —
   reusing the blueprint-product picker keeps the identity (`product_key`) and the "Item suchen" UX
   consistent with "Item anbieten"; a general game-item request picker can be a later, additive change.
-

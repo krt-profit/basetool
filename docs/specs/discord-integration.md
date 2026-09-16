@@ -582,4 +582,3 @@ first-broker-login collision precheck's nickname candidate deliberately stays **
   Discord registration onto the existing account directly from the approval queue — for members whose
   Discord handle differs from their in-app name, so the automatic collision check never recognised
   them and the registration reached the queue.
-

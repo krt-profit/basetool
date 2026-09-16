@@ -99,4 +99,3 @@ authorizing `ROLE_BANK_MANAGEMENT` for `SPECIAL` (it reads the role, not org-uni
   is redacted in both the history table and the PDF for org-unit viewers; bank staff keep the full view.
 - **Show the full holder distribution** — moot: ADR-0039 already removed the per-account holder
   distribution from the account detail.
-

@@ -1332,4 +1332,3 @@ JVM flag, same file, same failure class), REQ-OPS-020 (the measured limits this 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
   exercise the app workload) — e.g. recreating dependents on a config-digest change so their
   healthchecks gate the rollback. Promote to an ADR if pursued.
-

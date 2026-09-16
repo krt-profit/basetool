@@ -78,4 +78,3 @@ on role-hierarchy evaluation — same defensive pattern as `/lookup` and `/searc
 - **Leave the bank pickers on `/lookup` (unconverted).** They would still ship the full roster at 5000
   accounts, defeating the point of #1193 for exactly the audience that resolves the *whole* user base.
   Rejected.
-

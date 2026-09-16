@@ -92,4 +92,3 @@ measures it.** Four owner decisions, taken 2026-09-13:
   ever bit in Safari's tab mode.
 - **Nothing changes above 768px** except the three touch-target floors (which apply to ≤1024px) and
   the modal close button's styling, which was missing on every class.
-

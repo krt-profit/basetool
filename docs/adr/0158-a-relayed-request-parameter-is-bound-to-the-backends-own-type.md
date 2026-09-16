@@ -111,4 +111,3 @@ specification, which has no type.
 - Adding a proxy endpoint now carries an obligation: look at the backend signature and mirror it.
   That is cheaper than it sounds — the signature is the specification — and it is the only part of
   this decision that needs remembering.
-

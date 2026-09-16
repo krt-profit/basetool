@@ -107,4 +107,3 @@ bypassing it with fixture data.
   supposed to cover.
 - **Blocking non-UUID subjects** (service accounts, malformed tokens) — they are not people who can
   accept anything, and the audience and scope checks already govern them.
-

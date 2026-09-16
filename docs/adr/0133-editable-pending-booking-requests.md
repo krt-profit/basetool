@@ -115,4 +115,3 @@ to bank staff who already have it.
 - **A separate `bank_booking_request_revision` history table.** Rejected as disproportionate — the
   audit event records that an edit happened, and the approval gate (not an edit trail) is what
   actually protects the money.
-

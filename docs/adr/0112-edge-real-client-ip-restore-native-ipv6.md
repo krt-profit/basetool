@@ -123,4 +123,3 @@ still-shared gateway key.
   necessary companion to the LB option, never a fix by itself.
 - **Drop the AAAA record permanently** — rejected as an end state (kills IPv6 reachability); kept
   only as a zero-touch **interim** mitigation while this ADR is implemented.
-

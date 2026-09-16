@@ -93,4 +93,3 @@ plus lazy per-mission detail, and make the payout toggle O(1).
   # 1111): the field is a boolean; the REQUIRES_NEW retry, not a version echo, is what makes it
 
   last-writer-wins. The slim response carries no version.
-

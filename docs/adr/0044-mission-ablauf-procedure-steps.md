@@ -89,4 +89,3 @@ live-sync stack, so the Ablauf should reuse them rather than invent new machiner
   keep consistent on every toggle/reorder.
 - **Per-viewer (client-only) done state.** Rejected: the owner wants a shared live progress tracker;
   client-only state would not survive a reload nor be visible to the rest of the squadron.
-

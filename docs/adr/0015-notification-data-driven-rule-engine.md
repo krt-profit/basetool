@@ -48,4 +48,3 @@ admin-editable** rule, not hardcoded logic.
   set; the typed selector table covers the needs with far less surface.
 - **A dedicated user-group entity now** — deferred: the `GROUP` selector kind is reserved so the
   entity can be added later without an engine change.
-

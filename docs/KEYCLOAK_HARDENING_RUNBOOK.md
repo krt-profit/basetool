@@ -875,4 +875,3 @@ A *Conditional* sub-flow acts as *Required* when all its conditions evaluate tru
 > The release stands on its own — REQ-SEC-052 and REQ-SEC-053 are enforced in the application and
 > the sweeps assert them. These twelve reduce the blast radius *around* it: what an intercepted code
 > is worth, what a token carries, and whether anyone can see it happen.
-

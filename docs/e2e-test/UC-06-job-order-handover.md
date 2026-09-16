@@ -47,4 +47,3 @@ Der User öffnet das Handover-Modal auf der Auftragsdetailseite `/orders/{id}`.
 - Übergabezeit nutzt denselben `datetime-split-group`-Mechanismus wie UC-02, hier aber ohne Race (das Modal öffnet lange nach dem Page-Load) und mit `data-validate-not-past='false'`.
 - **Nur MATERIAL-Übergaben buchen Lager aus:** Item-Übergaben ([UC-17](UC-17-item-order-handover.md)) erhöhen nur die `deliveredAmount` der Bestellpositionen und rühren das Lager nicht an (`order.type != 'ITEM'`-Gate auf dem Material-Übergabe-Block). Die Ausbuchungs-Prüfung gehört daher zum Material-Flow.
 - **Kein Auto-Complete in den Ausbuchungs-Fällen:** Die Ausbuchungs-Aufträge fragen mehr an, als übergeben wird (200 vs. ≤ 100), damit der Auftrag nicht vollständig erfüllt wird — eine Komplettierung würde die verbleibenden Lagereinträge vom Auftrag trennen (Unlink) und sie aus der Auftrags-Inventarsicht entfernen, was die Pro-Eintrag-Assertion unterlaufen würde.
-

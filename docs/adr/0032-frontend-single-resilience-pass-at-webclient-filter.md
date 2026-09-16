@@ -65,4 +65,3 @@ We will make the **WebClient exchange filter the single resilience pass** for th
   the reactive chain (its operators compose with the WebClient pipeline and its
   `CallNotPermittedException` is mapped), the only one with a `TimeLimiter`, and the one that already
   special-cases idempotent-only retry and `ignoreExceptions` for reauth.
-

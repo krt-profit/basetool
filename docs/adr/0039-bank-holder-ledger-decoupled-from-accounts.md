@@ -109,4 +109,3 @@ ADR-0041 keep their recorded fee on the append-only ledger.)
   account balance" still holds.
 - **Holder balance per account (status quo, ADR-0010)** — rejected: contradicts the physical
   reality that a player's aUEC is not partitioned by the bank's account structure.
-

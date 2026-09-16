@@ -104,4 +104,3 @@ compatible.
   Rejected: `OPTIMISTIC_FORCE_INCREMENT` is the JPA-native tool for "force a version check even when
   only excluded fields changed"; a manual `@Modifying` bump on the `@Version` column fights
   Hibernate's own version management on the managed entity's flush.
-

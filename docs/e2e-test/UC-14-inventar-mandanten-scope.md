@@ -50,4 +50,3 @@ Zusätzlich abgedeckt:
 - **Admin-Pin verengt.** Ein gepinnter Admin ist wie ein Mitglied der gepinnten OrgUnit gescopt — nicht allsehend; eigentümerlose Zeilen sieht nur der **ungepinnte** Admin (und der Eigentümer in seiner persönlichen View).
 - **Keycloak-Rolle ≠ Mitgliedschaft.** `test-none` trägt die Basisrolle „KRT Member", hat aber keine `org_unit_membership` — der Scope-Prädikat-Pfad ist damit leer (sieht nichts im globalen Lager).
 - **Verifikation via API.** Die gruppierte Lager-Ansicht lädt Stacks lazy; gegen die gescopten Endpunkte als verschiedene Nutzer zu assertieren ist die etablierte, race-freie Methode für Tenancy-Grenzen (vgl. UC-08/UC-09).
-
