@@ -11,6 +11,12 @@
 
 ### Fixed
 
+- **Betrieb: die drei Dienst-Images konnten ohne ihr Log-Verzeichnis nicht starten.** Beim Bauen
+  legte der Trainingslauf die Logdateien als `root` an; sie blieben im Image liegen, und der
+  Anwendungsbenutzer durfte anschließend nicht mehr hineinschreiben. Sichtbar war das nur, wenn ein
+  Image ohne das eingehängte Log-Verzeichnis läuft — am laufenden Stack ändert sich nichts
+  (REQ-OPS-031).
+
 - **Ein beschädigter Sitzungseintrag sperrte einzelne Mitglieder komplett aus.** Verlor der
   Sitzungsspeicher einen Eintrag, während gerade eine Anfrage lief, blieb ein halb geschriebener
   Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
