@@ -24,8 +24,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,11 +48,19 @@ class NotificationRetentionTaskTest {
 
   @Mock private NotificationService notificationService;
 
-  private final TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+  private final TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   private NotificationRetentionTask task() {
     return new NotificationRetentionTask(
-        notificationService, taskMetrics, READ_MAX_AGE, UNREAD_MAX_AGE);
+        notificationService, taskMetrics, meterRegistry, READ_MAX_AGE, UNREAD_MAX_AGE);
+  }
+
+  private double deleted(String kind) {
+    return meterRegistry
+        .counter(MetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
+        .count();
   }
 
   // covers REQ-NOTIF-009 — read notifications age from readAt against the read window
@@ -110,5 +121,88 @@ class NotificationRetentionTaskTest {
 
     // Must not propagate.
     task().purgeExpiredNotifications();
+  }
+
+  /**
+   * A failing read half must not skip the unread half.
+   *
+   * <p>They were two sequential statements, so a read purge that threw returned before the unread
+   * purge was reached \u2014 and the unread half is the one this feature added: without it an inbox
+   * nobody opened kept the triggering member's handle forever. The halves share nothing but a
+   * schedule, so one failing is no reason to skip the other.
+   */
+  @Test
+  void aFailingReadHalfStillLetsTheUnreadHalfRun() {
+    when(notificationService.purgeReadOlderThan(any())).thenThrow(new RuntimeException("db down"));
+    when(notificationService.purgeUnreadOlderThan(any())).thenReturn(7);
+
+    task().purgeExpiredNotifications();
+
+    verify(notificationService).purgeUnreadOlderThan(any());
+    assertThat(deleted("unread")).isEqualTo(7.0);
+  }
+
+  /** And symmetrically: a failing unread half does not undo what the read half deleted. */
+  @Test
+  void aFailingUnreadHalfDoesNotUndoTheReadHalf() {
+    when(notificationService.purgeReadOlderThan(any())).thenReturn(4);
+    when(notificationService.purgeUnreadOlderThan(any()))
+        .thenThrow(new RuntimeException("db down"));
+
+    task().purgeExpiredNotifications();
+
+    assertThat(deleted("read")).isEqualTo(4.0);
+    assertThat(deleted("unread")).isZero();
+  }
+
+  /**
+   * Isolating the halves must not turn a broken sweep into a green one.
+   *
+   * <p>The job's outcome still has to read {@code failure}, which is what {@code
+   * ScheduledJobFailureStreak} watches; swallowing the exception here would have replaced a skipped
+   * half with a silent one.
+   */
+  @Test
+  void aFailingHalfStillRecordsTheRunAsFailed() {
+    when(notificationService.purgeReadOlderThan(any())).thenThrow(new RuntimeException("db down"));
+    when(notificationService.purgeUnreadOlderThan(any())).thenReturn(1);
+
+    task().purgeExpiredNotifications();
+
+    assertThat(
+            meterRegistry
+                .counter(
+                    MetricNames.SCHEDULED_JOB_EXECUTIONS,
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.NOTIFICATION_RETENTION.label(),
+                    MetricNames.TAG_OUTCOME,
+                    "failure")
+                .count())
+        .isEqualTo(1.0);
+  }
+
+  /**
+   * The two halves are counted apart, because the {@code items} total cannot say which one worked.
+   *
+   * <p>{@code items} stays the job's total; the split counter is what answers "did the unread half
+   * delete anything", the question a half that has quietly stopped raises.
+   */
+  @Test
+  void countsTheTwoHalvesSeparatelyAsWellAsTogether() {
+    when(notificationService.purgeReadOlderThan(any())).thenReturn(3);
+    when(notificationService.purgeUnreadOlderThan(any())).thenReturn(2);
+
+    task().purgeExpiredNotifications();
+
+    assertThat(deleted("read")).isEqualTo(3.0);
+    assertThat(deleted("unread")).isEqualTo(2.0);
+    assertThat(
+            meterRegistry
+                .counter(
+                    MetricNames.SCHEDULED_JOB_ITEMS,
+                    MetricNames.TAG_JOB,
+                    ScheduledJob.NOTIFICATION_RETENTION.label())
+                .count())
+        .isEqualTo(5.0);
   }
 }

@@ -1092,6 +1092,11 @@ transaction per pass) rather than per-scrape.
   cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
   who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
   24 h, warning; added 2026-09-17).
+- `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
+  `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
+  conflated. The halves are isolated from each other in the task, so one can be stuck while the
+  other keeps deleting — and then only a split count shows it (REQ-NOTIF-009, added
+  2026-09-17).
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from

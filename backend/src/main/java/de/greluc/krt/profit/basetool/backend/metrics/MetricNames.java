@@ -178,6 +178,19 @@ public final class MetricNames {
   public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
       "basetool.admin.registration.auto.activated";
 
+  /**
+   * Counter {@code basetool_notification_retention_deleted_total} — tag {@code kind} ({@code read}
+   * / {@code unread}), the two halves of the inbox retention sweep (REQ-NOTIF-009).
+   *
+   * <p>Beside, not instead of, {@code basetool_scheduled_job_items_total{task=
+   * "notification_retention"}}: that counter is the job's total and stays the job's total, but a
+   * sum of two windows cannot answer "did the unread half delete anything", which is the question a
+   * half that has stopped working raises. The two halves are isolated from each other in the task,
+   * so one can be stuck while the other keeps deleting — and then only a split count shows it.
+   */
+  public static final String NOTIFICATION_RETENTION_DELETED =
+      "basetool.notification.retention.deleted";
+
   // --- Identity (UserReconciliationService) ----------------------------------------------
 
   /**
@@ -566,7 +579,9 @@ public final class MetricNames {
   public static final String TAG_EVENT_TYPE = "event_type";
 
   /**
-   * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS}.
+   * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS},
+   * and the inbox retention half ({@code read} / {@code unread}) on {@link
+   * #NOTIFICATION_RETENTION_DELETED}. Bounded in both uses.
    */
   public static final String TAG_KIND = "kind";
 

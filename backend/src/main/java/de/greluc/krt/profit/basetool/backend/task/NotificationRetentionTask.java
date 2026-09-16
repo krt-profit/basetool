@@ -19,13 +19,18 @@
 
 package de.greluc.krt.profit.basetool.backend.task;
 
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.function.IntSupplier;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -57,16 +62,32 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class NotificationRetentionTask {
 
+  /** The bounded {@code kind} tag value for the read-retention half. */
+  private static final String KIND_READ = "read";
+
+  /** The bounded {@code kind} tag value for the unread-retention half. */
+  private static final String KIND_UNREAD = "unread";
+
   private final NotificationService notificationService;
   private final TaskMetrics taskMetrics;
+  private final MeterRegistry meterRegistry;
   private final Duration maxAge;
   private final Duration unreadMaxAge;
+
+  /**
+   * The first failure of the current run, held while the other half is still to be attempted.
+   *
+   * <p>Confined to one run: {@link #purgeExpired()} clears it as it rethrows, and the sweep is
+   * single-threaded ({@code @Scheduled} with a {@code fixedDelay}, so a run cannot overlap itself).
+   */
+  private @Nullable RuntimeException firstFailure;
 
   /**
    * Creates the retention task.
    *
    * @param notificationService the inbox service performing the delete
    * @param taskMetrics the scheduled-job instrumentation wrapper
+   * @param meterRegistry where the per-half deleted counter is registered
    * @param maxAge how long a read notification is retained after being read before the sweep
    *     removes it (ISO-8601 duration; default {@code P90D})
    * @param unreadMaxAge how long an unread notification is retained after being raised before the
@@ -75,10 +96,12 @@ public class NotificationRetentionTask {
   public NotificationRetentionTask(
       NotificationService notificationService,
       TaskMetrics taskMetrics,
+      MeterRegistry meterRegistry,
       @Value("${app.notifications.retention.max-age:P90D}") Duration maxAge,
       @Value("${app.notifications.retention.unread-max-age:P180D}") Duration unreadMaxAge) {
     this.notificationService = notificationService;
     this.taskMetrics = taskMetrics;
+    this.meterRegistry = meterRegistry;
     this.maxAge = maxAge;
     this.unreadMaxAge = unreadMaxAge;
   }
@@ -95,13 +118,28 @@ public class NotificationRetentionTask {
   }
 
   /**
-   * Performs both retention deletes; any failure propagates to {@link TaskMetrics}.
+   * Performs both retention deletes, each isolated from the other.
    *
-   * <p>The two statements share one {@code Instant.now()} so a slow first delete cannot shift the
+   * <p><b>The halves are independent, so a failure in one must not skip the other.</b> They were
+   * two sequential statements: a read purge that threw — a lock timeout on a large batch, a
+   * constraint the inbox fanout writes — returned before the unread purge was reached, so the half
+   * this feature added (REQ-NOTIF-009) silently never ran while the job reported a plain failure.
+   * {@code AuditRetentionService}, written in the same work, isolates each audit domain for the
+   * same reason; this is that shape, applied to the two windows that have nothing to do with each
+   * other beyond sharing a schedule.
+   *
+   * <p><b>A failure is still a failure.</b> Both halves are attempted and then the first failure is
+   * rethrown, so {@link TaskMetrics} records {@code outcome=failure} and {@code
+   * ScheduledJobFailureStreak} can see it. Isolating the halves buys the other half a run; it does
+   * not turn a broken sweep into a green one.
+   *
+   * <p>The two windows share one {@code Instant.now()} so a slow first delete cannot shift the
    * second window, which would make two rows of identical age fall on opposite sides of the cutoff
    * within a single run.
    *
-   * @return the total number of notifications deleted this run (the {@code items} metric)
+   * @return the total number of notifications deleted this run (the {@code items} metric); the two
+   *     halves are also counted separately under {@link MetricNames#NOTIFICATION_RETENTION_DELETED}
+   *     because a sum cannot say which half did the work
    */
   private int purgeExpired() {
     log.info(
@@ -109,13 +147,49 @@ public class NotificationRetentionTask {
         maxAge,
         unreadMaxAge);
     Instant now = Instant.now();
-    int readDeleted = notificationService.purgeReadOlderThan(now.minus(maxAge));
-    int unreadDeleted = notificationService.purgeUnreadOlderThan(now.minus(unreadMaxAge));
+    int readDeleted =
+        purgeHalf(KIND_READ, () -> notificationService.purgeReadOlderThan(now.minus(maxAge)));
+    int unreadDeleted =
+        purgeHalf(
+            KIND_UNREAD, () -> notificationService.purgeUnreadOlderThan(now.minus(unreadMaxAge)));
     log.info(
         "Notification retention sweep finished — {} read and {} unread notification(s) deleted.",
         readDeleted,
         unreadDeleted);
+    if (firstFailure != null) {
+      RuntimeException failure = firstFailure;
+      firstFailure = null;
+      throw failure;
+    }
     return readDeleted + unreadDeleted;
+  }
+
+  /**
+   * Runs one half of the sweep, counting what it deleted and holding on to a failure instead of
+   * letting it skip the other half.
+   *
+   * <p>The first failure is kept and rethrown once both halves have been attempted, so the run is
+   * still reported as failed. A second failure is logged and dropped: the outcome is already
+   * failure and there is only one exception to rethrow.
+   *
+   * @param kind the bounded {@code read} / {@code unread} tag value for the per-half counter
+   * @param half the delete to perform
+   * @return the rows the half deleted, or {@code 0} when it failed
+   */
+  private int purgeHalf(@NotNull String kind, @NotNull IntSupplier half) {
+    try {
+      int deleted = half.getAsInt();
+      meterRegistry
+          .counter(MetricNames.NOTIFICATION_RETENTION_DELETED, MetricNames.TAG_KIND, kind)
+          .increment(deleted);
+      return deleted;
+    } catch (RuntimeException e) {
+      log.warn("Notification retention: the {} half failed: {}", kind, e.toString());
+      if (firstFailure == null) {
+        firstFailure = e;
+      }
+      return 0;
+    }
   }
 
   /**
