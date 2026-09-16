@@ -129,18 +129,18 @@ whichever name they use for the person.
 > [name search](#finding-every-mention-of-a-person) and look at the hits before granting. That is
 > also why granting is never automatic.
 
-> [!important] Rather more than half of it is still your job, and the tool now says which half
-> The eleven columns above are the ones a rule can rewrite safely: a column that holds a name and
-> nothing else. The larger part of the schema holds the name **inside a sentence somebody wrote** —
-> a booking justification, a mission description, an announcement, an org-chart placeholder, a
-> market remark. No rule can rewrite those without either corrupting the sentence or missing the
-> mention, so an admin edits them by hand, which is what the name search is for and why this
-> document has always required it.
->
-> `HandleErasureCoverage` in the code now classifies **every** column the name search knows about
-> as one of four things — rewritten by the erasure, removed with the account, structurally about
-> somebody else, or *your manual step*. It is gate-enforced, so the list cannot go quietly out of
-> date, and it is the answer to "have I finished?" when you are working through the search hits.
+**Rather more than half of it is still your job, and the tool now says which half.** The eleven
+columns above are the ones a rule can rewrite safely: a column that holds a name and nothing else.
+The larger part of the schema holds the name **inside a sentence somebody wrote** — a booking
+justification, a mission description, an announcement, an org-chart placeholder, a market remark. No
+rule can rewrite those without either corrupting the sentence or missing the mention, so an admin
+edits them by hand, which is what the name search is for and why this document has always required
+it.
+
+`HandleErasureCoverage` in the code classifies **every** column the name search knows about as one
+of four things — rewritten by the erasure, removed with the account, structurally about somebody
+else, or *your manual step*. It is gate-enforced, so the list cannot go quietly out of date, and it
+is the answer to "have I finished?" when you are working through the search hits.
 
 **Do not confuse an erasure request with leaving the organisation.** A departing member whose account
 is deleted for organisational reasons gets the standard deletion; someone exercising Art. 17 is

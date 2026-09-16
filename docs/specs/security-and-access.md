@@ -3669,7 +3669,10 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > and unless every entry in either map names a section and a column that exist. Without that gate
 > `notificationRuleTargets` shipped selecting an administrator's free text unscrubbed, and a renamed
 > key would have dropped out of the scrub set while the export kept reporting success.
->
+
+The scrubbing half had three defects of its own, and it is the half where a defect is a leak rather
+than a gap.
+
 > [!warning] Three scrubber defects, all member-reachable — corrected 2026-09-16
 > Each of these was reachable by any member from their own profile, and the first two reached an
 > export the member requested for themselves.
@@ -3690,7 +3693,9 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 >   and everybody's `discord_guild_nickname` were never scrubbed. All three columns are registered
 >   as person-name surfaces for the search; the scrubber now loads all three, and the granted
 >   erasure (REQ-SEC-062) matches on all three for the same reason.
->
+
+None of that closes the gap between what a rule can do and what the article asks for.
+
 > [!warning] The residue is real and is covered by a human, not by code
 > The scrubber cannot recognise somebody who has no account, a nickname or a misspelling — nothing
 > can, from text alone. That is why Art. 15(4) and
@@ -3969,7 +3974,9 @@ name, and the search registry already treats all three as places a person is nam
 > [`data-subject-requests.md`](../privacy/data-subject-requests.md) requires an admin to walk its
 > hits — but it was implicit before, and an erasure whose manual half is implicit is one somebody
 > will believe is complete.
->
+
+One more thing the same review found in the same place, about the token rather than the columns.
+
 > [!note] The sentinel's uniqueness is enforced, not assumed
 > `HandleAnonymisation`'s comment claimed a real handle could not equal the token while
 > `display_name` was self-service free text with only a length limit — so any member could set
