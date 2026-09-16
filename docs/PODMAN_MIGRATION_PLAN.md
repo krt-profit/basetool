@@ -2102,3 +2102,64 @@ machine simply had not rebooted since. Neither the remediation's doing nor a pro
 real reboot. `uptime -s` said `19:00:32` and `uptime -p` said `up 0 minutes`: it really is that
 quick. The suspicion was wrong, and checking was still right — that is only knowable afterwards.
 
+## 19. One CIS rule that must never be satisfied — 2026-09-16
+
+`cis_server_l1` requires every file to have an owner and a group that exist in `passwd`/`group`. **A
+rootless-container host cannot satisfy that, by design**, and the rule will fail on every such host
+forever.
+
+Every uid inside a container maps to a **subuid** on the host, and subuids deliberately have no
+`passwd` entry. That covers two kinds of file:
+
+- the **image store** — `containers/storage/overlay/*/diff/etc/shadow` and its neighbours, owned by
+  whatever uid the image built them as;
+- the **data directories this role creates**, with exactly the namespace-translated ownership that
+  ADR-0186 derives rather than writes down: `/var/iri/redis` at `100998`, `/var/iri/db-backend` at
+  `100069`, the three application modules at `110000`.
+
+Those are correct. They are also, to CIS, ownerless.
+
+> [!danger] The failing rule is not the risk — the remediation for it is
+> `chown -R` across those paths rewrites the image store's ownership, breaking every container built
+> on those layers, **and** hands every database its data directory under the wrong uid. It is the
+> kind of fix that looks like housekeeping and is not reversible by repeating it.
+>
+> So the role reports this as a **known exception** rather than leaving twelve unexplained failures
+> for someone to tidy up later.
+
+### Getting the predicate right took four attempts, and every one of them measured
+
+The check that separates this exception from a real orphan was wrong three times, and each wrong
+version produced a **plausible number** rather than an error. Recorded in full, because the shape of
+the mistake repeats and the number is what makes it invisible.
+
+| Attempt |                           Predicate                           | Reported |                                                Why it was wrong                                                 |
+|---------|---------------------------------------------------------------|----------|-----------------------------------------------------------------------------------------------------------------|
+| 1       | not under `containers/storage/`                               | **11**   | Those were the data directories, equally deliberate. *Where a file sits* describes today's layout, not the rule |
+| 2       | uid outside the **service user's** subuid range               | **14**   | Containers run under another account's subuids. One user's range says nothing about another's                   |
+| 3       | uid outside **every** subuid range                            | **1000** | Not a count — a **uid**. The YAML folded scalar joined the lines with spaces and ate the trailing `| wc -l`     |
+| 4       | uid vs `/etc/subuid` **and** gid vs `/etc/subgid`, separately | —        | Correct                                                                                                         |
+
+The fourth is the interesting one. Attempt 3's surviving entry was `uid=1000` on a container's
+`/etc/shadow` — and uid 1000 is the operator, perfectly valid. The file had been matched by
+**`-nogroup`**, not `-nouser`: its *group* was a subgid. Checking the uid of a file that was flagged
+for its group asks the wrong question of the right file.
+
+`-nouser` is about the uid and is explained by `/etc/subuid`. `-nogroup` is about the gid and is
+explained by `/etc/subgid`. They are two questions, and the check now asks both:
+
+```
+find / -xdev -nouser  -printf '%U\n' | sort -u | awk ... /etc/subuid -  | wc -l
+find / -xdev -nogroup -printf '%G\n' | sort -u | awk ... /etc/subgid -  | wc -l
+```
+
+> [!note] Three plausible numbers, none of them an error message
+> Eleven, fourteen, a thousand. Each was returned by a check that ran cleanly and answered exactly
+> the question it was asked. Two asked the wrong question; one was reshaped by YAML into a different
+> command than the one written. **A literal block (`|`) rather than a folded one (`>-`) is not a
+> style preference where a shell pipeline is concerned** — folding reflows it, and an `awk` program
+> with a trailing pipe does not survive being reflowed.
+>
+> What turned each of them into progress was the same reflex: the number looked like a finding, so
+> it got investigated instead of filed.
+

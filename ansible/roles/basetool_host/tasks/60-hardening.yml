@@ -252,33 +252,70 @@
     # --- the two rules that will never pass, and must not be "fixed" ------------------------------
     #
     # CIS requires every file to have an owner and a group that exist in passwd/group. A host running
-    # ROOTLESS containers cannot satisfy that, structurally: an image layer contains files owned by
-    # uids from INSIDE the container's namespace, which land on subuids the host has no account for.
-    # Measured on the testing host: every orphan was under
-    # ~/.local/share/containers/storage/overlay/*/diff -- image content, not host content.
+    # ROOTLESS containers cannot satisfy that, and the reason is the design rather than an oversight:
+    # every uid inside a container maps to a SUBUID on the host, and subuids deliberately have no
+    # passwd entry. That covers both the image store and the data directories this role creates with
+    # namespace-translated ownership -- /var/iri/redis at 100998, /var/iri/db-backend at 100069, and
+    # so on. They are correct. They are also, to CIS, ownerless.
     #
-    # The danger is not the failing rule. It is the remediation somebody reaches for later:
-    # `chown -R` across those paths rewrites the image store's ownership and breaks every container
-    # built on those layers. The rule is therefore reported as a KNOWN EXCEPTION, with its scope
-    # measured on each run so that an orphan appearing OUTSIDE container storage is still noticed.
-    - name: Where do the ownerless files actually live?
-      ansible.builtin.shell: >-
-        set -o pipefail &&
-        find / -xdev \( -nouser -o -nogroup \) 2>/dev/null
-        | grep -cv '/containers/storage/' || true
-      register: basetool_orphans_outside
+    # The danger is not the failing rule. It is the remediation somebody reaches for later: a
+    # `chown -R` across those paths rewrites the image store AND hands every database its data
+    # directory under the wrong uid. The rule is therefore reported as a KNOWN EXCEPTION.
+    #
+    # The criterion is the SUBUID RANGE, not a path. A first version excluded paths under
+    # containers/storage and reported eleven orphans "outside" it -- which were the data directories,
+    # equally deliberate. Filtering by where a file sits describes today's layout; filtering by
+    # EVERY range in /etc/subuid, not just the service user's. Narrowing it to `iri` reported 14
+    # orphans -- which were containers run under another account's subuids. A uid inside ANY granted
+    # Two separate questions, because a file lands here for two separate reasons. `-nouser` is about
+    # the UID and is explained by /etc/subuid; `-nogroup` is about the GID and is explained by
+    # /etc/subgid. Checking the uid of a file that matched on its GROUP asks the wrong question of
+    # the right file -- it reported a container's /etc/shadow as unexplained because its owner was
+    # valid, while the thing that flagged it was a subgid.
+    #
+    # A LITERAL block (|), not folded: folding joins the lines with spaces and ate the final
+    # `| wc -l`, so the task reported an orphan's uid as though it were a count.
+    - name: Count owners outside every granted subuid range
+      ansible.builtin.shell: |
+        set -o pipefail
+        find / -xdev -nouser -printf '%U\n' 2>/dev/null | sort -u |
+        awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
+             { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subuid - |
+        wc -l
+      register: basetool_orphan_uids
       changed_when: false
       failed_when: false
       check_mode: false
 
+    - name: Count groups outside every granted subgid range
+      ansible.builtin.shell: |
+        set -o pipefail
+        find / -xdev -nogroup -printf '%G\n' 2>/dev/null | sort -u |
+        awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
+             { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subgid - |
+        wc -l
+      register: basetool_orphans_real
+
+      register: basetool_orphans_real
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+
     - name: Report the exception, and only the exception
       ansible.builtin.debug:
         msg: >-
-          CIS's two file-ownership rules fail and always will on a rootless-container host: image
-          layers carry files owned by namespace uids the host has no account for. Do NOT chown them
-          -- that rewrites the image store. Orphans found OUTSIDE container storage:
-          {{ basetool_orphans_outside.stdout | trim | default('0', true) }}. That number is the one
-          worth watching; anything above zero is a real finding rather than this exception.
+          CIS's two file-ownership rules fail and always will on a rootless-container host: every
+          uid inside a container is a subuid on the host, and subuids have no passwd entry by
+          design. That covers the image store and the data directories this role creates. Do NOT
+          chown them -- it rewrites the image store and misplaces every database's data directory.
+          Unexplained owners: {{ basetool_orphan_uids.stdout | trim | default('?', true) }}
+          (uids outside every subuid range), unexplained groups:
+          {{ basetool_orphans_real.stdout | trim | default('?', true) }} (gids outside every subgid
+          range). Those two numbers are the ones worth watching; above zero is a real finding rather
+          than this exception.
+
+
 
     - name: Say what has to happen next, because the scan cannot
       ansible.builtin.debug:
