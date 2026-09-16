@@ -1770,9 +1770,19 @@ time — a different machine, not the host probing itself.
 > [!important] The exact `set_real_ip_from` value cannot be a fixed address unless the container's is
 > Measured: the peer the edge sees is the **container's own address**, and it moved from `10.89.0.2`
 > to `10.89.0.3` across a recreation. ADR-0187 asks for a single address rather than a subnet, and
-> that is only achievable with `IP=` pinned in the edge's Quadlet unit. The ADR now says so. Without
-> the pin the rule would have to widen to the one-member ingress subnet — still narrow, still
-> unreachable from outside, but no longer the single value the decision asked for.
+> that is only achievable with `IP=` pinned in the edge's Quadlet unit. The ADR now says so.
+
+Then measured against the **real** `net-edge-ingress` subnet rather than a scratch one:
+
+|                                      |    Container address     |      Peer the edge saw       |
+|--------------------------------------|--------------------------|------------------------------|
+| `IP=172.28.15.10`, three recreations | `172.28.15.10` each time | **`172.28.15.10` each time** |
+| no pin, two recreations              | `172.28.15.2`, then `.3` | `172.28.15.2`, then `.3`     |
+
+And the pin **presupposes a user-defined bridge network** — podman refuses it on the default one:
+*"static ip/mac address can only be used with Bridge mode networking"*. So the pin and the ingress
+network's isolation properties are decisions about the **same** network, and have to be taken
+together rather than in sequence. That is the second reason `net-edge-ingress` is kept.
 
 ### A methodological finding, which cost an hour
 

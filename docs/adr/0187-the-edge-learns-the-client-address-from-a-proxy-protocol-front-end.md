@@ -51,10 +51,19 @@ of band, using PROXY protocol v2.**
 - **The edge trusts exactly the forwarder** via `set_real_ip_from`, with `real_ip_header
   proxy_protocol`. A single address, **not a subnet**, and never `0.0.0.0/0` — as the edge's own
   configuration has said since before this decision. **This requires the edge container's address
-  to be pinned** (`IP=` in its Quadlet unit): measured on Rocky, the peer the edge sees is the
-  container's *own* address, and it moved from `10.89.0.2` to `10.89.0.3` across a recreation.
-  Without a pinned address there is no single value to name, and the rule would have to widen to
-  the one-member ingress subnet.
+  to be pinned** with `IP=` in its Quadlet unit — measured, not assumed.
+
+> [!note] Why the pin is not optional, and what it drags in with it
+> The peer the edge sees is the container's **own** address. Measured on Rocky against the real
+> `net-edge-ingress` subnet: with `IP=172.28.15.10` pinned, three recreations in a row produced
+> `peer=172.28.15.10`. Without it, two recreations produced `172.28.15.2` and then
+> `172.28.15.3`. So the single address ADR asks for exists only with the pin; without it the rule
+> would have to widen to the subnet, and would be quietly broken by the first restart.
+>
+> The pin also **presupposes a user-defined bridge network** — podman refuses it otherwise:
+> *"static ip/mac address can only be used with Bridge mode networking"*. So the pin and the
+> ingress network's isolation properties are decisions about the **same** network, and are taken
+> together rather than one after the other.
 
 Why that last pair is load-bearing, and not a detail of configuration style:
 
