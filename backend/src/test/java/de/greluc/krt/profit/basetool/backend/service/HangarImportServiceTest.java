@@ -41,7 +41,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -73,16 +72,19 @@ class HangarImportServiceTest {
   @Mock private UserRepository userRepository;
   @Mock private OwnerScopeService ownerScopeService;
 
-  @InjectMocks private HangarImportService hangarImportService;
+  // Constructed in setUp() rather than by @InjectMocks: the parser needs a WORKING ObjectMapper,
+  // and @InjectMocks would supply a mock. It used to be patched in reflectively afterwards, but the
+  // field is `private final` — the mutation JEP 500 (JDK 26) warns about and a later release will
+  // refuse. Constructor-arg order matches the service's @RequiredArgsConstructor field order.
+  private HangarImportService hangarImportService;
 
   private final JsonMapper objectMapper = JsonMapper.builder().build();
 
   @BeforeEach
-  void injectObjectMapper() throws Exception {
-    // Inject the real ObjectMapper into the service via reflection
-    var field = HangarImportService.class.getDeclaredField("objectMapper");
-    field.setAccessible(true);
-    field.set(hangarImportService, objectMapper);
+  void setUp() {
+    hangarImportService =
+        new HangarImportService(
+            shipRepository, shipTypeRepository, userRepository, objectMapper, ownerScopeService);
     // Post-R9 D3 (V101): the import flow stamps owning_org_unit via the shared resolver. Tests
     // don't care which OrgUnit is returned — they only verify ship creation count + shape — so
     // return a stub Squadron for every call. Lenient because not every test triggers ship saves.

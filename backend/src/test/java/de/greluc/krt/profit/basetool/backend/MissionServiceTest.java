@@ -64,7 +64,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class MissionServiceTest {
@@ -90,15 +89,38 @@ class MissionServiceTest {
   @Mock private AuditService auditService;
 
   @InjectMocks private MissionParticipantService missionParticipantService;
-  @InjectMocks private MissionService missionService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL participant sub-service
+  // is one of its arguments
+  private MissionService missionService;
 
   @BeforeEach
   void wireExtractedParticipantService() {
     // MissionService delegates the participant methods to the extracted MissionParticipantService
     // (L1 step 2, #920). Wire a real instance (built from this class's mocks) into the CUT via
     // reflection, since Mockito does not inject one @InjectMocks target into another.
-    ReflectionTestUtils.setField(
-        missionService, "missionParticipantService", missionParticipantService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    missionService =
+        new MissionService(
+            missionRepository,
+            missionParticipantRepository,
+            userRepository,
+            null, // frequencyTypeRepository
+            null, // missionFrequencyRepository
+            null, // missionOwnershipRepository
+            null, // operationRepository
+            userService,
+            ownerScopeService,
+            authHelperService,
+            auditService,
+            null, // missionTimelineService
+            missionParticipantService,
+            null // missionStructureService
+            );
   }
 
   // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions

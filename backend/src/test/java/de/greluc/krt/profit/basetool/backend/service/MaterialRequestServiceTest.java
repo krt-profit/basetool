@@ -75,7 +75,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Unit coverage for the Materialbörse Gesuche domain's security-critical behaviour across the
@@ -103,7 +102,9 @@ class MaterialRequestServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialRequestService> selfProvider;
 
-  @InjectMocks private MaterialRequestService service;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL board service is one of
+  // its arguments
+  private MaterialRequestService service;
 
   // Read/write split (ADR-0116): the board/detail/counts reads plus the supplier-anonymity
   // redaction
@@ -122,10 +123,25 @@ class MaterialRequestServiceTest {
   /** Builds a fresh owner + active material-request fixture before each test. */
   @BeforeEach
   void setUp() {
-    // Mockito passes null for the board-service constructor arg (no @Mock of that type); wire the
-    // real co-built board service so the write service's write→read projection runs the real
-    // redaction/DTO mapping.
-    ReflectionTestUtils.setField(service, "boardService", boardService);
+    // The REAL co-built board service goes in through the constructor so the write->read
+    // projection runs the real redaction/DTO mapping.
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    service =
+        new MaterialRequestService(
+            requestRepository,
+            interestRepository,
+            materialRepository,
+            userRepository,
+            authHelperService,
+            auditService,
+            boardService,
+            blueprintProductService,
+            ownerScopeService,
+            eventPublisher,
+            selfProvider);
     owner = user(ownerId, "Suchende");
     material = material("Agricium");
     request = materialRequest(requestId, material, owner);

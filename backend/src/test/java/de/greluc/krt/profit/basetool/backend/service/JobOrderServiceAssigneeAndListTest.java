@@ -67,7 +67,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Coverage for {@link JobOrderService} methods that the main {@code JobOrderServiceTest} doesn't
@@ -100,26 +99,62 @@ class JobOrderServiceAssigneeAndListTest {
   // gets the real projection chained in — so the delegated add/remove/note paths and the list paths
   // keep exercising the real logic.
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
-  @InjectMocks private JobOrderAssigneeService jobOrderAssigneeService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
+  // of its arguments
+  private JobOrderAssigneeService jobOrderAssigneeService;
 
-  @InjectMocks private JobOrderService service;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
+  // co-built services
+  private JobOrderService service;
 
   // Read/write split (#14): the list/reference/detail reads moved to JobOrderQueryService, built
   // from the same mocks with the real stock projection wired in below.
-  @InjectMocks private JobOrderQueryService queryService;
+  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
+  // of its arguments
+  private JobOrderQueryService queryService;
 
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
   private static final UUID USER_ID = UUID.randomUUID();
 
   @BeforeEach
   void stubMapperEchoingEmptyMaterials() {
-    ReflectionTestUtils.setField(
-        service, "jobOrderStockProjectionService", jobOrderStockProjectionService);
-    ReflectionTestUtils.setField(
-        jobOrderAssigneeService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
-    ReflectionTestUtils.setField(service, "jobOrderAssigneeService", jobOrderAssigneeService);
-    ReflectionTestUtils.setField(
-        queryService, "jobOrderStockProjectionService", jobOrderStockProjectionService);
+    // Built through the constructor instead of patched in afterwards: these fields are
+    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
+    // warns about and a later release will refuse. Arg order matches the
+    // @RequiredArgsConstructor field-declaration order of each service.
+    // A `null` argument is a dependency this fixture never reaches -- exactly what
+    // @InjectMocks passed before, only visible now.
+    jobOrderAssigneeService =
+        new JobOrderAssigneeService(
+            jobOrderRepository, userRepository, auditService, jobOrderStockProjectionService);
+    service =
+        new JobOrderService(
+            jobOrderRepository,
+            materialRepository,
+            inventoryItemRepository,
+            jobOrderAssigneeService,
+            null, // orgUnitRepository
+            null, // jobOrderOrgUnitResolver
+            null, // authHelperService
+            null, // eventPublisher
+            materialClaimService,
+            auditService,
+            jobOrderItemService,
+            jobOrderStockProjectionService,
+            null // jobOrderPriorityService
+            );
+    queryService =
+        new JobOrderQueryService(
+            jobOrderRepository,
+            materialRepository,
+            inventoryItemRepository,
+            ownerScopeService,
+            jobOrderMapper,
+            squadronMapper,
+            jobOrderItemService,
+            jobOrderStockProjectionService,
+            null, // materialRequirementResolver
+            inventoryItemMapper);
     // The service routes nearly every return through mapToDtoWithStock(),
     // which calls jobOrderMapper.toDto(...) and then iterates the result's
     // materials. Return an empty materials list so we don't have to stub

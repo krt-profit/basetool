@@ -56,7 +56,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -64,7 +63,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
@@ -101,7 +99,12 @@ class PromotionFeatureFlagServiceGateTest {
   // we inject the latter directly with its repository mocks. The downstream PromotionTopicService
   // tests further down still receive the OwnerScopeService shim as a plain Mockito mock — the
   // shim's bean shape is unchanged from the caller's perspective.
-  @InjectMocks private OwnerScopeService ownerScopeService;
+  //
+  // Constructed in stubMembershipLookup() rather than by @InjectMocks, because the facade needs a
+  // REAL RequestScopeResolver and that used to be patched into a `private final` field with
+  // ReflectionTestUtils.setField — the mutation JEP 500 (JDK 26) warns about and a later release
+  // will refuse.
+  private OwnerScopeService ownerScopeService;
 
   private static Squadron squadron(UUID id, boolean enabled) {
     Squadron s = new Squadron();
@@ -142,7 +145,14 @@ class PromotionFeatureFlagServiceGateTest {
             mock(OrgUnitCascadeService.class),
             staffelMembershipResolver,
             request);
-    ReflectionTestUtils.setField(ownerScopeService, "requestScopeResolver", requestScopeResolver);
+    // Arg order matches OwnerScopeService's @RequiredArgsConstructor field order. The gate and
+    // stamping collaborators are never reached on the promotion path, so plain mocks satisfy the
+    // constructor — which is what @InjectMocks did with nulls before, only visibly.
+    ownerScopeService =
+        new OwnerScopeService(
+            requestScopeResolver,
+            mock(AccessGateService.class),
+            mock(OrgUnitStampingService.class));
   }
 
   @Test

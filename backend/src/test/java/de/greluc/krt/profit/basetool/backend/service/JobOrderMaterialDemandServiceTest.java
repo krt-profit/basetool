@@ -90,7 +90,8 @@ class JobOrderMaterialDemandServiceTest {
    */
   @InjectMocks private JobOrderMaterialRequirementResolver materialRequirementResolver;
 
-  @InjectMocks private JobOrderMaterialDemandService service;
+  // Constructed in setUp() so the REAL requirement resolver goes in through the constructor.
+  private JobOrderMaterialDemandService service;
 
   /** Stubbed batched stock lookup; each test decides what a bucket has linked to it. */
   private OrderLinkedStockIndex stockIndex;
@@ -101,9 +102,18 @@ class JobOrderMaterialDemandServiceTest {
   @BeforeEach
   void setUp() {
     // @InjectMocks would leave the extracted resolver as a mock returning no buckets, so every
-    // demand row would come back empty (#1740).
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service, "materialRequirementResolver", materialRequirementResolver);
+    // demand row would come back empty (#1740) — hence the REAL resolver, passed through the
+    // constructor. It used to be patched in with ReflectionTestUtils.setField, but the field is
+    // `private final`: the mutation JEP 500 (JDK 26) warns about and a later release will refuse.
+    // Arg order matches the service's @RequiredArgsConstructor field order.
+    service =
+        new JobOrderMaterialDemandService(
+            jobOrderRepository,
+            ownerScopeService,
+            materialRequirementResolver,
+            jobOrderStockProjectionService,
+            materialClaimService,
+            squadronMapper);
     stockIndex = mock(OrderLinkedStockIndex.class);
     titanium = material("Titanium", QuantityType.SCU);
     titaniumDto = materialDto(titanium);
