@@ -1,20 +1,50 @@
-# ADR-0163 — The container runtime becomes rootless Podman on CentOS Stream 10, on a rebuilt host
+# ADR-0163 — The container runtime becomes rootless Podman on Rocky Linux 10, on a rebuilt host
 
-- **Status:** **Accepted 2026-09-16**, with choice 1 amended. The measurement this ADR names as
-  able to stop it came back **negative** for Debian 13 on the same day, and the re-ruling moved
-  the platform rather than the decision. Read *The re-ruling* first, then *The measurement came
-  back negative* for why.
-- **Published title:** this ADR shipped as *… rootless Podman on Debian 13 …*, and the file name
-  keeps that spelling so no link breaks. The decision is CentOS Stream 10.
+- **Status:** **Accepted 2026-09-16**, with choice 1 amended **twice on the same day**. Read
+  *The second re-ruling* immediately below; then *The re-ruling* and *The measurement came back
+  negative* for the first one. Choices 2 to 5 were never in question.
+- **Published title:** this ADR shipped as *… rootless Podman on Debian 13 …* and the file name
+  keeps that spelling so no link breaks. The decision is **Rocky Linux 10**.
+
+## The second re-ruling — 2026-09-16, and it undoes the first one's reason
+
+Choice 1 moved from Debian 13 to CentOS Stream 10 for exactly one reason: only Podman 6 offers
+`rootless_port_forwarder="pasta"`, and only that preserved the client's source address for a
+bridge-networked edge. Everything below about CentOS is kept verbatim, because it is the honest
+record of why that was right at the time.
+
+**It stopped being right the same day.** The pasta forwarder was measured on CentOS Stream 10 and
+**does not deliver IPv6 at all** — see the plan's §13. [ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+then solved the source-address problem a different way, with a host-level PROXY-protocol front
+end, and that solution **needs no Podman 6 and no pasta forwarder**.
+
+With the reason gone, the cost of a development stream is no longer worth paying:
+
+|                                          |                     CentOS Stream 10                     |         **Rocky Linux 10**          |
+|------------------------------------------|----------------------------------------------------------|-------------------------------------|
+| supported until                          | 2030-05-31 (~5 years)                                    | **2035-05 (10 years)**              |
+| position relative to RHEL                | **upstream** — changes arrive before RHEL validates them | downstream rebuild of released RHEL |
+| SELinux, container-selinux, SCAP content | yes                                                      | yes                                 |
+| available on Hetzner                     | yes                                                      | yes, rapid-deploy image             |
+
+A hardened production host should receive changes **after** RHEL has validated them, not before.
+AlmaLinux 10 was weighed as equally viable and rejected only on a preference: it is ABI-compatible
+rather than bug-for-bug, and the hardening guidance this deployment is measured against is written
+for RHEL.
+
+**What this costs, stated plainly:** every Phase 1 measurement was taken on Podman 6.1.0 with
+netavark 2.1.0. Rocky 10 carries an older netavark, so `no_default_route` as an egress block and
+`--internal` against inbound DNAT are **re-measured there before production**, together with the
+certificate handover, the subuid base, cgroup delegation and ADR-0186's full chain.
 - **Date:** 2026-09-12, re-ruled 2026-09-16
 - **Deciders:** @greluc (four choices recorded below), Claude (analysis and measurement)
-- **Related:** [ADR-0049](0049-host-configuration-as-a-promotable-artifact.md) ·
-  [ADR-0072](0072-monitoring-stack-decoupled-from-the-app-deploy.md) ·
-  [ADR-0112](0112-edge-per-ip-limit-keys-on-the-ipv6-64-prefix.md) ·
-  [ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) ·
-  specs `REQ-OPS-002`, `REQ-OPS-003`, `REQ-OPS-004`, `REQ-OPS-013`, `REQ-OPS-014`,
-  `REQ-OPS-015`, `REQ-OPS-022`, `REQ-OBS-014`, `REQ-SEC-023` ·
-  [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md)
+- **Related:** [ADR-0049](0049-config-as-promotable-oci-artifact.md) ·
+[ADR-0072](0072-monitoring-stack-prometheus-grafana.md) ·
+[ADR-0112](0112-edge-real-client-ip-restore-native-ipv6.md) ·
+[ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) ·
+specs `REQ-OPS-002`, `REQ-OPS-003`, `REQ-OPS-004`, `REQ-OPS-013`, `REQ-OPS-014`,
+`REQ-OPS-015`, `REQ-OPS-022`, `REQ-OBS-014`, `REQ-SEC-023` ·
+[`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md)
 
 ## Context
 
@@ -148,9 +178,15 @@ makes against the current Docker stack.
 
 ## Decision
 
-**The container runtime becomes rootless Podman on CentOS Stream 10, orchestrated by Quadlet, on
+**The container runtime becomes rootless Podman on Rocky Linux 10, orchestrated by Quadlet, on
 a production host that is rebuilt rather than upgraded in place.**
 
+> [!note] Amended twice, and the second amendment is at the top of this file
+> This sentence named Debian 13 when written on 2026-09-12 and CentOS Stream 10 after the first
+> re-ruling. The analysis of CentOS below is kept as written; it records why that platform was
+> correct while Podman 6 was required, which [ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+> removed.
+>
 > [!note] As originally written, 2026-09-12
 > The sentence above read "rootless Podman 5.4.2 on Debian 13 trixie". The four choices below
 > are the originals and are kept verbatim, because the reasoning behind choices 2 to 5 is
@@ -370,7 +406,9 @@ per week and two were used on 2026-09-12.
 
 ## Status of this decision
 
-**Accepted** on 2026-09-16 by @greluc, with choice 1 amended to CentOS Stream 10. The plan it
+**Accepted** on 2026-09-16 by @greluc, with choice 1 amended to CentOS Stream 10 and then, the
+same day, to **Rocky Linux 10** once [ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+removed the need for Podman 6. The plan it
 governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
 has been touched. The phases were sequenced so that the measurements which could reject this ADR came
 first and cost nothing but time — and that is what happened: §3.1 was answered from vendor

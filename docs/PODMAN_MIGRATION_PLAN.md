@@ -1201,7 +1201,7 @@ has only ever been tested against one host.**
 
 ## 12. The host bootstrap is an Ansible role — ruled 2026-09-16
 
-[ADR-0185](adr/0185-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
+[ADR-0186](adr/0186-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
 from §11 rather than from a preference for the tool: **the testing host is built first and
 production is built from the same procedure afterwards.** A prose checklist executed twice by a
 human is not the same procedure twice. It is two procedures that resemble each other, and the
@@ -1465,18 +1465,49 @@ C also settles two things at once. §3.2 has been open since the beginning and s
 under C it disappears, because a host service may bind privileged ports anyway. An option that
 closes a standing question alongside its own is worth more than the list suggests.
 
-> [!important] The verdict, and it is a recommendation rather than a decision
-> **C, with B as the fallback.** Not because C is more elegant — it is not — but because B gives up
-> a security property the deployment has today, and C only costs work.
+> [!important] Decided 2026-09-16 by @greluc: **C**, recorded as [ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+> B stays the written-down fallback if C proves unworkable in Phase 2.
 >
-> Two things get measured before this becomes a decision, and both fit in an afternoon on the
-> testing host: whether a rootless container can publish **on loopback only, on both families**,
-> which is what the whole forgery argument rests on; and whether HTTP/3 is in play, since QUIC is
-> UDP and would pass a TCP front end by.
+> Both of the questions that were open when the recommendation was made have since been answered.
+> HTTP/3 is **not** in play — nothing in `docker/edge/` mentions QUIC or h3, so a TCP front end
+> passes nothing by. And a rootless container **can** publish on loopback only, on both families,
+> which is what the forgery argument rests on. The full chain was then measured end to end.
 
 A middle path — keep pasta for IPv4, where it does preserve the address, and front only IPv6 — is
 rejected: two paths with different trust configuration, and one of them stays the experimental one.
 
+#### C, measured end to end — 2026-09-16
+
+On the CentOS Stream 10 VM with Podman 6.1.0, haproxy 3.0.5 in `mode tcp` on `:80`, the container
+published on loopback only, `set_real_ip_from` plus `real_ip_header proxy_protocol` in nginx:
+
+|                                            |                               Result                                |
+|--------------------------------------------|---------------------------------------------------------------------|
+| loopback-only publish, both families       | `127.0.0.1:18080` and `[::1]:18080` bound — not `0.0.0.0` or `[::]` |
+| the port, from the host's global v4 and v6 | **refused** on both                                                 |
+| a connection carrying no PROXY header      | **rejected** — *broken header while reading PROXY protocol*         |
+| the full chain, IPv4                       | `remote=::ffff:10.9.0.14`, equal to `$proxy_protocol_addr`          |
+| the full chain, IPv6                       | `remote=2003:…:fe85:2fe9`, equal to `$proxy_protocol_addr`          |
+
+Three things came out of it that reading would not have produced:
+
+1. **`bind :::80 v4v6` is a trap.** IPv4 clients then arrive as `::ffff:10.9.0.14`, and every
+   CIDR-based `allow` rule behind it silently stops matching. The connection works; only the
+   address has the wrong shape. haproxy binds the two families **separately**.
+2. **SELinux needs one narrow grant, and only one.** Confined haproxy may not connect to an
+   unlabelled port; `semanage port -a -t http_port_t -p tcp <port>` is enough. The broad
+   `haproxy_connect_any` boolean was tried afterwards, was **not needed**, and stays off.
+3. **The first bind attempt failed with `Permission denied` on a port above 1024** — which is
+   SELinux confinement doing its job, not a privilege problem. Worth recording because it looks
+   like the latter and would send the next person to `ip_unprivileged_port_start`.
+
+> [!warning] Two properties are still unmeasured, and neither may be guessed at build time
+> The probe trusted a **subnet** in `set_real_ip_from`, which is fine for a probe and not fine for
+> production: the exact address the edge sees behind `rootlessport` on a one-member
+> `net-edge-ingress` has to be measured and pinned as a single address. And unreachability was
+> established only from the host's own addresses — the stronger test, a direct connection **from a
+> different machine**, is still owed. Both are on the Rocky list below.
+>
 > [!warning] What the neighbouring deployment's measurement does and does not establish
 > The PVE operator reached their own rootless Caddy over IPv6 from an external client and got a
 > 200, on **Podman 5.4.2** with **pasta as the network mode**. That is worth having: it refutes
@@ -1618,4 +1649,53 @@ images and configuration. The accident was worth more than a tidy run would have
 - §3.2, binding `:80`/`:443` rootless, which is a host-configuration question and not an experiment;
 - everything in Phase 2 — read-only with real mounts, the capability reduction for the databases,
   and the restart tuning that finding 3 above just added to it.
+
+## 14. The platform moves to Rocky Linux 10 — ruled 2026-09-16
+
+[ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md) removed
+the only reason this migration was on a development stream. ADR-0163's choice 1 went from Debian 13
+to CentOS Stream 10 because **only Podman 6 had `rootless_port_forwarder="pasta"`**, and only that
+preserved the client's source address for a bridge-networked edge. The PROXY-protocol front end does
+not need Podman 6, does not need pasta, and works on any of the three candidates.
+
+With the reason gone, the trade reverses:
+
+|                                  |                     CentOS Stream 10                     |            **Rocky Linux 10**             |                      AlmaLinux 10                      |
+|----------------------------------|----------------------------------------------------------|-------------------------------------------|--------------------------------------------------------|
+| supported until                  | 2030-05-31 (~5 years)                                    | **2035-05 (10 years)**                    | 2035-05 (10 years)                                     |
+| relative to RHEL                 | **upstream** — changes arrive before RHEL validates them | downstream rebuild of released RHEL       | downstream, **ABI-compatible** rather than bug-for-bug |
+| Podman                           | 6.1.0                                                    | 5.6.0 on 10.1, rebased over the lifecycle | comparable                                             |
+| SELinux, container-selinux, SCAP | yes                                                      | yes                                       | yes                                                    |
+| on Hetzner                       | yes                                                      | **yes**, rapid-deploy image               | yes, rapid-deploy image                                |
+
+A hardened production host should take changes **after** RHEL has validated them, not before. That
+is the whole argument, and it only became available once Podman 6 stopped being mandatory.
+
+AlmaLinux was weighed as equally viable and set aside on a preference rather than a defect: it is
+ABI-compatible rather than bug-for-bug, ships its own security backports — sometimes faster than
+RHEL — and the hardening content this deployment is measured against is written for RHEL. Rocky's
+1:1 rebuild keeps that mapping exact. Either would have been defensible.
+
+### What this costs, and it is not nothing
+
+**Every Phase 1 measurement was taken on Podman 6.1.0 with netavark 2.1.0.** Rocky 10 carries an
+older netavark, so the results do not transfer by assertion. Re-measured on the new host before
+anything is promoted:
+
+1. `no_default_route=true` as an egress block — the replacement for the masquerade switch (§3.3)
+2. `--internal` against inbound DNAT — decides whether `net-edge-ingress` stays necessary (§3.3)
+3. the certificate handover under userns with SELinux enforcing, and **the subuid base**, which
+   differed between the two platforms already and is the reason the Ansible role derives it (§3.4)
+4. cgroup delegation in the user slice (§3.5)
+5. ADR-0186's full chain, plus the two properties it left open — the exact `set_real_ip_from`
+   address, and unreachability of the edge port **from a different machine**
+
+Quadlet's `Memory=` needs Podman 6, so on 5.6 the generator emits `PodmanArgs=--memory=` instead.
+That path was already written for Debian 13 and is kept rather than deleted, which is now the second
+time it has been useful.
+
+> [!note] What does *not* need re-measuring
+> The pasta findings in §13 are not re-run. They rejected an option that is no longer taken, and
+> repeating them on Rocky would establish nothing that changes a decision. They stay recorded because
+> they are why ADR-0186 exists.
 
