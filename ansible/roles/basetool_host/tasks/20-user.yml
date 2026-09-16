@@ -35,6 +35,12 @@
 
 # Without lingering the user's systemd instance exists only while somebody is logged in: the
 # containers stop the moment the last session closes, and they never start at boot at all.
+#
+# Enabling it also STARTS every unit already sitting in ~/.config/containers/systemd, because
+# the generated units carry [Install] WantedBy=default.target. That is harmless here -- the
+# role provisions a host that has no units yet, and deploy.sh delivers them afterwards -- but
+# it is the reason this task must never be reordered after unit delivery, and the reason a
+# hand bootstrap enables lingering last. Measured on the testing VM, 2026-09-16.
 - name: Enable lingering so the user manager runs without a session
   ansible.builtin.command: "loginctl enable-linger {{ basetool_service_user }}"
   args:

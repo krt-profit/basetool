@@ -381,6 +381,10 @@ The *empirical* half is closed as of 2026-09-16 — see the measurement above. T
 said what was supposed to happen, and this project's own history is a list of things that were
 supposed to happen, so it was measured.
 
+The other half is closed too: **the positive arm was measured on CentOS Stream 10 with Podman
+6.1.0 on the same day, and it passes.** A bridge-networked container with
+`rootless_port_forwarder = "pasta"` logged the real client address. See §13.
+
 ### 3.2 Can the edge bind :80 and :443 rootless, and at what cost? — open, and now cheaper
 
 `net.ipv4.ip_unprivileged_port_start` is **1024** on the production host, re-verified 2026-09-16.
@@ -426,6 +430,10 @@ Read off `podman-network-create(1)` on 2026-09-16:
 which is the reason `net-edge-ingress` exists at all. Whether netavark's `--internal` behaves the
 same way decides whether the ingress bridge is still needed. **Measure it; do not read it.**
 
+**Measured 2026-09-16 — §13.** Both answers came back: `no_default_route=true` does block egress
+and leaves the container with no default route, so it is the masquerade equivalent; and netavark's
+`--internal` does remove inbound DNAT, so **`net-edge-ingress` stays necessary**.
+
 ### 3.4 Does the certificate handover survive user-namespace mapping? — sharpened, and testable
 
 The handover is more delicate than §3.4 assumed, and reading the actual `acme` command makes the
@@ -448,11 +456,21 @@ Under a user namespace, "root in container" is the service user on the host and 
 `REQ-OPS-026` (a renewed certificate is not delivered until the edge can open it) is the acceptance
 here, unchanged.
 
+**Measured 2026-09-16 — §13.** The handover works on CentOS Stream 10 under SELinux: `CAP_CHOWN`
+alone sufficed, the chmod-before-chown order held, and `edge` as uid 101 opened the file. The host
+uid turned out to be **524388**, from a subuid base of 524288 rather than the Debian guest's
+100000 — which is the argument for deriving that number instead of writing it down.
+
 ### 3.5 Do healthchecks and resource limits work under a user slice? — yes, with one spelling change
 
 Measured on the Debian 13 testing host, 2026-09-16: cgroup v2, and **`user.slice` already delegates
 `cpuset cpu io memory hugetlb pids rdma misc`**. The memory and pids controllers a rootless service
 needs are therefore present without further host work.
+
+**The target platform delegates less — and still enough.** CentOS Stream 10 gives the user slice
+`cpu memory pids` only (§13). `Memory=`, `PidsLimit=` and `--cpus` each have their controller, and
+nothing here uses `io`. The wider Debian list is not a property of rootless Podman, so it should
+not be relied on as one.
 
 Read off the **Podman 5.4.2** `podman-systemd.unit(5)` man page — the version Debian 13 ships, not
 the latest:
@@ -1226,3 +1244,122 @@ Ansible at bootstrap therefore adds no inbound path that did not already exist.
 It is written down because an objection resting on a sentence that turns out to be wrong is worth
 saying out loud rather than quietly dropping — and because a requirement whose prose is false
 teaches its readers not to trust the ones that are true.
+
+## 13. Phase 1 — measured on the target platform, 2026-09-16
+
+Every open experiment in §3 has now been run, on the **CentOS Stream 10 testing VM with Podman
+6.1.0**, against a client on the LAN. The PVE operator took the snapshot `vor-phase-1` first; the
+host was left clean afterwards — no containers, no unit files, no failed units.
+
+This section is the record of what the host said. Where it disagrees with §3, §3 is now annotated to
+point here.
+
+### §3.1 The source address — **the measurement passes on the chosen platform**
+
+Two arms, thirteen seconds apart, same image, same host, same client, one variable:
+
+|                   Arm                   | What the container logged as the client |
+|-----------------------------------------|-----------------------------------------|
+| default (`rootlessport`)                | **`10.89.2.2`** — the forwarder         |
+| **`rootless_port_forwarder = "pasta"`** | **`10.1.0.30`** — the real client       |
+
+A container on a **user-defined bridge** with a published port, probed from a LAN machine against
+the VM's own address. So the setting does on this platform exactly what the Podman 6.0 release
+notes describe, and the reason ADR-0163 was re-ruled onto CentOS Stream 10 holds up under
+measurement rather than under citation.
+
+That is the same experimental shape that produced the negative result on Debian 13 — same image,
+same minute, same client, one variable — which is what makes the pair comparable.
+
+> [!warning] What this settles, and what it does not
+> It settles the **mechanism**: on this platform, with that setting, a bridge-networked container
+> sees the client. It does not settle the IPv6 half, because the probe was IPv4, and it does not
+> settle behaviour under production-shaped traffic — which is Phase 5 on the new host while it is
+> idle, exactly as §3.1 split it. The option also remains **experimental upstream**, so the standing
+> assertion stays the conformance suite's `client-address-visible` check, not this one measurement.
+>
+> The IPv6 arm needs the PVE operator, because the prefix rotates on PPPoE re-dial and a stale
+> literal would measure nothing. It is scheduled, not skipped.
+
+### §3.3 The two network semantics — **both answered, and both matter**
+
+**`-o no_default_route=true` is the masquerade equivalent.** The hypothesis §3.3 refused to assume
+is confirmed:
+
+|            Arm             |   Egress    |
+|----------------------------|-------------|
+| a plain network            | reachable   |
+| `-o no_default_route=true` | **blocked** |
+
+And on the second arm the container's routing table carries a link-scope route and **no default
+route at all**. The property `com.docker.network.bridge.enable_ip_masquerade=false` was buying —
+ingress without egress — is therefore reproducible on netavark, by a documented driver option.
+
+**`--internal` removes inbound DNAT, exactly as Docker's `internal: true` did.** A container on an
+internal network with a published port is not reachable from outside: the probe times out and the
+container logs no request at all.
+
+So **`net-edge-ingress` stays necessary.** The one-member, non-internal bridge that the published
+ports land on is not a Docker artefact to be tidied away during the translation; netavark needs it
+for the same reason Docker did. That is a finding worth having before the topology was simplified
+on the assumption that it was legacy.
+
+### §3.4 The certificate handover — **works, and the host uid was not what memory would have said**
+
+`acme` simulated with `--cap-drop ALL --cap-add CHOWN`: wrote the key, `chmod` **before** `chown`
+(CAP_FOWNER is dropped, so root may not chmod a file it does not own), chowned to `101:101`, renamed
+atomically. `edge` simulated as `--user 101:101` **opened it**. SELinux enforcing throughout, on a
+Podman named volume — which is what production uses for `edge-certs`. All three conditions §3.4
+listed hold, and `REQ-OPS-026` is satisfiable on this platform.
+
+> [!tip] The host uid was 524388, and that is the argument for deriving it rather than writing it
+> Inside the namespace the file is `101:101`; on the host it is **524388**, because this host's
+> subuid base is **524288** — not the 100000 the Debian testing guest uses. A bootstrap that
+> hard-coded `chown 100100` would have been silently wrong here, and wrong in the direction that
+> produces a file nobody can read at renewal time. The Ansible role derives the host uid from the
+> same variable that grants the range, and this is the measurement that says why that was worth
+> doing.
+
+### §3.5 cgroup delegation — narrower here, and still sufficient
+
+The user slice on this host delegates `cpu memory pids` — noticeably less than the Debian guest's
+`cpuset cpu io memory hugetlb pids rdma misc`. It is **enough**: `Memory=`, `PidsLimit=` and
+`--cpus` each have their controller, and nothing in this stack uses `io`. Worth recording because
+§3.5's "already delegates everything" was measured on the platform that is no longer the target.
+
+### Three things the units did that nobody asked for
+
+Enabling lingering started the user manager, which read the unit files already lying there and
+**tried to start the whole stack** — because the generated units carry `WantedBy=default.target`,
+faithfully translating compose's `restart: unless-stopped`. Fourteen services failed on absent
+images and configuration. The accident was worth more than a tidy run would have been.
+
+1. **The `.network` units materialise the real topology.** Not in a dry run — the networks were
+   created, and `net-edge-ingress` came up dual-stack with `172.28.15.0/24` and `fd00:28:15::/64`,
+   `net-proxy-api` with `internal=true` and its pinned pair. The nineteen-segment model reproduces
+   on netavark with its addresses intact.
+2. **The dependency graph held.** `backend`, `frontend`, `ingest` and `keycloak` never started at
+   all — `inactive`, zero restart attempts — because `Requires=` on their failed databases held them
+   back. That is the `depends_on: condition: service_healthy` behaviour surviving the translation.
+3. **`Restart=always` needs tuning, and that is a real Phase 2 item.** `edge` burned five restarts
+   in seconds and then stopped for good with *"Start request repeated too quickly"* — systemd's
+   default start limiter. Compose's `unless-stopped` backs off instead and keeps trying. Without an
+   explicit `RestartSec=` and a widened `StartLimitBurst` / `StartLimitIntervalSec`, a transient
+   failure at boot — a database slow to come up, a registry briefly unreachable — leaves a unit
+   permanently down rather than retrying. It would look exactly like a broken deploy and would not
+   be one.
+
+> [!important] Bootstrap order now matters in a way it did not under Compose
+> Under Compose nothing starts until `docker compose up` runs. Under Quadlet the units are *enabled*
+> by their `[Install]` section, so the stack starts the moment the user manager does — which is when
+> lingering is switched on. `loginctl enable-linger` therefore belongs **after** the images, the
+> environment files and the configuration are in place, never before. It is one line in the
+> bootstrap, and it is the difference between a clean first start and eighteen failing units.
+
+### What Phase 1 leaves open
+
+- the **IPv6 arm** of §3.1, which needs the PVE operator for the current prefix;
+- §3.2, binding `:80`/`:443` rootless, which is a host-configuration question and not an experiment;
+- everything in Phase 2 — read-only with real mounts, the capability reduction for the databases,
+  and the restart tuning that finding 3 above just added to it.
+

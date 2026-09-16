@@ -15,6 +15,12 @@ basetool_service_group: iri
 # The subordinate id range. EVERY host-side uid in this role is derived from this number rather
 # than written down, so changing it here moves every ownership rule with it. That is the one thing
 # the prose bootstrap cannot do: a hand-computed 110000 is silently wrong the day this changes.
+#
+# It is not hypothetical. A user auto-allocated by useradd on the CentOS Stream 10 testing VM got
+# base 524288 (SUB_UID_MIN in that distribution's login.defs), not the 100000 the Debian guest
+# uses -- so the certificate the acme container hands to uid 101 sits at 524388 on that host and
+# at 100100 on the other. Measured 2026-09-16. This role pins the base explicitly so the two
+# hosts agree, and derives from the pin so that they still agree if it ever moves.
 basetool_subuid_base: 100000
 basetool_subuid_count: 65536
 

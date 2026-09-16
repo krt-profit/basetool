@@ -110,6 +110,17 @@ loginctl show-user iri --property=Linger   # expect Linger=yes
 ls -d /run/user/$(id -u iri)               # the user manager's runtime dir must exist
 ```
 
+> [!warning] Enable lingering **last**, after the units, images and configuration are in place
+> This is the one ordering constraint in the whole bootstrap, and it was found the hard way on
+> the testing VM on 2026-09-16. Enabling lingering starts the user manager, and the user manager
+> immediately starts every unit whose `[Install]` section wants `default.target` — which is all
+> of them, because that is how `restart: unless-stopped` translates. On a host where the images
+> have not been pulled and `.env` does not exist yet, that is eighteen units failing at once,
+> several of them past their start limit and therefore **staying** down.
+>
+> Under Compose nothing ran until somebody ran `docker compose up`. Under Quadlet the units are
+> already enabled, so switching on lingering **is** the start command. Treat it as one.
+
 ---
 
 ## 3. Directory layout, and the ownership arithmetic
@@ -270,6 +281,19 @@ the acceptance below asserts the behaviour rather than the setting.
 The Quadlet units live in `~iri/.config/containers/systemd/` and are materialised by
 `systemctl --user daemon-reload`. The unit files replace `docker-compose.yml` inside the promoted
 config bundle (`REQ-OPS-004` — host configuration stays a promotable, digest-pinned artifact).
+
+Every generated `.container` carries `[Install] WantedBy=default.target`, which is the faithful
+translation of `restart: unless-stopped` — it is what makes the stack come back after a reboot
+without anything being logged in. It also means a unit file dropped into that directory is an
+**enabled** unit as soon as `daemon-reload` runs, which is the ordering constraint in §2.
+
+> [!note] `Restart=always` is not `unless-stopped`, and the difference bites at boot
+> systemd's default start limiter stops a unit for good after five starts in ten seconds — the
+> testing VM produced `edge.service: Start request repeated too quickly` within a minute. Docker's
+> `unless-stopped` backs off and keeps trying instead, so a dependency that is merely slow is
+> survivable there and terminal here. The units therefore need an explicit `RestartSec=` and a
+> widened `StartLimitBurst` / `StartLimitIntervalSec` before anything real runs on them; it is a
+> Phase 2 task and it is tracked in the migration plan's §13.
 
 Secrets are unchanged in shape and stay **host-only**, never in the bundle (`REQ-OPS-005`,
 `REQ-OPS-012`): `/var/iri/code/.env` at `0640`, the keystore under `/var/iri/secrets`, the GHCR
