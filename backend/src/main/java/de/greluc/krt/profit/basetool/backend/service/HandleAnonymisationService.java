@@ -55,8 +55,13 @@ import org.springframework.transaction.annotation.Transactional;
  * is <b>never automatic</b>: an admin weighs the wish and grants it deliberately, and the procedure
  * for weighing it is in {@code docs/privacy/data-subject-requests.md}.
  *
- * <p><b>Eight columns, one act.</b> Erasing some and leaving others would be worse than not erasing
- * at all, because the result reads as an erasure that has been performed:
+ * <p><b>Twelve columns in eight statements, one act.</b> Erasing some and leaving others would be
+ * worse than not erasing at all, because the result reads as an erasure that has been performed.
+ * The list below is the eight <em>statements</em>; two of them cover several columns, and {@link
+ * #ANONYMISED_COLUMNS} is the authoritative twelve that {@code HandleErasureCoverageTest} and the
+ * receipt's own log line both read. The prose used to say „Eight columns“ over a list naming
+ * twelve, which is the same kind of count a reader checks a coverage list against (corrected
+ * 2026-09-17):
  *
  * <ol>
  *   <li>{@code audit_event.actor_handle} — the activity trail, matched by id

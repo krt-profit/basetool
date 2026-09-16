@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.frontend.template;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -299,20 +298,6 @@ class AnonymisedHandleRenderTest {
         .isTrue();
     try (Stream<Path> tree = Files.walk(root)) {
       return tree.filter(p -> p.toString().endsWith(".html")).sorted().toList();
-    }
-  }
-
-  /**
-   * Reads a template, turning the checked exception into an unchecked one for stream use.
-   *
-   * @param template the file
-   * @return its content
-   */
-  private static String read(Path template) {
-    try {
-      return Files.readString(template, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
     }
   }
 
