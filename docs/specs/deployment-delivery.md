@@ -22,10 +22,19 @@ existed only as a runbook.
 
 ### REQ-OPS-001 — Pull-only delivery
 
-The production host **pulls**; nothing pushes to it. There is no inbound SSH, no webhook, and
-no GitHub-issued credential capable of running commands on the box. The host holds only a
-**read-only** GHCR pull token. A compromised Actions workflow or stolen `GITHUB_TOKEN` must
-not be able to drive code execution on prod — at most it can read images already published.
+The production host **pulls**; nothing pushes to it **for delivery**. There is no inbound SSH
+*for the deploy*, no webhook, and no GitHub-issued credential capable of running commands on the
+box. The host holds only a **read-only** GHCR pull token. A compromised Actions workflow or stolen
+`GITHUB_TOKEN` must not be able to drive code execution on prod — at most it can read images
+already published.
+
+> [!note] Corrected 2026-09-16 — this paragraph overstated its own scope
+> It read *"There is no inbound SSH"*, flatly, while the acceptance criteria below have always
+> scoped it to the **deploy path**. The operator's administrative SSH exists, is the host's sole
+> administrative entrance and the only route to the two loopback-bound admin interfaces, and it
+> **stays** — confirmed by @greluc on 2026-09-16. This requirement governs the delivery mechanism,
+> not human access. A requirement whose prose is false teaches its readers not to trust the ones
+> that are true, which is why this is a correction rather than a clarification.
 
 **Acceptance**
 

@@ -1,0 +1,84 @@
+---
+# Defaults for the basetool_host role.
+#
+# Everything a host might legitimately differ on lives here. The testing host and the production
+# host are built from the SAME role with the same values except where they genuinely differ, which
+# is the property ADR-0185 exists to buy -- see docs/PODMAN_HOST_BOOTSTRAP.md for why each of these
+# is what it is.
+
+# --- the rootless service user ----------------------------------------------------------------
+# It is in no privileged group, because there is no docker group to be in. That is the whole
+# security case for ADR-0163.
+basetool_service_user: iri
+basetool_service_group: iri
+
+# The subordinate id range. EVERY host-side uid in this role is derived from this number rather
+# than written down, so changing it here moves every ownership rule with it. That is the one thing
+# the prose bootstrap cannot do: a hand-computed 110000 is silently wrong the day this changes.
+basetool_subuid_base: 100000
+basetool_subuid_count: 65536
+
+# --- paths --------------------------------------------------------------------------------------
+basetool_root_dir: /var/iri
+basetool_state_dir: /var/lib/iri
+basetool_token_dir: /etc/iri
+
+# --- the versions the migration actually depends on ----------------------------------------------
+# Asserted, not hoped for. Without pesto, published ports fall back to rootlessport and the edge
+# sees one client address for the entire internet -- silently, with every health check green.
+basetool_min_podman_major: 6
+basetool_require_pesto: true
+
+# --- containers.conf ------------------------------------------------------------------------------
+# The setting the whole migration turns on. Measured 2026-09-16: with rootlessport a container on a
+# user-defined bridge logged the forwarder's address; with pasta it logged the real client.
+basetool_rootless_port_forwarder: pasta
+
+# --- SELinux ---------------------------------------------------------------------------------------
+# A permanent fcontext rule rather than :z/:Z on the mounts: it survives a relabel, it does not
+# mutate host paths at mount time, and a :Z on a shared path is how two services end up unable to
+# read each other's files.
+basetool_manage_selinux: true
+
+# --- the bind-mount owners ---------------------------------------------------------------------------
+# Each entry is a uid AS THE CONTAINER SEES IT, plus the paths under basetool_root_dir that need it.
+# The host uid is derived in tasks/30-directories.yml; it is never written here.
+#
+# Every one of these exists because something failed loudly and confusingly when it was missing.
+# The reasons are in docs/PODMAN_HOST_BOOTSTRAP.md section 3 and they have not changed with the
+# runtime -- only the arithmetic has.
+basetool_container_owners:
+  - container_uid: 10001          # backend / frontend / ingest, set in their Dockerfiles
+    reason: "the app modules write their logs here"
+    paths:
+      - backend/log
+      - frontend/log
+      - ingest/log
+  - container_uid: 1000           # the Keycloak Quarkus image
+    reason: "without it Keycloak logs OPEN_FAILURE and silently keeps console-only logging"
+    paths:
+      - keycloak/log
+  - container_uid: 999            # redis inside the official image
+    reason: >-
+      redis cannot chown its own /data because users.acl is mounted :ro from the same directory,
+      so it dies on "Can't open or create append-only dir" and the health gate rolls the deploy back
+    paths:
+      - redis
+  - container_uid: 70             # postgres inside the alpine image
+    reason: "the postgres data directories"
+    paths:
+      - db-backend
+      - db-keycloak
+
+# Directories owned by the service user itself (container root maps to it).
+basetool_service_user_dirs:
+  - code
+  - code/keycloak/providers      # the deploy stages the promoted provider JAR here; if it is
+                                 # missing the deploy fails at the LAST step, after every
+                                 # container is already healthy, which reads like a glitch
+  - secrets
+  - monitoring/data
+  - monitoring/textfile          # node_exporter's textfile collector, which the cgroup metrics
+                                 # collector and deploy.sh both write into
+  - monitoring/certs
+  - monitoring/secrets

@@ -1,0 +1,54 @@
+---
+- name: Install the container runtime and the tools this role and its operators need
+  ansible.builtin.dnf:
+    name:
+      - podman
+      - passt            # carries pasta AND pesto; pesto is what preserves the client address
+      - netavark
+      - aardvark-dns
+      - crun
+      - policycoreutils-python-utils   # semanage, for 40-selinux.yml
+      - setools-console                # sesearch, for diagnosing a denial rather than guessing
+      - git
+      - curl
+      - jq
+      - rsync
+    state: present
+
+- name: Read the installed podman version
+  ansible.builtin.command: podman --version
+  register: basetool_podman_version_raw
+  changed_when: false
+
+- name: Extract the major version
+  ansible.builtin.set_fact:
+    basetool_podman_major: >-
+      {{ basetool_podman_version_raw.stdout | regex_search('([0-9]+)\.', '\\1') | first | int }}
+
+- name: Assert podman is new enough to preserve the client source address
+  ansible.builtin.assert:
+    that: basetool_podman_major | int >= basetool_min_podman_major | int
+    fail_msg: >-
+      Found {{ basetool_podman_version_raw.stdout }}, need >= {{ basetool_min_podman_major }}.
+      rootless_port_forwarder="pasta" arrived in Podman 6.0. Below that, published ports on
+      user-defined bridge networks go through rootlessport, which replaces the client's address
+      with its own -- measured 2026-09-16 on Debian 13 / podman 5.4.2: a bridge container logged
+      10.89.0.2, the forwarder, while a pasta container logged the real client. The per-IP limiter
+      (REQ-SEC-023) then applies to the whole internet as one bucket and the Keycloak admin
+      allow-list stops discriminating. See PODMAN_MIGRATION_PLAN.md section 3.1.
+    success_msg: "{{ basetool_podman_version_raw.stdout }}"
+
+- name: Look for the pesto binary
+  ansible.builtin.stat:
+    path: /usr/bin/pesto
+  register: basetool_pesto
+
+- name: Assert pesto is present
+  ansible.builtin.assert:
+    that: basetool_pesto.stat.exists
+    fail_msg: >-
+      /usr/bin/pesto is missing. It ships in passt and is what rootless_port_forwarder="pasta"
+      invokes; without it the setting in 50-podman.yml has nothing to call and published ports fall
+      back to rootlessport SILENTLY -- every container starts, every health check passes, and the
+      edge sees one client address for the entire internet. Requires passt >= 0:20260526.
+  when: basetool_require_pesto | bool

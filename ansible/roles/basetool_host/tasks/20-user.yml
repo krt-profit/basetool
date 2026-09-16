@@ -1,0 +1,54 @@
+---
+- name: Create the rootless service user
+  ansible.builtin.user:
+    name: "{{ basetool_service_user }}"
+    group: "{{ basetool_service_group }}"
+    system: true
+    # A home, unlike the Docker bootstrap's --no-create-home: rootless Podman keeps its entire
+    # state under $HOME -- the image store, the per-user configuration, and the generated units.
+    # Here the home IS the deployment.
+    create_home: true
+    shell: /sbin/nologin
+    # No supplementary groups. There is no docker group to be in, which is the point.
+    state: present
+  register: basetool_user
+
+- name: Grant the subordinate uid range
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    regexp: "^{{ basetool_service_user }}:"
+    line: "{{ basetool_service_user }}:{{ basetool_subuid_base }}:{{ basetool_subuid_count }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Grant the subordinate gid range
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    regexp: "^{{ basetool_service_user }}:"
+    line: "{{ basetool_service_user }}:{{ basetool_subuid_base }}:{{ basetool_subuid_count }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+
+# Without lingering the user's systemd instance exists only while somebody is logged in: the
+# containers stop the moment the last session closes, and they never start at boot at all.
+- name: Enable lingering so the user manager runs without a session
+  ansible.builtin.command: "loginctl enable-linger {{ basetool_service_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ basetool_service_user }}"
+
+- name: Confirm the user manager's runtime directory exists
+  ansible.builtin.stat:
+    path: "/run/user/{{ basetool_user.uid }}"
+  register: basetool_runtime_dir
+
+- name: Warn when the user manager has not come up yet
+  ansible.builtin.debug:
+    msg: >-
+      /run/user/{{ basetool_user.uid }} does not exist yet. Lingering was just enabled and systemd
+      usually creates it within a second or two; if it is still missing on the next run, the user
+      manager is not starting and no Quadlet unit will ever run.
+  when: not basetool_runtime_dir.stat.exists

@@ -1,0 +1,37 @@
+---
+# Fail before changing anything, rather than half-way through.
+
+- name: Assert the host is an EL 10 derivative
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['distribution_major_version'] | int >= 10
+    fail_msg: >-
+      This role targets CentOS Stream 10 (ADR-0163). Found
+      {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
+      Rocky 10 and AlmaLinux 10 are EL 10 and will pass this check, but they were measured on
+      2026-09-16 carrying podman 5.8.2 with no /usr/bin/pesto -- the version assertion in
+      10-packages.yml is what will stop them, and it is the one that matters.
+    success_msg: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+- name: Read the cgroup filesystem type
+  ansible.builtin.command: stat -fc %T /sys/fs/cgroup
+  register: basetool_cgroup_fs
+  changed_when: false
+
+- name: Assert cgroup v2
+  ansible.builtin.assert:
+    that: basetool_cgroup_fs.stdout.strip() == 'cgroup2fs'
+    fail_msg: >-
+      Rootless Podman needs cgroup v2 for resource limits to mean anything -- Memory= and
+      PidsLimit= are silently decoration without it, and REQ-OPS-020's measured limits would not
+      be applied. Found '{{ basetool_cgroup_fs.stdout.strip() }}'.
+
+- name: Warn when SELinux is not enforcing
+  ansible.builtin.debug:
+    msg: >-
+      SELinux reports '{{ ansible_facts['selinux']['status'] | default('absent') }}'. This role's
+      file contexts still apply, but the second confinement layer ADR-0163 counts as part of its
+      security case is not in force. Do NOT set it permissive to make something work -- diagnose
+      with `ausearch -m AVC -ts recent`.
+  when: ansible_facts['selinux']['status'] | default('disabled') != 'enabled'

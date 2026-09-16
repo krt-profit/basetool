@@ -1,0 +1,46 @@
+---
+- name: Create the service user's containers configuration directory
+  ansible.builtin.file:
+    path: "~{{ basetool_service_user }}/.config/containers"
+    state: directory
+    owner: "{{ basetool_service_user }}"
+    group: "{{ basetool_service_group }}"
+    mode: "0755"
+
+- name: Create the Quadlet unit directory
+  ansible.builtin.file:
+    path: "~{{ basetool_service_user }}/.config/containers/systemd"
+    state: directory
+    owner: "{{ basetool_service_user }}"
+    group: "{{ basetool_service_group }}"
+    mode: "0755"
+
+# The setting the whole migration turns on. Without it, published ports on user-defined bridge
+# networks go through rootlessport -- a userspace proxy that replaces the client's address with its
+# own -- and every $remote_addr rule in the edge stops discriminating.
+- name: Configure rootless port forwarding
+  ansible.builtin.template:
+    src: containers.conf.j2
+    dest: "~{{ basetool_service_user }}/.config/containers/containers.conf"
+    owner: "{{ basetool_service_user }}"
+    group: "{{ basetool_service_group }}"
+    mode: "0644"
+
+- name: Read back what podman actually resolved the setting to
+  become: true
+  become_user: "{{ basetool_service_user }}"
+  ansible.builtin.command: podman info --format '{{ "{{" }} .Host.RootlessNetworkCmd {{ "}}" }}'
+  register: basetool_rootless_netcmd
+  changed_when: false
+  failed_when: false
+
+- name: Report it
+  ansible.builtin.debug:
+    msg: >-
+      podman reports rootless network command '{{ basetool_rootless_netcmd.stdout | default('?') }}'.
+      That is the DEFAULT network mode, not the bridge port forwarder -- the setting written above
+      governs bridge networks and podman does not report it here. It is asserted where it matters:
+      run `scripts/check-conformance.py --ssh <host>` and require client-address-visible to be
+      green. A stack can be entirely healthy with that check red, and then the per-IP limiter
+      applies to the whole internet at once.
+  changed_when: false

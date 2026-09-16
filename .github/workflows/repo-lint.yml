@@ -226,6 +226,36 @@ jobs:
       - name: Self-test the cgroup metrics collector
         run: bash scripts/cgroup-container-metrics.test.sh
 
+  ansible-lint:
+    name: ansible-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # ADR-0185. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
+      # delivery is untouched by it. The role is the reason "production is built from the same
+      # procedure as testing" can be asserted rather than hoped for, so it is worth having CI
+      # notice when it stops parsing -- it cannot be exercised against a real host here, and an
+      # unrunnable role is discovered at the worst possible moment otherwise.
+      - name: Install ansible-core, ansible-lint and the pinned collections
+        run: |
+          set -euo pipefail
+          pip install --disable-pip-version-check --quiet ansible-core ansible-lint
+          ansible-galaxy collection install -r ansible/requirements.yml -p ansible/collections
+
+      # `-i localhost,` rather than the committed example: an inventory file named
+      # *.example is not recognised by extension, so ansible falls back to scanning and
+      # buries a real error in parser warnings.
+      - name: Syntax-check the playbook
+        working-directory: ansible
+        run: ansible-playbook -i localhost, --syntax-check site.yml
+
+      - name: Lint the role
+        working-directory: ansible
+        run: ansible-lint
+
   probe-vs-allowlist:
     name: probe-vs-allowlist
     runs-on: ubuntu-latest

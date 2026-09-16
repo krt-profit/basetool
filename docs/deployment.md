@@ -54,7 +54,7 @@ filesystem and are bind-mounted into the containers at runtime. The
 including them in a build context.
 
 **The host pulls; nothing pushes to the host from GitHub.** The deploy timer
-holds a read-only GHCR token. There is no inbound SSH, no webhook, no
+holds a read-only GHCR token. There is no inbound SSH **for the deploy**, no webhook, no
 GitHub-issued credential capable of running shell commands on the box.
 
 **Tag promotion is deliberate.** `release-images.yml` publishes versioned

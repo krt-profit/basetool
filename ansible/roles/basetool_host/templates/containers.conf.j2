@@ -1,0 +1,24 @@
+#
+# Managed by Ansible -- ansible/roles/basetool_host (ADR-0185). Edits are overwritten.
+#
+# Rationale: docs/PODMAN_HOST_BOOTSTRAP.md section 6.
+#
+# rootless_port_forwarder selects how published ports reach a container attached to a USER-DEFINED
+# BRIDGE network. The default, "rootlessport", is a userspace proxy that replaces the client's
+# source address with its own. Measured on 2026-09-16: two containers of the same image on the same
+# host, differing only in network mode -- on a bridge the container logged 10.89.0.2, the
+# forwarder; on pasta it logged the real client address.
+#
+# This deployment's edge sits on six bridge networks, and six things in its nginx configuration read
+# $remote_addr: the per-IP rate limiter (REQ-SEC-023), the ADR-0112 IPv6 /64 bucket key, the
+# Keycloak admin allow-list, the default-server allow-list, the API allow-list, and the access log
+# that is the only record of a refused request's origin. Five of those degrade without this setting.
+# One INVERTS: the admin allow-list names the bridge gateways, so with every client wearing the
+# forwarder's address it either admits the internet or locks the operator out.
+#
+# The option is EXPERIMENTAL and off by default upstream (Podman 6.0 release notes). That is a
+# standing risk recorded in ADR-0163, not a footnote -- which is why the acceptance asserts the
+# BEHAVIOUR, via scripts/check-conformance.py's client-address-visible check, rather than the
+# presence of this line.
+[network]
+rootless_port_forwarder = "{{ basetool_rootless_port_forwarder }}"

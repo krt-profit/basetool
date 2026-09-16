@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: basetool_host
+  description: >-
+    Prepare a CentOS Stream 10 host to run the Profit Basetool stack under rootless Podman:
+    packages, the service user and its subuid range, the directory layout with namespace-translated
+    ownership, SELinux contexts, and the containers.conf setting that preserves the client source
+    address. ADR-0185.
+  license: "see LICENSE.md"
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "10"
+dependencies: []

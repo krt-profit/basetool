@@ -1,0 +1,33 @@
+---
+# SELinux is enforcing by default on the RHEL family. The Ubuntu host runs AppArmor, which never
+# had an opinion about bind mounts; SELinux does. A container process runs as container_t and may
+# only read files labelled container_file_t, so a bind mount from /var/iri hands it Permission
+# denied on a file whose mode bits say it should be readable -- which gets misdiagnosed as an
+# ownership problem every time.
+#
+# A permanent fcontext rule rather than :z / :Z on the mounts: it survives a relabel, it does not
+# rewrite labels on a host path at mount time, and a :Z on a path two services share is how they
+# end up unable to read each other's files.
+
+- name: Label the data tree for container access
+  community.general.sefcontext:
+    target: "{{ basetool_root_dir }}(/.*)?"
+    setype: container_file_t
+    state: present
+  register: basetool_fcontext
+
+- name: Apply the labels
+  ansible.builtin.command: "restorecon -R {{ basetool_root_dir }}"
+  when: basetool_fcontext.changed
+  changed_when: true
+
+- name: Note where the first failure will be
+  ansible.builtin.debug:
+    msg: >-
+      The certificate handover is where SELinux will bite first: acme writes fullchain.pem and
+      privkey.pem and hands them to container uid 101 so the edge can open them (REQ-OPS-026), and
+      that path now crosses a user-namespace uid translation AND a label transition at once. Both
+      failures present identically -- the edge exits three seconds after start, the health gate
+      fails, the deploy rolls back, and nothing says "label". Diagnose with
+      `ausearch -m AVC -ts recent`, never by guessing, and never by setting SELinux permissive.
+  changed_when: false

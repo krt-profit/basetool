@@ -86,3 +86,7 @@ ssh Befehle.txt
 # way to keep it is to make `git add -A` unable to pick them up.
 *.tmp
 .ui.xml
+
+# Ansible (ADR-0185): an inventory names real machines and this repository is public.
+ansible/inventory/hosts.yml
+ansible/collections/

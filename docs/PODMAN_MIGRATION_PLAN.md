@@ -1176,3 +1176,53 @@ it is a property of *this deployment issuing its own certificates*. The second n
 `ACME_HOSTS` and skips where nothing is issued. **A check that has only ever run against one host
 has only ever been tested against one host.**
 
+---
+
+## 12. The host bootstrap is an Ansible role — ruled 2026-09-16
+
+[ADR-0185](adr/0185-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
+from §11 rather than from a preference for the tool: **the testing host is built first and
+production is built from the same procedure afterwards.** A prose checklist executed twice by a
+human is not the same procedure twice. It is two procedures that resemble each other, and the
+resemblance is exactly what that sequence was supposed to guarantee.
+
+Three facts made it more than a convenience. This project already decided that host configuration is
+not a document (ADR-0049 / `REQ-OPS-004` — it is a promotable, digest-pinned artifact, and
+hand-editing it on the host is forbidden), so the bootstrap being prose was the **exception** to a
+rule already made everywhere else. Phases 1-4 snapshot, break and re-bootstrap the testing host
+repeatedly, which makes idempotence the loop rather than a nicety. And ADR-0163 chose "rebuild
+rather than upgrade", so this recurs by design.
+
+`ansible/` holds the role; [`PODMAN_HOST_BOOTSTRAP.md`](PODMAN_HOST_BOOTSTRAP.md) keeps the **why**
+and is not duplicated into it. One thing the role does better than the prose: the uid arithmetic is
+**derived from the same variable that grants the subuid range**, rather than transcribed — so a
+hand-computed `110000` cannot go silently wrong the day that base changes, and the ownership tasks
+gain real idempotence that a `command:` wrapping `podman unshare` could not have.
+
+> [!danger] The boundary is the load-bearing half
+> **Ansible provisions; `deploy.sh` deploys.** The playbook ships no unit files, pulls no image, and
+> is never run against a host that is serving traffic. The temptation is concrete and will arrive
+> quickly — once a playbook configures the host, running the playbook is one short step from
+> pushing the next compose file with it, and `REQ-OPS-001`'s pull-only property is gone by
+> convenience rather than by decision.
+
+### A correction the decision forced — `REQ-OPS-001`
+
+The obvious objection was that Ansible is push-over-SSH while `REQ-OPS-001` is *pull-only delivery*.
+Checking it turned up a defect in the requirement rather than in the plan.
+
+Its prose read **"There is no inbound SSH"**, flatly. Its own acceptance criteria have always said
+something narrower — *"no SSH key, deploy key, or git credential is provisioned **for the deploy
+path**"* — and the reality, documented at length in the production-access runbook, is that the
+operator's SSH **is** the host's sole administrative entrance and the only route to the two
+loopback-bound admin interfaces. @greluc confirmed on 2026-09-16 that it exists and stays.
+
+So the prose was false and the acceptance criteria were right: the requirement governs the
+**delivery mechanism, not human access**. Corrected the same day in
+[`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md),
+[`docs/deployment.md`](deployment.md) and [ADR-0049](adr/0049-config-as-promotable-oci-artifact.md).
+Ansible at bootstrap therefore adds no inbound path that did not already exist.
+
+It is written down because an objection resting on a sentence that turns out to be wrong is worth
+saying out loud rather than quietly dropping — and because a requirement whose prose is false
+teaches its readers not to trust the ones that are true.

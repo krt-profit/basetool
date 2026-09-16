@@ -1,0 +1,35 @@
+---
+# basetool_host -- prepare a CentOS Stream 10 host to run the Basetool stack under rootless Podman.
+#
+# ADR-0185. This role PROVISIONS; it does not deploy. It installs packages, creates the service
+# user and its subuid range, lays out and owns the directories, sets SELinux contexts and writes
+# containers.conf. It never ships unit files, never pulls an image, and must never be run against a
+# host that is serving traffic -- REQ-OPS-001's pull-only delivery is untouched by it.
+#
+# The reasoning behind every step is in docs/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
+# document is the why, and it is not duplicated here on purpose.
+
+- name: Preflight -- the host is what this role assumes
+  ansible.builtin.import_tasks: 00-preflight.yml
+  tags: [preflight]
+
+- name: Packages, and the two versions the migration depends on
+  ansible.builtin.import_tasks: 10-packages.yml
+  tags: [packages]
+
+- name: The rootless service user
+  ansible.builtin.import_tasks: 20-user.yml
+  tags: [user]
+
+- name: Directory layout and its namespace-translated ownership
+  ansible.builtin.import_tasks: 30-directories.yml
+  tags: [directories]
+
+- name: SELinux file contexts
+  ansible.builtin.import_tasks: 40-selinux.yml
+  when: basetool_manage_selinux | bool
+  tags: [selinux]
+
+- name: Podman configuration
+  ansible.builtin.import_tasks: 50-podman.yml
+  tags: [podman]
