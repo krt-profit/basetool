@@ -101,8 +101,9 @@
                     </thead>
                     <tbody>
                     <tr th:each="g : ${grants}" data-testid="bank-grant-row"
+                        th:with="grantHandle=${@handles.display(g.userHandle())}"
                         th:classappend="${!g.granteeHasBankRole()} ? ' is-inert' : ''"
-                        th:attr="data-user-id=${g.userId()},data-account-id=${g.accountId()},data-version=${g.version()},data-can-deposit=${g.canDeposit()},data-can-withdraw=${g.canWithdraw()},data-can-transfer=${g.canTransfer()},data-user-handle=${@handles.display(g.userHandle())}">
+                        th:attr="data-user-id=${g.userId()},data-account-id=${g.accountId()},data-version=${g.version()},data-can-deposit=${g.canDeposit()},data-can-withdraw=${g.canWithdraw()},data-can-transfer=${g.canTransfer()},data-user-handle=${grantHandle}">
                         <td>
                             <span th:text="${@handles.display(g.userHandle())}">greluc</span>
                             <span class="chip chip--muted krtm-font-size-0-55rem-eff3"
@@ -135,7 +136,8 @@
                         <td class="text-right">
                             <button type="button" class="btn btn-ghost btn-sm"
                                     data-trigger="open-modal-display" data-modal-id="bank-grant-revoke-modal"
-                                    th:attr="data-field-_userId=${g.userId()},data-field-_accountId=${g.accountId()},data-field-_label=${@handles.display(g.userHandle())} + ' / ' + ${g.accountNo()}"
+                                    th:with="grantLabel=${@handles.display(g.userHandle())} + ' / ' + ${g.accountNo()}"
+                                    th:attr="data-field-_userId=${g.userId()},data-field-_accountId=${g.accountId()},data-field-_label=${grantLabel}"
                                     data-testid="bank-grant-revoke-open"
                                     th:text="#{bank.grants.revoke}">Entziehen</button>
                         </td>

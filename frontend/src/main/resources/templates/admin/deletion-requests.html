@@ -66,7 +66,8 @@
                 </thead>
                 <tbody id="deletionRequestsBody">
                     <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
-                        th:attr="data-id=${req.id},data-handle=${@handles.display(req.handle)},data-version=${req.version}">
+                        th:with="reqHandle=${@handles.display(req.handle)}"
+                        th:attr="data-id=${req.id},data-handle=${reqHandle},data-version=${req.version}">
                         <td>
                             <span th:text="${@handles.display(req.handle)}">Mitglied</span>
                         </td>

@@ -94,6 +94,17 @@ class AnonymisedHandleRenderTest {
   /** What every occurrence inside such an attribute has to be wrapped in. */
   private static final String WRAPPER = "@handles.display(";
 
+  /**
+   * The attribute forms Thymeleaf evaluates in restricted mode, where a bean reference throws.
+   *
+   * <p>{@code th:attr} / {@code th:attrappend} / {@code th:attrprepend} set arbitrary attributes,
+   * and {@code th:data-*} (any {@code th:} prefix on a non-standard attribute) goes through the
+   * same default-attribute processor. Group 1 is the attribute for the failure message, group 2 the
+   * expression text.
+   */
+  private static final Pattern RESTRICTED_ATTRIBUTE =
+      Pattern.compile("th:(attr|attrappend|attrprepend|data-[\\w-]+)=\"([^\"]*)\"");
+
   // covers REQ-SEC-062 - an erased handle must never reach a page as its raw token
   @Test
   void everyRenderedHandleGoesThroughTheDisplayHelper() throws IOException {
@@ -123,6 +134,50 @@ class AnonymisedHandleRenderTest {
                 + " would print #ANONYMISED# verbatim. Wrap the expression in"
                 + " ${@handles.display(...)}, which maps it to general.anonymisedHandle and passes"
                 + " every other value through unchanged.")
+        .isEmpty();
+  }
+
+  /**
+   * The wrapper may not sit in an attribute Thymeleaf evaluates in restricted mode.
+   *
+   * <p>The companion defect to an unwrapped render, and it costs a 500 rather than a leak: {@code
+   * th:attr}, its prepend/append siblings and every {@code th:<custom-attribute>} are evaluated
+   * with {@code StandardExpressionExecutionContext.RESTRICTED}, which refuses a bean reference. So
+   * {@code th:attr="data-handle=${@handles.display(...)}"} parses and then throws "Instantiation of
+   * new objects and access to static classes or parameters is forbidden in this context" the first
+   * time the page renders.
+   *
+   * <p>Three sites were written that way when the wrapping was applied (2026-09-17) and only one of
+   * them had an MVC render test, so two shipped broken behind a green suite. The remedy is {@code
+   * th:with}: a declaration rather than an attribute value, evaluated in normal mode and at a
+   * higher precedence than {@code th:attr}, so the bound name is available where the bean call is
+   * not.
+   */
+  @Test
+  void theWrapperNeverSitsInARestrictedAttribute() throws IOException {
+    List<String> restricted = new ArrayList<>();
+
+    for (Path template : templates()) {
+      String content = Files.readString(template, StandardCharsets.UTF_8);
+      Matcher attribute = RESTRICTED_ATTRIBUTE.matcher(content);
+      while (attribute.find()) {
+        if (attribute.group(2).contains(WRAPPER)) {
+          restricted.add(
+              template.getFileName()
+                  + ": th:"
+                  + attribute.group(1)
+                  + " in "
+                  + oneLine(attribute.group(2)));
+        }
+      }
+    }
+
+    assertThat(restricted)
+        .as(
+            "Thymeleaf evaluates th:attr and every th:<custom-attribute> in restricted mode, which"
+                + " refuses a bean reference: each of these throws on the first render rather than"
+                + " printing a wrong value. Bind it with th:with and reference the bound name"
+                + " instead.")
         .isEmpty();
   }
 
