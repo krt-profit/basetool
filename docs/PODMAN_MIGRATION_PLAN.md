@@ -1913,6 +1913,34 @@ compliant"* from *"the remediation did nothing"* — two situations that look id
 > before the first hypothesis, not after the second: *what would this check look like if it were not
 > working?* If the answer is "the same", it is not a check yet.
 
+### What it actually achieved
+
+Measured by the third evaluation, which is the whole point of adding it:
+
+|         | before  |  after  |
+|---------|---------|---------|
+| passing | **166** | **281** |
+| failing | **124** | **12**  |
+
+So the remediation worked substantially, and the task that reported *"0 newly passing"* was wrong
+about its own run rather than describing a host that needed nothing.
+
+> [!warning] Two more of the same family, both in the checking rather than the thing checked
+> Reading those numbers back took two attempts, and both failures are worth writing down because
+> they are the cheapest kind to repeat.
+>
+> `grep -oE 'Result +[a-z]+'` found **nothing** in a 1299-line result log: `oscap` separates the
+> word from the value with a **tab**, and the pattern demanded a space. An empty result read as "the
+>
+>> scan produced nothing". The role's own expression uses `\s` and was never affected — it was the
+>> ad-hoc check that lied.
+>
+> And `pgrep -f 'oscap xccdf eval'`, run inline over ssh, reported the scan as still running for
+> more than ten minutes after it had finished: **the pattern matched the checking command's own
+> command line**. The report files were timestamped a minute after the scan started. Running the
+> same `pgrep` from a script file — whose command line is the script's name — answered correctly at
+> once.
+
 ### `nohup` does not detach far enough
 
 The run was started with `nohup` so a dropped SSH connection could not abort it half-way — a
