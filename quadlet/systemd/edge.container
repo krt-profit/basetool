@@ -12,9 +12,11 @@ DropCapability=ALL
 NoNewPrivileges=true
 Tmpfs=/tmp:rw,noexec,nosuid,size=64m
 Tmpfs=/var/cache/nginx:rw,noexec,nosuid,size=64m
-PublishPort=80:8080
-PublishPort=443:8443
-Network=net-edge-ingress.network
+PublishPort=127.0.0.1:8080:8080
+PublishPort=[::1]:8080:8080
+PublishPort=127.0.0.1:8443:8443
+PublishPort=[::1]:8443:8443
+Network=net-edge-ingress.network:ip=172.28.15.10
 Network=net-proxy-frontend.network
 Network=net-proxy-keycloak.network
 Network=net-proxy-ingest.network
@@ -27,7 +29,7 @@ Volume=/var/iri/monitoring/certs/basetool-ca.crt:/etc/nginx/upstream-ca.crt:ro
 Volume=/var/iri/code/docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
 EnvironmentFile=/var/iri/code/env.d/edge.env
 Exec=/bin/sh /etc/nginx/edge/render-and-run.sh
-HealthCmd=wget -q -O /dev/null http://127.0.0.1:8080/healthz
+HealthCmd=wget -q -O /dev/null http://127.0.0.1:8081/healthz
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=3

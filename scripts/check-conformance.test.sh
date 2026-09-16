@@ -242,6 +242,27 @@ case "$cmd" in
       *)            echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
     esac
     ;;
+    *"docker inspect edge --format '{{json .NetworkSettings.Ports}}'"*)
+      case "$scenario" in
+        # The pre-ADR-0187 shape: published to the world, so there is nothing to assert yet.
+        edge-world) echo '{"8080/tcp":[{"HostIp":"0.0.0.0","HostPort":"80"}]}' ;;
+        *)          echo '{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"}]}' ;;
+      esac
+      ;;
+    *"ip -o addr show scope global"*)
+      case "$scenario" in
+        edge-no-addr) echo "" ;;
+        *)            printf '10.9.0.15\n2003:db8::1\n' ;;
+      esac
+      ;;
+    *"--max-time 4 http://"*)
+      case "$scenario" in
+        # Something answered on a routable address: the invariant is gone, and the PROXY header the
+        # edge trusts can be forged by anyone able to reach that port.
+        edge-open) echo "200" ;;
+        *)         echo "000" ;;
+      esac
+      ;;
   *"/dev/tcp/"*)
     case "$scenario" in
       redis-open)     echo "+PONG" ;;
@@ -561,6 +582,22 @@ STUB_SCENARIO=logs-stopped assert_status \
   "log-streams fails when ingestion has stopped" log-streams fail "has stopped" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=logs-absent assert_status \
   "log-streams fails when the metric is absent" log-streams fail "no samples" -- "${STUB_ARGS[@]}"
+
+# ADR-0187 load-bearing invariant. The red case is the one that matters: a port answering on a
+# routable address means the PROXY header can be forged, and nothing about a healthy-looking
+# stack would show it.
+STUB_SCENARIO=edge-open assert_status \
+  "edge-not-directly-reachable fails when the edge answers on a routable address" \
+  edge-not-directly-reachable fail "can be forged" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=edge-world assert_status \
+  "edge-not-directly-reachable skips when nothing is in front of the edge" \
+  edge-not-directly-reachable skip "does not publish on loopback" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=edge-no-addr assert_status \
+  "edge-not-directly-reachable skips when the host reports no global address" \
+  edge-not-directly-reachable skip "no global address" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=healthy assert_status \
+  "edge-not-directly-reachable passes when every routable address refuses" \
+  edge-not-directly-reachable pass "refused on 2 global address" -- "${STUB_ARGS[@]}"
 
 # The real condition on the testing host today, and the message has to name it rather than leak
 # the shell guard's marker.

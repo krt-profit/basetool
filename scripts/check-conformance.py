@@ -1051,6 +1051,77 @@ class Check:
     fn: Callable[[Context], str]
 
 
+def check_edge_not_directly_reachable(ctx: Context) -> str:
+    """The edge's own port must be reachable from nothing but the front end.
+
+    This is the invariant ADR-0187 rests on, and it is the one that turns the decision into its
+    opposite when it slips. The front end hands the edge the client's address in a PROXY protocol
+    header, and the edge believes it -- because the header **asserts** a source address, it does not
+    prove one. So if anything else can open a connection to the edge's port, it can invent a client
+    address, and walk past the per-client rate limiter (``REQ-SEC-023``) and the Keycloak admin
+    allow-list, which are exactly the two controls the front end exists to preserve.
+
+    The property that closes it is that the container publishes on **loopback only**. That is one
+    line in the unit file, it is invisible in every screenshot of a working system, and nothing about
+    a healthy stack would reveal its absence. Hence a check rather than a comment.
+
+    The probe deliberately runs **from the host**, against the host's own routable addresses rather
+    than against ``127.0.0.1``: loopback is where the port is *supposed* to answer. A connection that
+    succeeds there proves nothing, and one that succeeds on the public address proves the invariant
+    is gone.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the addresses that were tried and refused.
+
+    Raises:
+        Skip: when no host access is configured, or the edge does not publish on loopback at all --
+            which is the pre-ADR-0187 shape and not a failure of this check.
+        CheckFailed: when the edge answers on an address other than loopback.
+    """
+    published = ctx.runner.run(
+        "docker inspect edge --format '{{json .NetworkSettings.Ports}}' 2>/dev/null || echo ''"
+    ).strip()
+    if not published or '127.0.0.1' not in published:
+        raise Skip(
+            "the edge does not publish on loopback, so there is no front end in front of it "
+            "(ADR-0187 not in effect on this host)"
+        )
+
+    # Every routable address the host has, v4 and v6 -- not a hardcoded one. A host gains an
+    # interface and the check has to follow it, or it proves the invariant for the address somebody
+    # thought of in 2026 and not for the one that was added later.
+    addrs = ctx.runner.run(
+        "ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1"
+    ).split()
+    if not addrs:
+        raise Skip("the host reports no global address to probe from")
+
+    reachable = []
+    for addr in addrs:
+        target = f"[{addr}]" if ":" in addr else addr
+        for port in ("8080", "8443"):
+            out = ctx.runner.run(
+                f"curl -s -o /dev/null -w '%{{http_code}}' --max-time 4 "
+                f"http://{target}:{port}/ 2>/dev/null || true"
+            ).strip()
+            # 000 is curl's "no HTTP response", which is what a refused or filtered port gives.
+            # Anything else means something answered, and something answering here is the defect.
+            if out and out != "000":
+                reachable.append(f"{target}:{port} -> HTTP {out}")
+
+    if reachable:
+        raise CheckFailed(
+            "the edge answers on a routable address, so the PROXY header it trusts can be forged: "
+            + "; ".join(reachable)
+            + ". It must publish on loopback only (ADR-0187)."
+        )
+
+    return f"refused on {len(addrs)} global address(es), on both 8080 and 8443"
+
+
 CHECKS: tuple[Check, ...] = (
     Check("vhost-reachable", "REQ-OPS-014", False, check_vhost_reachable),
     Check("certificate-valid", "REQ-OPS-026", False, check_certificate_valid),
@@ -1064,6 +1135,8 @@ CHECKS: tuple[Check, ...] = (
     Check("container-metrics", "REQ-OBS-006", True, check_container_metrics),
     Check("log-streams", "REQ-OBS-005", True, check_log_streams),
     Check("rate-limit-active", "REQ-SEC-023", False, check_rate_limit_active),
+    Check("edge-not-directly-reachable", "ADR-0187 / REQ-SEC-023", True,
+          check_edge_not_directly_reachable),
 )
 
 

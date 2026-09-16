@@ -61,6 +61,30 @@ ENV_DIR_ON_HOST = "/var/iri/code/env.d"
 #: Host paths the compose files reach through a variable. Quadlet units are static, so these are
 #: resolved here -- to the values the production `.env` already sets. The plan's §3.1 records the
 #: alternative (render the units at bundle-build time) and why this one was taken.
+# ADR-0187: the edge does not publish its ports to the world any more. A host-level
+# haproxy binds :80 and :443 and forwards with PROXY protocol, so the container is
+# reachable ONLY from that front end -- which is precisely what makes the header
+# unforgeable, since PROXY protocol asserts a source address rather than proving one.
+#
+# Compose keeps "80:8080" and "443:8443" because the Docker deployment still serves
+# them directly; this override is what makes the Quadlet shape differ, deliberately
+# and in one readable place rather than by a second copy of the compose file.
+#
+# The address is PINNED, and that is not neatness. Measured on Rocky 10.2: the peer
+# the edge sees is the container's OWN address, and without a pin it moved from
+# .2 to .3 across a recreation -- so `set_real_ip_from`, which must name a single
+# address, would have been broken by the first restart. Three recreations with the
+# pin produced the same peer every time. `IP=` also requires a user-defined bridge
+# network, which net-edge-ingress is.
+FRONT_END = {
+    "edge": {
+        "publish": ["127.0.0.1:8080:8080", "[::1]:8080:8080",
+                    "127.0.0.1:8443:8443", "[::1]:8443:8443"],
+        "network": "net-edge-ingress",
+        "ip": "172.28.15.10",
+    }
+}
+
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
@@ -476,13 +500,25 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         container.append("NoNewPrivileges=true")
     for tmpfs in spec.get("tmpfs", []) or []:
         container.append(f"Tmpfs={tmpfs}")
-    for port in spec.get("ports", []) or []:
-        container.append(f"PublishPort={port}")
+    front = FRONT_END.get(service)
+    if front:
+        # Deliberately NOT spec["ports"]: see FRONT_END. The compose value is the
+        # Docker deployment's, and translating it faithfully here would publish the
+        # edge to the world behind a front end that trusts a forgeable header.
+        for port in front["publish"]:
+            container.append(f"PublishPort={port}")
+    else:
+        for port in spec.get("ports", []) or []:
+            container.append(f"PublishPort={port}")
 
     networks = spec.get("networks")
     names = list(networks.keys()) if isinstance(networks, dict) else list(networks or [])
     for net in names:
-        container.append(f"Network={net}.network")
+        if front and net == front["network"]:
+            # Quadlet takes the address as an option on the Network= line.
+            container.append(f"Network={net}.network:ip={front['ip']}")
+        else:
+            container.append(f"Network={net}.network")
 
     for vol in spec.get("volumes", []) or []:
         container.append(f"Volume={_volume(str(vol), service)}")

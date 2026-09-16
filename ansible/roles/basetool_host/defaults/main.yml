@@ -101,3 +101,23 @@ basetool_hardening_datastream: /usr/share/xml/scap/ssg/content/ssg-cs10-ds.xml
 # deliberate act, and the scan report is what makes it an informed one. Set this true on a host you
 # have a snapshot of, and re-run the conformance suite afterwards.
 basetool_hardening_remediate: false
+
+# --- the L4 front end (ADR-0187) ------------------------------------------------------------------
+# haproxy binds the public ports and hands the edge the client address with PROXY protocol, because
+# rootless port forwarding replaces it. The edge itself publishes on loopback only.
+#
+# basetool_edge_trusted_proxy is the edge container's PINNED address on net-edge-ingress, and it must
+# match `IP=` in the generated unit. It is the peer the edge sees -- measured: without a pin that
+# address moves between recreations, which would break set_real_ip_from at the first restart.
+basetool_edge_trusted_proxy: "172.28.15.10"
+basetool_edge_loopback_ports: [8080, 8443]
+basetool_frontend_ports:
+  - { public: 80, backend: 8080 }
+  - { public: 443, backend: 8443 }
+basetool_frontend_maxconn: 4096
+basetool_frontend_timeout_connect: 5s
+# Generous on the client side: an SSE stream through the edge is a long-lived connection, and the
+# front end must not be the thing that cuts it. The edge's own keepalive governs the rest.
+basetool_frontend_timeout_client: 15m
+basetool_frontend_timeout_server: 15m
+basetool_manage_frontend: true

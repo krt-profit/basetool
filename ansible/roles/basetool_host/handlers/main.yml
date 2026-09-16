@@ -1,0 +1,14 @@
+---
+# Reload rather than restart: haproxy's reload hands the listening sockets to the new process, so a
+# configuration change does not drop the connections currently going through it.
+#
+# Guarded on the unit ALREADY running, from an explicit check rather than from `ansible_facts`:
+# service facts are only present when `service_facts` has been gathered, and a handler that assumes
+# them fails on a host where it has not. This role provisions a host that is not serving yet, where
+# haproxy is enabled but deliberately not started -- reloading it there would start a front end in
+# front of an edge that does not exist.
+- name: Reload haproxy
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: reloaded
+  when: basetool_haproxy_active | default(false) | bool

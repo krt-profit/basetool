@@ -1,0 +1,86 @@
+---
+# The L4 front end (ADR-0187).
+#
+# Rootless Podman's port forwarder replaces every client address with its own, which does not merely
+# degrade the per-client rate limiter but INVERTS the Keycloak admin allow-list. haproxy binds :80
+# and :443 on the host, forwards to the edge in `mode tcp` and prepends a PROXY v2 header; the edge
+# restores the address from it. TLS still terminates at the edge -- this is byte forwarding, so no
+# key exists in a second place and the certificate handover is untouched.
+#
+# Everything here was measured on the target platform before it was written. The two details that
+# look like style and are not:
+#
+#   * SEPARATE v4 and v6 binds. A single `bind :::80 v4v6` makes IPv4 clients arrive as
+#     `::ffff:10.9.0.15`, and every CIDR-based `allow` rule behind it silently stops matching. The
+#     connection works; only the address has the wrong shape.
+#   * A NARROW SELinux port label. Confined haproxy may not connect to an unlabelled port. Labelling
+#     the one loopback port is enough; the `haproxy_connect_any` boolean would permit connecting
+#     anywhere and is deliberately left off.
+
+- name: Install haproxy
+  ansible.builtin.package:
+    name: haproxy
+    state: present
+
+# The first bind attempt on the testing host failed with "Permission denied" on a port ABOVE 1024,
+# which reads exactly like a privilege problem and is not: it is SELinux refusing a confined service
+# an unlabelled port. Recording it here so the next person does not go looking at
+# ip_unprivileged_port_start.
+- name: Allow haproxy to reach the edge's loopback port
+  community.general.seport:
+    ports: "{{ basetool_edge_loopback_ports | join(',') }}"
+    proto: tcp
+    setype: http_port_t
+    state: present
+  when: basetool_manage_selinux | bool
+
+- name: Refuse a front-end address that trusts too much
+  ansible.builtin.assert:
+    that:
+      - basetool_edge_trusted_proxy is match('^[0-9a-fA-F:.]+$')
+      - "'/' not in basetool_edge_trusted_proxy"
+    fail_msg: >-
+      basetool_edge_trusted_proxy must be ONE address, never a prefix and never a wildcard.
+      PROXY protocol asserts a source address rather than proving one, so a range wide enough to
+      contain an attacker turns this front end into a source-address forgery tool aimed at the rate
+      limiter and the admin allow-list it exists to preserve (ADR-0187). The edge's own
+      render-and-run.sh refuses the same values; this is the earlier of the two gates.
+
+# The handler needs to know this, and asking systemd is cheaper and more honest than gathering the
+# whole service inventory just to read one unit's state.
+- name: Is the front end already running?
+  ansible.builtin.command: systemctl is-active haproxy
+  register: basetool_haproxy_state
+  changed_when: false
+  failed_when: false
+
+- name: Remember it for the reload handler
+  ansible.builtin.set_fact:
+    basetool_haproxy_active: "{{ basetool_haproxy_state.stdout | trim == 'active' }}"
+
+- name: Write the front-end configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    validate: haproxy -c -f %s
+  notify: Reload haproxy
+
+# Enabled, but NOT started here. This role provisions a host that is not serving traffic yet, and a
+# front end with no backend behind it would answer every request with a connection error for as long
+# as the gap lasts. `deploy.sh` brings the stack up; the front end comes with the boot after it.
+- name: Enable haproxy for the next boot
+  ansible.builtin.systemd_service:
+    name: haproxy
+    enabled: true
+
+- name: State what is deliberately not done here
+  ansible.builtin.debug:
+    msg: >-
+      haproxy is installed, configured and enabled but NOT started: there is no edge behind it yet.
+      It comes up with the first boot after deploy.sh, or start it by hand once the stack is
+      healthy. The edge must carry EDGE_TRUSTED_PROXY={{ basetool_edge_trusted_proxy }} in its
+      environment, or its listeners stay plain and the PROXY header this front end sends will be
+      rejected.

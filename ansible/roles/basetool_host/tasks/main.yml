@@ -38,3 +38,8 @@
   ansible.builtin.import_tasks: 60-hardening.yml
   when: basetool_manage_hardening | default(true) | bool
   tags: [hardening]
+
+- name: The L4 front end that gives the edge back the client address
+  ansible.builtin.import_tasks: 70-frontend.yml
+  when: basetool_manage_frontend | default(true) | bool
+  tags: [frontend]
