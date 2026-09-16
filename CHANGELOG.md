@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **Der alte Nginx Proxy Manager ist aus dem Stack entfernt.** Er lag seit der Umstellung auf den
+  neuen Edge-Proxy nur noch als Rückweg im `rollback`-Profil und startete im Normalbetrieb nicht.
+  Der Edge hat sich bewährt, also fällt die Rückfallebene weg (ADR-0162). Für Betreiber ändert sich
+  nichts am laufenden Betrieb; die Daten unter `/var/iri/npm` bleiben auf dem Host liegen und werden
+  nicht automatisch gelöscht.
+
 ### Changed
 
 - **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**

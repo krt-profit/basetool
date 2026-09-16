@@ -1004,8 +1004,8 @@ x-frontend: &frontend-template
 
 x-ingest: &ingest-template
   # The desktop one-click ingest gateway (epic #639, ADR-0018) — the ONLY new internet-reachable
-  # service. NPM terminates the public TLS and re-encrypts to this gateway over https://ingest:11262
-  # (NPM upstream: scheme https, upstream-cert verification OFF — the shared cert is self-signed), so
+  # service. The edge terminates the public TLS and re-encrypts to this gateway over
+  # https://ingest:11262 against the shared self-signed cert, so
   # like backend/frontend the gateway serves HTTPS. The bind-mounted keystore.p12 is used BOTH as the
   # server keystore AND as the TRUSTSTORE that validates the backend's self-signed https://backend:11261
   # cert (backend-trust bundle in application-prod.yml). It owns no database — it relays to the backend
@@ -1130,9 +1130,9 @@ x-ingest: &ingest-template
     MONITORING_TRACING_SAMPLING_PROBABILITY: ${MONITORING_TRACING_SAMPLING_PROBABILITY:-1.0}
     # Same keystore + password the other modules use. These bind BOTH the server connector
     # (`server.ssl.*`, enabled in ingest application.yml so the gateway serves HTTPS on 11262) AND the
-    # `spring.ssl.bundle.backend-trust` truststore that validates the backend's self-signed cert. NPM
-    # re-encrypts to this connector (upstream scheme https, upstream-cert verification OFF for the
-    # self-signed cert).
+    # `spring.ssl.bundle.backend-trust` truststore that validates the backend's self-signed cert. The
+    # edge re-encrypts to this connector and verifies it against the shared CA -- which NPM never
+    # did, and which is part of why it was replaced (ADR-0162).
     SERVER_SSL_KEY_STORE: file:/run/secrets/keystore.p12
     SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}
     # MaxRAMPercentage=60 (was 75) — see the heap-budget rationale in the deploy.resources comment
@@ -1295,7 +1295,7 @@ services:
     <<: *keycloak-template
     profiles: ["prod"]
     container_name: keycloak
-    # Prod serves HTTPS ONLY. NPM re-encrypts the public host to https://keycloak:18443 (NPM upstream
+    # Prod serves HTTPS ONLY. The edge re-encrypts the public host to https://keycloak:18443 (upstream
     # scheme https, upstream-cert verification OFF for the shared self-signed cert) and the backend
     # admin client reaches the SAME connector over the internal net-backend-keycloak network. Plain
     # HTTP is disabled (`--http-enabled=false`) so no cleartext Keycloak listener exists anywhere.
@@ -1397,7 +1397,7 @@ services:
       - net-backend-frontend
       - net-backend-keycloak
       - net-backend-ingest
-      # ADR-0135: the ONLY net-proxy-* network the backend joins, so NPM can reach the app connector
+      # ADR-0135: the ONLY net-proxy-* network the backend joins, so the edge can reach the connector
       # for the public API vhost. Without it the vhost's forward target `backend` does not resolve
       # and every allow-listed path answers 503 from the maintenance page (measured 2026-08-18).
       - net-proxy-api
@@ -1628,102 +1628,6 @@ services:
         aliases:
           - ingest
 
-  npm:
-    # SUPERSEDED by the `edge` service below (ADR-0162), and deliberately kept.
-    # The `rollback` profile means `docker compose --profile prod up -d` no longer
-    # starts it — the two would fight over :80/:443 — while the definition, the
-    # /var/iri/npm data and the Let's Encrypt material stay exactly as they are.
-    # Going back is one command:
-    #
-    #   docker compose --profile prod stop edge acme
-    #   docker compose --profile rollback up -d npm
-    #
-    # Remove this service only after the new edge has held for longer than feels
-    # necessary, and in its own change.
-    profiles: ["rollback"]
-    # Pin to a concrete release. Bump deliberately as part of an upgrade workflow;
-    # do not move back to `:latest` (silent upstream changes are a supply-chain risk
-    # and break reproducibility). Consider appending @sha256:<digest> as well.
-    image: jc21/nginx-proxy-manager:2.15.1@sha256:52b2c59994f3d36acfcf70a1626f29734df0ed8c71bacc0269f78b6f939858bb
-    container_name: npm
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - "80:80"     # Frontend / Keycloak HTTP Traffic
-      - "443:443"    # Frontend / Keycloak HTTPS Traffic
-      - "127.0.0.1:10081:81"     # NGINX Proxy Manager Admin Web UI (loopback-only)
-    environment:
-      DB_SQLITE_FILE: "/data/database.sqlite"
-    # Runtime hardening (REQ-OPS-014) — the edge proxy is the most internet-exposed container
-    # on the host, so it gets the baseline the monitoring stack already applies. The jc21 image
-    # boots as root under s6-overlay and documents no reduced capability set, so the add-back
-    # list is the empirically verified minimum on 2.15.1 (clean boot incl. the /data/nginx sed
-    # pass, check-health OK, `nginx -s reload` OK, container restart OK): NET_BIND_SERVICE
-    # (nginx binds 80/443), CHOWN/FOWNER/DAC_OVERRIDE (s6 prepare chowns /data +
-    # /etc/letsencrypt and sed-rewrites *.conf files it does not own), SETUID/SETGID (s6 and
-    # the nginx master drop to the npm user), KILL (nginx master signals workers across uid
-    # boundaries on reload). read_only rootfs stays OFF — the s6 prepare step must write across
-    # the fs (same EROFS constraint as the .conf mounts below). Re-verify the set on every
-    # image bump before promoting it.
-    security_opt:
-      - no-new-privileges:true
-    cap_drop: [ALL]
-    cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETUID
-      - SETGID
-      - FOWNER
-      - DAC_OVERRIDE
-      - KILL
-    # Nginx + the SQLite-backed admin UI is feather-light; 256 MB is ample for HTTP/HTTPS
-    # proxying at our request volume. The pids cap bounds a fork bomb / worker leak in the
-    # exposed container (same 512 as the monitoring stack; normal operation runs ~45
-    # processes).
-    #
-    # #937 (2026-08-03, 7-day baseline): memory KEPT at 256M — `rss` peaked at 66.3 % of it,
-    # the highest ratio of any non-JVM app container, so this one has the least room to give
-    # back and is the first to watch if the edge ever gains a module. CPU raised, see below.
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          # 0.5 -> 1.0 (#937). 20.0 % peak throttle ratio, 121 s over 7 days, against a
-          # measured 5m-averaged peak of 0.03 cores. nginx does its expensive work — the TLS
-          # handshake — in short parallel bursts across workers, which is what a 0.5 quota
-          # clips; this is the container every user request passes through first, so a clipped
-          # handshake is added latency on the very first byte.
-          cpus: '1.0'
-    volumes:
-      - /var/iri/npm/data:/data
-      - /var/iri/npm/letsencrypt:/etc/letsencrypt
-      # Maintenance page served on upstream 502/503/504 during deploys. The
-      # snippets in ./docker/maintenance/nginx are picked up by NPM via its
-      # /data/nginx/custom hook (http.conf into the `http` block, server_proxy.conf
-      # into every proxy host's `server` block) and the static assets are read
-      # from /usr/share/nginx/html/maintenance/.
-      #
-      # The static-assets mount is :ro; the two .conf mounts are intentionally
-      # NOT read-only. NPM's startup script `/etc/s6-overlay/s6-rc.d/prepare/
-      # 50-ipv6.sh` walks every *.conf under /data/nginx/ and runs `sed -i`
-      # against it to add IPv6 listeners — with :ro that fails with EROFS,
-      # the `prepare` s6 service exits non-zero, and the entire NPM container
-      # refuses to start. Our snippets contain no `listen` directives so sed
-      # produces byte-identical content, but the write attempt itself has to
-      # succeed for the container boot to proceed.
-      - ./docker/maintenance/static:/usr/share/nginx/html/maintenance:ro
-      - ./docker/maintenance/nginx/http.conf:/data/nginx/custom/http.conf
-      - ./docker/maintenance/nginx/server_proxy.conf:/data/nginx/custom/server_proxy.conf
-    networks:
-      - net-proxy-frontend
-      - net-proxy-keycloak
-      - net-proxy-ingest
-      # NPM re-encrypts the public grafana.profit-base.online host to grafana:3000 over this dedicated
-      # net (Grafana joins it from docker-compose.monitoring.yml). Keeps NPM OFF net-monitoring-core.
-      - net-proxy-grafana
-      # API vhost of the mobile-client exposure (ADR-0135) — NPM's route to backend:11261.
-      - net-proxy-api
-
 # Every bridge network is pinned to a fixed /24 under 172.28.0.0/16 instead of
 # being left to Docker's dynamic address pool. This is deliberate, not cosmetic:
 # a `docker compose down` (or any network re-create) otherwise reassigns each
@@ -1732,18 +1636,18 @@ services:
 #
 # That gateway IP is load-bearing. The Keycloak Admin Console is exposed on the
 # public `/auth/admin` path on the web vhost but locked to an SSH tunnel via an
-# nginx `allow … / deny all` on the `/admin` location in NPM. Host-origin traffic
-# (the operator's `ssh -N -L 443:127.0.0.1:443 …` tunnel hitting NPM's published
+# nginx `allow … / deny all` on the `/admin` location in the EDGE. Host-origin traffic
+# (the operator's `ssh -N -L 443:127.0.0.1:443 …` tunnel hitting the edge's published
 # 443 through the host loopback) is SNAT'd by Docker to the gateway of whichever
 # net-proxy-* bridge the published-port DNAT targets — so the allow-list matches
 # a Docker gateway, not the operator's real IP. External clients keep their real
 # source IP and stay blocked by `deny all`. With dynamic subnets that gateway
 # moved on every restart and silently locked the admin console out (the exact
 # breakage this pinning prevents). See docs/deployment.md → "Keycloak Admin
-# Console via SSH tunnel" for the matching NPM `/admin` block.
+# Console via SSH tunnel" for the matching `/admin` block, now in docker/edge/.
 #
 # 172.28.0.0/16 sits outside Docker's default bridge (172.17.0.0/16) and is a
-# single-purpose host, so collision risk is nil. The three NPM-facing bridges
+# single-purpose host, so collision risk is nil. The three edge-facing bridges
 # (net-proxy-frontend/-keycloak/-ingest) are grouped in .3/.4/.7 so the admin
 # allow-list is a short, explicit list of their gateways.
 # Data volumes for the DEV-profile stateful services only. The prod services deliberately keep their
@@ -1755,8 +1659,9 @@ services:
   # ===========================================================================
   # edge — the public reverse proxy (ADR-0162)
   #
-  # Replaces `npm` above, which stays defined under the `rollback` profile as the
-  # documented way back. Everything this container serves is configured from
+  # Replaced `npm`, which was kept under a `rollback` profile as the documented way back until
+  # 2026-09-16 and is now removed -- the edge had held long enough. Everything this container
+  # serves is configured from
   # docker/edge/ in this repository: no admin UI, no SQLite, no generated files.
   #
   # The hardening is the point of the swap, so each line is load-bearing:
@@ -1980,7 +1885,7 @@ networks:
   # project can reference these as `external` by a deterministic name: the postgres/redis exporters
   # bridge into these existing data nets to reach the DBs/Redis, which keeps the databases OFF the
   # broad monitoring-scrape net (no new lateral path such as keycloak→db-backend). The subnet/gateway
-  # are unchanged, so the NPM SSH-tunnel admin allow-list (which matches net-proxy-* gateways) is
+  # are unchanged, so the SSH-tunnel admin allow-list (which matches net-proxy-* gateways) is
   # unaffected.
   net-db-backend:
     name: net-db-backend
@@ -2073,7 +1978,7 @@ networks:
     # relays every IPv6 client through the bridge gateway and nginx sees 172.28.3.1 for all
     # of them (dual-stack browsers prefer IPv6 -> the edge per-IP limiter collapses to one
     # global bucket, the 2026-07-20 outage). A real IPv6 subnet makes Docker install the
-    # kernel DNAT ([::]:443 -> [npm-v6]:443) so the client IPv6 is preserved like IPv4 already
+    # kernel DNAT ([::]:443 -> [edge-v6]:443) so the client IPv6 is preserved like IPv4 already
     # is. This edits the pinned `networks:` block, so deploy.sh runs a gated clean-slate
     # recreate (brief full-stack outage) — apply in a maintenance window. The IPv4 gateway
     # 172.28.3.1 is unchanged, so the Keycloak /admin SSH-tunnel allow-list is untouched.
@@ -2196,8 +2101,9 @@ networks:
       config:
         - subnet: 172.28.10.0/24
           gateway: 172.28.10.1
-  # Dedicated NPM<->Grafana proxy net (epic #936): NPM re-encrypts the public grafana.profit-base.online
-  # host to grafana:3000 here so NPM never joins the closed net-monitoring-core. Grafana joins it from
+  # Dedicated edge<->Grafana proxy net (epic #936): the edge re-encrypts the public
+  # grafana.profit-base.online host to grafana:3000 here so it never joins the closed
+  # net-monitoring-core. Grafana joins it from
   # docker-compose.monitoring.yml (external ref by this fixed name). Subnet continues the pinned block
   # (.11); the gateway is NOT load-bearing (net-proxy-grafana is not in the Keycloak-admin allow-list).
   net-proxy-grafana:
@@ -2229,10 +2135,10 @@ networks:
       config:
         - subnet: 172.28.11.0/24
           gateway: 172.28.11.1
-  # NPM <-> backend for the public API vhost `api.profit-base.online` (ADR-0135). A dedicated bridge
+  # edge <-> backend for the public API vhost `api.profit-base.online` (ADR-0135). A dedicated bridge
   # rather than putting the backend on the existing net-proxy-frontend: that one carries the web
   # vhost, and keeping the API path on its own network means the two can be reasoned about — and if
-  # it ever comes to it, severed — independently. The single new lateral path is NPM -> backend,
+  # it ever comes to it, severed — independently. The single new lateral path is edge -> backend,
   # which is the entire point; frontend <-> backend already exists over net-backend-frontend.
   #
   # Dual-stack for the same reason net-proxy-frontend is (ADR-0112): with an IPv4-only bridge Docker

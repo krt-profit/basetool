@@ -142,8 +142,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
         "it exists only to hand cAdvisor and Alloy a GET-only view of the Docker socket. There is "
         "no Docker socket.",
     ),
-    # --- never on a production host ------------------------------------------------------------
-    "npm": ("deleted", "the retired proxy, kept in compose's `rollback` profile only."),
 }
 
 #: Compose profiles whose services are translated. `dev` and `rollback` are local-stack and
