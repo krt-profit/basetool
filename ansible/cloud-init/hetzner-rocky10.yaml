@@ -13,6 +13,10 @@
 # So: one user, one key, sudo. Nothing else.
 #
 # Paste into Hetzner's "Cloud config" field when creating the server. Replace the key.
+#
+# Validated against cloud-init 24.4 on the target platform itself -- `cloud-init schema
+# --config-file` reports "Valid schema". Parsing as YAML would not have been the same check:
+# a misspelled top-level key is valid YAML and silently does nothing.
 # =====================================================================================
 
 # Why a user at all, when Hetzner already injects the selected SSH key for root: the
