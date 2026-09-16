@@ -61,4 +61,3 @@ independent of user-initiated deletes.
   scale.
 - **Storing rendered text** — rejected: it would freeze language and locale at creation time;
   storing `type` + `params` keeps rendering a frontend concern.
-

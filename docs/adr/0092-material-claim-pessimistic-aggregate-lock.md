@@ -98,4 +98,3 @@ concurrency. Requirement `REQ-ORDERS-024` records the invariant.
 - **Raise the transaction isolation to `SERIALIZABLE` for the claim upsert.** Rejected: a broad
   isolation change with serialization-failure retries for the whole method, versus a single targeted
   row lock that expresses exactly the intended serialization.
-

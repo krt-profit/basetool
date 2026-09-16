@@ -32,4 +32,3 @@ that entity's behalf.
 | Entity                          | Authorised contributors (GitHub handles) | Effective from | CLA version |
 |:--------------------------------|:-----------------------------------------|:---------------|:------------|
 | <!-- first entity goes here --> |                                          |                |             |
-

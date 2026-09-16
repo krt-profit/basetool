@@ -2439,11 +2439,16 @@ The first three runs produced a full table of results and all of it was wrong.
 > looks exactly like a service that needs a writable path — which is the very thing being measured,
 > so the wrong answer agreed with the question.
 
-### Found on the way, and not part of this
+### Found on the way, and fixed upstream before this landed
 
-All three application images **ship the log files their CDS training run wrote during the build**,
-owned by `root`, because the training run executes before the `USER 10001` line. The backend image
-carries 60 KB of build-time startup log. Without the `/app/logs` bind mount the container does not
-start at all — `openFile(logs/backend.log) … Permission denied`, then
-`Logback configuration error detected`, exit 1. Production mounts over it, so this is latent rather
-than live, and the content carries no credential (checked). Recorded as its own piece of work.
+All three application images **shipped the log files their CDS training run wrote during the
+build**, owned by `root`, because the training run executes before the `USER 10001` line and a
+`USER` switch does not change an existing file's owner. The backend image carried 60 KB of
+build-time startup log. Without the `/app/logs` bind mount the container did not start at all —
+`openFile(logs/backend.log) … Permission denied`, then `Logback configuration error detected`,
+exit 1. Production mounts over it, which is what kept it latent and is not a fix. The content
+carried no credential (checked).
+
+Found while measuring read-only for the JVM modules, and **fixed in `#1932`** before this branch
+merged: the three Dockerfiles now clear the directory in the same `RUN` layer that produces the CDS
+archive, so nothing is stacked as a whiteout over files that still ship.

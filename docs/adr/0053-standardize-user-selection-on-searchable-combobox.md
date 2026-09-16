@@ -113,4 +113,3 @@ REQ-FE-011.
   provides.
 - **Leave the bespoke mission guest autocompletes and migrate them too** — the strict combobox forbids
   free text, so converting them would drop guest entry; left as-is per the carve-out.
-

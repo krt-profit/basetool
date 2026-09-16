@@ -35,4 +35,3 @@ Nach jedem Schritt spiegelt das neu gerenderte `#pa-topics-results`-Fragment die
 - **Rollenwahl:** Der Offizier-Pfad umgeht das All-Staffeln-Modus-Problem des Admins vollständig — kein Staffel-Pin, kein `X-Active-Org-Unit-Id`-Header nötig.
 - **Fragment-Swap-Wait:** Wie in `OrgChartPositionCrudE2eTest` wartet ein einmaliger `krt:swapped`-Listener, der auf den Container `#pa-topics-results` scoped ist, auf den Commit des neuen Fragments (mit frischen `data-pa-version`) — 30-s-Budget wegen der geteilten Stack-Last.
 - **Audit:** Die drei Mutationen sind auditierte Beförderungs-Aktivitäten (REQ-AUDIT-001); der Flow ist der erste E2E-Nachweis dieser Area.
-

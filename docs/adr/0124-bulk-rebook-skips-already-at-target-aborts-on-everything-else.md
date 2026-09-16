@@ -115,4 +115,3 @@ audit log.
   is not made worse here; a bulk selection simply hits it more often.
 - The action is owner-scoped and **not** role-overridable, so a logistician cannot use it to
   reorganize another member's stock — they must use the single-row endpoints.
-

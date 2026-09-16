@@ -100,4 +100,3 @@ for that item, the editor's picker falls back to one that still produces it.
 - **Follow-up.** If drift turns out to be frequent rather than a twice-a-year event, revisit
   alternative *(D)*: auto-healing becomes defensible if it is paired with a notification to the
   order's participants, which is out of scope here.
-

@@ -55,4 +55,3 @@ reuse detection) and no converter/semantics change — this is transport-only, R
   redundant next to the per-phase handlers, and it diverges from the transport idiom the backend
   WebClient already uses; rejected for consistency.
 - **Retry on transport failure** — still rejected (REQ-SEC-012, refresh-token replay).
-

@@ -150,4 +150,3 @@ because their connector posture differs:
   frontend or ingest logger in prod is back to a config edit plus a force-recreate, which is what
   REQ-OBS-016 set out to avoid — the trade is taken because the alternative is an unauthenticated
   write on a port whose whole security model is "nobody can reach it".
-

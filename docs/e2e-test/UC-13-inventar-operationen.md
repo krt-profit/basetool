@@ -49,4 +49,3 @@ Jede Operation wird über die UI getrieben und anschließend **über dieselbe gr
 - **Append-only + Epsilon.** Umbuchen/Einbuchen fügen Zeilen hinzu; DISCARD/SELL dekrementieren und löschen unterhalb von `1e-4`. Jedes Szenario nutzt ein eigenes Material zur Isolation.
 - **Ein Login pro Klasse.** Der OIDC-Login (die dokumentierte Flakiness-Quelle der Suite) läuft einmal im `@BeforeAll`; jeder Test öffnet aus diesem Storage-State seinen eigenen Kontext.
 - **SCU-Eingabe.** Das `data-scu-decimal`-Feld erzwingt nur „> 0", nicht das gehaltene Maximum, sodass die Übermengen-Buchung tatsächlich das Backend (400) erreicht.
-

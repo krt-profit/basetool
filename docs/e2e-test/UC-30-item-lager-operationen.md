@@ -40,4 +40,3 @@ Jede Mutation läuft über die echte UI und wird über dieselbe gruppierte `cata
 - **Item-Semantik.** Item-Zeilen sind katalog-diskriminiert (`gameItemId` XOR `materialId`, REQ-INV-029): ganze Mengen, keine Qualität, kein Einsatz-Split, PIECE-Auto-Merge; die geteilten Modals (Ausbuchen/Umbuchen) funktionieren unverändert über `data-game-item-id`.
 - **Ein Seam, drei Spiegelpunkte.** Der Live-Sync nutzt den bestehenden `inventory`/`stock`-Seam ohne neue Section-Keys; der Empfänger zieht sein eigenes gefiltertes Fragment inklusive `view=items` (REQ-FE-010-Paritätsregel bleibt unberührt).
 - **UI treiben, API verifizieren** — wie UC-13: die Baum-Ansicht lädt Stack-Einträge lazy, Assertions gegen die gruppierte API rennen dem Post-Write-Render nie hinterher.
-

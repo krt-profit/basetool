@@ -687,3 +687,60 @@ key* — reasoning that assumes participation is granted rather than claimed.
 
 **Decided by:** ADR-0150. **Enforced by:** `OperationPayoutServiceTest`
 (`summary_escapeOnlyCaller_seesOnlyTheirOwnRow`), `AccessGateService#canSeeOperationLedger`.
+
+### REQ-ORG-023 — The owner-picker rejection is a stable code, never English prose
+
+REQ-ORG-017's "pin, else choose" ends in a `400` when a member of more than one org unit supplies no
+`owningOrgUnitId` and carries no honourable active-context pin. That rejection is correct and stays.
+What was wrong is how it reached the member.
+
+It was thrown as a generic `BadRequestException`, so the RFC 7807 body carried the catch-all code
+`BAD_REQUEST` and the frontend had nothing to branch on. Every picker surface therefore fell through
+to its last resort — render `problem.detail` — and `detail` is the backend's own developer-facing
+English:
+
+> User belongs to multiple org units; owningOrgUnitId is required
+
+which a member on the German UI read in a toast on 2026-09-16. That is two defects at once: an i18n
+violation (a user-visible string that comes from neither `messages_de` nor `messages_en`), and an
+instruction nobody can act on — it names a JSON field, not the control on the screen.
+
+**The rule:** a service-layer rejection the member can fix carries a **stable problem code**, and the
+client renders its own localized wording from that code. Concretely for this one:
+
+- The backend throws `OwnerOrgUnitRequiredException` — its own sealed `AppException` subtype, its own
+  `AppExceptionKind`, code **`OWNER_ORG_UNIT_REQUIRED`**, still `400`. A pick the caller may *not*
+  make stays an `AccessDeniedException`; this code means no pick was made at all.
+- The frontend renders it **centrally**, in `krt-fetch.js`, from `window.krtOwnerPickerI18n.required`
+  (bundle key `ownerPicker.error.required`, DE + EN). The failure can arrive on any of the five
+  picker surfaces — book-in, hangar, mission, operation, refinery order — and one sentence localized
+  once beats five copies drifting apart.
+- A page-local `onError` handler bypasses `handleProblem` entirely, so the branch is **exposed** as
+  `krtFetch.ownerOrgUnitRequiredMessage(problem)` rather than re-derived. `inventory-input.js` and
+  `mission-detail.js` are the two such handlers today; both call it before their own
+  `problem.detail` fallback.
+
+> [!note] What this requirement does **not** do
+> It does not make the picker a required field. The picker renders whenever the option list has more
+> than one entry, but that list is the caller's **pickable** set — direct memberships *plus* a
+> leader's cascading reach (REQ-ORG-016) — while the backend forces a choice on the count of
+> **direct** memberships and on whether a pin applies. A client cannot tell the two apart without
+> either duplicating the stamping rule or widening `/me/pickable-org-units`, and a picker marked
+> required on a leader with one membership would refuse a submit the backend would have accepted. So
+> the form still lets the member submit, and the rejection now tells them what to do.
+
+**Acceptance**
+
+- [ ] A member of more than one org unit who submits a picker form with no choice and no pin gets a
+  `400` whose problem `code` is `OWNER_ORG_UNIT_REQUIRED`, from **both** stamping entry points.
+- [ ] The member sees a localized instruction naming the control, in DE and EN — never the backend's
+  `detail`.
+- [ ] A member with an honourable pin is stamped and sees no message at all.
+- [ ] The rejection stays a `400`; it is neither a conflict nor a permission failure.
+- [ ] A page-local `onError` handler renders the same wording as the central path.
+
+**Enforced by:** `OrgUnitStampingServiceOwnerRequiredTest` (both entry points, the status, and the
+pinned negative) · **Code:** `OrgUnitStampingService#resolveStampedOrgUnit` /
+`#resolveSquadronForPickerOutput`, `OwnerOrgUnitRequiredException`, `AppExceptionKind`,
+`krt-fetch.js#ownerOrgUnitRequiredMessage`, `fragments/head.html` ·
+**Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `CLAUDE.md`

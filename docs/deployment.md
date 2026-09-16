@@ -1798,4 +1798,3 @@ A few decisions worth keeping in mind when you touch any of the pieces:
   `setfacl -m u:1000:r`) — so both the JVM services and the Keycloak image read
   the shared self-signed cert without it being world-readable; root ownership
   still blocks the deploy user from rewriting it.
-

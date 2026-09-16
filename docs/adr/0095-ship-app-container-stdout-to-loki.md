@@ -89,4 +89,3 @@ Two facts bound the value:
   thread-starved to emit the line through logback at all, so the JSON stream would not have caught it.
 - **Leave it as a documented known gap** — rejected; the blind spot is general to every JVM/native
   crash, not specific to the one fixed incident.
-

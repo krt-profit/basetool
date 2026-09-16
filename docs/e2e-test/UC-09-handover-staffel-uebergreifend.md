@@ -38,4 +38,3 @@ Das von Staffel B beigesteuerte Material wird an einen Empfänger übergeben —
 - **Keine OrgUnit-Prüfung im Handover:** Der Service operiert auf dem an den Auftrag verknüpften Inventar unabhängig vom Besitzer — das ist die Mechanik hinter „B liefert in A's Auftrag, A protokolliert die Übergabe".
 - **`recipientSquadron`** erfasst die Heimat-Staffel des Empfängers (Freitext-Handle + optionale Staffel-Auswahl) — so ist der Drei-Staffel-Fall (A bestellt, B liefert, C empfängt) dokumentierbar.
 - **Concurrency/409:** Der Handover dekrementiert Inventar **und** offene Auftragsmenge in einer Transaktion (`*WithinTransaction`-Pattern); Bulk-Unlinks laufen einmalig nach der Schleife (sonst detachte Entities → 409).
-

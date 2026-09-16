@@ -107,7 +107,7 @@ class SessionAttributeRepairIntegrationTest {
     repository.setDefaultMaxInactiveInterval(Duration.ofMinutes(30));
     repository.setRedisKeyNamespace("basetool:session");
     repository.setFlushMode(FlushMode.IMMEDIATE);
-    repository.setRedisSessionMapper(new SessionAttributeDiagnosticMapper());
+    repository.setRedisSessionMapper(new SessionAttributeDiagnosticMapper(registryProvider()));
 
     raw = new StringRedisTemplate(connectionFactory);
     raw.afterPropertiesSet();

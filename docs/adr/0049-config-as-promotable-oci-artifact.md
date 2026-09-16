@@ -101,4 +101,3 @@ can never overwrite the running deployer; they stay a manual bootstrap concern.
   an anti-pattern for this repo.
 - **Status quo (manual copy).** Rejected: it is exactly the toil the owner asked to remove,
   and the manual `scp` is a standing secret-leak path.
-

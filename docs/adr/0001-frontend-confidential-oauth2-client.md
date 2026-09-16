@@ -47,4 +47,3 @@ then useless without the server-only secret.
   component that can safely hold a secret.
 - **`client_secret_post` instead of `client_secret_basic`.** Both work;
   `client_secret_basic` is Keycloak's default and was chosen for that reason.
-

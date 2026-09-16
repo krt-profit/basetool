@@ -107,4 +107,3 @@ lifetime**, and shape the refresh so the cost lands only where the value can act
   which reads as a broken tool rather than as a withdrawn permission.
 - **Invalidate the session from the backend on approval.** Would force the re-login rather than remove
   it, and a forced session kill on an unrelated admin action is a worse experience than a 15 s wait.
-

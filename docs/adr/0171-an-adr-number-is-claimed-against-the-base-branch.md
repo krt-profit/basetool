@@ -138,4 +138,3 @@ self-enrolment decision (`MissionRepository.kt`, `MissionJoinRequestTest.kt`,
   it still does not stop a branch from picking a number the registry has not yet seen.
 - **Nothing; rely on review.** Rejected on the record: three collisions, one of which survived
   eleven days on `main` and was found by a reader, not a reviewer.
-

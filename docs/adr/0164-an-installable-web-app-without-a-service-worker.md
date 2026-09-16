@@ -182,4 +182,3 @@ Four parts, all of them in `REQ-UI-020`:
 
 - **The tool gains no dependency**, no build step and no JavaScript. The whole feature is one
   controller, six `<head>` lines, three bundle keys, one `permitAll` entry and one access-log skip.
-

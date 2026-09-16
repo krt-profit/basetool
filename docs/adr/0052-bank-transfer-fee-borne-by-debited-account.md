@@ -110,4 +110,3 @@ amount is the amount that **arrives**; the source is debited `amount + fee`.
   complexity, same as in ADR-0041: the fee is real money lost to the game, so some leg sum must be
   non-zero; recording it on the header is the smallest honest representation.
 - **A separate bank fee rate** — rejected: one rate governs the whole org.
-

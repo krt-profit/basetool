@@ -67,4 +67,3 @@ this version.
 - **Aggregate book-out with FIFO allocation across a stack.** Deferred: it reintroduces
   multi-row allocation logic and obscures which contribution was consumed; per-entry actions
   match the existing id+version architecture and ship the provenance benefit with less risk.
-

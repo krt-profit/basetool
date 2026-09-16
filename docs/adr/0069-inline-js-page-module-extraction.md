@@ -81,4 +81,3 @@ module*, moved verbatim.**
   (`let`/`const`) — verified unread as `window.*` anywhere; per-module `/* global */` headers
   couple module and bootstrap explicitly; the `sectionWrite` factory adds a small generic surface
   to `krt-fetch.js` that only mission uses until the next page adopts it.
-

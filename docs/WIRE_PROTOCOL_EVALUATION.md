@@ -941,4 +941,3 @@ Three things, all of them measurements, and none of them obtainable from a repos
 
 Until the third one is answered, §8.5 is a capability rather than a justified change — which is
 exactly what its own "measure first" clause says, and the flag is there so that stays true.
-

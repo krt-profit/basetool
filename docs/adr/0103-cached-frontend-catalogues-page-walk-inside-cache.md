@@ -87,4 +87,3 @@ Each `CachedCatalog` constant declares a **fetch mode** — `Fetch.PAGE_WALK` or
 - **A truncation banner surface for cached catalogues** — rejected: consumers are cross-page
   fragments and pickers with no shared render seam for a warning; the cap is a runaway backstop
   (≥100 000 rows at the smallest chunk), not an expected state, so a WARN log is proportionate.
-

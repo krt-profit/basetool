@@ -160,4 +160,3 @@ on every run. The remaining gap is the edge routing itself, covered by `nginx -t
 - **Put Keycloak at the web host's root instead of under `/auth`.** It would need `/realms`,
   `/resources` and `/js` carved out of the app's own namespace at the edge, forever, and any future
   app route that collides silently shadows an identity route.
-

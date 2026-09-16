@@ -78,4 +78,3 @@ stored discriminator column — partial indexes key on `game_item_id IS NOT NULL
 - **`GameItem.isCraftable` as the catalog predicate** — rejected: the blueprint→output
   relation is what the orders feature treats as authoritative; the flag is sync-derived
   display metadata.
-

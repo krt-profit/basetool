@@ -36,4 +36,3 @@ Der Auftrag erscheint in der Liste unter `/orders` als `order-row`.
 
 - **Sichtbarkeit über die bearbeitende Einheit (REQ-ORG-003):** Job Orders sind bedingt staffel-scoped — Responsible = SK → öffentlich, Responsible = Staffel → privat für diese Staffel + Admins (siehe [UC-18](UC-18-job-order-mandanten-sichtbarkeit.md)). Das Anlegen selbst ist `permitAll`; beide Owner-Dropdowns werden aus dem aktiven Org-Unit-Katalog befüllt, das Responsible-Dropdown nur mit profit-eligible Einheiten.
 - Das Material-Dropdown ist auf `isJobOrder=true` gefiltert; deshalb wird ein eigens geseedetes Job-Order-Material gewählt.
-

@@ -106,4 +106,3 @@ fail-open precheck let through.
 - **Auto-suggest the matching account in the picker.** Dropped for this case: the matcher keys on the
   same name signals that already failed (handle differs, nickname absent), so it would suggest
   nothing. A plain server-side search is what the admin needs.
-

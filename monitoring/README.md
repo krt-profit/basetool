@@ -596,4 +596,3 @@ docker compose -f docker-compose.monitoring.yml config -q
 python3 scripts/check-grafana-dashboards.py
 scripts/check-grafana-dashboards.test.sh
 ```
-

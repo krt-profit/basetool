@@ -27,4 +27,3 @@ The bean graph is strictly one-way (write → read); tests followed the code (di
 - **No route, security, or behaviour change** — the route-inventory diff is empty; every `@PreAuthorize` asymmetry (including the intentionally unannotated guest-flow mission/order endpoints) is preserved; the full frontend suite, Checkstyle, SpotBugs and Spotless pass.
 - The four page controllers shrink to their read surface (e.g. Mission 3027 → ~800 LOC), and every write endpoint now lives in a class whose single concern is the mutation surface — the natural seam for the upcoming per-template JS-extraction PRs of #924.
 - Accepted costs: ~60 LOC of verbatim leaf-helper duplication in JobOrder, duplicated `@InitBinder`/constants in Mission, and a handful of Javadoc `{@link}`s that now cross the class pair.
-

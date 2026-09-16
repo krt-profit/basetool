@@ -101,26 +101,39 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
     endWithNewline()
   }
 
-  // Markdown reflow via Spotless's built-in `flexmark` extension. NB: this MUST be
-  // the built-in extension, not a custom `format("markdown") { flexmark {} }` — the
-  // latter registers its task lazily and trips Gradle 9.5.1's mutation guard
-  // ("DefaultTaskContainer#register ... cannot be executed in the current
-  // context"), whereas the built-in extension registers eagerly during apply.
-  // CHANGELOG.md is excluded (the release workflow parses its structure);
-  // CHANGELOG-ARCHIVE.md holds the same very-long-line release entries split out
-  // of it and is excluded for the same reason (keep the historical text stable).
-  flexmark {
-    // LICENSE.md is excluded because flexmark cannot converge on it (its output is
-    // not idempotent), which it otherwise skips with a warning on every run.
-    // CLAUDE.md is excluded because it is a hand-maintained agent-instruction file
-    // whose deliberate structure must not be reflowed; it is also the file editors
-    // most often re-save as CRLF on Windows, and with `core.autocrlf=true` +
-    // `*.md text eol=lf` (.gitattributes) that CRLF working-tree copy reads as clean
-    // to git until flexmark rewrites it to LF — flipping it to "modified" with an
-    // empty `git diff` on every `spotlessApply`. Excluding it stops that churn.
+  // Markdown: whitespace hygiene, and deliberately NOT a reflow.
+  //
+  // This was Spotless's `flexmark` extension until 2026-09-16. It was removed after its
+  // ledger was actually added up over six months: 26 commits whose entire content was
+  // Markdown reformatting, 5473 lines rewritten by them, two CI failures, and four files
+  // excluded — each for a different flexmark defect, one of them because flexmark's output
+  // on it is **not idempotent** so it could never converge.
+  //
+  // The dominant behaviour was table-cell re-padding: widen one cell and every row of the
+  // table is rewritten. `docs/adr/README.md` once moved 170 lines in and 170 out for that,
+  // which buries the real change, conflicts with any concurrent edit of the same table, and
+  // renders identically either way — cell padding is insignificant in GFM.
+  //
+  // Nothing checked is lost. flexmark never linted: no link check, no structure check, no
+  // heading-level check — this repository has none of those, before or after. What it did
+  // provide and is kept here is the same treatment `format("yaml")` above gets.
+  //
+  // The four exclusions stay, but two of them had flexmark-specific reasons that no longer
+  // apply and are restated for what is actually true now:
+  //   * CHANGELOG.md / CHANGELOG-ARCHIVE.md — the release workflow parses their structure,
+  //     and the historical entries stay byte-stable.
+  //   * LICENSE.md — verbatim upstream GPL text. Not ours to reformat, whitespace included.
+  //     (Was: "flexmark cannot converge on it", which is now moot.)
+  //   * CLAUDE.md — editors re-save it as CRLF on Windows, and with `core.autocrlf=true` +
+  //     `*.md text eol=lf` (.gitattributes) that working-tree copy reads as clean to git
+  //     until Spotless rewrites it to LF, flipping it to "modified" with an empty diff on
+  //     every run. That is caused by Spotless TOUCHING the file at all, not by the reflow,
+  //     so dropping flexmark does not fix it and the exclusion is still needed.
+  format("markdown") {
     target("**/*.md")
     targetExclude(*vendored, "CHANGELOG.md", "CHANGELOG-ARCHIVE.md", "LICENSE.md", "CLAUDE.md")
-    flexmark()
+    trimTrailingWhitespace()
+    endWithNewline()
   }
 
   format("properties") {

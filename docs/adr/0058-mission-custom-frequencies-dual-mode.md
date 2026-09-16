@@ -59,4 +59,3 @@ unique constraint keeps at most one typed row per type, and — because PostgreS
 - **Rejected:** a separate entity — it would duplicate the DTO, mapper, controller sub-resource, audit
   wiring and both render sites without any modelling benefit, since a custom channel is the same thing
   (a mission-scoped radio value) minus the shared-type reference.
-

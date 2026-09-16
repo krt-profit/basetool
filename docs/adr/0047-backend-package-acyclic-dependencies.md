@@ -112,4 +112,3 @@ removals are routine relocations.
   breaks it.
 - **Backend-wide `beFreeOfCycles` left unenforced (a one-off cleanup)** — rejected: without
   the gate the graph would re-acquire cycles within a few PRs.
-

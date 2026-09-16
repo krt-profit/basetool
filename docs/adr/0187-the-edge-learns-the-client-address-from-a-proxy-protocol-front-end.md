@@ -154,4 +154,3 @@ Two things are deliberately **not** settled yet, and neither may be guessed at d
 2. **Unreachability from a third machine.** The probe above established that the port is closed on
    the host's own global addresses. The stronger test — a direct connection from another host on the
    management network — runs on Rocky before this is built for real.
-

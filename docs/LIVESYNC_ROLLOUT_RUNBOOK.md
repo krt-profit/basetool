@@ -206,4 +206,3 @@ sudo systemctl start iri-deploy.timer
 ```
 
 > Leaving `net-redis-backend` in place after a code-only rollback is harmless — nothing joins it once the backend no longer references it.
-

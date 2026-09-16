@@ -372,6 +372,18 @@ logging:
     # > 0.2/s — and an unreachable Alloy pages via TargetDown regardless. The pin's real effect is
     # dropping the exporter's INFO chatter; not OFF, which would also drop the only local breadcrumb.
     io.opentelemetry.exporter: WARN
+    # REQ-OBS-001: a 404 this application answers on purpose must not also warn. DispatcherServlet
+    # writes "No mapping for GET /favicon.ico" through this dedicated logger UNCONDITIONALLY — before
+    # throwExceptionIfNoHandlerFound is consulted, so before GlobalExceptionHandler.handleNotFound
+    # renders the 404 page it is designed to render. /favicon.ico and /sm/** are permitAll with no
+    # file behind them by design (see WebMvcConfig#addResourceHandlers): the favicons are declared by
+    # <link rel="icon"> against /logos/, and /sm/ is a path browser extensions probe. So the WARN
+    # warns about the app working as intended, in the same stream the bot rules and the asset-shaped
+    # type mismatch were demoted out of. ERROR rather than OFF: this logger has no other output, and
+    # a level still leaves it reachable via /actuator/loggers. Pinned on the LOGGER, not on
+    # org.springframework.web, so every other web logger keeps INFO. Nothing is lost — the request is
+    # still access-logged and still rendered as the 404 page.
+    org.springframework.web.servlet.PageNotFound: ERROR
 
 resilience4j:
   spring:

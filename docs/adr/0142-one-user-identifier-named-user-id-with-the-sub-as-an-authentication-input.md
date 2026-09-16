@@ -138,4 +138,3 @@ not worth doing while the values agree.
 - **Leave it.** The values are consistent today, so nothing is broken *now*. Rejected because the
   five FK-less columns and the username fallback are how it stops being true — quietly, one row at a
   time, in the tables that hold notifications and personal inventory.
-

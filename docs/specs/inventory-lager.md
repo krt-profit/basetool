@@ -1154,4 +1154,3 @@ REQ-INV-037)
 - A convenience "book out N from the whole stack" with automatic allocation across entries
   (FIFO) was deferred; per-entry actions were chosen for v1 (ADR-0003). Revisit if operators
   ask for it.
-

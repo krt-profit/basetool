@@ -42,4 +42,3 @@ Der User öffnet die Detailseite `/refinery-orders/{id}` (Bearbeiten/Abbrechen) 
 - **Optimistic Locking vor Owner-Check.** `updateRefineryOrder` prüft erst die `version` (409), dann die Eigentümerschaft — eine veraltete Version schlägt also vor dem 403-Pfad zu (vgl. den Owner-Gate-Fall in UC-21).
 - **Abbrechen ist ein Soft-Cancel.** `DELETE /api/v1/refinery-orders/{id}` setzt `status=CANCELED`, löscht nichts.
 - **Save-Button steht außerhalb des Formulars** und referenziert es via `form="refineryOrderMainForm"`; Playwright klickt ihn dennoch als Submit des verknüpften Formulars.
-

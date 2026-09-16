@@ -35,4 +35,3 @@ Das Schiff erscheint in der Hangar-Liste als `hangar-ship-row` mit dem gewählte
 
 - **ShipTypes sind UEX-synced** (kein POST-Endpunkt, praktisch DB-Insert-only). Deshalb wird der Schiffstyp über den JDBC-Katalog-Snapshot geseedet statt über die Admin-API.
 - Der Add-Ship-Dialog wird per JS geöffnet; die Selects (`#ship-type`, `#ship-insurance`) sind server-gerendert.
-

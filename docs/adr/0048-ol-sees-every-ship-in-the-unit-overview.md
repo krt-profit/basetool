@@ -73,4 +73,3 @@ every caller **except** one widening:
 - **Grant OL `adminAllScope` everywhere (drop the REQ-ORG-015 invariant)** — rejected: it would hand OL
   the SK-lifecycle / promotion / system-settings carve-outs too. The exception is deliberately scoped
   to the one read surface the owner asked about.
-

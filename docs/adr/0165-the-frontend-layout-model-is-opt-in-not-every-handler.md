@@ -105,4 +105,3 @@ marker and that no `@RestController` does; `LayoutModelScopeMvcTest` asserts tha
   larger refactor and is not attempted here.
 - PR #1870's manifest controller inherits the fix on merge without a conflict: it is a
   `@RestController`, so it simply never opts in.
-

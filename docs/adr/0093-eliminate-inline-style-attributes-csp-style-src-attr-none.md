@@ -76,4 +76,3 @@ Remove every inline `style=""` attribute from the templates and pin the CSP to
   (`MaterialsProfitCalculationRendersE2eTest`, `OrdersCreateItemLineRendersE2eTest`,
   `OrdersCreateScuHintRevealE2eTest`) assert the elements render/reveal with no `style-src-attr`
   console violation.
-

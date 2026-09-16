@@ -1010,4 +1010,3 @@ This spec still governs how those fields *look*.
   entry; the implementation constant is a 144 px minimum, which the single 512 px tile satisfies.
   One extra entry would remove the question rather than leave it resting on an implementation
   detail.
-

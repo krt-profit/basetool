@@ -208,6 +208,25 @@ COPY --from=build --chown=10001:10001 /app/extracted/application/ ./
 # Verified 2026-09-15 on eclipse-temurin:25-jdk-alpine in both directions. The dump itself needs a
 # base archive in the same layout and the Temurin image ships one (`classes_coh.jsa` beside
 # `classes.jsa`). Change one of the two flags and you change both.
+#
+# The training run is a real application start, so Logback builds its file appenders and creates
+# logs/frontend.log and logs/frontend-error.log relative to WORKDIR — as root, because `USER 10001:10001`
+# comes below and a USER switch does not change an existing file's owner. Baked in, those files make
+# the published image unable to start on its own: /app/logs is writable by 10001 (a NEW file there
+# succeeds), but the app user cannot append to a root-owned one, and Logback turns that into
+# "openFile(logs/frontend.log,true) call failed ... (Permission denied)" -> "Logback configuration error
+# detected" -> exit 1, before any application code runs. docker-compose.yml bind-mounts
+# /var/iri/frontend/log over /app/logs and hides them, which is what kept this latent in production and
+# is not a fix. Cleared in the SAME RUN: a later layer would stack a whiteout on top and still ship
+# the bytes underneath. The directory itself must survive, owned by the runtime user.
+#
+# Cleared after training rather than suppressed during it, deliberately. A console-only logging
+# config would keep AsyncAppender, RollingFileAppender, SizeAndTimeBasedRollingPolicy and
+# PiiMaskingPatternLayout out of the archive although every real startup loads them (measured on the
+# ingest image, 2026-09-16: 56 classes and 278 KB less), and one that fails to parse guts the whole
+# training run while still producing a .jsa — which the `if [ -f ... ]` fallback cannot detect, just
+# like the object-layout mismatch above. A bare `-Dlogging.config=` suppresses nothing: Spring Boot
+# reads an empty value as "no explicit config" and falls back to the classpath logback-spring.xml.
 RUN java -XX:ArchiveClassesAtExit=/app/application.jsa \
         -XX:+UseCompactObjectHeaders \
         -Dspring.context.exit=onRefresh \
@@ -221,7 +240,9 @@ RUN java -XX:ArchiveClassesAtExit=/app/application.jsa \
         echo "[CDS] Archive created: $(wc -c < /app/application.jsa) bytes" ; \
     else \
         echo "[CDS] Archive not produced; runtime will start without CDS." ; \
-    fi
+    fi ; \
+    rm -rf /app/logs && mkdir -p /app/logs && chown 10001:10001 /app/logs \
+    && echo "[CDS] Training-run logs cleared; /app/logs ships empty."
 
 USER 10001:10001
 

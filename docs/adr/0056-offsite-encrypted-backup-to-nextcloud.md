@@ -76,4 +76,3 @@ remote, scheduled by systemd:
   encrypted off-site.
 - **Continuous WAL archiving / PITR** — rejected as overkill for this data size and RPO; daily
   logical dumps suffice (see spec *Out of scope*).
-

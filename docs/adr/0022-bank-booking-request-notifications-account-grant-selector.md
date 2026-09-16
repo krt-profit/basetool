@@ -68,4 +68,3 @@ columns carry no CHECK (open enums).
 - **Filter grant holders by the request's capability (deposit→`can_deposit`)** — deferred:
   bakes bank-capability semantics into the generic engine; notifying all grant holders is simpler
   and the confirm gate already enforces capability.
-

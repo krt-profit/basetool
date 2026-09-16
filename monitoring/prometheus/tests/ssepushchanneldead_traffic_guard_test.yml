@@ -82,12 +82,16 @@ tests:
               summary: "Notification SSE push channel dead while users are online"
               description: "The backend has zero live SSE connections for 30 minutes while the frontend is still serving real user page traffic — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
 
-  # The `blackbox-public-surface` job (ADR-0166) probes SEVEN public URLs every 30s. Each one is
-  # 0.033 req/s, which clears the 0.01 floor on its own — so a target missing from the `uri`
-  # exclusion list pages every night on a healthy idle site, which is the 2026-07-26 regression
-  # verbatim. Two were missing when the job was added: `/.well-known/assetlinks.json`, tagged with
-  # its own path by AssetLinksController, and `/robots.txt`, a static file the resource handler
-  # serves and Micrometer tags `/**`.
+  # The `blackbox-public-surface` job (ADR-0166) and its `blackbox-app-link` sibling (REQ-SEC-038)
+  # probe NINE public URLs every 30s. Each one is 0.033 req/s, which clears the 0.01 floor on its
+  # own — so a target missing from the `uri` exclusion list pages every night on a healthy idle
+  # site, which is the 2026-07-26 regression verbatim. Two were missing when the job was added:
+  # `/.well-known/assetlinks.json`, tagged with its own path by AssetLinksController, and
+  # `/robots.txt`, a static file the resource handler serves and Micrometer tags `/**`.
+  #
+  # `/app/callback` answers 303 and is asserted under BOTH spellings it could carry — its handler
+  # pattern (what Micrometer tags it, a matched pattern winning over the `REDIRECTION` special
+  # case) and `REDIRECTION` — so the guard is proven rather than assumed.
   - name: silent - the ADR-0166 public-surface probes on an idle night
     interval: 1m
     input_series:
@@ -104,6 +108,14 @@ tests:
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/.well-known/assetlinks.json"}'
         values: "0+2x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/link-help"}'
+        values: "0+2x180"
+      # The 303 fallback, under its handler pattern...
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/callback"}'
+        values: "0+2x180"
+      # ...and under the tag it would carry if no pattern were matched. Both must stay excluded.
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="REDIRECTION"}'
+        values: "0+2x180"
       # /robots.txt arrives under the resource handler's pattern, not its own path.
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/**"}'
         values: "0+2x180"
@@ -115,7 +127,7 @@ tests:
         exp_alerts: []
 
   # And the signal still survives the wider exclusion list: one real page route plus the polling
-  # endpoint every viewer holds is enough to fire, with all seven probes running alongside.
+  # endpoint every viewer holds is enough to fire, with all nine probes running alongside.
   - name: fires - real users still detected past the ADR-0166 exclusions
     interval: 1m
     input_series:
@@ -128,6 +140,10 @@ tests:
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/**"}'
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/.well-known/assetlinks.json"}'
+        values: "0+2x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/callback"}'
+        values: "0+2x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/app/link-help"}'
         values: "0+2x180"
     alert_rule_test:
       - eval_time: 150m

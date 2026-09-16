@@ -71,4 +71,3 @@ change the spec contract (REQ-BANK-004).
 - **Redis as balance cache** — rejected for v1: balances are cheap SQL aggregates;
   a cache adds an invalidation bug class for zero measured need. Can be revisited with
   data from the volume test.
-

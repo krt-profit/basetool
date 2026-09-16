@@ -38,4 +38,3 @@ Der Auftrag erscheint in der Liste unter `/refinery-orders` als `refinery-order-
 - **Drei Pflichtfelder in der Goods-Zeile:** `inputMaterialId_0`, `inputQuantity_0` **und** `outputQuantity_0` sind HTML-`required` (nicht nur Material + Ausgangsmenge). Fehlt eines, blockiert der Browser den Submit stumm.
 - **Standort-Dropdown:** listet nur **refinery-fähige** Standorte (`getRefineryLocations` joint über `city.has_refinery`). Solche Standorte sind UEX-synced und per Admin-API nicht anlegbar → der Katalog-Snapshot setzt `has_refinery=true` per JDBC.
 - `LocationDto` hat ein primitives `boolean hidden`, das beim POST mitgesendet werden muss (sonst scheitert die Jackson-Deserialisierung).
-

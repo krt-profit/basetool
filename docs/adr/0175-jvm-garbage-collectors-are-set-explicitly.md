@@ -96,4 +96,3 @@ must be made deliberately rather than discovered afterwards.
   before it is used to justify another change; this ADR deliberately does not pre-empt those numbers.
 - The collector becomes greppable. `jvm_gc_pause_seconds_count` identifies it with no flag to read:
   `gc="Copy"` + `gc="MarkSweepCompact"` is Serial, `gc="G1 Young Generation"` is G1.
-
