@@ -228,9 +228,14 @@ public class DataExportService {
   /**
    * A scrubber loaded with every spelling of every member's name <em>except</em> the subject's.
    *
-   * <p>Excluding the subject is not an optimisation: scrubbing their own name would remove the one
-   * name the export is supposed to be about, and would do it from the entries they wrote
+   * <p>Not scrubbing the subject is not an optimisation: replacing their own name would remove the
+   * one name the export is supposed to be about, and would do it from the entries they wrote
    * themselves.
+   *
+   * <p><b>But they are still passed to the scrubber, as protected terms.</b> Leaving them out of
+   * the matcher entirely is what shredded them — longest-match ranks only the terms it knows, so a
+   * three-character third-party handle that is a prefix of the subject's own longer name won, and
+   * the name came back with a placeholder spliced into the middle of it.
    *
    * <p><b>Every spelling, not just the effective one.</b> {@code getEffectiveName()} is {@code
    * displayName ?: username}, so loading only that left a member's {@code username} unscrubbed for
@@ -245,13 +250,25 @@ public class DataExportService {
    * @return the scrubber
    */
   private @NotNull HandleScrubber scrubberForOthers(@NotNull UUID subjectId) {
+    List<User> roster = userRepository.findAll();
     List<String> others =
-        userRepository.findAll().stream()
+        roster.stream()
             .filter(u -> !u.getId().equals(subjectId))
             .flatMap(DataExportService::everySpellingOf)
             .filter(h -> h != null && !h.isBlank())
             .toList();
-    return new HandleScrubber(others);
+    // The subject's own names go in as PROTECTED terms rather than being left out. Excluding them
+    // entirely is what shredded them: longest-match can only rank terms the matcher knows, so a
+    // third party called "Val" beat the subject's own "Valkyrie" and turned it into
+    // "#OTHER_MEMBER#kyrie" -- in the subject's own export, reported to the reviewing admin as a
+    // third-party redaction.
+    List<String> own =
+        roster.stream()
+            .filter(u -> u.getId().equals(subjectId))
+            .flatMap(DataExportService::everySpellingOf)
+            .filter(h -> h != null && !h.isBlank())
+            .toList();
+    return new HandleScrubber(others, own);
   }
 
   /**

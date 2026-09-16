@@ -282,13 +282,24 @@ class DataExportIntegrationTest {
   // covers REQ-SEC-058 — the subject's OWN handle must not be scrubbed out of their own entries
   @Test
   void theSubjectsOwnHandleIsNotScrubbed() {
+    // A third party whose handle is a PREFIX of the subject's own name, which is the fixture that
+    // matters: this test used to seed no other user at all, so it pinned only the case where the
+    // dictionary is empty. With "ZzzSelf" in it and the subject's own name left out of the
+    // matcher, longest-match had no competitor and "ZzzSelfNamedZzz" came back as
+    // "#OTHER_MEMBER#NamedZzz" -- the subject's own name shredded, in their own export.
     UUID subject = user("ZzzSelfNamedZzz");
+    user("ZzzSelf");
     personalItem(subject, "Notiz von ZzzSelfNamedZzz");
 
     DataExportService.DataExport export = dataExportService.export(subject);
 
     assertThat(allStrings(export)).anyMatch(v -> v.contains("ZzzSelfNamedZzz"));
-    assertThat(export.thirdPartyHandlesRemoved()).isFalse();
+    assertThat(allStrings(export))
+        .as("and no placeholder was spliced into it")
+        .noneMatch(v -> v.contains(HandleScrubber.REPLACEMENT));
+    assertThat(export.thirdPartyHandlesRemoved())
+        .as("nothing was replaced, so the Art. 15(4) reviewer is not told there was")
+        .isFalse();
   }
 
   // covers REQ-SEC-058 — an audit subject label is a person often enough that it is not exported

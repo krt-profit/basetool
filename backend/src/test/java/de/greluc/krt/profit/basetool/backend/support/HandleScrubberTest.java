@@ -69,6 +69,64 @@ class HandleScrubberTest {
     assertThat(result).doesNotContain("kyrie");
   }
 
+  // covers REQ-SEC-058 - regression: a name is not replaced inside an unrelated word
+  @Test
+  void aMatchMustBeFlankedByWordBoundaries() {
+    // A three-character display name is settable, and without a boundary rule it rewrote every
+    // word containing it. The class used to argue only the two-character case and then assert that
+    // three was safe.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Ore"));
+
+    assertThat(scrubber.scrub("Erz sortiert, Store gefuellt"))
+        .as("inside a word is not a mention of the person")
+        .isEqualTo("Erz sortiert, Store gefuellt");
+    assertThat(scrubber.scrub("Ore aus Daymar"))
+        .as("at the start, flanked by the string edge and a space")
+        .isEqualTo(HandleScrubber.REPLACEMENT + " aus Daymar");
+    assertThat(scrubber.scrub("uebergeben an Ore"))
+        .as("at the end")
+        .isEqualTo("uebergeben an " + HandleScrubber.REPLACEMENT);
+    assertThat(scrubber.scrub("an @Ore, danke"))
+        .as("punctuation is a boundary, so a mention beside it still matches")
+        .isEqualTo("an @" + HandleScrubber.REPLACEMENT + ", danke");
+  }
+
+  // covers REQ-SEC-058 - regression: the subject's own name survives its own export
+  @Test
+  void theSubjectsOwnNameIsMatchedAndPassedThroughVerbatim() {
+    // Leaving the subject out of the matcher entirely is what shredded them: longest-match ranks
+    // only the terms it knows, so a third party's "Val" beat the subject's own "Valkyrie" and
+    // produced "#OTHER_MEMBER#kyrie" -- in the subject's own export, and reported to the reviewing
+    // admin as a third-party redaction, because the caller's flag keys off any change at all.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Val"), List.of("Valkyrie"));
+
+    assertThat(scrubber.scrub("Notiz von Valkyrie"))
+        .as("the subject's own longer name wins and is emitted unchanged")
+        .isEqualTo("Notiz von Valkyrie");
+    assertThat(scrubber.scrub("Val war auch da"))
+        .as("and the third party is still replaced")
+        .isEqualTo(HandleScrubber.REPLACEMENT + " war auch da");
+  }
+
+  // covers REQ-SEC-058 - a protected-only scrubber changes nothing, so it reports itself inactive
+  @Test
+  void aScrubberWithOnlyProtectedNamesIsInactive() {
+    assertThat(new HandleScrubber(List.of(), List.of("Valkyrie")).isActive()).isFalse();
+  }
+
+  // covers REQ-SEC-058 - the first-character index must fold no more narrowly than the comparison
+  @Test
+  void aTermStartingWithAWideCaseFoldingCharacterIsStillFound() {
+    // regionMatches(true, ...) compares toUpperCase and then toLowerCase of each pair, which
+    // accepts pairs a single folding does not -- KELVIN SIGN (U+212A) matches 'k'. Bucketing the
+    // index under only two foldings made it the narrower of the two, so such a term was never
+    // tested at all.
+    HandleScrubber scrubber = new HandleScrubber(List.of("KELVIN".replace("K", "\u212A")));
+
+    assertThat(scrubber.scrub("uebergeben an kelvin heute"))
+        .isEqualTo("uebergeben an " + HandleScrubber.REPLACEMENT + " heute");
+  }
+
   // covers REQ-SEC-058 — a two-character handle would shred every note in the export
   @Test
   void skipsHandlesTooShortToMatchSafely() {
@@ -136,7 +194,9 @@ class HandleScrubberTest {
     // the final append run backwards and IndexOutOfBoundsException left the whole export as a 500.
     HandleScrubber scrubber = new HandleScrubber(List.of("Valkyrie"));
 
-    assertThat(scrubber.scrub("\u0130Valkyrie")).isEqualTo("\u0130" + HandleScrubber.REPLACEMENT);
+    // A space between the two, because U+0130 is a letter and the boundary rule is
+    // deliberate: what this test is about is the offset arithmetic, not the boundary.
+    assertThat(scrubber.scrub("\u0130 Valkyrie")).isEqualTo("\u0130 " + HandleScrubber.REPLACEMENT);
   }
 
   // covers REQ-SEC-058 - regression: the replacement must not be scrubbed by a later handle
@@ -162,12 +222,15 @@ class HandleScrubberTest {
         .containsOnlyOnce(HandleScrubber.REPLACEMENT);
   }
 
-  // covers REQ-SEC-058 - a handle occurring twice adjacently is still two separate replacements
+  // covers REQ-SEC-058 - two mentions separated only by punctuation are both replaced
   @Test
   void adjacentOccurrencesAreBothReplaced() {
     HandleScrubber scrubber = new HandleScrubber(List.of("Nova"));
 
-    assertThat(scrubber.scrub("NovaNova"))
-        .isEqualTo(HandleScrubber.REPLACEMENT + HandleScrubber.REPLACEMENT);
+    assertThat(scrubber.scrub("Nova/Nova"))
+        .isEqualTo(HandleScrubber.REPLACEMENT + "/" + HandleScrubber.REPLACEMENT);
+    // "NovaNova" is deliberately NOT two mentions: there is no boundary between them, so it is one
+    // longer word that happens to contain the name twice.
+    assertThat(scrubber.scrub("NovaNova")).isEqualTo("NovaNova");
   }
 }

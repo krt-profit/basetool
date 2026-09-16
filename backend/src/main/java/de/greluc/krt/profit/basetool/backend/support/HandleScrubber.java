@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.support;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -67,10 +69,23 @@ import org.jetbrains.annotations.Nullable;
  * character in their own note and then request their own export. {@code regionMatches} compares
  * character for character, so the two cannot drift apart.
  *
+ * <p><b>A match must be flanked by non-alphanumeric characters.</b> Without that, a name is
+ * replaced inside unrelated words: a third party called "Ore" turned "Store gefuellt" into
+ * "St#OTHER_MEMBER# gefuellt". The boundary is what makes the three-character floor below
+ * defensible — the class used to argue only the two-character case and then assert that three was
+ * safe. A mention next to punctuation still matches, because punctuation is a boundary.
+ *
  * <p><b>Handles under {@value #MIN_HANDLE_LENGTH} characters are skipped.</b> A two-character
- * handle occurs as a substring of ordinary words constantly, and replacing it would shred every
- * note in the export. A short handle that genuinely appears is left to the human review, which is
+ * handle occurs inside ordinary words constantly and no boundary rule saves it — "Al" is a word in
+ * several languages. A short handle that genuinely appears is left to the human review, which is
  * the correct trade: a readable export with a reviewed residue beats a mangled one.
+ *
+ * <p><b>The subject's own names are matched and passed through verbatim.</b> They are not in the
+ * replaced set — the export is about them — but they have to be in the <em>matcher</em>, or
+ * longest-match cannot see them. With a third party called "Val" and nothing protecting the
+ * subject's own "Valkyrie", "Notiz von Valkyrie" became "Notiz von #OTHER_MEMBER#kyrie": the
+ * subject's own name shredded, in their own export, and reported to the reviewing admin as a
+ * third-party redaction because the caller's flag keys off any change at all.
  */
 public final class HandleScrubber {
 
@@ -95,68 +110,127 @@ public final class HandleScrubber {
    */
   public static final String REPLACEMENT = "#OTHER_MEMBER#";
 
-  /** Every handle to look for, longest first, so a longer match always wins over a shorter one. */
-  private final List<String> handles;
+  /**
+   * One term the matcher recognises.
+   *
+   * @param text the term as the dictionary spells it
+   * @param replaced whether a match is replaced ({@code true}) or emitted verbatim ({@code false})
+   */
+  private record Term(String text, boolean replaced) {}
+
+  /** Every term to look for, longest first, so a longer match always beats a shorter one. */
+  private final List<Term> terms;
 
   /**
-   * The handles bucketed by their first character in both cases, so a position in the text is
-   * tested only against the handles that could start there.
+   * The terms bucketed by their first character, so a position in the text is tested only against
+   * the terms that could start there.
    *
    * <p>This is what keeps the pass affordable. The scan advances one position at a time, and a few
-   * hundred handles tested at every character of a few thousand values would be the one part of an
-   * export that could plausibly become slow -- the concern the previous implementation cited to
-   * justify hand-rolling the match rather than compiling a pattern. A character that starts no
-   * handle now costs one map lookup.
+   * hundred terms tested at every character of a few thousand values would be the one part of an
+   * export that could plausibly become slow — the concern the original hand-rolled match cited to
+   * justify not compiling a pattern. A character that starts no term costs one map lookup.
+   *
+   * <p>Bucketed under every case-folding of the first character that {@link
+   * String#regionMatches(boolean, int, String, int, int)} would accept, so the index cannot fold
+   * more narrowly than the comparison does and silently miss a match.
    */
-  private final Map<Character, List<String>> byFirstChar;
+  private final Map<Character, List<Term>> byFirstChar;
 
   /**
    * Creates a scrubber for the given third-party handles.
    *
-   * @param otherHandles every other member's name in every spelling the schema stores; the
-   *     requester's own must already be excluded by the caller, because replacing it would remove
-   *     the one name the export is supposed to be about
+   * @param otherHandles every other member's name in every spelling the schema stores
    */
   public HandleScrubber(@NotNull Collection<String> otherHandles) {
-    this.handles =
-        otherHandles.stream()
-            .filter(h -> h != null && h.trim().length() >= MIN_HANDLE_LENGTH)
-            .map(String::trim)
-            .distinct()
-            .sorted((a, b) -> Integer.compare(b.length(), a.length()))
+    this(otherHandles, List.of());
+  }
+
+  /**
+   * Creates a scrubber that replaces one set of names and protects another.
+   *
+   * @param otherHandles every other member's name in every spelling the schema stores; each
+   *     occurrence is replaced by {@link #REPLACEMENT}
+   * @param ownNames the subject's own names, in every spelling. Matched so that longest-match can
+   *     see them, and then emitted <b>verbatim</b>: the export is about this person, and without
+   *     them in the matcher a shorter third-party handle that is a prefix of the subject's own name
+   *     shreds it.
+   */
+  public HandleScrubber(
+      @NotNull Collection<String> otherHandles, @NotNull Collection<String> ownNames) {
+    List<Term> collected = new ArrayList<>();
+    addTerms(collected, otherHandles, true);
+    addTerms(collected, ownNames, false);
+    this.terms =
+        collected.stream()
+            .sorted((a, b) -> Integer.compare(b.text().length(), a.text().length()))
             .toList();
-    Map<Character, List<String>> buckets = new HashMap<>();
-    for (String handle : this.handles) {
-      char first = handle.charAt(0);
-      // Both cases, because the scan looks up the text's character exactly as it stands there.
-      char lower = Character.toLowerCase(first);
-      char upper = Character.toUpperCase(first);
-      buckets.computeIfAbsent(lower, k -> new ArrayList<>()).add(handle);
-      if (upper != lower) {
-        buckets.computeIfAbsent(upper, k -> new ArrayList<>()).add(handle);
+
+    Map<Character, List<Term>> buckets = new HashMap<>();
+    for (Term term : this.terms) {
+      for (char first : caseFoldings(term.text().charAt(0))) {
+        buckets.computeIfAbsent(first, k -> new ArrayList<>()).add(term);
       }
     }
     this.byFirstChar = Map.copyOf(buckets);
   }
 
   /**
-   * Replaces every occurrence of a known third-party handle in the text, case-insensitively.
+   * Adds the usable spellings of one side to the term list.
    *
-   * <p>Case-insensitive because whoever wrote the note was typing, not copying from a roster -- the
+   * @param into the list being built
+   * @param names the raw candidates, possibly containing nulls and blanks
+   * @param replaced whether these terms are replaced or protected
+   */
+  private static void addTerms(
+      @NotNull List<Term> into, @NotNull Collection<String> names, boolean replaced) {
+    names.stream()
+        .filter(name -> name != null && name.trim().length() >= MIN_HANDLE_LENGTH)
+        .map(String::trim)
+        .distinct()
+        .filter(name -> into.stream().noneMatch(t -> t.text().equalsIgnoreCase(name)))
+        .forEach(name -> into.add(new Term(name, replaced)));
+  }
+
+  /**
+   * Every character a case-insensitive comparison could accept in place of this one.
+   *
+   * <p>{@code regionMatches(true, …)} compares {@code toUpperCase} and then {@code toLowerCase} of
+   * each pair, which accepts pairs that a single folding does not: {@code K} (U+212A) matches
+   * {@code k}, {@code ı} matches {@code I}. Bucketing under only two foldings made the index the
+   * narrower of the two, so a term starting with such a character was silently never tested.
+   *
+   * @param first the term's first character
+   * @param <ignored> not used
+   * @return the distinct characters to bucket under
+   */
+  private static @NotNull Set<Character> caseFoldings(char first) {
+    Set<Character> out = new LinkedHashSet<>();
+    out.add(first);
+    out.add(Character.toLowerCase(first));
+    out.add(Character.toUpperCase(first));
+    out.add(Character.toLowerCase(Character.toUpperCase(first)));
+    out.add(Character.toUpperCase(Character.toLowerCase(first)));
+    return out;
+  }
+
+  /**
+   * Replaces every occurrence of a known third-party name in the text, case-insensitively.
+   *
+   * <p>Case-insensitive because whoever wrote the note was typing, not copying from a roster — the
    * same reason the Personensuche matches that way (REQ-SEC-060).
    *
    * @param text the free text, possibly {@code null}
-   * @return the text with third-party handles replaced, or {@code null} when the input was
+   * @return the text with third-party names replaced, or {@code null} when the input was
    */
   public @Nullable String scrub(@Nullable String text) {
-    if (text == null || text.isEmpty() || handles.isEmpty()) {
+    if (text == null || text.isEmpty() || terms.isEmpty()) {
       return text;
     }
     StringBuilder out = null;
     int copiedUpTo = 0;
     int at = 0;
     while (at < text.length()) {
-      String hit = handleAt(text, at);
+      Term hit = termAt(text, at);
       if (hit == null) {
         at++;
         continue;
@@ -164,8 +238,15 @@ public final class HandleScrubber {
       if (out == null) {
         out = new StringBuilder(text.length());
       }
-      out.append(text, copiedUpTo, at).append(REPLACEMENT);
-      at += hit.length();
+      out.append(text, copiedUpTo, at);
+      if (hit.replaced()) {
+        out.append(REPLACEMENT);
+      } else {
+        // The subject's own name, in the casing the author typed. Emitting it rather than skipping
+        // past it is what makes it a competitor in the longest-match above.
+        out.append(text, at, at + hit.text().length());
+      }
+      at += hit.text().length();
       copiedUpTo = at;
     }
     if (out == null) {
@@ -175,32 +256,52 @@ public final class HandleScrubber {
   }
 
   /**
-   * The longest known handle that starts at this position, ignoring case.
+   * The longest known term that starts at this position, ignoring case, flanked by boundaries.
    *
    * @param text the text being scanned
    * @param at the position to test
-   * @return the matching handle as the dictionary spells it, or {@code null} when none starts here
+   * @return the matching term, or {@code null} when none starts here
    */
-  private @Nullable String handleAt(@NotNull String text, int at) {
-    List<String> candidates = byFirstChar.get(text.charAt(at));
+  private @Nullable Term termAt(@NotNull String text, int at) {
+    List<Term> candidates = byFirstChar.get(text.charAt(at));
     if (candidates == null) {
       return null;
     }
-    for (String handle : candidates) {
-      if (at + handle.length() <= text.length()
-          && text.regionMatches(true, at, handle, 0, handle.length())) {
-        return handle;
+    for (Term term : candidates) {
+      int end = at + term.text().length();
+      if (end <= text.length()
+          && text.regionMatches(true, at, term.text(), 0, term.text().length())
+          && isBoundary(text, at - 1)
+          && isBoundary(text, end)) {
+        return term;
       }
     }
     return null;
   }
 
   /**
+   * Whether the character at this index does not continue a word.
+   *
+   * <p>Outside the string counts as a boundary: a name at the very start or end of a value is a
+   * mention, not a fragment of something longer.
+   *
+   * @param text the text being scanned
+   * @param index the position to inspect, possibly outside the string
+   * @return {@code true} when the position is a word boundary
+   */
+  private static boolean isBoundary(@NotNull String text, int index) {
+    return index < 0 || index >= text.length() || !Character.isLetterOrDigit(text.charAt(index));
+  }
+
+  /**
    * Whether this scrubber would change anything at all.
    *
-   * @return {@code true} when it holds at least one usable handle
+   * <p>Asks about <em>replaceable</em> terms only: a scrubber holding nothing but the subject's own
+   * protected names changes no text, so running it would be work with no effect.
+   *
+   * @return {@code true} when it holds at least one third-party name
    */
   public boolean isActive() {
-    return !handles.isEmpty();
+    return terms.stream().anyMatch(Term::replaced);
   }
 }
