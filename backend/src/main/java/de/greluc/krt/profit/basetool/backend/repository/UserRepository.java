@@ -409,6 +409,35 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           java.util.Collection<String> lowerNames);
 
   /**
+   * Whether any <em>other</em> account already carries this name, as its login {@code username} or
+   * its in-app {@code displayName} (REQ-SEC-062).
+   *
+   * <p>The self-service display name is what the Art. 17 erasure's text-matched statements are
+   * driven by, and those statements carry no owner predicate: they rewrite {@code
+   * job_order.handle}, both {@code recipient_handle} columns and {@code audit_event.subject_label}
+   * wherever the value equals the name. Without this check a departing member could set their
+   * display name to a victim's handle and have an admin, acting through the intended workflow,
+   * rewrite the victim's rows to the erasure sentinel — which every viewer renders as "this person
+   * requested erasure".
+   *
+   * <p>Compared lower-cased, because the erasure matches case-insensitively and a check that did
+   * not would be trivially sidestepped. The row being edited is excluded, so re-saving one's own
+   * unchanged name is not a collision.
+   *
+   * @param lowerName the candidate name, already lower-cased and trimmed by the caller
+   * @param selfId the account being edited, excluded from the comparison
+   * @return {@code true} when somebody else already answers to this name
+   */
+  @Query(
+      """
+      SELECT (COUNT(u) > 0) FROM User u
+      WHERE u.id <> :selfId
+        AND (LOWER(u.username) = :lowerName OR LOWER(u.displayName) = :lowerName)
+      """)
+  boolean existsOtherAccountWithName(
+      @Param("lowerName") String lowerName, @Param("selfId") UUID selfId);
+
+  /**
    * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
    * the given e-mail (already lower-cased by the caller)? Case-insensitive counterpart to the
    * case-sensitive {@link #findByEmail(String)}; returns the bare existence fact so no PII is
