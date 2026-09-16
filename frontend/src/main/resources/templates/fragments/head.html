@@ -222,6 +222,19 @@
         };
     </script>
     <!--
+      Wording for the one owner-picker rejection a member can act on (REQ-ORG-023). Defined on its
+      own global, like the two dictionaries around it, because the failure can arrive on ANY of the
+      five picker surfaces (book-in, hangar, mission, operation, refinery order) and krt-fetch.js
+      renders it centrally from the backend's stable OWNER_ORG_UNIT_REQUIRED code. Localising it per
+      page would be five copies of one sentence, and the previous behaviour — echoing the backend's
+      own English `detail` into a German toast — is exactly what this replaces.
+    -->
+    <script th:inline="javascript" th:attr="nonce=${cspNonce}">
+        window.krtOwnerPickerI18n = {
+            required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.'
+        };
+    </script>
+    <!--
       Shared default labels for the searchable combobox (krt-searchable-select.js). Defined on a
       dedicated global, like `window.krtScuI18n` above, so they are localised in ONE place and the
       ~20 pickers across the app need only the `data-krt-combobox` marker (a single control may

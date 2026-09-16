@@ -283,6 +283,14 @@ interface KrtFetchApi {
     syncVersion(container: KrtElementRef, newVersion: number | string | null): void;
     /** Handles an RFC 7807 `problem+json` response, showing the appropriate toast. */
     handleProblem(response: Response, problem: any, opts?: KrtSendOpts): Promise<void>;
+
+    /**
+     * The localized message for a `OWNER_ORG_UNIT_REQUIRED` problem, or `null`
+     * when the problem is anything else. Exposed so a page-local `onError`
+     * handler — which bypasses `handleProblem` entirely — renders the same
+     * wording instead of re-deriving it (REQ-ORG-023).
+     */
+    ownerOrgUnitRequiredMessage(problem: any): string | null;
     /** Redirects to the re-auth path when the response carries `X-Reauthenticate`. */
     maybeReauthenticate(response: Response): boolean;
     /** Redirects the window to a same-origin re-authentication path. */
@@ -607,6 +615,14 @@ interface Window {
      */
     krtToastI18n: KrtI18nDict;
     krtLiveSyncI18n?: KrtI18nDict;
+
+    /**
+     * Wording for the owner-picker's one actionable rejection, from
+     * `fragments/head.html`. Read by `krt-fetch.js` when the backend answers the
+     * stable `OWNER_ORG_UNIT_REQUIRED` code, so the member sees a localized
+     * instruction instead of the backend's English `detail` (REQ-ORG-023).
+     */
+    krtOwnerPickerI18n?: KrtI18nDict;
 
     /**
      * Returns `url` when it is a same-origin absolute path, otherwise

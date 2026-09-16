@@ -15,6 +15,11 @@
   `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
   Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
   stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
+  
+- **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
+  Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
+  und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
+  zu tun ist. Betrifft Lager, Hangar, Einsätze, Operationen und Raffinerieaufträge (REQ-ORG-023).
 
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend

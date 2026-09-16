@@ -471,8 +471,38 @@
             errorToast(prefix + domainDetail);
             return;
         }
+        const ownerRequired = ownerOrgUnitRequiredMessage(problem);
+        if (ownerRequired) {
+            errorToast(prefix + ownerRequired);
+            return;
+        }
         const generic = problem && problem.detail ? problem.detail : genericError;
         errorToast(prefix + generic);
+    }
+
+    /**
+     * Localized message for the one 400 on the owner-stamping path the member can act on, or null
+     * when the problem is something else.
+     *
+     * The fallback below this branch shows `problem.detail` verbatim, and the backend's detail is
+     * developer-facing English — a member on a German UI was told "User belongs to multiple org
+     * units; owningOrgUnitId is required", which is both an i18n violation and an instruction
+     * nobody can act on. The backend now carries the stable code OWNER_ORG_UNIT_REQUIRED
+     * (REQ-ORG-023) precisely so this can be branched on; the wording comes from the bundle via
+     * `window.krtOwnerPickerI18n`, so it is localized once for every picker surface.
+     *
+     * @param {any} problem the parsed RFC 7807 body, or null
+     * @returns {string | null} the localized message, or null when this is not that failure
+     */
+    function ownerOrgUnitRequiredMessage(problem) {
+        if (!problem || typeof problem !== 'object' || problem.code !== 'OWNER_ORG_UNIT_REQUIRED') {
+            return null;
+        }
+        const i18n = window.krtOwnerPickerI18n;
+        return text(
+            i18n && i18n.required,
+            'Bitte oben eine Organisationseinheit auswählen, der dieser Eintrag gehören soll.',
+        );
     }
 
     async function parseBody(response) {
@@ -1112,6 +1142,11 @@
         bindSwap: bindSwap,
         syncVersion: syncVersion,
         handleProblem: handleProblem,
+        // Exposed so a page-local onError handler — which bypasses handleProblem entirely — can
+        // render the SAME localized wording for OWNER_ORG_UNIT_REQUIRED instead of falling back to
+        // the backend's English detail (REQ-ORG-023). Duplicating the branch per page is how the
+        // two would drift.
+        ownerOrgUnitRequiredMessage: ownerOrgUnitRequiredMessage,
         maybeReauthenticate: maybeReauthenticate,
         reauthRedirect: reauthRedirect,
         sectionWrite: sectionWrite,
