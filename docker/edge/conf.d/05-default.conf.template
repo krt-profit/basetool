@@ -12,18 +12,23 @@
 # GET.
 # =============================================================================
 
+# Liveness for the container HEALTHCHECK, on a listener of its own that NEVER
+# speaks PROXY protocol — and that is the whole reason it exists separately.
+#
+# It used to live on :8080 beside the redirect. Once a front end is configured
+# (ADR-0187) that listener becomes `proxy_protocol`, and such a listener REJECTS
+# a header-less connection: the HEALTHCHECK's own `wget http://127.0.0.1/healthz`
+# would be refused, the container would never go healthy, and `Notify=healthy`
+# would hold the entire stack down behind an edge that is in fact working.
+# A dedicated plain listener keeps the check honest in both modes.
+#
+# Bound to loopback, so nothing outside the container can reach it at all. The
+# allow-list stays as a second lock rather than as the only one.
 server {
-  listen 8080 default_server;
-  listen [::]:8080 default_server;
+  listen 127.0.0.1:8081;
+  listen [::1]:8081;
   server_name _;
 
-  include /etc/nginx/edge/include/acme-challenge.conf;
-
-  # Liveness for the container HEALTHCHECK, and the reason the deploy gate stops
-  # being blind to the edge: the jc21 image shipped no HEALTHCHECK at all, so the
-  # one container whose failure takes everything else down was the one
-  # `--wait` could not observe. Loopback only — the check runs inside the
-  # container, so 127.0.0.1 is the whole allow list.
   location = /healthz {
     allow 127.0.0.1;
     allow ::1;
@@ -32,6 +37,16 @@ server {
     add_header Content-Type text/plain always;
     return 200 "ok\n";
   }
+
+  location / { return 444; }
+}
+
+server {
+  listen 8080 default_server ${EDGE_LISTEN_OPTS};
+  listen [::]:8080 default_server ${EDGE_LISTEN_OPTS};
+  server_name _;
+
+  include /etc/nginx/edge/include/acme-challenge.conf;
 
   location / {
     return 308 https://$host$request_uri;
@@ -42,8 +57,8 @@ server {
 # probing by IP never gets a certificate and never learns a hostname — carried
 # over from NPM's fallback server, which did the same.
 server {
-  listen 8443 ssl default_server;
-  listen [::]:8443 ssl default_server;
+  listen 8443 ssl default_server ${EDGE_LISTEN_OPTS};
+  listen [::]:8443 ssl default_server ${EDGE_LISTEN_OPTS};
   server_name _;
 
   ssl_reject_handshake on;

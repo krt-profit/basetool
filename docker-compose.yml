@@ -1832,12 +1832,27 @@ services:
       EDGE_HOST_INGEST: ${EDGE_HOST_INGEST:-}
       EDGE_HOST_GRAFANA: ${EDGE_HOST_GRAFANA:-}
       EDGE_HOST_API: ${EDGE_HOST_API:-}
+      # Optional, and empty here by design: the address of a PROXY-protocol front
+      # end (ADR-0187). Unset means the listeners stay plain and the edge trusts
+      # no header, which is what this Docker deployment does. Setting it switches
+      # every public listener to `proxy_protocol` AND restores the client address
+      # from it -- the two move together, and `render-and-run.sh` refuses a
+      # wildcard or a prefix, because the header asserts an address rather than
+      # proving one.
+      EDGE_TRUSTED_PROXY: ${EDGE_TRUSTED_PROXY:-}
     healthcheck:
       # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
-      # gate could never fire for the edge. /healthz is loopback-only and answers
-      # from the default :8080 server, which proves nginx is accepting and
+      # gate could never fire for the edge. /healthz proves nginx is accepting and
       # routing rather than merely running.
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      #
+      # :8081, not :8080, and it is load-bearing rather than cosmetic. With a
+      # front end configured the public listeners speak `proxy_protocol`, and such
+      # a listener REJECTS a header-less connection -- this wget would be refused,
+      # the container would never go healthy, and the health gate would hold the
+      # whole stack down behind an edge that is in fact working. :8081 is a
+      # loopback-only listener that never speaks PROXY protocol, so the check
+      # behaves identically in both modes.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -7,8 +7,8 @@
 # across from the runbook block after both copies were verified identical.
 # =============================================================================
 server {
-  listen 8443 ssl;
-  listen [::]:8443 ssl;
+  listen 8443 ssl ${EDGE_LISTEN_OPTS};
+  listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
   http2 on;
   server_name ${EDGE_HOST_API};
 

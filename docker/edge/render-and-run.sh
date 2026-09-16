@@ -47,13 +47,59 @@ if [ -n "${missing}" ]; then
   exit 1
 fi
 
-SHELL_FORMAT=''
+# --- optional: a PROXY-protocol front end in front of the edge (ADR-0187) -----
+#
+# EDGE_TRUSTED_PROXY holds the ONE address the edge accepts a PROXY header from.
+# Unset means there is no front end: the listeners stay plain and the edge trusts
+# nothing, which is what the Docker deployment does today. Setting it switches
+# every public listener to `proxy_protocol` AND restores the client address from
+# that header -- the two have to move together, because a `proxy_protocol`
+# listener rejects a header-less connection and a plain listener never sees one.
+#
+# PROXY protocol ASSERTS a source address; it does not measure one. So this value
+# is a trust decision, and the refusals below are the two ways it is got wrong:
+# trusting everything, or trusting a range wide enough to contain an attacker.
+EDGE_LISTEN_OPTS=''
+if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
+  case "${EDGE_TRUSTED_PROXY}" in
+    0.0.0.0/0|::/0|*' '*)
+      echo "edge: refusing to start - EDGE_TRUSTED_PROXY=${EDGE_TRUSTED_PROXY}" >&2
+      echo "edge: that trusts every client to forge its own address. Name the" >&2
+      echo "edge: front end's single address (ADR-0187), never a wildcard." >&2
+      exit 1
+      ;;
+    */*)
+      echo "edge: refusing to start - EDGE_TRUSTED_PROXY=${EDGE_TRUSTED_PROXY}" >&2
+      echo "edge: a prefix is not specific enough. The front end has ONE address," >&2
+      echo "edge: pinned with IP= in its unit, and anything else in that range" >&2
+      echo "edge: could forge a client address past the rate limiter and the" >&2
+      echo "edge: admin allow-list (ADR-0187)." >&2
+      exit 1
+      ;;
+  esac
+  EDGE_LISTEN_OPTS='proxy_protocol'
+fi
+export EDGE_LISTEN_OPTS
+
+SHELL_FORMAT='${EDGE_LISTEN_OPTS}'
 for v in ${EDGE_VARS}; do
   SHELL_FORMAT="${SHELL_FORMAT}\${${v}}"
 done
 
 mkdir -p "${CONF_OUT}"
 rm -f "${CONF_OUT}"/*.conf
+
+# After the wipe, or the next start deletes it again.
+if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
+  # http context: `include /tmp/edge-conf.d/*.conf` sits inside `http`, the same
+  # place 00-maps.conf is already included from.
+  printf 'set_real_ip_from %s;
+real_ip_header proxy_protocol;
+'     "${EDGE_TRUSTED_PROXY}" > "${CONF_OUT}/00-realip.conf"
+  echo "edge: PROXY protocol on, trusting ${EDGE_TRUSTED_PROXY} only"
+else
+  echo "edge: no front end configured - listeners are plain, no header is trusted"
+fi
 
 # Environment-independent blocks are copied verbatim. `*.conf` cannot match
 # `*.conf.template`, so the two loops never touch the same file.

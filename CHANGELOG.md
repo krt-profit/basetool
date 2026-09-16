@@ -4,6 +4,13 @@
 
 ### Changed
 
+- **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**
+  Neue optionale Variable `EDGE_TRUSTED_PROXY`: ist sie leer, ändert sich nichts. Trägt sie die
+  Adresse eines Vorschalters, sprechen die öffentlichen Listener PROXY-Protocol und der Edge stellt
+  die Client-Adresse daraus wieder her — nötig für den Umzug auf rootless Podman, weil dessen
+  Port-Weiterleitung die Adresse sonst ersetzt (ADR-0187). Der Health-Check des Containers läuft
+  jetzt über einen eigenen Loopback-Listener auf Port 8081.
+
 - **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
   Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
   Voreinstellung, hier wird es auf Java 25 vorgezogen. Die Speichergrenzen der Container bleiben

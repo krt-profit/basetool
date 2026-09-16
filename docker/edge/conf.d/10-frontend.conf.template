@@ -8,8 +8,8 @@
 # the platform the PWA exists for. Same-origin identity is the only arrangement
 # that keeps sign-in inside the installed window.
 server {
-  listen 8443 ssl;
-  listen [::]:8443 ssl;
+  listen 8443 ssl ${EDGE_LISTEN_OPTS};
+  listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
   http2 on;
   server_name ${EDGE_HOST_FRONTEND};
 
