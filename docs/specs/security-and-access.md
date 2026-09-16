@@ -3668,7 +3668,11 @@ profile of that person assembled across the whole system.
 **Case-insensitive, always.** Whoever typed the name was not copying it from a roster, so a
 case-sensitive match would miss the very entries the search exists to find. `ILIKE`, with the
 term's `%`, `_` and `\` escaped — an unescaped pasted `%` would match every row of every searched
-column, an accident indistinguishable from a deliberate dump.
+column, an accident indistinguishable from a deliberate dump. It holds in **both** directions —
+the casing the admin types and the casing the row happens to hold are independent — and
+`PersonSearchIntegrationTest` seeds the same name in three casings to prove it, because a
+case-sensitive match would answer "no further mentions" and nothing downstream would reveal that
+the answer was wrong.
 
 **A written registry, checked against the schema.** `PersonSearchTargets.TARGETS` names each
 searched `(area, table, column, idColumn, linkKind)`. It is a list rather than a reflection sweep
