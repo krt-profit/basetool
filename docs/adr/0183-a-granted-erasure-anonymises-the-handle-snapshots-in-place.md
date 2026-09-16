@@ -211,4 +211,3 @@ somebody will believe is complete.
   receipts while the record says their request was granted.
 - **Include the org-unit name beside an anonymised counterparty.** Kept, deliberately: an org unit
   is not a natural person, and removing it would degrade the booking's meaning for no gain.
-

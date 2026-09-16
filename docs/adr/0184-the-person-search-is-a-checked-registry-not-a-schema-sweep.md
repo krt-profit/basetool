@@ -144,4 +144,3 @@ and a link where the row has a page. Rectification happens on the record's own s
   bypassing each one's own validation and optimistic locking.
 - **Recording the search term in the audit event.** Rejected: it creates a permanent list of the
   names admins have searched for, inside the trail whose own retention this work just had to bound.
-

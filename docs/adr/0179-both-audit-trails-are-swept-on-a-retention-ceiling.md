@@ -140,4 +140,3 @@ purge must not have to guess why.
 - **Changing `purgeBefore` to skip writing a marker when it deleted nothing.** Rejected: it changes
   an admin-facing behaviour (a deliberate purge that found nothing is a fact worth recording) in
   order to simplify a background job. The exists-check belongs to the caller that needs it.
-

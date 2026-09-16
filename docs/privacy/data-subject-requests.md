@@ -242,4 +242,3 @@ Stated here so nobody has to guess whether a gap is deliberate:
   remedy.
 - If the request revealed that the tool cannot serve a right properly — that is a defect. File it and
   fix it, the same way this document came about.
-

@@ -146,4 +146,3 @@ admin still has two weeks to weigh a request.
 - **Notify the member when the deletion is carried out.** Rejected as impossible rather than
   unwanted: the recipient row cascades away with the account. Telling them is an out-of-band act by
   definition.
-

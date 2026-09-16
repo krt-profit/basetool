@@ -98,4 +98,3 @@ outbound call or a new place data can leave, not a calendar date:
 - [ ] Does a third-country transfer occur, and on what mechanism?
 - [ ] Is it in the record of processing activities' recipients table?
 - [ ] Does anything it receives need a retention window of its own?
-

@@ -240,4 +240,3 @@ now, which is what every other download endpoint in the codebase already did.
   the document — and it could not mark a legal basis or omit an actor column.
 - **Recording the subject's handle in the audit payload or the filename.** Rejected: it would make
   every export a second place the name is written, including in shell histories and mail clients.
-

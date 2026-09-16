@@ -176,4 +176,3 @@ Stated deliberately, because a measures document that lists only strengths is no
   within roughly six months; re-erasure after a restore is part of the restore procedure.
 - **The project is run voluntarily**, so availability is explicitly not warranted — stated in the
   terms of use rather than implied.
-

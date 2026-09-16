@@ -131,4 +131,3 @@ transaction. Stamping there would write a column nobody can ever read.
   notification models an event. It would either arrive once and be forgotten or repeat nightly. An
   alert with a `for:` clause is the right shape for a standing condition, and the dashboard panel
   answers "how many" at a glance.
-
