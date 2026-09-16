@@ -2,6 +2,7 @@
 [Unit]
 After=backend.service redis.service
 Requires=backend.service redis.service
+StartLimitIntervalSec=0
 
 [Container]
 Image=ghcr.io/krt-profit/basetool-ingest:stable
@@ -29,6 +30,9 @@ PodmanArgs=--cpus=1.5
 
 [Service]
 Restart=always
+RestartSec=1
+RestartSteps=6
+RestartMaxDelaySec=60
 TimeoutStopSec=30
 
 [Install]

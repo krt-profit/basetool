@@ -2,6 +2,7 @@
 [Unit]
 After=db-keycloak.service
 Requires=db-keycloak.service
+StartLimitIntervalSec=0
 
 [Container]
 Image=quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
@@ -32,6 +33,9 @@ PodmanArgs=--cpus=3.0
 
 [Service]
 Restart=always
+RestartSec=1
+RestartSteps=6
+RestartMaxDelaySec=60
 TimeoutStopSec=30
 
 [Install]

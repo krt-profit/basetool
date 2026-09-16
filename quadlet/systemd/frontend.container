@@ -2,6 +2,7 @@
 [Unit]
 After=backend.service keycloak.service redis.service
 Requires=backend.service keycloak.service redis.service
+StartLimitIntervalSec=0
 
 [Container]
 Image=ghcr.io/krt-profit/basetool-frontend:stable
@@ -30,6 +31,9 @@ PodmanArgs=--cpus=2.0 --ulimit nofile=65536:65536
 
 [Service]
 Restart=always
+RestartSec=1
+RestartSteps=6
+RestartMaxDelaySec=60
 TimeoutStopSec=30
 
 [Install]

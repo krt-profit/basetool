@@ -349,7 +349,7 @@ Five things, each of which changes the files rather than being tuned afterwards:
 Questions 3 and 4 are measurements, and they are Phase 1's. Questions 1, 2 and 5 are decisions, and
 they belong to the same sitting.
 
-## 10. Container hardening — what is already there, and what the migration adds
+## 9. Container hardening — what is already there, and what the migration adds
 
 Measured across all twenty translated services on 2026-09-16, from the compose files rather than
 from impressions:
@@ -432,7 +432,57 @@ it does not recognise is worse than no generator, its output being indistinguish
 Its own drift check cannot help here: that compares generated against generated. The allow-list
 found `oom_score_adj` on its first run, minutes after `pids` had been found by hand.
 
-## 9. Acceptance
+## 10. `restart:` — the translation that looked like one line and is four
+
+`restart: unless-stopped` becomes **four keys across two sections**, and the reason is a measured
+failure rather than a preference. On the testing VM on 2026-09-16 the edge burned five restarts in
+seconds and stopped for good with *"Start request repeated too quickly"*. `Restart=always` on its
+own does not mean what `unless-stopped` means.
+
+```ini
+[Unit]
+StartLimitIntervalSec=0
+
+[Service]
+Restart=always
+RestartSec=1
+RestartSteps=6
+RestartMaxDelaySec=60
+```
+
+|                    Key                     |                                                             Why it is there                                                              |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `Restart=always`                           | the obvious half, and the only half that was there before                                                                                |
+| `RestartSec=1`                             | systemd's default is 100ms, so a fast-failing container burns its whole allowance inside one second                                      |
+| `RestartSteps=6` + `RestartMaxDelaySec=60` | grow the interval geometrically to a 60s ceiling — the shape Docker's restart policy has. Both need systemd >= 254; the target ships 257 |
+| `StartLimitIntervalSec=0`                  | never give up, which is what `unless-stopped` says                                                                                       |
+
+`StartLimitIntervalSec=` lives in **`[Unit]`**. `systemd.service(5)` does not mention it **even
+once** — put it in `[Service]` and it is silently ignored, so the unit reads as though it were
+limited and is not. Verified against systemd 257's own man pages on the target host, and confirmed
+independently by the neighbouring deployment's operator.
+
+> [!important] Backoff and the start limiter cancel each other out, quietly
+> They cannot be tuned independently. Once the interval reaches the 60s ceiling, at most ten starts
+> fit into a ten-minute window — so a burst threshold of 60 in 600s is **never reached** and the
+> limit never fires. A unit configured that way would still *carry* a limit, and anyone reading it
+> later would believe in a boundary that no longer exists.
+>
+> So the give-up rule is made as **one** decision and written where it can be seen. Here it is
+> *never give up*, for three reasons: it is what `unless-stopped` already does today, so the
+> migration changes no behaviour; this stack is **monitored**, so a `failed` unit is not the only
+> signal anyone would get that something is down; and an edge that stays down after five minutes is
+> a total outage, where one that retries every 60s recovers by itself when a slow database or a
+> briefly unreachable registry clears.
+>
+> An unmonitored service would be argued the other way round, and correctly — there a visible
+> `failed` is the only signal there is. The point is that it is a choice, not an interaction.
+
+**Validated on the host**, not assumed: podman's own Quadlet generator passes all four through, and
+`StartLimitIntervalSec=0` lands in the generated unit's `[Unit]` section. All eighteen `.container`
+units carry all four; the generator emits no errors and no warnings.
+
+## 11. Acceptance
 
 The Phase 0 conformance suite, green against the host running these units — with
 `client-address-visible` the one that matters, because every other check can pass while the edge
