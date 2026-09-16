@@ -1,0 +1,58 @@
+#cloud-config
+# =====================================================================================
+# The ONLY thing cloud-init does for this deployment: make the machine reachable by
+# Ansible. Everything else is the role's (ADR-0186), and that boundary is the point.
+#
+# The migration's safety argument is that the testing host and the production host come
+# out of the SAME procedure -- testing first, production afterwards, same role, same
+# variables. Anything cloud-init sets up here that the role also sets up exists in two
+# places, and two places drift. A host built by "cloud-init plus the role" is not the
+# host that was rehearsed; it is a near neighbour of it, and the resemblance is exactly
+# what the sequence was supposed to guarantee.
+#
+# So: one user, one key, sudo. Nothing else.
+#
+# Paste into Hetzner's "Cloud config" field when creating the server. Replace the key.
+# =====================================================================================
+
+# Why a user at all, when Hetzner already injects the selected SSH key for root: the
+# testing host is reached as `sysadm`, and the inventory's production entry said `root`.
+# That difference is a difference in the procedure. Creating sysadm here makes the two
+# inventory entries identical apart from the address, which is what "the same role with
+# the same variables" is supposed to mean.
+users:
+  - name: sysadm
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true          # key authentication only; there is no password to guess
+    ssh_authorized_keys:
+      # The Ansible control node's key. Restrict it in authorized_keys AFTER the first
+      # run, from a measured source address -- a `from=` guessed before the machine
+      # exists locks you out of a machine you cannot yet reach any other way.
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQ9ZZFW/dkY6kMitzDdUqCDD5F0dBQLuq8IX5IaaAVX basetool-ansible-wsl@LUCAS-DESKTOP
+
+# Root stays reachable by key until the role has run and `sysadm` is PROVEN to work.
+# The hardening profile then sets `PermitRootLogin no` itself, which is the right moment:
+# closing it here would mean that a cloud-init failure to create sysadm leaves a machine
+# nobody can log into at all, on a provider where the way back is the rescue system.
+#
+# Stated rather than omitted, because "we forgot" and "we decided" look identical in a
+# file that simply does not mention it.
+disable_root: false
+
+package_update: true
+package_upgrade: true
+
+# NOT installed here: podman, firewalld, the SCAP content, anything under /var/iri.
+# The role installs all of it, asserts the versions it needs, and is re-runnable. A
+# package list in two files is a version skew waiting to happen.
+
+# Rebooting once here gets the kernel from package_upgrade into use before Ansible runs,
+# so the role never measures one kernel and leaves another running -- which is exactly
+# what happened on the testing host, where an update from the build step only took effect
+# at a reboot hours later and briefly looked like the hardening's doing.
+power_state:
+  mode: reboot
+  condition: true
+  message: "Rebooting into the updated kernel before provisioning"

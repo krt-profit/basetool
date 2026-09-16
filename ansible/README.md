@@ -50,6 +50,26 @@ and it gets real idempotence, which a `command:` wrapping `podman unshare` could
 Set `basetool_report_uid_map: true` to have it print the translation it used, so a reader can check
 it against `podman unshare` on the host.
 
+## Before the role: the machine has to exist and let you in
+
+[`cloud-init/hetzner-rocky10.yaml`](cloud-init/hetzner-rocky10.yaml) does that and **nothing else** —
+one user, one key, sudo. Paste it into Hetzner's *Cloud config* field when creating the server.
+
+The restraint is the design. This migration's safety argument is that testing and production come
+out of the *same* procedure; anything cloud-init configures that the role also configures exists in
+two places, and two places drift. A host built by "cloud-init plus the role" is then a near
+neighbour of the one that was rehearsed rather than the same host, and the resemblance is exactly
+what the sequence was meant to guarantee.
+
+One thing it cannot defer, and neither can you: **the disk layout**. CIS wants `/var`, `/var/log`,
+`/var/log/audit` and `/home` as separate filesystems, and on a cloud VM that is decided when the
+machine is created. `/tmp` is the exception — `tmp.mount` gives it as a tmpfs without partitioning,
+and takes effect at the next boot with `noexec`, so it is switched on deliberately and measured.
+
+Firewalls: the production host runs **both** the provider's and `firewalld`, on purpose. See
+[`PODMAN_HOST_BOOTSTRAP.md` §10](../docs/PODMAN_HOST_BOOTSTRAP.md) for what each allows and why the
+doubling is not redundancy.
+
 ## Running it
 
 ```bash

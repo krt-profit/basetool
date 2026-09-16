@@ -366,3 +366,56 @@ Named here rather than discovered later:
   Phase 4, and [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) §10.
 - **`dnf-automatic`**, the equivalent of the current host's unattended upgrades.
 
+---
+
+## 10. Two firewalls, on purpose
+
+The production host runs **both** the provider's cloud firewall and `firewalld` on the host. That is
+a deliberate doubling, decided by @greluc on 2026-09-16, and it is written down here because an
+undocumented second layer is indistinguishable from a forgotten one — and the failure mode of the
+two is opposite. A forgotten layer gets removed; a deliberate one gets maintained.
+
+They are not redundant. They fail differently, and that is the entire argument:
+
+|            |                  Hetzner cloud firewall                   |           `firewalld` on the host            |
+|------------|-----------------------------------------------------------|----------------------------------------------|
+| sits       | **outside** the machine                                   | inside it                                    |
+| survives   | a host that is misconfigured, compromised, or reinstalled | a cloud-console mistake or an API token leak |
+| changed by | the provider's console or API                             | the Ansible role                             |
+| blind to   | anything the host does to itself                          | anything upstream drops before arrival       |
+
+A host whose `firewalld` is switched off by a bad playbook run is still covered. A cloud firewall
+rule deleted by accident still leaves the host filtering. Neither protects against the other's
+mistake, which is why both.
+
+### What each layer allows
+
+The same three things, and nothing else:
+
+```
+22/tcp     SSH, for the operator and the Ansible control node
+80/tcp     the front end -- ACME HTTP-01 and the redirect to HTTPS
+443/tcp    the front end -- every vhost, selected by SNI
+```
+
+Both IPv4 and IPv6. **Nothing the stack publishes needs a rule beyond those**, and that is a
+property of the design rather than an accident: the edge container binds `127.0.0.1` and `[::1]`
+only, which is what makes its PROXY-protocol header unforgeable (ADR-0187). If a container ever
+publishes to a routable address, it needs a rule at *both* layers — and it needs a reason first.
+
+> [!warning] Do not narrow the cloud firewall's SSH rule to a single address without a second way in
+> It is tempting, and on this deployment it is how you lock yourself out. `root` and the service
+> account are password-locked, so a console gives no login. On Hetzner the way back is the rescue
+> system, which is slower and noisier than it sounds when something is already broken. Narrow it to
+> a range you control and can still reach after a DHCP change.
+
+### The order that matters when they disagree
+
+Traffic is dropped by whichever layer says no first, and only the outer one leaves a trace the host
+can see — **none**. A service that is reachable locally and not remotely looks identical to a healthy
+one from inside, because every check on the host is on the host. That is not hypothetical: it is
+exactly what happened on the testing host when the CIS remediation installed `firewalld` and the
+edge fell off the internet while every probe on the box stayed green (plan §18).
+
+So when something is unreachable, read **both** layers before changing either, and probe from a
+third machine rather than from the host.

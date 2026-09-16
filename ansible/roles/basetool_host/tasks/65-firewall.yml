@@ -67,6 +67,33 @@
     - basetool_manage_firewall | bool
     - basetool_fw_cockpit is changed
 
+# CIS asks for loopback to be trusted explicitly, and here that is not box-ticking: this
+# deployment's whole front end routes through it. haproxy binds the public ports and forwards to
+# 127.0.0.1, where the edge container publishes -- which is what makes the PROXY header unforgeable
+# (ADR-0187). Measured on the testing host: `lo` was in NO zone at all, which happens to work
+# because firewalld's filter does not sit on it, and "happens to work" is the state this whole
+# migration keeps finding underneath things.
+- name: Which zone is loopback in?
+  ansible.builtin.command: firewall-cmd --get-zone-of-interface=lo
+  register: basetool_fw_lo
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: basetool_manage_firewall | bool
+
+- name: Put loopback in the trusted zone
+  ansible.builtin.command: "firewall-cmd --permanent --zone=trusted --change-interface=lo"
+  when:
+    - basetool_manage_firewall | bool
+    - "'trusted' not in (basetool_fw_lo.stdout | default(''))"
+  register: basetool_fw_lo_changed
+
+- name: Load the loopback change
+  ansible.builtin.command: firewall-cmd --reload
+  when:
+    - basetool_manage_firewall | bool
+    - basetool_fw_lo_changed is changed
+
 - name: State the policy, so the next reader does not have to infer it
   ansible.builtin.debug:
     msg: >-

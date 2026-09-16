@@ -249,6 +249,37 @@
           actually use, `ssh -p 2222 -i <key> {{ ansible_user_id }}@<host> true`. Only restart sshd
           once that succeeds -- if it fails, the old instance is still running and still yours.
 
+    # --- the two rules that will never pass, and must not be "fixed" ------------------------------
+    #
+    # CIS requires every file to have an owner and a group that exist in passwd/group. A host running
+    # ROOTLESS containers cannot satisfy that, structurally: an image layer contains files owned by
+    # uids from INSIDE the container's namespace, which land on subuids the host has no account for.
+    # Measured on the testing host: every orphan was under
+    # ~/.local/share/containers/storage/overlay/*/diff -- image content, not host content.
+    #
+    # The danger is not the failing rule. It is the remediation somebody reaches for later:
+    # `chown -R` across those paths rewrites the image store's ownership and breaks every container
+    # built on those layers. The rule is therefore reported as a KNOWN EXCEPTION, with its scope
+    # measured on each run so that an orphan appearing OUTSIDE container storage is still noticed.
+    - name: Where do the ownerless files actually live?
+      ansible.builtin.shell: >-
+        set -o pipefail &&
+        find / -xdev \( -nouser -o -nogroup \) 2>/dev/null
+        | grep -cv '/containers/storage/' || true
+      register: basetool_orphans_outside
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Report the exception, and only the exception
+      ansible.builtin.debug:
+        msg: >-
+          CIS's two file-ownership rules fail and always will on a rootless-container host: image
+          layers carry files owned by namespace uids the host has no account for. Do NOT chown them
+          -- that rewrites the image store. Orphans found OUTSIDE container storage:
+          {{ basetool_orphans_outside.stdout | trim | default('0', true) }}. That number is the one
+          worth watching; anything above zero is a real finding rather than this exception.
+
     - name: Say what has to happen next, because the scan cannot
       ansible.builtin.debug:
         msg: >-
