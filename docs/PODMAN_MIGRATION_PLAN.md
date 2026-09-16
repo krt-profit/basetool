@@ -1345,13 +1345,11 @@ the option carries no documented IPv6 test, which is consistent with a feature s
    address — a real redesign of two security controls, not a configuration change.
 3. **Re-open the platform question.** ADR-0163's choice 1 was already amended once on evidence;
    this is new evidence against the amended version.
-4. **Split the edge out of the bridge topology** (host networking, or pasta as the network mode) so
-   it sees clients natively. It is the only option that could solve both halves at once, and it
-   costs the edge its membership in the five internal networks, which is how it reaches every
-   backend — so it is probably fatal on that ground alone. **Nothing about it has been measured
-   here**, and the two things it needs are separate questions: whether pasta-as-network-mode
-   delivers IPv6 on Podman 6.1.0, and whether it preserves the source address on IPv6. Neither is
-   established.
+4. ~~**Split the edge out of the bridge topology**~~ — **measured 2026-09-16 and dead.** Taking the
+   edge off the bridges and giving it pasta as its network mode would have solved both halves at
+   once. It does not, because pasta-as-network-mode **does not deliver IPv6 on Podman 6.1.0
+   either**. See below. The option is closed on evidence, not on the separate objection that it
+   would have cost the edge the five internal networks it reaches every backend through.
 
 Nothing here should be chosen on this page. The measurement is the deliverable; the choice is not.
 
@@ -1368,14 +1366,44 @@ Nothing here should be chosen on this page. The measurement is the deliverable; 
 > Their result must not be carried further than that, and the version gap from 5.4.2 to 6.1.0
 > stays open. It shrinks the uncertainty; it does not remove it.
 >
-> [!note] Why option 4 is still unmeasured, and what it is waiting on
-> The deciding probe needs one temporary firewall rule on the hypervisor, and the PVE session's
-> own guard refused to write it, classifying an externally reachable port as a weakening of
-> security. **That is the guard working, and it was not worked around** — not by them, and not
-> from this side by lowering `ip_unprivileged_port_start` to reuse a port that is already open,
-> which would have reached the same outcome by a route nobody had approved and would have added a
-> second variable to a measurement built to isolate one. The rule is drafted and waits on
-> @greluc. Until then option 4 stays a question, and it is listed as one.
+  #### Option 4, measured — pasta as the **network mode**, Podman 6.1.0
+
+Both of option 4's questions in one probe, external client, same port, no proxy, `$remote_addr`
+read from the container's own access log:
+
+| Family |        Result        |         What the container logged         |
+|--------|----------------------|-------------------------------------------|
+| IPv4   | HTTP 200             | **`10.1.0.30`** — the real client address |
+| IPv6   | **connection reset** | **nothing at all**                        |
+
+So the earlier network-mode arm, filed as indicative because it was probed from the host, is now
+**confirmed by a proper external measurement**. And the second question answers itself: the source
+address survives on IPv4, and on IPv6 there is no connection for it to survive on.
+
+**On this platform — CentOS Stream 10, Podman 6.1.0, passt `0^20260728`, netavark 2.1.0, kernel
+6.12.0-267 — pasta does not deliver inbound IPv6 in either mode.** Not as the forwarder on a
+bridge network, not as the container's network. `rootlessport` serves both families over the same
+path.
+
+> [!warning] What this is not evidence for
+> It is **not** evidence that Podman 6 broke something Podman 5 could do. The neighbouring
+> deployment that delivers IPv6 through pasta differs in four variables at once — Podman 5.4.2
+> against 6.1.0, Debian against CentOS, two passt versions, two kernels. The two results do not
+> contradict each other; they are two points with four differences between them. The narrow claim
+> is the one that matters here: on the platform ADR-0163 chose, pasta is IPv6-dead, and option 4
+> falls whatever the cause turns out to be.
+>
+> [!note] How the measurement came to be possible, and a test defect that is not a finding
+> The probe needed a temporary firewall rule on the hypervisor. The PVE session's own guard
+> refused to write it, classifying an externally reachable port as a weakening of security, and
+> **that refusal was respected on both sides** — not routed around from here by lowering
+> `ip_unprivileged_port_start` to reuse a port that was already open, which would have reached the
+> same outcome without approval and put a second variable into a measurement built to isolate one.
+> Both sessions asked @greluc independently; he approved; the rule was opened and then removed.
+>
+> Separately: an attempt to check whether IPv6 is broken **outbound** as well reported v4 and v6
+> both blocked, which is a broken test rather than a result — the image's busybox `wget` does not
+> take `-4`/`-6`. It is recorded as a defect and used as evidence for nothing.
 >
 > [!note] One honest limitation on the evidence
 > pasta was also tried as a **network mode** rather than a forwarder, and IPv6 failed there too —
