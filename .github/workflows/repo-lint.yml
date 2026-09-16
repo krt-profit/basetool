@@ -256,6 +256,29 @@ jobs:
         working-directory: ansible
         run: ansible-lint
 
+  quadlet-drift:
+    name: quadlet-drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Ensure PyYAML
+        run: |
+          set -eu
+          python3 -c "import yaml" 2>/dev/null || pip3 install --disable-pip-version-check pyyaml
+
+      # Phase 2 of docs/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
+      # replaces docker-compose.yml with, and for as long as BOTH exist the compose file is
+      # authoritative -- so the units are generated from it and this asserts they still match.
+      #
+      # Without the assertion the two drift silently: a digest bump, a new network membership or a
+      # changed memory limit would land in compose and not in the units, and nothing would notice
+      # until a host ran the stale one. A unit that starts is not a unit that is right.
+      - name: Check the Quadlet units against the compose files
+        run: python3 scripts/generate-quadlet.py --check
+
   probe-vs-allowlist:
     name: probe-vs-allowlist
     runs-on: ubuntu-latest
