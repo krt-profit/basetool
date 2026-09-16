@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.DecideDeletionRequestRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.DeletionRequestDto;
 import de.greluc.krt.profit.basetool.backend.service.DeletionRequestService;
@@ -27,6 +28,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -70,9 +72,14 @@ public class AdminDeletionRequestController {
               + "Each entry carries the requesting member's handle, because an admin cannot act on "
               + "an anonymous request.")
   public List<DeletionRequestDto> pending() {
-    return deletionRequestService.listPending().stream()
-        .map(
-            r -> DeletionRequestController.toDto(r, deletionRequestService.handleOf(r.getUserId())))
+    List<DeletionRequest> pending = deletionRequestService.listPending();
+    // One query for the whole page, not one per row (REQ-DATA-003). A queue of twenty requests
+    // used to issue twenty-one statements, on the page an admin refreshes while working through a
+    // month of Art. 12(3) deadlines.
+    Map<UUID, String> handles =
+        deletionRequestService.handlesOf(pending.stream().map(DeletionRequest::getUserId).toList());
+    return pending.stream()
+        .map(r -> DeletionRequestController.toDto(r, handles.get(r.getUserId())))
         .toList();
   }
 

@@ -1034,6 +1034,11 @@ x-frontend: &frontend-template
     APP_HTTP_BACKEND_PROTOCOL: ${APP_HTTP_BACKEND_PROTOCOL:-H2}
     APP_HTTP_MAX_CONCURRENT_STREAMS: ${APP_HTTP_MAX_CONCURRENT_STREAMS:-20}
     APP_HTTP_CODEC: ${APP_HTTP_CODEC:-CBOR}
+    # The data-export download's own response timeout. Named here for the same reason as the two
+    # above: the block is a closed allow-list, so a variable that is not listed does not reach the
+    # container however the host .env spells it. 120s ships as the default; an operator meeting a
+    # slow export raises it rather than editing the image.
+    APP_HTTP_EXPORT_RESPONSE_TIMEOUT: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:-120s}
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     # Monitoring plane (epic #936, REQ-OBS-005/-009) — see the backend template for the full
     # rationale. Everything defaults OFF/empty so dev/test/e2e stay inert; the prod .env supplies the

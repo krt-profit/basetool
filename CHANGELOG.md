@@ -63,6 +63,11 @@
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
   Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
 
+- **Ein großer Datenexport lief nicht mehr in eine Zeitüberschreitung.** Der Download teilte sich
+  die 5-Sekunden-Grenze aller übrigen Aufrufe, obwohl er das gesamte Konto zusammenstellt — bei
+  langer Historie endete er mit einem Fehler. Er hat jetzt seine eigene Grenze
+  (`APP_HTTP_EXPORT_RESPONSE_TIMEOUT`, Vorgabe 120s).
+
 - **Im Auskunfts-PDF standen technische Spaltennamen statt Bezeichnungen.** In den vollständig
   abgedruckten Abschnitten hieß die linke Spalte etwa ‚discord_guild_nickname‘ oder ‚join_date‘.
   Alle Felder haben jetzt eine deutsche Bezeichnung (REQ-SEC-058).

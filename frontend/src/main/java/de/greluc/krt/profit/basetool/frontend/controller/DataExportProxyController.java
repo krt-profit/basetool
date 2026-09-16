@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.netty.http.client.HttpClientRequest;
 
 /**
  * Streams the member's own Art. 15 / Art. 20 export to the browser as a download (REQ-SEC-058).
@@ -58,6 +60,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class DataExportProxyController {
 
   private final WebClient webClient;
+
+  private final AppHttpProperties httpProperties;
 
   /**
    * The caller's export as a JSON download.
@@ -124,6 +128,14 @@ public class DataExportProxyController {
    * needs no identifier at all; an admin export carries the subject's <em>id</em>, because an admin
    * handling several requests has to be able to tell two files apart.
    *
+   * <p><b>Its own response timeout.</b> This is the one backend call that is expected to take a
+   * long time: the export runs ~29 statements across the whole schema and then renders a PDF, so
+   * for an account with years of history the shared 5 s {@code app.http.response-timeout} turned a
+   * working export into a read timeout and a 500. Raised per request rather than globally, because
+   * every other call is a page render that should keep failing fast. It is deliberately <b>not</b>
+   * routed through {@code BackendApiClient}'s Resilience4j chain either: retrying a minute-long
+   * export on a timeout would multiply the very work that timed out.
+   *
    * @param uri the backend URI
    * @param filename the download filename
    * @param mediaType the response content type
@@ -132,7 +144,18 @@ public class DataExportProxyController {
   private ResponseEntity<byte[]> fetch(
       @NotNull String uri, @NotNull String filename, @NotNull MediaType mediaType) {
     try {
-      byte[] body = webClient.get().uri(uri).retrieve().bodyToMono(byte[].class).block();
+      byte[] body =
+          webClient
+              .get()
+              .uri(uri)
+              .httpRequest(
+                  request -> {
+                    HttpClientRequest nativeRequest = request.getNativeRequest();
+                    nativeRequest.responseTimeout(httpProperties.exportResponseTimeout());
+                  })
+              .retrieve()
+              .bodyToMono(byte[].class)
+              .block();
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(mediaType);
       headers.setContentDispositionFormData("attachment", filename);

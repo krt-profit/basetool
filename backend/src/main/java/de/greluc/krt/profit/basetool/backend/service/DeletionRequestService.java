@@ -35,7 +35,10 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -508,5 +511,35 @@ public class DeletionRequestService {
   @Transactional(readOnly = true)
   public @Nullable String handleOf(@NotNull UUID userId) {
     return userRepository.findById(userId).map(User::getEffectiveName).orElse(null);
+  }
+
+  /**
+   * The effective names of several members, in one query.
+   *
+   * <p>The admin queue rendered one {@link #handleOf(UUID)} per row, which is the N+1 REQ-DATA-003
+   * forbids: a queue of twenty requests issued twenty-one statements. A month's worth of Art. 12(3)
+   * deadlines is exactly when that page is opened repeatedly.
+   *
+   * <p>A missing member is absent from the map rather than mapped to {@code null}, so the caller's
+   * {@code get} keeps the same "no handle" answer {@code handleOf} gives — the row survives its
+   * subject in {@code WITHDRAWN} and {@code DECLINED}, so absence is a normal state and not an
+   * error.
+   *
+   * @param userIds the members to look up; an empty collection queries nothing
+   * @return effective name by member id, without entries for ids that no longer exist
+   */
+  @Transactional(readOnly = true)
+  public @NotNull Map<UUID, String> handlesOf(@NotNull Collection<UUID> userIds) {
+    if (userIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, String> handles = new HashMap<>();
+    for (User user : userRepository.findAllById(userIds)) {
+      String name = user.getEffectiveName();
+      if (name != null) {
+        handles.put(user.getId(), name);
+      }
+    }
+    return handles;
   }
 }

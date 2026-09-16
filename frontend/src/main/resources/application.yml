@@ -173,6 +173,13 @@ app:
   http:
     connect-timeout: 2s
     response-timeout: 5s
+    # The data-export download is the one backend call expected to take a long time: an Art. 15
+    # export runs ~29 statements across the whole schema and then renders a PDF. On the shared 5 s
+    # response-timeout a member with years of history got a read timeout and a 500. Applied per
+    # request (DataExportProxyController), so an ordinary page render keeps failing fast -- and
+    # deliberately NOT routed through the Resilience4j chain, because retrying a minute-long export
+    # on a timeout multiplies the work that timed out. Env override: APP_HTTP_EXPORT_RESPONSE_TIMEOUT.
+    export-response-timeout: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:120s}
     read-timeout: 3s
     write-timeout: 3s
     # The wire protocol and encoding of the frontend->backend hop (ADR-0161 8.1 / 8.5,

@@ -3526,6 +3526,23 @@ worse than a short document that says exactly what exists and points at the mach
 > then discarded it. The caller assembles the export and hands it to the renderer now, so the
 > audited count is the count of what was actually served.
 
+> [!note] What the export costs, and which parts of that were changed (2026-09-17)
+> The download now carries **its own response timeout** (`app.http.export-response-timeout`,
+> default 120 s, per request). It is the one frontend→backend call expected to take a long time,
+> and the shared 5 s bound turned a working export into a read timeout and a 500 for a member
+> with years of history. It is deliberately **not** routed through the Resilience4j chain:
+> retrying a minute-long export on a timeout multiplies the work that timed out. The admin
+> erasure queue also looked each member's handle up per row; it is one query for the page now
+> (REQ-DATA-003).
+>
+> Two further costs were weighed and **left as they are**, with the reasoning beside the code.
+> The scrubber reads the whole roster per export rather than a projection of the three name
+> columns, because a projection would route it around `HandleSpellings` — the single source
+> the export and the erasure share, and the roster is in the hundreds. And the PDF is assembled
+> from rows it reduces to counts, because a `COUNT(*)` variant per section would double the
+> statement registry, put the PDF's counts on a different query and moment from the JSON's, and
+> hand the two export coverage gates statements they do not check.
+
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:
 

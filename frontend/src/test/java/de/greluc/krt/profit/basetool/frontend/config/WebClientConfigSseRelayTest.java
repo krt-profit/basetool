@@ -89,6 +89,7 @@ class WebClientConfigSseRelayTest {
             new AppHttpProperties(
                 Duration.ofSeconds(3),
                 Duration.ofSeconds(5),
+                Duration.ofSeconds(120),
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(5),
                 AppHttpProperties.BackendProtocol.H2,

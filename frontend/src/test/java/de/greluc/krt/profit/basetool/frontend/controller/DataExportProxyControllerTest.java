@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.frontend.config.AppHttpProperties;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
@@ -74,7 +76,19 @@ class DataExportProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    controller = new DataExportProxyController(webClient);
+    // A generous export timeout: these tests assert the proxy's wrapping, not its bound.
+    controller =
+        new DataExportProxyController(
+            webClient,
+            new AppHttpProperties(
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(120),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(5),
+                AppHttpProperties.BackendProtocol.H2,
+                20,
+                AppHttpProperties.BackendCodec.CBOR));
   }
 
   @AfterEach
