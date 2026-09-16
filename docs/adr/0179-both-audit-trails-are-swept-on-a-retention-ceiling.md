@@ -107,7 +107,7 @@ purge must not have to guess why.
   rows are still never *updated*, and the only delete path is still `purgeBefore` — now with two
   callers instead of one.
 - **First run after deploy is destructive.** Enabling this on the existing deployment removes every
-  audit row older than two years in one sweep. `IRI_AUDIT_RETENTION_ENABLED=false` before deploying
+  audit row older than two years in one sweep. `APP_AUDIT_RETENTION_ENABLED=false` before deploying
   is the lever if any of it must be kept, and REQ-AUDIT-003's export is the way to keep it.
 - The sweep appears in `ScheduledJobStale` (REQ-OBS-008) as `audit_retention`, so a silently dead
   sweep — a retention promise that stopped being kept — alerts rather than passing unnoticed.

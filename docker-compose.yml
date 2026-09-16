@@ -588,6 +588,11 @@ x-backend: &backend-template
     # Which client may act for another member via X-Ingest-On-Behalf-Of (ADR-0129). Must be the
     # ingest gateway's confidential client id. EMPTY MEANS NOBODY.
     APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: ${IRI_INGEST_GATEWAY_CLIENT_IDS:-}
+    # Clients whose token deliberately carries an INCOMPLETE role set, so a login through them must
+    # not overwrite the stored roles (REQ-SEC-036). Default is the Android app, the only such client
+    # today. Forwarded because the CHANGELOG announced it as an optional environment variable while
+    # this allow-list did not carry it — so it could not in fact be set.
+    APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS: ${APP_SECURITY_PARTIAL_ROLE_SCOPE_CLIENT_IDS:-basetool-android}
     # How long an assembled authority collection is reused before the authorization path is
     # re-resolved from the database (REQ-SEC-056, ADR-0174). Default PT5M. This block is a CLOSED
     # ALLOW-LIST with no `env_file:`, so without this line the variable never reaches the
@@ -611,6 +616,16 @@ x-backend: &backend-template
     # SILENTLY until the fetch-failure alert fires.
     KEYCLOAK_ADMIN_URL: https://keycloak:18443/auth
     KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set in .env}
+    # Cadence of the periodic Keycloak->local user sync (ADR-0085). Forwarded for the same reason
+    # the retention sweeps below are: application.yml calls these "env-parameterised ... so the
+    # cadence is tunable without a rebuild", and `.env.example` offers both to an operator -- but a
+    # name this closed allow-list does not forward is not tunable at all, and the promise was
+    # silently untrue. Defaults are the property's own: 05:00 Europe/Berlin, once a day, off-peak.
+    # A 1-minute cadence was the accelerant behind the 2026-07-09 native-thread exhaustion
+    # incident, so lower this only deliberately; an invalid cron fails startup rather than
+    # disabling the sync silently.
+    APP_KEYCLOAK_SYNC_CRON: ${APP_KEYCLOAK_SYNC_CRON:-0 0 5 * * *}
+    APP_KEYCLOAK_SYNC_ZONE: ${APP_KEYCLOAK_SYNC_ZONE:-Europe/Berlin}
     # Optional (REQ-SEC-022): shared secret guarding the internal /internal/discord/account-existence
     # endpoint the Keycloak Discord SPI calls. Blank → the endpoint is disabled (503) and the SPI
     # fails open. Must equal the KRT_DISCORD_SPI_SHARED_SECRET set on the keycloak service.
@@ -641,6 +656,13 @@ x-backend: &backend-template
     # starts. Note the channel is the FRONTEND's -- the bridge works by both modules speaking
     # on one wire, so overriding it severs web-to-app propagation while every signal stays green.
     APP_LIVE_SYNC_REDIS_FANOUT_ENABLED: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:-true}
+    # Access-log lines slower than this are escalated to WARN. README documents the lever for all
+    # three modules, so all three templates forward it or it is only a third true; 2000 is each
+    # module's own default. Its neighbour APP_LOGGING_STRUCTURED_ENABLED is deliberately NOT here:
+    # that one is profile-driven (false in the base config, true in application-prod.yml), and
+    # backend and backend-dev merge this one map, so any single default would hand the dev stack
+    # the prod value. This threshold is the same in every profile and carries no such risk.
+    APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
     # Which Android builds the server still serves (REQ-API-010). Passed through here because
     # raising the floor is meant to be an env var and a restart -- an operator acting the moment a
     # contract breaks cannot wait for a deploy, and a property the compose file does not forward is
@@ -649,6 +671,34 @@ x-backend: &backend-template
     APP_ANDROID_MINIMUM_VERSION_CODE: ${APP_ANDROID_MINIMUM_VERSION_CODE:-0}
     APP_ANDROID_LATEST_VERSION_CODE: ${APP_ANDROID_LATEST_VERSION_CODE:-0}
     APP_ANDROID_RELEASES_URL: ${APP_ANDROID_RELEASES_URL:-https://github.com/krt-profit/basetool-android/releases/latest}
+    # The three scheduled retention sweeps (REQ-AUDIT-006, REQ-SEC-057, REQ-NOTIF-009). Forwarded
+    # for the reason this block's own comment gives further up: the map is a CLOSED ALLOW-LIST with
+    # no `env_file:`, so a lever not named here cannot be pulled from /var/iri/.env at all -- and
+    # each of these sweeps deletes rows irreversibly, on a schedule, with no undo. ADR-0179 and the
+    # CHANGELOG both tell an operator to set APP_AUDIT_RETENTION_ENABLED=false before deploying if
+    # the older audit history must be kept; until these lines existed that instruction silently did
+    # nothing, which is worse than no instruction at all.
+    #
+    # Every default below is the property's own default from application.yml, so forwarding them
+    # changes no behaviour by itself -- it only makes them settable. The run to think about is the
+    # FIRST one after a sweep is enabled: it removes everything already past the window in a single
+    # pass. That run is what the =false levers are for, and REQ-AUDIT-003's export is how to keep
+    # the audit rows instead.
+    APP_AUDIT_RETENTION_ENABLED: ${APP_AUDIT_RETENTION_ENABLED:-true}
+    APP_AUDIT_RETENTION_MAX_AGE: ${APP_AUDIT_RETENTION_MAX_AGE:-P730D}
+    APP_AUDIT_RETENTION_INTERVAL: ${APP_AUDIT_RETENTION_INTERVAL:-PT24H}
+    # max-age doubles as the window in which an erroneous rejection can still be reopened
+    # (REQ-SEC-034), so shortening this shortens the recovery window too.
+    APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED: ${APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED:-true}
+    APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE: ${APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE:-P90D}
+    APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL: ${APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL:-PT24H}
+    # Two windows in one sweep: a READ notification ages from readAt, an UNREAD one from createdAt.
+    # The unread window is new, so this sweep also has a destructive first run on a stack that has
+    # been carrying unread notifications older than it.
+    APP_NOTIFICATIONS_RETENTION_ENABLED: ${APP_NOTIFICATIONS_RETENTION_ENABLED:-true}
+    APP_NOTIFICATIONS_RETENTION_MAX_AGE: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:-P90D}
+    APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE: ${APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE:-P180D}
+    APP_NOTIFICATIONS_RETENTION_INTERVAL: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:-PT24H}
     # Monitoring plane (epic #936, REQ-OBS-005/-009). Every value defaults OFF/empty so dev, test,
     # e2e and a prod host without the monitoring stack stay inert: /actuator/prometheus denies every
     # request until MONITORING_SCRAPE_* is set, and tracing exports nothing until
@@ -956,6 +1006,8 @@ x-frontend: &frontend-template
   environment: &frontend-env
     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
     SERVER_PORT: 18081
+    # See the backend template for why this one is forwarded and structured-enabled is not.
+    APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
     # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261
@@ -1064,6 +1116,8 @@ x-ingest: &ingest-template
   environment: &ingest-env
     SPRING_PROFILES_ACTIVE: prod
     SERVER_PORT: 11262
+    # See the backend template for why this one is forwarded and structured-enabled is not.
+    APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS: ${APP_LOGGING_SLOW_REQUEST_THRESHOLD_MS:-2000}
     # Derived from KC_HOSTNAME — see the rationale on the backend template's KEYCLOAK_ISSUER_URI.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
     BACKEND_URL: https://backend:11261

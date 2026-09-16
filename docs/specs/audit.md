@@ -489,7 +489,7 @@ and swallowed there, so the scheduler thread survives a bad run.
 
 > [!warning] First run after deploy
 > Enabling this on an existing deployment deletes every audit row older than two years on the first
-> sweep, irreversibly. Set `IRI_AUDIT_RETENTION_ENABLED=false` before deploying if any of it must be
+> sweep, irreversibly. Set `APP_AUDIT_RETENTION_ENABLED=false` before deploying if any of it must be
 > kept, and export it (REQ-AUDIT-003) first.
 
 **Acceptance**

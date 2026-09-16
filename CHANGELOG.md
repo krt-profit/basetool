@@ -18,7 +18,7 @@
 
 - **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung durch einen Administrator bleibt unverändert bestehen. Die Datenschutzerklärung nennt die Frist (REQ-AUDIT-006).
 
-  > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `IRI_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
+  > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `APP_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
 
 - **Abgelehnte Registrierungen werden nicht mehr dauerhaft gespeichert.** Wurde eine Anmeldung von
   einem Administrator abgelehnt, blieben Konto, Anmeldedaten und die Ablehnungsbegründung bisher
@@ -49,6 +49,14 @@
   bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
 
 ### Fixed
+
+- **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
+  drei Aufräumläufe (Audit, abgelehnte Registrierungen, Benachrichtigungen) waren nirgends an das
+  Backend durchgereicht — der in der Dokumentation genannte Not-Aus vor dem ersten, unwiderruflichen
+  Lauf blieb wirkungslos. Ebenso betroffen: die Taktung der Keycloak-Synchronisation, die Clients
+  mit unvollständigem Rollen-Scope und die WARN-Schwelle für langsame Anfragen. Alle sind jetzt
+  eingetragen; die Vorgabewerte bleiben unverändert (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
+  REQ-NOTIF-009).
 
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend
