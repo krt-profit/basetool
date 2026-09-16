@@ -898,7 +898,7 @@ change.
 > is the one to remember: somebody reading firewall state on the new host and expecting `iptables`
 > output will conclude the rules are missing.
 
-### The rehearsal environment — open, and it belongs to the owner
+### The rehearsal environment — **answered in §11**
 
 Choice 1 existed so production and testing would match. Moving production to CentOS Stream 10
 re-opens exactly that, and there are two honest answers:
@@ -909,7 +909,7 @@ re-opens exactly that, and there are two honest answers:
 - **Move the testing host to CentOS Stream 10 as well.** It is a PVE VM with ZFS snapshots that roll
   back in seconds, so the cost is low and the property is restored.
 
-The second is what choice 1 was asking for. It is not decided here.
+**The second was chosen on 2026-09-16 — see §11.** The testing host migrates first, and production is not touched until everything provable there has been proven.
 
 ### Sequencing from here
 
@@ -922,4 +922,205 @@ The second is what choice 1 was asking for. It is not decided here.
 
 Phase 0 is done and does not need redoing: the conformance suite is platform-agnostic by
 construction, and `client-address-visible` is the acceptance test for step 1.
+
+---
+
+## 10. Container observability under Podman — what is preserved, and what is gained
+
+§3.6 said this is a rebuild rather than a re-point, and that stands. What it did **not** establish,
+and what decides how much work it is, is whether anything is genuinely *lost*. It is not.
+
+> [!success] Every signal the alerts read is in cgroup v2. Only the collector changes.
+> Verified on 2026-09-16 by reading the cgroup files of a running container directly:
+>
+> |     Alert needs      |                cgroup v2 file                 |                                  field                                  |
+> |----------------------|-----------------------------------------------|-------------------------------------------------------------------------|
+> | OOM kills            | `memory.events`                               | `oom_kill`                                                              |
+> | CPU throttling       | `cpu.stat`                                    | `nr_periods`, `nr_throttled`, `throttled_usec`                          |
+> | pids and the ceiling | `pids.current`, `pids.max`                    | the values themselves                                                   |
+> | memory and its limit | `memory.stat`, `memory.current`, `memory.max` | `anon` (RSS), `inactive_file` (working set = `current - inactive_file`) |
+>
+> cAdvisor never had privileged access to anything the kernel does not publish here. It read these
+> files and gave them Docker's names.
+
+### The seven alerts, one by one
+
+|             Alert             |                         reads today                          |                                              under Podman                                              |         source         |
+|-------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------|------------------------|
+| `ContainerRestartLoop`        | `container_start_time_seconds`                               | `podman_container_started_seconds`                                                                     | exporter, **direct**   |
+| `ContainerMetricsMissing`     | `container_last_seen`                                        | `absent(podman_container_state{...})`                                                                  | exporter, rewritten    |
+| `CoreContainerMetricsMissing` | `container_last_seen`                                        | same                                                                                                   | exporter, rewritten    |
+| `ContainerMemoryHigh`         | `container_memory_rss` ÷ `container_spec_memory_limit_bytes` | `podman_container_mem_usage_bytes` ÷ `podman_container_mem_limit_bytes`, or exactly from `memory.stat` | exporter **or** cgroup |
+| `ContainerPidsHigh`           | `container_threads` ÷ `container_threads_max`                | `podman_container_pids` **plus a ceiling the exporter does not publish**                               | exporter + cgroup      |
+| `ContainerOomKilled`          | `container_oom_events_total`                                 | `memory.events` → `oom_kill`                                                                           | **cgroup only**        |
+| `ContainerCpuThrottledHigh`   | `container_cpu_cfs_*`                                        | `cpu.stat` → `nr_periods` / `nr_throttled`                                                             | **cgroup only**        |
+
+Five of seven come from `prometheus-podman-exporter` directly or with a rewritten expression. Two
+have no exporter equivalent at all, and one more is only half-served — and all three of those are a
+`cat` away in the cgroup tree.
+
+> [!warning] The threshold on `ContainerMemoryHigh` has to be re-derived, not carried across
+> `podman_container_mem_usage_bytes` is what `podman stats` reports, which is not
+> `container_memory_rss`. A percentage tuned against one will misfire against the other. If the
+> alert is to keep its meaning rather than its number, take memory from the cgroup bridge below,
+> where `anon` and `working set` are exactly what cAdvisor was reporting.
+
+### The bridge is a pattern this deployment already runs
+
+node_exporter's **textfile collector** is already in use here: `/var/iri/monitoring/textfile` exists
+on the production host and `deploy.sh` writes `basetool_monitoring_config_applied_timestamp` into it.
+So a small periodic reader that walks the rootless containers' cgroup paths and writes the six
+series above as a `.prom` file is not a new mechanism — it is the established one, and it needs no
+socket, no daemon and no privilege beyond reading `/sys/fs/cgroup`.
+
+That matters for the security case: cAdvisor and Alloy reach the Docker socket today through a
+GET-only proxy that exists precisely because the raw socket is root-equivalent. The cgroup reader
+needs none of that.
+
+> [!note] cAdvisor is not the way back, and it is worth saying why
+> Its rootless-Podman issue upstream is **closed as not planned**, with reporters on Podman 4.9.3 /
+> cAdvisor 0.49.1 getting no CPU or memory metrics at all. Keeping cAdvisor would mean betting the
+> `container_*` family on an integration its maintainers have declined.
+
+### What the migration gains, which is the other half of the question
+
+Three signals that do not exist in the deployment today:
+
+- **`podman_container_health`** — health status as a *metric* (`-1` unknown, `0` healthy,
+  `1` unhealthy, `2` starting). Today a container's health is visible only to `docker inspect`, and
+  `REQ-OPS-003`'s health gate is the only thing that ever looks. An unhealthy container that is
+  still `Up` currently raises nothing.
+- **`podman_container_exit_code`** — `137` is the OOM-kill signature, and a second, independent
+  witness beside `memory.events`.
+- **systemd unit state.** Quadlet units *are* systemd services, so node_exporter's
+  `--collector.systemd` yields `node_systemd_unit_state` and restart counters for every container.
+  That is a whole signal class with no equivalent under Compose, and it is free.
+
+Plus the exporter's own block-IO and per-interface network counters, which the current cAdvisor
+configuration deliberately does not collect (`disk` was disabled because Docker 29's containerd
+snapshotter made it spam `fsHandler overlayfs no such file`).
+
+> [!danger] The label vocabulary changes, and it is not cosmetic
+> Seven places in `monitoring/` group by `container_label_com_docker_compose_service`, which exists
+> only because Compose sets it. The exporter labels by `name`, `id`, `image` and `pod`. Every
+> dashboard query and alert expression carrying that label has to move to `name`, and
+> `REQ-OBS-006`'s cardinality bound has to be re-checked against the new label set rather than
+> assumed to hold.
+
+### Acceptance
+
+Unchanged from Phase 4 and deliberately strict: not "the metric exists" but **the alert fires**.
+`ContainerRestartLoop`, `ContainerOomKilled`, `ContainerMemoryHigh`, `ContainerPidsHigh`,
+`ContainerCpuThrottledHigh` and both `*MetricsMissing` guards each have to be induced on the testing
+host and observed firing, with their promtool unit tests updated in the same change.
+
+---
+
+## 11. The testing host goes first — ruled 2026-09-16
+
+**The permanent testing host migrates to CentOS Stream 10 and rootless Podman first.** Production is
+not touched until everything that *can* be proven there has been. @greluc's ruling, and it restores
+what ADR-0163's choice 1 was for: a rehearsal environment that matches production.
+
+It also settles §9's open question. There is no throwaway-VM compromise: the testing host **is** the
+rehearsal ground, it is rebuilt as the target platform, and it stays there.
+
+> [!tip] The rollback is a snapshot, not a restore
+> A ZFS snapshot is taken **immediately after the bootstrap succeeds and before the first
+> experiment**, and again at each phase boundary. Going back is then seconds rather than a rebuild,
+> which is what makes it reasonable to break things on purpose — and breaking things on purpose is
+> the entire point of the next four phases. The host's disk is marked `backup=0`, so the snapshots
+> are the only net; there is no vzdump copy behind them.
+
+### What is there today, measured 2026-09-16
+
+|                |                                                                                      |
+|----------------|--------------------------------------------------------------------------------------|
+| Virtualisation | KVM guest, `qemu-guest-agent` active                                                 |
+| Sizing         | **4 vCPU, 12 GB RAM, 120 GB disk** with 12 GB used                                   |
+| OS             | Debian 13 trixie, cgroup v2, AppArmor active, **no** unprivileged-userns restriction |
+| Runtime        | Docker 26.1.5+dfsg1, Compose 2.26.1-4                                                |
+| Stack          | **9 containers** — the full app profile, including the native `edge` and `acme`      |
+| Access         | `ssh sysadm@10.9.0.12` from the LAN, key auth, **`sudo` now works**                  |
+| Networks       | `eth0` with a global IPv6 and a working v6 default route; `eth1` on a second segment |
+
+> [!success] The `:testing` edge cutover already happened, and it was clean — corrected 2026-09-16
+> §4 records a trap: `deploy.sh` hardcodes `PROFILE=prod`, so the next `:testing` promotion would
+> swap `npm` for an `edge` matching none of that host's names, beside an `acme` asking for
+> production certificates. **It sprang, and nothing broke.** The edge has been `healthy` for 17
+> hours, logged `edge: rendered 4 vhost(s)`, and `npm` is `Exited (0)`. `acme` is up with no output
+> at all, which is its documented idle behaviour when `ACME_HOSTS` is empty.
+>
+> Two guards did the work, and both were added after that section was written: the vhost names are
+> `${EDGE_HOST_*}` and `render-and-run.sh` refuses to start on an unset one, and the empty
+> `ACME_HOSTS` makes `acme` idle rather than request anything. The trap as recorded is resolved.
+
+### The gap that has to close with the rebuild
+
+**There is no monitoring plane on the testing host at all** — no Prometheus, no Grafana, no Loki,
+no exporters. Nine containers against production's twenty-two. §4 already noted this; §10 makes it
+decisive, because container observability is now known to be a **rebuild** rather than a re-point,
+and a rebuild cannot be rehearsed on a host that has nothing to rebuild.
+
+So the monitoring stack comes up on the testing host as part of this migration. That is new scope,
+and it is not optional: without it, Phase 4 has no rehearsal ground and would arrive at production
+unproven — which is the one thing this plan exists to prevent.
+
+Sizing that against what is there: 12 GB RAM for twenty-two containers, where production uses
+4.5 GB of 16 GB for the same set, and ~100 GB free disk against production's 15 GB of monitoring
+data. Retention on testing can be short, so the disk is comfortable; **the memory is the thing to
+watch**, and it is a reason to bring the monitoring plane up early rather than last.
+
+### Sequence
+
+1. **Provision** a CentOS Stream 10 VM to replace the current testing guest — same sizing or better.
+   The old guest is kept until the new one is proven, so this is a build-beside, exactly as
+   production will be.
+2. **Bootstrap** it as the documented procedure, rewritten `dnf`-shaped: the rootless service user
+   with its subuid/subgid range, lingering, cgroup delegation, SELinux, and the `:80`/`:443`
+   decision from §3.2. The documentation is the deliverable, not a by-product — production is built
+   from it afterwards.
+3. **Snapshot.** Before anything is experimented with.
+4. **Phase 1**, the §3 measurements against Podman 6.1, snapshotting between experiments:
+   `rootless_port_forwarder="pasta"` with a real external client from the LAN (this host's `eth0`
+   carries a global IPv6 and its guest firewall admits the management networks in full, so both
+   families are testable), `--internal` inbound behaviour, `no_default_route` as the egress block,
+   cgroup delegation on a user slice, and the SELinux labels on the acme → edge handover.
+5. **Phase 2**, the Quadlet translation of all twenty-two services.
+6. **Phase 3**, the delivery rebuild, and **Phase 4**, the observability rebuild — which is why the
+   monitoring plane has to be standing by then.
+7. **Only then** Phase 5, the new production host.
+
+### The acceptance, and it already exists
+
+The Phase 0 conformance suite is the gate at every step, and its testing-host baseline was taken on
+2026-09-16, **before** the platform changes — a suite that has never run there proves nothing when it
+passes later.
+
+**Testing on Docker, 2026-09-16: 3 passed, 6 failed, 2 skipped.** Every failure is a true finding
+about that host, and together they are the list the migration has to close:
+
+|  Result  |                            Check                            |                                                                                 What it says about the testing host                                                                                  |
+|----------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **fail** | `client-address-visible`                                    | the edge logs `10.98.0.10` — the reverse proxy in front of the VM. **This independently confirms §3.1's claim** that the testing edge already sees one bucket for every request, under Docker, today |
+| **fail** | `scrape-targets-up`, `container-metrics`, `log-streams`     | no monitoring plane at all                                                                                                                                                                           |
+| **fail** | `ipv6-reachable`                                            | the public names carry no AAAA; they reach the host through a v4 proxy                                                                                                                               |
+| **fail** | `vhost-reachable`                                           | the grafana vhost closes the connection — it is rendered, and there is no Grafana behind it. Resolves itself when the monitoring plane comes up                                                      |
+| skip     | `certificate-shared`                                        | `ACME_HOSTS` is empty, so certificates are provided rather than issued and the one-leaf property is not claimed here                                                                                 |
+| pass     | `certificate-valid`, `http-redirects`, `containers-running` | the parts that already match production                                                                                                                                                              |
+
+> [!important] The source-address measurement cannot use the public name on this host
+> `client-address-visible` failing here is **correct and unavoidable**: the reverse proxy in front
+> of the VM rewrites the source before the edge ever sees it, whatever the container runtime is. So
+> Phase 1's pasta measurement must connect to the VM's **own LAN interface directly**, not to
+> `basetool.greluc.me`. Its `eth0` has a global IPv6 and its guest firewall admits the two
+> management networks in full, which is exactly the property that makes the mechanism testable
+> there — and it is the reason §3.1 split the mechanism from the production-shaped behaviour.
+
+Running the suite against the testing host is also what found two defects in the suite itself, both
+fixed the same day: it matched SAN entries as literal strings, so a wildcard certificate read as
+four uncovered vhosts; and it asserted "one leaf across every vhost" as a universal invariant when
+it is a property of *this deployment issuing its own certificates*. The second now reads
+`ACME_HOSTS` and skips where nothing is issued. **A check that has only ever run against one host
+has only ever been tested against one host.**
 

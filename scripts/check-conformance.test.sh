@@ -242,6 +242,18 @@ case "$cmd" in
       *)            echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
     esac
     ;;
+  *"docker inspect acme"*)
+    case "$scenario" in
+      no-acme) echo "" ;;
+      *)       echo "example.test ingest.example.test" ;;
+    esac
+    ;;
+  *"docker inspect prometheus"*|*"query="*)
+    if [ "$scenario" = "no-monitoring" ]; then
+      echo "NO_PROMETHEUS_ADDRESS" >&2
+      exit 1
+    fi
+    ;;&
   *"docker ps -a"*)
     printf 'edge|Up 15 hours (healthy)\nacme|Up 2 days\nkeycloak|Up 15 hours (healthy)\n'
     printf 'backend|Up 9 hours (healthy)\nfrontend|Up 9 hours (healthy)\ningest|Up 9 hours (healthy)\n'
@@ -358,6 +370,31 @@ say ""
 say "== the suite is wired correctly =="
 # =============================================================================================
 if "$PY" "$SUITE" --list >/dev/null 2>&1; then ok "--list runs"; else bad "--list runs"; fi
+
+# RFC 6125 wildcard matching, unit-tested directly. Found by running the suite against the
+# testing host on 2026-09-16: it serves *.basetool.greluc.me and the check reported three vhosts
+# uncovered, which was a defect in the check rather than a finding about the host. A wildcard
+# must match exactly one label -- neither the apex nor a deeper name.
+if "$PY" - <<'WILDCARD' >/dev/null 2>&1
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("cc", "scripts/check-conformance.py")
+cc = importlib.util.module_from_spec(spec); sys.modules["cc"] = cc; spec.loader.exec_module(cc)
+cases = [
+    ("api.example.com",   ["*.example.com"], True),
+    ("example.com",       ["*.example.com"], False),
+    ("a.b.example.com",   ["*.example.com"], False),
+    ("API.Example.COM",   ["*.example.com"], True),
+    ("example.com.",      ["example.com"],   True),
+    ("evil.com",          ["*.example.com"], False),
+    ("example.com",       ["example.com", "api.example.com"], True),
+]
+sys.exit(0 if all(cc._san_covers(h, s) is e for h, s, e in cases) else 1)
+WILDCARD
+then
+  ok "a wildcard SAN covers one label, and only one"
+else
+  bad "a wildcard SAN covers one label, and only one"
+fi
 if "$PY" "$SUITE" --only no-such-check >/dev/null 2>&1; then
   bad "an unknown --only is rejected"
 else
@@ -387,10 +424,12 @@ fi
 say ""
 say "== external checks go GREEN against a correct fixture =="
 # =============================================================================================
+export STUB_SCENARIO=healthy
 start_fixture || exit 2
 assert_status "vhost-reachable passes"    vhost-reachable    pass - -- "${ALL_LOCAL[@]}"
 assert_status "certificate-valid passes"  certificate-valid  pass - -- "${ALL_LOCAL[@]}"
-assert_status "certificate-shared passes" certificate-shared pass - -- "${ALL_LOCAL[@]}"
+assert_status "certificate-shared passes" certificate-shared pass - \
+  -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 assert_status "http-redirects passes"     http-redirects     pass - -- "${ALL_LOCAL[@]}"
 assert_status "ipv6-reachable passes"     ipv6-reachable     pass - -- "${ALL_LOCAL[@]}"
 
@@ -412,11 +451,14 @@ assert_status "certificate-valid fails inside the renewal margin" \
 
 start_fixture || exit 2
 assert_status "certificate-valid fails when the SAN does not cover the name" \
-  certificate-valid fail "not in SAN list" -- "${ALL_IP[@]}"
+  certificate-valid fail "not covered by SAN list" -- "${ALL_IP[@]}"
 
 start_fixture --sni-cert "${WORK}/secondary.crt" --sni-key "${WORK}/secondary.key" || exit 2
 assert_status "certificate-shared fails on two distinct leaves" \
-  certificate-shared fail "distinct leaf certificates" -- "${MIXED[@]}"
+  certificate-shared fail "distinct leaf certificates" -- "${STUB_ARGS[@]}" "${MIXED[@]}"
+STUB_SCENARIO=no-acme assert_status \
+  "certificate-shared skips where the host issues no certificates of its own" \
+  certificate-shared skip "ACME_HOSTS is empty" -- "${STUB_ARGS[@]}" "${MIXED[@]}"
 
 start_fixture --http-status 200 || exit 2
 assert_status "http-redirects fails when :80 serves content" \
@@ -491,6 +533,12 @@ STUB_SCENARIO=logs-stopped assert_status \
   "log-streams fails when ingestion has stopped" log-streams fail "has stopped" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=logs-absent assert_status \
   "log-streams fails when the metric is absent" log-streams fail "no samples" -- "${STUB_ARGS[@]}"
+
+# The real condition on the testing host today, and the message has to name it rather than leak
+# the shell guard's marker.
+STUB_SCENARIO=no-monitoring assert_status \
+  "container-metrics fails clearly when the host has no monitoring plane" \
+  container-metrics fail "no monitoring plane" -- "${STUB_ARGS[@]}"
 
 # =============================================================================================
 say ""

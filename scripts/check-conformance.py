@@ -376,6 +376,33 @@ def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
             "fingerprint": hashlib.sha256(der).hexdigest()}
 
 
+def _san_covers(host: str, sans: Sequence[str]) -> bool:
+    """Whether any DNS SAN entry covers this host name.
+
+    Implements the wildcard rule of RFC 6125 §6.4.3 rather than comparing strings: a leftmost
+    ``*`` matches exactly one label, so ``*.example.com`` covers ``api.example.com`` but neither
+    ``example.com`` itself nor ``a.b.example.com``. Comparison is case-insensitive and ignores a
+    trailing dot.
+
+    Args:
+        host: the vhost name being checked.
+        sans: the certificate's DNS subject-alternative names.
+
+    Returns:
+        ``True`` when at least one entry covers ``host``.
+    """
+    h = host.lower().rstrip(".")
+    for raw in sans:
+        san = raw.lower().rstrip(".")
+        if san == h:
+            return True
+        if san.startswith("*."):
+            suffix = san[1:]  # ".example.com"
+            if h.endswith(suffix) and "." not in h[: -len(suffix)]:
+                return True
+    return False
+
+
 def _is_private(address: str) -> bool:
     """Whether an address is one a first-hop edge must never report as a client.
 
@@ -464,8 +491,8 @@ def check_certificate_valid(ctx: Context) -> str:
             cert = _peer_certificate(host)
         except OSError as exc:
             raise CheckFailed(f"{host}: {exc}") from exc
-        if host not in cert["sans"]:
-            problems.append(f"{host} not in SAN list {cert['sans']}")
+        if not _san_covers(host, cert["sans"]):
+            problems.append(f"{host} not covered by SAN list {cert['sans']}")
         days = (cert["not_after"] - now).days
         margins.append((days, host))
         if days < CERT_MIN_DAYS:
@@ -484,6 +511,12 @@ def check_certificate_shared(ctx: Context) -> str:
     different leaves, the publish loop reached one and not the other - which is exactly the
     defect REQ-OPS-026 exists for, and it is invisible until the unreached one expires.
 
+    This is a property of *this deployment issuing its own certificates*, not a universal one.
+    An environment whose certificate is provided rather than issued sets ``ACME_HOSTS`` empty,
+    which makes the acme container idle by design, and may legitimately serve several - the
+    testing host serves a wildcard for its subdomains and a separate one for the apex. So the
+    check reads that variable and skips rather than inventing a finding.
+
     Args:
         ctx: the run context.
 
@@ -491,8 +524,22 @@ def check_certificate_shared(ctx: Context) -> str:
         The shared fingerprint, abbreviated.
 
     Raises:
+        Skip: when the host does not issue its own certificates, or says nothing about it.
         CheckFailed: when more than one distinct leaf is served.
     """
+    if ctx.runner.available:
+        try:
+            # Only ACME_HOSTS is extracted, on the host. The same environment carries
+            # ACME_EMAIL, and an address must not cross into this process or the report.
+            managed = ctx.runner.run(
+                'docker inspect acme --format "{{range .Config.Env}}{{println .}}{{end}}" '
+                '| grep "^ACME_HOSTS=" | cut -d= -f2-')
+        except (Skip, CheckFailed):
+            managed = ""
+        if not managed.strip():
+            raise Skip(
+                "this host issues no certificates of its own (ACME_HOSTS is empty, so the acme "
+                "container idles) - a single shared leaf is not claimed here")
     prints: dict[str, list[str]] = {}
     for role, host in sorted(ctx.hosts.items()):
         try:
@@ -785,7 +832,15 @@ def _promql(ctx: Context, query: str) -> dict:
         'curl -sS -K - -G "http://$addr:9090/api/v1/query" '
         f'--data-urlencode "query={query}"'
     )
-    raw = ctx.runner.run(cmd)
+    try:
+        raw = ctx.runner.run(cmd)
+    except CheckFailed as exc:
+        if "NO_PROMETHEUS_ADDRESS" in str(exc):
+            raise CheckFailed(
+                "no running prometheus container on this host - there is no monitoring plane "
+                "here to read, which is a finding about the host rather than about the query"
+            ) from exc
+        raise
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -933,7 +988,7 @@ class Check:
 CHECKS: tuple[Check, ...] = (
     Check("vhost-reachable", "REQ-OPS-014", False, check_vhost_reachable),
     Check("certificate-valid", "REQ-OPS-026", False, check_certificate_valid),
-    Check("certificate-shared", "REQ-OPS-026 / ADR-0162", False, check_certificate_shared),
+    Check("certificate-shared", "REQ-OPS-026 / ADR-0162", True, check_certificate_shared),
     Check("http-redirects", "REQ-SEC-023", False, check_http_redirects),
     Check("ipv6-reachable", "ADR-0112", False, check_ipv6_reachable),
     Check("client-address-visible", "REQ-SEC-023 / ADR-0112", True, check_client_address_visible),
