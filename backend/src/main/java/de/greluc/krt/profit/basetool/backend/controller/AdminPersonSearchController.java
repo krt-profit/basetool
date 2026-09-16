@@ -19,10 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -46,7 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminPersonSearchController {
 
   private final PersonSearchService personSearchService;
-  private final AuditService auditService;
 
   /**
    * Searches every registered free-text column for the term, case-insensitively.
@@ -76,14 +72,7 @@ public class AdminPersonSearchController {
   })
   public PersonSearchService.PersonSearchResult search(@RequestParam("q") String q) {
     PersonSearchService.PersonSearchResult result = personSearchService.search(q);
-    auditService.record(
-        AuditEventType.PERSON_SEARCH_PERFORMED,
-        null,
-        null,
-        null,
-        AuditDetails.of("termLength", q.trim().length())
-            .with("hits", result.hits().size())
-            .with("truncated", result.truncated()));
+    personSearchService.recordSearch(q, result);
     return result;
   }
 }

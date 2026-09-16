@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
 import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
@@ -68,6 +70,7 @@ public class DataExportService {
   public static final int MAX_ROWS_PER_SECTION = 5000;
 
   private final UserRepository userRepository;
+  private final AuditService auditService;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -187,6 +190,41 @@ public class DataExportService {
         export.totalRows(),
         scrubbed ? ", third-party handles removed from free text" : "");
     return export;
+  }
+
+  /**
+   * Appends the audit row for one served export (REQ-SEC-058, REQ-AUDIT-001).
+   *
+   * <p>Separate from {@link #export(UUID)}, and deliberately so. The assembly is {@code readOnly =
+   * true} — the right setting for ~29 statements across the whole schema, and one that cannot hold
+   * an {@code INSERT}: Spring marks the JDBC connection read-only and Postgres refuses the write.
+   * The audit row therefore gets its own short writable transaction, which also satisfies the
+   * {@code MANDATORY} propagation on {@link AuditService#record} that a controller calling it
+   * directly cannot satisfy at all.
+   *
+   * <p>Being a second transaction rather than the export's own is acceptable <em>here</em> and
+   * nowhere near a mutation: the export is a read, so there is no business write for the audit row
+   * to be atomic with. What the guarantee costs is the case where the row is written and the
+   * response never reaches the caller — an export recorded that nobody received, which errs towards
+   * over-recording and is the safe direction for an access-request trail.
+   *
+   * <p>The payload names the format and the row count only. Nothing about the export's contents
+   * goes in, and neither does the subject's handle.
+   *
+   * @param userId the member the export was about, recorded as both subject and target
+   * @param format {@code json} or {@code pdf}
+   * @param rows the row count, or {@code -1} when the format does not report one
+   * @param bySelf whether the subject exported their own data, as opposed to an admin doing it for
+   *     them — the distinction the trail exists to make answerable
+   */
+  @Transactional
+  public void recordExport(@NotNull UUID userId, @NotNull String format, int rows, boolean bySelf) {
+    auditService.record(
+        AuditEventType.PERSONAL_DATA_EXPORTED,
+        userId,
+        null,
+        userId,
+        AuditDetails.of("format", format).with("rows", rows).with("bySelf", bySelf));
   }
 
   /**

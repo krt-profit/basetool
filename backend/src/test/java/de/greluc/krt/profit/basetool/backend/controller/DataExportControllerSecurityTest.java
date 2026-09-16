@@ -28,7 +28,6 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService;
 import java.time.Instant;
@@ -69,7 +68,6 @@ class DataExportControllerSecurityTest {
 
   @MockitoBean private DataExportService dataExportService;
   @MockitoBean private DataExportReportService dataExportReportService;
-  @MockitoBean private AuditService auditService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach

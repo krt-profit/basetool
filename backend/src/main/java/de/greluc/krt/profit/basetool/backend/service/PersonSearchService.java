@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets.Target;
 import jakarta.persistence.EntityManager;
@@ -28,6 +30,7 @@ import jakarta.persistence.Query;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -62,6 +65,7 @@ import org.springframework.transaction.annotation.Transactional;
  * matching case would miss the very entries this exists to find.
  */
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class PersonSearchService {
 
@@ -84,6 +88,8 @@ public class PersonSearchService {
    * in depth against a future edit that pastes something else into the registry.
    */
   private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-z_][a-z0-9_]{0,62}$");
+
+  private final AuditService auditService;
 
   @PersistenceContext private EntityManager entityManager;
 
@@ -137,6 +143,38 @@ public class PersonSearchService {
         PersonSearchTargets.TARGETS.size(),
         truncated ? " (truncated)" : "");
     return new PersonSearchResult(hits, truncated);
+  }
+
+  /**
+   * Appends the audit row for one performed search (REQ-SEC-060, REQ-AUDIT-001).
+   *
+   * <p>The search is a read, and a read would normally leave no trace — but this one assembles a
+   * profile of a named person across the whole system, and is the one operation here whose misuse
+   * would otherwise be invisible. Hence a row per search.
+   *
+   * <p>Separate from {@link #search(String)} rather than folded into it, because that method is
+   * {@code readOnly = true}: Spring marks the JDBC connection read-only and Postgres refuses an
+   * {@code INSERT} on it. The row gets its own short writable transaction, which is also what
+   * satisfies the {@code MANDATORY} propagation on {@link AuditService#record} — a controller
+   * calling it straight from a handler cannot satisfy it at all.
+   *
+   * <p><b>The term itself never reaches the row.</b> It is somebody's name, and REQ-AUDIT-001 keeps
+   * user free text out of the details payload; its length and the hit count are enough to judge how
+   * the surface was used.
+   *
+   * @param term the term that was searched, used only for its trimmed length
+   * @param result what the search returned, used only for its hit count and truncation flag
+   */
+  @Transactional
+  public void recordSearch(@NotNull String term, @NotNull PersonSearchResult result) {
+    auditService.record(
+        AuditEventType.PERSON_SEARCH_PERFORMED,
+        null,
+        null,
+        null,
+        AuditDetails.of("termLength", term.trim().length())
+            .with("hits", result.hits().size())
+            .with("truncated", result.truncated()));
   }
 
   /**

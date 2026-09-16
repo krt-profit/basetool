@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -30,14 +29,11 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -55,10 +51,12 @@ import org.springframework.web.context.WebApplicationContext;
  * place a given name appears, which is a profile of that person assembled across the whole system.
  * An officer or bank employee has no business assembling one.
  *
- * <p>The class also pins down the audit rule, because it is the kind of thing a later refactor
- * "tidies up": the recorded payload must carry the term's <b>length</b> and never the term. A trail
- * of every name an admin searched for would be a second store of exactly the data this search
- * exists to help remove.
+ * <p>The class also pins down that a served search reaches the seam that records it. What the
+ * recorded payload may contain — the term's <b>length</b>, never the term, because a trail of every
+ * name an admin searched for would be a second store of exactly the data this search exists to help
+ * remove — is asserted in {@link
+ * de.greluc.krt.profit.basetool.backend.service.PersonSearchServiceAuditTest}, which is where the
+ * payload is now built.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -68,7 +66,6 @@ class AdminPersonSearchControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private PersonSearchService personSearchService;
-  @MockitoBean private AuditService auditService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @BeforeEach
@@ -128,11 +125,12 @@ class AdminPersonSearchControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // covers REQ-SEC-060 — the search is recorded, and the recorded payload never holds the name
+  // covers REQ-SEC-060 — a served search is handed to the service that records it
   @Test
-  void personSearch_isAuditedWithoutTheSearchTerm() throws Exception {
-    when(personSearchService.search(any()))
-        .thenReturn(new PersonSearchService.PersonSearchResult(List.of(), false));
+  void personSearch_isHandedToTheAuditingSeam() throws Exception {
+    PersonSearchService.PersonSearchResult result =
+        new PersonSearchService.PersonSearchResult(List.of(), false);
+    when(personSearchService.search(any())).thenReturn(result);
 
     mockMvc
         .perform(
@@ -144,13 +142,12 @@ class AdminPersonSearchControllerSecurityTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
 
-    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
-    verify(auditService)
-        .record(eq(AuditEventType.PERSON_SEARCH_PERFORMED), any(), any(), any(), details.capture());
-    String payload = details.getValue().toString();
-    assertThat(payload).doesNotContain("SomeVeryDistinctiveHandle");
-    assertThat(payload).contains("termLength");
-    // The length is the whole point: 25 characters, not the 25 characters.
-    assertThat(payload).contains("25");
+    // The controller's whole audit responsibility is this delegation. It cannot write the row
+    // itself: AuditService.record is MANDATORY-propagated and a handler has no transaction, so a
+    // direct call 500s the endpoint (ArchitectureTest#controllerLayerMustNotWriteAuditRowsDirectly
+    // forbids it). The payload's shape — length yes, term never — is asserted where it is now
+    // built, in PersonSearchServiceAuditTest, and end-to-end against a real AuditService in
+    // DataSubjectRightsAuditIntegrationTest.
+    verify(personSearchService).recordSearch(eq("SomeVeryDistinctiveHandle"), eq(result));
   }
 }

@@ -30,7 +30,28 @@ Every state-mutating activity in the eight areas writes exactly **one** row to a
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
 sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
 as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
-silent gaps**. Each event stores: timestamp (UTC), the acting user's id (FK `ON
+silent gaps**. `AuditService.record` is `@Transactional(propagation = MANDATORY)`, which is what
+makes "same transaction" a guard rather than a convention: a call with no transaction in progress
+throws instead of quietly opening one of its own.
+
+**The handful of audited *reads* are the deliberate exception, and they are not a relaxation of the
+rule.** A read has no business write for the row to be atomic with (see
+[REQ-SEC-058](security-and-access.md) exports and
+[REQ-SEC-060](security-and-access.md) person search — reads of everything the
+system holds about a person, whose misuse would otherwise leave no trace). Those call sites get
+their own short **writable** transaction in the service that owns the operation —
+`DataExportService#recordExport`, `PersonSearchService#recordSearch` — separate from the
+`readOnly = true` transaction that served the read, because Spring marks a read-only transaction's
+JDBC connection read-only and Postgres refuses the `INSERT` on it. What the separation costs is the
+case where the row is written and the response never reaches the caller: an access recorded that
+nobody received, which errs towards over-recording and is the safe direction for this trail.
+
+**A controller must never call `record` itself.** A request handler has no transaction
+(`open-in-view` is `false`, and nothing wraps the handler), so the call throws
+`IllegalTransactionStateException` and the endpoint returns 500. This is gate-enforced by
+`ArchitectureTest#controllerLayerMustNotWriteAuditRowsDirectly`, matched on the call site rather
+than the package dependency — `AuditAdminController` legitimately injects `AuditService` to *query*
+the trail for the viewer. Each event stores: timestamp (UTC), the acting user's id (FK `ON
 DELETE SET NULL`) **plus** a denormalized actor-handle snapshot (the trail must survive user
 deletion), the `domain`, the event type, the affected subject's id + a denormalized subject-label
 snapshot, an optional target-user reference, a compact details payload, and the bounded
@@ -217,6 +238,14 @@ foreign key on both tables.
   (domain, type, actor, subject).
 - [ ] Audit write failures fail the business transaction (same TX — no silent gaps); the optimistic-
   locking landmine paths (book-out, handover, store, delete, completion, claim) record without a 409.
+- [ ] Every audited endpoint is exercised by at least one test that wires the **real** `AuditService`
+  and asserts both the success status and the written row. A test that replaces the bean with
+  `@MockitoBean` also removes its transactional proxy, so it cannot see a `MANDATORY` violation —
+  which is exactly how five endpoints shipped into review returning 500
+  (`DataSubjectRightsAuditIntegrationTest`).
+- [ ] No controller calls `record(...)` on either audit service (`ArchitectureTest`). The rule covers
+  `BankAuditService` too, which carries the same `MANDATORY` propagation — no controller calls it
+  today, which is the moment to fence it rather than after a second occurrence.
 - [ ] Non-admin access to `/api/v1/audit/**` and `/admin/audit-log`: 403; the sidebar link is hidden.
 
 A new event type is only half-wired until the viewer can filter for it: the per-area event-type list

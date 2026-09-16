@@ -19,12 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
-import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
-import de.greluc.krt.profit.basetool.backend.service.AuditService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportReportService;
 import de.greluc.krt.profit.basetool.backend.service.DataExportService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
-import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -69,7 +66,6 @@ public class DataExportController {
   private final DataExportService dataExportService;
   private final DataExportReportService dataExportReportService;
   private final UserService userService;
-  private final AuditService auditService;
 
   /**
    * The caller's complete export as JSON.
@@ -90,7 +86,7 @@ public class DataExportController {
   public DataExportService.DataExport exportJson(@AuthenticationPrincipal Jwt jwt) {
     UUID userId = userService.getUserIdFromJwt(jwt);
     DataExportService.DataExport export = dataExportService.export(userId);
-    record(userId, "json", export.totalRows());
+    dataExportService.recordExport(userId, "json", export.totalRows(), true);
     return export;
   }
 
@@ -113,7 +109,7 @@ public class DataExportController {
   public ResponseEntity<byte[]> exportPdf(@AuthenticationPrincipal Jwt jwt) {
     UUID userId = userService.getUserIdFromJwt(jwt);
     byte[] pdf = dataExportReportService.renderPdf(userId);
-    record(userId, "pdf", -1);
+    dataExportService.recordExport(userId, "pdf", -1, true);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
@@ -125,21 +121,5 @@ public class DataExportController {
                 .toString())
         .contentType(MediaType.APPLICATION_PDF)
         .body(pdf);
-  }
-
-  /**
-   * Records that an export happened, without recording what was in it.
-   *
-   * @param userId the subject
-   * @param format {@code json} or {@code pdf}
-   * @param rows the row count, or {@code -1} when the format does not report one
-   */
-  private void record(UUID userId, String format, int rows) {
-    auditService.record(
-        AuditEventType.PERSONAL_DATA_EXPORTED,
-        userId,
-        null,
-        userId,
-        AuditDetails.of("format", format).with("rows", rows).with("bySelf", true));
   }
 }
