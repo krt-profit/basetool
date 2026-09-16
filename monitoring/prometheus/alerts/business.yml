@@ -783,13 +783,19 @@ groups:
       # failure direction is safe: if the frontend job disappears entirely the guard goes absent and
       # this alert stays silent, leaving a full outage to TargetDown / blackbox, which own it.
       #
-      # EVERY target of the `blackbox-public-surface` job has to appear here, and the list is only
-      # correct against the metric's `uri` LABEL rather than the probed path. That job probes seven
-      # URLs every 30s = 0.033 req/s each, so any single one of them left in clears the 0.01 floor
-      # on its own and pages during the dead window — which is the 2026-07-26 failure verbatim.
+      # EVERY target of the `blackbox-public-surface` AND `blackbox-app-link` jobs has to appear
+      # here, and the list is only correct against the metric's `uri` LABEL rather than the probed
+      # path. Those jobs probe nine URLs every 30s = 0.033 req/s each, so any single one of them
+      # left in clears the 0.01 floor on its own and pages during the dead window — which is the
+      # 2026-07-26 failure verbatim.
       #   - `/impressum`, `/privacy`, `/terms`, `/manifest.webmanifest` and `/` are controller
       #     routes and are tagged with their own path.
       #   - `/.well-known/assetlinks.json` is a @RestController (AssetLinksController) and likewise.
+      #   - `/app/link-help` and `/app/callback` are AppLinkController routes (REQ-SEC-038) and
+      #     likewise. The callback answers 303, and a matched handler pattern wins over the
+      #     `REDIRECTION` special case in the `uri` tag — so it is tagged `/app/callback`, not
+      #     `REDIRECTION`. Both spellings are excluded here, so the guard holds either way rather
+      #     than resting on that being read correctly.
       #   - `/robots.txt` is a FILE under `static/`, served by the resource handler mapped at
       #     `/**`, so it is tagged `/**` and excluding the literal path would not have matched it.
       #     `/**` is therefore excluded, which also drops the CSS/JS/font requests that accompany a
@@ -801,7 +807,7 @@ groups:
           (basetool_sse_connections == 0)
           and on()
           (sum(rate(http_server_requests_seconds_count{job="basetool-frontend",
-          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
+          uri!~"/|/\\*\\*|/actuator.*|/impressum|/privacy|/terms|/manifest.webmanifest|/robots.txt|/\\.well-known/.*|/app/callback|/app/link-help|NOT_FOUND|UNKNOWN|REDIRECTION"}[15m])) > 0.01)
         for: 30m
         labels:
           severity: warning
@@ -876,6 +882,44 @@ groups:
         annotations:
           summary: "Frontend is dropping unreadable session values ({{ $value | printf \"%.0f\" }} per 15m)"
           description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
+
+      # (2026-09-16 log triage, REQ-SEC-063 / ADR-0186) The sibling of the alert above, on the other
+      # way a session read can fail: the hash EXISTS in Redis and is missing one of the three fields
+      # Spring Session requires, so RedisSessionMapper refuses it. Until 2026-09-16 that threw
+      # IllegalStateException straight out of SessionRepositoryFilter and answered HTTP 500 — on
+      # EVERY request carrying that cookie, for up to the 720-hour authenticated window, because
+      # nothing on the read path catches it and nothing clears the cookie. The member is locked out
+      # of the whole application until they delete it by hand.
+      #
+      # That fault ran for months unseen. 286 of those 500s landed on 2026-09-14 and 18 more on
+      # 2026-09-16, and nothing fired: LogbackErrorSpike needs 0.2/s for 10m and the worst hour of it
+      # reached 0.045/s. So this alert is not a nicety — it is the entire reason the read is now
+      # allowed to degrade quietly to "signed out".
+      #
+      # HOW TO READ IT. The producer is a delta write: RedisSession#saveDelta HSETs the changed
+      # fields only, and creationTime is in that delta solely if(isNew), so a request that commits
+      # after its hash has gone re-creates the key holding lastAccessedTime alone and puts the full
+      # TTL back on it. One lost hash therefore produces exactly ONE unmappable read and then the
+      # member gets a fresh session, so this counter is a step per affected browser, never a
+      # plateau.
+      #   - a burst after a Redis restart, an AOF truncation or a session purge run against live
+      #     traffic = expected; those are the events that lose hashes.
+      #   - a rate that climbs with no such event = hashes are being lost in volume, and Redis is
+      #     where to look, not the frontend.
+      #   - missing_key covering the whole population at once = the wire format broke and every
+      #     member is being signed out. That is the case this alert must not miss.
+      #
+      # baseline-tune: >20 in 15m held for 30m, mirroring SessionValueDropsSustained. The 2026-09-14
+      # burst was 90 and then 163 within an hour, so a real event clears it comfortably, while the
+      # handful of scattered singles seen on ordinary days (8-10 per day at most) cannot.
+      - alert: SessionUnmappableSustained
+        expr: sum(increase(basetool_session_unmappable_total[15m])) > 20
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frontend cannot map session hashes ({{ $value | printf \"%.0f\" }} per 15m)"
+          description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
 
       # (2026-09-02 log triage) Cross-instance Redis fan-out not subscribed. Until this release, a
       # Redis unreachable during context refresh threw out of SmartLifecycle#start() and aborted the

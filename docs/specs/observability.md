@@ -104,6 +104,22 @@ truncated link), a `maxParameterCount` breach, a malformed `POST` body — onto 
 `DEBUG`. The exception message is never logged at any level: it quotes the offending chunk verbatim,
 i.e. raw attacker-controlled bytes that may contain line breaks (CWE-117, REQ-OBS-004).
 
+**A 404 the application answers deliberately does not also warn.** Spring's `DispatcherServlet`
+writes `No mapping for GET /favicon.ico` through its dedicated `org.springframework.web.servlet
+.PageNotFound` logger, at `WARN`, **unconditionally** — before `throwExceptionIfNoHandlerFound` is
+consulted and therefore before this application's own handler ever sees the request. The frontend
+already answers that path correctly: `GlobalExceptionHandler.handleNotFound` renders the 404 page for
+both `NoHandlerFoundException` and `NoResourceFoundException`, and `WebMvcConfig` states in writing
+that `/favicon.ico` and `/sm/**` are `permitAll` while nothing ships a file at either — the favicons
+are declared by `<link rel="icon">` against `/logos/`, and `/sm/` is a path browser extensions probe.
+The 404 is the designed answer, so the `WARN` is a warning about working as intended, and it lands in
+the same stream REQ-OBS-004's asset-shaped mismatch and the bot rules were demoted out of. The logger
+is therefore pinned to `ERROR` in the frontend's `logging.level` — the narrowest pin that silences it,
+leaving every other `org.springframework.web` logger at `INFO`. Nothing is lost: the request is still
+counted and still access-logged, and a 404 that is *not* deliberate shows up as the rendered error
+page and in the access log exactly as before. The pin is frontend-only because the backend does not
+set `spring.web.resources.add-mappings: false` and so does not reach that branch.
+
 **A masking keyword only counts when a separator follows it.** `PiiMasker`'s keyword rule
 (`bearer` / `token` / `session-id` / `authorization`) previously treated the `:`/`=`/whitespace
 separator as optional, so the keyword matched **inside** any identifier containing it and the value
@@ -1566,6 +1582,38 @@ A third frontend meter was added by the 2026-09-02 production log triage:
   will rewrite it" is an assumption about *other* code that has to be checked in that code, not
   asserted from the one being fixed.
 
+A fourth frontend meter was added by the 2026-09-16 production log triage, on the *other* way a
+session read can fail:
+
+- `basetool_session_unmappable_total{missing_key}` — counter bumped by
+  `SessionAttributeDiagnosticMapper` every time a session hash in Redis is non-empty but carries
+  none of one of the three fields `RedisSessionMapper` requires, so the mapper answers `null` and
+  the request is served as if it had no session (REQ-SEC-063, ADR-0186). `missing_key` is a closed
+  set of four literals — `creationTime`, `lastAccessedTime`, `maxInactiveInterval`, `other` —
+  resolved from the hash itself rather than parsed out of the upstream exception message
+  (REQ-OBS-006).
+
+  **It is the price of a degradation, not a nicety.** Until 2026-09-16 that hash threw
+  `IllegalStateException: creationTime key must not be null` straight out of
+  `SessionRepositoryFilter` and answered **HTTP 500** — on every request carrying that cookie, for
+  up to the 720-hour window, because nothing on the read path catches it and nothing clears the
+  cookie. Production served 286 of those on 2026-09-14 and 18 more on 2026-09-16, plus 8–10 a day
+  on nine scattered days back to July, and **nothing fired**: `LogbackErrorSpike` needs 0.2/s held
+  10 m and the worst hour of it reached 0.045/s. Now that the read degrades to a signed-out member,
+  this counter is the only thing separating a graceful failure from a silent one.
+
+  The producer is a delta write — `RedisSession#saveDelta` issues a plain `HSET` of the changed
+  fields only, and `creationTime` is in that delta solely `if (isNew)` — so a request committing
+  after its hash has gone re-creates the key holding `lastAccessedTime` alone and puts the full TTL
+  back on it. One lost hash therefore yields exactly **one** increment and then that browser gets a
+  fresh session: the counter is a step per affected browser, never a plateau. A burst after a Redis
+  restart, an AOF truncation or a session purge run against live traffic is expected and decays; a
+  rate that climbs with no such event means hashes are being lost in volume and Redis is where to
+  look; a rate covering the whole active population at once means the session wire format broke and
+  everybody is being signed out. Backs `SessionUnmappableSustained` (> 20 per 15 m held 30 m,
+  warning), which sums **across** `missing_key` precisely so a format break that loses all three
+  fields at once cannot hide below a per-series threshold.
+
 Two frontend meters were added by the 2026-08 logging audit:
 
 - `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`
@@ -1763,9 +1811,9 @@ instead of trusting the one-time rollout verification:
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
   design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
   contract.
-- **Public surface stays public** — the `blackbox-public-surface` job probes the seven frontend
+- **Public surface stays public** — the `blackbox-public-surface` job probes the eight frontend
   paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/robots.txt`,
-  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`) with
+  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`, `/app/link-help`) with
   `http_public_200_no_redirect` — exactly `200`, **redirects not followed**;
   `EdgePublicSurfaceNot200` (warning, 15 min) fires on drift. This is the inverse of the
   members-only probe and, until 2026-09-13, the half that had none. **`follow_redirects: false` is
@@ -1780,6 +1828,25 @@ instead of trusting the one-time rollout verification:
   probe naming one type would assert content negotiation rather than reachability. The probe
   declares itself with `X-Basetool-Probe: public-surface` so the frontend's request cache does not
   mint a Redis session per hit, for the same reason as the members-only probe.
+- **The Android App Link fallback still redirects** — the `blackbox-app-link` job probes
+  `/app/callback` with `http_app_link_fallback_303`: exactly `303`, redirects not followed, and a
+  `Location` naming `/app/link-help`; `EdgeAppLinkFallbackBroken` (warning, 15 min) fires on drift.
+  It is a separate job because it is the one public path whose contract is **not** `200` — the URL
+  carries a live authorization code, and the redirect is what keeps that code out of the address
+  bar and the history entry (`REQ-SEC-038`). Every regression it guards is silent and lands on a
+  member mid-login: a `200` leaves the code where the redirect removed it, a `302` into
+  `/oauth2/authorization/keycloak` means the `permitAll` entry was lost and the member is sent back
+  into a login they cannot finish, and a `404` means `AppLinkController` is missing from the image
+  — which is how this last surfaced, as two `No mapping for GET /app/callback` WARN lines found in
+  a log archive a day after a member's login broke. `AppLinkControllerTest` runs in-process against
+  MockMvc and stays green through all three.
+
+  **Do not measure how often the fallback is used from `http_server_requests_seconds_count{uri="/app/callback"}`.**
+  This probe puts a constant `0.033 req/s` floor on that series, which drowns the handful of real
+  hits — and the counter could not tell a member's phone from a crawler anyway (a `Google-Read-Aloud`
+  fetch requested the full callback URL twice on 2026-09-15). That measurement belongs in Loki over
+  the edge access log, which carries the user agent. Both `/app/callback` and `/app/link-help` are
+  therefore excluded from the `SsePushChannelDead` traffic guard alongside the other probe targets.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
   `EdgeHstsHeaderMissing` (warning). Extended to the grafana/ingest vhosts once their

@@ -28,6 +28,12 @@
   Ablehnung automatisch und vollständig gelöscht; bis dahin lässt sich eine irrtümliche Ablehnung
   weiterhin zurücknehmen (REQ-SEC-057).
 
+- **Betrieb: die Ersatzseite für eine Android-Anmeldung, die im Browser landet, wird jetzt von außen
+  überwacht.** `/app/callback` muss auf `/app/link-help` weiterleiten — das ist es, was den
+  Anmeldecode aus Adresszeile und Verlauf nimmt — und `/app/link-help` muss ohne Anmeldung
+  antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
+  Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
+
 ### Changed
 
 - **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
@@ -57,6 +63,28 @@
   — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind
   jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
   REQ-NOTIF-009).
+
+- **Betrieb: die drei Dienst-Images konnten ohne ihr Log-Verzeichnis nicht starten.** Beim Bauen
+  legte der Trainingslauf die Logdateien als `root` an; sie blieben im Image liegen, und der
+  Anwendungsbenutzer durfte anschließend nicht mehr hineinschreiben. Sichtbar war das nur, wenn ein
+  Image ohne das eingehängte Log-Verzeichnis läuft — am laufenden Stack ändert sich nichts
+  (REQ-OPS-031).
+
+- **Ein beschädigter Sitzungseintrag sperrte einzelne Mitglieder komplett aus.** Verlor der
+  Sitzungsspeicher einen Eintrag, während gerade eine Anfrage lief, blieb ein halb geschriebener
+  Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
+  bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
+  sich neu anmelden (REQ-SEC-063).
+  
+- **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
+  `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
+  Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
+  stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
+  
+- **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
+  Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
+  und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
+  zu tun ist. Betrifft Lager, Hangar, Einsätze, Operationen und Raffinerieaufträge (REQ-ORG-023).
 
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend

@@ -23,12 +23,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.FlushMode;
 import org.springframework.session.Session;
@@ -54,10 +57,11 @@ import tools.jackson.databind.json.JsonMapper;
  * dropping the field errors / target / object-name. These tests pin that behaviour so it cannot
  * silently regress when the configuration is touched in the future.
  *
- * <p>Also pins {@link RedisSessionConfig#sessionRepositoryCustomizer()}: the configurable {@code
- * spring.session.redis.flush-mode} must bind leniently (case- and {@code -}/{@code _}-insensitive)
- * and fall back to the durable {@code IMMEDIATE} default on an unrecognised value rather than
- * crashing startup, while the session timeout and key namespace stay applied.
+ * <p>Also pins {@link RedisSessionConfig#sessionRepositoryCustomizer(ObjectProvider)}: the
+ * configurable {@code spring.session.redis.flush-mode} must bind leniently (case- and {@code
+ * -}/{@code _}-insensitive) and fall back to the durable {@code IMMEDIATE} default on an
+ * unrecognised value rather than crashing startup, while the session timeout and key namespace stay
+ * applied.
  */
 class RedisSessionConfigTest {
 
@@ -149,8 +153,9 @@ class RedisSessionConfigTest {
 
   /**
    * Instantiates {@link RedisSessionConfig} with the given flush-mode value (plus fixed timeout and
-   * namespace), runs its {@link RedisSessionConfig#sessionRepositoryCustomizer()} against a mock
-   * repository, and returns that mock for verification.
+   * namespace), runs its {@link
+   * RedisSessionConfig#sessionRepositoryCustomizer(org.springframework.beans.factory.ObjectProvider)}
+   * against a mock repository, and returns that mock for verification.
    *
    * @param flushModeValue the raw {@code spring.session.redis.flush-mode} value to inject
    * @return the mock repository the customizer was applied to
@@ -161,10 +166,25 @@ class RedisSessionConfigTest {
     ReflectionTestUtils.setField(config, "redisNamespace", "basetool:session");
     ReflectionTestUtils.setField(config, "flushModeValue", flushModeValue);
     SessionRepositoryCustomizer<RedisIndexedSessionRepository> customizer =
-        config.sessionRepositoryCustomizer();
+        config.sessionRepositoryCustomizer(meterRegistryProvider());
     RedisIndexedSessionRepository repository = mock(RedisIndexedSessionRepository.class);
     customizer.customize(repository);
     return repository;
+  }
+
+  /**
+   * Builds the {@code ObjectProvider<MeterRegistry>} the customizer hands to the session mapper.
+   *
+   * <p>Backed by a real bean factory rather than a stub, so the lazy {@code getIfAvailable()}
+   * resolution the production wiring depends on is the one exercised here.
+   *
+   * @return a provider over a throwaway {@link SimpleMeterRegistry}
+   */
+  private static org.springframework.beans.factory.ObjectProvider<MeterRegistry>
+      meterRegistryProvider() {
+    DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+    beanFactory.registerSingleton("meterRegistry", new SimpleMeterRegistry());
+    return beanFactory.getBeanProvider(MeterRegistry.class);
   }
 
   /**

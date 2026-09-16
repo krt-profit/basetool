@@ -1,6 +1,6 @@
 # promtool unit test for the TargetDown /probe-scoping (REQ-OBS-008/-012, 2026-07-12 false-critical fix).
 #
-# Proves the scoped expr `up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns).*"} == 0`:
+# Proves the scoped expr `up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0`:
 #   - does NOT fire TargetDown for any of the blackbox /probe jobs whose scrape timed out (up==0 is a
 #     scrape-timeout artifact there, not a target-down signal — see the alert comment);
 #   - STILL fires for the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and for
@@ -34,6 +34,8 @@ tests:
       - series: 'up{job="blackbox-members-only", instance="https://profit-base.online/missions"}'
         values: "0x10"
       - series: 'up{job="blackbox-public-surface", instance="https://profit-base.online/manifest.webmanifest"}'
+        values: "0x10"
+      - series: 'up{job="blackbox-app-link", instance="https://profit-base.online/app/callback"}'
         values: "0x10"
       - series: 'up{job="blackbox-hsts", instance="https://profit-base.online"}'
         values: "0x10"
