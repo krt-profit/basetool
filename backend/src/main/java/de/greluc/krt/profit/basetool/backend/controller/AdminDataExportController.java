@@ -92,8 +92,9 @@ public class AdminDataExportController {
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Export another member's data as a PDF")
   public ResponseEntity<byte[]> exportPdf(@PathVariable UUID userId) {
-    byte[] pdf = dataExportReportService.renderPdf(userId);
-    dataExportService.recordExport(userId, "pdf", -1, false);
+    DataExportService.DataExport export = dataExportService.export(userId);
+    byte[] pdf = dataExportReportService.renderPdf(export);
+    dataExportService.recordExport(userId, "pdf", export.totalRows(), false);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,

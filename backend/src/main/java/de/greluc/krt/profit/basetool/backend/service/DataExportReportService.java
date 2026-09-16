@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.service.pdf.DataExportPdfFormat;
 import java.util.Locale;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
@@ -43,13 +42,20 @@ public class DataExportReportService {
   private final MessageSource messageSource;
 
   /**
-   * Assembles the member's export and renders it as a PDF.
+   * Renders an already-assembled export as a PDF.
    *
-   * @param userId the member the export is about
+   * <p><b>Takes the export rather than a user id, so the caller keeps it.</b> It used to assemble
+   * the export itself and return only the bytes, which left the caller with nothing to audit: both
+   * PDF endpoints recorded {@code rows: -1} in their {@code PERSONAL_DATA_EXPORTED} payload, on a
+   * sentinel documented as "when the format does not report one". The count was never unavailable —
+   * this method was discarding the object that carries it. Handing the assembled export in also
+   * means the audited count is the count of what was actually rendered, not of a second assembly.
+   *
+   * @param export the member's assembled export
    * @return the PDF bytes
    */
-  public byte @NotNull [] renderPdf(@NotNull UUID userId) {
-    return DataExportPdfFormat.render(dataExportService.export(userId), this::label);
+  public byte @NotNull [] renderPdf(@NotNull DataExportService.DataExport export) {
+    return DataExportPdfFormat.render(export, this::label);
   }
 
   /**

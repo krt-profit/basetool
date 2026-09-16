@@ -160,7 +160,13 @@ class DataSubjectRightsAuditIntegrationTest {
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)
         .allSatisfy(
-            event -> assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true"));
+            event -> {
+              assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true");
+              // Not rows=-1. The renderer used to assemble the export itself and return only the
+              // bytes, so both PDF endpoints recorded a sentinel where the count belongs -- in the
+              // one payload that answers "how much was disclosed".
+              assertThat(event.getDetails()).doesNotContain("rows=-1");
+            });
   }
 
   // covers REQ-SEC-058 - the admin JSON export is served and audited as somebody else's
@@ -196,8 +202,11 @@ class DataSubjectRightsAuditIntegrationTest {
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)
         .allSatisfy(
-            event ->
-                assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false"));
+            event -> {
+              assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false");
+              // See selfExportPdf_isServedAndAudited: the admin path carried the same sentinel.
+              assertThat(event.getDetails()).doesNotContain("rows=-1");
+            });
   }
 
   // covers REQ-SEC-060 - the person search is served and audited without recording the term

@@ -122,8 +122,9 @@ public class DataExportController {
   @ApiResponses(@ApiResponse(responseCode = "200", description = "The PDF"))
   public ResponseEntity<byte[]> exportPdf(@AuthenticationPrincipal Jwt jwt) {
     UUID userId = userService.getUserIdFromJwt(jwt);
-    byte[] pdf = dataExportReportService.renderPdf(userId);
-    dataExportService.recordExport(userId, "pdf", -1, true);
+    DataExportService.DataExport export = dataExportService.export(userId);
+    byte[] pdf = dataExportReportService.renderPdf(export);
+    dataExportService.recordExport(userId, "pdf", export.totalRows(), true);
     return ResponseEntity.ok()
         .header(
             HttpHeaders.CONTENT_DISPOSITION,

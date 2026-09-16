@@ -3624,6 +3624,12 @@ worse than a short document that says exactly what exists and points at the mach
 > now, and `DataExportPdfFieldLabelCoverageTest` fails the build when a projection selects a
 > column the bundle cannot name — necessary because a missing key resolves to the key
 > itself by design, which is exactly how the aliases got through.
+>
+> **Corrected with it:** both PDF endpoints recorded `rows: -1` in their `PERSONAL_DATA_EXPORTED`
+> payload, on a sentinel documented as "when the format does not report one". The count was never
+> unavailable — the renderer assembled the very export the JSON path reports `totalRows()` from and
+> then discarded it. The caller assembles the export and hands it to the renderer now, so the
+> audited count is the count of what was actually served.
 
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:

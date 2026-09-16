@@ -348,8 +348,11 @@ class DataExportIntegrationTest {
   void thePdfRenders() {
     UUID subject = user("ZzzPdfZzz");
 
-    byte[] pdf = dataExportReportService.renderPdf(subject);
+    DataExportService.DataExport export = dataExportService.export(subject);
+    byte[] pdf = dataExportReportService.renderPdf(export);
 
+    // The count the audit payload records is the count of what was rendered, not -1.
+    assertThat(export.totalRows()).isNotNegative();
     assertThat(pdf).isNotEmpty();
     // %PDF- magic: proves a document came out rather than an empty buffer.
     assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1))

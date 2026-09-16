@@ -211,7 +211,10 @@ public class DataExportService {
    *
    * @param userId the member the export was about, recorded as both subject and target
    * @param format {@code json} or {@code pdf}
-   * @param rows the row count, or {@code -1} when the format does not report one
+   * @param rows how many rows the export contains, taken from the assembled {@link
+   *     DataExport#totalRows()} of the export that was actually served. Both formats report it; the
+   *     PDF path used to pass {@code -1}, on a sentinel that described a discarded object rather
+   *     than a limitation of the format (corrected 2026-09-17)
    * @param bySelf whether the subject exported their own data, as opposed to an admin doing it for
    *     them — the distinction the trail exists to make answerable
    */
