@@ -381,9 +381,12 @@ The *empirical* half is closed as of 2026-09-16 — see the measurement above. T
 said what was supposed to happen, and this project's own history is a list of things that were
 supposed to happen, so it was measured.
 
-The other half is closed too: **the positive arm was measured on CentOS Stream 10 with Podman
-6.1.0 on the same day, and it passes.** A bridge-networked container with
-`rootless_port_forwarder = "pasta"` logged the real client address. See §13.
+The other half was measured on CentOS Stream 10 with Podman 6.1.0 on the same day, and it is
+**split**: a bridge-networked container with `rootless_port_forwarder = "pasta"` logged the real
+client address **over IPv4**, and over **IPv6 the forwarder does not deliver the connection at
+all**. The default `rootlessport` serves IPv6 but reports the client as an IPv4 bridge address.
+Neither option currently satisfies both halves of what the edge needs — see §13, which also lists
+what was ruled out and what the options are.
 
 ### 3.2 Can the edge bind :80 and :443 rootless, and at what cost? — open, and now cheaper
 
@@ -1254,6 +1257,12 @@ host was left clean afterwards — no containers, no unit files, no failed units
 This section is the record of what the host said. Where it disagrees with §3, §3 is now annotated to
 point here.
 
+> [!danger] One of the answers is negative, and it is the load-bearing one
+> `rootless_port_forwarder="pasta"` preserves the client address over IPv4 and **does not forward
+> IPv6 at all**. ADR-0163 chose this platform to obtain that forwarder, so the premise now holds
+> for one address family out of two. The measurement and everything ruled out are below; the
+> decision belongs to @greluc.
+
 ### §3.1 The source address — **the measurement passes on the chosen platform**
 
 Two arms, thirteen seconds apart, same image, same host, same client, one variable:
@@ -1278,8 +1287,77 @@ same minute, same client, one variable — which is what makes the pair comparab
 > idle, exactly as §3.1 split it. The option also remains **experimental upstream**, so the standing
 > assertion stays the conformance suite's `client-address-visible` check, not this one measurement.
 >
-> The IPv6 arm needs the PVE operator, because the prefix rotates on PPPoE re-dial and a stale
-> literal would measure nothing. It is scheduled, not skipped.
+> The IPv6 arm has since been run, and it **fails** — see immediately below. That result, not
+> this one, is what decides whether the plan can proceed as written.
+
+### §3.1 The IPv6 arm — **it fails, and it blocks the plan as written**
+
+The v4 arm above passes. The v6 arm does not, and the two were measured on the same container, in
+the same minute, with the same publish specification, from the same external client:
+
+| Family |        Result        |         What the container logged         |
+|--------|----------------------|-------------------------------------------|
+| IPv4   | HTTP 200             | **`10.1.0.30`** — the real client address |
+| IPv6   | **connection reset** | **nothing at all**                        |
+
+Not a wrong address. Nothing arrives. The socket is bound — both `0.0.0.0:18080` and `[::]:18080`
+are listening — and inbound IPv6 connections are reset.
+
+**The control arm serves both families.** `rootlessport` answered the same v6 request with HTTP 200
+and logged it as `10.89.0.2` — an **IPv4** bridge address. So the default forwarder does not merely
+lose the client's address over IPv6, it collapses the request into a different address family
+before the container ever sees it. That is worse than §3.1 assumed, and it is the other half of why
+neither option is currently acceptable.
+
+#### What was ruled out, so nobody re-runs it
+
+- **The hypervisor firewall.** The reset happens from `::1` on the VM itself.
+- **The topology.** netavark installs correct DNAT rules for **both** families; the v6 rule was read
+  out of the rootless netns and reads `dnat ip6 to [fd2f:…::2]:8080`.
+- **SELinux.** Zero AVC denials, and the failure is identical with SELinux permissive. The upstream
+  PR shipped alongside a policy fix, which made this the first thing to check. It is not that.
+- **IPv6 forwarding.** The rootless netns already has `forwarding=1`; setting the host's to 1 changes
+  nothing. Reverted.
+- **Stale packages.** podman 6.1.0, passt `0^20260728`, netavark 2.1.0, and `dnf check-update`
+  reports nothing newer. This is the distribution's current best.
+
+Upstream states the intent plainly — pesto binds both `0.0.0.0` and `[::]` "so IPv6 networks work
+out of the box", and both sockets do appear. Only the forwarding does not happen. The PR that added
+the option carries no documented IPv6 test, which is consistent with a feature shipped as
+**experimental**.
+
+> [!danger] The choice, as it stands, is between two unacceptable options
+> **pasta** gives correct client addresses and **no IPv6 service**. **rootlessport** gives IPv6 and
+> **no client addresses** — on IPv6 it does not even preserve the address family. The edge serves
+> dual-stack, three application networks and `net-blackbox-v6` carry IPv6, and `ipv6-reachable` is
+> one of the twelve assertions the Phase 0 conformance suite makes. Either option fails a check the
+> suite already makes today.
+>
+> **This is a decision for @greluc, not a problem to engineer around quietly.** ADR-0163 chose this
+> platform specifically to obtain the pasta forwarder; that premise now holds only for IPv4.
+
+#### The options, stated honestly
+
+1. **Report it upstream and wait.** The feature is experimental and its IPv6 path looks untested.
+   This is the cheapest option and the one with no timeline.
+2. **Ship with `rootlessport` and stop depending on `$remote_addr`.** That means rebuilding the
+   rate limiter's key and replacing the Keycloak admin allow-list with something that is not a peer
+   address — a real redesign of two security controls, not a configuration change.
+3. **Re-open the platform question.** ADR-0163's choice 1 was already amended once on evidence;
+   this is new evidence against the amended version.
+4. **Split the edge out of the bridge topology** (host networking, or pasta as the network mode) so
+   it sees clients natively. It preserves addresses on both families but costs the edge its
+   membership in the five internal networks, which is how it reaches every backend. Probably fatal,
+   but it is the only option that solves both halves at once and it has not been measured.
+
+Nothing here should be chosen on this page. The measurement is the deliverable; the choice is not.
+
+> [!note] One honest limitation on the evidence
+> pasta was also tried as a **network mode** rather than a forwarder, and IPv6 failed there too —
+> but that arm is **confounded** and is recorded as indicative only: in that mode the container
+> shares the host's address space, and the probe came from the host itself, so it is not the same
+> shape as an external client. The forwarder finding above carries the weight: an external client,
+> two families, one variable, reproduced twice.
 
 ### §3.3 The two network semantics — **both answered, and both matter**
 
@@ -1358,7 +1436,8 @@ images and configuration. The accident was worth more than a tidy run would have
 
 ### What Phase 1 leaves open
 
-- the **IPv6 arm** of §3.1, which needs the PVE operator for the current prefix;
+- **the IPv6 decision** — no longer a measurement. The arm was run and it failed; what remains is
+  a choice between the four options in this section, and it is @greluc's;
 - §3.2, binding `:80`/`:443` rootless, which is a host-configuration question and not an experiment;
 - everything in Phase 2 — read-only with real mounts, the capability reduction for the databases,
   and the restart tuning that finding 3 above just added to it.
