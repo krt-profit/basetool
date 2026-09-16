@@ -1327,6 +1327,63 @@ on two different collectors).
 [ADR-0180](../adr/0180-compact-object-headers-on-java-25.md) · **Related:** REQ-OPS-028 (the other
 JVM flag, same file, same failure class), REQ-OPS-020 (the measured limits this must not pre-empt)
 
+### REQ-OPS-031 — The image build leaves nothing root-owned behind, and the image starts unmounted
+
+The AppCDS training run of REQ-OPS-030 is a **real application start**, so Logback builds every
+appender `logback-spring.xml` declares and creates `logs/<svc>.log` and `logs/<svc>-error.log`
+relative to `WORKDIR /app`. It runs *before* `USER 10001:10001`, and a `USER` switch does not change
+an existing file's owner — so without cleanup those files ship inside the image owned by `root`.
+
+**Every artefact the training run writes is removed in the same `RUN` layer.** The same layer is the
+whole requirement: a later `RUN rm` only stacks a whiteout on top and still ships the bytes
+underneath, so "cleaned up afterwards" would leave the payload in the published image and merely
+hide it. `/app/logs` itself must survive, owned by `10001:10001` — it is the mount point the compose
+templates bind `/var/iri/<svc>/log` over.
+
+**The property this protects is that a published image starts with nothing mounted over it.** The
+baked files broke it, in a way that reads as an application defect: `/app/logs` *is* writable by the
+app user, so creating a new file there succeeds, but appending to a root-owned one does not. Logback
+escalates the failed `openFile(logs/<svc>.log,true)` to `Logback configuration error detected` and
+the container exits 1 — before any application code runs, and therefore before any of the
+configuration errors an operator running the image bare would actually be trying to read.
+
+> [!note] Production never saw this, and that is the point
+> `docker-compose.yml` bind-mounts `/var/iri/<svc>/log` over `/app/logs` on all three services, so
+> the baked files were hidden on every deployed start. The defect was **latent for the life of the
+> Alpine images**: the artefact was broken while the deployment was not, and no probe, alert or log
+> line could have said so. A mount may supply data; it may never be the thing that makes an image
+> work.
+
+**The clean-up happens after training, not instead of it.** Suppressing the files by pointing the
+training run at a console-only logging config was considered and rejected: it would keep
+`AsyncAppender`, `RollingFileAppender`, `SizeAndTimeBasedRollingPolicy` and the module's
+`PiiMaskingPatternLayout` out of the archive although every real startup loads them (measured on the
+`ingest` image, 2026-09-16: 56 classes and 278 KB less), and a logging config that fails to parse
+guts the entire training run — 14 635 classes down to 3 898 — while still producing a `.jsa`, which
+the `ENTRYPOINT`'s `if [ -f ... ]` fallback cannot detect, exactly the silent-degradation shape
+REQ-OPS-030 exists to prevent. A bare `-Dlogging.config=` suppresses nothing at all: Spring Boot
+reads an empty value as *no explicit config* and falls back to the classpath `logback-spring.xml`.
+
+**Acceptance**
+
+- [x] `backend`, `frontend` and `ingest` clear `/app/logs` inside the training `RUN` and recreate the
+  directory owned by `10001:10001`.
+- [x] `find /app -user 0` returns nothing in each published image. This is the check, rather than
+  "the log directory is empty": it catches the whole class, and it was what showed the log files
+  were the only instance of it.
+- [x] `docker run` on the image with **no** `/app/logs` mount gets past Logback — it fails on missing
+  configuration, not on `(Permission denied)`.
+- [x] The training run's flags are unchanged, so the REQ-OPS-030 archive stays representative: the
+  classes the runtime loads at startup are the classes training loaded.
+- [ ] The `find /app -user 0` assertion runs in `release-images.yml` against the built image, so a
+  future build-stage side effect fails the build instead of waiting to be noticed. Not built — today
+  the guarantee rests on the three `Dockerfile`s and this requirement.
+
+**Code:** `backend/Dockerfile` · `frontend/Dockerfile` · `ingest/Dockerfile` (the
+`-XX:ArchiveClassesAtExit` `RUN` in each) · **Related:** REQ-OPS-030 (the training run this cleans up
+after, and the same silent-degradation failure class), REQ-OPS-014 (the runtime posture the fixed
+UID/GID serves)
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
