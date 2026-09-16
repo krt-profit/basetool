@@ -363,3 +363,46 @@ modules:
       ip_protocol_fallback: false
       tls_config:
         insecure_skip_verify: false
+
+  # Succeeds ONLY when the Android App Link's web-side fallback answers `303` to /app/link-help on
+  # the FIRST response (REQ-SEC-038). The sibling of http_public_200_no_redirect, split off because
+  # this one path must NOT answer 200: rendering a page at /app/callback is precisely the failure
+  # the redirect exists to prevent.
+  #
+  # The URL carries a live authorization code, so the redirect is the security half rather than a
+  # convenience — it takes the code out of the address bar and out of the history entry. A
+  # regression that renders instead of redirecting leaves the code in both, and on 2026-09-15 a
+  # `Google-Read-Aloud` fetch requested the full callback URL, code included, within a second of
+  # each attempt. A regression that loses the `permitAll` entry sends the member back into OAuth
+  # with a dead code, which is the loop the route was added to break.
+  #
+  # Both regressions are invisible to the app's own tests: AppLinkControllerTest runs in-process
+  # against MockMvc and stays green through an edge rule, a cache, or a permitAll entry lost in a
+  # merge. Before the route existed this failed as `No mapping for GET /app/callback` and was found
+  # from a member's report of a login that died mid-flight.
+  #
+  # The Location regexp accepts the absolute and the relative spelling: Spring answers with the
+  # absolute form today, and which one it sends is not part of the contract.
+  http_app_link_fallback_303:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: [303]
+      method: GET
+      follow_redirects: false
+      headers:
+        # Declares itself, so the frontend's request cache does not remember the probe and mint a
+        # Redis session per hit — same reason as the two modules above.
+        X-Basetool-Probe: "app-link-fallback"
+      fail_if_header_not_matches:
+        - header: Location
+          # Single-quoted so the regexp's backslash is not a YAML escape: the exporter refuses to
+          # load a config with an unknown escape character, and "\." is one.
+          regexp: '^(https://profit-base\.online)?/app/link-help$'
+      fail_if_ssl: false
+      fail_if_not_ssl: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+      tls_config:
+        insecure_skip_verify: false
