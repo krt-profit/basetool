@@ -56,7 +56,7 @@ Verify the versions actually installed — the whole migration rests on two of t
 
 ```bash
 podman --version          # expect 6.1.0 or newer
-ls -l /usr/bin/pesto      # must exist; it is what carries the source address
+ls -l /usr/bin/pesto      # informational since ADR-0187; nothing depends on it any more
 rpm -q passt netavark aardvark-dns crun conmon
 ```
 
@@ -251,7 +251,18 @@ forwarder, not nginx, which already listens on 8080/8443 inside the container as
 
 ---
 
-## 6. `containers.conf` — the setting the migration turns on
+## 6. `containers.conf` — the setting the migration turned on, and then did not
+
+> [!important] Superseded 2026-09-16 by [ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+> Everything below describes `rootless_port_forwarder="pasta"`, which was the mechanism for
+> keeping real client addresses until it was measured to **deliver no IPv6 at all** (plan §13).
+> The deployment now gets the client address from a host-level PROXY-protocol front end, and
+> **this setting is deliberately not applied** — the Ansible role writes a `containers.conf`
+> that carries no settings and explains why.
+>
+> The text is kept rather than deleted because it records what was tried and what it cost, and
+> because a future podman that fixes the IPv6 path would make it relevant again — though even
+> then, turning it on would make the edge trust two sources for one fact.
 
 ```ini
 # ~iri/.config/containers/containers.conf

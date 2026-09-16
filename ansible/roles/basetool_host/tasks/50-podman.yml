@@ -26,21 +26,30 @@
     group: "{{ basetool_service_group }}"
     mode: "0644"
 
+# In --check the service user does not exist, so becoming it is meaningless -- and `acl`,
+# which Ansible needs to hand its temp files to an unprivileged become_user, has not been
+# installed either. Both are properties of a dry run rather than defects, and without this
+# guard the run dies on a chmod error that reads like a permissions problem.
 - name: Read back what podman actually resolved the setting to
+  when: not ansible_check_mode
   become: true
   become_user: "{{ basetool_service_user }}"
   ansible.builtin.command: podman info --format '{{ "{{" }} .Host.RootlessNetworkCmd {{ "}}" }}'
   register: basetool_rootless_netcmd
   changed_when: false
+  check_mode: false
   failed_when: false
 
 - name: Report it
   ansible.builtin.debug:
     msg: >-
-      podman reports rootless network command '{{ basetool_rootless_netcmd.stdout | default('?') }}'.
-      That is the DEFAULT network mode, not the bridge port forwarder -- the setting written above
-      governs bridge networks and podman does not report it here. It is asserted where it matters:
-      run `scripts/check-conformance.py --ssh <host>` and require client-address-visible to be
-      green. A stack can be entirely healthy with that check red, and then the per-IP limiter
-      applies to the whole internet at once.
+        podman reports rootless network command '{{ basetool_rootless_netcmd.stdout | default('?') }}'.
+        That is the DEFAULT network mode. The bridge port forwarder is a different thing and podman
+        does not report it here -- and since ADR-0187 this host deliberately sets nothing for it:
+        the edge gets the client address from the PROXY-protocol front end instead. The acceptance
+        is the BEHAVIOUR either way: run `scripts/check-conformance.py --ssh <host>` and require
+        both client-address-visible and edge-not-directly-reachable to be green. A stack can be
+        entirely healthy with the first red, and then the per-IP limiter applies to the whole
+        internet at once; with the second red, the header it trusts can be forged.
   changed_when: false
+  check_mode: false

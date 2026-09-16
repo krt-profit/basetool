@@ -3,4 +3,10 @@
 #   ansible-galaxy collection install -r requirements.yml
 collections:
   - name: community.general
-    version: ">=10.0.0"   # for community.general.sefcontext, used by roles/basetool_host/tasks/40-selinux.yml
+    # Lower bound: community.general.sefcontext and .seport, used by 40-selinux.yml and
+    # 70-frontend.yml. Upper bound: 12.0.0 needs ansible-core >= 2.17 and the target platform
+    # ships 2.16.16 -- installing it there warns "does not support Ansible version 2.16.16" and
+    # then aborts on the removed yaml callback before the first task. An operator on a newer
+    # control node is unaffected by the ceiling; a host running it locally is not, and that is
+    # the case this bound exists for.
+    version: ">=10.0.0,<12.0.0"

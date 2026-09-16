@@ -7,17 +7,18 @@
       - ansible_facts['os_family'] == 'RedHat'
       - ansible_facts['distribution_major_version'] | int >= 10
     fail_msg: >-
-      This role targets CentOS Stream 10 (ADR-0163). Found
-      {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
-      Rocky 10 and AlmaLinux 10 are EL 10 and will pass this check, but they were measured on
-      2026-09-16 carrying podman 5.8.2 with no /usr/bin/pesto -- the version assertion in
-      10-packages.yml is what will stop them, and it is the one that matters.
+        This role targets Rocky Linux 10 (ADR-0163, amended twice on 2026-09-16). Found
+        {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}.
+        CentOS Stream 10 and AlmaLinux 10 are EL 10 and pass this check too; Stream was the target
+        until ADR-0187 removed the need for podman 6, at which point ten years of support and
+        changes arriving AFTER RHEL beat five years and arriving before.
     success_msg: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
 
 - name: Read the cgroup filesystem type
   ansible.builtin.command: stat -fc %T /sys/fs/cgroup
   register: basetool_cgroup_fs
   changed_when: false
+  check_mode: false
 
 - name: Assert cgroup v2
   ansible.builtin.assert:

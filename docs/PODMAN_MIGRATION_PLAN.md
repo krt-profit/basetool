@@ -1793,3 +1793,95 @@ subject, and the symptom — haproxy healthy, backend gone, empty reply — read
 Lingering was enabled (safe here precisely because no unit files exist yet, per §13) and the chain
 was then run inside a single invocation.
 
+## 16. The Ansible role, run for real — 2026-09-16
+
+[ADR-0186](adr/0186-the-host-bootstrap-is-an-ansible-role.md) exists because a prose checklist
+executed twice is two procedures that resemble each other. The role that replaced it had itself
+never been executed — only linted — and running it against Rocky 10.2 found **nine defects**, one of
+which would have stopped it at the first task.
+
+The control node was the host itself (`ansible_connection: local`). That avoids putting a copy of a
+private key anywhere and exercises every task; what it does **not** exercise is the SSH transport,
+which is a difference worth naming rather than glossing.
+
+### What only running it could find
+
+| # |                             Defect                              |                                                              Why it survived review                                                              |
+|---|-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Preflight demanded podman **≥ 6.0** and `/usr/bin/pesto`        | Written while the pasta forwarder was the mechanism. ADR-0187 replaced it, and the assertion would have **refused the chosen platform outright** |
+| 2 | `containers.conf` still set `rootless_port_forwarder = "pasta"` | The one setting the IPv6 finding says must **not** be applied                                                                                    |
+| 3 | Eight read-only tasks lacked `check_mode: false`                | Ansible skips `command` in `--check`, so every assertion downstream compared against an empty string. **`--check` could never have worked**      |
+| 4 | `stdout_callback = yaml`                                        | Resolves to `community.general.yaml`, **removed** in community.general 12 — it aborts the run before the first task rather than degrading        |
+| 5 | No upper bound on `community.general`                           | 12.0 requires ansible-core ≥ 2.17; the platform ships 2.16.16                                                                                    |
+| 6 | `regex_search` with a capture group                             | Raised `'NoneType' object has no attribute 'group'`, which names neither the pattern nor the input                                               |
+| 7 | Three tasks read state that does not exist in `--check`         | A uid of an uncreated user, a `become` onto it, and `acl` not yet installed                                                                      |
+| 8 | The SCAP datastream was pinned to `ssg-cs10-ds.xml`             | CentOS's. Rocky ships `ssg-rl10-ds.xml` and `ssg-rhel10-ds.xml` and **neither of that name**                                                     |
+| 9 | `ansible.builtin.user` with `group:` does not create the group  | **Only the real run found this.** In `--check` the module never reaches the system call that would say *Group iri does not exist*                |
+
+Defects 1, 2 and 8 are the same failure in three places: the role was written for a platform and a
+mechanism that two decisions on the same day replaced. They are the cost of deciding quickly, and
+they were all caught before a host depended on them.
+
+Defect 3 is the more interesting one. A dry run that cannot work is worse than none, because its
+green result is read as evidence. This one reported six tasks `ok` while comparing assertions
+against empty strings.
+
+### What the run produced
+
+```
+PLAY RECAP
+testing : ok=46  changed=18  unreachable=0  failed=0  skipped=5
+```
+
+The datastream selection picked `ssg-rl10-ds.xml` on its own, and the scan reported
+`cis_server_l1: 166 passed, 124 failed` — the expected shape for a host that has not been remediated,
+since `basetool_hardening_remediate` defaults to **false**. The role scans and reports; it does not
+rewrite `sshd` behind the operator's back.
+
+haproxy is installed, configured and **enabled but not started**, which is deliberate: the role
+provisions a host that is not serving traffic yet, and a front end with no backend answers every
+request with a connection error for as long as the gap lasts.
+
+### The second pass, which is the actual point of the role
+
+```
+PLAY RECAP
+testing : ok=45  changed=0  unreachable=0  failed=0  skipped=5
+```
+
+**Zero.** Not one task reports a change on a re-run — stricter than expected, since `restorecon` and
+`semanage` tasks commonly report `changed` on every pass for want of a clean idempotence check.
+That is the property ADR-0186 was written to obtain: the testing host and the production host are
+built by the same procedure, and "the same procedure" only means anything if running it twice is a
+no-op.
+
+### Verified on the host afterwards, over a new connection
+
+A **new** SSH connection rather than the one that was already open — an existing session survives an
+`sshd` change that already blocks new logins, which is the same trap as measuring a container whose
+session has ended.
+
+|                   |                                                                               |
+|-------------------|-------------------------------------------------------------------------------|
+| access            | `sshd active`, login works                                                    |
+| service user      | `iri:992:992`, `/sbin/nologin`, lingering **yes**                             |
+| subordinate range | `iri:100000:65536`, uid and gid                                               |
+| `/var/iri`        | `iri:iri 755`, context `container_file_t`                                     |
+| front end         | `inactive / enabled`, config valid, separate v4 and v6 binds, `send-proxy-v2` |
+| port label        | `http_port_t` now carries 8080 and 8443                                       |
+| `containers.conf` | present, **0 setting lines**                                                  |
+
+**The derived-uid arithmetic is visible in the result**, which is the part worth looking at twice:
+`/var/iri/redis` came out `100998:100998` and `/var/iri/db-backend` `100069:100069` — base 100000
+plus the container uids 999 and 70. Not one of those numbers is written down anywhere in the role.
+
+> [!note] Two things that looked like findings and were not
+> The hardening report directory appeared empty. It is `root:root 750`, so listing it as the
+> unprivileged operator fails — the reports are there, 3.5 MB of HTML and 30 MB of ARF, and a
+> directory that hides which controls a host fails is the right shape for that content.
+>
+> And one failure looked like a role defect: re-extracting the tree removed the installed collection
+> with it, and the next run died on *couldn't resolve community.general.sefcontext*. The run script
+> installs the collection every time now. Worth recording because the message points squarely at the
+> role, and the cause was one directory above it.
+

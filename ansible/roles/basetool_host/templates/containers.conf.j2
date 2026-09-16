@@ -3,22 +3,24 @@
 #
 # Rationale: docs/PODMAN_HOST_BOOTSTRAP.md section 6.
 #
-# rootless_port_forwarder selects how published ports reach a container attached to a USER-DEFINED
-# BRIDGE network. The default, "rootlessport", is a userspace proxy that replaces the client's
-# source address with its own. Measured on 2026-09-16: two containers of the same image on the same
-# host, differing only in network mode -- on a bridge the container logged 10.89.0.2, the
-# forwarder; on pasta it logged the real client address.
+# THIS FILE CARRIES NO SETTINGS, ON PURPOSE, AND IS STILL WRITTEN. Podman's defaults are what this
+# host runs; the value of the file is the paragraph below, which answers the question a reader will
+# otherwise ask again in a year -- "shouldn't this set rootless_port_forwarder?" -- on the host,
+# where they are standing. An empty configuration file that explains its own emptiness is cheaper
+# than the experiment that re-discovers why.
 #
-# This deployment's edge sits on six bridge networks, and six things in its nginx configuration read
-# $remote_addr: the per-IP rate limiter (REQ-SEC-023), the ADR-0112 IPv6 /64 bucket key, the
-# Keycloak admin allow-list, the default-server allow-list, the API allow-list, and the access log
-# that is the only record of a refused request's origin. Five of those degrade without this setting.
-# One INVERTS: the admin allow-list names the bridge gateways, so with every client wearing the
-# forwarder's address it either admits the internet or locks the operator out.
+# rootless_port_forwarder is DELIBERATELY NOT SET here, and the omission is the decision.
 #
-# The option is EXPERIMENTAL and off by default upstream (Podman 6.0 release notes). That is a
-# standing risk recorded in ADR-0163, not a footnote -- which is why the acceptance asserts the
-# BEHAVIOUR, via scripts/check-conformance.py's client-address-visible check, rather than the
-# presence of this line.
-[network]
-rootless_port_forwarder = "{{ basetool_rootless_port_forwarder }}"
+# Setting it to "pasta" was the entire reason this migration first moved to a platform with podman 6.
+# Measured on 2026-09-16, that forwarder preserves the client address on IPv4 and delivers NO IPv6 at
+# all: the socket binds, the connection is reset, nothing reaches the container. Traced to podman
+# overriding the rootless namespace's IPv6 address with a ULA, so the host's global v6 address is not
+# local there and netavark's `fib daddr type local` DNAT chain is never entered.
+#
+# ADR-0187 recovers the client address a different way -- a host-level haproxy hands it to the edge
+# in a PROXY protocol header -- which needs no forwarder setting at all. The default, rootlessport,
+# is what runs, and the edge no longer cares what address it presents.
+#
+# If a future podman fixes the IPv6 path, turning this on is still not a free win: the edge would
+# then trust two sources for one fact. The acceptance is the BEHAVIOUR either way, via
+# scripts/check-conformance.py's client-address-visible check.

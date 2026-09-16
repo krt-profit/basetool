@@ -30,15 +30,17 @@ basetool_state_dir: /var/lib/iri
 basetool_token_dir: /etc/iri
 
 # --- the versions the migration actually depends on ----------------------------------------------
-# Asserted, not hoped for. Without pesto, published ports fall back to rootlessport and the edge
-# sees one client address for the entire internet -- silently, with every health check green.
-basetool_min_podman_major: 6
-basetool_require_pesto: true
-
-# --- containers.conf ------------------------------------------------------------------------------
-# The setting the whole migration turns on. Measured 2026-09-16: with rootlessport a container on a
-# user-defined bridge logged the forwarder's address; with pasta it logged the real client.
-basetool_rootless_port_forwarder: pasta
+# This floor used to be podman 6, because only there does `rootless_port_forwarder="pasta"` exist and
+# that was how the edge was to keep seeing real client addresses. ADR-0187 replaced that mechanism
+# with a host-level PROXY-protocol front end, after the pasta forwarder was measured on 2026-09-16 to
+# preserve the address on IPv4 and deliver NO IPv6 at all.
+#
+# So the floor is now about Quadlet, not about networking. 5.8 is where this stack's units were
+# measured to translate completely: `Memory=` exists (5.4.2 has it not, and a missing key makes
+# REQ-OPS-020's limits silent decoration), alongside `PidsLimit=`, `ReadOnly=`, `DropCapability=`,
+# `NoNewPrivileges=`, `AutoUpdate=` and `Notify=healthy`.
+basetool_min_podman_major: 5
+basetool_min_podman_minor: 8
 
 # --- SELinux ---------------------------------------------------------------------------------------
 # A permanent fcontext rule rather than :z/:Z on the mounts: it survives a relabel, it does not
@@ -95,7 +97,16 @@ basetool_service_user_dirs:
 # short version is that it is the only one of the four without fapolicyd, which would block every
 # rootless container, and its noexec targets do not include /home, where the container storage is.
 basetool_hardening_profile: xccdf_org.ssgproject.content_profile_cis_server_l1
-basetool_hardening_datastream: /usr/share/xml/scap/ssg/content/ssg-cs10-ds.xml
+# NOT one hard-coded path. scap-security-guide ships one datastream per distribution, and this
+# migration has already changed platform twice in a day -- a pinned cs10 path was simply wrong on
+# Rocky, which ships ssg-rl10-ds.xml and ssg-rhel10-ds.xml and neither of the other name. The role
+# takes the first candidate that exists; set basetool_hardening_datastream to override.
+basetool_hardening_datastream_candidates:
+  - /usr/share/xml/scap/ssg/content/ssg-rl10-ds.xml      # Rocky Linux 10
+  - /usr/share/xml/scap/ssg/content/ssg-cs10-ds.xml      # CentOS Stream 10
+  - /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml    # RHEL 10, and Rocky's fallback
+  - /usr/share/xml/scap/ssg/content/ssg-almalinux10-ds.xml
+basetool_hardening_datastream: ""
 
 # Scanning always happens; remediation does not. Applying a thousand rules to a host is a
 # deliberate act, and the scan report is what makes it an informed one. Set this true on a host you

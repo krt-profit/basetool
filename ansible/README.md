@@ -64,20 +64,23 @@ The controller cannot be Windows natively — use WSL or a container.
 
 ## What it asserts, and refuses to proceed without
 
-Two version facts, because the entire migration rests on them and both fail **silently** at runtime
-rather than loudly at install time:
+**Podman >= 5.8.** Not for networking -- that floor used to be 6.0, for
+`rootless_port_forwarder="pasta"`, and [ADR-0187](../docs/adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
+removed the need for it entirely. It is about **Quadlet**: measured 2026-09-16, podman 5.8.2 carries
+`Memory=`, `PidsLimit=`, `ReadOnly=`, `DropCapability=`, `NoNewPrivileges=`, `AutoUpdate=` and
+`Notify=healthy`, while 5.4.2 has no `Memory=` at all.
 
-- **podman ≥ 6.0.** `rootless_port_forwarder="pasta"` arrived there. Below it, published ports on
-  user-defined bridge networks go through `rootlessport`, which replaces the client's source
-  address with its own.
-- **`/usr/bin/pesto` present.** It ships in `passt` and is what that setting invokes. Without it
-  the setting has nothing to call and the fallback is the same one.
+That is the kind of gap worth an assertion because of **how** it fails: a Quadlet key that does not
+exist is not an error. The unit starts, the container runs, every health check passes -- and the
+memory limit measured for that service was simply never applied. The role therefore also reads the
+shipped `podman-systemd.unit(5)` and confirms `Memory=` is really documented there, because a
+distribution rebase can move that underneath a version number.
 
-Measured on 2026-09-16, which is why these are assertions rather than notes: on Debian 13 with
-podman 5.4.2, two containers of the same image on the same host differing only in network mode — a
-bridge container logged `10.89.0.2`, the forwarder; a pasta container logged the real client
-address. Rocky 10 and AlmaLinux 10 are EL 10 and will pass the distribution check; they ship
-podman 5.8.2 with no `pesto`, and the version assertion is what stops them.
+**`/usr/bin/pesto` is no longer required, and that is a change rather than an oversight.** It was
+asserted while the migration depended on the pasta forwarder. Measured on 2026-09-16, that forwarder
+preserves the client address on IPv4 and delivers **no IPv6 at all** -- so the deployment gets its
+client addresses from a host-level PROXY-protocol front end instead, which needs neither pesto nor
+podman 6. See the plan's section 13.
 
 ## Acceptance
 

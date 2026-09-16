@@ -45,19 +45,30 @@
     group: root
     mode: "0750"
 
-- name: Locate the datastream for this distribution
+- name: Look for every datastream this role knows about
   ansible.builtin.stat:
-    path: "{{ basetool_hardening_datastream }}"
-  register: basetool_datastream
+    path: "{{ item }}"
+  loop: "{{ basetool_hardening_datastream_candidates }}"
+  register: basetool_datastreams
+  changed_when: false
+  check_mode: false
 
-- name: Assert the datastream exists
+- name: Take the first one that exists
+  ansible.builtin.set_fact:
+    basetool_hardening_datastream: >-
+      {{ basetool_hardening_datastream
+         or (basetool_datastreams.results | selectattr('stat.exists') | map(attribute='item') | first | default('')) }}
+
+- name: Assert a datastream was found
   ansible.builtin.assert:
-    that: basetool_datastream.stat.exists
+    that: basetool_hardening_datastream | length > 0
     fail_msg: >-
-      {{ basetool_hardening_datastream }} is missing. scap-security-guide ships one datastream per
-      distribution; on CentOS Stream 10 it is ssg-cs10-ds.xml, and on RHEL 10 ssg-rhel10-ds.xml.
-      Set basetool_hardening_datastream rather than hardening against content written for a
-      different distribution.
+      None of {{ basetool_hardening_datastream_candidates | join(', ') }} exists on this host.
+      scap-security-guide ships ONE datastream per distribution, and hardening against content
+      written for a different one proves nothing about this host. Either the package is missing, or
+      this distribution names its file differently -- set basetool_hardening_datastream explicitly
+      rather than letting the scan run against the wrong content.
+    success_msg: "{{ basetool_hardening_datastream }}"
 
 # Always. A report that is only produced when somebody remembers to ask is a report nobody has.
 - name: Scan against the profile
@@ -79,8 +90,12 @@
   # a failure of this task.
   failed_when: basetool_scan.rc == 1
   changed_when: false
+  # NOT check_mode: false. The scan changes no configuration, but it WRITES a report and an
+  # ARF file -- and a --check run that leaves files behind is not a dry run. It is skipped
+  # there, and the summary below is skipped with it rather than reading an undefined var.
 
 - name: Summarise the scan
+  when: not ansible_check_mode
   ansible.builtin.debug:
     msg: >-
       {{ basetool_hardening_profile | regex_replace('^.*_profile_', '') }}:

@@ -52,6 +52,7 @@
   ansible.builtin.command: systemctl is-active haproxy
   register: basetool_haproxy_state
   changed_when: false
+  check_mode: false
   failed_when: false
 
 - name: Remember it for the reload handler

@@ -3,7 +3,7 @@
   ansible.builtin.dnf:
     name:
       - podman
-      - passt            # carries pasta AND pesto; pesto is what preserves the client address
+      - passt            # pasta: podman's rootless default network mode, and its dependency
       - netavark
       - aardvark-dns
       - crun
@@ -13,42 +13,72 @@
       - curl
       - jq
       - rsync
+      # Ansible needs setfacl to hand its temp files to an unprivileged become_user. Without it
+      # the fallback is `chmod A+user:iri:rx:allow`, which is NFSv4 syntax that GNU chmod
+      # rejects outright -- the run then dies with "Failed to set permissions on the temporary
+      # files Ansible needs", which reads like a permissions problem and is a missing package.
+      - acl
     state: present
 
 - name: Read the installed podman version
   ansible.builtin.command: podman --version
   register: basetool_podman_version_raw
   changed_when: false
+  check_mode: false
 
-- name: Extract the major version
+- name: Split the version
+  # `podman --version` prints "podman version 5.8.2". Taking the last field and splitting on dots
+  # beats a regex here: it is readable, it cannot return None, and a regex_search with a capture
+  # group raised 'NoneType' object has no attribute 'group' on ansible-core 2.16 when it did not
+  # match -- an error that says nothing about which pattern or which input.
   ansible.builtin.set_fact:
-    basetool_podman_major: >-
-      {{ basetool_podman_version_raw.stdout | regex_search('([0-9]+)\.', '\\1') | first | int }}
+    basetool_podman_parts: "{{ basetool_podman_version_raw.stdout.split()[-1].split('.') }}"
 
-- name: Assert podman is new enough to preserve the client source address
+- name: Refuse a version string this role cannot read
   ansible.builtin.assert:
-    that: basetool_podman_major | int >= basetool_min_podman_major | int
+    that: basetool_podman_parts | length >= 2
     fail_msg: >-
-      Found {{ basetool_podman_version_raw.stdout }}, need >= {{ basetool_min_podman_major }}.
-      rootless_port_forwarder="pasta" arrived in Podman 6.0. Below that, published ports on
-      user-defined bridge networks go through rootlessport, which replaces the client's address
-      with its own -- measured 2026-09-16 on Debian 13 / podman 5.4.2: a bridge container logged
-      10.89.0.2, the forwarder, while a pasta container logged the real client. The per-IP limiter
-      (REQ-SEC-023) then applies to the whole internet as one bucket and the Keycloak admin
-      allow-list stops discriminating. See PODMAN_MIGRATION_PLAN.md section 3.1.
+      Could not read a version out of '{{ basetool_podman_version_raw.stdout }}'. Everything below
+      compares numbers, and comparing against a value that was never parsed would pass silently.
+
+- name: Name the two numbers the assertions use
+  ansible.builtin.set_fact:
+    basetool_podman_major: "{{ basetool_podman_parts[0] | int }}"
+    basetool_podman_minor: "{{ basetool_podman_parts[1] | int }}"
+
+
+- name: Assert podman translates this stack's units completely
+  ansible.builtin.assert:
+    that:
+      - basetool_podman_major | int > basetool_min_podman_major | int or
+        (basetool_podman_major | int == basetool_min_podman_major | int and
+         basetool_podman_minor | int >= basetool_min_podman_minor | int)
+    fail_msg: >-
+      Found {{ basetool_podman_version_raw.stdout }}, need >=
+      {{ basetool_min_podman_major }}.{{ basetool_min_podman_minor }}. Measured 2026-09-16: podman
+      5.8.2 carries Memory=, PidsLimit=, ReadOnly=, DropCapability=, NoNewPrivileges=, AutoUpdate=
+      and Notify=healthy in podman-systemd.unit(5); 5.4.2 has no Memory= at all. A missing Quadlet
+      key does not fail the unit -- it is simply not applied, so the container runs without the
+      limit that was measured for it.
     success_msg: "{{ basetool_podman_version_raw.stdout }}"
 
-- name: Look for the pesto binary
-  ansible.builtin.stat:
-    path: /usr/bin/pesto
-  register: basetool_pesto
+# Belt and braces on the key that degrades silently rather than loudly. The version floor above is
+# the rule; this reads the shipped manual page and checks the rule still describes reality, which a
+# distribution rebase can quietly change underneath a version number.
+- name: Confirm Quadlet really carries Memory=
+  ansible.builtin.shell: >-
+    set -o pipefail && man podman-systemd.unit 2>/dev/null | col -b | grep -cE '^ +Memory='
+  register: basetool_quadlet_memory
+  changed_when: false
+  check_mode: false
+  failed_when: false
 
-- name: Assert pesto is present
+- name: Assert it, when the manual page could be read at all
   ansible.builtin.assert:
-    that: basetool_pesto.stat.exists
+    that: basetool_quadlet_memory.stdout | int > 0
     fail_msg: >-
-      /usr/bin/pesto is missing. It ships in passt and is what rootless_port_forwarder="pasta"
-      invokes; without it the setting in 50-podman.yml has nothing to call and published ports fall
-      back to rootlessport SILENTLY -- every container starts, every health check passes, and the
-      edge sees one client address for the entire internet. Requires passt >= 0:20260526.
-  when: basetool_require_pesto | bool
+      podman-systemd.unit(5) on this host does not document Memory=, although podman reports
+      {{ basetool_podman_version_raw.stdout }}. Either the manual page is absent, or this build's
+      Quadlet differs from the one measured -- and in the second case every Memory= line in the
+      generated units would be ignored without a word. Check by hand before proceeding.
+  when: basetool_quadlet_memory.stdout | int >= 0 and basetool_quadlet_memory.rc | int == 0

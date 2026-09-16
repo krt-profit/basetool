@@ -31,3 +31,4 @@
       fails, the deploy rolls back, and nothing says "label". Diagnose with
       `ausearch -m AVC -ts recent`, never by guessing, and never by setting SELinux permissive.
   changed_when: false
+  check_mode: false
