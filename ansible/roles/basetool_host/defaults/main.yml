@@ -132,3 +132,9 @@ basetool_frontend_timeout_connect: 5s
 basetool_frontend_timeout_client: 15m
 basetool_frontend_timeout_server: 15m
 basetool_manage_frontend: true
+
+# --- the host firewall ----------------------------------------------------------------------------
+# Default-deny in front of a host that publishes two ports to the internet is straightforwardly
+# right, and the CIS profile installs firewalld regardless. Set this false only on a host whose
+# packet filtering genuinely lives somewhere else -- and then say where.
+basetool_manage_firewall: true

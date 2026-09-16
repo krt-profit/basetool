@@ -18,6 +18,11 @@
       # rejects outright -- the run then dies with "Failed to set permissions on the temporary
       # files Ansible needs", which reads like a permissions problem and is a missing package.
       - acl
+      # A host firewall, installed on purpose. The CIS remediation pulls firewalld in as a
+      # dependency anyway -- but then it arrives unannounced, enabled, with a default zone
+      # that does not know about this stack, and the edge times out from every other machine
+      # while every check on the host stays green. Owning the decision is the difference.
+      - firewalld
     state: present
 
 - name: Read the installed podman version

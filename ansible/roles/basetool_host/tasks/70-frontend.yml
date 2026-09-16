@@ -85,3 +85,55 @@
       healthy. The edge must carry EDGE_TRUSTED_PROXY={{ basetool_edge_trusted_proxy }} in its
       environment, or its listeners stay plain and the PROXY header this front end sends will be
       rejected.
+
+# --- the firewall the hardening profile brings with it ---------------------------------------------
+#
+# MEASURED 2026-09-16, and it is the reason this section exists: this host had no firewalld at all in
+# the morning. The CIS remediation INSTALLS it, enables it, and leaves the default `public` zone
+# allowing ssh, cockpit and dhcpv6-client -- and nothing else. After the reboot, :80 and :443 were
+# listening locally and timed out from another machine.
+#
+# That is the exact failure the hardening section warns about in words: an oscap report showing a
+# perfect score on a host whose edge is unreachable. Every health check inside the host stays green,
+# because every health check inside the host is inside the host.
+#
+# So the ports are opened explicitly, here, next to the service that binds them -- not left to
+# whoever notices the outage.
+
+- name: Is firewalld in the way?
+  ansible.builtin.command: systemctl is-active firewalld
+  register: basetool_firewalld
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Open the ports the front end binds
+  when: basetool_firewalld.stdout | trim == 'active'
+  block:
+    - name: Ask firewalld what it already allows
+      ansible.builtin.command: "firewall-cmd --permanent --query-port={{ item.public }}/tcp"
+      loop: "{{ basetool_frontend_ports }}"
+      register: basetool_fw_query
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Allow them permanently
+      ansible.builtin.command: "firewall-cmd --permanent --add-port={{ item.item.public }}/tcp"
+      loop: "{{ basetool_fw_query.results }}"
+      loop_control:
+        label: "{{ item.item.public }}/tcp"
+      when: item.stdout | trim != 'yes'
+      register: basetool_fw_added
+
+    - name: Load the new rules
+      ansible.builtin.command: firewall-cmd --reload
+      when: basetool_fw_added is changed
+
+    - name: Say what the front end can now be reached on
+      ansible.builtin.debug:
+        msg: >-
+          The front end's ports are open in firewalld:
+          {{ basetool_frontend_ports | map(attribute='public') | join(', ') }}/tcp. Nothing else the
+          stack publishes is, and nothing else should be -- the container ports are on loopback by
+          design (ADR-0187).

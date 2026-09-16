@@ -39,6 +39,11 @@
   when: basetool_manage_hardening | default(true) | bool
   tags: [hardening]
 
+- name: The host firewall, and what it deliberately does not allow
+  ansible.builtin.import_tasks: 65-firewall.yml
+  when: basetool_manage_firewall | default(true) | bool
+  tags: [firewall]
+
 - name: The L4 front end that gives the edge back the client address
   ansible.builtin.import_tasks: 70-frontend.yml
   when: basetool_manage_frontend | default(true) | bool

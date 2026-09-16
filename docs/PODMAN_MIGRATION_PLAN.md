@@ -1929,11 +1929,10 @@ about its own run rather than describing a host that needed nothing.
 > Reading those numbers back took two attempts, and both failures are worth writing down because
 > they are the cheapest kind to repeat.
 >
-> `grep -oE 'Result +[a-z]+'` found **nothing** in a 1299-line result log: `oscap` separates the
-> word from the value with a **tab**, and the pattern demanded a space. An empty result read as "the
->
->> scan produced nothing". The role's own expression uses `\s` and was never affected — it was the
->> ad-hoc check that lied.
+> `grep -oE 'Result +[a-z]+'` found **nothing** in a 1299-line result log. `oscap` separates the
+> word from the value with a **tab**, and the pattern demanded a space, so an empty result read as
+> though the scan had produced nothing at all. The role's own expression uses `\s` and was never
+> affected — it was the ad-hoc check that lied.
 >
 > And `pgrep -f 'oscap xccdf eval'`, run inline over ssh, reported the scan as still running for
 > more than ten minutes after it had finished: **the pattern matched the checking command's own
@@ -1996,4 +1995,110 @@ explicitly rather than trusting the report:
 |----------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `tmp.mount`                      | **`disabled`** | CIS wants `/tmp` as its own filesystem; the usual fix enables this unit, which does nothing until the next boot and then mounts `/tmp` `noexec`                |
 | `auditd admin_space_left_action` | **`SUSPEND`**  | `halt` there is a mechanism by which the host switches itself off when the audit partition fills — in three weeks, when nobody is looking at the hardening run |
+
+## 18. The reboot, and the firewall nobody asked for — 2026-09-16
+
+The reboot was the second dangerous moment, because mount options and boot parameters only take
+effect there. It was clean:
+
+|                  |                                                                 |
+|------------------|-----------------------------------------------------------------|
+| boot             | 19:00:32 UTC, eight seconds after the trigger                   |
+| failed units     | **0**                                                           |
+| `sshd`, `auditd` | active                                                          |
+| SELinux          | Enforcing                                                       |
+| lingering        | still on                                                        |
+| `tmp.mount`      | **still `disabled`** — the boot trap did not fire               |
+| `/dev/shm`       | gained `nosuid,nodev,noexec` — a hardening that did take effect |
+
+### And then: `:80` and `:443` timed out from another machine
+
+`haproxy` was `active`, listening on both ports and both families. Locally everything looked right.
+From a second machine, both ports timed out.
+
+> [!warning] That probe did not prove what it was used for, and the real one is thirty seconds long
+> A high-level HTTP client cannot tell a refused connection from one that was accepted and then
+> produced nothing — it reports both the same way — and `haproxy` with no backend behind it is the
+> second case. So the timeout was *consistent with* a block and could not establish one. Only
+> firewalld's configuration could, and a configuration is an argument rather than a measurement.
+>
+> Settled by removing the rule again, from the **runtime only**, and probing the TCP handshake
+> separately from HTTP:
+>
+> |               |     TCP handshake      |                            HTTP                            |
+> |---------------|------------------------|------------------------------------------------------------|
+> | with the rule | **connects**           | `curl-exit 52` — empty reply, i.e. haproxy with no backend |
+> | without it    | **refused / filtered** | `curl-exit 7`                                              |
+>
+> So firewalld really does drop `:80` when nothing allows it, and the finding stands — now on a
+> measurement rather than on an inference. The same probe showed `:8080`, the edge container's
+> published port, **refused from outside**, which is ADR-0187's invariant holding.
+>
+> [!danger] The CIS remediation **installs firewalld**, and its default zone does not know about this
+> stack
+>
+> ```
+> firewalld  active / enabled,  default zone: public
+> services   cockpit  dhcpv6-client  ssh
+> ports      (none)
+> ```
+>
+> This host had **no firewalld at all** earlier the same day — measured, while chasing an unrelated
+> problem, and ruled out as a cause. The remediation brought it in as a dependency, enabled it, and
+> left the `public` zone allowing three things, none of which is the application.
+>
+> After the reboot the edge would have been unreachable from the internet, **and every health check
+> on the host would have stayed green** — because every health check on the host is on the host.
+
+That is, word for word, the failure the role's own hardening section warns about: *an oscap report
+will happily show a perfect score on a host whose edge is down.* The sentence was written before the
+run and did not prevent it; only probing from a different machine did.
+
+### The answer is not to avoid the firewall — it is to stop getting one by accident
+
+The first reaction to this was to treat firewalld as damage. That framing is wrong, and @greluc said
+so: **a default-deny packet filter in front of a host that publishes two ports to the internet is
+straightforwardly right**, and getting one for free is a gain. The defect was never that a firewall
+appeared. It was that it appeared *unannounced*, configured by a profile that knows nothing about
+this stack, on a host whose own checks cannot see the difference.
+
+So the role now owns it:
+
+- **`firewalld` is installed explicitly** (`10-packages.yml`) rather than arriving as a dependency of
+  a remediation that may or may not be enabled. It is present either way, and it is a decision.
+- **`65-firewall.yml`** enables it, reads the default zone, and states the policy in its own output.
+- **`70-frontend.yml` opens the front end's two ports**, beside the service that binds them —
+  guarded on firewalld being active, idempotent via `--query-port`. A port list that lives away from
+  the service it serves drifts from it.
+
+The resulting policy, stated rather than inferred:
+
+|                              |                                                                                                                                                                                   |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| open                         | `ssh`, and `:80` / `:443` for the front end                                                                                                                                       |
+| **closed, and deliberately** | everything else the stack publishes — because it publishes on **loopback**. The edge binds `127.0.0.1` and `[::1]` only, which is exactly what makes its PROXY header unforgeable |
+
+Two judgement calls are written down rather than left in the diff. **`cockpit` is removed from the
+zone**: it is a root-privileged administration web UI, the default zone permits it whether or not it
+is installed, and that is an open door waiting for someone to install the thing behind it.
+**`dhcpv6-client` is left alone**: this host takes IPv6 by SLAAC so the rule is *probably*
+unnecessary — and "probably" is doing the work in that sentence, while the failure mode of being
+wrong is a host that silently loses its IPv6 address at the next lease event.
+
+> [!note] And one more of the day's pattern, in the fix itself
+> The first version of the reporting task used `lookup('pipe', 'firewall-cmd --get-default-zone')`.
+> **`lookup` runs on the control node**, not on the target — and the control node is a WSL Ubuntu
+> with no `firewall-cmd`. The run failed at the very last task, after correctly opening both ports.
+> A lookup reads the machine you are sitting at; a `command` reads the machine you are configuring.
+
+### Two attributions corrected before they were written down
+
+**The kernel changed across the reboot** — `6.12.0-211.16.1` to `211.54.1` — and the remediation was
+the obvious suspect. The dnf history says otherwise: `kernel-core 211.54.1` was installed at 17:08,
+during the hypervisor operator's `dnf update` when building the VM, *before* the snapshot. The
+machine simply had not rebooted since. Neither the remediation's doing nor a problem.
+
+**The host answered five seconds after the reboot was triggered**, which looked far too fast to be a
+real reboot. `uptime -s` said `19:00:32` and `uptime -p` said `up 0 minutes`: it really is that
+quick. The suspicion was wrong, and checking was still right — that is only knowable afterwards.
 
