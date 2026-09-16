@@ -7,7 +7,10 @@ StartLimitIntervalSec=0
 [Container]
 Image=quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
 ContainerName=keycloak
+ReadOnly=true
 DropCapability=ALL
+Tmpfs=/opt/keycloak/lib/quarkus:rw,tmpcopyup
+Tmpfs=/opt/keycloak/data/transaction-logs:rw
 NoNewPrivileges=true
 Network=net-db-keycloak.network
 Network=net-proxy-keycloak.network

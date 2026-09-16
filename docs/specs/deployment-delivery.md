@@ -374,21 +374,26 @@ re-verified on every image bump** of that service before the bump is promoted (a
 healthcheck passing). The deploy health-gate is the safety net: a wrong cap set fails the container
 at start and is rolled back rather than shipped.
 
-**A read-only root filesystem is part of the baseline under Quadlet, with one recorded exception**
-([ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md)). Seventeen of the eighteen
-units carry it. Earlier revisions of this requirement said the opposite — *the JVM and DB working
-dirs write across the filesystem* — and that was never measured; when it was, on 2026-09-16, it was
-wrong in both halves. A healthy Spring Boot module writes Tomcat's work directory, its docbase and
-the JVM perf data, all three under `/tmp`, and nothing else; its own source contains no filesystem
-write API at all. Nine of the ten third-party images write nothing outside their mounts or write
-only under `/tmp`. **No `Tmpfs=` entry was needed anywhere**, because Podman mounts `/run`, `/tmp`
-and `/var/tmp` itself under `--read-only` and copies the image's content up into them — which
-**Docker does not do**, and is why this lives in the Quadlet units rather than in the compose file.
+**A read-only root filesystem is part of the baseline under Quadlet** — all eighteen units
+([ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md)). Earlier revisions of this
+requirement said the opposite — *the JVM and DB working dirs write across the filesystem* — and that
+was never measured; when it was, on 2026-09-16, it was wrong in both halves. A healthy Spring Boot
+module writes Tomcat's work directory, its docbase and the JVM perf data, all three under `/tmp`,
+and nothing else; its own source contains no filesystem write API at all. Nine of the ten
+third-party images write nothing outside their mounts or write only under `/tmp`. **No `Tmpfs=`
+entry was needed for any of them**, because Podman mounts `/run`, `/tmp` and `/var/tmp` itself under
+`--read-only` and copies the image's content up into them — which **Docker does not do**, and is why
+this lives in the Quadlet units rather than in the compose file.
 
-The exception is **`keycloak`**: `kc.sh start` without `--optimized` re-augments the Quarkus
-application into `/opt/keycloak/lib` at every boot (476 paths, measured), and that rebuild is
-required because the SPI provider arrives as a JAR mounted in at deploy time. Making it read-only
-means changing how the provider is delivered, which is a separate decision.
+**`keycloak` needs one `Tmpfs=` to get there, and it is the entry that has to be re-verified on
+every image bump.** `kc.sh start` without `--optimized` re-augments the Quarkus application at every
+boot, which plain read-only stops dead. A tmpfs over the 4.7M directory it rewrites — with
+`tmpcopyup`, so the image content is present — lets it start ready with the real SPI provider
+compiled in, at a measured 466M of its 2560M limit. That keeps [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)
+intact: the provider JAR stays its own promotable artifact, a provider-only change still
+auto-applies, and the rollback stays at JAR level. Baking the provider into a custom image and
+running `start --optimized` would buy the same property by making every provider change an
+operator-gated image rebuild.
 
 Under Docker, `read_only: true` remains required of `edge` specifically — `tmpfs` for nginx's temp
 paths and `/var/cache/nginx`, which Podman does **not** supply either — because that service exists

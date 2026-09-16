@@ -288,10 +288,9 @@ case "$cmd" in
     # one invocation for every app container at once; docker prints names with a leading slash
     for n in edge acme keycloak backend frontend ingest db-backend db-keycloak redis; do
       ro=true
-      [ "$n" = keycloak ] && ro=false
       case "$scenario" in
         writable-edge)     [ "$n" = edge ] && ro=false ;;
-        keycloak-readonly) [ "$n" = keycloak ] && ro=true ;;
+        writable-keycloak) [ "$n" = keycloak ] && ro=false ;;
         ro-container-gone) [ "$n" = redis ] && continue ;;
       esac
       printf '/%s|%s\n' "$n" "$ro"
@@ -552,7 +551,7 @@ assert_status "client-address-visible passes" client-address-visible pass "203.0
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 assert_status "containers-running passes" containers-running pass "up and healthy" -- "${STUB_ARGS[@]}"
 assert_status "containers-unprivileged passes" containers-unprivileged pass "redis=999" -- "${STUB_ARGS[@]}"
-assert_status "containers-read-only passes" containers-read-only pass "keycloak exempt" -- "${STUB_ARGS[@]}"
+assert_status "containers-read-only passes" containers-read-only pass "all 9 app containers" -- "${STUB_ARGS[@]}"
 # The same three containers on a ROOTLESS host, where each uid arrives as a subuid. Green only if
 # the uid_map translation works -- the half of this check a Docker-shaped stub cannot exercise, and
 # the half the migration depends on.
@@ -597,10 +596,11 @@ STUB_SCENARIO=db-wrong-uid assert_status "containers-unprivileged fails on a uid
 STUB_SCENARIO=uid-unreadable assert_status "containers-unprivileged fails rather than passes when the uid cannot be read" containers-unprivileged fail "could not read" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=container-gone assert_status "containers-unprivileged fails when the container is not running at all" containers-unprivileged fail "not running" -- "${STUB_ARGS[@]}"
 
-# Read-only is a posture, so both directions are findings: a container that lost it, and the one
-# recorded exception gaining it -- which would mean the record is stale rather than the host wrong.
+# keycloak is in the list like everything else. It took a tmpfs over the one directory its start-time
+# re-augmentation rewrites to get there, so it is the entry most likely to be quietly dropped on an
+# image bump -- which is exactly why it has a scenario of its own.
 STUB_SCENARIO=writable-edge assert_status "containers-read-only fails on a writable root filesystem" containers-read-only fail "writable root filesystem" -- "${STUB_ARGS[@]}"
-STUB_SCENARIO=keycloak-readonly assert_status "containers-read-only fails when the recorded exception is no longer one" containers-read-only fail "recorded as the one that cannot be" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=writable-keycloak assert_status "containers-read-only fails on keycloak, which needed a tmpfs to get there" containers-read-only fail "writable root filesystem" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=ro-container-gone assert_status "containers-read-only fails when a container is absent rather than passing it over" containers-read-only fail "says nothing" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=container-absent assert_status \
   "containers-running fails on a missing container" \

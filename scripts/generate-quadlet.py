@@ -138,13 +138,25 @@ ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "default
 # that still runs them. What was measured is podman's behaviour, so it is expressed where podman
 # reads it.
 #
-# `keycloak` is deliberately absent, and section 21 records why: `kc.sh start` without
-# `--optimized` re-augments the Quarkus application into /opt/keycloak/lib at every boot -- 476
-# paths, measured -- and read-only stops it dead with
-# `FileSystemException: /opt/keycloak/lib/quarkus/transformed-...`. That is not a missing tmpfs:
-# the augmentation is REQUIRED here, because the Keycloak SPI provider arrives as a JAR mounted
-# into /opt/keycloak/providers at deploy time. Read-only for keycloak means changing how that
-# provider is delivered, which is a separate decision.
+# `keycloak` is here too, and it took two passes to get right. `kc.sh start` without `--optimized`
+# re-augments the Quarkus application at every boot, and plain read-only stops it dead with
+# `FileSystemException: /opt/keycloak/lib/quarkus/transformed-...`. The first reading of that was
+# that keycloak simply cannot be read-only. It was wrong on both halves:
+#
+#   * podman's tmpfs takes `tmpcopyup`, so the image content IS present under the mount; and
+#   * the augmentation is ALREADY thrown away -- it lands in the container's writable layer and is
+#     redone at every start -- so a tmpfs has exactly the lifetime it already had.
+#
+# Measured with the real SPI provider JAR staged the way deploy.sh stages it: read-only plus a
+# tmpfs over `lib/quarkus` alone -- 4.7M of the 172M tree -- comes up ready, and the augmentation
+# compiles the provider in (generated-bytecode.jar differs by 768 bytes against an empty
+# providers/, same configuration, one variable). The 476 paths podman diff reported across `lib/`
+# were overlay metadata, not writes.
+#
+# This keeps ADR-0055 intact, which is the point: the provider JAR stays its own signed promotable
+# artifact, a provider-only change still auto-applies and still recreates only keycloak, and the
+# rollback is still JAR-level. Baking the provider into a custom image and running
+# `start --optimized` would buy the same read-only property by dismantling all of that.
 READ_ONLY: dict[str, dict[str, Any]] = {
     "prometheus": {},
     "loki": {},
@@ -162,6 +174,8 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "postgres-exporter-keycloak": {},
     "redis-exporter": {},
     "acme": {},
+    "keycloak": {"tmpfs": ["/opt/keycloak/lib/quarkus:rw,tmpcopyup",
+                           "/opt/keycloak/data/transaction-logs:rw"]},
     "backend": {},
     "frontend": {},
     "ingest": {},
@@ -598,6 +612,10 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
             container.append(f"DropCapability={cap}")
         for cap in spec.get("cap_add", []) or []:
             container.append(f"AddCapability={cap}")
+        for entry in READ_ONLY.get(service, {}).get("tmpfs") or []:
+            # The one or two paths a read-only service still has to write. Compose's own `tmpfs:`
+            # is emitted below; these exist only because the root filesystem became read-only.
+            container.append(f"Tmpfs={entry}")
         for key, value in (READ_ONLY.get(service, {}).get("environment") or {}).items():
             # A literal value, set because the unit is read-only -- it never belongs in the host's
             # .env, and it is not a secret, so it is written into the unit rather than routed

@@ -98,14 +98,6 @@ UNPRIVILEGED_CONTAINERS = {
     "redis": 999,
 }
 
-#: Containers whose root filesystem must be read-only, and the one that cannot be.
-#: Measured service by service (PODMAN_MIGRATION_PLAN.md section 21, ADR-0190). `keycloak` is
-#: absent on purpose: `kc.sh start` without `--optimized` re-augments the Quarkus application into
-#: /opt/keycloak/lib at every boot, which read-only stops dead -- and the augmentation is required
-#: because the SPI provider arrives as a JAR mounted in at deploy time.
-#: Written out here rather than derived, for the same reason as UNPRIVILEGED_CONTAINERS.
-READ_ONLY_EXEMPT = ("keycloak",)
-
 EXPECTED_APP_CONTAINERS = (
     "edge",
     "acme",
@@ -1024,7 +1016,7 @@ def check_containers_unprivileged(ctx: Context) -> str:
 
 
 def check_containers_read_only(ctx: Context) -> str:
-    """Every app container but the recorded exception runs on a read-only root filesystem.
+    """Every app container runs on a read-only root filesystem.
 
     Read-only is not defence in depth here so much as a statement about what the image is allowed
     to become: a container that cannot rewrite its own installation cannot be persistently
@@ -1038,8 +1030,11 @@ def check_containers_read_only(ctx: Context) -> str:
     an explicit tmpfs -- and why this is expressed in the Quadlet units rather than in the compose
     file, since Docker does not do that.
 
-    ``keycloak`` is exempt and the exemption is asserted rather than assumed: if it ever becomes
-    read-only, that is a change worth noticing, not a silent improvement.
+    ``keycloak`` needed two passes. Plain read-only stops its start-time Quarkus re-augmentation
+    dead, and the first reading of that was that it could not have a read-only root filesystem at
+    all. A tmpfs over the one directory it rewrites -- with ``tmpcopyup``, so the image content is
+    there -- costs 4.7M and works, because that augmentation was already being thrown away at
+    every start.
 
     Args:
         ctx: the run context.
@@ -1049,8 +1044,7 @@ def check_containers_read_only(ctx: Context) -> str:
 
     Raises:
         Skip: when no host access is configured.
-        CheckFailed: when a container that should be read-only is not, when one cannot be read,
-            or when the exempt container has become read-only without the record being updated.
+        CheckFailed: when a container is not read-only, or when one cannot be read at all.
     """
     out = ctx.runner.run(
         'docker inspect --format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" '
@@ -1066,22 +1060,15 @@ def check_containers_read_only(ctx: Context) -> str:
     verified = 0
     for name in EXPECTED_APP_CONTAINERS:
         value = state.get(name)
-        exempt = name in READ_ONLY_EXEMPT
         if value is None:
             problems.append(f"{name}: no container, so its root filesystem says nothing")
-        elif exempt and value == "true":
-            problems.append(
-                f"{name} is read-only, and it is recorded as the one that cannot be. Either the "
-                "record is stale or something else changed -- both are worth reading before this "
-                "check is edited to agree with the host")
-        elif not exempt and value != "true":
+        elif value != "true":
             problems.append(f"{name} has a writable root filesystem")
-        elif not exempt:
+        else:
             verified += 1
     if problems:
         raise CheckFailed("; ".join(problems))
-    return (f"{verified} of {len(EXPECTED_APP_CONTAINERS)} app containers read-only; "
-            f"{', '.join(READ_ONLY_EXEMPT)} exempt as recorded")
+    return f"all {verified} app containers on a read-only root filesystem"
 
 
 def check_container_metrics(ctx: Context) -> str:

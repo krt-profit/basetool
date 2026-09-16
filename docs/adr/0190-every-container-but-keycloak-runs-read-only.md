@@ -1,13 +1,21 @@
-# ADR-0190 — Every container but Keycloak runs on a read-only root filesystem
+# ADR-0190 — Every container runs on a read-only root filesystem
 
 - **Status:** Accepted
 - **Date:** 2026-09-16
 - **Deciders:** @greluc (the decision), Claude (measurement and analysis)
 - **Related:** [ADR-0189](0189-stateful-containers-run-as-their-own-uid.md) ·
   [ADR-0163](0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) ·
+  [ADR-0055](0055-keycloak-spi-jar-as-promotable-oci-artifact.md) ·
   [ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) ·
   specs `REQ-OPS-014` ·
   [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md) §21
+
+> [!important] Corrected the same day it was written — the file name keeps the original spelling
+> The first version of this ADR was titled *"Every container **but Keycloak**"* and recorded
+> Keycloak as unable to have a read-only root filesystem at all. That was wrong, and it was wrong
+> because of a measurement that was not taken rather than one that misled. The correction and its
+> evidence are under *Keycloak took two passes* below. The file name is unchanged so no link
+> breaks.
 
 ## Context
 
@@ -25,9 +33,9 @@ wrong about both halves.
 filesystems with no capabilities at all.
 
 **Neither do the JVM modules.** Their own source contains **no filesystem write API whatsoever** —
-no `new File`, no `Files.*`, no `FileOutputStream`, no `createTempFile`. The only writer is
-logback, whose path is relative to `/app` and therefore inside the log directory that is already
-mounted. Measured against the built images, a **healthy** Spring Boot service — `ingest`, up and
+no `new File`, no `Files.*`, no `FileOutputStream`, no `createTempFile`. The only writer is logback,
+whose path is relative to `/app` and therefore inside the log directory that is already mounted.
+Measured against the built images, a **healthy** Spring Boot service — `ingest`, up and
 `health=healthy` on a read-only root filesystem — writes exactly three things:
 
 ```
@@ -46,7 +54,7 @@ Of the ten third-party images, nine write nothing outside their mounts or write 
 
 ## Decision
 
-**Every container gets `ReadOnly=true` except `keycloak`.** Seventeen of the eighteen units.
+**Every container gets `ReadOnly=true`.** Eighteen of eighteen units.
 
 **It is a Quadlet-side table, not `read_only: true` in the compose file.** That is not stylistic:
 **Docker does not mount those three tmpfs** — Podman's `--read-only` does and Docker's does not. The
@@ -54,28 +62,65 @@ same line in the compose file would break most of these services on the Docker h
 them. What was measured is Podman's behaviour, so it is expressed where Podman reads it. The table
 sits beside `FRONT_END` and `RUN_AS`, which exist for the same reason.
 
-**`keycloak` is exempt, and the exemption is structural rather than a missing tmpfs.** `kc.sh start`
-without `--optimized` **re-augments the Quarkus application into its own installation directory** at
-every boot: 476 paths under `/opt/keycloak/lib`, measured, plus `/opt/keycloak/data/transaction-logs`.
-Read-only stops it dead with `FileSystemException: /opt/keycloak/lib/quarkus/transformed-…`.
+**`keycloak` gets two tmpfs entries with it**, and nothing else changes about how it is delivered:
 
-That augmentation is **required here**. The Keycloak SPI provider arrives as a JAR mounted into
-`/opt/keycloak/providers` at deploy time, and a provider that appears at runtime is exactly what
-forces the re-augmentation. Making Keycloak read-only means baking the provider into a custom image
-and running `start --optimized` — which changes how the provider is delivered and promoted. That is
-a separate decision with its own trade-offs, and it is not made here.
+```ini
+Tmpfs=/opt/keycloak/lib/quarkus:rw,tmpcopyup
+Tmpfs=/opt/keycloak/data/transaction-logs:rw
+```
 
-**Grafana gets one literal environment variable with it.** Its background installer tries to refresh
-a *bundled* plugin inside its own installation directory and logs
+**Grafana gets one literal environment variable.** Its background installer tries to refresh a
+*bundled* plugin inside its own installation directory and logs
 `unlinkat /usr/share/grafana/data/plugins-bundled/elasticsearch: read-only file system` at every
 start. Grafana serves regardless — measured, `HTTP 200` on `/login` — but an error line per boot is
 what the log-based alerting reads. `GF_PLUGINS_PREINSTALL_DISABLED=true` removes it, measured both
 ways, and changes nothing this deployment uses: the datasources are provisioned from files and
 Elasticsearch is not one of them. It also removes an outbound call at every start.
 
-**The conformance suite asserts the posture in both directions.** `containers-read-only` fails on a
-container that should be read-only and is not, **and** on `keycloak` becoming read-only — because
-that would mean this record is stale, which is worth reading rather than quietly agreeing with.
+**The conformance suite asserts the posture on a running host.** `containers-read-only` fails on any
+app container with a writable root filesystem, and carries a scenario for `keycloak` specifically,
+because it is the entry most likely to be quietly dropped on an image bump.
+
+## Keycloak took two passes, and the first was a wrong conclusion from a real failure
+
+`kc.sh start` without `--optimized` **re-augments the Quarkus application at every boot**. Plain
+read-only stops that dead:
+
+```
+Caused by: java.nio.file.FileSystemException: /opt/keycloak/lib/quarkus/transformed-…
+```
+
+The first reading of that was **Keycloak cannot be read-only**, with a tmpfs refused on the grounds
+that it *"hides the installation the augmentation is meant to produce, and what survives a restart
+would be whatever the tmpfs happened to hold."* Both halves of that were wrong:
+
+- **Podman's tmpfs takes `tmpcopyup`**, so the image's content is present under the mount. Measured:
+  the directory has its entries, and the mount is a tmpfs.
+- **The augmentation is already thrown away.** It lands in the container's writable layer and is
+  redone at every start — Keycloak says so itself: *Updating the configuration and installing your
+  custom providers*. A tmpfs has exactly the lifetime it already had. Nothing was being preserved
+  that a tmpfs takes away.
+
+Measured with the **real SPI provider JAR**, staged `0644` into `/opt/keycloak/providers` the way
+`deploy.sh` stages it:
+
+|                      Arm                       |  Ready  | cgroup of 2560M |
+|------------------------------------------------|---------|-----------------|
+| writable, provider present                     | yes     | 991M            |
+| read-only, no tmpfs                            | **no**  | —               |
+| read-only + tmpfs over `lib`, 172M             | yes     | 630M            |
+| **read-only + tmpfs over `lib/quarkus`, 4.7M** | **yes** | **466M**        |
+
+The narrow mount is enough: the 476 paths `podman diff` reported across `lib/` were overlay
+metadata, not writes. And the provider is genuinely compiled in rather than skipped — same
+configuration, one variable, `generated-bytecode.jar` **768 bytes larger** with the JAR present than
+against an empty `providers/`.
+
+> [!important] What this preserves is ADR-0055, and that is the point
+> The provider JAR stays its own cosign-signed promotable artifact. A provider-only change still
+> **auto-applies**, still recreates **only** keycloak, and still rolls back at **JAR level**. The
+> start-time rebuild that read-only appeared to forbid is the mechanism that delivery depends on,
+> and it keeps running — into a tmpfs.
 
 ## Alternatives considered
 
@@ -83,39 +128,45 @@ that would mean this record is stale, which is worth reading rather than quietly
 so every service that writes to `/tmp` would need an explicit `tmpfs:` entry to keep the Docker host
 working — a set of entries that exist only to compensate for a runtime the stack is leaving.
 
-**Give Keycloak a tmpfs over `/opt/keycloak/lib`.** Refused: that hides the installation the
-augmentation is meant to produce, and what survives a restart would be whatever the tmpfs happened
-to hold. It would look like it worked.
+**Bake the SPI provider into a custom Keycloak image and run `start --optimized`.** This is what the
+upstream documentation points at, and it is **refused** here. It buys the same read-only property by
+dismantling ADR-0055: a provider-only change would become a Keycloak **image** rebuild, and an image
+change is operator-gated by the `REQ-OPS-006` carve-out, so it would no longer auto-apply and would
+no longer roll back at JAR level. It also means owning a Keycloak image against upstream CVEs. The
+only thing it adds over the tmpfs is a faster start, and that is not worth a delivery path.
 
-**Bake the SPI provider into a custom Keycloak image and run `start --optimized`.** Not refused —
-deferred. It is the only real route to a read-only Keycloak, and it is a change to the promotion
-path (`REQ-OPS-003`), not a hardening flag.
+**A tmpfs over the whole of `/opt/keycloak/lib`.** Works — measured — but costs 172M of RAM to hold
+a tree of which 4.7M is ever written. The narrow mount is the same property for 3% of the memory.
 
-**Drop the `tmpfs:` entries `edge` carries, now that Podman provides them.** Refused, and only one
-of the two would have been safe to drop anyway: `edge` mounts `/tmp` — which Podman does supply —
-and **`/var/cache/nginx`, which it does not**. Podman covers `/run`, `/tmp` and `/var/tmp` and
-nothing else, so a service writing anywhere else still needs its own entry. `/tmp` stays as well,
-because it is what makes the requirement legible to a reader who does not know the defaults.
+**Leave Keycloak writable.** Refused once the tmpfs was measured: the identity provider is the worst
+container to leave modifiable within its own lifetime, and containers here live for weeks.
+
+**Drop the `tmpfs:` entries `edge` carries, now that Podman provides them.** Refused, and only one of
+the two would have been safe to drop anyway: `edge` mounts `/tmp` — which Podman does supply — and
+**`/var/cache/nginx`, which it does not**. Podman covers `/run`, `/tmp` and `/var/tmp` and nothing
+else, so a service writing anywhere else still needs its own entry. `/tmp` stays as well, because it
+is what makes the requirement legible to a reader who does not know the defaults.
 
 **Assert the posture by reading the unit files instead of the running host.** Refused for the same
 reason as ADR-0189's uid check: a unit file records what was asked for.
 
 ## Consequences
 
-- Seventeen of eighteen containers cannot rewrite their own installation. Whatever gets inside one
-  is gone at the next restart, and the image is the image.
-- No `Tmpfs=` line was needed anywhere. That is a Podman property, and it is written down in the
-  generator so the next reader does not spend the afternoon rediscovering it.
-- **Keycloak stays writable, and the reason is recorded where somebody will look for it** — in the
-  generator's table, in the conformance suite's exemption, and here. An unexplained exception is how
-  a posture quietly becomes a suggestion.
-- An image bump that starts writing to its own root filesystem now fails at deploy time, where
-  `REQ-OPS-003`'s health gate rolls it back, rather than succeeding and drifting.
+- Eighteen of eighteen containers cannot rewrite their own installation. Whatever gets inside one is
+  gone at the next restart, and the image is the image.
+- Four `Tmpfs=` lines exist across the whole stack, on `keycloak` and `edge`, and each one is there
+  because something was measured writing to that path.
+- **Keycloak's entry is the fragile one.** An upstream change to where the augmentation writes turns
+  into a container that fails at start — loud, health-gated, rolled back by `REQ-OPS-003` — but it
+  has to be re-verified on every Keycloak image bump, the same rule `REQ-OPS-014` already applies to
+  the capability sets.
+- Podman's `/tmp` tmpfs is now load-bearing for the JVM modules. It is a documented default rather
+  than a configured one, which is why it is written down in the generator and here.
 - `REQ-OPS-014`'s statement that read-only is not part of the baseline is amended in the same change.
 
 ## Status of this decision
 
-Accepted. Seventeen units carry `ReadOnly=true`, `scripts/generate-quadlet.py` refuses a table that
+Accepted. Eighteen units carry `ReadOnly=true`, `scripts/generate-quadlet.py` refuses a table that
 disagrees with itself or names something that is not a container, and `containers-read-only` has
 three red scenarios that behaved. Nothing is deployed: these are Quadlet units for a host that does
 not serve traffic yet.

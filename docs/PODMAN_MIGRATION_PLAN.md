@@ -2305,45 +2305,73 @@ the tmpfs list; the second proves it was not needed.
 
 ### The result
 
-|          Service          |    Writes to its own root filesystem    | Read-only |
-|---------------------------|-----------------------------------------|-----------|
-| prometheus                | nothing                                 | runs      |
-| tempo                     | nothing                                 | runs      |
-| alertmanager              | nothing                                 | runs      |
-| blackbox-exporter         | nothing                                 | runs      |
-| postgres-exporter (both)  | nothing                                 | runs      |
-| redis-exporter            | nothing                                 | runs      |
-| acme                      | nothing                                 | runs      |
-| loki                      | `/tmp/loki-rules/…`                     | runs      |
-| grafana                   | `/tmp` only                             | runs¹     |
-| backend, frontend, ingest | `/tmp` only — see below                 | runs      |
-| **keycloak**              | **476 paths under `/opt/keycloak/lib`** | **fails** |
+|          Service          |   Writes to its own root filesystem   | Read-only |
+|---------------------------|---------------------------------------|-----------|
+| prometheus                | nothing                               | runs      |
+| tempo                     | nothing                               | runs      |
+| alertmanager              | nothing                               | runs      |
+| blackbox-exporter         | nothing                               | runs      |
+| postgres-exporter (both)  | nothing                               | runs      |
+| redis-exporter            | nothing                               | runs      |
+| acme                      | nothing                               | runs      |
+| loki                      | `/tmp/loki-rules/…`                   | runs      |
+| grafana                   | `/tmp` only                           | runs¹     |
+| backend, frontend, ingest | `/tmp` only — see below               | runs      |
+| **keycloak**              | **`/opt/keycloak/lib/quarkus`, 4.7M** | runs²     |
 
-¹ with one environment variable; see below.
+¹ with one environment variable, ² with one tmpfs; both below.
 
-Seventeen of the eighteen units now carry `ReadOnly=true`. The decision is
+**All eighteen units** now carry `ReadOnly=true`. The decision is
 [ADR-0190](adr/0190-every-container-but-keycloak-runs-read-only.md).
 
-### Keycloak is not a missing tmpfs
+### Keycloak took two passes, and the first was a wrong conclusion from a real failure
 
-`kc.sh start` **without `--optimized` re-augments the Quarkus application into its own installation
-directory at every boot**. Measured: 476 paths under `/opt/keycloak/lib`, plus
-`/opt/keycloak/data/transaction-logs`. Read-only stops it dead:
+`kc.sh start` **without `--optimized` re-augments the Quarkus application at every boot**, and plain
+read-only stops it dead:
 
 ```
 Caused by: java.nio.file.FileSystemException: /opt/keycloak/lib/quarkus/transformed-…
 ```
 
-And the augmentation is **required here**, which is the part that settles it. The Keycloak SPI
-provider arrives as a JAR mounted into `/opt/keycloak/providers` at deploy time, and a provider that
-appears at runtime is exactly what forces the rebuild. A read-only Keycloak means baking the
-provider into a custom image and running `start --optimized` — a change to how the provider is
-promoted, not a hardening flag. Left open deliberately.
+That was read as *Keycloak cannot be read-only*, and a tmpfs was refused on the grounds that it
+would hold the augmentation in memory over an installation the image had put there — *the shape of
+a fix that passes every check and is wrong*. **Both halves of that were wrong**, and neither needed
+a new tool to find out:
 
-> [!warning] A tmpfs over `/opt/keycloak/lib` would have looked like it worked
-> The container would start. What it started would be an augmentation held in memory, thrown away
-> on restart, over an installation directory the image had put there. That is the shape of a fix
-> that passes every check and is wrong.
+- **Podman's tmpfs takes `tmpcopyup`.** The image's content is copied in, so nothing is hidden. One
+  command to check, and it was not run before the conclusion was written down.
+- **The augmentation is already thrown away.** It lands in the container's writable layer and is
+  redone at every start — Keycloak prints it: *Updating the configuration and installing your custom
+  providers*. A tmpfs has exactly the lifetime it already had.
+
+Re-measured with the **real SPI provider JAR**, staged `0644` into `/opt/keycloak/providers` the way
+`deploy.sh` stages it, because a provider appearing at runtime is the whole reason the rebuild runs:
+
+|                      Arm                       |  Ready  | cgroup of 2560M |
+|------------------------------------------------|---------|-----------------|
+| writable, provider present                     | yes     | 991M            |
+| read-only, no tmpfs                            | **no**  | —               |
+| read-only + tmpfs over `lib`, 172M             | yes     | 630M            |
+| **read-only + tmpfs over `lib/quarkus`, 4.7M** | **yes** | **466M**        |
+
+The narrow mount is enough — the 476 paths `podman diff` reported across `lib/` were overlay
+metadata, not writes. And the provider is compiled in rather than skipped: same configuration, one
+variable, `generated-bytecode.jar` **768 bytes larger** with the JAR present than against an empty
+`providers/`.
+
+> [!important] The tmpfs is what keeps ADR-0055 intact
+> The alternative — bake the provider into a custom image and run `start --optimized` — buys the
+> same read-only property by dismantling the delivery path. ADR-0055 gives the provider JAR its own
+> cosign-signed promotable artifact **so that** a provider-only change auto-applies, recreates only
+> keycloak, and rolls back at JAR level. As an image change it would be operator-gated by the
+> REQ-OPS-006 carve-out instead. The start-time rebuild that read-only appeared to forbid is the
+> mechanism the delivery depends on, and it keeps running — into 4.7M of tmpfs.
+>
+> [!warning] This one is re-checked on every Keycloak image bump
+> It is the only `ReadOnly=true` in the stack that depends on where an upstream start-time build
+> chooses to write. If that moves, the container fails at start — loud, health-gated, rolled back —
+> but it fails, and the check belongs beside the capability re-verification REQ-OPS-014 already
+> requires.
 
 ### The JVM modules write three things, and all three are under `/tmp`
 
