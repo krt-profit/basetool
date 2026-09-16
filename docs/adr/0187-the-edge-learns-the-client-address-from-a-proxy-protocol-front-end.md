@@ -50,7 +50,11 @@ of band, using PROXY protocol v2.**
   header unforgeable: nothing outside the host can reach the container's port to invent one.
 - **The edge trusts exactly the forwarder** via `set_real_ip_from`, with `real_ip_header
   proxy_protocol`. A single address, **not a subnet**, and never `0.0.0.0/0` — as the edge's own
-  configuration has said since before this decision.
+  configuration has said since before this decision. **This requires the edge container's address
+  to be pinned** (`IP=` in its Quadlet unit): measured on Rocky, the peer the edge sees is the
+  container's *own* address, and it moved from `10.89.0.2` to `10.89.0.3` across a recreation.
+  Without a pinned address there is no single value to name, and the rule would have to widen to
+  the one-member ingress subnet.
 
 Why that last pair is load-bearing, and not a detail of configuration style:
 

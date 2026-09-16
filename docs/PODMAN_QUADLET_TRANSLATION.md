@@ -457,10 +457,11 @@ RestartMaxDelaySec=60
 | `RestartSteps=6` + `RestartMaxDelaySec=60` | grow the interval geometrically to a 60s ceiling — the shape Docker's restart policy has. Both need systemd >= 254; the target ships 257 |
 | `StartLimitIntervalSec=0`                  | never give up, which is what `unless-stopped` says                                                                                       |
 
-`StartLimitIntervalSec=` lives in **`[Unit]`**. `systemd.service(5)` does not mention it **even
-once** — put it in `[Service]` and it is silently ignored, so the unit reads as though it were
-limited and is not. Verified against systemd 257's own man pages on the target host, and confirmed
-independently by the neighbouring deployment's operator.
+`StartLimitIntervalSec=` lives in **`[Unit]`**. `systemd.service(5)` mentions it exactly once, and
+only to point elsewhere — *"service restart is subject to unit start rate limiting configured with
+StartLimitIntervalSec= and StartLimitBurst=, see systemd.unit(5) for details"*. Put it in
+`[Service]` and it is silently ignored, so the unit reads as though it were limited and is not.
+Verified against the shipped man pages on both candidate platforms.
 
 > [!important] Backoff and the start limiter cancel each other out, quietly
 > They cannot be tuned independently. Once the interval reaches the 60s ceiling, at most ten starts

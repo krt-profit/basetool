@@ -1699,3 +1699,87 @@ time it has been useful.
 > repeating them on Rocky would establish nothing that changes a decision. They stay recorded because
 > they are why ADR-0186 exists.
 
+## 15. Re-measured on Rocky Linux 10.2 — 2026-09-16
+
+Everything in §13 was measured on Podman 6.1.0 with netavark 2.1.0. The target platform is a major
+version back on both — **Podman 5.8.2, netavark 1.17.2, passt `0^20251210`, crun 1.27, systemd
+257**, on kernel 6.12.0-211. So the §13 results do not transfer by assertion, and the first question
+for each was not *does it behave the same* but *is it there at all*.
+
+### What transfers unchanged
+
+|                                         |                               Rocky 10.2                                |                  same as Stream 10?                  |
+|-----------------------------------------|-------------------------------------------------------------------------|------------------------------------------------------|
+| SELinux                                 | **Enforcing**, `container-selinux` present                              | yes                                                  |
+| subuid base                             | **524288**, so container uid 101 is **524388** on the host              | yes — the RHEL-family convention, not a CentOS quirk |
+| cgroup delegation                       | `cpu memory pids`                                                       | yes                                                  |
+| `no_default_route=true`                 | **blocks egress**; the container sees a link-scope route and no default | yes                                                  |
+| the certificate handover                | works: `CAP_CHOWN` alone, chmod before chown, edge as uid 101 opens it  | yes                                                  |
+| `RestartSteps=` / `RestartMaxDelaySec=` | present (systemd 257)                                                   | yes                                                  |
+
+The subuid result is the third host to confirm it and the second to produce **524388**, which is the
+argument for the Ansible role deriving every host-side uid instead of writing one down.
+
+### What is better than expected
+
+**Quadlet 5.8.2 has `Memory=`.** Podman 5.4.2 did not, and the generator carries a
+`PodmanArgs=--memory=` fallback written for Debian 13. It is not needed here: `Memory=`,
+`PidsLimit=`, `ReadOnly=`, `DropCapability=`, `NoNewPrivileges=`, `AutoUpdate=` and `Notify=healthy`
+all exist. The fallback stays in the generator anyway, because it costs nothing and has now been
+relevant twice.
+
+**Every netavark option the plan depends on exists** in 1.17.2 — `no_default_route`, `--internal`,
+`isolate`, `metric`, `mode`. The concern that a major version back might simply lack them is closed.
+
+### What **reverses** a §13 finding
+
+> [!warning] `--internal` does **not** remove inbound DNAT on netavark 1.17.2
+> A container on an `--internal` network with a published port answered **HTTP 200** to an external
+> client, and logged the request. On netavark 2.1.0 the same probe — same rig, external client —
+> timed out and the container logged nothing.
+>
+> So §13's conclusion that *"`net-edge-ingress` stays necessary"* was a statement about **netavark
+> 2.1.0**, not about netavark. It does not hold on the target platform.
+
+That cuts both ways and the second way matters more. It means `--internal` **cannot be relied on for
+ingress isolation**: a network marked internal will still accept published traffic here. The
+five `net-proxy-*` networks publish nothing, so nothing is exposed today — but the property the
+topology leans on is version-dependent, and a future netavark could flip it back.
+
+**`net-edge-ingress` is therefore kept**, and the reason changes. It is no longer *"netavark forces
+it"* but *"the topology should not depend on a behaviour that changed between two adjacent major
+versions"*. Publishing nothing on the internal networks is the invariant; `--internal` is a
+belt-and-braces measure on top of it, not the thing being trusted.
+
+### ADR-0187's chain, on the platform that will run it
+
+Validated end to end from a **real external client** on both families, with haproxy on the host and
+the container published on loopback only:
+
+|                        Probe                         |              What the edge logged              |
+|------------------------------------------------------|------------------------------------------------|
+| IPv4 from the workstation, over the management VPN   | `remote=10.1.0.30`                             |
+| IPv6 from the workstation, over the public path      | `remote=2003:c5:5f03:e501:e891:1846:54c8:c5b6` |
+| the edge's own port, directly, from that workstation | **not reachable**                              |
+
+The IPv4 value is the visible improvement over the Stream run, where it arrived as
+`::ffff:10.9.0.15`. Separate `bind 0.0.0.0:80` and `bind [::]:80 v6only` produce a plain IPv4
+address, so CIDR-based `allow` rules match again. The unreachability check is the stronger one this
+time — a different machine, not the host probing itself.
+
+> [!important] The exact `set_real_ip_from` value cannot be a fixed address unless the container's is
+> Measured: the peer the edge sees is the **container's own address**, and it moved from `10.89.0.2`
+> to `10.89.0.3` across a recreation. ADR-0187 asks for a single address rather than a subnet, and
+> that is only achievable with `IP=` pinned in the edge's Quadlet unit. The ADR now says so. Without
+> the pin the rule would have to widen to the one-member ingress subnet — still narrow, still
+> unreachable from outside, but no longer the single value the decision asked for.
+
+### A methodological finding, which cost an hour
+
+On a host **without lingering**, a detached rootless container does not survive the SSH session that
+started it: the user's systemd instance exists only while a session does, and it takes the
+containers with it. A measurement split across two `ssh` invocations therefore silently loses its
+subject, and the symptom — haproxy healthy, backend gone, empty reply — reads like a chain defect.
+Lingering was enabled (safe here precisely because no unit files exist yet, per §13) and the chain
+was then run inside a single invocation.
+
