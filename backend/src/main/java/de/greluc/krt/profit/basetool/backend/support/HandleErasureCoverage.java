@@ -38,6 +38,12 @@ import org.jetbrains.annotations.NotNull;
  * a search target therefore forces the question "and what does an erasure do about it?" at the
  * moment somebody can still answer it.
  *
+ * <p>The {@link Disposition#ANONYMISED} entries are cross-checked against {@code
+ * HandleAnonymisationService.ANONYMISED_COLUMNS} rather than against a second literal list. The
+ * test used to hold its own copy, and the copy fell one column behind the service: the only
+ * configuration in which everything was green was the one that <em>understated</em> what the
+ * erasure reached.
+ *
  * <p><b>The registry is honest about how much is manual.</b> Rather more than half of these columns
  * are {@link Disposition#REVIEWED_BY_HAND}: prose somebody else typed, where the member's name sits
  * inside a sentence and no mechanical rule can rewrite it without either corrupting the sentence or
@@ -103,15 +109,20 @@ public final class HandleErasureCoverage {
               "audit_event.subject_label",
               "Matched where the whole label IS the member's name. A label that merely contains it"
                   + " is a job-order title naming that order's contact, which is somebody else."),
-          anonymised(
+          byHand(
               "audit_event.details",
-              "A name concatenated into the payload against REQ-AUDIT-001; replaced in place so"
-                  + " the row still says what happened."),
+              "A name concatenated into the payload against REQ-AUDIT-001. The erasure used to"
+                  + " rewrite it by substring REPLACE over every row of the table; that was removed"
+                  + " on 2026-09-17 because the needle is the departing member's own self-service"
+                  + " display name, so a short or common one rewrote unrelated rows irreversibly."
+                  + " Found through the Personensuche and edited by an administrator."),
           anonymised(
               "bank_audit_event.actor_handle", "The bank trail's actor snapshot, matched by id."),
-          anonymised(
+          byHand(
               "bank_audit_event.details",
-              "Where BankHolderService and BankLedgerService put the handle. Replaced in place."),
+              "Where BankHolderService and BankLedgerService concatenate the handle. Same removal"
+                  + " and same reason as audit_event.details -- a member called aUEC would have had"
+                  + " the amount annotation rewritten across the whole financial trail."),
           anonymised(
               "bank_transaction.counterparty_handle",
               "The booking history. The single approved mutation of an append-only ledger"

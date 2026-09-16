@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepositor
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.util.Collection;
@@ -56,38 +55,49 @@ import org.springframework.transaction.annotation.Transactional;
  * is <b>never automatic</b>: an admin weighs the wish and grants it deliberately, and the procedure
  * for weighing it is in {@code docs/privacy/data-subject-requests.md}.
  *
- * <p><b>Eleven places, one act.</b> Erasing some and leaving others would be worse than not erasing
+ * <p><b>Eight columns, one act.</b> Erasing some and leaving others would be worse than not erasing
  * at all, because the result reads as an erasure that has been performed:
  *
  * <ol>
  *   <li>{@code audit_event.actor_handle} — the activity trail, matched by id
- *   <li>{@code audit_event.subject_label} — the same rows' subject label, matched by exact text
- *   <li>{@code audit_event.details} — a name concatenated into the payload, replaced in place
+ *   <li>{@code audit_event.subject_label} — matched where the whole label <em>is</em> the name
  *   <li>{@code bank_audit_event.actor_handle} — the bank trail, matched by id
- *   <li>{@code bank_audit_event.details} — where the bank services put the handle
- *   <li>{@code bank_transaction.counterparty_handle} — the booking history
- *   <li>{@code bank_booking_request} — four columns (requester, decider, counterparty, owner
- *       approver), any of which can name the same member on one row
+ *   <li>{@code bank_transaction.counterparty_handle} — the booking history, matched by id
+ *   <li>{@code bank_booking_request} — four handle columns, matched by their four id columns in one
+ *       statement
  *   <li>{@code bank_holder.handle} — the custodian registry, which outlives the account by design
- *   <li>{@code job_order.handle} — the order's contact person, matched by text
- *   <li>{@code job_order_handover.recipient_handle} — matched by text, case-insensitively
- *   <li>{@code job_order_item_handover.recipient_handle} — likewise
+ *   <li>{@code job_order.handle} — the order's contact person, matched by the whole value
+ *   <li>{@code job_order_handover.recipient_handle} and its item sibling — likewise
  * </ol>
  *
- * <p>Five of those eleven were added after review: the set claimed to be closed and was not, which
- * is exactly the failure this class's own note calls worse than not erasing. The list is now held
- * to the schema by {@code HandleErasureCoverageTest}, which walks every column {@link
- * de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets} registers as a place a person
- * is named and fails the build unless each one is anonymised here, removed by the account's own
- * deletion, or recorded as out of scope with a reason. The person search got that gate from the
- * start; this set did not, and that asymmetry is why one drifted and the other did not.
+ * <p><b>Every statement here is a whole-value comparison or an id match. None is a substring
+ * rewrite, and that is a security property rather than a style preference.</b> Three substring
+ * {@code REPLACE} statements were removed on 2026-09-17 after review: they rewrote every row of
+ * {@code audit_event.details}, {@code bank_audit_event.details} and {@code notification.params}
+ * whose text contained the needle, with no owner predicate — and the needle is the departing
+ * member's own {@code display_name}, which is self-service free text. A member who called
+ * themselves {@code aUEC} could have an admin, acting through the intended and legally obliged
+ * workflow, irreversibly rewrite the amount annotation on the entire financial trail. A single
+ * common letter would have shredded all three columns.
+ *
+ * <p>Guarding them — a length floor, an owner predicate, LIKE escaping, longest-first ordering —
+ * would have left a narrower version of the same weapon. Not having one is better, and it costs
+ * nothing that was real: a name inside a key/value payload is text somebody's code composed around
+ * it, which {@link de.greluc.krt.profit.basetool.backend.support.HandleErasureCoverage} already
+ * classifies as an administrator's manual step, found through the Personensuche. The spliced
+ * sentinel could not have been rendered either — both humanisers compare the whole value, so every
+ * viewer would have shown {@code #ANONYMISED#} verbatim in the middle of a sentence.
+ *
+ * <p>The columns are held to the schema by {@code HandleErasureCoverageTest}, which walks every
+ * column {@link de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets} registers as a
+ * place a person is named and fails the build unless each one is anonymised here, removed by the
+ * account's own deletion, structurally about somebody else, or recorded as a manual step with a
+ * reason. The person search got that gate from the start; this set did not, and that asymmetry is
+ * why one drifted and the other did not.
  *
  * <p><b>Every spelling, not the effective name only.</b> {@code getEffectiveName()} is {@code
  * displayName ?: username}, so the text-matched columns missed a handover typed with the member's
- * username or their Discord nickname. All three are passed, and each text-matched update runs once
- * per spelling. This is the same correction the export's {@link
- * de.greluc.krt.profit.basetool.backend.support.HandleScrubber} needed, for the same reason:
- * whoever typed the name was typing what they call the person.
+ * username or their Discord nickname. All three are passed, longest first.
  *
  * <p><b>What it does not change.</b> Not one row is removed and not one fact about what happened is
  * altered: timestamps, event types, amounts, accounts, subjects and counts all stand. Only the name
@@ -114,22 +124,45 @@ public class HandleAnonymisationService {
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderRepository jobOrderRepository;
-  private final NotificationRepository notificationRepository;
   private final AuditService auditService;
   private final BankAuditService bankAuditService;
 
   /**
+   * Exactly the columns this service rewrites, as {@code table.column}.
+   *
+   * <p>Declared here rather than restated in a test, because a literal list in a test is how the
+   * count came apart: it held fourteen entries while the service rewrote fifteen columns, and the
+   * only configuration in which everything was green was the one that <em>understated</em> the
+   * erasure. {@code HandleErasureCoverageTest} reads this, so the two cannot disagree — and a
+   * column added to the service without being added here is a compile-time-visible omission rather
+   * than a silently passing test.
+   */
+  public static final java.util.List<String> ANONYMISED_COLUMNS =
+      java.util.List.of(
+          "audit_event.actor_handle",
+          "audit_event.subject_label",
+          "bank_audit_event.actor_handle",
+          "bank_transaction.counterparty_handle",
+          "bank_booking_request.requester_handle",
+          "bank_booking_request.decider_handle",
+          "bank_booking_request.counterparty_handle",
+          "bank_booking_request.owner_approval_granted_by_handle",
+          "bank_holder.handle",
+          "job_order.handle",
+          "job_order_handover.recipient_handle",
+          "job_order_item_handover.recipient_handle");
+
+  /**
    * The per-table row counts one anonymisation rewrote.
    *
-   * @param activityAudit rows rewritten in {@code audit_event} (handle, label and payload together)
-   * @param bankAudit rows rewritten in {@code bank_audit_event} (handle and payload together)
+   * @param activityAudit rows rewritten in {@code audit_event}
+   * @param bankAudit rows rewritten in {@code bank_audit_event}
    * @param bankTransactions rows rewritten in {@code bank_transaction}
    * @param bookingRequests rows rewritten in {@code bank_booking_request}
    * @param bankHolders rows rewritten in {@code bank_holder}
    * @param jobOrders rows rewritten in {@code job_order}
    * @param materialHandovers rows rewritten in {@code job_order_handover}
    * @param itemHandovers rows rewritten in {@code job_order_item_handover}
-   * @param notifications rows rewritten in {@code notification}
    */
   public record AnonymisationResult(
       int activityAudit,
@@ -139,11 +172,10 @@ public class HandleAnonymisationService {
       int bankHolders,
       int jobOrders,
       int materialHandovers,
-      int itemHandovers,
-      int notifications) {
+      int itemHandovers) {
 
     /**
-     * The total number of rows rewritten across every place.
+     * The total number of rows rewritten across every column.
      *
      * @return the sum of the per-table counts
      */
@@ -155,8 +187,7 @@ public class HandleAnonymisationService {
           + bankHolders
           + jobOrders
           + materialHandovers
-          + itemHandovers
-          + notifications;
+          + itemHandovers;
     }
   }
 
@@ -196,15 +227,11 @@ public class HandleAnonymisationService {
     int jobOrders = 0;
     int materialHandovers = 0;
     int itemHandovers = 0;
-    int notifications = 0;
     for (String name : names) {
       activityAudit += auditEventRepository.anonymiseSubjectLabel(name, sentinel);
-      activityAudit += auditEventRepository.anonymiseDetails(name, sentinel);
-      bankAudit += bankAuditEventRepository.anonymiseDetails(name, sentinel);
       jobOrders += jobOrderRepository.anonymiseHandle(name, sentinel);
       materialHandovers += jobOrderHandoverRepository.anonymiseRecipientHandle(name, sentinel);
       itemHandovers += jobOrderItemHandoverRepository.anonymiseRecipientHandle(name, sentinel);
-      notifications += notificationRepository.anonymiseParams(name, sentinel);
     }
 
     AnonymisationResult result =
@@ -216,8 +243,7 @@ public class HandleAnonymisationService {
             bankHolders,
             jobOrders,
             materialHandovers,
-            itemHandovers,
-            notifications);
+            itemHandovers);
 
     // The markers go in AFTER the updates, so they are not scrubbed by them. The payload carries
     // counts and the target reference only -- never the handle that was just removed.
@@ -234,7 +260,6 @@ public class HandleAnonymisationService {
             .with("jobOrders", jobOrders)
             .with("materialHandovers", materialHandovers)
             .with("itemHandovers", itemHandovers)
-            .with("notifications", notifications)
             .with("spellings", names.size()));
 
     bankAuditService.record(
@@ -248,34 +273,42 @@ public class HandleAnonymisationService {
             .with("bankHolders", bankHolders));
 
     log.info(
-        "Anonymised handle snapshots for user {}: {} row(s) across eleven places, {} spelling(s)",
+        "Anonymised handle snapshots for user {}: {} row(s) across {} column(s), {} spelling(s)",
         userId,
         result.total(),
+        ANONYMISED_COLUMNS.size(),
         names.size());
     return result;
   }
 
   /**
-   * The spellings that are safe to match on.
+   * The spellings that are safe to match on, longest first.
    *
    * <p>A blank one would match every row whose column is empty and rewrite all of them, so blanks
    * are dropped rather than passed through. Deduplicated because a member whose display name equals
-   * their username would otherwise have every text-matched update run twice, inflating the counts
-   * in the receipt for no change on disk.
+   * their username would otherwise have every statement run twice, inflating the counts in the
+   * receipt for no change on disk.
+   *
+   * <p><b>Longest first</b>, for the same reason {@link
+   * de.greluc.krt.profit.basetool.backend.support.HandleScrubber} sorts that way. Every remaining
+   * statement is a whole-value comparison, so the order cannot currently change the outcome — but
+   * the two components are read side by side and a reader who finds one sorted and the other not
+   * has to work out whether the difference is deliberate. It is not, so they match.
    *
    * @param spellings the raw candidates, possibly {@code null} and possibly containing blanks
-   * @return the distinct non-blank spellings, trimmed, in a stable order
+   * @return the distinct non-blank spellings, trimmed, longest first
    */
   private static @NotNull Set<String> usableSpellings(@Nullable Collection<String> spellings) {
     if (spellings == null) {
       return Set.of();
     }
     Set<String> out = new LinkedHashSet<>();
-    for (String candidate : spellings) {
-      if (candidate != null && !candidate.isBlank()) {
-        out.add(candidate.trim());
-      }
-    }
+    spellings.stream()
+        .filter(candidate -> candidate != null && !candidate.isBlank())
+        .map(String::trim)
+        .distinct()
+        .sorted((a, b) -> Integer.compare(b.length(), a.length()))
+        .forEach(out::add);
     return out;
   }
 }

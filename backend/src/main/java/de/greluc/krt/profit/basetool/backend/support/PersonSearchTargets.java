@@ -266,10 +266,15 @@ public final class PersonSearchTargets {
           // template, and is swept within 180 days (REQ-NOTIF-009). Searching it would return one
           // hit per admin inbox for the same event.
           //
-          // The erasure does not rely on this exemption. A granted Art. 17 request rewrites the
-          // column directly (REQ-SEC-062, NotificationRepository#anonymiseParams), because 180
-          // days of every admin's inbox holding the name is not an erasure that has been
-          // performed.
+          // A granted Art. 17 request used to rewrite the name inside this payload. That
+          // statement was removed on 2026-09-17 -- it was a substring REPLACE over every row of
+          // the table driven by the member's own self-service display name, so a short or common
+          // one rewrote unrelated rows irreversibly (ADR-0183).
+          //
+          // The notification is superseded instead, which is better than rewriting it: the three
+          // terminal transitions of a deletion request now resolve the pending notification, so
+          // the row carrying the name is gone the moment the request is withdrawn, declined or
+          // carried out rather than surviving until the 180-day unread sweep.
           "notification.params",
           "notification.entity_type",
           // P4K import diagnostics and the uploaded file's own name.

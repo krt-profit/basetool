@@ -204,29 +204,4 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("types") Set<NotificationType> types,
       @Param("entityType") String entityType,
       @Param("entityId") UUID entityId);
-
-  /**
-   * Replaces this member's name where it occurs inside a notification's render parameters
-   * (REQ-SEC-062).
-   *
-   * <p>{@code deleteAllForRecipient} removes the departing member's <em>own</em> inbox. It does not
-   * touch anybody else's — and {@code AccountDeletionRequestedEvent} writes {@code
-   * {"handle":"<name>"}} into a row for <b>every administrator</b>. So a granted erasure used to
-   * leave the requester's name sitting in every admin's inbox and bell for up to the unread
-   * retention window (REQ-NOTIF-009), which is 180 days.
-   *
-   * <p>Substring replace inside the serialised payload: the surrounding JSON stays parseable
-   * because the sentinel carries no quote or brace, and the notification still renders — it just
-   * names the sentinel instead of the person. Case-sensitive, because the payload was written by
-   * the application from the member's own stored name rather than typed.
-   *
-   * @param handle the spelling to erase
-   * @param sentinel {@code HandleAnonymisation#SENTINEL}
-   * @return the number of rows rewritten
-   */
-  @Modifying
-  @Query(
-      "UPDATE Notification n SET n.params = REPLACE(n.params, :handle, :sentinel)"
-          + " WHERE n.params LIKE CONCAT('%', :handle, '%')")
-  int anonymiseParams(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

@@ -21,9 +21,11 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.service.HandleAnonymisationService;
 import de.greluc.krt.profit.basetool.backend.support.HandleErasureCoverage.Coverage;
 import de.greluc.krt.profit.basetool.backend.support.HandleErasureCoverage.Disposition;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -110,38 +112,35 @@ class HandleErasureCoverageTest {
             });
   }
 
-  // covers REQ-SEC-062 - the columns the service claims to rewrite are the ones marked ANONYMISED
+  // covers REQ-SEC-062 - the columns the service rewrites are exactly the ones marked ANONYMISED
   @Test
   void theAnonymisedSetMatchesWhatTheServiceActuallyRewrites() {
-    // Held as a literal list rather than derived, deliberately: the point is to notice when the
-    // service changes, and a derived expectation would move with it silently. Update both together
-    // and the diff says what the erasure now reaches.
-    Set<String> rewritten =
-        Set.of(
-            "audit_event.actor_handle",
-            "audit_event.subject_label",
-            "audit_event.details",
-            "bank_audit_event.actor_handle",
-            "bank_audit_event.details",
-            "bank_transaction.counterparty_handle",
-            "bank_booking_request.requester_handle",
-            "bank_booking_request.decider_handle",
-            "bank_booking_request.counterparty_handle",
-            "bank_booking_request.owner_approval_granted_by_handle",
-            "bank_holder.handle",
-            "job_order.handle",
-            "job_order_handover.recipient_handle",
-            "job_order_item_handover.recipient_handle");
-
+    // Read from the service, not restated here. A literal copy in this test is how the two came
+    // apart: it held fourteen entries while the service rewrote fifteen columns, and adding the
+    // missing one failed the sibling assertion because that column is EXEMPT from the search -- so
+    // the only configuration in which everything was green was the one that understated the
+    // erasure. One list, in the class that does the work.
     Set<String> declared =
         HandleErasureCoverage.COVERAGE.entrySet().stream()
             .filter(e -> e.getValue().disposition() == Disposition.ANONYMISED)
-            .map(java.util.Map.Entry::getKey)
+            .map(Map.Entry::getKey)
             .collect(Collectors.toSet());
 
     assertThat(declared)
-        .as("HandleAnonymisationService rewrites exactly these columns, no more and no fewer")
-        .isEqualTo(rewritten);
+        .as("HandleAnonymisationService.ANONYMISED_COLUMNS is the one list; this map must match it")
+        .isEqualTo(Set.copyOf(HandleAnonymisationService.ANONYMISED_COLUMNS));
+  }
+
+  // covers REQ-SEC-062 - and every column it rewrites is one the person search can find again
+  @Test
+  void everyAnonymisedColumnIsAlsoSearchable() {
+    Set<String> registered = registeredColumns();
+    assertThat(HandleAnonymisationService.ANONYMISED_COLUMNS)
+        .as(
+            "A column the erasure rewrites but the search cannot reach is a column an admin cannot"
+                + " verify afterwards -- and for an already-deleted account the search is the only"
+                + " route to it at all.")
+        .allSatisfy(column -> assertThat(registered).contains(column));
   }
 
   // covers REQ-SEC-062 - the manual residue is visible rather than implied

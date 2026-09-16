@@ -37,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepositor
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.repository.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.util.List;
 import java.util.UUID;
@@ -55,19 +54,23 @@ import org.mockito.quality.Strictness;
  * Mockito unit tests for {@link HandleAnonymisationService} — the granted Art. 17 erasure of a
  * member's surviving handle snapshots (REQ-SEC-062).
  *
- * <p>The properties that carry the requirement: <b>all eleven</b> places are reached (erasing ten
- * of eleven is worse than erasing none, because the result reads as a completed erasure); every
- * text-matched column is run <b>once per spelling</b>, because a handover is typed by hand and the
- * typist wrote whichever name they call the person; the marker events are written <b>after</b> the
- * updates, so the receipt is not scrubbed by the thing it records; the payload never carries the
- * name that was removed; and the text-matched columns are skipped rather than matched against an
- * empty string when no name is known.
+ * <p>The properties that carry the requirement: <b>every</b> column in {@code
+ * HandleAnonymisationService.ANONYMISED_COLUMNS} is reached (erasing seven of eight is worse than
+ * erasing none, because the result reads as a completed erasure); every text-matched column is run
+ * <b>once per spelling</b>, because a handover is typed by hand and the typist wrote whichever name
+ * they call the person; the marker events are written <b>after</b> the updates, so the receipt is
+ * not scrubbed by the thing it records; the payload never carries the name that was removed; and
+ * the text-matched columns are skipped rather than matched against an empty string when no name is
+ * known.
  *
- * <p>Five of the eleven and the per-spelling loop are regressions: the set was documented as closed
- * while {@code bank_holder.handle}, {@code job_order.handle}, {@code notification.params} and both
- * {@code details} payloads survived a granted erasure, and {@code audit_event.subject_label} was
- * rewritten with the name six lines after being scrubbed. {@code HandleErasureCoverageTest} is what
- * now keeps the set closed against the schema rather than against a comment.
+ * <p><b>What this class cannot check is why the set shrank.</b> Three substring {@code REPLACE}
+ * statements were removed on 2026-09-17 — over {@code audit_event.details}, {@code
+ * bank_audit_event.details} and {@code notification.params} — because they rewrote every row whose
+ * text contained a needle the departing member sets on themselves. Mocked repositories cannot see
+ * SQL semantics, which is exactly why that defect reached review: the assertions below were green
+ * against a statement that could rewrite an unrelated member's rows. Nothing here would have caught
+ * it, and nothing here catches its absence either; {@code HandleErasureCoverageTest} is what pins
+ * the column set.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -88,7 +91,6 @@ class HandleAnonymisationServiceTest {
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private BankHolderRepository bankHolderRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private NotificationRepository notificationRepository;
   @Mock private AuditService auditService;
   @Mock private BankAuditService bankAuditService;
 
@@ -97,16 +99,13 @@ class HandleAnonymisationServiceTest {
   private void stubCounts(int each) {
     when(auditEventRepository.anonymiseActorHandle(any(), any())).thenReturn(each);
     when(auditEventRepository.anonymiseSubjectLabel(any(), any())).thenReturn(each);
-    when(auditEventRepository.anonymiseDetails(any(), any())).thenReturn(each);
     when(bankAuditEventRepository.anonymiseActorHandle(any(), any())).thenReturn(each);
-    when(bankAuditEventRepository.anonymiseDetails(any(), any())).thenReturn(each);
     when(bankTransactionRepository.anonymiseCounterpartyHandle(any(), any())).thenReturn(each);
     when(bankBookingRequestRepository.anonymiseHandles(any(), any())).thenReturn(each);
     when(bankHolderRepository.anonymiseHandle(any(), any())).thenReturn(each);
     when(jobOrderRepository.anonymiseHandle(any(), any())).thenReturn(each);
     when(jobOrderHandoverRepository.anonymiseRecipientHandle(any(), any())).thenReturn(each);
     when(jobOrderItemHandoverRepository.anonymiseRecipientHandle(any(), any())).thenReturn(each);
-    when(notificationRepository.anonymiseParams(any(), any())).thenReturn(each);
   }
 
   // covers REQ-SEC-062 - every place a handle snapshot survives a deletion is reached
@@ -124,14 +123,12 @@ class HandleAnonymisationServiceTest {
     verify(bankHolderRepository).anonymiseHandle(USER, SENTINEL);
     // Text-matched, because these columns have no user id beside them.
     verify(auditEventRepository).anonymiseSubjectLabel(HANDLE, SENTINEL);
-    verify(auditEventRepository).anonymiseDetails(HANDLE, SENTINEL);
-    verify(bankAuditEventRepository).anonymiseDetails(HANDLE, SENTINEL);
     verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
     verify(jobOrderHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
     verify(jobOrderItemHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
-    verify(notificationRepository).anonymiseParams(HANDLE, SENTINEL);
-    // Twelve updates at 2 rows each: eleven places, with audit_event counted once per column.
-    assertThat(result.total()).isEqualTo(24);
+    // Nine statements at 2 rows each -- eight columns, with bank_booking_request's four handle
+    // columns rewritten by one statement.
+    assertThat(result.total()).isEqualTo(18);
   }
 
   // covers REQ-SEC-062 - a handover typed with the username is erased as surely as one typed with
@@ -146,10 +143,7 @@ class HandleAnonymisationServiceTest {
       verify(jobOrderHandoverRepository).anonymiseRecipientHandle(spelling, SENTINEL);
       verify(jobOrderItemHandoverRepository).anonymiseRecipientHandle(spelling, SENTINEL);
       verify(jobOrderRepository).anonymiseHandle(spelling, SENTINEL);
-      verify(notificationRepository).anonymiseParams(spelling, SENTINEL);
       verify(auditEventRepository).anonymiseSubjectLabel(spelling, SENTINEL);
-      verify(auditEventRepository).anonymiseDetails(spelling, SENTINEL);
-      verify(bankAuditEventRepository).anonymiseDetails(spelling, SENTINEL);
     }
     // The id-matched ones run once, not once per spelling: repeating them would inflate the
     // receipt's counts while changing nothing on disk.
@@ -165,7 +159,7 @@ class HandleAnonymisationServiceTest {
     service.anonymise(USER, List.of(HANDLE, HANDLE, "  " + HANDLE + "  "));
 
     verify(jobOrderHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
-    verify(notificationRepository).anonymiseParams(HANDLE, SENTINEL);
+    verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
   }
 
   // covers REQ-SEC-062 - the receipt is written AFTER the updates, so the update cannot scrub it
@@ -181,14 +175,14 @@ class HandleAnonymisationServiceTest {
             bankAuditEventRepository,
             bankTransactionRepository,
             bankBookingRequestRepository,
-            notificationRepository,
+            jobOrderRepository,
             auditService,
             bankAuditService);
     order.verify(auditEventRepository).anonymiseActorHandle(USER, SENTINEL);
     order.verify(bankAuditEventRepository).anonymiseActorHandle(USER, SENTINEL);
     order.verify(bankTransactionRepository).anonymiseCounterpartyHandle(USER, SENTINEL);
     order.verify(bankBookingRequestRepository).anonymiseHandles(USER, SENTINEL);
-    order.verify(notificationRepository).anonymiseParams(HANDLE, SENTINEL);
+    order.verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
     order
         .verify(auditService)
         .record(eq(AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED), eq(USER), any(), eq(USER), any());
@@ -237,11 +231,10 @@ class HandleAnonymisationServiceTest {
     verify(jobOrderHandoverRepository, never()).anonymiseRecipientHandle(any(), any());
     verify(jobOrderItemHandoverRepository, never()).anonymiseRecipientHandle(any(), any());
     verify(jobOrderRepository, never()).anonymiseHandle(any(), any());
-    verify(notificationRepository, never()).anonymiseParams(any(), any());
     verify(auditEventRepository, never()).anonymiseSubjectLabel(any(), any());
     assertThat(result.materialHandovers()).isZero();
     assertThat(result.itemHandovers()).isZero();
-    assertThat(result.notifications()).isZero();
+    assertThat(result.jobOrders()).isZero();
     // The five id-matched places still ran.
     assertThat(result.total()).isEqualTo(5);
   }
