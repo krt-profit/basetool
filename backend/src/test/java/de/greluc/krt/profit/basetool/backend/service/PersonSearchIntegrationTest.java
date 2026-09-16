@@ -111,6 +111,24 @@ class PersonSearchIntegrationTest {
     assertThat(found).allSatisfy(h -> assertThat(h.area()).isEqualTo("MEMBER"));
   }
 
+  // covers REQ-SEC-060 - the snippet has to contain the name that was searched for
+  @Test
+  void theSnippetIsAWindowAroundTheMatchAndNotTheValuesFirstCharacters() {
+    // The snippet used to be left(column, 200). A long note that mentions the person late -- the
+    // ordinary shape of a note -- then produced a snippet without the name in it, so the admin had
+    // to open every hit to find out whether it was the right person. On a surface whose job is to
+    // be exhaustive, that is the difference between a usable list and a list nobody finishes.
+    String longPrefix = "x".repeat(400);
+    seedMember(HANDLE, longPrefix + " und " + HANDLE + " waren beide dabei.");
+
+    List<PersonSearchHitDto> found = hits(HANDLE, "description");
+
+    assertThat(found).hasSize(1);
+    assertThat(found.getFirst().snippet())
+        .as("the window is centred on the match, so the name is in it")
+        .contains(HANDLE);
+  }
+
   /**
    * Commits a member so the native query can see it.
    *

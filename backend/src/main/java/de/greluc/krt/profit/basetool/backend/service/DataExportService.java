@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
 import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
+import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
@@ -37,8 +38,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -79,16 +80,11 @@ public class DataExportService {
    *
    * @param key the stable machine key, also the label key
    * @param legalBasis {@code ART_15} or {@code ART_15_20}
-   * @param portableHint why the section is or is not portable
    * @param rows the rows, each a column-name to value map in the statement's own column order
    * @param truncated whether {@link #MAX_ROWS_PER_SECTION} was reached
    */
   public record ExportSection(
-      String key,
-      String legalBasis,
-      String portableHint,
-      List<Map<String, Object>> rows,
-      boolean truncated) {}
+      String key, String legalBasis, List<Map<String, Object>> rows, boolean truncated) {}
 
   /**
    * A complete export.
@@ -141,7 +137,6 @@ public class DataExportService {
             .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
     HandleScrubber scrubber = scrubberForOthers(userId);
-    Set<String> freeText = Set.copyOf(DataExportSections.FREE_TEXT_SECTIONS);
 
     List<ExportSection> sections = new ArrayList<>(DataExportSections.SECTIONS.size());
     boolean scrubbed = false;
@@ -155,14 +150,19 @@ public class DataExportService {
       boolean truncated = raw.size() > MAX_ROWS_PER_SECTION;
 
       List<Map<String, Object>> rows = new ArrayList<>(Math.min(raw.size(), MAX_ROWS_PER_SECTION));
-      boolean scrub = freeText.contains(section.key()) && scrubber.isActive();
+      boolean sectionHasProse = scrubber.isActive();
       for (Object item : raw.subList(0, Math.min(raw.size(), MAX_ROWS_PER_SECTION))) {
         Tuple tuple = (Tuple) item;
         Map<String, Object> row = new LinkedHashMap<>();
         for (TupleElement<?> element : tuple.getElements()) {
           String name = element.getAlias();
           Object value = tuple.get(name);
-          if (scrub && value instanceof String text) {
+          // Per column, not per section. Scrubbing every String of a section corrupted structured
+          // values -- an e-mail address, a status, a username -- whenever another member's handle
+          // occurred inside one (REQ-SEC-058, DataExportSections#UNSCRUBBED_PERSON_COLUMNS).
+          if (sectionHasProse
+              && DataExportSections.isScrubbed(section.key(), name)
+              && value instanceof String text) {
             String cleaned = scrubber.scrub(text);
             if (cleaned != null && !cleaned.equals(text)) {
               scrubbed = true;
@@ -173,9 +173,7 @@ public class DataExportService {
         }
         rows.add(row);
       }
-      sections.add(
-          new ExportSection(
-              section.key(), section.legalBasis(), section.portableHint(), rows, truncated));
+      sections.add(new ExportSection(section.key(), section.legalBasis(), rows, truncated));
     }
 
     DataExport export =
@@ -228,11 +226,20 @@ public class DataExportService {
   }
 
   /**
-   * A scrubber loaded with every member's handle <em>except</em> the subject's.
+   * A scrubber loaded with every spelling of every member's name <em>except</em> the subject's.
    *
    * <p>Excluding the subject is not an optimisation: scrubbing their own name would remove the one
    * name the export is supposed to be about, and would do it from the entries they wrote
    * themselves.
+   *
+   * <p><b>Every spelling, not just the effective one.</b> {@code getEffectiveName()} is {@code
+   * displayName ?: username}, so loading only that left a member's {@code username} unscrubbed for
+   * as long as they had a display name set, and left every member's {@code discord_guild_nickname}
+   * unscrubbed always — while the export still told the reader that other members' names had been
+   * removed. Whoever typed the name into a note was typing what they call the person, which is as
+   * likely to be the Discord nickname as the display name. {@link PersonSearchTargets} registers
+   * all three columns as places a person is named, and a scrubber that knew fewer of them than the
+   * search did was the two registries disagreeing about the same question.
    *
    * @param subjectId the member the export is about
    * @return the scrubber
@@ -241,9 +248,26 @@ public class DataExportService {
     List<String> others =
         userRepository.findAll().stream()
             .filter(u -> !u.getId().equals(subjectId))
-            .map(User::getEffectiveName)
+            .flatMap(DataExportService::everySpellingOf)
             .filter(h -> h != null && !h.isBlank())
             .toList();
     return new HandleScrubber(others);
+  }
+
+  /**
+   * Every column of one member that holds a name somebody might have typed into free text.
+   *
+   * <p>Kept beside {@link #scrubberForOthers} rather than on {@code User}, because it is a
+   * statement about this export's scrubbing and not about the entity: the same three columns are
+   * registered in {@link PersonSearchTargets} for the search, and {@code
+   * HandleAnonymisationService} erases the same three on a granted Art. 17 request. Adding a fourth
+   * name column means adding it in all three places, and {@code HandleSpellingCoverageTest} fails
+   * until it is.
+   *
+   * @param user the member
+   * @return their username, display name and Discord guild nickname, in any order, nulls included
+   */
+  private static @NotNull Stream<String> everySpellingOf(@NotNull User user) {
+    return Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname());
   }
 }

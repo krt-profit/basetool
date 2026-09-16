@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets.Target;
 import jakarta.persistence.EntityManager;
@@ -82,6 +83,15 @@ public class PersonSearchService {
   private static final int SNIPPET_LENGTH = 200;
 
   /**
+   * How many characters of the value precede the match in a snippet.
+   *
+   * <p>A quarter of the window, so the name appears near the start of what the admin reads while
+   * still carrying the sentence it sits in -- which is what tells them whether the mention is the
+   * person they mean.
+   */
+  private static final int SNIPPET_CONTEXT = 50;
+
+  /**
    * Identifier shape the registry is allowed to contain. The table and column names are
    * interpolated into SQL — they cannot be bound as parameters — so they are validated against this
    * before a statement is built, even though they come from a compile-time constant list. Defence
@@ -120,7 +130,18 @@ public class PersonSearchService {
     Query query = entityManager.createNativeQuery(buildSql());
     // The term is a bound parameter; only the identifiers are interpolated, and those are validated
     // against SAFE_IDENTIFIER while the SQL is assembled.
-    query.setParameter("term", "%" + escapeLikeWildcards(trimmed) + "%");
+    // LikePatterns.contains is exactly "%" + escape(x) + "%", and it is what every other
+    // substring search in this codebase already binds (BlueprintService, HangarService,
+    // LocationService, MaterialService, MissionService, OperationService, UserService). A private
+    // copy of the escape chain here would be one more place for the set of escaped characters to
+    // drift from the rest.
+    query.setParameter("term", LikePatterns.contains(trimmed));
+    // The same term unwrapped, for `position` in the snippet window. Bound separately rather than
+    // trimming the wildcards off in SQL: the escaped form is what ILIKE needs and the literal form
+    // is what position needs, and deriving one from the other in SQL would be the kind of
+    // cleverness
+    // that stops being obviously correct.
+    query.setParameter("term_plain", trimmed);
     query.setMaxResults(TOTAL_LIMIT + 1);
 
     List<?> rows = query.getResultList();
@@ -207,9 +228,19 @@ public class PersonSearchService {
           .append("CAST(")
           .append(t.idColumn())
           .append(" AS text) AS row_id, ")
-          .append("left(")
+          // A window around the match rather than the value's first 200 characters. A prefix
+          // routinely did not contain the name the admin searched for -- the one part of a long
+          // note they need to see to decide whether the hit is the person they mean -- so they had
+          // to open the row to find out. `position` is computed on the lower-cased pair, matching
+          // the ILIKE, and greatest(1, ...) keeps substring's one-based start legal when the match
+          // sits near the beginning.
+          .append("substring(")
           .append(t.column())
-          .append(", ")
+          .append(", greatest(1, position(lower(:term_plain) in lower(")
+          .append(t.column())
+          .append(")) - ")
+          .append(SNIPPET_CONTEXT)
+          .append("), ")
           .append(SNIPPET_LENGTH)
           .append(") AS snippet, ")
           .append(t.linkKind() == null ? "CAST(NULL AS text)" : quote(t.linkKind()))
@@ -223,6 +254,12 @@ public class PersonSearchService {
           .append(PER_TARGET_LIMIT)
           .append(')');
     }
+    // A deterministic order for the outer LIMIT. Without one, which hits survive the 300-row cap
+    // is whatever order the Append node happens to produce -- stable enough under a serial plan to
+    // look reliable, and not stable under a Parallel Append. An admin re-running the same search
+    // and seeing a different 300 rows has no way to tell a plan change from a data change, on a
+    // surface whose whole purpose is to be complete. The order is also the one the page groups by.
+    sql.append(" ORDER BY area, src_table, src_column, row_id");
     return sql.toString();
   }
 
@@ -252,19 +289,5 @@ public class PersonSearchService {
    */
   private static @NotNull String quote(@NotNull String value) {
     return "'" + value.replace("'", "''") + "'";
-  }
-
-  /**
-   * Escapes the {@code LIKE} wildcards in a search term.
-   *
-   * <p>Without this, searching for {@code %} matches every row of every column — an accident that
-   * looks exactly like a deliberate attempt to dump the database, and one an admin could make by
-   * pasting.
-   *
-   * @param term the raw search term
-   * @return the term with {@code \}, {@code %} and {@code _} escaped
-   */
-  private static @NotNull String escapeLikeWildcards(@NotNull String term) {
-    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
   }
 }

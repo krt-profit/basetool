@@ -143,9 +143,16 @@
                 successMessage: i18n.deletionRequested,
                 errorMessage: i18n.deletionError,
                 onSuccess: function () {
+                    // The documented close is the two classes, not an inline style: an inline
+                    // display:none wins over any stylesheet rule and leaves the overlay in a state
+                    // the shared open/close contract does not describe. It happens to reopen today
+                    // only because `open-modal-display` clears the inline style first -- a
+                    // dependency on the order of two unrelated pieces of code, which is the shape
+                    // of a latent defect rather than a working design.
                     const overlay = document.getElementById('profile-deletion-modal');
                     if (overlay) {
-                        overlay.style.display = 'none';
+                        overlay.classList.remove('krtm-modal-open');
+                        overlay.classList.add('krtm-hidden');
                     }
                     if (eraseHistory) {
                         eraseHistory.checked = false;

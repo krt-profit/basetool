@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -31,7 +31,6 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -149,7 +148,7 @@ class AdminDeletionRequestsPageControllerTest {
   @Test
   void execute_readsTheHistoryErasureFromTheAdminsPayload() {
     // The member's wish is recorded on the request row; whether it is granted is the admin's
-    // answer, and that is what this flag carries (decision 6, @greluc).
+    // answer, and that is what this flag carries (decision 6, greluc).
     BackendApiClient client = mock(BackendApiClient.class);
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
@@ -160,7 +159,23 @@ class AdminDeletionRequestsPageControllerTest {
     assertEquals(HttpStatus.OK, response.getStatusCode());
     Map<String, Object> body = capturePostedBody(client, EXECUTE_URI);
     assertEquals(true, body.get("grantHistoryErasure"));
-    assertEquals("Granted.", body.get("note"));
+  }
+
+  // covers REQ-SEC-061 - an execution collects no note, because nothing can store one
+  @Test
+  void execute_relaysNoNoteEvenWhenTheClientSendsOne() {
+    // The dialog no longer offers a note field and the proxy no longer forwards one. There is
+    // nowhere durable to put it: the deletion_request row cascades away with the account, and
+    // REQ-AUDIT-001 keeps free text out of the audit payload. Asking an admin for a justification
+    // and discarding it is worse than not asking -- they believe they have recorded it. A refusal
+    // is the case where the reasoning survives, and /decline requires it.
+    BackendApiClient client = mock(BackendApiClient.class);
+    AdminDeletionRequestsPageController controller =
+        new AdminDeletionRequestsPageController(client);
+
+    controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", false, "note", "Anything."));
+
+    assertThat(capturePostedBody(client, EXECUTE_URI)).doesNotContainKey("note");
   }
 
   @Test
@@ -174,22 +189,6 @@ class AdminDeletionRequestsPageControllerTest {
     controller.execute(REQUEST_ID, Map.of("grantHistoryErasure", "true"));
 
     assertEquals(false, capturePostedBody(client, EXECUTE_URI).get("grantHistoryErasure"));
-  }
-
-  @Test
-  void execute_aBlankNoteIsRelayedAsNullRatherThanAsWhitespace() {
-    // An empty decision note that is stored as "   " reads as a reason nobody can make sense of;
-    // null reads as "no note", which is the truth.
-    BackendApiClient client = mock(BackendApiClient.class);
-    AdminDeletionRequestsPageController controller =
-        new AdminDeletionRequestsPageController(client);
-    Map<String, Object> payload = new HashMap<>();
-    payload.put("grantHistoryErasure", false);
-    payload.put("note", "  ");
-
-    controller.execute(REQUEST_ID, payload);
-
-    assertNull(capturePostedBody(client, EXECUTE_URI).get("note"));
   }
 
   @Test

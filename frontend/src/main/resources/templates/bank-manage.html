@@ -221,8 +221,8 @@
                              (matched on the OIDC sub). The backend canSeeHolder gate is authoritative. -->
                         <td th:with="canViewHolder=${management or (h.userId() != null and selfUserId != null and h.userId().toString().equals(selfUserId))}">
                             <a th:if="${canViewHolder}" th:href="@{'/bank/holders/' + ${h.id()}}"
-                               th:text="${h.handle()}" data-testid="bank-holder-history-link">greluc</a>
-                            <span th:unless="${canViewHolder}" th:text="${h.handle()}">greluc</span>
+                               th:text="${@handles.display(h.handle())}" data-testid="bank-holder-history-link">greluc</a>
+                            <span th:unless="${canViewHolder}" th:text="${@handles.display(h.handle())}">greluc</span>
                         </td>
                         <td>
                             <span class="status-pill"
@@ -544,7 +544,7 @@
                         <select id="bank-holder-transfer-source" name="sourceHolderId" required
                                 data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-source">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
-                            <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                            <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="sourceHolderId"></span>
                     </div>
@@ -553,7 +553,7 @@
                         <select id="bank-holder-transfer-dest" name="destinationHolderId" required
                                 data-role="bank-holder-select" data-krt-combobox data-testid="bank-holder-transfer-dest">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
-                            <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${h.handle()}">carol</option>
+                            <option th:each="h : ${holders}" th:value="${h.id()}" th:text="${@handles.display(h.handle())}">carol</option>
                         </select>
                         <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                     </div>

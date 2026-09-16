@@ -148,10 +148,13 @@
                     <p class="form-hint" th:text="#{admin.deletionRequests.execute.eraseHistory.hint}">Betrifft beide Audit-Protokolle, die Buchungshistorie, Buchungsantr&auml;ge und die &Uuml;bergabe-Empf&auml;nger. Die Zeilen bleiben bestehen, nur der Name verschwindet.</p>
                 </div>
             </div>
-            <div class="bank-form-row">
-                <label for="execute-note" th:text="#{admin.deletionRequests.execute.note}">Notiz (optional)</label>
-                <textarea id="execute-note" rows="3" data-testid="execute-note"></textarea>
-            </div>
+            <!-- No note field here, unlike the refusal dialog, and that is deliberate. There is
+                 nowhere durable to put one: the deletion_request row cascades away with the account
+                 the moment this action completes, and REQ-AUDIT-001 keeps free text out of the
+                 audit details payload. The dialog used to ask for one and discard it, which is
+                 worse than not asking -- the admin believes they have recorded their reasoning.
+                 A refusal is the case where the reasoning has to survive, and there it does
+                 (deletion_request.decision_note, enforced by a CHECK constraint). -->
             <span class="bank-field-error" data-error-for="_global"></span>
         </div>
         <div class="krt-modal-foot">

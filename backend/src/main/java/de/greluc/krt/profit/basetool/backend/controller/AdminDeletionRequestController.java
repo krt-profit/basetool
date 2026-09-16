@@ -136,7 +136,10 @@ public class AdminDeletionRequestController {
   })
   public ResponseEntity<Void> execute(
       @PathVariable UUID id, @Valid @RequestBody DecideDeletionRequestRequest request) {
-    deletionRequestService.execute(id, request.grantHistoryErasure(), request.note());
+    // request.note() is deliberately not read here: an execution has nowhere durable to
+    // record a note (see DeletionRequestService#decline). The field stays on the shared
+    // request record because a refusal requires it.
+    deletionRequestService.execute(id, request.grantHistoryErasure());
     return ResponseEntity.noContent().build();
   }
 }

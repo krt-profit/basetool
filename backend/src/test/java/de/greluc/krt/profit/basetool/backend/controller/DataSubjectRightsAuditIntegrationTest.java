@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -64,6 +66,18 @@ import org.springframework.web.context.WebApplicationContext;
  * it, so the propagation is never exercised and those tests stay green against an endpoint that
  * would 500 in production.
  *
+ * <p><b>The four export requests also carry the frontend's real {@code Accept} header</b>, and that
+ * is a second defect this class is the only place to catch. The shared {@code webClient} bean sends
+ * {@code application/cbor, application/json} under the default {@code APP_HTTP_CODEC=CBOR} ({@code
+ * WebClientConfig#backendAcceptTypes}), and both download endpoints hand their bytes straight to
+ * the member's browser. A {@code produces} condition on the PDF mappings answered 406 before the
+ * handler ran, and the JSON export -- returning a POJO -- negotiated its way to CBOR and was served
+ * as {@code datenauskunft.json}, a binary blob no JSON tool opens. Both are invisible to a test
+ * that sends no {@code Accept} header, and invisible to {@code DataExportProxyControllerTest}
+ * because that builds a bare {@code WebClient} without the bean's default headers. The person
+ * search is deliberately left to negotiate: its response is decoded by the frontend, never handed
+ * to a member as a file.
+ *
  * <p><b>This class must never become {@code @Transactional}</b>, and neither must its test methods.
  * A test-managed transaction is exactly the ambient transaction whose absence is the defect, and it
  * would make the class pass against broken code. The seeding goes through an explicit {@link
@@ -75,6 +89,15 @@ class DataSubjectRightsAuditIntegrationTest {
 
   /** Clears {@code PersonSearchService.MIN_TERM_LENGTH}, and distinctive enough to own its hits. */
   private static final String SEARCH_TERM = "ZzzAuditProbeZzz";
+
+  /**
+   * Exactly what the frontend's shared {@code webClient} bean sends under the default {@code
+   * APP_HTTP_CODEC=CBOR}. Hardcoded rather than read from the frontend module, which the backend
+   * does not depend on; {@code WebClientCborNegotiationTest} pins the other end of the pair.
+   */
+  private static final MediaType[] FRONTEND_ACCEPT = {
+    MediaType.APPLICATION_CBOR, MediaType.APPLICATION_JSON
+  };
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
@@ -111,7 +134,10 @@ class DataSubjectRightsAuditIntegrationTest {
   // covers REQ-SEC-058 - the member's own JSON export is served and audited
   @Test
   void selfExportJson_isServedAndAudited() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me/export").with(member(actor))).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/users/me/export").with(member(actor)).accept(FRONTEND_ACCEPT))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .as("one export row, recorded by the subject themselves")
@@ -127,8 +153,9 @@ class DataSubjectRightsAuditIntegrationTest {
   @Test
   void selfExportPdf_isServedAndAudited() throws Exception {
     mockMvc
-        .perform(get("/api/v1/users/me/export/pdf").with(member(actor)))
-        .andExpect(status().isOk());
+        .perform(get("/api/v1/users/me/export/pdf").with(member(actor)).accept(FRONTEND_ACCEPT))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)
@@ -140,8 +167,12 @@ class DataSubjectRightsAuditIntegrationTest {
   @Test
   void adminExportJson_isServedAndAudited() throws Exception {
     mockMvc
-        .perform(get("/api/v1/admin/users/{id}/export", actor).with(admin(actor)))
-        .andExpect(status().isOk());
+        .perform(
+            get("/api/v1/admin/users/{id}/export", actor)
+                .with(admin(actor))
+                .accept(FRONTEND_ACCEPT))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .as("bySelf=false is the distinction the trail exists to make")
@@ -155,8 +186,12 @@ class DataSubjectRightsAuditIntegrationTest {
   @Test
   void adminExportPdf_isServedAndAudited() throws Exception {
     mockMvc
-        .perform(get("/api/v1/admin/users/{id}/export/pdf", actor).with(admin(actor)))
-        .andExpect(status().isOk());
+        .perform(
+            get("/api/v1/admin/users/{id}/export/pdf", actor)
+                .with(admin(actor))
+                .accept(FRONTEND_ACCEPT))
+        .andExpect(status().isOk())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PDF));
 
     assertThat(auditRows(AuditEventType.PERSONAL_DATA_EXPORTED))
         .hasSize(1)

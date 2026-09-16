@@ -40,8 +40,11 @@ import org.jetbrains.annotations.Nullable;
  * </ul>
  *
  * @param grantHistoryErasure whether the surviving handle snapshots are anonymised as well; ignored
- *     when refusing
- * @param note the admin's recorded reasoning; mandatory when refusing
+ *     when refusing * @param note the refusal's reason. <b>Required for a refusal</b>, where Art.
+ *     12(4) obliges telling the requester and a CHECK constraint enforces it; <b>ignored on an
+ *     execution</b>, which has nowhere durable to record one -- the row cascades away with the
+ *     account and REQ-AUDIT-001 keeps free text out of the audit payload. The execute dialog
+ *     therefore does not ask for one.
  */
 public record DecideDeletionRequestRequest(
     boolean grantHistoryErasure, @Nullable @Size(max = 4000) String note) {

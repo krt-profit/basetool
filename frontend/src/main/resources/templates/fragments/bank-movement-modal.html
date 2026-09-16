@@ -181,7 +181,7 @@
                     <select id="bank-mv-deposit-holder" name="holderId" required data-krt-combobox
                             data-testid="bank-movement-deposit-holder">
                         <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
-                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
                     </select>
                     <span class="bank-field-error" data-error-for="holderId"></span>
                 </div>
@@ -194,7 +194,7 @@
                             data-testid="bank-movement-withdraw-holder">
                         <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                         <option th:each="h : ${holders}" th:value="${h.id()}"
-                                th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
+                                th:text="${@handles.display(h.handle())} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
                     </select>
                     <span class="bank-field-error" data-error-for="holderId"></span>
                 </div>
@@ -207,7 +207,7 @@
                             data-testid="bank-movement-source-holder">
                         <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                         <option th:each="h : ${holders}" th:value="${h.id()}"
-                                th:text="${h.handle()} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
+                                th:text="${@handles.display(h.handle())} + (${!h.active()} ? ' (' + #{bank.holder.inactive} + ')' : '')">greluc</option>
                     </select>
                     <span class="bank-field-error" data-error-for="sourceHolderId"></span>
                 </div>
@@ -219,7 +219,7 @@
                     <select id="bank-mv-dest-holder" name="destinationHolderId" required disabled data-krt-combobox
                             data-testid="bank-movement-dest-holder">
                         <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
-                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                        <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
                     </select>
                     <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                 </div>

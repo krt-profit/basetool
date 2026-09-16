@@ -166,4 +166,54 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
       "UPDATE AuditEvent e SET e.actorHandle = :sentinel"
           + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
   int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces a subject label that <em>is</em> this member's name with the erasure sentinel
+   * (REQ-SEC-062).
+   *
+   * <p>A second column on the same rows, and it was missed the first time: {@code
+   * anonymiseActorHandle} scrubs {@code actor_handle} and never touches {@code subject_label}, so a
+   * granted erasure left rows literally half-anonymised — scrubbed actor, intact name, same row —
+   * and the deletion-request events were themselves labelled with the requester's name. Those call
+   * sites now pass {@code null}, per the REQ-AUDIT-001 convention that a subject label is a
+   * non-personal display label; this query is what reaches the rows already written.
+   *
+   * <p><b>Exact match, not a substring replace.</b> A label that merely <em>contains</em> the
+   * handle is a job-order title naming that order's contact person, which is a different person's
+   * name on a row about a different act; rewriting it would erase somebody who did not ask.
+   * Case-insensitive because a label can be assembled from text a human typed.
+   *
+   * @param handle the spelling to erase; compared case-insensitively against the whole label
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE AuditEvent e SET e.subjectLabel = :sentinel"
+          + " WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel")
+  int anonymiseSubjectLabel(@Param("handle") String handle, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces this member's name where it occurs inside a details payload (REQ-SEC-062).
+   *
+   * <p>{@code details} is a bare {@code CharSequence} on {@code AuditService#record}, so nothing
+   * forces a caller through the {@code AuditDetails} builder and nothing stops a handle being
+   * concatenated into it. REQ-AUDIT-001 forbids it, {@code PersonSearchTargets} exempted the column
+   * on the strength of that rule, and the bank services falsified it — which is why the search now
+   * covers the column and the erasure now reaches it.
+   *
+   * <p><b>Substring replace, and case-sensitive.</b> The payload is machine-written, so the handle
+   * appears in it exactly as the application spelled it; a case-insensitive replace would need
+   * {@code regexp_replace} and a native query, for a case that cannot arise. The surrounding
+   * key/value text is preserved, so the row still says what happened.
+   *
+   * @param handle the spelling to erase
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE AuditEvent e SET e.details = REPLACE(e.details, :handle, :sentinel)"
+          + " WHERE e.details LIKE CONCAT('%', :handle, '%')")
+  int anonymiseDetails(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

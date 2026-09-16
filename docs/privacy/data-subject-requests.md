@@ -108,19 +108,39 @@ is easier to grant than one asking to rewrite the ledger. Decide it explicitly, 
 and tell the requester the outcome either way — Art. 12(4) requires telling them **why** if the
 answer is no, together with their right to complain and to a judicial remedy.
 
-**What granting it does** (REQ-SEC-062): the member's handle is replaced by a placeholder in all six
-places a handle snapshot survives a deletion — both audit trails, the bank booking history, the four
-handle columns on the booking requests, and the two job-order handover recipients. **No row is
+**What granting it does** (REQ-SEC-062): the member's name is replaced by a placeholder in all
+**eleven** places a handle snapshot survives a deletion — both audit trails (the actor handle, the
+subject label and the details payload), the bank booking history, the four handle columns on the
+booking requests, the bank custodian registry, the job-order contact, the two job-order handover
+recipients and the render parameters of the notifications other administrators received. **No row is
 removed** and no fact about what happened changes; only the name goes. That is why it can be granted
 at all: deleting the rows would take a counterparty's own evidence with it. It leaves a marker event
-in both trails, and it runs **before** the account is deleted — four of the six updates match on the
-foreign key the deletion nulls out.
+in both trails, and it runs **before** the account is deleted — the id-matched updates only reach
+rows while the foreign key the deletion nulls out still points at the account.
 
-> [!warning] Two of the six are matched by text, so review the hits first
-> The two handover recipients have no user id beside them: the recipient was typed in by hand. They
-> are matched on the handle text, case-insensitively, which means the anonymisation can **over-match**
-> if two people ever used the same spelling. Run the [name search](#finding-every-mention-of-a-person)
-> and look at the hits before granting. That is also why granting is never automatic.
+It matches on **every spelling the account carries** — username, display name and Discord guild
+nickname — because a handover or a job-order contact was typed by hand and whoever typed it wrote
+whichever name they use for the person.
+
+> [!warning] The text-matched columns can over-match, so review the hits first
+> A handover recipient, a job-order contact and an audit subject label have no user id beside them:
+> somebody typed them. They are matched on the text, case-insensitively, which means the
+> anonymisation can **over-match** if two people ever used the same spelling. Run the
+> [name search](#finding-every-mention-of-a-person) and look at the hits before granting. That is
+> also why granting is never automatic.
+
+> [!important] Rather more than half of it is still your job, and the tool now says which half
+> The eleven columns above are the ones a rule can rewrite safely: a column that holds a name and
+> nothing else. The larger part of the schema holds the name **inside a sentence somebody wrote** —
+> a booking justification, a mission description, an announcement, an org-chart placeholder, a
+> market remark. No rule can rewrite those without either corrupting the sentence or missing the
+> mention, so an admin edits them by hand, which is what the name search is for and why this
+> document has always required it.
+>
+> `HandleErasureCoverage` in the code now classifies **every** column the name search knows about
+> as one of four things — rewritten by the erasure, removed with the account, structurally about
+> somebody else, or *your manual step*. It is gate-enforced, so the list cannot go quietly out of
+> date, and it is the answer to "have I finished?" when you are working through the search hits.
 
 **Do not confuse an erasure request with leaving the organisation.** A departing member whose account
 is deleted for organisational reasons gets the standard deletion; someone exercising Art. 17 is

@@ -32,16 +32,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.openpdf.text.pdf.PdfPTable;
 
 /**
  * Renders a data export as the human-readable half of the Art. 15 answer (REQ-SEC-058).
  *
- * <p><b>This is a summary by design, and the JSON is the full disclosure.</b> Decided by @greluc on
- * 2026-09-15. An active member's export runs to thousands of warehouse movements and audit rows;
- * rendering every one as a PDF table produces a document nobody reads, which serves the right of
- * access worse than a short document that says exactly what exists and points at the
- * machine-readable file for the detail.
+ * <p><b>This is a summary by design, and the JSON is the full disclosure.</b> Decided by
+ * {@literal @}greluc on 2026-09-15. An active member's export runs to thousands of warehouse
+ * movements and audit rows; rendering every one as a PDF table produces a document nobody reads,
+ * which serves the right of access worse than a short document that says exactly what exists and
+ * points at the machine-readable file for the detail.
  *
  * <p>So the PDF carries:
  *
@@ -57,6 +58,13 @@ import org.openpdf.text.pdf.PdfPTable;
  * through the caller's label function rather than written inline.
  */
 public final class DataExportPdfFormat {
+
+  /**
+   * What an absent value reads as. An en dash rather than an empty cell, so the row still shows
+   * that the column exists and is simply not filled in -- which is itself part of the answer to an
+   * access request.
+   */
+  private static final String EMPTY_VALUE = "–";
 
   /** Not instantiable. */
   private DataExportPdfFormat() {}
@@ -142,7 +150,7 @@ public final class DataExportPdfFormat {
             Color bg = KrtPdfSupport.rowBackground(rowAlt);
             rowAlt = !rowAlt;
             KrtPdfSupport.addTableCell(table, cell.getKey(), bg, false);
-            KrtPdfSupport.addTableCell(table, String.valueOf(cell.getValue()), bg, false);
+            KrtPdfSupport.addTableCell(table, renderValue(cell.getValue()), bg, false);
           }
         }
         krt.document().add(table);
@@ -158,5 +166,23 @@ public final class DataExportPdfFormat {
     } catch (IOException e) {
       throw new ReportGenerationException("Could not render the data-export PDF", e);
     }
+  }
+
+  /**
+   * One cell's value as it should read in the document.
+   *
+   * <p>An empty column renders as a dash and not as the four letters {@code null}. The projections
+   * select every column unconditionally, so a member who never filled in their description, Discord
+   * id or display name used to receive a document with rows reading {@code description | null} --
+   * which invites the reading that the system stores the string rather than nothing. {@code
+   * String.valueOf(Object)} is what produced it: the value is statically {@code Object}, so the
+   * overload that maps {@code null} to {@code "null"} was the one bound, before {@code
+   * addTableCell}'s non-null guard could help.
+   *
+   * @param value the projected value, possibly {@code null}
+   * @return the text for the cell
+   */
+  private static @NotNull String renderValue(@Nullable Object value) {
+    return value == null ? EMPTY_VALUE : String.valueOf(value);
   }
 }

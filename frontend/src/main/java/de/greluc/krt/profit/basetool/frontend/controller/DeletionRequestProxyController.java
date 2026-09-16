@@ -76,20 +76,27 @@ public class DeletionRequestProxyController {
    * request, pending, declined-with-reason — decided in exactly one place, so the swapped card can
    * never disagree with the freshly loaded page.
    *
-   * @param model the view model the fragment reads {@code deletionRequest} from
+   * @param model the view model the fragment reads {@code deletionRequest} and {@code
+   *     deletionRequestUnavailable} from
    * @return the fragment view name
    */
   @GetMapping(params = "fragment=card")
   @PreAuthorize("isAuthenticated()")
   public String card(Model model) {
     Map<String, Object> deletionRequest = null;
+    boolean unavailable = false;
     try {
       deletionRequest =
           backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
     } catch (Exception e) {
       log.debug("Could not load the member's deletion request for the card fragment", e);
+      unavailable = true;
     }
     model.addAttribute("deletionRequest", deletionRequest);
+    // Reported rather than swallowed: the swap happens after a write that already succeeded, and
+    // rendering the no-request state here would tell the member the opposite of what just
+    // happened. See the same flag in ProfileController.
+    model.addAttribute("deletionRequestUnavailable", unavailable);
     return "fragments/profile-deletion-card :: card";
   }
 

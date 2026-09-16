@@ -137,8 +137,62 @@ rows — would take a counterparty's own evidence with it.
   `HandleDisplay`, a **mirror pair** with the same cause as `CLIENT_IDS` mirroring
   `ClientAttribution`: the frontend module holds no backend beans. Changing it means changing both.
 
+## Corrected after review — 2026-09-16
+
+This decision shipped describing its set of columns as closed. It was not, and the ADR said so more
+confidently than the code justified. Five further columns survived a granted erasure:
+
+| Column                                            | Why it survived                                                                                                                                                                                                                                                      |
+|:--------------------------------------------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `bank_holder.handle`                              | The custodian registry, whose `user_id` is `ON DELETE SET NULL` and whose `handle` is `NOT NULL` — so it becomes **more** visible after the account is gone, not less. The most conspicuous omission of the five.                                                    |
+| `job_order.handle`                                | The order's contact person. Its two sibling *handover* columns were text-matched from the start; this one was not, so the name stayed in the order list and in the audit labels built from it.                                                                       |
+| `notification.params`                             | `AccountDeletionRequestedEvent` writes `{"handle":"<name>"}` into a row for **every** administrator, and the deletion only clears the departing member's own inbox. The name sat in every admin's bell for up to the 180-day unread window.                          |
+| `audit_event.details`, `bank_audit_event.details` | `details` is a bare `CharSequence`, so nothing forces the `AuditDetails` builder — and the bank services concatenate a handle into it on every booking. `PersonSearchTargets` had exempted both columns *on the strength of* the REQ-AUDIT-001 rule that forbids it. |
+
+And `audit_event.subject_label` was worse than missed: the erasure rewrote `actor_handle` and then
+the execution's own audit row put the member's effective name back into `subject_label` on the same
+row, six lines later. All four deletion-request events did the same, so a granted erasure left rows
+literally half-anonymised for the full 24-month retention.
+
+Three things changed, and only the third of them is a fix rather than a lesson:
+
+1. **The set is eleven columns, and text-matched columns run once per spelling.** `getEffectiveName()`
+   is `displayName ?: username`, so a handover typed with the member's username or Discord nickname
+   was never reached. All three spellings are passed now — the same correction `HandleScrubber`
+   needed, for the same reason.
+2. **The four deletion-request events carry a `null` subject label.** REQ-AUDIT-001 limits it to a
+   non-personal display label; the member is identified by `actor_user_id` and `target_user_id`,
+   which the viewer resolves against the live roster.
+3. **The set is gate-enforced.** `HandleErasureCoverage` classifies every column
+   `PersonSearchTargets` registers as a place a person is named, and `HandleErasureCoverageTest`
+   fails the build unless each one is anonymised, removed with the account, structurally about
+   somebody else, or recorded as an admin's manual step with a reason.
+
+The third is the load-bearing one, and the asymmetry it removes is the actual lesson: the person
+search had `PersonSearchCoverageTest` from the day it was written and never drifted. This set had a
+comment, and drifted before the branch was even merged. A registry without a gate is a comment.
+
+**The registry is honest about how much stays manual.** Rather more than half the columns are
+prose somebody else typed, where the name sits inside a sentence and no mechanical rule can rewrite
+it without either corrupting the sentence or missing the mention. That residue is why the admin
+Personensuche exists and why `docs/privacy/data-subject-requests.md` requires an admin to walk its
+hits — but it was previously implicit, and an erasure whose manual half is implicit is an erasure
+somebody will believe is complete.
+
 ## Alternatives considered
 
+- **Substring-replace the handle inside `audit_event.subject_label` rather than matching the whole
+  value.** Rejected: a label that merely *contains* the handle is a job-order title naming that
+  order's contact person, which is a different person on a row about a different act. Rewriting it
+  would erase somebody who did not ask.
+- **Fix the two bank services and keep the `details` columns exempt from the search.** Rejected as
+  the *whole* answer, though the writers should indeed be fixed: the rows already written carry the
+  names, and a registry that assumes a rule nothing enforces is how the exemption came to be false
+  in the first place.
+- **Delete the notification rows instead of rewriting their payload.** Rejected: the rows are other
+  administrators' inboxes, and removing an entry an admin has not read yet loses the fact that a
+  request was raised at all. Replacing the name inside the payload leaves the notification
+  readable and the JSON parseable.
 - **Delete the rows that name the member.** Rejected by @greluc: it tears holes in a record whose
   worth rests on being complete, and a bank posting's counterparty losing their own evidence line is
   a cost to somebody who did not make the request.

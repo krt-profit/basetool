@@ -31,8 +31,10 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -48,13 +50,13 @@ import org.springframework.transaction.annotation.Transactional;
  * The members' Art. 17 erasure requests, and the admin decisions on them (REQ-SEC-061).
  *
  * <p>A member raises a request on their own profile; an admin decides it. <b>Nothing here deletes
- * an account as a side effect of the member's click</b> — that is the whole design (decision 5,
+ * an account as a side effect of the member's click</b> — that is the whole design: decision 5,
+ * {@literal @}greluc, ADR-0181. The deletion removes the Keycloak account, purges the member's
+ * warehouse stock and hangar and reassigns their missions and refinery orders (REQ-DATA-008); none
+ * of it is reversible, and a mis-click on one's own profile page must not be able to start it.
  *
- * @greluc, ADR-0181). The deletion removes the Keycloak account, purges the member's warehouse
- *     stock and hangar and reassigns their missions and refinery orders (REQ-DATA-008); none of it
- *     is reversible, and a mis-click on one's own profile page must not be able to start it.
- *     <p>Modelled on the registration-approval queue rather than a second pattern: a row per
- *     request, a status, a decider, a decision instant and a recorded reason.
+ * <p>Modelled on the registration-approval queue rather than a second pattern: a row per request, a
+ * status, a decider, a decision instant and a recorded reason.
  */
 @Service
 @RequiredArgsConstructor
@@ -79,48 +81,101 @@ public class DeletionRequestService {
   private final ObjectProvider<DeletionRequestService> selfProvider;
 
   /**
+   * How many times {@link #raise} retries a concurrent-insert loss.
+   *
+   * <p>Three, matching the other find-or-create sites. The loser only has to lose once for the
+   * winner's row to be committed and readable, so two would do; the third is there for the case
+   * where the winner's request is withdrawn between the failed insert and the retry's pre-read,
+   * which puts the loser back at the start legitimately.
+   */
+  private static final int RAISE_ATTEMPTS = 3;
+
+  /**
    * Raises a member's erasure request.
    *
    * <p>Idempotent by design rather than by check-then-act: a partial unique index on {@code
    * (user_id) WHERE status = 'PENDING'} is what guarantees one open request per member, so a member
-   * who double-clicks gets their existing request back instead of a second queue entry. The
-   * pre-read is there to answer the common case without provoking a constraint violation; the
-   * {@code catch} is what makes it correct under a genuine race.
+   * who double-clicks gets their existing request back instead of a second queue entry.
+   *
+   * <p><b>A non-transactional orchestrator around a {@code REQUIRES_NEW} attempt, and that shape is
+   * the whole point.</b> The recovery used to sit in a {@code catch} inside the same transaction as
+   * the failing {@code saveAndFlush}, which cannot work: JPA marks a transaction rollback-only once
+   * a flush has failed, and Postgres aborts the backend transaction on the constraint violation
+   * (SQLSTATE 25P02), so the recovery {@code SELECT} on that connection fails outright and the
+   * commit hook throws {@code UnexpectedRollbackException}. The member's second click answered 500.
+   * Retrying in a <em>fresh</em> transaction is what makes the recovery reachable — by then the
+   * winner has committed and the pre-read finds their row. Same pattern, same reason, as {@code
+   * OperationService#setPayoutStatus} and {@code MaterialClaimService#upsertClaim}
+   * (backend/CLAUDE.md, "find-or-create races").
+   *
+   * <p>A race that outlives the attempt bound is allowed to propagate rather than be swallowed:
+   * {@code DataIntegrityViolationException} maps to a truthful 409, and a silent success would be
+   * worse than a status the client can retry on.
    *
    * @param userId the member asking to be erased
    * @param eraseHistoryRequested whether they also ask for the surviving handle snapshots to be
    *     anonymised — a wish an admin decides deliberately, never an instruction
    * @return the member's open request, newly created or pre-existing
    */
-  @Transactional
   public @NotNull DeletionRequest raise(@NotNull UUID userId, boolean eraseHistoryRequested) {
+    DataIntegrityViolationException last = null;
+    for (int attempt = 1; attempt <= RAISE_ATTEMPTS; attempt++) {
+      try {
+        return selfProvider.getObject().raiseWithinNewTransaction(userId, eraseHistoryRequested);
+      } catch (DataIntegrityViolationException e) {
+        // The partial unique index fired: a concurrent click won. Its row is the answer, and the
+        // next attempt's pre-read will find it now that this transaction is gone.
+        last = e;
+        log.debug(
+            "Concurrent deletion request for {} (attempt {} of {}); retrying to read the winner's"
+                + " row",
+            userId,
+            attempt,
+            RAISE_ATTEMPTS);
+      }
+    }
+    throw last;
+  }
+
+  /**
+   * One attempt at the find-or-create, in a transaction of its own.
+   *
+   * <p>{@code REQUIRES_NEW} rather than the default, because the caller retries on failure and a
+   * joined transaction would hand the retry the same poisoned one. Public only so the self-proxy
+   * can reach it; {@link #raise} is the entry point.
+   *
+   * @param userId the member asking to be erased
+   * @param eraseHistoryRequested the member's wish about the surviving handle snapshots
+   * @return the request this attempt found or created
+   * @throws DataIntegrityViolationException when a concurrent attempt committed first
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public @NotNull DeletionRequest raiseWithinNewTransaction(
+      @NotNull UUID userId, boolean eraseHistoryRequested) {
     Optional<DeletionRequest> existing =
         deletionRequestRepository.findByUserIdAndStatus(userId, DeletionRequestStatus.PENDING);
     if (existing.isPresent()) {
       return existing.get();
     }
-    DeletionRequest saved;
-    try {
-      saved =
-          deletionRequestRepository.saveAndFlush(
-              new DeletionRequest(userId, eraseHistoryRequested));
-    } catch (DataIntegrityViolationException e) {
-      // The partial unique index fired: a concurrent click won. Its row is the answer.
-      log.debug("Concurrent deletion request for {}; returning the winner's row", userId);
-      return deletionRequestRepository
-          .findByUserIdAndStatus(userId, DeletionRequestStatus.PENDING)
-          .orElseThrow(() -> e);
-    }
+    final DeletionRequest saved =
+        deletionRequestRepository.saveAndFlush(new DeletionRequest(userId, eraseHistoryRequested));
 
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUESTED,
         userId,
-        handleOf(userId),
+        // No subject label. REQ-AUDIT-001 limits it to a non-personal display label, and this
+        // one is a person by definition -- who the row is about is in actor_user_id and
+        // target_user_id, which the viewer resolves against the live roster and the erasure
+        // reaches. A name here outlived the erasure for the full 24-month retention:
+        // anonymise() rewrites actor_handle, and subject_label sat on the same row intact.
+        null,
         userId,
         AuditDetails.of("eraseHistoryRequested", eraseHistoryRequested));
 
-    // Published after the row is flushed so the admins' notification cannot describe a request that
-    // then rolls back (REQ-NOTIF-002 produces after commit).
+    // Published inside the transaction on purpose: the listener is AFTER_COMMIT, so the admins'
+    // notification cannot describe a request that then rolls back (REQ-NOTIF-002). Publishing from
+    // the non-transactional orchestrator instead would leave no transaction for it to bind to and
+    // the event would never be delivered.
     eventPublisher.publishEvent(new AccountDeletionRequestedEvent(userId, handleOf(userId)));
     log.info("Member {} raised an account-deletion request", userId);
     return saved;
@@ -151,7 +206,8 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_WITHDRAWN,
         userId,
-        handleOf(userId),
+        // See the note in raise(): the subject is identified by id, never by name.
+        null,
         userId,
         AuditDetails.of("requestId", request.getId()));
     log.info("Member {} withdrew their account-deletion request", userId);
@@ -175,6 +231,11 @@ public class DeletionRequestService {
    */
   @Transactional
   public @NotNull DeletionRequest decline(@NotNull UUID requestId, @Nullable String note) {
+    // A refusal is the one decision whose reasoning survives -- the row stays, in DECLINED, and
+    // the member reads the reason on their profile page. An execution has nowhere to put one: the
+    // row cascades away with the account it was about, and REQ-AUDIT-001 keeps free text out of
+    // the audit payload. So execute() takes no note at all rather than accepting one and dropping
+    // it, which is what it used to do.
     if (note == null || note.isBlank()) {
       throw new IllegalArgumentException("A declined deletion request must carry a reason");
     }
@@ -188,7 +249,8 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_DECLINED,
         request.getUserId(),
-        handleOf(request.getUserId()),
+        // See the note in raise(): the subject is identified by id, never by name.
+        null,
         request.getUserId(),
         AuditDetails.of("requestId", request.getId()));
 
@@ -241,7 +303,7 @@ public class DeletionRequestService {
    * specific account, so the application removes the Keycloak user itself instead of asking the
    * admin to do it in the Keycloak console and come back after the nightly roster sync. Leaving the
    * second act to a human is exactly the state REQ-SEC-059 exists to detect, and this path avoids
-   * creating it (decision by @greluc, 2026-09-15).
+   * creating it (decision by {@literal @}greluc, 2026-09-15).
    *
    * <p><b>Ordering is load-bearing</b> and is the one REQ-SEC-026 / ADR-0111 established: the
    * database half commits <em>first</em> and the Keycloak user is deleted <em>last</em>. A
@@ -257,13 +319,11 @@ public class DeletionRequestService {
    * @param grantHistoryErasure whether the admin also grants the Art. 17 wish to anonymise the
    *     surviving handle snapshots; independent of what the member asked for, because the admin
    *     weighs it
-   * @param note the admin's recorded reasoning, for the decision record; may be {@code null}
    * @throws EntityNotFoundException when no such pending request exists
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public void execute(@NotNull UUID requestId, boolean grantHistoryErasure, @Nullable String note) {
-    UUID userId =
-        selfProvider.getObject().executeDatabaseHalf(requestId, grantHistoryErasure, note);
+  public void execute(@NotNull UUID requestId, boolean grantHistoryErasure) {
+    UUID userId = selfProvider.getObject().executeDatabaseHalf(requestId, grantHistoryErasure);
     // Only after the database half has committed.
     try {
       keycloakService.deleteUser(userId);
@@ -287,13 +347,11 @@ public class DeletionRequestService {
    *
    * @param requestId the pending request to carry out
    * @param grantHistoryErasure whether the handle snapshots are anonymised as well
-   * @param note the admin's recorded reasoning, or {@code null}
    * @return the id of the deleted account, for the caller's Keycloak half
    * @throws EntityNotFoundException when no such pending request exists
    */
   @Transactional
-  public @NotNull UUID executeDatabaseHalf(
-      @NotNull UUID requestId, boolean grantHistoryErasure, @Nullable String note) {
+  public @NotNull UUID executeDatabaseHalf(@NotNull UUID requestId, boolean grantHistoryErasure) {
     DeletionRequest request = pendingOrThrow(requestId);
     UUID userId = request.getUserId();
     User user =
@@ -303,19 +361,28 @@ public class DeletionRequestService {
 
     if (grantHistoryErasure) {
       // Before the delete: the id-matched updates only reach rows while the FK still points at the
-      // account, and the handle-matched ones need the handle the account still carries.
-      handleAnonymisationService.anonymise(userId, user.getEffectiveName());
+      // account, and the text-matched ones need the names the account still carries.
+      //
+      // All three spellings, not the effective name alone. A handover or a job-order contact is
+      // typed by hand, and whoever typed it wrote what they call the person -- as likely the
+      // Discord nickname as the display name. Passing one spelling left the others standing.
+      handleAnonymisationService.anonymise(
+          userId,
+          Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname())
+              .filter(Objects::nonNull)
+              .toList());
     }
 
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_EXECUTED,
         userId,
-        user.getEffectiveName(),
+        // See the note in raise(). This was the worst of the four: on a granted erasure the name
+        // went back in six lines after being removed, into a row the erasure had just rewritten.
+        null,
         userId,
         AuditDetails.of("requestId", request.getId())
             .with("historyErasureGranted", grantHistoryErasure)
-            .with("historyErasureRequested", request.isEraseHistoryRequested())
-            .with("noteRecorded", note != null && !note.isBlank()));
+            .with("historyErasureRequested", request.isEraseHistoryRequested()));
 
     user.setInKeycloak(false);
     userRepository.saveAndFlush(user);
@@ -346,8 +413,11 @@ public class DeletionRequestService {
   }
 
   /**
-   * The member's effective name, for the audit row's subject-label snapshot and for the admin
-   * queue, which cannot act on an anonymous request.
+   * The member's effective name, for the admin queue, which cannot act on an anonymous request.
+   *
+   * <p>Read by the queue projection only. It used to feed the audit rows' subject label as well,
+   * which is how a granted erasure came to leave the name in a row it had just rewritten; the label
+   * is {@code null} on all four events now (REQ-AUDIT-001).
    *
    * @param userId the member
    * @return their effective name, or {@code null} when the row is gone

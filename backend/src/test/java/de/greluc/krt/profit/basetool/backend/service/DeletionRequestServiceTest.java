@@ -22,9 +22,11 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -157,6 +159,24 @@ class DeletionRequestServiceTest {
         .thenThrow(new DataIntegrityViolationException("uq_deletion_request_one_pending_per_user"));
 
     assertThat(service.raise(USER, false)).isSameAs(winner);
+    // Through the self-proxy both times, which is what puts the retry in a FRESH transaction. The
+    // recovery used to be a catch inside the failed one, where the persistence context is
+    // rollback-only and Postgres has already aborted the backend transaction (25P02), so the
+    // re-read could not run and the member's second click answered 500.
+    verify(selfProvider, times(2)).getObject();
+  }
+
+  // covers REQ-SEC-061 - a race that outlives the bound is a truthful 409, never a silent success
+  @Test
+  void aRaceThatNeverResolvesPropagates() {
+    when(deletionRequestRepository.findByUserIdAndStatus(USER, DeletionRequestStatus.PENDING))
+        .thenReturn(Optional.empty());
+    when(deletionRequestRepository.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("uq_deletion_request_one_pending_per_user"));
+
+    assertThatThrownBy(() -> service.raise(USER, false))
+        .isInstanceOf(DataIntegrityViolationException.class);
+    verify(deletionRequestRepository, times(3)).saveAndFlush(any());
   }
 
   // covers REQ-SEC-061 — a withdrawal is recorded, not erased
@@ -229,11 +249,13 @@ class DeletionRequestServiceTest {
   void executingGrantsTheHistoryWishBeforeDeletingAndRemovesKeycloakLast() {
     when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(true)));
 
-    service.execute(REQUEST, true, "Wunsch gewaehrt");
+    service.execute(REQUEST, true);
 
     InOrder order =
         inOrder(handleAnonymisationService, userRepository, userDeletionService, keycloakService);
-    order.verify(handleAnonymisationService).anonymise(USER, HANDLE);
+    // Every spelling the account carries, not the effective name alone: a handover or a
+    // job-order contact is typed by hand and the typist wrote whichever name they use.
+    order.verify(handleAnonymisationService).anonymise(eq(USER), anyList());
     order.verify(userRepository).saveAndFlush(any(User.class));
     order
         .verify(userDeletionService)
@@ -248,7 +270,7 @@ class DeletionRequestServiceTest {
   void executingWithoutGrantingLeavesTheHandleSnapshotsAlone() {
     when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(true)));
 
-    service.execute(REQUEST, false, null);
+    service.execute(REQUEST, false);
 
     verifyNoInteractions(handleAnonymisationService);
     verify(userDeletionService).deleteUser(eq(USER), any());
@@ -262,7 +284,7 @@ class DeletionRequestServiceTest {
     Mockito.doThrow(new RuntimeException("keycloak down")).when(keycloakService).deleteUser(USER);
 
     // Must not propagate: the member's data is gone, which is what they asked for.
-    service.execute(REQUEST, false, null);
+    service.execute(REQUEST, false);
 
     verify(userDeletionService).deleteUser(eq(USER), any());
   }

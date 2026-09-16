@@ -43,6 +43,24 @@
     // bootstrap bug rather than a broken page.
     /** @type {KrtI18nDict} */
     const i18n = window.krtDeletionRequestsI18n || {};
+
+    /**
+     * Substitutes {handle} in a template without treating the handle as a replacement pattern.
+     *
+     * String.prototype.replace reads $ sequences in the REPLACEMENT as patterns: '$&' inserts the
+     * match, '$`' everything before it, "$'" everything after. A member's displayName is
+     * self-service with only a length limit on it, so '$&' as a display name made this dialog read
+     * "Mitglied: {handle}" and "$'" made it read "Mitglied: " -- an admin confirming a permanent,
+     * irreversible deletion against a dialog naming the wrong account, or naming nobody. The
+     * function form of the second argument is never scanned for patterns.
+     *
+     * @param {string | undefined} template the localised sentence carrying {handle}
+     * @param {string | null | undefined} handle the member's display name, verbatim
+     * @returns {string} the filled sentence
+     */
+    function fillHandle(template, handle) {
+        return String(template || '').replace('{handle}', () => String(handle ?? ''));
+    }
     const host = document.getElementById('deletionRequestsHost');
     if (!host) {
         return;
@@ -138,17 +156,9 @@
                 // act, and a pre-ticked box turns it into the default.
                 erase.checked = false;
             }
-            /** @type {HTMLTextAreaElement | null} */
-            const execNote = document.querySelector('#execute-note');
-            if (execNote) {
-                execNote.value = '';
-            }
             const memberSlot = document.querySelector('[data-execute-member]');
             if (memberSlot) {
-                memberSlot.textContent = String(i18n.confirmMember || '').replace(
-                    '{handle}',
-                    current.handle,
-                );
+                memberSlot.textContent = fillHandle(i18n.confirmMember, current.handle);
             }
             clearErrors('execute-modal');
             openModal('execute-modal');
@@ -198,14 +208,11 @@
             }
             /** @type {HTMLInputElement | null} */
             const erase = document.querySelector('#execute-erase-history');
-            /** @type {HTMLTextAreaElement | null} */
-            const note = document.querySelector('#execute-note');
             window.krtFetch.write({
                 method: 'POST',
                 url: '/admin/deletion-requests/' + current.id + '/execute',
                 payload: {
                     grantHistoryErasure: erase ? erase.checked : false,
-                    note: note ? note.value.trim() : '',
                 },
                 successMessage: i18n.executed,
                 errorMessage: i18n.error,

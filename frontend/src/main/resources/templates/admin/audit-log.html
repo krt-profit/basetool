@@ -135,7 +135,7 @@
                             <span class="chip krtm-font-size-0-55rem-eff3"
                                   th:text="#{${e.eventLabelKey()}}">Ereignis</span>
                         </td>
-                        <td th:text="${e.subject()}">&mdash;</td>
+                        <td th:text="${@handles.display(e.subject())}">&mdash;</td>
                         <!-- Falls back to the raw client id rather than a missing-key marker: an
                              unlabelled value means the deployment renamed a client, and the id
                              itself is the useful answer. -->

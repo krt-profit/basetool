@@ -223,7 +223,7 @@
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                         <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
                                     </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
@@ -449,7 +449,7 @@
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                         <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
                                     </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>

@@ -30,8 +30,19 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data repository for the append-only {@link BankTransaction} headers (epic #556, ADR-0010).
- * Strictly insert-and-read: no {@code @Modifying} method may ever appear here — the ledger is never
- * updated or deleted (REQ-BANK-004, pinned by {@code ArchitectureTest}).
+ * Insert-and-read: <b>no booking fact</b> is ever updated or deleted — a correction is a {@code
+ * REVERSAL} transaction, not an {@code UPDATE} (REQ-BANK-004, pinned by {@code ArchitectureTest}).
+ *
+ * <p><b>One {@code @Modifying} method exists, and exactly one may.</b> {@link
+ * #anonymiseCounterpartyHandle} replaces a departed member's handle snapshot on a granted Art. 17
+ * request (REQ-SEC-062), which changes no amount, account, date or posting row — only the name the
+ * row displays. It was approved by {@literal @}greluc on 2026-09-16 and is recorded in ADR-0183 as
+ * an amendment to ADR-0010's insert-only consequence. {@code ArchitectureTest} names it by its
+ * <em>fully qualified</em> signature, so a second mutation here fails the build even if somebody
+ * gives it the same method name.
+ *
+ * <p>The class comment previously said no such method may ever appear, which had already stopped
+ * being true when the erasure shipped.
  */
 @Repository
 public interface BankTransactionRepository extends JpaRepository<BankTransaction, UUID> {

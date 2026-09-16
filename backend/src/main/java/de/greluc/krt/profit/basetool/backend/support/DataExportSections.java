@@ -20,6 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Every section of the Art. 15 / Art. 20 data export, as the SQL that produces it (REQ-SEC-058).
@@ -76,11 +79,17 @@ public final class DataExportSections {
    * @param key the stable machine key, also the JSON property name and the suffix of the {@code
    *     pdf.export.section.*} label key in the backend message bundle
    * @param legalBasis {@link #ART_15} or {@link #ART_15_20}
-   * @param portableHint short prose on why the section is or is not portable, carried into the
-   *     export itself so the document explains its own structure
-   * @param sql the statement, with exactly one {@code :userId} parameter
+   * @param rationale why the section carries this legal basis, in one sentence.
+   *     <p><b>Not shipped, and that is the correction.</b> It used to be serialised into the
+   *     member's JSON download as English prose, which the i18n rule forbids and which the PDF
+   *     never rendered -- so it was user-visible text with no bundle key anywhere. The wire carries
+   *     {@link #legalBasis} instead, which is machine-readable and locale-free; what the two bases
+   *     mean is explained in the PDF, in the reader's language, and in {@code
+   *     docs/privacy/processing-activities.md}. This field is the recorded reason for the
+   *     classification, kept beside the statement it is about, and {@code DataExportSectionsTest}
+   *     keeps every section carrying one.
    */
-  public record Section(String key, String legalBasis, String portableHint, String sql) {}
+  public record Section(String key, String legalBasis, String rationale, String sql) {}
 
   /**
    * The sections, in the order they appear in the export.
@@ -390,57 +399,156 @@ public final class DataExportSections {
               """));
 
   /**
-   * Section keys whose rows carry text that can name a person, and which are therefore passed
-   * through {@link HandleScrubber}.
+   * The columns whose value is passed through {@link HandleScrubber}, keyed by section.
    *
-   * <p>Most of them carry free text the <em>member</em> wrote — a note, a remark, a description.
-   * That is their own data and belongs in the export, but it may name somebody else mid-sentence,
-   * where no projection can reach. Four are listed for the mirror-image reason: the text names a
-   * thing rather than being prose, and somebody may have named that thing after a person. Each is
-   * registered as a person-name surface in {@link PersonSearchTargets}, which is the registry that
-   * settles the question:
+   * <p><b>The gate is the column and not the section, and that is a correction.</b> It used to be
+   * the section: every {@code String} of a listed section was scrubbed. That is fine for a section
+   * whose columns are all prose, and wrong for every section that mixes prose with structured
+   * values — most visibly {@code account}, which selects {@code username}, {@code email}, {@code
+   * approval_status} and six more identity fields, all of them {@code String} on the wire. Another
+   * member's three-character handle occurring inside the subject's own e-mail address was replaced
+   * there, so the export handed the member a corrupted copy of their own identity. The subject's
+   * own name is excluded from the scrubber's dictionary, which does nothing against somebody else's
+   * handle being a substring of it.
    *
-   * <ul>
-   *   <li>{@code hangar} — {@code ship.name}, chosen by the member.
-   *   <li>{@code missionsManaged} — {@code mission.name}, chosen by whoever created the mission.
-   *       The same column is already scrubbed in {@code missionsOwned} and {@code
-   *       missionParticipations}; leaving it unscrubbed here was an inconsistency, not a decision.
-   *   <li>{@code notificationRuleTargets} — {@code notification_rule.description}, written by an
-   *       administrator, who may well describe a rule by the member it targets.
-   *   <li>{@code bankAccountGrants} — {@code bank_account.name}, chosen by the bank.
-   * </ul>
+   * <p>The file's previous note argued the section-wide gate was the accepted side of a trade —
+   * "the scrubber only fires on handles of three characters or more, and a collision corrupts one
+   * value in one person's export, whereas the alternative discloses a name". The trade was real but
+   * it was not necessary: naming the prose columns costs one line per column and gives up nothing.
    *
-   * <p>Listing sections rather than scrubbing everything is deliberate: scrubbing a structured
-   * value — a material name, a status, an account number — could corrupt it if a member's handle
-   * happened to be a substring, and a corrupted export is worse than a verbose one. The gate is the
-   * section and not the column, so a listed section's structured columns are scrubbed along with
-   * its prose. That is the accepted side of the trade (ADR-0185) rather than an oversight: the
-   * scrubber only fires on handles of three characters or more, and a collision corrupts one value
-   * in one person's export, whereas the alternative discloses a name.
+   * <p>Most of these carry free text the <em>member</em> wrote — a note, a remark, a description.
+   * That is their own data and belongs in the export, and it may name somebody else mid-sentence
+   * where no {@code SELECT} list can reach. Five are listed for the mirror-image reason: the text
+   * names a thing rather than being prose, and somebody may have named that thing after a person.
+   * Each of those is registered as a person-name surface in {@link PersonSearchTargets}, which is
+   * the registry that settles the question.
    *
    * <p><b>This list cannot be the answer for every column.</b> It only reaches handles the scrubber
-   * knows, which is registered members — never an external contact or an already-deleted member.
-   * Where those appear, the column has to be left unselected instead; {@code
-   * audit_event.subject_label} is the worked example, in the class note above.
+   * knows, which is registered members in all three of their spellings — never an external contact
+   * and never an already-deleted member. Where those appear, the column has to be left unselected
+   * instead; {@code audit_event.subject_label} is the worked example, in the class note above.
+   *
+   * @see #UNSCRUBBED_PERSON_COLUMNS for the columns that are a person-name surface and are still
+   *     deliberately not scrubbed, each with its reason
    */
-  public static final List<String> FREE_TEXT_SECTIONS =
-      List.of(
-          "account",
-          "registrationDecisions",
-          "deletionRequests",
-          "warehouseContributions",
-          "hangar",
-          "personalInventory",
-          "personalBlueprints",
-          "notifications",
-          "notificationRuleTargets",
-          "missionsOwned",
-          "missionParticipations",
-          "missionsManaged",
-          "jobOrderAssignments",
-          "marketOffers",
-          "marketRequests",
-          "bankAccountGrants",
-          "bankBookingsAsCounterparty",
-          "bankRequestsRaised");
+  public static final Map<String, Set<String>> FREE_TEXT_COLUMNS =
+      Map.ofEntries(
+          // The member's own prose about themselves. NOT username / display_name / email /
+          // discord_guild_nickname: those are the subject's own identity, the scrubber cannot
+          // improve them, and substituting inside them is the corruption this registry exists to
+          // stop.
+          Map.entry("account", Set.of("description")),
+          // An administrator's written assessment of the member, which may name the admin's source.
+          Map.entry("registrationDecisions", Set.of("reason")),
+          Map.entry("deletionRequests", Set.of("decision_note")),
+          Map.entry("warehouseContributions", Set.of("note")),
+          // ship.name, chosen by the member.
+          Map.entry("hangar", Set.of("name")),
+          Map.entry("personalInventory", Set.of("name", "note")),
+          Map.entry("personalBlueprints", Set.of("note")),
+          // notification.params is a serialised key/value payload, and one of the keys is a handle:
+          // AccountDeletionRequestedEvent puts the requesting member's name in it. Replacing a name
+          // inside a JSON string value leaves the document parseable, so this one is safe to scrub
+          // and unsafe to leave.
+          Map.entry("notifications", Set.of("params")),
+          // notification_rule.description, written by an administrator who may well describe a rule
+          // by the member it targets.
+          Map.entry("notificationRuleTargets", Set.of("rule")),
+          Map.entry("missionsOwned", Set.of("name", "description", "meeting_point")),
+          Map.entry("missionParticipations", Set.of("mission", "comment")),
+          // The same mission.name column as its two siblings; leaving it unscrubbed here was an
+          // inconsistency rather than a decision.
+          Map.entry("missionsManaged", Set.of("mission")),
+          Map.entry("jobOrderAssignments", Set.of("note")),
+          Map.entry("marketOffers", Set.of("remark")),
+          Map.entry("marketRequests", Set.of("remark")),
+          // bank_account.name, chosen by the bank.
+          Map.entry("bankAccountGrants", Set.of("account")),
+          Map.entry("bankBookingsAsCounterparty", Set.of("note", "justification")),
+          Map.entry("bankRequestsRaised", Set.of("note", "justification")),
+          // org_chart_position.name / display_name: a position the member holds, but a placeholder
+          // row can carry somebody else's name.
+          Map.entry("orgChartPositions", Set.of("name", "display_name")));
+
+  /**
+   * Selected columns that {@link PersonSearchTargets} registers as a person-name surface and that
+   * are nevertheless <b>not</b> scrubbed, each with the reason.
+   *
+   * <p>Keyed {@code section.column}. This is the other half of {@link #FREE_TEXT_COLUMNS}, and it
+   * exists so that the two registries can be held against each other by a test rather than by
+   * whoever reads them next: {@code DataExportScrubCoverageTest} walks every section's {@code
+   * SELECT} list, and a column that names a person must appear in one map or the other. Without
+   * that, a new section selecting a prose column is scrubbed or not depending on whether its author
+   * remembered — which is precisely how {@code notificationRuleTargets} came to ship unscrubbed.
+   *
+   * <p>The pattern is the one {@code PersonSearchCoverageTest} uses for the search registry:
+   * covered or exempted, never merely absent.
+   */
+  public static final Map<String, String> UNSCRUBBED_PERSON_COLUMNS =
+      Map.ofEntries(
+          Map.entry(
+              "account.username",
+              "The subject's own handle. Their own name is what the export is about, and"
+                  + " substituting another member's handle inside it corrupts an identity field."),
+          Map.entry("account.display_name", "The subject's own name; see account.username."),
+          Map.entry(
+              "account.email",
+              "A structured identifier, and the subject's own. A three-character handle occurring"
+                  + " inside a local part would have made the address unusable."),
+          Map.entry(
+              "account.discord_guild_nickname",
+              "The subject's own nickname; see account.username."),
+          Map.entry(
+              "bankHolderRegistration.handle",
+              "The subject's own custodian handle -- the registration is theirs, and the column is"
+                  + " a snapshot of their own name."),
+          Map.entry(
+              "orgUnitMemberships.org_unit",
+              "org_unit.name and org_unit.shorthand: an organisational unit, created by the"
+                  + " organisation and not named after a member. Scrubbing it would corrupt the"
+                  + " name of the unit the membership is in."),
+          Map.entry("orgUnitMemberships.shorthand", "See orgUnitMemberships.org_unit."),
+          Map.entry(
+              "orgChartPositions.org_unit",
+              "org_unit.name, the unit the position sits in; see orgUnitMemberships.org_unit."),
+          Map.entry(
+              "evaluations.category",
+              "promotion_category.name: a catalogue entry maintained by the organisation, rendered"
+                  + " in the promotion UI. A corrupted category name would misdescribe the"
+                  + " assessment itself."),
+          Map.entry(
+              "warehouseContributions.location",
+              "location.name: a station or outpost from the synced catalogue, not a person."),
+          Map.entry(
+              "warehouseContributions.material",
+              "material.name: a commodity from the synced catalogue. Flagged only because the"
+                  + " statement also reads location, whose name column is a person-name surface;"
+                  + " the coverage check matches column names across a statement's tables on"
+                  + " purpose, so an over-flag is answered here rather than by narrowing the"
+                  + " check."),
+          Map.entry(
+              "hangar.ship_type",
+              "ship_type.name: a hull from the synced catalogue. Flagged for the same reason as"
+                  + " warehouseContributions.material -- the statement also reads ship, whose name"
+                  + " column is the member's own and is scrubbed."),
+          Map.entry("hangar.location", "location.name; see warehouseContributions.location."),
+          Map.entry(
+              "refineryOrdersOwned.location",
+              "location.name; see warehouseContributions.location."),
+          Map.entry(
+              "materialClaims.job_order",
+              "job_order.display_id, a number rather than a name. The order's handle column is"
+                  + " deliberately not selected by any section, being an external contact's name"
+                  + " the scrubber cannot see."));
+
+  /**
+   * Whether one selected column of one section is scrubbed.
+   *
+   * @param sectionKey the section's key
+   * @param column the column alias as the statement yields it
+   * @return {@code true} when the value goes through {@link HandleScrubber}
+   */
+  public static boolean isScrubbed(@NotNull String sectionKey, @NotNull String column) {
+    return FREE_TEXT_COLUMNS.getOrDefault(sectionKey, Set.of()).contains(column);
+  }
 }

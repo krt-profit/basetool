@@ -143,9 +143,13 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
    * Deletes the complete notification history of one recipient, read and unread alike, as part of
    * the hard account deletion (REQ-DATA-008). {@code recipient_user_id} is a loose reference with
    * no foreign key to {@code app_user} (V155 says so explicitly and defers row lifetime to
-   * retention), so nothing cascades — and the retention sweep {@link #deleteReadOlderThan(Instant)}
-   * only ever reaps <em>read</em> rows, which is why a departed member's unread backlog would
-   * otherwise survive forever.
+   * retention), so nothing cascades.
+   *
+   * <p>The stated reason for this method used to be that the retention sweep only ever reaps
+   * <em>read</em> rows, so a departed member's unread backlog would otherwise survive forever. That
+   * stopped being true when {@link #deleteUnreadOlderThan(Instant)} shipped (REQ-NOTIF-009). The
+   * method is still needed, for a different reason: the sweep's windows are 90 and 180 days, and a
+   * deleted account's inbox must go <em>now</em> rather than at the end of one of them.
    *
    * <p>Deliberately without {@code clearAutomatically}: this runs inside the user-deletion
    * transaction, where evicting the persistence context would detach the {@code User} row that is
@@ -200,4 +204,29 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("types") Set<NotificationType> types,
       @Param("entityType") String entityType,
       @Param("entityId") UUID entityId);
+
+  /**
+   * Replaces this member's name where it occurs inside a notification's render parameters
+   * (REQ-SEC-062).
+   *
+   * <p>{@code deleteAllForRecipient} removes the departing member's <em>own</em> inbox. It does not
+   * touch anybody else's — and {@code AccountDeletionRequestedEvent} writes {@code
+   * {"handle":"<name>"}} into a row for <b>every administrator</b>. So a granted erasure used to
+   * leave the requester's name sitting in every admin's inbox and bell for up to the unread
+   * retention window (REQ-NOTIF-009), which is 180 days.
+   *
+   * <p>Substring replace inside the serialised payload: the surrounding JSON stays parseable
+   * because the sentinel carries no quote or brace, and the notification still renders — it just
+   * names the sentinel instead of the person. Case-sensitive, because the payload was written by
+   * the application from the member's own stored name rather than typed.
+   *
+   * @param handle the spelling to erase
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE Notification n SET n.params = REPLACE(n.params, :handle, :sentinel)"
+          + " WHERE n.params LIKE CONCAT('%', :handle, '%')")
+  int anonymiseParams(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

@@ -36506,7 +36506,7 @@
               }
             },
             "content" : {
-              "application/pdf" : {
+              "*/*" : {
                 "schema" : {
                   "type" : "string",
                   "format" : "byte"
@@ -53208,7 +53208,7 @@
               }
             },
             "content" : {
-              "application/pdf" : {
+              "*/*" : {
                 "schema" : {
                   "type" : "string",
                   "format" : "byte"
@@ -62848,9 +62848,6 @@
             "type" : "string"
           },
           "legalBasis" : {
-            "type" : "string"
-          },
-          "portableHint" : {
             "type" : "string"
           },
           "rows" : {

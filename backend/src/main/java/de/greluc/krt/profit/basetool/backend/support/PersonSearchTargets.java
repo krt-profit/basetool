@@ -214,7 +214,21 @@ public final class PersonSearchTargets {
           // is gone (REQ-SEC-062).
           new Target("AUDIT", "audit_event", "actor_handle", "id", LINK_AUDIT),
           new Target("AUDIT", "audit_event", "subject_label", "id", LINK_AUDIT),
-          new Target("AUDIT", "bank_audit_event", "actor_handle", "id", LINK_AUDIT));
+          new Target("AUDIT", "bank_audit_event", "actor_handle", "id", LINK_AUDIT),
+          // Both details payloads, and they were exempt until review. The exemption read "carries
+          // ids and counts, never user free text (REQ-AUDIT-001)", which is what the rule says and
+          // not what the code does: `details` is a bare CharSequence on AuditService#record and
+          // BankAuditService#record, so nothing routes a caller through the AuditDetails builder.
+          // BankHolderService records HOLDER_REGISTERED with the holder's handle AS the payload,
+          // and BankLedgerService writes "+<amount> aUEC @<handle>" on every booking. A search
+          // that skipped these would report "no further mentions" for a name that is in them, and
+          // the whole point of this registry is that such an answer cannot be wrong quietly.
+          //
+          // The cost is a hit that sometimes duplicates its own parent row's hit, which is the
+          // reason the exemption gave for skipping them. A duplicate line in an admin's result
+          // list is not comparable to a missed occurrence in an Art. 16 rectification.
+          new Target("AUDIT", "audit_event", "details", "id", LINK_AUDIT),
+          new Target("AUDIT", "bank_audit_event", "details", "id", LINK_AUDIT));
 
   /**
    * Text columns deliberately <b>not</b> searched, as {@code table.column}, each covered by one of
@@ -236,16 +250,26 @@ public final class PersonSearchTargets {
   public static final Set<String> EXEMPT_COLUMNS =
       Set.of(
           // --- technical payloads, stated explicitly ------------------------------------
-          // A bounded key/value payload that carries ids and counts, never user free text
-          // (REQ-AUDIT-001). Searching it would report the same hit as its parent row twice.
-          "audit_event.details",
-          "bank_audit_event.details",
+          // NOTE: audit_event.details and bank_audit_event.details used to be exempt here, on the
+          // reason that they carry ids and counts and never user free text. They do carry names -
+          // see the two targets above - so they are searched now. Do not re-exempt them without
+          // first making the writers honour REQ-AUDIT-001.
+          //
           // The originating-client label: a bounded vocabulary, never a name (REQ-AUDIT-005).
           "audit_event.client_id",
           "bank_audit_event.client_id",
-          // Render parameters for one notification, machine-written from a bounded template. Can
-          // hold a handle; reachable only through the notification, which belongs to one recipient
-          // and is swept within 180 days (REQ-NOTIF-009).
+          // Render parameters for one notification, machine-written from a bounded template.
+          //
+          // It does hold a handle - AccountDeletionRequestedEvent writes {"handle":"<name>"} into
+          // one row per administrator - and that is why the exemption is about reachability and
+          // not about absence: a notification belongs to one recipient, renders through a bounded
+          // template, and is swept within 180 days (REQ-NOTIF-009). Searching it would return one
+          // hit per admin inbox for the same event.
+          //
+          // The erasure does not rely on this exemption. A granted Art. 17 request rewrites the
+          // column directly (REQ-SEC-062, NotificationRepository#anonymiseParams), because 180
+          // days of every admin's inbox holding the name is not an erasure that has been
+          // performed.
           "notification.params",
           "notification.entity_type",
           // P4K import diagnostics and the uploaded file's own name.

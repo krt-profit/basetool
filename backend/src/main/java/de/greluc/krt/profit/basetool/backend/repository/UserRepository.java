@@ -492,6 +492,22 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   long countByInKeycloakFalse();
 
   /**
+   * The same count, with the given usernames excluded — the gauge's actual query (REQ-SEC-059).
+   *
+   * <p>The exclusion is the ingest gateway's service account, and it is not a nicety. An unfiltered
+   * {@code GET /users} omits service accounts, so the roster sync never sees one and {@code
+   * markMissingUsers} flags it; nothing can ever clear the flag, because {@code syncUser} only runs
+   * for a user the roster reports. Production holds exactly such a row. Counted, it made the gauge
+   * permanently non-zero and the {@code UserDeletionUnfinished} alert fire seven days after deploy
+   * and never resolve — for a machine row that holds no personal data at all.
+   *
+   * @param usernames the usernames to leave out; must not be empty, because {@code NOT IN ()} is
+   *     not valid SQL — the caller falls back to {@link #countByInKeycloakFalse()} instead
+   * @return the number of orphaned member accounts
+   */
+  long countByInKeycloakFalseAndUsernameNotIn(@NotNull Collection<String> usernames);
+
+  /**
    * Finds when the longest-waiting orphaned account was first observed missing, for the {@code
    * basetool_users_pending_deletion_oldest_age_seconds} gauge (REQ-SEC-059).
    *
@@ -506,6 +522,24 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       "SELECT MIN(u.keycloakAbsentSince) FROM User u"
           + " WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL")
   Instant findOldestKeycloakAbsentSince();
+
+  /**
+   * The same earliest stamp, with the given usernames excluded (REQ-SEC-059).
+   *
+   * <p>Paired with {@link #countByInKeycloakFalseAndUsernameNotIn}: excluding the service account
+   * from the count and not from the age would leave the age gauge growing without bound from the
+   * deploy timestamp V241 backfilled, which is the half of the pair the alert reads.
+   *
+   * @param usernames the usernames to leave out; must not be empty
+   * @return the earliest {@code keycloakAbsentSince} among the remaining orphaned accounts, or
+   *     {@code null} when none is waiting
+   */
+  @Query(
+      "SELECT MIN(u.keycloakAbsentSince) FROM User u"
+          + " WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL"
+          + " AND u.username NOT IN :usernames")
+  Instant findOldestKeycloakAbsentSinceExcluding(
+      @Param("usernames") @NotNull Collection<String> usernames);
 
   /**
    * Returns the ids of every local user that already carries a Discord account link ({@code

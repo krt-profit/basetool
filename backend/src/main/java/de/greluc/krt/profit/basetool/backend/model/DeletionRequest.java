@@ -75,9 +75,8 @@ public class DeletionRequest extends AbstractEntity<UUID> {
    * audit trails, the bank booking history, the booking requests and the two handover recipients.
    *
    * <p><b>A wish, not an instruction.</b> Nothing acts on this automatically: an admin weighs it
-   * against the legitimate interest in an auditable ledger and decides it deliberately (decision 6,
-   *
-   * @greluc; the procedure is in {@code docs/privacy/data-subject-requests.md}).
+   * against the legitimate interest in an auditable ledger and decides it deliberately -- decision
+   * 6, {@literal @}greluc, with the procedure in {@code docs/privacy/data-subject-requests.md}.
    */
   @Column(name = "erase_history_requested", nullable = false)
   private boolean eraseHistoryRequested;

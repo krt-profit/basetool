@@ -40,10 +40,12 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,6 +95,7 @@ public class BusinessMetricsCollector {
   private final P4kImportJobRepository p4kImportJobRepository;
   private final MaterialExchangeOfferRepository materialExchangeOfferRepository;
   private final MaterialExchangeRequestRepository materialExchangeRequestRepository;
+  private final IngestGatewayProperties ingestGatewayProperties;
   private final TaskMetrics taskMetrics;
 
   private final AtomicLong registrationPending = new AtomicLong();
@@ -207,9 +210,21 @@ public class BusinessMetricsCollector {
 
     // Accounts already gone from Keycloak but still present locally: a deletion whose second
     // half was forgotten (REQ-SEC-059). Unlike the queues above nothing enqueues these, so a
-    // non-zero value is always somebody's unfinished work rather than normal throughput.
-    usersPendingDeletion.set(userRepository.countByInKeycloakFalse());
-    usersPendingDeletionOldestAge.set(ageSeconds(userRepository.findOldestKeycloakAbsentSince()));
+    // non-zero value is always somebody's unfinished work rather than normal throughput -- which
+    // holds only because the configured gateways' service accounts are excluded. Such a row is
+    // permanently flagged and cannot be un-flagged (an unfiltered user listing omits service
+    // accounts, so the roster sync never reports one), and counting it made the alert fire seven
+    // days after deploy and never resolve, for a machine that holds no personal data.
+    Set<String> machineAccounts = ingestGatewayProperties.serviceAccountUsernames();
+    if (machineAccounts.isEmpty()) {
+      usersPendingDeletion.set(userRepository.countByInKeycloakFalse());
+      usersPendingDeletionOldestAge.set(ageSeconds(userRepository.findOldestKeycloakAbsentSince()));
+    } else {
+      usersPendingDeletion.set(
+          userRepository.countByInKeycloakFalseAndUsernameNotIn(machineAccounts));
+      usersPendingDeletionOldestAge.set(
+          ageSeconds(userRepository.findOldestKeycloakAbsentSinceExcluding(machineAccounts)));
+    }
 
     bankRequestPending.set(
         bankBookingRequestRepository.countByStatus(BankBookingRequestStatus.PENDING));

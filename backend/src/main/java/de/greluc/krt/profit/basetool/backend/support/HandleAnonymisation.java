@@ -52,11 +52,37 @@ public final class HandleAnonymisation {
   /**
    * The stored replacement for an erased handle snapshot. Deliberately not a word in any language,
    * and deliberately impossible for a real handle to equal.
+   *
+   * <p>That second half is enforced, not assumed. It used to be a claim in this comment while
+   * {@code display_name} was self-service free text with only a length limit on it, so any member
+   * could set theirs to the token and have it written into the audit trail as their own actor
+   * handle. {@link #isReserved(String)} is the check and {@code UserService} applies it to both
+   * write paths; {@code UserServiceReservedNameTest} keeps it applied.
+   *
+   * <p>Forging it was never a privilege escalation — nothing branches on the value, every erasure
+   * update is matched by id, and {@code actor_user_id} still attributes the row — but a comment
+   * asserting an invariant the code does not have is worse than no comment, because the next person
+   * to touch this will build on it.
    */
   public static final String SENTINEL = "#ANONYMISED#";
 
   /** Not instantiable. */
   private HandleAnonymisation() {}
+
+  /**
+   * Whether a name a member chose for themselves would collide with the erasure sentinel.
+   *
+   * <p>Compared case-insensitively and after trimming, because the point is to keep the token
+   * unambiguous to a <em>reader</em> — {@code #anonymised#} reads exactly like the real thing in
+   * the member list and in the audit viewer.
+   *
+   * @param name the candidate display name or username, possibly {@code null}
+   * @return {@code true} when it must be rejected
+   */
+  @Contract(value = "null -> false", pure = true)
+  public static boolean isReserved(@Nullable String name) {
+    return name != null && SENTINEL.equalsIgnoreCase(name.trim());
+  }
 
   /**
    * Tells whether a handle snapshot has been erased on request.

@@ -158,4 +158,27 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
       "UPDATE BankAuditEvent e SET e.actorHandle = :sentinel"
           + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
   int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces this member's name where it occurs inside a bank details payload (REQ-SEC-062).
+   *
+   * <p>This column was exempted from the person search on the reason that it "carries ids and
+   * counts, never user free text". That was false and the bank services are where: {@code
+   * BankHolderService} records {@code HOLDER_REGISTERED} with the holder's handle <em>as</em> the
+   * payload, and {@code BankLedgerService} writes {@code "+<amount> aUEC @<handle>"} on every
+   * booking. A granted erasure that left those rows would leave the name in the one place the
+   * privacy policy names first.
+   *
+   * <p>Substring replace and case-sensitive, for the same reason as the activity trail's: the
+   * payload is machine-written from the member's own stored name.
+   *
+   * @param handle the spelling to erase
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE BankAuditEvent e SET e.details = REPLACE(e.details, :handle, :sentinel)"
+          + " WHERE e.details LIKE CONCAT('%', :handle, '%')")
+  int anonymiseDetails(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

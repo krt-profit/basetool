@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
@@ -40,9 +42,12 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,6 +72,12 @@ class BusinessMetricsCollectorTest {
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private MaterialExchangeRequestRepository materialExchangeRequestRepository;
 
+  /**
+   * No gateway configured, which is the default and the shape the existing assertions expect: the
+   * orphaned-account gauges then use the unfiltered queries. The exclusion path has its own test.
+   */
+  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
+
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
 
@@ -85,6 +96,7 @@ class BusinessMetricsCollectorTest {
             p4kImportJobRepository,
             materialExchangeOfferRepository,
             materialExchangeRequestRepository,
+            ingestGatewayProperties,
             new TaskMetrics(registry));
     // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();
@@ -160,6 +172,43 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
     // Past the 7-day UserDeletionUnfinished threshold, which is the number the alert compares.
     assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isGreaterThan(604800.0d);
+  }
+
+  // covers REQ-SEC-059 - a configured gateway's service account is not somebody's unfinished work
+  @Test
+  void refresh_excludesTheIngestGatewaysServiceAccountFromTheUnfinishedDeletionGauges() {
+    // Production holds exactly one such row and can never clear it: an unfiltered GET /users omits
+    // service accounts, so the roster sync never reports one and markMissingUsers leaves the flag
+    // set forever. Counted, it made the gauge permanently non-zero, V241 backfilled its age with
+    // the deploy timestamp, and UserDeletionUnfinished fired at T+7d and never resolved -- telling
+    // an admin to finish a deletion for a machine row that holds no personal data at all.
+    IngestGatewayProperties configured = new IngestGatewayProperties();
+    configured.setClientIds(List.of("basetool-ingest"));
+    BusinessMetricsCollector withGateway =
+        new BusinessMetricsCollector(
+            registry,
+            userRepository,
+            deletionRequestRepository,
+            bankBookingRequestRepository,
+            jobOrderRepository,
+            operationRepository,
+            refineryOrderRepository,
+            p4kImportJobRepository,
+            materialExchangeOfferRepository,
+            materialExchangeRequestRepository,
+            configured,
+            new TaskMetrics(registry));
+
+    Set<String> excluded = Set.of("service-account-basetool-ingest");
+    when(userRepository.countByInKeycloakFalseAndUsernameNotIn(excluded)).thenReturn(0L);
+    when(userRepository.findOldestKeycloakAbsentSinceExcluding(excluded)).thenReturn(null);
+
+    withGateway.refresh();
+
+    verify(userRepository, never()).countByInKeycloakFalse();
+    verify(userRepository, never()).findOldestKeycloakAbsentSince();
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isZero();
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isZero();
   }
 
   @Test

@@ -32,6 +32,11 @@ import org.junit.jupiter.api.Test;
  * the <b>longest match wins</b> (or a shorter handle leaves a fragment of a longer one behind,
  * which is both a leak and a corruption), and <b>case is ignored</b> (whoever wrote the note was
  * typing, not copying from a roster).
+ *
+ * <p>The last three tests are regressions for defects this class did not catch the first time, and
+ * each of them was reachable by any member from their own profile: a handle that is a substring of
+ * the replacement token, and a single character in their own note. They are the reason the
+ * implementation is one forward pass over the original text rather than a loop over the handles.
  */
 class HandleScrubberTest {
 
@@ -107,5 +112,62 @@ class HandleScrubberTest {
                 + HandleScrubber.REPLACEMENT
                 + ", zuletzt "
                 + HandleScrubber.REPLACEMENT);
+  }
+
+  // covers REQ-SEC-058 - regression: toLowerCase is not length-preserving
+  @Test
+  void aCharacterThatChangesLengthWhenLowerCasedDoesNotShiftTheSplice() {
+    // U+0130 (LATIN CAPITAL LETTER I WITH DOT ABOVE) lowercases to two characters. The previous
+    // implementation found the match in a lower-cased copy and spliced the original at that index,
+    // so everything after such a character was off by one: the export kept the first letter of the
+    // third party's handle and still reported the removal as complete.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Valkyrie"));
+
+    String result = scrubber.scrub("\u0130 hat mit Valkyrie geredet");
+
+    assertThat(result).isEqualTo("\u0130 hat mit " + HandleScrubber.REPLACEMENT + " geredet");
+    assertThat(result).as("no prefix of the handle survives").doesNotContain("V");
+  }
+
+  // covers REQ-SEC-058 - regression: the same drift threw the export away entirely
+  @Test
+  void aMatchAtTheEndAfterSuchACharacterDoesNotThrow() {
+    // Same cause, worse symptom: with the match at the end of the value the shifted offsets made
+    // the final append run backwards and IndexOutOfBoundsException left the whole export as a 500.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Valkyrie"));
+
+    assertThat(scrubber.scrub("\u0130Valkyrie")).isEqualTo("\u0130" + HandleScrubber.REPLACEMENT);
+  }
+
+  // covers REQ-SEC-058 - regression: the replacement must not be scrubbed by a later handle
+  @Test
+  void aHandleThatIsASubstringOfTheReplacementLeavesItIntact() {
+    // The previous implementation scrubbed once per handle, each pass reading the previous pass's
+    // output, so a short handle occurring inside the placeholder was substituted inside it --
+    // eleven such handles turned a 30-character note into 1780 characters. displayName is
+    // self-service, so any member could pick one and corrupt the free text in every other member's
+    // export. The forward pass cannot re-read what it has emitted.
+    String insideTheToken = HandleScrubber.REPLACEMENT.substring(1, 6);
+    assertThat(insideTheToken.length())
+        .as("the fixture only means anything if it clears the minimum length")
+        .isGreaterThanOrEqualTo(HandleScrubber.MIN_HANDLE_LENGTH);
+
+    HandleScrubber scrubber = new HandleScrubber(List.of("Valkyrie", insideTheToken));
+
+    String result = scrubber.scrub("Uebergabe an Valkyrie erledigt");
+
+    assertThat(result).isEqualTo("Uebergabe an " + HandleScrubber.REPLACEMENT + " erledigt");
+    assertThat(result)
+        .as("exactly one replacement, not one nested in another")
+        .containsOnlyOnce(HandleScrubber.REPLACEMENT);
+  }
+
+  // covers REQ-SEC-058 - a handle occurring twice adjacently is still two separate replacements
+  @Test
+  void adjacentOccurrencesAreBothReplaced() {
+    HandleScrubber scrubber = new HandleScrubber(List.of("Nova"));
+
+    assertThat(scrubber.scrub("NovaNova"))
+        .isEqualTo(HandleScrubber.REPLACEMENT + HandleScrubber.REPLACEMENT);
   }
 }

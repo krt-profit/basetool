@@ -152,8 +152,73 @@ Two further things were wrong with the guard rather than the code, and both are 
   `bankAccountGrants` (`bank_account.name`). These *are* scrubber-reachable, since they name a
   thing rather than an outsider, so they were added to `FREE_TEXT_SECTIONS`.
 
+## Corrected after review — 2026-09-16
+
+Six things, and the first three were in the scrubber — the one part of this design that scrubs
+rather than omits, and therefore the one part where a defect is a leak rather than a gap.
+
+1. **The scrubber spliced the original text at offsets found in a lower-cased copy.**
+   `String.toLowerCase` is not length-preserving — U+0130 lowercases to two characters — so a match
+   after such a character leaked a prefix of the third party's handle while the export still
+   reported the removal as complete, and a match near the end threw `IndexOutOfBoundsException` out
+   of both export endpoints. Any member could put that character in their own note and then request
+   their own export. It is one forward pass over the original text now, matching with
+   `String.regionMatches`, which cannot drift.
+
+2. **The scrubber rewrote its own placeholder.** Each handle scrubbed the previous handle's output,
+   so a three-character handle that is a substring of the replacement text was substituted *inside*
+   a placeholder an earlier pass had written — eleven such handles turned a 30-character note into
+   1780 characters. `displayName` is self-service, so any member could pick one and corrupt the free
+   text in every other member's export. The forward pass cannot re-read what it has emitted.
+
+3. **The scrubber knew one spelling per member.** Built from `getEffectiveName()` alone, it never
+   saw a third party's `username` (whenever they had set a display name) or anybody's
+   `discord_guild_nickname`, while the document still told the reader that other members' names had
+   been removed. All three columns are registered in `PersonSearchTargets` as places a person is
+   named, so the registry and the scrubber were answering the same question differently. All three
+   are loaded now.
+
+4. **The scrub gate is the column, not the section.** This ADR argued the section-wide gate was an
+   accepted trade — "a collision corrupts one value in one person's export, whereas the alternative
+   discloses a name". The trade was real and it was not necessary. The `account` section selects
+   `username`, `email`, `approval_status` and six more identity fields, all `String` on the wire,
+   and another member's three-character handle inside the subject's own e-mail address was replaced
+   — so the export handed the member a corrupted copy of their own identity, which is the failure
+   this ADR's own note predicted and accepted. Naming the prose columns costs one line per column.
+
+5. **The registry pair is gate-enforced.** `DataExportScrubCoverageTest` walks every section's
+   `SELECT` list and fails the build unless each column that `PersonSearchTargets` registers as a
+   person-name surface is either scrubbed or recorded in `UNSCRUBBED_PERSON_COLUMNS` with a reason
+   — and unless every entry in either registry names a section and a column that exist. Without
+   that, `notificationRuleTargets` could select an administrator's free text unscrubbed (it did),
+   and a renamed key could drop out of the scrub set while the export kept reporting success.
+
+6. **The per-section legal prose is no longer shipped.** `Section.portableHint` was ~30 English
+   sentences serialised into the member's JSON download, which the i18n rule forbids and which the
+   PDF never rendered — user-visible text with no bundle key anywhere. The wire carries
+   `legalBasis`, which is machine-readable and locale-free; what the two bases mean is explained in
+   the PDF, in the reader's language. The prose stays beside the SQL as the recorded reason for the
+   classification, and a test keeps every section carrying one.
+
+Two runtime defects on the same endpoints were fixed with these and are worth recording because
+neither was visible to any test: `produces = APPLICATION_PDF_VALUE` on the two PDF mappings is a
+*mapping condition*, so both answered **406** against the frontend's `Accept: application/cbor,
+application/json`; and the JSON export returned a POJO, so it negotiated its way to **CBOR** and was
+served to the member as `datenauskunft.json`. Both content types are pinned on the `ResponseEntity`
+now, which is what every other download endpoint in the codebase already did.
+
 ## Alternatives considered
 
+- **Localise the ~30 per-section hints into the three bundles.** Rejected: it would put thirty
+  sentences of legal prose into the translation surface to say something `legalBasis` already says
+  machine-readably, and the human explanation of the two bases belongs in the PDF, which is
+  localised already.
+- **Keep the section-wide scrub gate and accept the corruption.** Rejected — see correction 4. The
+  argument for it was that the alternative was expensive; the alternative is one line per column.
+- **`Pattern.compile(quote(handle), CASE_INSENSITIVE)` for the scrubbing.** Considered again after
+  the offset defect, and not needed: a single forward pass with a first-character bucket index is
+  both correct and faster than compiling a pattern per handle per value, which is the cost the
+  original hand-rolled loop existed to avoid.
 - **Dump the rows and redact afterwards.** Rejected, and it is the crux of this ADR: a redaction has
   to find other people in selected data, and a miss is silent. Not selecting is verifiable by
   reading a `SELECT` list.

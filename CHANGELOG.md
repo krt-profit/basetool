@@ -4,19 +4,21 @@
 
 ### Added
 
-- **Du kannst deine Daten jetzt selbst exportieren.** Im Profil gibt es unter „Meine Daten exportieren“ eine PDF- und eine JSON-Datei mit allem, was das Tool zu dir gespeichert hat. Das PDF ist die lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, die JSON-Datei die vollständige Auskunft. Namen anderer Mitglieder sind in beiden entfernt (REQ-SEC-058).
+- **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
 
-- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“. Der Antrag geht an die Administration – mit dem Absenden wird nichts gelöscht, und du kannst ihn bis zur Entscheidung zurückziehen. Optional kannst du zusätzlich beantragen, deinen Spielernamen in den Protokollen und der Buchungshistorie zu anonymisieren; darüber entscheidet ein Administrator gesondert. Wird ein Antrag abgelehnt, erfährst du den Grund (REQ-SEC-061, REQ-SEC-062).
+- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“ – mit dem Absenden wird nichts gelöscht, und du kannst den Antrag bis zur Entscheidung zurückziehen; wird er abgelehnt, erfährst du den Grund. Optional kannst du zusätzlich beantragen, deinen Spielernamen überall dort zu anonymisieren, wo er eine Kontolöschung überdauert: in beiden Protokollen, der Buchungshistorie, den Buchungsanträgen, der Halter-Registrierung, bei Auftrags-Ansprechpartnern und Übergabe-Empfängern sowie in den Benachrichtigungen anderer Administratoren. Darüber entscheidet ein Administrator gesondert (REQ-SEC-061, REQ-SEC-062).
 
 - **Administration: neue Seite „Löschanträge“.** Offene Löschanträge entscheiden – ältester zuerst, weil ein Antrag innerhalb eines Monats zu beantworten ist. Eine Ablehnung braucht eine Begründung, die dem Mitglied mitgeteilt wird. Das Ausführen entfernt Konto und Zugang in einem Schritt (REQ-SEC-061).
 
 - **Administration: neue Seite „Personensuche“.** Findet jede Stelle, an der ein Name vorkommt – auch in Freitextfeldern ohne Kontoverknüpfung, etwa bei externen Einsatzteilnehmern, Übergabe-Empfängern oder Organigramm-Platzhaltern. Gedacht für Auskunfts-, Berichtigungs- und Löschanfragen, bei denen eine Korrektur an einer von vier Stellen keine Korrektur ist (REQ-SEC-060).
 
+- **Benachrichtigung, wenn ein Mitglied die Löschung beantragt – und wenn ein Antrag abgelehnt wird.** Die Administration sieht den Antrag im Postfach mit dem Namen des Mitglieds, das Mitglied die Ablehnung mit dem Hinweis auf die Begründung im eigenen Profil (REQ-SEC-061).
+
 - **Administration: Datenauskunft für ein anderes Mitglied.** Auf der Mitglieder-Bearbeitungsseite, für eine Anfrage von jemandem, der sich nicht selbst anmelden kann. Inhalt und Anonymisierung sind identisch mit dem Selbstexport (REQ-SEC-058).
 
 - **Halbfertige Kontolöschungen fallen jetzt auf.** Wurde ein Keycloak-Zugang entfernt, die lokale Zeile aber nie gelöscht, blieben E-Mail-Adresse, Spielername, Discord-ID und Beschreibung unbegrenzt liegen, ohne dass es irgendwo auffiel. Die Überwachung meldet das jetzt nach sieben Tagen (REQ-SEC-059).
 
-- **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung durch einen Administrator bleibt unverändert bestehen. Die Datenschutzerklärung nennt die Frist (REQ-AUDIT-006).
+- **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung und die in der Datenschutzerklärung genannte Frist bleiben davon unberührt (REQ-AUDIT-006).
 
   > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `APP_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
 
@@ -34,14 +36,14 @@
   erneut zustimmen; bis dahin ruht auch die Desktop-Anwendung (REQ-SEC-028).
 
 - **Die Datenschutzerklärung erklärt jetzt, wie lange Daten in Sicherungskopien verbleiben.** Nach
-  einer Löschung sind die Daten bis zu etwa sechs Monate in verschlüsselten Sicherungen weiterhin
-  vorhanden, bis diese auslaufen. Das stand bisher nicht dort. Ergänzt wurde außerdem der Hinweis,
-  dass wissentlich keine Daten von Personen unter 18 Jahren verarbeitet werden.
+  einer Löschung sind sie bis zu etwa sechs Monate in verschlüsselten Sicherungen weiterhin
+  vorhanden, bis diese auslaufen — das stand bisher nicht dort. Ergänzt wurde auch der Hinweis, dass
+  wissentlich keine Daten von Personen unter 18 Jahren verarbeitet werden.
 
 - **Ungelesene Benachrichtigungen werden jetzt ebenfalls gelöscht.** Die automatische Löschung
-  erfasste bisher nur gelesene Benachrichtigungen; ein Postfach, das niemand öffnete, behielt seine
-  Einträge dauerhaft. Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene
-  unverändert 90 Tage nach dem Lesen. Die Datenschutzerklärung nennt beide Fristen (REQ-NOTIF-009).
+  erfasste bisher nur gelesene; ein Postfach, das niemand öffnete, behielt seine Einträge dauerhaft.
+  Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene unverändert 90 Tage nach
+  dem Lesen — beide Fristen stehen in der Datenschutzerklärung (REQ-NOTIF-009).
 
 - **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
   Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
@@ -51,12 +53,11 @@
 ### Fixed
 
 - **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
-  drei Aufräumläufe (Audit, abgelehnte Registrierungen, Benachrichtigungen) waren nirgends an das
-  Backend durchgereicht — der in der Dokumentation genannte Not-Aus vor dem ersten, unwiderruflichen
-  Lauf blieb wirkungslos. Ebenso betroffen: die Taktung der Keycloak-Synchronisation, die Clients
-  mit unvollständigem Rollen-Scope und die WARN-Schwelle für langsame Anfragen. Alle sind jetzt
-  eingetragen; die Vorgabewerte bleiben unverändert (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
-  REQ-NOTIF-009).
+  drei Aufräumläufe waren nirgends an das Backend durchgereicht — der dokumentierte Not-Aus vor
+  dem ersten, unwiderruflichen Lauf blieb wirkungslos. Ebenso betroffen: die Taktung der
+  Keycloak-Synchronisation, die Clients mit unvollständigem Rollen-Scope und die WARN-Schwelle für
+  langsame Anfragen. Alle sind jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006,
+  REQ-SEC-036, REQ-SEC-057, REQ-NOTIF-009).
 
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend

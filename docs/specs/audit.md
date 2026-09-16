@@ -171,6 +171,29 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
   the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
   body, the requester/supplier handle, or any location.
+- **Datenschutz / Betroffenenrechte** (`AuditDomain.ROLE`, REQ-SEC-058 / -060 / -061 / -062) — the
+  data-subject-rights surfaces, added 2026-09-16. Six event types, and two of them audit a **read**
+  (the deliberate exception above):
+  - `PERSONAL_DATA_EXPORTED` — one row per served Art. 15 / Art. 20 export. The payload names the
+    `format` (`json` / `pdf`), the `rows` count and `bySelf`, which is the distinction the trail
+    exists to make answerable: a member reading their own record is unremarkable, an admin reading
+    somebody else's is not. Nothing about the export's *contents* goes in.
+  - `PERSON_SEARCH_PERFORMED` — one row per admin Personensuche. The payload carries the term's
+    **length**, the hit count and the truncation flag, and **never the term**: the term is somebody's
+    name, and a trail of every name an admin searched for would be a second store of exactly the
+    data the search exists to help remove.
+  - `ACCOUNT_DELETION_REQUESTED` / `..._WITHDRAWN` / `..._DECLINED` / `..._EXECUTED` — the four
+    states of an Art. 17 request. All four carry a `null` subject **label**; the member is identified
+    by `actor_user_id` and `target_user_id` only. That is not a style choice: a name in the label
+    survived the erasure for the full 24-month retention, because the erasure rewrites
+    `actor_handle` and the label sat on the same row untouched.
+  - `HANDLE_SNAPSHOTS_ANONYMISED` — the receipt for a granted erasure, written to **both** trails
+    *after* the updates so the marker is not scrubbed by them. The payload carries the per-table row
+    counts and the number of spellings matched, and never the name that was removed — writing it
+    back would undo the erasure in the very row that records it.
+
+  The bank trail gains the same `HANDLE_SNAPSHOTS_ANONYMISED` marker, and
+  `CARTEL_APPROVAL_TIERS_CLEARED` for the unrelated approval-tier reset.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
@@ -178,6 +201,16 @@ The audit table is **business data, not logging** — the [`observability.md`](o
 details payload — only ids, counts and lengths (the actor handle and the subject label are
 snapshotted, exactly as the bank trail snapshots holder handles).
 
+> [!warning] Corrected 2026-09-16 — `details` is typed `CharSequence`, so the rule is not enforced
+> Nothing routes a caller of `AuditService.record` / `BankAuditService.record` through the
+> `AuditDetails` builder: the last parameter is a bare `CharSequence`, and two bank call sites
+> concatenate a handle straight into it (`BankHolderService` records `HOLDER_REGISTERED` with the
+> holder's handle **as** the payload; `BankLedgerService` writes `"+<amount> aUEC @<handle>"` on
+> every booking). `PersonSearchTargets` had exempted both `details` columns from the person search
+> **on the strength of this rule**, which made the exemption false. Both columns are searched now
+> (REQ-SEC-060) and a granted erasure rewrites them in place (REQ-SEC-062). The rule stands as a
+> rule; it is simply not a guarantee, and the two registries no longer assume it is.
+>
 > [!warning] Corrected 2026-09-16 — `subject_label` is **not** reliably non-personal
 > This paragraph used to give "a material name or order title" as examples of *non-personal*
 > subject labels. The order title is not non-personal: the job-order trails snapshot

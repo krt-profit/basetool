@@ -2329,8 +2329,8 @@ class ArchitectureTest {
     // A granted Art. 17 request replaces the member's handle in `bank_transaction`
     // .counterparty_handle with a placeholder. That is an UPDATE on a ledger table, which this rule
     // forbids — so the exception is by METHOD NAME, not by relaxing the rule: every other
-    // @Modifying method on these repositories still fails, including a second anonymisation-shaped
-    // one somebody adds later.
+    // @Modifying method on these repositories still fails, including one with this exact name on a
+    // different ledger repository.
     //
     // Why it is admissible at all: the rule exists so a ledger CORRECTION cannot be made by update
     // (corrections are reversal transactions, REQ-BANK-004). This changes no booking fact — not an
@@ -2342,7 +2342,15 @@ class ArchitectureTest {
     //
     // ADR-0010's insert-only consequence is therefore amended, and ADR-0183 records that amendment
     // rather than leaving it to be inferred from this test.
-    Set<String> approvedLedgerMutations = Set.of("anonymiseCounterpartyHandle");
+    // Fully qualified, not by bare method name. The predicate consulted input.getName() only, so a
+    // @Modifying method that happened to be called anonymiseCounterpartyHandle on
+    // BankPostingRepository or BankHolderPostingRepository would have inherited the exemption
+    // silently -- and those are the tables carrying amounts. The approval was for one method on one
+    // repository; the check now says so.
+    Set<String> approvedLedgerMutations =
+        Set.of(
+            "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository"
+                + ".anonymiseCounterpartyHandle");
     noMethods()
         .that()
         .areDeclaredInClassesThat(
@@ -2356,7 +2364,8 @@ class ArchitectureTest {
             new DescribedPredicate<>("are not the one approved Art. 17 anonymisation") {
               @Override
               public boolean test(com.tngtech.archunit.core.domain.JavaMethod input) {
-                return !approvedLedgerMutations.contains(input.getName());
+                return !approvedLedgerMutations.contains(
+                    input.getOwner().getFullName() + "." + input.getName());
               }
             })
         .should()

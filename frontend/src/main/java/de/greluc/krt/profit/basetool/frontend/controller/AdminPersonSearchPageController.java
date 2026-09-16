@@ -24,11 +24,10 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.PersonSearchResultDto;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -58,6 +57,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class AdminPersonSearchPageController {
 
+  /**
+   * The result type, as a {@link ParameterizedTypeReference} rather than a {@code Class}, because
+   * only that overload of {@code BackendApiClient#get} takes URI-template variables — and binding
+   * the term as a variable is the whole point here.
+   */
+  private static final ParameterizedTypeReference<PersonSearchResultDto> RESULT_TYPE =
+      new ParameterizedTypeReference<>() {};
+
   private final BackendApiClient backendApiClient;
 
   /**
@@ -82,10 +89,16 @@ public class AdminPersonSearchPageController {
 
     if (term.length() >= 3) {
       try {
+        // The term goes as a URI-template variable so it is percent-encoded exactly once across
+        // the frontend->backend hop (REQ-FE-016). URLEncoder here was encoded twice: WebClient's
+        // default TEMPLATE_AND_VALUES mode re-encodes each '%' to '%25', the backend's
+        // @RequestParam
+        // then held the literal escape sequence, escapeLikeWildcards escaped those '%' into '\%',
+        // and ILIKE matched nothing. Plain ASCII terms were unaffected, which is why it sat
+        // unnoticed -- and a search for a name with an umlaut reported no mentions at all, which on
+        // this surface is the one answer that must never be wrong (REQ-SEC-060).
         PersonSearchResultDto result =
-            backendApiClient.get(
-                "/api/v1/admin/person-search?q=" + URLEncoder.encode(term, StandardCharsets.UTF_8),
-                PersonSearchResultDto.class);
+            backendApiClient.get("/api/v1/admin/person-search?q={q}", RESULT_TYPE, term);
         model.addAttribute("hits", result == null ? List.of() : result.hits());
         model.addAttribute("truncated", result != null && result.truncated());
         model.addAttribute("searched", true);

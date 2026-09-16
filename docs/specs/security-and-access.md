@@ -3511,10 +3511,27 @@ rather than an access one, and the reason this is a hygiene signal rather than a
 
 **Two gauges, sampled by `BusinessMetricsCollector` (REQ-OBS-011):**
 
-|                        Gauge                         |                Reads                 |
-|------------------------------------------------------|--------------------------------------|
-| `basetool_users_pending_deletion_count`              | `COUNT(*) WHERE in_keycloak = false` |
-| `basetool_users_pending_deletion_oldest_age_seconds` | `now() - MIN(keycloak_absent_since)` |
+|                        Gauge                         |                                             Reads                                             |
+|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `basetool_users_pending_deletion_count`              | `COUNT(*) WHERE in_keycloak = false`, **excluding the configured gateways' service accounts** |
+| `basetool_users_pending_deletion_oldest_age_seconds` | `now() - MIN(keycloak_absent_since)`, same exclusion                                          |
+
+> [!important] The exclusion is not tidying — without it the alert fires on day one, forever
+> Corrected 2026-09-16. An unfiltered `GET /users` **omits service accounts**, so the roster sync
+> never reports one and `markMissingUsers` flags it; nothing can ever clear the flag, because
+> `syncUser` only runs for a user the roster reports. Production holds exactly such a row — the
+> ingest gateway's service account, created when the gateway's first call ran the registration flow
+> on itself before the machine-identity carve-out existed (ADR-0129). Counted, the gauge was
+> permanently non-zero, V241 backfilled its age with the deploy timestamp, and
+> `UserDeletionUnfinished` fired at T+7d and never resolved — telling an admin to finish a deletion
+> for a machine row that holds no e-mail address, no handle and no description at all.
+>
+> The exclusion is by username (`service-account-<clientId>`, for the configured client ids only),
+> which is a **display convention rather than a reserved namespace** and must never be the basis of
+> a security decision — `UserDeletionService` still asks Keycloak which user backs a configured
+> client before it waives its delete guard. For a gauge it is proportionate: excluding a hand-made
+> lookalike from a monitoring count is a nuisance, not a hole, and the alternative is a Keycloak
+> round trip on every metrics tick.
 
 **The age needs a column, and V241 adds it.** No existing timestamp carries "when did this account
 stop being present": `created_at` is when the account was created — for a member who joined in April
@@ -3524,6 +3541,15 @@ moving on every unrelated profile edit. So `app_user.keycloak_absent_since` is a
 `UserRepository#markMissingUsers` and cleared by `UserReconciliationService` when the account
 reappears — an account that comes back is not waiting for deletion, and a stamp left behind would
 alert forever.
+
+> [!note] `in_keycloak` is now derivable from the stamp, and stays anyway
+> Observed in review, 2026-09-16. The two are written and cleared together, so
+> `keycloak_absent_since IS NOT NULL` and `in_keycloak = false` mean the same thing, and the boolean
+> carries no information the timestamp does not. It stays because it is the column a dozen queries
+> and the member list's render gate already read, and because the pair fails **safe**: a row with
+> the flag and no stamp still hides the delete action and still counts, it simply reports no age.
+> Collapsing them would be a schema change for tidiness, on a column whose whole purpose is that
+> existing code reads it the same way it always did.
 
 **It is a first-observation stamp, not a last-seen one.** The update's existing `in_keycloak = true`
 predicate restricts it to rows that actually flip, so a row already flagged is never rewritten.
@@ -3611,16 +3637,60 @@ places where that is the whole point:
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. Four sections are scrubbed for the mirror-image reason — they
-select a **name somebody gave a thing**, which can be a person's: `hangar` (`ship.name`),
-`missionsManaged` (`mission.name`, already scrubbed in the two sibling sections that select it),
-`notificationRuleTargets` (`notification_rule.description`) and `bankAccountGrants`
-(`bank_account.name`). Each is a person-name surface in `PersonSearchTargets` (REQ-SEC-060), which
-is the registry that settles the question rather than a per-section judgement call. `HandleScrubber` replaces the handles of other members,
-case-insensitively, longest match first (or "Val" would leave "kyrie" behind from "Valkyrie"), and
-skips handles under three characters because a two-character handle occurs inside ordinary words and
-replacing it would shred every note.
+where no `SELECT` list can reach. Five columns are scrubbed for the mirror-image reason — they
+carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (`ship.name`),
+`missionsManaged.mission` (`mission.name`, already scrubbed in the two sibling sections that select
+it), `notificationRuleTargets.rule` (`notification_rule.description`), `bankAccountGrants.account`
+(`bank_account.name`) and the two `orgChartPositions` name columns. Each is a person-name surface in
+`PersonSearchTargets` (REQ-SEC-060), which is the registry that settles the question rather than a
+per-section judgement call.
 
+`HandleScrubber` replaces the names of other members, case-insensitively, longest match first (or
+"Val" would leave "kyrie" behind from "Valkyrie"), in **one forward pass over the original text**,
+and skips names under three characters because a two-character handle occurs inside ordinary words
+and replacing it would shred every note. The replacement is the locale-free token
+`#OTHER_MEMBER#`, for the same reason the erasure sentinel is a token: the export has no language
+of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
+`thirdPartyHandlesRemoved` flag) are what explain it.
+
+> [!important] The scrub gate is the **column**, not the section — corrected 2026-09-16
+> It used to be the section: every `String` value of a listed section went through the scrubber.
+> That is fine for a section whose columns are all prose and wrong for every section that mixes
+> prose with structured values. The `account` projection selects `username`, `email`,
+> `approval_status` and six more identity fields, all `String` on the wire, and another member's
+> three-character handle occurring inside the subject's **own e-mail address** was replaced — so the
+> export handed the member a corrupted copy of their own identity while telling them third-party
+> names had been removed.
+>
+> `DataExportSections.FREE_TEXT_COLUMNS` names the prose columns per section, and
+> `UNSCRUBBED_PERSON_COLUMNS` records, with a reason, every selected column that *is* a person-name
+> surface and is still deliberately not scrubbed. `DataExportScrubCoverageTest` walks each section's
+> `SELECT` list and **fails the build** unless every such column appears in one map or the other —
+> and unless every entry in either map names a section and a column that exist. Without that gate
+> `notificationRuleTargets` shipped selecting an administrator's free text unscrubbed, and a renamed
+> key would have dropped out of the scrub set while the export kept reporting success.
+>
+> [!warning] Three scrubber defects, all member-reachable — corrected 2026-09-16
+> Each of these was reachable by any member from their own profile, and the first two reached an
+> export the member requested for themselves.
+>
+> - **Offsets from a lower-cased copy.** `String.toLowerCase` is not length-preserving (U+0130
+>   lowercases to two characters), and the splice used indices found in the lower-cased text. A
+>   match after such a character **leaked a prefix of the third party's handle** while
+>   `thirdPartyHandlesRemoved` still reported success; a match near the end threw
+>   `IndexOutOfBoundsException` out of both export endpoints. Matching is `String.regionMatches`
+>   now, which compares character for character and cannot drift.
+> - **The placeholder was scrubbed by later passes.** Scrubbing once per handle meant each pass read
+>   the previous pass's output, so a three-character name that is a substring of the replacement was
+>   substituted *inside* a placeholder — eleven such names expanded a 30-character note to 1780
+>   characters. `display_name` is self-service, so any member could pick one and corrupt the free
+>   text in **every other member's** export. The single forward pass cannot re-read what it emitted.
+> - **One spelling per member.** The dictionary was built from `getEffectiveName()`
+>   (`displayName ?: username`), so a third party's `username` — whenever they had a display name —
+>   and everybody's `discord_guild_nickname` were never scrubbed. All three columns are registered
+>   as person-name surfaces for the search; the scrubber now loads all three, and the granted
+>   erasure (REQ-SEC-062) matches on all three for the same reason.
+>
 > [!warning] The residue is real and is covered by a human, not by code
 > The scrubber cannot recognise somebody who has no account, a nickname or a misspelling — nothing
 > can, from text alone. That is why Art. 15(4) and
@@ -3847,25 +3917,69 @@ When an admin grants the member's wish, the member's handle MUST be replaced by 
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
 about what happened is altered — only the name goes.
 
-**The six places**, and the reason it is all six: erasing five reads as a completed erasure while
-still naming the person on the sixth.
+**The eleven places**, and the reason it is all eleven: erasing ten reads as a completed erasure
+while still naming the person on the eleventh.
 
 |                                   Where                                   |                         Matched by                          |
 |---------------------------------------------------------------------------|-------------------------------------------------------------|
 | `audit_event.actor_handle`                                                | `actor_user_id`                                             |
+| `audit_event.subject_label`                                               | the text, exactly and case-insensitively                    |
+| `audit_event.details`                                                     | the text, replaced in place inside the payload              |
 | `bank_audit_event.actor_handle`                                           | `actor_user_id`                                             |
+| `bank_audit_event.details`                                                | the text, replaced in place inside the payload              |
 | `bank_transaction.counterparty_handle`                                    | `counterparty_user_id`                                      |
 | `bank_booking_request` — requester, decider, counterparty, owner approver | the four id columns, in one statement                       |
-| `job_order_handover.recipient_handle`                                     | **the text, case-insensitively** — there is no id beside it |
+| `bank_holder.handle`                                                      | `user_id`                                                   |
+| `job_order.handle`                                                        | **the text, case-insensitively** — there is no id beside it |
+| `job_order_handover.recipient_handle`                                     | likewise                                                    |
 | `job_order_item_handover.recipient_handle`                                | likewise                                                    |
+| `notification.params`                                                     | the text, replaced in place inside the payload              |
 
-**The two handover columns have no user id at all**: a recipient is typed in by hand and may name
-somebody with no account. So the match is on the text and must ignore case, because whoever typed it
-was not copying from a roster. That also makes these two the only targets reachable for an
-*already deleted* account — and it can over-match, since a handle is not a unique key, which is why
-the admin reviews the Personensuche hits (REQ-SEC-060) before granting.
+**The text-matched columns have no user id at all**: a handover recipient or a job-order contact is
+typed in by hand and may name somebody with no account. So the match is on the text and must ignore
+case, because whoever typed it was not copying from a roster. That also makes them the only targets
+reachable for an *already deleted* account — and it can over-match, since a handle is not a unique
+key, which is why the admin reviews the Personensuche hits (REQ-SEC-060) before granting.
 
-**A sentinel, not `NULL`.** Four of the six columns are `NOT NULL`, and that constraint is the
+**Every spelling, not the effective name alone.** `getEffectiveName()` is `displayName ?: username`,
+so each text-matched update runs once per stored spelling — username, display name and Discord guild
+nickname. A handover typed with the member's nickname is as likely as one typed with their display
+name, and the search registry already treats all three as places a person is named.
+
+> [!important] Five of the eleven were added after review, and the set is gate-enforced now
+> Corrected 2026-09-16. The set was documented as closed and was not: `bank_holder.handle` (the
+> custodian registry, which becomes **more** visible after the account is gone, because its
+> `user_id` is `ON DELETE SET NULL` and the display name falls back to the snapshot),
+> `job_order.handle`, `notification.params` (one row per **administrator**, kept for up to the
+> 180-day unread window) and both `details` payloads all survived a granted erasure. And
+> `audit_event.subject_label` was worse than missed: the execution's own audit row put the member's
+> effective name back into it six lines after `actor_handle` had been scrubbed, on the same row. All
+> four deletion-request events did the same, so a granted erasure left rows literally
+> half-anonymised for the full 24-month retention. They carry a `null` label now.
+>
+> `HandleErasureCoverage` classifies **every** column `PersonSearchTargets` registers as a place a
+> person is named, and `HandleErasureCoverageTest` fails the build unless each one is anonymised
+> here, removed with the account, structurally about somebody else, or recorded as an admin's manual
+> step with a reason. The person search had that gate from the day it was written and never drifted;
+> this set had a comment, and drifted before the branch merged.
+>
+> **The registry also makes the manual half visible.** Rather more than half of those columns are
+> prose somebody else typed, where the name sits inside a sentence and no mechanical rule can
+> rewrite it safely. That residue is why the Personensuche exists and why
+> [`data-subject-requests.md`](../privacy/data-subject-requests.md) requires an admin to walk its
+> hits — but it was implicit before, and an erasure whose manual half is implicit is one somebody
+> will believe is complete.
+>
+> [!note] The sentinel's uniqueness is enforced, not assumed
+> `HandleAnonymisation`'s comment claimed a real handle could not equal the token while
+> `display_name` was self-service free text with only a length limit — so any member could set
+> theirs to `#ANONYMISED#` and have it written into the trail as their own actor handle. Forging it
+> was never an escalation (nothing branches on the value, every erasure update is matched by id or
+> by the member's own spelling, and `actor_user_id` still attributes the row), but a comment
+> asserting an invariant the code does not have is worse than no comment.
+> `HandleAnonymisation.isReserved` is the check and `UserService` applies it to both write paths.
+
+**A sentinel, not `NULL`.** Four of the columns are `NOT NULL`, and that constraint is the
 guarantee that a row always says who acted (REQ-AUDIT-001). Relaxing it to make room for an erasure
 would weaken the invariant for every row ever written afterwards. The stored value is
 `#ANONYMISED#` — deliberately not a word in any language, because it is rendered in two and the
@@ -3874,7 +3988,7 @@ i18n rule admits no hardcoded user-visible text; every human-facing surface maps
 same rows stay comparable.
 
 **It leaves a receipt.** A `HANDLE_SNAPSHOTS_ANONYMISED` marker is written to **both** trails, after
-the updates so it is not scrubbed by them, carrying the per-table row counts and **never** the
+the updates so it is not scrubbed by them, carrying the per-table row counts and the number of spellings matched, and **never** the
 handle that was removed — writing the value back would undo the erasure in the very row that records
 it.
 

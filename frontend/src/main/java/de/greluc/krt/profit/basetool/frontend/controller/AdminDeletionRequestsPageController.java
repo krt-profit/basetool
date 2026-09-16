@@ -152,10 +152,10 @@ public class AdminDeletionRequestsPageController {
    *
    * <p>The flag is read from the payload rather than from the request row, because it is the
    * <b>admin's</b> answer to the member's wish and not the wish itself — a wish is not an
-   * instruction (decision 6, @greluc).
+   * instruction (decision 6, {@literal @}greluc).
    *
    * @param id the request to carry out
-   * @param request the client payload; {@code grantHistoryErasure} and an optional {@code note}
+   * @param request the client payload; only {@code grantHistoryErasure} is read
    * @return {@code 200} on success, else the relayed backend status
    */
   @ResponseBody
@@ -165,8 +165,11 @@ public class AdminDeletionRequestsPageController {
       @PathVariable UUID id, @RequestBody Map<String, Object> request) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("grantHistoryErasure", Boolean.TRUE.equals(request.get("grantHistoryErasure")));
-    Object note = request.get("note");
-    body.put("note", note instanceof String text && !text.isBlank() ? text : null);
+    // No note is relayed. An execution has nowhere to record one -- the deletion_request row
+    // cascades away with the account, and REQ-AUDIT-001 keeps free text out of the audit payload --
+    // so the dialog no longer asks for one either. Collecting a justification and discarding it is
+    // worse than not collecting it: the admin believes they have recorded their reasoning.
+    // A refusal is the case where it survives, and /decline requires it.
     try {
       backendApiClient.post(
           "/api/v1/admin/deletion-requests/" + id + "/execute", body, Object.class);

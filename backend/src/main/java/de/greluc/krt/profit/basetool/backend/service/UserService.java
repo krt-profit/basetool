@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -206,6 +207,11 @@ public class UserService {
       user.setDescription(description);
     }
     if (displayName != null) {
+      if (HandleAnonymisation.isReserved(displayName)) {
+        // The erasure sentinel, which is only meaningful because nothing else can equal it
+        // (REQ-SEC-062). A member naming themselves that would put it into their own audit rows.
+        throw new IllegalArgumentException("This display name is reserved");
+      }
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
     // joinDate can be explicitly set to null (clear the date)
@@ -240,6 +246,11 @@ public class UserService {
       user.setDescription(description);
     }
     if (displayName != null) {
+      if (HandleAnonymisation.isReserved(displayName)) {
+        // The erasure sentinel, which is only meaningful because nothing else can equal it
+        // (REQ-SEC-062). A member naming themselves that would put it into their own audit rows.
+        throw new IllegalArgumentException("This display name is reserved");
+      }
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
     // saveAndFlush so the bumped @Version is in the response — the profile page writes the returned

@@ -147,7 +147,7 @@ class DeletionRequestControllerSecurityTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
 
-    verify(deletionRequestService, never()).execute(any(), anyBoolean(), any());
+    verify(deletionRequestService, never()).execute(any(), anyBoolean());
   }
 
   @Test

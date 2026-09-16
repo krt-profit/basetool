@@ -170,9 +170,11 @@ class DeletionRequestProxyControllerTest {
   }
 
   @Test
-  void card_stillRendersTheNoRequestStateWhenTheBackendIsDown() {
-    // The card is swapped in after a write that already succeeded. Failing the fragment would leave
-    // the old state on screen, which is the one thing worse than showing "no request".
+  void card_saysSoWhenTheBackendIsDownRatherThanClaimingNoRequest() {
+    // The card is swapped in after a write that already succeeded, so failing the fragment would
+    // leave the old state on screen. Rendering the no-request state is not the answer either: a
+    // DECLINED request carries the refusal reason Art. 12(4) obliges the controller to tell the
+    // member, and it used to disappear from the page with nothing said.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(
             eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
@@ -184,6 +186,22 @@ class DeletionRequestProxyControllerTest {
 
     assertEquals("fragments/profile-deletion-card :: card", view);
     assertNull(model.getAttribute("deletionRequest"));
+    assertEquals(true, model.getAttribute("deletionRequestUnavailable"));
+  }
+
+  @Test
+  void card_marksTheStateAvailableOnASuccessfulLoad() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(
+            eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
+        .thenReturn(null);
+    DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
+    Model model = new ConcurrentModel();
+
+    controller.card(model);
+
+    // A member who has never asked is not an error, and the card must still offer the action.
+    assertEquals(false, model.getAttribute("deletionRequestUnavailable"));
   }
 
   /**

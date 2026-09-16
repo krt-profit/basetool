@@ -72,10 +72,12 @@ public class AdminDataExportController {
           "For an access request from somebody who cannot sign in - a locked-out member, or a "
               + "disabled account. Identical projections and identical third-party anonymisation "
               + "as the self-service export: an admin export is not a fuller one.")
-  public DataExportService.DataExport exportJson(@PathVariable UUID userId) {
+  public ResponseEntity<DataExportService.DataExport> exportJson(@PathVariable UUID userId) {
     DataExportService.DataExport export = dataExportService.export(userId);
     dataExportService.recordExport(userId, "json", export.totalRows(), false);
-    return export;
+    // Pinned, not negotiated -- see DataExportController#exportJson. An admin serving an access
+    // request has to be able to hand the member a file they can actually open.
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(export);
   }
 
   /**
@@ -84,7 +86,9 @@ public class AdminDataExportController {
    * @param userId the member the export is about
    * @return the PDF
    */
-  @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+  // No `produces` -- it is a mapping condition, and the frontend's Accept header does not include
+  // application/pdf, so it would answer 406. See DataExportController#exportPdf.
+  @GetMapping("/pdf")
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Export another member's data as a PDF")
   public ResponseEntity<byte[]> exportPdf(@PathVariable UUID userId) {
