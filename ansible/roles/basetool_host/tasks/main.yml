@@ -33,3 +33,8 @@
 - name: Podman configuration
   ansible.builtin.import_tasks: 50-podman.yml
   tags: [podman]
+
+- name: Host hardening, from the platform's own SCAP content
+  ansible.builtin.import_tasks: 60-hardening.yml
+  when: basetool_manage_hardening | default(true) | bool
+  tags: [hardening]

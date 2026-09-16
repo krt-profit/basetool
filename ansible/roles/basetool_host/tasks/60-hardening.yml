@@ -1,0 +1,119 @@
+---
+# Host hardening, from the platform's own versioned content rather than from anybody's idea of
+# what a hardened host looks like.
+#
+# CentOS Stream 10 ships scap-security-guide with a dedicated `cs10` datastream and seventeen
+# profiles -- CIS levels 1 and 2, DISA STIG, BSI SYS.1.1/SYS.1.3, ANSSI BP-028, PCI-DSS and more.
+# That content is versioned, reviewed, and matched to this exact distribution, which is the whole
+# reason to use it instead of a hand-written list of sysctls.
+#
+# WHY cis_server_l1 -- measured on 2026-09-16 against scap-security-guide 0.1.82, not chosen by
+# reputation:
+#
+#   profile             tasks   fapolicyd   noexec targets
+#   bsi                   652      YES      /tmp only
+#   cis_server_l1        1022      no       /tmp /dev/shm /var/tmp /var/log /var/log/audit
+#   cis (level 2)        1669      no       same, plus more
+#   stig                 1657      YES      most aggressive
+#
+# Two findings decided it:
+#
+#  1. fapolicyd is application allowlisting by path and trust database. Rootless Podman executes
+#     every container binary out of the service user's own storage under
+#     ~/.local/share/containers/storage/overlay/..., which is not in any trust database and never
+#     will be. It appears in `bsi` and `stig` and NOT in cis_server_l1.
+#  2. /home gets nodev and nosuid under CIS L1 but NOT noexec -- checked rule by rule. So the
+#     rootless container storage survives. nosuid there is in any case consistent with what these
+#     containers already do: every one of them runs with no-new-privileges, which makes setuid
+#     inert regardless of the mount option.
+#
+# Scanning is the default. Remediation is NOT: applying a thousand rules to a host is a deliberate
+# act, and the scan report is what makes it an informed one.
+
+- name: Install the hardening content and scanner
+  ansible.builtin.dnf:
+    name:
+      - scap-security-guide
+      - openscap-scanner
+    state: present
+
+- name: Create a directory for the scan reports
+  ansible.builtin.file:
+    path: "{{ basetool_state_dir }}/hardening"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Locate the datastream for this distribution
+  ansible.builtin.stat:
+    path: "{{ basetool_hardening_datastream }}"
+  register: basetool_datastream
+
+- name: Assert the datastream exists
+  ansible.builtin.assert:
+    that: basetool_datastream.stat.exists
+    fail_msg: >-
+      {{ basetool_hardening_datastream }} is missing. scap-security-guide ships one datastream per
+      distribution; on CentOS Stream 10 it is ssg-cs10-ds.xml, and on RHEL 10 ssg-rhel10-ds.xml.
+      Set basetool_hardening_datastream rather than hardening against content written for a
+      different distribution.
+
+# Always. A report that is only produced when somebody remembers to ask is a report nobody has.
+- name: Scan against the profile
+  ansible.builtin.command:
+    argv:
+      - oscap
+      - xccdf
+      - eval
+      - --profile
+      - "{{ basetool_hardening_profile }}"
+      - --results-arf
+      - "{{ basetool_state_dir }}/hardening/arf-{{ ansible_date_time.date }}.xml"
+      - --report
+      - "{{ basetool_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html"
+      - "{{ basetool_hardening_datastream }}"
+  register: basetool_scan
+  # oscap exits 0 when every rule passed, 2 when at least one failed, and 1 on an error. A failing
+  # rule is the normal state of an unhardened host and is the reason we are scanning, so only 1 is
+  # a failure of this task.
+  failed_when: basetool_scan.rc == 1
+  changed_when: false
+
+- name: Summarise the scan
+  ansible.builtin.debug:
+    msg: >-
+      {{ basetool_hardening_profile | regex_replace('^.*_profile_', '') }}:
+      {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }} passed,
+      {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'fail') | list | length }} failed.
+      Report: {{ basetool_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html
+
+- name: Remediate
+  when: basetool_hardening_remediate | bool
+  block:
+    - name: Apply the profile's remediations
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --remediate
+          - --profile
+          - "{{ basetool_hardening_profile }}"
+          - --results-arf
+          - "{{ basetool_state_dir }}/hardening/arf-remediated-{{ ansible_date_time.date }}.xml"
+          - --report
+          - "{{ basetool_state_dir }}/hardening/report-remediated-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_hardening_datastream }}"
+      register: basetool_remediate
+      failed_when: basetool_remediate.rc == 1
+      changed_when: true
+
+    - name: Say what has to happen next, because the scan cannot
+      ansible.builtin.debug:
+        msg: >-
+          Remediation applied. It is NOT accepted until two things are true: the host reboots
+          cleanly (mount options and grub settings only take effect then), and
+          scripts/check-conformance.py is green against it. A hardened host that no longer serves
+          the application has failed, and the conformance suite is the only thing that will say so
+          -- an oscap report will happily show a perfect score on a host whose edge is down.
