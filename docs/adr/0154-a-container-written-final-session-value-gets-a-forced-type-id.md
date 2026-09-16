@@ -124,4 +124,3 @@ A threshold tuned above a known-permanent rate cannot see the fault it was built
   `invalidate()` or Redis expiry, so Tomcat's close-the-WebSocket-on-logout path was never wired
   here and this does not wire it. That is a separate question about `/ws/sync` lifecycle, not a
   serialization one.
-

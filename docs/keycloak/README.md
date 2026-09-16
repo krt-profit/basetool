@@ -372,4 +372,3 @@ having its refresh token bound.
   on the public frontend client (it used the browser authorization-code flow anyway), so the
   password can never traverse a direct-access (resource-owner-password) grant. The e2e test realm
   (`realm-export.e2e.json`) deliberately keeps it `true` for its ROPC test logins.
-

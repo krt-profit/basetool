@@ -52,4 +52,3 @@ Zusätzlich abgedeckt:
 - **Admin-Pin verengt** auf die gepinnte OrgUnit (`adminAllScope = false`); damit lässt sich auch der gescopte Einsatz-Roll-up (BAC-004) ohne Mutation eines Logistician-Flags prüfen.
 - **Optimistic-Lock vor Owner-Check:** der Owner-Gate-Fall sendet bewusst die **aktuelle** `version`, damit der Versions-Check passiert und der Eigentümer-Check (403) feuert (vgl. den 409-Fall in UC-20).
 - **Verifikation via API.** Aufträge werden über ihre Id in den Listen-Payloads erkannt (volle UUID, kein Substring-Risiko); gegen die gescopten Endpunkte als verschiedene Nutzer zu assertieren ist die etablierte, race-freie Methode für Tenancy-Grenzen (vgl. UC-08/UC-14).
-

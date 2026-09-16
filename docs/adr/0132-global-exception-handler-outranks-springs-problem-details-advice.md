@@ -84,4 +84,3 @@ runs at all, the test has to exercise the wiring.
 - **Leave it and have the frontend infer the field from `detail`** — rejected outright. It would
   parse an untranslated framework string, still produce no server-side log, and encode the defect as
   a contract.
-

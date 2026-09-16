@@ -113,4 +113,3 @@ by up to a day for web users too. Too large a behaviour change for the defect at
 - Adding a second narrowed client in future is a configuration change, not a code change — but it is
   also a decision that has to be made deliberately, which is why the list is explicit rather than
   inferred from the token.
-

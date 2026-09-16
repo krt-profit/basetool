@@ -77,4 +77,3 @@ Rejected:
 - `edge-deny-probe` should return to `401` on those four paths on the next run after deploy. It is
   currently red for two further reasons that this ADR does not address (`materials/{id}/terminals`
   and `hangar/import/fleetview`).
-

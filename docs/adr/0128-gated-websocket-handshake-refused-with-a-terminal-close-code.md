@@ -106,4 +106,3 @@ drift into a socket that is never refused, and nothing would log.
   unbounded backoff exists for.
 - **Send a control frame before closing.** Would work, but adds a wire message and a
   send-then-close ordering dependency to say what the close code and reason already say.
-

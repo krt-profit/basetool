@@ -175,4 +175,3 @@ Spec (docs/specs, REQ-ID, acceptance criteria)
 3. Add a row to the registry table above.
 4. Open it as a PR — a spec change is reviewed like a code change.
 5. When you implement it, reference the REQ-ids from the issue, the PR, and the tests.
-

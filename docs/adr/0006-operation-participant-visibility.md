@@ -59,4 +59,3 @@ lack of one). Anonymous callers are excluded — viewing requires a resolved `cu
   the DB answers "did this user participate?" in one lookup.
 - **Grant participants edit access too.** Rejected: participation is not authority over the operation;
   settling/deleting stays with mission managers and admins (role + scope).
-

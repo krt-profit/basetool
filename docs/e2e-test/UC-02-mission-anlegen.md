@@ -35,4 +35,3 @@ Der Einsatz erscheint in der Liste unter `/missions` als `mission-row` (Filter a
 - **Clientseitige `required`-Blockade:** Planned-Start-Datum und -Zeit sind HTML-`required`. Fehlen sie, blockiert der Browser den Submit **stumm** (keine Server-Fehlermeldung) — der Test bleibt auf dem Formular. Daher beide Felder füllen.
 - **Zukunftsdatum nötig:** sonst greift die „nicht in der Vergangenheit"-Prüfung.
 - **datetime-splitter-Race:** `datetime-splitter.js` leert die Datum/Zeit-Picker beim `DOMContentLoaded` aus dem leeren Hidden-Feld. Wer vor diesem Init füllt, dessen Werte werden wieder gelöscht → stummer Submit-Block. Erst auf den vollständigen Load warten, dann füllen.
-

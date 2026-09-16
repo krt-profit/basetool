@@ -239,4 +239,3 @@ Precondition: Phases 2–4 verified, tunnel soaked ≥ several days incl. one ho
 - [ ] `ip route get 8.8.8.8` not via wg0; backups/deploys/e-mail run unchanged.
 - [ ] `WireGuardTunnelDown` fires on a provoked outage and recovers.
 - [ ] ADR-0077, REQ-OPS-017, REQ-OBS-012-ext, deployment.md, README, CHANGELOG shipped; no secrets anywhere in git/CI.
-

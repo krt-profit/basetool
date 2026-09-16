@@ -89,4 +89,3 @@ SCU. No migration.
   UI.
 - **Honour `includeRefinery` with a refetch per toggle** — rejected in favour of returning both
   figure sets once so the toggle is instant; the extra refinery read is a few rows for one user.
-

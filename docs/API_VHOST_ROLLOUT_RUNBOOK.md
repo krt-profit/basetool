@@ -2633,4 +2633,3 @@ immediate; no release, no promotion.
   merges trains you to ignore the channel it fires on.
 - **Do not** flip the audience (phase G) before its verification step. It is the one change here
   that can lock out every client simultaneously.
-

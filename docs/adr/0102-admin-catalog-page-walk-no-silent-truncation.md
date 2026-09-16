@@ -99,4 +99,3 @@ one shared helper — `frontend support.CatalogPages.fetchAll(pageFetcher)`:
 - **Derive totals from `totalElements` only (report's stated minimum)** — rejected as the sole
   fix: it makes the counts honest but still leaves rows unviewable and uneditable, which is the
   actual defect.
-

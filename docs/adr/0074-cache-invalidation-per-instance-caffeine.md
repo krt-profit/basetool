@@ -71,4 +71,3 @@ replacing the eviction-sensitive caches with a shared/broadcast eviction scheme.
 - **Leave the single-instance assumption undocumented.** Rejected: every other place with the same
   hazard already documents it (the live-sync relay, token single-flight, ADR-0019); REQ-DATA-007 was the
   lone silent carrier, so CACHE-DIST-01 closes a consistency gap.
-

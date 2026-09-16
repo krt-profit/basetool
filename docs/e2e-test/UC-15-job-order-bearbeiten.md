@@ -37,4 +37,3 @@ Die neu geladene Detailseite zeigt in der „Benötigt"-Spalte `250.000` und den
 - **Read-only `responsibleOrgUnit`:** Die bearbeitende Einheit ist im Modal nur lesend — sie wird ausschließlich über den Umschreib-Flow (`PATCH …/responsible-org-unit`) geändert, nicht über das reguläre Update. Das Update-DTO sendet `responsibleOrgUnitId = null`.
 - **Locale-robuste Assertion:** Statt auf lokalisierten Spaltentext zu prüfen, prüft der Test, dass die Materialzeile den Teilstring `250` enthält (die ursprüngliche `100` und der Lagerstand `0` erzeugen ihn nicht) plus den eindeutigen Kommentar-String.
 - **Post-Submit-Settle:** Der volle Redirect wird über `awaitFormPost` abgewartet, bevor neu navigiert wird (sonst bricht WebKit den In-Flight-Redirect ab — HTTP/2 `INTERNAL_ERROR`).
-

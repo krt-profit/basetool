@@ -23,4 +23,3 @@ accept and any follow-up work the decision creates.
 
 - **<Option A>** — why rejected.
 - **<Option B>** — why rejected.
-

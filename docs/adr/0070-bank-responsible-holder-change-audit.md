@@ -99,4 +99,3 @@ the leadership change, not a background job; (4) no optimistic-locking trap may 
   "before" state without either the seam (reintroducing the cycle) or a stored snapshot; (c)
   duplicating the resolution into a new `Bank*`-named component — dropped: it would either re-bridge
   org-unit scope and the bank (violating the single-seam ArchUnit pin) or duplicate the derivation.
-

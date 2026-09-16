@@ -36,4 +36,3 @@ Nach dem Anlegen ist der Eintrag in `#pi-results` sichtbar **und** per Backend-R
 - **UEX-City-Seed als Blocker:** Ohne eine `city`-Zeile mit `id_city` bleibt der Typeahead leer und das Anlegen scheitert — der Seed ist zwingend, nicht optional.
 - **Bespoke-Typeahead statt Combobox:** Der Ort ist ein eigener Debounce-Typeahead (nicht `krt-searchable-select`); ausgewählt wird per Klick auf den gerenderten Ergebnis-Button, der die versteckten Felder befüllt. Ohne gewählten Ort blockiert die JS den Submit clientseitig.
 - **Abgrenzung:** Nicht mit `/inventory/my` (UC-13) verwechseln — andere Entität, anderer Controller, andere Route.
-

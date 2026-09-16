@@ -87,4 +87,3 @@ guess is least safe — and it would erase the very ambiguity the column exists 
   volume signal tagged by event type; client attribution across the whole API already lives on
   `basetool_api_client_requests_total{client_id}` (REQ-OBS-018), and a second per-client counter
   here would restate it.
-

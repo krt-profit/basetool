@@ -2652,4 +2652,3 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
    **Partly resolved (2026-07-05, #994):** external free-text parties are now allowed for the
    deposit/withdrawal **counterparty** (Einzahler/Empfänger, REQ-BANK-044). External **Halter**
    remain out of scope — this question stays open only for the custody dimension.
-

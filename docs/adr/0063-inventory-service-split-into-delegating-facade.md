@@ -89,4 +89,3 @@ wipe) fails the build rather than leaking across org units.
   service sheds every write repository, the checkout service sheds the mappers/repositories only the
   read side used, and `InventoryItemService` reads as a facade over the create/update/note core plus
   two delegations.
-

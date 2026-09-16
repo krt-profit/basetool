@@ -87,4 +87,3 @@ We will split bank authorization into two layers:
   non-members alike; an eligibility predicate would add a lookup per request and an
   operational trap (joining a Staffel would silently kill bank access) for no required
   control.
-

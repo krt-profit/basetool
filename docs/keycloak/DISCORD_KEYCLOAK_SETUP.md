@@ -333,4 +333,3 @@ services; rebuild the truststore when the backend certificate is rotated.
 - Linking Discord to an existing account from the Account Console still works (the precheck is skipped
   for an already-authenticated session).
 - Keycloak/SPI logs contain **no** candidate usernames, nicknames, e-mails or Discord ids.
-

@@ -86,4 +86,3 @@ bad-digest backoff) and **before** the first `pull` / `docker create` / `docker 
   disables itself is not a gate. Fail-closed + a single explicit break-glass override is the correct
   posture; the host must be updated to get the new `deploy.sh` anyway, so installing cosign is part
   of that same manual step.
-

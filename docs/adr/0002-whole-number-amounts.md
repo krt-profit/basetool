@@ -84,4 +84,3 @@ and rounding it would contradict the "keep internal precision" requirement.
 - **No frontend constraint (rely on HTML `step="1"` + backend).** Rejected: the form already
   validates its other fields; an inline field error beats a backend round-trip, and the client/server
   mirror keeps the rule identical on both sides.
-

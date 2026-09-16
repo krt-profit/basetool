@@ -88,4 +88,3 @@ deployments and the test profile are byte-for-byte unchanged until opted in:
 - **Always-on internal JWKS (no opt-in).** Rejected: a high-blast-radius change to token validation
   (a misconfiguration locks everyone out) and it would require the `keycloak-trust` bundle in every
   environment; env-gating makes the rollout controlled and reversible.
-

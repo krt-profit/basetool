@@ -120,4 +120,3 @@ keep their own validation. The DB-precision / migration mechanics live in
 
 - Should the DB columns carry an explicit `NUMERIC(p, 3)` scale as a belt-and-suspenders guard behind
   the application-layer rounding, or is the `@PrePersist`/`@PreUpdate` chokepoint sufficient?
-

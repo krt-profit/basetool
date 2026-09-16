@@ -163,4 +163,3 @@ link), so a host compromise is contained by revoking one token.
   `failed` in `systemctl`. Promote to an ADR/issue when an alerting transport is chosen.
 - Whether to add an occasional `restic check --read-data-subset` (full data re-read) beyond the
   structural nightly `restic check`, traded off against egress cost.
-

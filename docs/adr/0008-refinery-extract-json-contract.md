@@ -84,4 +84,3 @@ payload the real producer emits; a tightening that *could* still requires the ve
   payload is tiny.
 - **No version field, duck-typed parsing:** rejected — the project has been bitten by
   silent shape drift between modules before; loud rejection is a deliberate property.
-

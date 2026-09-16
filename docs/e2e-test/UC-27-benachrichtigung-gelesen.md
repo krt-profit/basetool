@@ -37,4 +37,3 @@ Die geseedete Benachrichtigung erscheint in der Liste (Nachweis, dass die Ereign
 - **Rollen-Spiegelung vor dem Ereignis:** `getUserId(test-admin)` loggt den Admin ein und synct dessen `Admin`-Rolle nach `user_roles` — passiert das erst nach dem Ereignis, verpasst der `ROLE ADMIN`-Selektor den Empfänger.
 - **Geteilter Stack:** Schwester-Suiten legen ebenfalls Aufträge an, daher nie absolute Zähler prüfen, nur die spezifische Zeile über die `displayId` und ihren Zustandswechsel.
 - **Live-SSE bewusst nicht geprüft:** Best-effort-Push mit gejittertem Reconnect und ≤60-s-Poll-Fallback ist deutlich flakiger — die persistierte Liste nach Navigation ist der robuste Vertrag.
-

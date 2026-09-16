@@ -303,4 +303,3 @@ comment should answer the obvious "why now?" question before they need to.
   `V<n>`, new files numbered after the current tip on `main`). Run it
   locally before pushing:
   `FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh`.
-

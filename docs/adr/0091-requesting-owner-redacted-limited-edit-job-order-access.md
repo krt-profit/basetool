@@ -72,4 +72,3 @@ paths — closing the pre-existing in-loop-before-save detach fragility on `upda
 - The whole-order freeze means a partially-delivered order is fully frozen for the requester — simpler
   and safe under the lossy material-amount model, at the cost of not allowing edits to the
   still-undelivered remainder once any delivery has started.
-

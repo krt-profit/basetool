@@ -91,4 +91,3 @@ version-checked endpoint surfaced as a "Verantwortliche Einheit" control in the 
 - **Auto-clear `is_internal` when moving to a "private" unit.** Rejected: `is_internal` is an
   independent visibility control; silently flipping it on reassignment would surprise users and
   couple two orthogonal concerns.
-

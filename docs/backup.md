@@ -221,4 +221,3 @@ A restore with **no** compromise suspected keeps the restored secrets as-is.
 - **A failed backup or drill** shows `failed` in `systemctl` / `journalctl`. Treat a failed
   **restore drill** as a severe incident — it means the latest backup did not restore cleanly.
 - **Change retention/schedule:** edit `/etc/iri/backup.env` (retention) or the timer's `OnCalendar`.
-

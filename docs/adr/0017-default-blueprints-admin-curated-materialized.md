@@ -73,4 +73,3 @@ an **admin-curated** `default_blueprint` table (not the unreliable flag, not a h
   starter loadout without a deploy; the hard-coded list survives only as the one-time seed source.
 - **Revoke on default removal / show a "Default" badge.** Rejected by the owner: keep existing rows
   on removal, and hide the delete control instead of adding a badge.
-
