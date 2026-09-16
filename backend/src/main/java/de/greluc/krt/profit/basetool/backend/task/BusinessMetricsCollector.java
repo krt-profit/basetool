@@ -124,6 +124,9 @@ public class BusinessMetricsCollector {
    */
   @PostConstruct
   void registerGauges() {
+    // A bean @ConditionalOnProperty never created publishes nothing, and that
+    // absence is what lets ScheduledJobStale tell "switched off" from "never ran".
+    taskMetrics.markEnabled(ScheduledJob.BUSINESS_METRICS);
     countGauge(MetricNames.REGISTRATION_PENDING, registrationPending);
     ageGauge(MetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
 

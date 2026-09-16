@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.task;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.RejectedRegistrationRetentionService;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
@@ -92,5 +93,19 @@ public class RejectedRegistrationRetentionTask {
     int purged = retentionService.purgeRejectedOlderThan(Instant.now().minus(maxAge));
     log.info("Rejected-registration retention sweep finished — {} registration(s) purged.", purged);
     return purged;
+  }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="rejected_registration_retention"} = 1}.
+   *
+   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
+   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
+   * Without it, following the documented instruction to disable a sweep before its first
+   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
+   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    taskMetrics.markEnabled(ScheduledJob.REJECTED_REGISTRATION_RETENTION);
   }
 }

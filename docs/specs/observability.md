@@ -833,13 +833,37 @@ shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.Busine
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
+> [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
+> Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
+> success**, so `absent(last_success)` means "has never succeeded" — which covers two very
+> different states: a job that is stuck, and a job that was switched off on purpose and was never
+> going to run. **All ten** wrapped jobs can be switched off by configuration, and the `absent()`
+> legs could not distinguish the two: following `.env.example`'s own instruction to disable a
+> retention sweep before its first irreversible run raised a **permanent** `warning` from 26 hours
+> of uptime onwards — using the documented safeguard fired the alert.
+>
+> Each job publishes `1` from its own `@PostConstruct`, so a bean `@ConditionalOnProperty` never
+> created publishes nothing and that absence is the signal. That is why the gauge lives on the job
+> rather than being derived from configuration somewhere central: the publisher cannot disagree
+> with the thing it describes. `ScWikiScheduler` is the one exception and shows what the metric
+> actually means — its bean is always created and the sync early-returns on
+> `krt.scwiki.scheduler-enabled`, so it publishes only when that property is on. The gauge says
+> "this job is configured to run", not "this bean exists".
+>
+> Every `absent()` leg in `business.yml` now requires it, per task and never over an alternation —
+> for the same reason the `absent()` legs themselves are written per task. Pinned by
+> `tests/scheduled_job_never_succeeded_test.yml`, which covers both directions: a switched-off job
+> stays silent, and an enabled one that has never succeeded still fires.
+
 **Backend.**
 
 - `basetool_scheduled_job_executions_total{task,outcome}` counter,
   `basetool_scheduled_job_duration_seconds{task}` timer,
-  `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the eight
+  `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
+  `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the ten
   wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
   / `recordCounting`). The `business_metrics` job wraps `BusinessMetricsCollector.refresh()` (the 60s
   queue-depth sampler) so a wedged sampler surfaces via its frozen last-success (`BusinessMetricsStale`)
@@ -852,7 +876,8 @@ transaction per pass) rather than per-scrape.
   annotation marks the cutover). The last-success gauge is the source of the
   staleness alerts — `UserSyncStale` (`user_sync`, > 26h — daily 05:00 cadence, see `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs,
 
-  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
+  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
+  > `rejected_registration_retention` / `audit_retention`, > 26 h),
   > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for

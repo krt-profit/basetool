@@ -50,6 +50,26 @@ public final class MetricNames {
   public static final String SCHEDULED_JOB_ITEMS = "basetool.scheduled.job.items";
 
   /**
+   * Gauge {@code basetool_scheduled_job_enabled} — {@code 1} while this job is configured to run,
+   * tag {@code task}.
+   *
+   * <p><b>What it is for.</b> The last-success gauge is registered lazily, on a job's first
+   * success, so {@code absent(last_success)} means "has never succeeded" — which covers two very
+   * different states: a job that is wedged, and a job that was switched off on purpose and was
+   * never going to run. All ten wrapped jobs can be switched off by configuration, and the {@code
+   * absent()} legs of the staleness alerts could not tell the two apart: following the documented
+   * instruction to disable a retention sweep before its first irreversible run raised a permanent
+   * warning for doing what the documentation asked.
+   *
+   * <p>Published at startup by each job's own bean, which is what makes it reliable — a bean
+   * {@code @ConditionalOnProperty} never created publishes nothing, and that absence is the signal.
+   * {@code ScWikiScheduler} is the one job whose switch is a runtime property rather than bean
+   * existence and publishes only when that property is on, which is why the metric means "this job
+   * is configured to run" rather than "this bean exists".
+   */
+  public static final String SCHEDULED_JOB_ENABLED = "basetool.scheduled.job.enabled";
+
+  /**
    * Counter {@code basetool_scheduled_job_step_failures_total} — tags {@code task}, {@code step}.
    * Bumped when one step of a multi-step sync job throws and is swallowed so the remaining steps
    * still run: the umbrella job then records {@code outcome=success} with a non-zero item tally

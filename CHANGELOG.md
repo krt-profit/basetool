@@ -64,6 +64,12 @@
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
   Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
 
+- **Betrieb: einen Aufräumlauf wie dokumentiert abzuschalten löste einen dauerhaften Alarm aus.**
+  Die Überwachung konnte „noch nie erfolgreich gelaufen“ nicht von „absichtlich ausgeschaltet“
+  unterscheiden, weil ein abgeschalteter Lauf gar keinen Messwert veröffentlicht. Jeder Lauf meldet
+  jetzt, ob er überhaupt eingeschaltet ist (`basetool_scheduled_job_enabled`), und die Alarme fragen
+  das ab (REQ-OBS-011).
+
 ## [v1.8.6](https://github.com/krt-profit/basetool/releases/tag/v1.8.6) - 2026-09-15
 
 

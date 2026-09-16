@@ -122,14 +122,14 @@ groups:
       # LAZILY, on a job's first success, and lives in the backend process — so a job that fails on
       # EVERY run since the last restart publishes no series at all, `time() - gauge` has nothing to
       # evaluate, and this alert stayed silent on exactly the failure it exists for. The companion is
-      # gated on backend uptime exceeding this rule's own window rather than being a bare absent():
+      # gated on backend uptime exceeding this rule's own window, AND on the job's bean existing:
       # a bare one would fire after every deploy, since (unlike the textfile metrics behind the
       # ops-automation alerts) this gauge does not survive a restart. Written per task, never once
       # over an alternation — absent() is 1 only when the selector matches NOTHING, so a combined
       # guard would stay false while one of two tasks was dead. Pinned by
       # tests/scheduled_job_never_succeeded_test.yml.
       - alert: UserSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="user_sync"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -144,7 +144,7 @@ groups:
       # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ExternalSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="uex_sync"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="scwiki_sync"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -332,13 +332,18 @@ groups:
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
       # blueprint back-fill had no staleness guard. The daily rejected-registration purge
       # (REQ-SEC-057) joined them: a retention sweep that silently stops running is exactly the
-      # failure nobody notices from the outside, because its whole job is that nothing is left over. No absent() — the last-success gauge is registered
-      # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
-      # has not yet completed a run in this process) never publishes it and cannot report a false
-      # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
+      # failure nobody notices from the outside, because its whole job is that nothing is left over.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
+      # This comment used to claim that a config-gated-off job "cannot report a false stale
+      # (deliberate, per the issue)". That stopped being true the moment the companion was added
+      # (2026-08-29): a bean @ConditionalOnProperty never created publishes no last-success gauge,
+      # which is exactly the state absent() fires on. Following .env.example's own instruction to
+      # disable a retention sweep before its first irreversible run therefore raised a PERMANENT
+      # warning from 26h of uptime onwards. The `basetool_scheduled_job_enabled` leg (2026-09-17)
+      # is what makes the claim true again: the job publishes 1 while it is configured to run, so
+      # absent-and-enabled means "never ran" and absent-and-not-enabled means "switched off".
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -353,7 +358,7 @@ groups:
       # invariant it guards.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="bank_ledger_integrity"} == 1))
         for: 10m
         labels:
           severity: critical
@@ -366,7 +371,7 @@ groups:
       # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: JobOrderIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="job_order_integrity"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -379,7 +384,7 @@ groups:
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BusinessMetricsStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m
         labels:
           severity: warning
