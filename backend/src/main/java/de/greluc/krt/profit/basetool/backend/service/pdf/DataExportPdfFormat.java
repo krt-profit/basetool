@@ -55,7 +55,11 @@ import org.openpdf.text.pdf.PdfPTable;
  * </ul>
  *
  * <p>The document is German, like every other PDF in this application; its labels are resolved
- * through the caller's label function rather than written inline.
+ * through the caller's label function rather than written inline. <b>That was untrue of the field
+ * names until 2026-09-17</b>: the verbatim sections printed the projection's own SQL aliases, so a
+ * member read {@code discord_guild_nickname}. They come from {@code pdf.export.field.*} now, and
+ * {@code DataExportPdfFieldLabelCoverageTest} fails the build when a projection selects a column
+ * the bundle cannot name.
  */
 public final class DataExportPdfFormat {
 

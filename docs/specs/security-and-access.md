@@ -3729,7 +3729,7 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 The scrubbing half had three defects of its own, and it is the half where a defect is a leak rather
 than a gap.
 
-> [!warning] Three scrubber defects, all member-reachable — corrected 2026-09-16
+> [!warning] Four scrubber defects, all member-reachable — corrected 2026-09-16/-17
 > Each of these was reachable by any member from their own profile, and the first two reached an
 > export the member requested for themselves.
 >
@@ -3749,6 +3749,14 @@ than a gap.
 >   and everybody's `discord_guild_nickname` were never scrubbed. All three columns are registered
 >   as person-name surfaces for the search; the scrubber now loads all three, and the granted
 >   erasure (REQ-SEC-062) matches on all three for the same reason.
+> - **A first-character index narrower than the comparison** (added 2026-09-17). The matcher
+>   buckets terms by their first character to avoid testing every handle at every position, and
+>   `regionMatches(true, …)` accepts pairs a single case folding does not: `K` (U+212A) matches
+>   `k`, `ı` matches `I`, `İ` matches `i`, `ς` matches `σ`, `ẞ` matches `ß`. The index
+>   now folds **both** sides, because folding one is not symmetric: a handle `Kelvin` sits under
+>   `K` and `k`, and a note written with the Kelvin sign looked up a character no bucket held.
+>   Both directions are pinned, and the fix is verified by mutation rather than by observing a
+>   green test.
 
 None of that closes the gap between what a rule can do and what the article asks for.
 

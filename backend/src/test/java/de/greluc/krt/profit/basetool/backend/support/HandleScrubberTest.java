@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Unit tests for {@link HandleScrubber} — removing other members' handles from the free text that
@@ -125,6 +127,51 @@ class HandleScrubberTest {
 
     assertThat(scrubber.scrub("uebergeben an kelvin heute"))
         .isEqualTo("uebergeben an " + HandleScrubber.REPLACEMENT + " heute");
+  }
+
+  // covers REQ-SEC-058 - and the mirror case: the wide character sits in the TEXT
+  @Test
+  void anOrdinaryTermIsFoundWhereTheTextUsesTheWideCharacter() {
+    // The direction the first fix left open. Folding only the term's first character indexes
+    // "Kelvin" under 'K' and 'k'; a note written with KELVIN SIGN (U+212A) then looks up a
+    // character no bucket holds, although regionMatches(true, ...) accepts the pair. Folding is
+    // not transitive through one key, so both sides have to fold.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Kelvin"));
+
+    assertThat(scrubber.scrub("uebergeben an " + "Kelvin".replace("K", "\u212A") + " heute"))
+        .isEqualTo("uebergeben an " + HandleScrubber.REPLACEMENT + " heute");
+  }
+
+  // covers REQ-SEC-058 - the other four characters the comparison accepts and one folding does not
+  @ParameterizedTest
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        // handle | the same name as somebody typed it
+        "Islay|\u0130slay",
+        "Islay|\u0131slay",
+        // A wide folding pairs the two forms of the SAME letter, not a Latin look-alike:
+        // U+03C2 matches sigma, not "S"; U+1E9E matches eszett, not "S".
+        "\u03c3igma|\u03c2igma",
+        "\u00dfeta|\u1e9eeta",
+      })
+  void aTermIsFoundWhereTheTextSubstitutesAWideCaseFolding(String handle, String written) {
+    HandleScrubber scrubber = new HandleScrubber(List.of(handle));
+
+    assertThat(scrubber.scrub("notiz von " + written))
+        .as("%s written as %s", handle, written)
+        .isEqualTo("notiz von " + HandleScrubber.REPLACEMENT);
+  }
+
+  // covers REQ-SEC-058 - folding both sides must not cost longest-match-first
+  @Test
+  void theLongestTermStillWinsAcrossTheFoldedBuckets() {
+    // "Val" and "Valkyrie" land in the same bucket here, but a folded lookup consults several --
+    // so the longest match has to win across them, not merely within one.
+    HandleScrubber scrubber = new HandleScrubber(List.of("Val", "Valkyrie"));
+
+    assertThat(scrubber.scrub("Valkyrie war dabei"))
+        .isEqualTo(HandleScrubber.REPLACEMENT + " war dabei");
   }
 
   // covers REQ-SEC-058 — a two-character handle would shred every note in the export

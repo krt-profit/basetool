@@ -196,12 +196,18 @@ public final class HandleScrubber {
    *
    * <p>{@code regionMatches(true, …)} compares {@code toUpperCase} and then {@code toLowerCase} of
    * each pair, which accepts pairs that a single folding does not: {@code K} (U+212A) matches
-   * {@code k}, {@code ı} matches {@code I}. Bucketing under only two foldings made the index the
-   * narrower of the two, so a term starting with such a character was silently never tested.
+   * {@code k}, {@code ı} matches {@code I}, {@code ẞ} matches {@code ß}, {@code ς} matches {@code
+   * σ}, {@code İ} matches {@code i}. Bucketing under only two foldings made the index the narrower
+   * of the two, so such a pair was silently never tested at all.
    *
-   * @param first the term's first character
-   * @param <ignored> not used
-   * @return the distinct characters to bucket under
+   * <p><b>Applied to both sides, which is what makes the index exactly as wide as the
+   * comparison.</b> Folding only the term's first character left the mirror case open: a handle
+   * {@code Kelvin} is indexed under {@code K} and {@code k}, and a note written with the Kelvin
+   * sign looks up U+212A, which no bucket holds. The term side alone is not symmetric because
+   * folding is not transitive through one key.
+   *
+   * @param first the character to fold
+   * @return the distinct characters it can stand in for, itself included
    */
   private static @NotNull Set<Character> caseFoldings(char first) {
     Set<Character> out = new LinkedHashSet<>();
@@ -258,25 +264,43 @@ public final class HandleScrubber {
   /**
    * The longest known term that starts at this position, ignoring case, flanked by boundaries.
    *
+   * <p>The index is consulted under every {@link #caseFoldings(char)} of the text's own character,
+   * not only under the character itself: the buckets fold the term's first character, and folding
+   * one side is not symmetric. Without this a handle {@code Kelvin} — indexed under {@code K} and
+   * {@code k} — was never tested against a note written with the Kelvin sign, although {@code
+   * regionMatches(true, …)} accepts that pair.
+   *
+   * <p>Each bucket is longest-first, so the first match inside one is that bucket's best; across
+   * buckets the longest match wins, and the scan of a bucket stops as soon as its remaining terms
+   * are too short to beat what is already held. Longest-match-first is load-bearing — matching
+   * „Val“ before „Valkyrie“ leaves „kyrie“ behind, which is a leak and a corruption at once.
+   *
    * @param text the text being scanned
    * @param at the position to test
-   * @return the matching term, or {@code null} when none starts here
+   * @return the longest matching term, or {@code null} when none starts here
    */
   private @Nullable Term termAt(@NotNull String text, int at) {
-    List<Term> candidates = byFirstChar.get(text.charAt(at));
-    if (candidates == null) {
-      return null;
-    }
-    for (Term term : candidates) {
-      int end = at + term.text().length();
-      if (end <= text.length()
-          && text.regionMatches(true, at, term.text(), 0, term.text().length())
-          && isBoundary(text, at - 1)
-          && isBoundary(text, end)) {
-        return term;
+    Term best = null;
+    for (char folded : caseFoldings(text.charAt(at))) {
+      List<Term> candidates = byFirstChar.get(folded);
+      if (candidates == null) {
+        continue;
+      }
+      for (Term term : candidates) {
+        if (best != null && term.text().length() <= best.text().length()) {
+          break;
+        }
+        int end = at + term.text().length();
+        if (end <= text.length()
+            && text.regionMatches(true, at, term.text(), 0, term.text().length())
+            && isBoundary(text, at - 1)
+            && isBoundary(text, end)) {
+          best = term;
+          break;
+        }
       }
     }
-    return null;
+    return best;
   }
 
   /**
