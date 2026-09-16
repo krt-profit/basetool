@@ -164,6 +164,20 @@ public final class MetricNames {
   public static final String ACCOUNT_DELETION_KEYCLOAK_FAILURES =
       "basetool.account.deletion.keycloak.failures";
 
+  /**
+   * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
+   * reconciliation inserts a brand-new {@code app_user} row that is {@code ACTIVE} on arrival
+   * because the subject holds the Keycloak ADMIN realm role (REQ-SEC-017 bootstrap carve-out).
+   *
+   * <p>The carve-out is deliberate — the first admin must never be lockable out by the approval
+   * gate — but it is the one way an account gains full authority with no admin decision behind it,
+   * and it used to leave no trace at all. Normally zero: an admin account is created once. A
+   * non-zero value is the bootstrap, a re-provisioning, or somebody who was granted the realm role
+   * in Keycloak, and each of those wants a human to confirm it was intended (REQ-OBS-011).
+   */
+  public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
+      "basetool.admin.registration.auto.activated";
+
   // --- Identity (UserReconciliationService) ----------------------------------------------
 
   /**

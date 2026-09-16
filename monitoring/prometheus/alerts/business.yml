@@ -584,6 +584,32 @@ groups:
             Administration -> Mitglieder (the delete action appears for accounts the sync no longer
             finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
 
+      # (2026-09-17) A brand-new account that is ACTIVE on arrival. The REQ-SEC-017 approval gate
+      # carves ADMIN-realm-role holders out for bootstrap safety -- the first admin must never be
+      # lockable out -- which makes it the one way a row gains full authority with no admin decision
+      # behind it, and it left no trace at all. Normally zero: an admin account is created once.
+      #
+      # A firing is the bootstrap, a re-provisioning, or somebody who was granted the ADMIN realm
+      # role in Keycloak and then logged in. It is also the tail of a failed erasure: the recreated
+      # row of an ADMIN-realm-role holder is ACTIVE immediately rather than a refusable PENDING
+      # registration, which is why AccountErasureKeycloakDeleteFailed exists below.
+      #
+      # Untagged on purpose -- the callsign would be both unbounded and PII (REQ-OBS-004). Who it
+      # was is in the ROLE audit trail, by actor and by time.
+      - alert: AdminAccountAutoActivated
+        expr: sum(increase(basetool_admin_registration_auto_activated_total[24h])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A new account was activated as admin without an approval"
+          description: >-
+            A brand-new account arrived already holding the Keycloak ADMIN realm role and was
+            activated without passing the approval queue (REQ-SEC-017 bootstrap carve-out). Expected
+            for the first admin and for a deliberate re-provisioning; otherwise confirm who was
+            granted the ADMIN realm role in Keycloak, and check Administration -> Protokoll (Rollen
+            tab) for the account's arrival.
+
       # (2026-09-17) The opposite direction of UserDeletionUnfinished, and the one nothing watched.
       # An erasure commits its local half first and deletes the Keycloak user last (REQ-SEC-026,
       # ADR-0111). When that last step throws, the catch block logged a warning and returned -- and

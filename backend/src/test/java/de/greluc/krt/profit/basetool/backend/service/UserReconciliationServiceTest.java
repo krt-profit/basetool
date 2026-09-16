@@ -270,6 +270,64 @@ class UserReconciliationServiceTest {
           "a callsign collision must be counted");
     }
 
+    /**
+     * A brand-new row that is ACTIVE on arrival has to be counted.
+     *
+     * <p>{@code stampNewPendingRegistration} carves ADMIN-realm-role holders out of the approval
+     * gate for bootstrap safety (REQ-SEC-017), which is the one way an account gains full authority
+     * with no admin decision behind it \u2014 and it used to leave no trace at all. It is also the
+     * tail of a failed erasure: the recreated row of an ADMIN-realm-role holder is ACTIVE
+     * immediately rather than a refusable PENDING registration (REQ-SEC-061).
+     */
+    @Test
+    void countsTheAutoActivatedAdmin_soTheCarveOutIsNotSilent() {
+      Jwt jwt =
+          newJwt(
+              USER_ID.toString(),
+              Map.of(
+                  "preferred_username",
+                  "alice",
+                  "realm_access",
+                  Map.of("roles", List.of("ADMIN"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("ADMIN", "ADMIN")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
+          "an account that arrives already holding ADMIN must be counted");
+    }
+
+    /** A new ordinary member lands PENDING, which is the approval queue's own signal, not this. */
+    @Test
+    void doesNotCountANewOrdinaryMemberAsAnAutoActivatedAdmin() {
+      Jwt jwt =
+          newJwt(
+              USER_ID.toString(),
+              Map.of(
+                  "preferred_username",
+                  "alice",
+                  "realm_access",
+                  Map.of("roles", List.of("MEMBER"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("MEMBER", "MEMBER")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(
+          0.0, meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count());
+    }
+
     /** No collision, no counter: an ordinary first login must not look like an incident. */
     @Test
     void doesNotCountAnythingForAnOrdinaryFirstLogin() {

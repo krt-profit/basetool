@@ -301,6 +301,14 @@ public class UserReconciliationService {
       user.setApprovedAt(Instant.now());
       changed = true;
     }
+    if (created && isAdmin) {
+      // The bootstrap carve-out is the one way a row reaches ACTIVE with no admin decision behind
+      // it, and until this counter existed it left no trace whatsoever. It is also what makes a
+      // failed Keycloak delete during an erasure dangerous rather than untidy: the recreated row
+      // of an ADMIN-realm-role holder is ACTIVE immediately, not a refusable PENDING registration
+      // (REQ-SEC-061, and the corrected note in security-and-access.md).
+      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
+    }
 
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
@@ -434,6 +442,12 @@ public class UserReconciliationService {
         userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
     if (newPendingRegistration) {
       changed = true;
+    } else if (created
+        && localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
+      // Same signal as the interactive path: a brand-new row that is ACTIVE on arrival because of
+      // the REQ-SEC-017 bootstrap carve-out. Counted on whichever path inserts the row, so the two
+      // cannot double-count -- `created` is true exactly once per account.
+      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (changed || user.isNew()) {

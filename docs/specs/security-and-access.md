@@ -3916,6 +3916,11 @@ not create it.
 > transaction has already committed), carrying the account id the Keycloak console needs.
 > `AccountErasureKeycloakDeleteFailed` alerts on any occurrence. The remedy is manual and stays
 > manual: delete that account in Keycloak.
+>
+> The carve-out itself stays — the first admin must never be lockable out by the
+> approval gate — but it no longer fires silently: a brand-new row that is `ACTIVE` on
+> arrival bumps `basetool_admin_registration_auto_activated_total` on whichever path inserts
+> it, and `AdminAccountAutoActivated` alerts on any occurrence.
 
 **The history checkbox is a wish, not an instruction** (REQ-SEC-062). The member may additionally
 ask for the handle snapshots that survive a deletion to be anonymised. Nothing acts on that

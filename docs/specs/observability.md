@@ -1083,6 +1083,15 @@ transaction per pass) rather than per-scrape.
   bootstrap safety. Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
   warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
   the account id the Keycloak console needs (added 2026-09-17).
+- `basetool_admin_registration_auto_activated_total` counter (untagged,
+  `UserReconciliationService`, both creation paths) counts a brand-new row that is `ACTIVE` on
+  arrival because the subject holds the Keycloak ADMIN realm role — the REQ-SEC-017
+  bootstrap carve-out, which is the one way an account gains full authority with no admin
+  decision behind it and which used to leave no trace. Counted on whichever path inserts the
+  row (`created` is true exactly once per account), so the interactive and scheduled paths
+  cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
+  who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
+  24 h, warning; added 2026-09-17).
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from
