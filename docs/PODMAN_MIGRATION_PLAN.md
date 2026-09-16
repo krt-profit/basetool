@@ -2163,3 +2163,114 @@ find / -xdev -nogroup -printf '%G\n' | sort -u | awk ... /etc/subgid -  | wc -l
 > What turned each of them into progress was the same reflex: the number looked like a finding, so
 > it got investigated instead of filed.
 
+## 20. Phase 2 — the databases, read-only and without capabilities — 2026-09-16
+
+The two Phase 2 items the plan called *indicative* rather than *measured* — **read-only with real
+mounts** and **the capability reduction for the databases** — are now measured on Rocky 10.2 with
+Podman 5.8.2, against the real image digests, the real `PGDATA`, the real data mount, the real
+`appendonly` persistence and the real server flags from `docker-compose.yml`.
+
+**Both databases run read-only.** Both can run with **no capabilities at all**. And the reduction
+that looks most obviously safe — dropping capabilities from redis — turned out to be the one that
+silently makes it *more* privileged.
+
+### The measured sets
+
+Every arm is judged by a health probe **and** a real write, and reports the **uid of pid 1**,
+because *the container came up* stopped being evidence of anything partway through this.
+
+| Service | Configuration | Result | pid 1 |
+|---------|---------------|--------|-------|
+| postgres | the compose set: `CHOWN DAC_OVERRIDE FOWNER SETGID SETUID` | OK | 70 |
+| postgres | **without `FOWNER`** | OK | 70 |
+| postgres | without `CHOWN` / without `DAC_OVERRIDE` | FAIL | — |
+| postgres | without `SETGID` / without `SETUID` | FAIL | — |
+| postgres | **`--user 70:70`, `--cap-drop=ALL`** | OK | 70 |
+| redis | the compose set (same five) | OK | 999 |
+| redis | **`SETGID`+`SETUID` only** | OK | 999 |
+| redis | `CHOWN`+`DAC_OVERRIDE`+`FOWNER`, no gosu caps | **OK** | **0** |
+| redis | `--cap-drop=ALL` | FAIL | — |
+| redis | **`--user 999:999`, `--cap-drop=ALL`** | OK | 999 |
+
+So postgres needs **four** of its five, redis needs **two** of its five, and both need **none** if
+the container is started as its own uid instead of dropping to it.
+
+`DAC_OVERRIDE` is postgres's least obvious requirement: the data directory belongs to container uid
+70 and the entrypoint's root phase has to create `pgdata` inside it. Pre-creating that directory on
+the host, owned by 70, does **not** buy the capability back — measured, because it was worth asking.
+
+> [!danger] Redis fails **open**, and that is a one-way door
+> The redis entrypoint tests its own capabilities before dropping privileges:
+>
+> ```
+> # our uid is 0 (container started without explicit --user)
+> # and we have capabilities required to drop privs
+> if [ "$IS_REDIS_SERVER" ] && ... && has_cap setuid && has_cap setgid; then
+> ```
+>
+> Without those two it **skips the drop and runs redis as root** — healthy, answering `PING`,
+> passing any check that asks whether the container is up. Postgres has no such test: it runs
+> `exec gosu postgres`, which fails loudly.
+>
+> The damage is on disk. Measured: the root fallback writes `appendonlydir` and every AOF file as
+> `0:0`, mode `0600`. Restarting afterwards with the **correct** `--user 999:999` then **refuses**
+> to come up — `Error moving temp append only file on the final destination: Permission denied`.
+> A capability reduction that reads as a success leaves data the right configuration can no longer
+> open.
+
+### What this means for the units
+
+`--user` is the better shape for both, and the number it needs already exists: ADR-0186's role owns
+each data directory as `basetool_subuid_base + container_uid - 1`, with `container_uid` written once
+per service in `basetool_container_owners` — 70 for postgres, 999 for redis.
+
+It is not free. The entrypoint's root phase also *repairs*: if a data directory's ownership is ever
+wrong, root fixes it, and `--user` merely fails. The trade is a container that cannot repair itself
+against one with no root phase to escape from.
+
+> [!warning] Adopting `--user` puts the same number in two files
+> The role owns the directory as container uid 70; the unit would run the process as uid 70. Today
+> that number lives in `basetool_container_owners` only. A Quadlet `User=` line makes a second place
+> for it to be true, and a first place for it to drift. If this is adopted, the conformance suite has
+> to assert the two against each other — and it should assert the **uid of pid 1** regardless of
+> which shape is chosen, because that is the check redis's root fallback would have failed.
+
+### Podman mounts `/run` for you, and copies the image into it
+
+`--read-only` with **no tmpfs at all** worked, which should have been impossible: postgres has to
+write `/var/run/postgresql`. Podman's `--read-only` mounts a tmpfs over `/run`, `/tmp` and
+`/var/tmp` by default and **copies the image's content up into it**:
+
+```
+image:                  drwxrwsrwt  70  70  /run/postgresql
+--read-only container:  drwxrwsrwt  70  70  /run/postgresql   <- nothing inside created this
+```
+
+The container ran as uid 70 with `--cap-drop=ALL` against a `/run` owned by root at `0755`; it could
+not have made that directory. `--read-only-tmpfs=false` leaves all three unmounted, which is the
+control that proves who did it.
+
+**Docker does not do this**, and that is why `edge` carries explicit `tmpfs:` entries. Under Podman
+they become redundant rather than wrong — so they stay, because they are what makes the requirement
+legible.
+
+### Four failures that were mine, not the software's
+
+Recorded because each produced a **clean, plausible, wrong answer**, and two of them were reported
+to @greluc as findings before they were checked.
+
+1. **`postgres fails read-only`** — it does not. The harness left the data directory owned by the
+   host user, which is container **root**, at `0750`; the entrypoint re-execs as uid 70, which then
+   cannot traverse its own mount point. Every arm failed identically, *including the writable
+   control* — and every arm failing the same way is the shape of a broken harness, not of a finding.
+2. **`redis needs no capabilities`** — it does, unless it is given `--user`. That arm had no real
+   data mount, so nothing ever wrote to disk and the only failing path was never taken. The
+   difference between a container that starts and a container that persists is the whole question.
+3. **The `PGDATA`-pre-created arms measured nothing.** They created the directory with the host's
+   `mkdir` inside one already `chown`ed to `100069`, so it never existed and three arms re-ran the
+   same configuration. `podman unshare mkdir` was the fix: inside the namespace, `70` means 70.
+4. **`grep -iE 'error'` blamed `bf-error-rate`** — a redis startup line about bloom-filter defaults
+   — for a failure it had nothing to do with. The verdict came from the health probe and was right;
+   the explanation printed beside it was a substring match. A failing arm now prints its log
+   verbatim.
+
