@@ -112,10 +112,10 @@ public class AdminPersonSearchPageController {
       } catch (BackendServiceException e) {
         // No term in the message: see the class comment.
         log.debug("Person search failed with status {}", e.getStatusCode());
-        model.addAttribute("error", "error.loadFailed");
+        model.addAttribute("error", "admin.personSearch.error.load");
       } catch (Exception e) {
         log.error("Person search failed unexpectedly", e);
-        model.addAttribute("error", "error.loadFailed");
+        model.addAttribute("error", "admin.personSearch.error.load");
       }
     } else if (!term.isEmpty()) {
       model.addAttribute("error", "admin.personSearch.tooShort");

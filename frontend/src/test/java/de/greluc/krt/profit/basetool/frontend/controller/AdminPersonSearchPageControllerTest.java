@@ -187,7 +187,7 @@ class AdminPersonSearchPageControllerTest {
 
     controller.page("SomeHandle", null, model);
 
-    assertEquals("error.loadFailed", model.getAttribute("error"));
+    assertEquals("admin.personSearch.error.load", model.getAttribute("error"));
     assertEquals(false, model.getAttribute("searched"));
   }
 
@@ -201,7 +201,7 @@ class AdminPersonSearchPageControllerTest {
 
     controller.page("SomeHandle", null, model);
 
-    assertEquals("error.loadFailed", model.getAttribute("error"));
+    assertEquals("admin.personSearch.error.load", model.getAttribute("error"));
     assertEquals(false, model.getAttribute("searched"));
   }
 

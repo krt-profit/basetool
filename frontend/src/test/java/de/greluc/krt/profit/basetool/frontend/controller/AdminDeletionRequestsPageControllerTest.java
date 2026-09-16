@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -232,16 +232,32 @@ class AdminDeletionRequestsPageControllerTest {
 
     assertEquals("admin/deletion-requests", view);
     assertEquals(List.of(), model.getAttribute("requests"));
-    assertEquals("error.loadFailed", model.getAttribute("error"));
+    assertEquals("admin.deletionRequests.error.load", model.getAttribute("error"));
   }
 
   @Test
-  void rows_rendersTheFragmentAndCarriesNoErrorAttribute() {
-    // The fragment is swapped into a page that already shows its own banner; a second error
-    // attribute in the fragment's model would render a banner inside the table.
+  void rows_letsAFailurePropagateRatherThanPaintingAnEmptyQueue() {
+    // It used to catch and render an empty list, which paints "Keine offenen Loeschantraege" --
+    // telling the admin the Art. 12(3) queue is empty when the backend is merely unreachable. The
+    // banner its page() sibling sets could not have helped either: it sits OUTSIDE
+    // th:fragment="rows" and would never have rendered here. Propagating gives krtFetch a non-2xx,
+    // so the client toasts and leaves the table already on screen; stale-but-labelled beats
+    // empty-and-confident on a queue with a statutory deadline.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
         .thenThrow(new BackendServiceException("down", new RuntimeException(), 503));
+    AdminDeletionRequestsPageController controller =
+        new AdminDeletionRequestsPageController(client);
+
+    assertThatThrownBy(() -> controller.rows(new ConcurrentModel()))
+        .isInstanceOf(BackendServiceException.class);
+  }
+
+  @Test
+  void rows_rendersTheFragmentOnASuccessfulLoad() {
+    BackendApiClient client = mock(BackendApiClient.class);
+    when(client.get(any(String.class), ArgumentMatchers.<ParameterizedTypeReference<Object>>any()))
+        .thenReturn(List.of());
     AdminDeletionRequestsPageController controller =
         new AdminDeletionRequestsPageController(client);
     Model model = new ConcurrentModel();
@@ -250,7 +266,6 @@ class AdminDeletionRequestsPageControllerTest {
 
     assertEquals("admin/deletion-requests :: rows", view);
     assertEquals(List.of(), model.getAttribute("requests"));
-    assertFalse(model.containsAttribute("error"));
   }
 
   /**

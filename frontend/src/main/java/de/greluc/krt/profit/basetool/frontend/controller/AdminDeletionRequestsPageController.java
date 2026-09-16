@@ -87,7 +87,7 @@ public class AdminDeletionRequestsPageController {
     } catch (Exception e) {
       log.error("Loading the deletion-request queue failed", e);
       model.addAttribute("requests", List.of());
-      model.addAttribute("error", "error.loadFailed");
+      model.addAttribute("error", "admin.deletionRequests.error.load");
     }
     return "admin/deletion-requests";
   }
@@ -96,19 +96,23 @@ public class AdminDeletionRequestsPageController {
    * Re-renders the queue table as a fragment, for the in-place refresh after a decision
    * (REQ-FE-001).
    *
+   * <p><b>A failure is re-thrown, not swallowed.</b> This used to catch and render an empty list,
+   * which paints "Keine offenen Löschanträge" — telling the admin the Art. 12(3) queue is empty
+   * when the backend is simply unreachable. The banner its {@code page()} sibling sets could not
+   * have helped: it sits outside {@code th:fragment="rows"} and would never have rendered here.
+   *
+   * <p>Letting it propagate gives {@code krtFetch} a non-2xx to work with, so the client shows its
+   * error toast and leaves the table it already has on screen. Stale-but-labelled beats
+   * empty-and-confident on a queue with a statutory deadline.
+   *
    * @param model the view model
    * @return the fragment view name
    */
   @GetMapping(params = "fragment=rows")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String rows(Model model) {
-    try {
-      model.addAttribute(
-          "requests", backendApiClient.get("/api/v1/admin/deletion-requests", REQUEST_LIST_TYPE));
-    } catch (Exception e) {
-      log.error("Reloading the deletion-request queue fragment failed", e);
-      model.addAttribute("requests", List.of());
-    }
+    model.addAttribute(
+        "requests", backendApiClient.get("/api/v1/admin/deletion-requests", REQUEST_LIST_TYPE));
     return "admin/deletion-requests :: rows";
   }
 
