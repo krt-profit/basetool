@@ -1346,12 +1346,37 @@ the option carries no documented IPv6 test, which is consistent with a feature s
 3. **Re-open the platform question.** ADR-0163's choice 1 was already amended once on evidence;
    this is new evidence against the amended version.
 4. **Split the edge out of the bridge topology** (host networking, or pasta as the network mode) so
-   it sees clients natively. It preserves addresses on both families but costs the edge its
-   membership in the five internal networks, which is how it reaches every backend. Probably fatal,
-   but it is the only option that solves both halves at once and it has not been measured.
+   it sees clients natively. It is the only option that could solve both halves at once, and it
+   costs the edge its membership in the five internal networks, which is how it reaches every
+   backend — so it is probably fatal on that ground alone. **Nothing about it has been measured
+   here**, and the two things it needs are separate questions: whether pasta-as-network-mode
+   delivers IPv6 on Podman 6.1.0, and whether it preserves the source address on IPv6. Neither is
+   established.
 
 Nothing here should be chosen on this page. The measurement is the deliverable; the choice is not.
 
+> [!warning] What the neighbouring deployment's measurement does and does not establish
+> The PVE operator reached their own rootless Caddy over IPv6 from an external client and got a
+> 200, on **Podman 5.4.2** with **pasta as the network mode**. That is worth having: it refutes
+> "pasta cannot do IPv6" and narrows this finding to the Podman 6 forwarder option on bridge
+> networks. It establishes **delivery, on 5.4.2, externally measured** — and nothing more.
+>
+> It does **not** establish what source address that Caddy saw. They said so themselves and
+> declined to find out, because reading it would have meant writing an access log into a live
+> proxy configuration to answer a question with no consequence on their side: none of their
+> hostnames carries an AAAA record, so nothing reaches them over IPv6 unless it is forced to.
+> Their result must not be carried further than that, and the version gap from 5.4.2 to 6.1.0
+> stays open. It shrinks the uncertainty; it does not remove it.
+>
+> [!note] Why option 4 is still unmeasured, and what it is waiting on
+> The deciding probe needs one temporary firewall rule on the hypervisor, and the PVE session's
+> own guard refused to write it, classifying an externally reachable port as a weakening of
+> security. **That is the guard working, and it was not worked around** — not by them, and not
+> from this side by lowering `ip_unprivileged_port_start` to reuse a port that is already open,
+> which would have reached the same outcome by a route nobody had approved and would have added a
+> second variable to a measurement built to isolate one. The rule is drafted and waits on
+> @greluc. Until then option 4 stays a question, and it is listed as one.
+>
 > [!note] One honest limitation on the evidence
 > pasta was also tried as a **network mode** rather than a forwarder, and IPv6 failed there too —
 > but that arm is **confounded** and is recorded as indicative only: in that mode the container
