@@ -33,6 +33,18 @@ import java.util.List;
  * HandleScrubber} — it is the requester's own data and belongs in the export, but it may name
  * somebody else inside the prose, where no projection can reach.
  *
+ * <p><b>{@code audit_event.subject_label} is deliberately not selected.</b> It reads like a safe
+ * column — REQ-AUDIT-001 describes it as a non-personal label, and for most domains it is one: a
+ * material name, a rank step, an org-unit shorthand. For two it is a person. The job-order trails
+ * build it as {@code #<displayId> '<handle>'}, where the handle is the order's <em>contact</em>
+ * ("Handle des Ansprechpartners"), frequently an external customer with no account; and {@code
+ * DeletionRequestService} writes a member's own effective name into it. {@link HandleScrubber}
+ * could rescue neither: it is built from the roster, so a non-member contact is invisible to it and
+ * a deleted member has already left it. Hence the column is <em>dropped</em> rather than scrubbed —
+ * the projection is the only mechanism that works here. The timestamp, domain and event type carry
+ * the Art. 15 substance; {@code subject_id} was never selected either, so the export did not
+ * identify the object in the first place.
+ *
  * <p><b>Each section carries its legal basis</b>, because the two rights are not the same set:
  *
  * <ul>
@@ -61,8 +73,8 @@ public final class DataExportSections {
   /**
    * One export section.
    *
-   * @param key the stable machine key, also the JSON property name and the {@code
-   *     privacy.export.section.*} label key
+   * @param key the stable machine key, also the JSON property name and the suffix of the {@code
+   *     pdf.export.section.*} label key in the backend message bundle
    * @param legalBasis {@link #ART_15} or {@link #ART_15_20}
    * @param portableHint short prose on why the section is or is not portable, carried into the
    *     export itself so the document explains its own structure
@@ -334,27 +346,29 @@ public final class DataExportSections {
               SELECT type, amount, note, justification, status, created_at, decided_at
               FROM bank_booking_request WHERE requested_by = :userId ORDER BY created_at
               """),
-          // Actions the member performed. subject_label is a non-personal label by design
-          // (REQ-AUDIT-001); actor_handle is the requester's own and is redundant, so it is
-          // omitted.
+          // Actions the member performed. actor_handle is the requester's own and redundant;
+          // subject_label is NOT the non-personal label REQ-AUDIT-001 advertises -- see the class
+          // note -- so it is not selected either.
           new Section(
               "auditActionsByMember",
               ART_15,
               "Actions the member performed, retained under Art. 6(1)(f) for up to 24 months"
-                  + " (REQ-AUDIT-006).",
+                  + " (REQ-AUDIT-006). What each action was about is not named: that label can"
+                  + " itself be a person.",
               """
-              SELECT occurred_at, domain, event_type, subject_label, client_id
+              SELECT occurred_at, domain, event_type, client_id
               FROM audit_event WHERE actor_user_id = :userId ORDER BY occurred_at
               """),
-          // Actions performed ON the member. actor_handle is NOT selected -- the acting admin is
-          // another person, and this is the section where that distinction matters most.
+          // Actions performed ON the member. Neither actor_handle nor subject_label is selected
+          // -- the acting admin is another person, and this is the section where that distinction
+          // matters most.
           new Section(
               "auditActionsOnMember",
               ART_15,
-              "Actions performed on the member by somebody else. The acting person is not named,"
-                  + " being a third party.",
+              "Actions performed on the member by somebody else. Neither the acting person nor"
+                  + " what the action was about is named, both being third parties.",
               """
-              SELECT occurred_at, domain, event_type, subject_label
+              SELECT occurred_at, domain, event_type
               FROM audit_event WHERE target_user_id = :userId ORDER BY occurred_at
               """),
           new Section(
@@ -376,12 +390,38 @@ public final class DataExportSections {
               """));
 
   /**
-   * Section keys whose rows carry free text the member wrote, which may name somebody else inside
-   * the prose and is therefore passed through {@link HandleScrubber}.
+   * Section keys whose rows carry text that can name a person, and which are therefore passed
+   * through {@link HandleScrubber}.
    *
-   * <p>Listing them rather than scrubbing everything is deliberate: scrubbing a structured value —
-   * a material name, a status, an account number — could corrupt it if a member's handle happened
-   * to be a substring, and a corrupted export is worse than a verbose one.
+   * <p>Most of them carry free text the <em>member</em> wrote — a note, a remark, a description.
+   * That is their own data and belongs in the export, but it may name somebody else mid-sentence,
+   * where no projection can reach. Four are listed for the mirror-image reason: the text names a
+   * thing rather than being prose, and somebody may have named that thing after a person. Each is
+   * registered as a person-name surface in {@link PersonSearchTargets}, which is the registry that
+   * settles the question:
+   *
+   * <ul>
+   *   <li>{@code hangar} — {@code ship.name}, chosen by the member.
+   *   <li>{@code missionsManaged} — {@code mission.name}, chosen by whoever created the mission.
+   *       The same column is already scrubbed in {@code missionsOwned} and {@code
+   *       missionParticipations}; leaving it unscrubbed here was an inconsistency, not a decision.
+   *   <li>{@code notificationRuleTargets} — {@code notification_rule.description}, written by an
+   *       administrator, who may well describe a rule by the member it targets.
+   *   <li>{@code bankAccountGrants} — {@code bank_account.name}, chosen by the bank.
+   * </ul>
+   *
+   * <p>Listing sections rather than scrubbing everything is deliberate: scrubbing a structured
+   * value — a material name, a status, an account number — could corrupt it if a member's handle
+   * happened to be a substring, and a corrupted export is worse than a verbose one. The gate is the
+   * section and not the column, so a listed section's structured columns are scrubbed along with
+   * its prose. That is the accepted side of the trade (ADR-0185) rather than an oversight: the
+   * scrubber only fires on handles of three characters or more, and a collision corrupts one value
+   * in one person's export, whereas the alternative discloses a name.
+   *
+   * <p><b>This list cannot be the answer for every column.</b> It only reaches handles the scrubber
+   * knows, which is registered members — never an external contact or an already-deleted member.
+   * Where those appear, the column has to be left unselected instead; {@code
+   * audit_event.subject_label} is the worked example, in the class note above.
    */
   public static final List<String> FREE_TEXT_SECTIONS =
       List.of(
@@ -389,14 +429,18 @@ public final class DataExportSections {
           "registrationDecisions",
           "deletionRequests",
           "warehouseContributions",
+          "hangar",
           "personalInventory",
           "personalBlueprints",
           "notifications",
+          "notificationRuleTargets",
           "missionsOwned",
           "missionParticipations",
+          "missionsManaged",
           "jobOrderAssignments",
           "marketOffers",
           "marketRequests",
+          "bankAccountGrants",
           "bankBookingsAsCounterparty",
           "bankRequestsRaised");
 }

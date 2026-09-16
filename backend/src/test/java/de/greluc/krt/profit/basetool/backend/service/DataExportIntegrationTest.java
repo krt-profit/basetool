@@ -21,13 +21,17 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEvent;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
 import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,14 +69,26 @@ class DataExportIntegrationTest {
    */
   private static final String OTHER_HANDLE = "ZzzOtherMemberHandleZzz";
 
+  /**
+   * A person who has <em>no account</em> — a job order's external contact, which is the common case
+   * for {@code job_order.handle}.
+   *
+   * <p>The distinction is the point of {@link #anAuditSubjectLabelNeverReachesTheExport()}: {@link
+   * HandleScrubber} is built from the roster, so it can never match this name. Only the projection
+   * can keep it out, which is why the column is dropped rather than scrubbed.
+   */
+  private static final String EXTERNAL_CONTACT = "ZzzExternalContactZzz";
+
   @Autowired private DataExportService dataExportService;
   @Autowired private DataExportReportService dataExportReportService;
   @Autowired private UserRepository userRepository;
   @Autowired private PersonalInventoryItemRepository personalInventoryItemRepository;
+  @Autowired private AuditEventRepository auditEventRepository;
   @Autowired private TransactionTemplate transactionTemplate;
 
   private final Set<UUID> seededUsers = new HashSet<>();
   private final Set<UUID> seededItems = new HashSet<>();
+  private final Set<UUID> seededAuditEvents = new HashSet<>();
 
   /**
    * Removes what this class committed into the container the whole suite shares.
@@ -85,8 +101,12 @@ class DataExportIntegrationTest {
     transactionTemplate.executeWithoutResult(
         status -> {
           personalInventoryItemRepository.deleteAllById(seededItems);
+          // Audit rows outlive the account by design (REQ-AUDIT-006), so nothing cascades them
+          // away -- this class has to remove its own or they accumulate in the shared container.
+          auditEventRepository.deleteAllById(seededAuditEvents);
           userRepository.deleteAllById(seededUsers);
           seededItems.clear();
+          seededAuditEvents.clear();
           seededUsers.clear();
         });
   }
@@ -131,6 +151,50 @@ class DataExportIntegrationTest {
           item.setLocationNameSnapshot("Testort");
           seededItems.add(personalInventoryItemRepository.save(item).getId());
         });
+  }
+
+  /**
+   * Creates a committed audit row carrying a subject label, in the shape the job-order trails
+   * write: {@code #<displayId> '<handle>'}.
+   *
+   * @param actor the acting member, or {@code null} when the member is only the target
+   * @param target the member the action was performed on, or {@code null}
+   * @param subjectLabel the label to snapshot, which is what this test is about
+   */
+  private void auditEvent(UUID actor, UUID target, String subjectLabel) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          AuditEvent event =
+              AuditEvent.builder()
+                  .occurredAt(Instant.now())
+                  .domain(AuditEventType.JOB_ORDER_CREATED.domain())
+                  .eventType(AuditEventType.JOB_ORDER_CREATED)
+                  .actorUserId(actor)
+                  // NOT NULL, and deliberately the subject's own handle in the actor case: the
+                  // export omits the column, so a leak here would be a different bug.
+                  .actorHandle("ZzzActorZzz")
+                  .subjectLabel(subjectLabel)
+                  .targetUserId(target)
+                  .build();
+          seededAuditEvents.add(auditEventRepository.save(event).getId());
+        });
+  }
+
+  /**
+   * The rows of one section, by key.
+   *
+   * @param export the assembled export
+   * @param key the section key
+   * @return that section's rows
+   * @throws java.util.NoSuchElementException when no section carries the key
+   */
+  private static List<Map<String, Object>> sectionRows(
+      DataExportService.DataExport export, String key) {
+    return export.sections().stream()
+        .filter(s -> s.key().equals(key))
+        .findFirst()
+        .orElseThrow()
+        .rows();
   }
 
   /**
@@ -208,12 +272,7 @@ class DataExportIntegrationTest {
 
     DataExportService.DataExport export = dataExportService.export(subject);
 
-    List<Map<String, Object>> rows =
-        export.sections().stream()
-            .filter(s -> s.key().equals("personalInventory"))
-            .findFirst()
-            .orElseThrow()
-            .rows();
+    List<Map<String, Object>> rows = sectionRows(export, "personalInventory");
     assertThat(rows).hasSize(1);
     String note = String.valueOf(rows.get(0).get("note"));
     assertThat(note).contains("Uebergabe an").contains("erledigt");
@@ -230,6 +289,47 @@ class DataExportIntegrationTest {
 
     assertThat(allStrings(export)).anyMatch(v -> v.contains("ZzzSelfNamedZzz"));
     assertThat(export.thirdPartyHandlesRemoved()).isFalse();
+  }
+
+  // covers REQ-SEC-058 — an audit subject label is a person often enough that it is not exported
+  @Test
+  void anAuditSubjectLabelNeverReachesTheExport() {
+    UUID subject = user("ZzzSubjectFourZzz");
+    user(OTHER_HANDLE);
+    // The member acted on a job order whose contact is an outsider with no account.
+    auditEvent(subject, null, "#4711 '" + EXTERNAL_CONTACT + "'");
+    // Somebody acted on the member, and the label snapshotted a registered member's handle -- the
+    // shape DeletionRequestService writes.
+    auditEvent(null, subject, OTHER_HANDLE);
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    assertThat(allStrings(export))
+        .withFailMessage(
+            "An audit subject label reached the export. audit_event.subject_label is a person for "
+                + "the job-order and account-deletion trails, and HandleScrubber cannot rescue it: "
+                + "it knows registered members only, so an external contact and an already-deleted "
+                + "member are both invisible to it. The column must stay unselected.")
+        .noneMatch(v -> v.contains(EXTERNAL_CONTACT) || v.contains(OTHER_HANDLE));
+
+    // ... and the rows themselves still come through, so the fix is a narrower projection rather
+    // than a section that quietly stopped answering.
+    assertThat(sectionRows(export, "auditActionsByMember")).hasSize(1);
+    assertThat(sectionRows(export, "auditActionsOnMember")).hasSize(1);
+    assertThat(sectionRows(export, "auditActionsByMember").get(0))
+        .containsKeys("occurred_at", "domain", "event_type")
+        .doesNotContainKey("subject_label");
+  }
+
+  // covers REQ-SEC-058 — structural guard: no future section may select the label back in
+  @Test
+  void noSectionSelectsTheAuditSubjectLabel() {
+    assertThat(DataExportSections.SECTIONS)
+        .withFailMessage(
+            "A section selects subject_label. It is a person for the job-order and "
+                + "account-deletion trails, and adding the section to FREE_TEXT_SECTIONS does not "
+                + "fix it -- the scrubber is built from the roster and cannot see a non-member.")
+        .noneMatch(section -> section.sql().contains("subject_label"));
   }
 
   // covers REQ-SEC-058 — the PDF renders for a real subject without a label blowing up

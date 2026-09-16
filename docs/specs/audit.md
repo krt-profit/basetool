@@ -154,10 +154,20 @@ Coverage is **complete**, including the cross-area writers and the system/automa
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
 **free text** (inventory/assignee notes, handover recipient handles) is **never** written into the
-details payload — only ids, counts and lengths (the actor handle and non-personal subject labels
-such as a material name or order title are snapshotted, exactly as the bank trail snapshots holder
-handles).
+details payload — only ids, counts and lengths (the actor handle and the subject label are
+snapshotted, exactly as the bank trail snapshots holder handles).
 
+> [!warning] Corrected 2026-09-16 — `subject_label` is **not** reliably non-personal
+> This paragraph used to give "a material name or order title" as examples of *non-personal*
+> subject labels. The order title is not non-personal: the job-order trails snapshot
+> `#<displayId> '<handle>'`, and that handle is the order's **contact person**
+> (`orders.create.handle` — "Handle des Ansprechpartners"), often an outsider with no account.
+> `ACCOUNT_DELETION_REQUEST_EXECUTED` likewise snapshots the member's own effective name. The
+> snapshot itself is correct and stays — the trail has to survive the aggregate — but the column is
+> a person-name surface in `PersonSearchTargets` (REQ-SEC-060) and the Art. 15 export deliberately
+> does **not** select it (REQ-SEC-058). The wrong wording here is what left the export unguarded,
+> so it is corrected rather than quietly dropped.
+>
 > [!note] A detail *value* may be renamed; the rows already written are not rewritten — 2026-09-07
 > `MISSION_PARTICIPANT_ADDED` writes `type=user|external` and `MISSION_PARTY_LEAD_CHANGED`
 > `kind=user|external|cleared`. Both said `guest` until ADR-0159 renamed the tier (decision D4), and

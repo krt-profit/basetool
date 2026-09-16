@@ -50,6 +50,7 @@ SQL:
 | `missionParticipations`      | the mission's other participants, entirely          |
 | `bankBookingsAsCounterparty` | `initiated_by` — the bank employee who booked it    |
 | `auditActionsOnMember`       | `actor_handle` — the person who acted on the member |
+| both audit sections          | `subject_label` — which can itself be a person      |
 
 **Scrubbing is used in exactly one place, because there a projection cannot reach.** A note the
 member wrote is *their* data and must be in the export, and it may name somebody else mid-sentence.
@@ -60,6 +61,16 @@ constantly and replacing it would shred every note in the document. Only the sec
 `FREE_TEXT_SECTIONS` are scrubbed: running the scrubber over structured values could corrupt a
 material name or an account number that happened to contain a handle as a substring, and a corrupted
 export is worse than a verbose one.
+
+**The scrubber's reach bounds where it may be used at all — added 2026-09-16.** It is built from
+`userRepository.findAll()`, so it knows **registered members and nothing else**. Two kinds of person
+are therefore permanently invisible to it: somebody who never had an account, and somebody whose
+account is already gone. A column that can hold either **cannot be protected by listing its
+section** — the scrubber would pass it through unchanged *and* report
+`thirdPartyHandlesRemoved = false`, which the privacy record reads as "nothing to look for". Such a
+column must be left **unselected**. This is not a refinement of the decision but the decision's own
+logic; the first implementation simply did not apply it to `audit_event.subject_label`, and the
+consequence is recorded below.
 
 **The subject's own handle is never scrubbed.** It is the one name the export is about.
 
@@ -109,6 +120,37 @@ nor the PDF filename carries the subject's handle — a filename reaches shells,
   review step, and the export tells the reviewer whether it matters.
 - The scrubber loads every other member's handle per export. At this organisation's size that is a
   few hundred strings; it would want revisiting at a scale this application is not built for.
+
+### Corrected 2026-09-16 — `subject_label` was selected and should never have been
+
+Both audit sections shipped selecting `audit_event.subject_label`, and the acceptance criterion
+"no other member's handle appears anywhere in an export" was not met.
+
+The column looked safe because REQ-AUDIT-001 calls it a non-personal snapshot, and three code
+comments repeated that the job-order variant was "a non-personal order title and is safe to
+snapshot". It is not: `job_order.handle` is the order's **contact person**
+(`orders.create.handle` — "Handle des Ansprechpartners"), usually an external customer, and
+`ACCOUNT_DELETION_REQUEST_EXECUTED` snapshots a member's own effective name. The same PR that
+shipped the export had already registered `audit_event.subject_label` as a person-name surface in
+`PersonSearchTargets`, so the two halves of one change contradicted each other.
+
+Fixed by **dropping the column from both sections**, not by listing them in `FREE_TEXT_SECTIONS` —
+for the reason added to the Decision above: an external contact is exactly the person the scrubber
+cannot see. The remaining `occurred_at` / `domain` / `event_type` carry the Art. 15 substance, and
+`subject_id` was never selected, so the export did not identify the object in the first place.
+
+Two further things were wrong with the guard rather than the code, and both are fixed:
+
+- **The test could not have caught it.** `noOtherMembersHandleAppearsInTheExport` seeded only a
+  `personal_inventory_item.note` — a listed free-text section — and never wrote an `audit_event`
+  row, so it passed over the gap. It is now joined by a case that seeds audit rows in both
+  directions, one labelled with a contact who has **no account** (which no scrubber could catch),
+  and by a structural assertion that no section's SQL contains the column at all.
+- **Four more sections selected a person-name surface without being scrubbed:** `hangar`
+  (`ship.name`), `missionsManaged` (`mission.name` — already scrubbed in the two sibling sections
+  that select the same column), `notificationRuleTargets` (`notification_rule.description`) and
+  `bankAccountGrants` (`bank_account.name`). These *are* scrubber-reachable, since they name a
+  thing rather than an outsider, so they were added to `FREE_TEXT_SECTIONS`.
 
 ## Alternatives considered
 

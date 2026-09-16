@@ -105,6 +105,13 @@ public class AuditEvent {
   /**
    * Denormalized human-readable label of the subject (e.g. {@code material @ location}, {@code
    * #<displayId> '<handle>'}) — snapshotted so the trail stays readable after the subject is gone.
+   *
+   * <p><b>It can name a person, so do not treat it as non-personal.</b> Most domains snapshot a
+   * material name, a rank step or an org-unit shorthand, which is where that assumption comes from
+   * — but the job-order trails snapshot the order's <em>contact</em> handle, often an outsider with
+   * no account, and {@code DeletionRequestService} snapshots a member's own effective name. It is
+   * therefore a person-name surface in {@code PersonSearchTargets}, and the Art. 15 export
+   * deliberately does not select it (REQ-SEC-058).
    */
   @Nullable
   @Column(name = "subject_label", length = 255)

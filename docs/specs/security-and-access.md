@@ -3590,11 +3590,33 @@ places where that is the whole point:
   nothing about who else was there;
 - a **booking** returns the member's side; `initiated_by` — the bank employee — is not selected;
 - an **audit row where the member is the target** does not select `actor_handle`, because the acting
-  person is somebody else. This is the section where the distinction matters most.
+  person is somebody else. This is the section where the distinction matters most;
+- **neither audit section selects `subject_label`**, in either direction. See the warning below.
+
+> [!warning] `audit_event.subject_label` is not the non-personal label it looks like — 2026-09-16
+> REQ-AUDIT-001 describes `subject_label` as a non-personal snapshot, and for most domains it is
+> one: a material name, a rank step, an org-unit shorthand. For two domains it is a **person**. The
+> job-order trails write `#<displayId> '<handle>'`, where the handle is the order's *contact*
+> ("Handle des Ansprechpartners") and is frequently somebody outside the organisation with no
+> account at all; and the account-deletion trail writes the member's own effective name. Both
+> sections therefore shipped selecting a third party's name, against the acceptance criterion
+> below.
+>
+> **Scrubbing could not have fixed it, and that is the generalisable lesson.** `HandleScrubber` is
+> built from the roster, so it recognises registered members only: an external contact is invisible
+> to it, and a deleted member has already left the roster it is built from. Adding the sections to
+> `FREE_TEXT_SECTIONS` would therefore have produced an export that still carried the name *and*
+> reported `thirdPartyHandlesRemoved = false` — telling the Art. 15(4) reviewer there was nothing
+> to read through. **Where the scrubber cannot see the name, the column must not be selected.**
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. `HandleScrubber` replaces the handles of other members,
+where no `SELECT` list can reach. Four sections are scrubbed for the mirror-image reason — they
+select a **name somebody gave a thing**, which can be a person's: `hangar` (`ship.name`),
+`missionsManaged` (`mission.name`, already scrubbed in the two sibling sections that select it),
+`notificationRuleTargets` (`notification_rule.description`) and `bankAccountGrants`
+(`bank_account.name`). Each is a person-name surface in `PersonSearchTargets` (REQ-SEC-060), which
+is the registry that settles the question rather than a per-section judgement call. `HandleScrubber` replaces the handles of other members,
 case-insensitively, longest match first (or "Val" would leave "kyrie" behind from "Valkyrie"), and
 skips handles under three characters because a two-character handle occurs inside ordinary words and
 replacing it would shred every note.
@@ -3632,6 +3654,9 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
   accepts a user id.
 - [x] **No other member's handle appears anywhere in an export** — asserted across the whole
   document, not per section.
+- [x] **No audit `subject_label` appears in an export**, asserted both as data (a seeded row whose
+  label names an *unregistered* contact, which no scrubber could catch) and structurally (no
+  section's SQL contains the column, so a future section cannot select it back in).
 - [x] The member's own free text survives with the other name replaced, rather than being dropped.
 - [x] The subject's own handle is not scrubbed from their own entries.
 - [x] Every section runs against the real schema, and every section carries a legal-basis marker.

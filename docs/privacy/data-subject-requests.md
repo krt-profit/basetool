@@ -54,11 +54,19 @@ their request is served through the [name search](#finding-every-mention-of-a-pe
 
 **Art. 15(4) — the rights of others.** Free-text fields can name third parties. **The export already
 replaces the handles of other members** in the free text it contains, and it tells you whether it
-removed any — so when the document says nothing was removed, there is nothing to look for. It cannot
-recognise somebody with no account, a nickname or a misspelling, and nothing can, from text alone.
-So the read-through remains part of the procedure: before releasing free text verbatim, read it, and
-if an entry names another person redact that name rather than withholding the whole entry. The right
-is to a copy of *their* data, not to everything that mentions them.
+removed any. It cannot recognise somebody with no account, a nickname or a misspelling, and nothing
+can, from text alone. So the read-through remains part of the procedure: before releasing free text
+verbatim, read it, and if an entry names another person redact that name rather than withholding the
+whole entry. The right is to a copy of *their* data, not to everything that mentions them.
+
+> [!warning] "Nothing was removed" does not mean "nothing to look for" — corrected 2026-09-16
+> This section used to say that when the document reports no removals, there is nothing to read
+> through. **That is wrong, and it is the read-through that would have suffered.** The flag reports
+> what the scrubber *did*, and the scrubber only knows registered members — an external contact, a
+> nickname, a misspelling and an already-deleted member are all invisible to it, so an export can
+> report `false` and still contain a person's name. Read the free text on **every** release,
+> whatever the flag says. A `true` tells you a name was found and removed; a `false` tells you the
+> scrubber found none, not that none is there.
 
 ### Art. 16 — Rectification
 
