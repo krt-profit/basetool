@@ -6,7 +6,7 @@
 
 - **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
 
-- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“ – mit dem Absenden wird nichts gelöscht, und du kannst den Antrag bis zur Entscheidung zurückziehen; wird er abgelehnt, erfährst du den Grund. Optional kannst du zusätzlich beantragen, deinen Spielernamen überall dort zu anonymisieren, wo er eine Kontolöschung überdauert: in beiden Protokollen, der Buchungshistorie, den Buchungsanträgen, der Halter-Registrierung, bei Auftrags-Ansprechpartnern und Übergabe-Empfängern sowie in den Benachrichtigungen anderer Administratoren. Darüber entscheidet ein Administrator gesondert (REQ-SEC-061, REQ-SEC-062).
+- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“ – mit dem Absenden wird nichts gelöscht, du kannst den Antrag bis zur Entscheidung zurückziehen, und wird er abgelehnt, erfährst du den Grund. Optional beantragst du zusätzlich, deinen Spielernamen dort zu anonymisieren, wo er eine Kontolöschung überdauert; darüber entscheidet ein Administrator gesondert (REQ-SEC-061, REQ-SEC-062).
 
 - **Administration: neue Seite „Löschanträge“.** Offene Löschanträge entscheiden – ältester zuerst, weil ein Antrag innerhalb eines Monats zu beantworten ist. Eine Ablehnung braucht eine Begründung, die dem Mitglied mitgeteilt wird. Das Ausführen entfernt Konto und Zugang in einem Schritt (REQ-SEC-061).
 
@@ -53,11 +53,10 @@
 ### Fixed
 
 - **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
-  drei Aufräumläufe waren nirgends an das Backend durchgereicht — der dokumentierte Not-Aus vor
-  dem ersten, unwiderruflichen Lauf blieb wirkungslos. Ebenso betroffen: die Taktung der
-  Keycloak-Synchronisation, die Clients mit unvollständigem Rollen-Scope und die WARN-Schwelle für
-  langsame Anfragen. Alle sind jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006,
-  REQ-SEC-036, REQ-SEC-057, REQ-NOTIF-009).
+  drei Aufräumläufe und dreier weiterer Einstellungen waren nirgends an das Backend durchgereicht
+  — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind
+  jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
+  REQ-NOTIF-009).
 
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend

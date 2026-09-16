@@ -3494,111 +3494,6 @@ one event type.
 `UserRepository.findRejectedDecidedBefore`, `ScheduledJob`, `application.yml` · **Decision:**
 [ADR-0178](../adr/0178-a-refused-registration-is-purged-on-a-retention-window.md)
 
-### REQ-SEC-059 — A half-finished account deletion is observable
-
-Deleting a member is two acts, and the application MUST notice when only the first has happened.
-An admin removes the account in the Keycloak console; the nightly roster sync then flips
-`app_user.in_keycloak` to `false`; and only then does the member list render its delete action
-(`members.html` gates on `!user.inKeycloak`, and `UserDeletionService` refuses an account the flag
-still claims is present). The second act is therefore **not offered until the first is done, and not
-performed unless somebody comes back for it.**
-
-When nobody comes back, the row keeps the e-mail address, the display name / handle, the Discord
-snowflake, the guild nickname and the free-text profile description of a person who has already
-left, indefinitely — and until now nothing in the system said so. The data is not *exposed* by this
-(the account cannot sign in), it is simply *retained with no basis*, which is a retention defect
-rather than an access one, and the reason this is a hygiene signal rather than an incident.
-
-**Two gauges, sampled by `BusinessMetricsCollector` (REQ-OBS-011):**
-
-|                        Gauge                         |                                             Reads                                             |
-|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| `basetool_users_pending_deletion_count`              | `COUNT(*) WHERE in_keycloak = false`, **excluding the configured gateways' service accounts** |
-| `basetool_users_pending_deletion_oldest_age_seconds` | `now() - MIN(keycloak_absent_since)`, same exclusion                                          |
-
-> [!important] The exclusion is not tidying — without it the alert fires on day one, forever
-> Corrected 2026-09-16. An unfiltered `GET /users` **omits service accounts**, so the roster sync
-> never reports one and `markMissingUsers` flags it; nothing can ever clear the flag, because
-> `syncUser` only runs for a user the roster reports. Production holds exactly such a row — the
-> ingest gateway's service account, created when the gateway's first call ran the registration flow
-> on itself before the machine-identity carve-out existed (ADR-0129). Counted, the gauge was
-> permanently non-zero, V241 backfilled its age with the deploy timestamp, and
-> `UserDeletionUnfinished` fired at T+7d and never resolved — telling an admin to finish a deletion
-> for a machine row that holds no e-mail address, no handle and no description at all.
->
-> The exclusion matches the username convention `service-account-%`, lower-cased and
-> **unconditionally**. That is a display convention rather than a reserved namespace and must never
-> be the basis of a security decision — `UserDeletionService` still asks Keycloak which user backs
-> a configured client before it waives its delete guard. For a gauge it is proportionate: excluding
-> a hand-made lookalike from a monitoring count is a nuisance, not a hole, and the alternative is a
-> Keycloak round trip on every metrics tick.
->
->> [!bug] Corrected 2026-09-17 — the exclusion was empty exactly when the row exists
->> It first excluded `service-account-<clientId>` for the **configured** gateway clients. That
->> list defaults empty, and the machine-identity carve-out in
->> `CustomJwtGrantedAuthoritiesConverter` is gated on the same property — so with the property
->> unset the carve-out does not fire, the gateway's first call runs the registration flow on
->> itself and provisions the row, and the exclusion is empty. It could only ever protect a
->> deployment that, by having the property set, would never have created the row: it fixed the
->> legacy production row and was structurally unable to fix a fresh occurrence.
->>
->> The comparison was also case-sensitive, against the convention this repository states twenty
->> lines away in the same file — "Keycloak treats usernames that way".
-
-**The age needs a column, and V241 adds it.** No existing timestamp carries "when did this account
-stop being present": `created_at` is when the account was created — for a member who joined in April
-and left in September it overstates the wait by five months — and `updated_at` is `@UpdateTimestamp`,
-which a **bulk JPQL update** does not even write (Hibernate skips the entity lifecycle), besides
-moving on every unrelated profile edit. So `app_user.keycloak_absent_since` is assigned explicitly by
-`UserRepository#markMissingUsers` and cleared by `UserReconciliationService` when the account
-reappears — an account that comes back is not waiting for deletion, and a stamp left behind would
-alert forever.
-
-> [!note] `in_keycloak` is now derivable from the stamp, and stays anyway
-> Observed in review, 2026-09-16. The two are written and cleared together, so
-> `keycloak_absent_since IS NOT NULL` and `in_keycloak = false` mean the same thing, and the boolean
-> carries no information the timestamp does not. It stays because it is the column a dozen queries
-> and the member list's render gate already read, and because the pair fails **safe**: a row with
-> the flag and no stamp still hides the delete action and still counts, it simply reports no age.
-> Collapsing them would be a schema change for tidiness, on a column whose whole purpose is that
-> existing code reads it the same way it always did.
-
-**It is a first-observation stamp, not a last-seen one.** The update's existing `in_keycloak = true`
-predicate restricts it to rows that actually flip, so a row already flagged is never rewritten.
-Without that the value would be refreshed every nightly run and the age would report the sync's
-cadence — never older than a day — instead of how long the account has been waiting.
-
-**Rows flagged before V241 are backfilled with the migration's own timestamp.** Nothing recorded when
-they disappeared, which is the defect being fixed, so there is no value to recover; the deploy time
-is the only honest stand-in and is documented as a lower bound in the migration and in the alert's
-comment.
-
-**The alert is on age, not on count** (`UserDeletionUnfinished`, > 7 days, `for: 30m`). A count above
-zero held for seven days would also fire on a stream of accounts each cleared within a day, because
-the count never reaches zero in between. Seven days rather than 48 hours because the wait is
-legitimate while an admin is mid-task and the roster sync is nightly.
-
-**Acceptance**
-
-- [x] An account removed from Keycloak is counted by `basetool_users_pending_deletion_count` after
-  the next roster sync, and stops being counted when its local row is deleted.
-- [x] The absence stamp is written by the sweep that flips the flag, and a later sweep does not move
-  it forward.
-- [x] An account that reappears in Keycloak has both the flag and the stamp cleared, so it leaves
-  both gauges.
-- [x] The age gauge reports the oldest waiting account, not the newest.
-- [x] `UserDeletionUnfinished` fires past seven days and not on a count that merely stays non-zero.
-
-**Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
-`BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
-`repository/UserRepository#markMissingUsers` / `#countByInKeycloakFalse` /
-`#findOldestKeycloakAbsentSince`, `service/UserReconciliationService#syncUser`,
-`task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
-`db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
-`monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
-[ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·
-**Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
-
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
 Every member MUST be able to export their own data from the application, and an admin MUST be able
@@ -3804,6 +3699,111 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 member's buttons live beside the erasure request), `static/js/profile.js` · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
+
+### REQ-SEC-059 — A half-finished account deletion is observable
+
+Deleting a member is two acts, and the application MUST notice when only the first has happened.
+An admin removes the account in the Keycloak console; the nightly roster sync then flips
+`app_user.in_keycloak` to `false`; and only then does the member list render its delete action
+(`members.html` gates on `!user.inKeycloak`, and `UserDeletionService` refuses an account the flag
+still claims is present). The second act is therefore **not offered until the first is done, and not
+performed unless somebody comes back for it.**
+
+When nobody comes back, the row keeps the e-mail address, the display name / handle, the Discord
+snowflake, the guild nickname and the free-text profile description of a person who has already
+left, indefinitely — and until now nothing in the system said so. The data is not *exposed* by this
+(the account cannot sign in), it is simply *retained with no basis*, which is a retention defect
+rather than an access one, and the reason this is a hygiene signal rather than an incident.
+
+**Two gauges, sampled by `BusinessMetricsCollector` (REQ-OBS-011):**
+
+|                        Gauge                         |                                             Reads                                             |
+|------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| `basetool_users_pending_deletion_count`              | `COUNT(*) WHERE in_keycloak = false`, **excluding the configured gateways' service accounts** |
+| `basetool_users_pending_deletion_oldest_age_seconds` | `now() - MIN(keycloak_absent_since)`, same exclusion                                          |
+
+> [!important] The exclusion is not tidying — without it the alert fires on day one, forever
+> Corrected 2026-09-16. An unfiltered `GET /users` **omits service accounts**, so the roster sync
+> never reports one and `markMissingUsers` flags it; nothing can ever clear the flag, because
+> `syncUser` only runs for a user the roster reports. Production holds exactly such a row — the
+> ingest gateway's service account, created when the gateway's first call ran the registration flow
+> on itself before the machine-identity carve-out existed (ADR-0129). Counted, the gauge was
+> permanently non-zero, V241 backfilled its age with the deploy timestamp, and
+> `UserDeletionUnfinished` fired at T+7d and never resolved — telling an admin to finish a deletion
+> for a machine row that holds no e-mail address, no handle and no description at all.
+>
+> The exclusion matches the username convention `service-account-%`, lower-cased and
+> **unconditionally**. That is a display convention rather than a reserved namespace and must never
+> be the basis of a security decision — `UserDeletionService` still asks Keycloak which user backs
+> a configured client before it waives its delete guard. For a gauge it is proportionate: excluding
+> a hand-made lookalike from a monitoring count is a nuisance, not a hole, and the alternative is a
+> Keycloak round trip on every metrics tick.
+>
+>> [!bug] Corrected 2026-09-17 — the exclusion was empty exactly when the row exists
+>> It first excluded `service-account-<clientId>` for the **configured** gateway clients. That
+>> list defaults empty, and the machine-identity carve-out in
+>> `CustomJwtGrantedAuthoritiesConverter` is gated on the same property — so with the property
+>> unset the carve-out does not fire, the gateway's first call runs the registration flow on
+>> itself and provisions the row, and the exclusion is empty. It could only ever protect a
+>> deployment that, by having the property set, would never have created the row: it fixed the
+>> legacy production row and was structurally unable to fix a fresh occurrence.
+>>
+>> The comparison was also case-sensitive, against the convention this repository states twenty
+>> lines away in the same file — "Keycloak treats usernames that way".
+
+**The age needs a column, and V241 adds it.** No existing timestamp carries "when did this account
+stop being present": `created_at` is when the account was created — for a member who joined in April
+and left in September it overstates the wait by five months — and `updated_at` is `@UpdateTimestamp`,
+which a **bulk JPQL update** does not even write (Hibernate skips the entity lifecycle), besides
+moving on every unrelated profile edit. So `app_user.keycloak_absent_since` is assigned explicitly by
+`UserRepository#markMissingUsers` and cleared by `UserReconciliationService` when the account
+reappears — an account that comes back is not waiting for deletion, and a stamp left behind would
+alert forever.
+
+> [!note] `in_keycloak` is now derivable from the stamp, and stays anyway
+> Observed in review, 2026-09-16. The two are written and cleared together, so
+> `keycloak_absent_since IS NOT NULL` and `in_keycloak = false` mean the same thing, and the boolean
+> carries no information the timestamp does not. It stays because it is the column a dozen queries
+> and the member list's render gate already read, and because the pair fails **safe**: a row with
+> the flag and no stamp still hides the delete action and still counts, it simply reports no age.
+> Collapsing them would be a schema change for tidiness, on a column whose whole purpose is that
+> existing code reads it the same way it always did.
+
+**It is a first-observation stamp, not a last-seen one.** The update's existing `in_keycloak = true`
+predicate restricts it to rows that actually flip, so a row already flagged is never rewritten.
+Without that the value would be refreshed every nightly run and the age would report the sync's
+cadence — never older than a day — instead of how long the account has been waiting.
+
+**Rows flagged before V241 are backfilled with the migration's own timestamp.** Nothing recorded when
+they disappeared, which is the defect being fixed, so there is no value to recover; the deploy time
+is the only honest stand-in and is documented as a lower bound in the migration and in the alert's
+comment.
+
+**The alert is on age, not on count** (`UserDeletionUnfinished`, > 7 days, `for: 30m`). A count above
+zero held for seven days would also fire on a stream of accounts each cleared within a day, because
+the count never reaches zero in between. Seven days rather than 48 hours because the wait is
+legitimate while an admin is mid-task and the roster sync is nightly.
+
+**Acceptance**
+
+- [x] An account removed from Keycloak is counted by `basetool_users_pending_deletion_count` after
+  the next roster sync, and stops being counted when its local row is deleted.
+- [x] The absence stamp is written by the sweep that flips the flag, and a later sweep does not move
+  it forward.
+- [x] An account that reappears in Keycloak has both the flag and the stamp cleared, so it leaves
+  both gauges.
+- [x] The age gauge reports the oldest waiting account, not the newest.
+- [x] `UserDeletionUnfinished` fires past seven days and not on a count that merely stays non-zero.
+
+**Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
+`BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
+`repository/UserRepository#markMissingUsers` / `#countByInKeycloakFalse` /
+`#findOldestKeycloakAbsentSince`, `service/UserReconciliationService#syncUser`,
+`task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
+`db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
+`monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
+[ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·
+**Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
 
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 

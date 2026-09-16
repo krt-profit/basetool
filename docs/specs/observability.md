@@ -1097,6 +1097,12 @@ transaction per pass) rather than per-scrape.
   conflated. The halves are isolated from each other in the task, so one can be stuck while the
   other keeps deleting — and then only a split count shows it (REQ-NOTIF-009, added
   2026-09-17).
+
+  Each of the four metrics this round added carries a panel on `07-basetool-operations.json`
+  beside the erasure-queue stats, because an alert answers "is it broken now" and a panel
+  answers "since when, and how often" — which is the question a `warning` that fires once a
+  quarter actually raises. The enabled gauge sits under the last-success-age series on purpose:
+  a job missing from **both** is switched off, not wedged.
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from
