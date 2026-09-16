@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.List;
@@ -236,7 +237,8 @@ public class DeletionRequestService {
    * @throws IllegalArgumentException when the note is blank
    */
   @Transactional
-  public @NotNull DeletionRequest decline(@NotNull UUID requestId, @Nullable String note) {
+  public @NotNull DeletionRequest decline(
+      @NotNull UUID requestId, @Nullable String note, @Nullable Long clientVersion) {
     // A refusal is the one decision whose reasoning survives -- the row stays, in DECLINED, and
     // the member reads the reason on their profile page. An execution has nowhere to put one: the
     // row cascades away with the account it was about, and REQ-AUDIT-001 keeps free text out of
@@ -245,7 +247,7 @@ public class DeletionRequestService {
     if (note == null || note.isBlank()) {
       throw new IllegalArgumentException("A declined deletion request must carry a reason");
     }
-    DeletionRequest request = pendingOrThrow(requestId);
+    DeletionRequest request = pendingOrThrow(requestId, clientVersion);
     request.setStatus(DeletionRequestStatus.DECLINED);
     request.setDecidedAt(Instant.now());
     request.setDecidedById(authHelperService.currentUserId().orElse(null));
@@ -328,8 +330,10 @@ public class DeletionRequestService {
    * @throws EntityNotFoundException when no such pending request exists
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public void execute(@NotNull UUID requestId, boolean grantHistoryErasure) {
-    UUID userId = selfProvider.getObject().executeDatabaseHalf(requestId, grantHistoryErasure);
+  public void execute(
+      @NotNull UUID requestId, boolean grantHistoryErasure, @Nullable Long clientVersion) {
+    UUID userId =
+        selfProvider.getObject().executeDatabaseHalf(requestId, grantHistoryErasure, clientVersion);
     // Only after the database half has committed.
     try {
       keycloakService.deleteUser(userId);
@@ -357,8 +361,9 @@ public class DeletionRequestService {
    * @throws EntityNotFoundException when no such pending request exists
    */
   @Transactional
-  public @NotNull UUID executeDatabaseHalf(@NotNull UUID requestId, boolean grantHistoryErasure) {
-    DeletionRequest request = pendingOrThrow(requestId);
+  public @NotNull UUID executeDatabaseHalf(
+      @NotNull UUID requestId, boolean grantHistoryErasure, @Nullable Long clientVersion) {
+    DeletionRequest request = pendingOrThrow(requestId, clientVersion);
     UUID userId = request.getUserId();
     User user =
         userRepository
@@ -407,21 +412,40 @@ public class DeletionRequestService {
   }
 
   /**
-   * Loads a request and asserts it is still pending.
+   * Loads a request for a decision, row-locked, and asserts it is still pending.
+   *
+   * <p><b>The lock is pessimistic because the execute path never writes this row.</b>
+   * {@code @Version} protects {@link #decline} and {@link #withdraw} for free, since they save the
+   * entity — but the execution audits, writes {@code app_user}, deletes the user and lets the
+   * {@code ON DELETE CASCADE} take the request, so Hibernate issues no versioned {@code UPDATE} and
+   * optimistic locking has nothing to compare. Without the lock both transactions read {@code
+   * PENDING}, the member's withdrawal commits first, and the execution's cascade deletes the
+   * just-withdrawn row along with the account: the member believes they took their request back and
+   * is irreversibly deleted anyway.
+   *
+   * <p>The client's version is checked on top of the lock, so an admin deciding from a queue page
+   * that has gone stale gets a 409 rather than acting on a request whose current state they cannot
+   * see.
    *
    * @param requestId the request
-   * @return the pending request
+   * @param clientVersion the version the client last saw, or {@code null} to decide whatever is
+   *     there — the admin force-save semantics {@code OptimisticLock#checkOptionalClient} exists
+   *     for
+   * @return the pending request, locked for the rest of the transaction
    * @throws EntityNotFoundException when it does not exist or is already decided
    */
-  private @NotNull DeletionRequest pendingOrThrow(@NotNull UUID requestId) {
+  private @NotNull DeletionRequest pendingOrThrow(
+      @NotNull UUID requestId, @Nullable Long clientVersion) {
     DeletionRequest request =
         deletionRequestRepository
-            .findById(requestId)
+            .findByIdForDecision(requestId)
             .orElseThrow(
                 () -> new EntityNotFoundException("Deletion request not found: " + requestId));
     if (request.getStatus() != DeletionRequestStatus.PENDING) {
       throw new EntityNotFoundException("Deletion request is no longer pending: " + requestId);
     }
+    OptimisticLock.checkOptionalClient(
+        request.getVersion(), clientVersion, DeletionRequest.class, requestId);
     return request;
   }
 

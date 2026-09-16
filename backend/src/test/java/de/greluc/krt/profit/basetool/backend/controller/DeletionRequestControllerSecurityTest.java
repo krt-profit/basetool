@@ -147,7 +147,7 @@ class DeletionRequestControllerSecurityTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
         .andExpect(status().isForbidden());
 
-    verify(deletionRequestService, never()).execute(any(), anyBoolean());
+    verify(deletionRequestService, never()).execute(any(), anyBoolean(), any());
   }
 
   @Test
@@ -160,6 +160,6 @@ class DeletionRequestControllerSecurityTest {
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
 
-    verify(deletionRequestService, never()).decline(any(), any());
+    verify(deletionRequestService, never()).decline(any(), any(), any());
   }
 }

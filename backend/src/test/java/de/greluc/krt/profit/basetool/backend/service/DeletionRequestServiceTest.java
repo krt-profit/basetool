@@ -56,6 +56,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Mockito unit tests for {@link DeletionRequestService} — the members' Art. 17 erasure requests
@@ -168,6 +170,50 @@ class DeletionRequestServiceTest {
     verify(selfProvider, times(2)).getObject();
   }
 
+  // covers REQ-SEC-061 - the irreversible decision is read under a row lock and checks the echo
+  @Test
+  void decidingReadsTheRequestUnderARowLock() {
+    // The execute path never writes deletion_request -- it audits, writes app_user, deletes the
+    // user and lets the ON DELETE CASCADE take the row -- so Hibernate issues no versioned UPDATE
+    // and @Version has nothing to compare. Without the lock both transactions read PENDING, the
+    // member's withdrawal commits first, and the execution's cascade deletes the just-withdrawn
+    // row along with the account: the member believes they took their request back and is deleted
+    // anyway.
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
+
+    service.execute(REQUEST, false, null);
+
+    verify(deletionRequestRepository).findByIdForDecision(REQUEST);
+    verify(deletionRequestRepository, never()).findById(REQUEST);
+  }
+
+  // covers REQ-SEC-061 - a stale queue page cannot decide an irreversible request
+  @Test
+  void aStaleClientVersionIs409RatherThanADeletion() {
+    DeletionRequest request = pending(false);
+    ReflectionTestUtils.setField(request, "version", 7L);
+    when(deletionRequestRepository.findByIdForDecision(REQUEST)).thenReturn(Optional.of(request));
+
+    assertThatThrownBy(() -> service.execute(REQUEST, false, 6L))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThatThrownBy(() -> service.decline(REQUEST, "a reason", 6L))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    verify(userDeletionService, never()).deleteUser(any(), any());
+  }
+
+  // covers REQ-SEC-061 - a client that sends no version keeps the admin force-save semantics
+  @Test
+  void anAbsentClientVersionStillDecides() {
+    DeletionRequest request = pending(false);
+    ReflectionTestUtils.setField(request, "version", 7L);
+    when(deletionRequestRepository.findByIdForDecision(REQUEST)).thenReturn(Optional.of(request));
+
+    service.decline(REQUEST, "a reason", null);
+
+    assertThat(request.getStatus()).isEqualTo(DeletionRequestStatus.DECLINED);
+  }
+
   // covers REQ-SEC-061 - a race that outlives the bound is a truthful 409, never a silent success
   @Test
   void aRaceThatNeverResolvesPropagates() {
@@ -217,9 +263,9 @@ class DeletionRequestServiceTest {
   // covers REQ-SEC-061 — Art. 12(4): a refusal the requester cannot be told about is not allowed
   @Test
   void refusingWithoutAReasonIsRejected() {
-    assertThatThrownBy(() -> service.decline(REQUEST, "   "))
+    assertThatThrownBy(() -> service.decline(REQUEST, "   ", null))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> service.decline(REQUEST, null))
+    assertThatThrownBy(() -> service.decline(REQUEST, null, null))
         .isInstanceOf(IllegalArgumentException.class);
     verifyNoInteractions(deletionRequestRepository);
   }
@@ -227,9 +273,11 @@ class DeletionRequestServiceTest {
   // covers REQ-SEC-061 — a refusal records the reason and tells the member
   @Test
   void refusingRecordsTheReasonAndNotifiesTheMember() {
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(false)));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
 
-    DeletionRequest declined = service.decline(REQUEST, "Offene Buchung, bitte zuerst klaeren");
+    DeletionRequest declined =
+        service.decline(REQUEST, "Offene Buchung, bitte zuerst klaeren", null);
 
     assertThat(declined.getStatus()).isEqualTo(DeletionRequestStatus.DECLINED);
     assertThat(declined.getDecisionNote()).isNotBlank();
@@ -246,9 +294,9 @@ class DeletionRequestServiceTest {
   void decidingAnAlreadyDecidedRequestIsRejected() {
     DeletionRequest done = pending(false);
     done.setStatus(DeletionRequestStatus.WITHDRAWN);
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(done));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST)).thenReturn(Optional.of(done));
 
-    assertThatThrownBy(() -> service.decline(REQUEST, "a reason"))
+    assertThatThrownBy(() -> service.decline(REQUEST, "a reason", null))
         .isInstanceOf(EntityNotFoundException.class);
   }
 
@@ -256,9 +304,10 @@ class DeletionRequestServiceTest {
   // Keycloak AFTER the database half (ADR-0111)
   @Test
   void executingGrantsTheHistoryWishBeforeDeletingAndRemovesKeycloakLast() {
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(true)));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(true)));
 
-    service.execute(REQUEST, true);
+    service.execute(REQUEST, true, null);
 
     InOrder order =
         inOrder(handleAnonymisationService, userRepository, userDeletionService, keycloakService);
@@ -277,9 +326,10 @@ class DeletionRequestServiceTest {
   // covers REQ-SEC-061, REQ-NOTIF-018 - the execution clears the administrators' stale items too
   @Test
   void executingResolvesTheAdministratorsPendingNotifications() {
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(false)));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
 
-    service.execute(REQUEST, false);
+    service.execute(REQUEST, false, null);
 
     // UserDeletionService removes notifications by RECIPIENT, and these recipients are other
     // people -- so without this the departed member's name sat in every administrator's inbox
@@ -291,9 +341,10 @@ class DeletionRequestServiceTest {
   // covers REQ-SEC-061 — the wish is not an instruction: an ungranted wish anonymises nothing
   @Test
   void executingWithoutGrantingLeavesTheHandleSnapshotsAlone() {
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(true)));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(true)));
 
-    service.execute(REQUEST, false);
+    service.execute(REQUEST, false, null);
 
     verifyNoInteractions(handleAnonymisationService);
     verify(userDeletionService).deleteUser(eq(USER), any());
@@ -303,11 +354,12 @@ class DeletionRequestServiceTest {
   // covers REQ-SEC-061 — a Keycloak failure must not undo or mask the committed local deletion
   @Test
   void aFailingKeycloakDeleteDoesNotUndoTheLocalDeletion() {
-    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(false)));
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
     Mockito.doThrow(new RuntimeException("keycloak down")).when(keycloakService).deleteUser(USER);
 
     // Must not propagate: the member's data is gone, which is what they asked for.
-    service.execute(REQUEST, false);
+    service.execute(REQUEST, false, null);
 
     verify(userDeletionService).deleteUser(eq(USER), any());
   }

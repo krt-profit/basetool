@@ -21,11 +21,13 @@ package de.greluc.krt.profit.basetool.backend.repository;
 
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -86,4 +88,25 @@ public interface DeletionRequestRepository extends JpaRepository<DeletionRequest
    */
   @Query("SELECT MIN(d.createdAt) FROM DeletionRequest d WHERE d.status = :status")
   Instant findOldestCreatedAtByStatus(@Param("status") DeletionRequestStatus status);
+
+  /**
+   * Loads a request for a decision, taking a row lock (REQ-SEC-061).
+   *
+   * <p><b>Pessimistic, because the execute path never writes this row.</b> {@code @Version}
+   * protects {@code decline} and {@code withdraw} for free — they save the entity — but the
+   * execution audits, writes {@code app_user}, deletes the user and lets the {@code ON DELETE
+   * CASCADE} take the request. Hibernate issues no versioned {@code UPDATE}, so optimistic locking
+   * has nothing to compare and the pre-read is the only check there is.
+   *
+   * <p>Without the lock: both transactions read {@code PENDING}, the member's withdrawal commits
+   * first, and the execution's cascade then deletes the just-withdrawn row along with the account.
+   * The member believes they took their request back and is irreversibly deleted anyway. With it,
+   * the second reader waits and then sees the decided row.
+   *
+   * @param id the request to decide
+   * @return the request, row-locked for the rest of the transaction
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM DeletionRequest r WHERE r.id = :id")
+  Optional<DeletionRequest> findByIdForDecision(@Param("id") UUID id);
 }

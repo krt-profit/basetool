@@ -3533,17 +3533,17 @@ rather than an access one, and the reason this is a hygiene signal rather than a
 > a hand-made lookalike from a monitoring count is a nuisance, not a hole, and the alternative is a
 > Keycloak round trip on every metrics tick.
 >
-> > [!bug] Corrected 2026-09-17 — the exclusion was empty exactly when the row exists
-> > It first excluded `service-account-<clientId>` for the **configured** gateway clients. That
-> > list defaults empty, and the machine-identity carve-out in
-> > `CustomJwtGrantedAuthoritiesConverter` is gated on the same property — so with the property
-> > unset the carve-out does not fire, the gateway's first call runs the registration flow on
-> > itself and provisions the row, and the exclusion is empty. It could only ever protect a
-> > deployment that, by having the property set, would never have created the row: it fixed the
-> > legacy production row and was structurally unable to fix a fresh occurrence.
-> >
-> > The comparison was also case-sensitive, against the convention this repository states twenty
-> > lines away in the same file — "Keycloak treats usernames that way".
+>> [!bug] Corrected 2026-09-17 — the exclusion was empty exactly when the row exists
+>> It first excluded `service-account-<clientId>` for the **configured** gateway clients. That
+>> list defaults empty, and the machine-identity carve-out in
+>> `CustomJwtGrantedAuthoritiesConverter` is gated on the same property — so with the property
+>> unset the carve-out does not fire, the gateway's first call runs the registration flow on
+>> itself and provisions the row, and the exclusion is empty. It could only ever protect a
+>> deployment that, by having the property set, would never have created the row: it fixed the
+>> legacy production row and was structurally unable to fix a fresh occurrence.
+>>
+>> The comparison was also case-sensitive, against the convention this repository states twenty
+>> lines away in the same file — "Keycloak treats usernames that way".
 
 **The age needs a column, and V241 adds it.** No existing timestamp carries "when did this account
 stop being present": `created_at` is when the account was created — for a member who joined in April

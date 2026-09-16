@@ -137,6 +137,7 @@ public class AdminDeletionRequestsPageController {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("grantHistoryErasure", false);
     body.put("note", text);
+    body.put("version", request.get("version"));
     try {
       backendApiClient.post(
           "/api/v1/admin/deletion-requests/" + id + "/decline", body, Object.class);
@@ -169,6 +170,10 @@ public class AdminDeletionRequestsPageController {
       @PathVariable UUID id, @RequestBody Map<String, Object> request) {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("grantHistoryErasure", Boolean.TRUE.equals(request.get("grantHistoryErasure")));
+    // Relayed verbatim, including null. The backend reads null as the admin force-save the
+    // OptimisticLock helper family exists for; coercing it to a number here would invent a claim
+    // about the row's state that the client did not make (REQ-FE-003).
+    body.put("version", request.get("version"));
     // No note is relayed. An execution has nowhere to record one -- the deletion_request row
     // cascades away with the account, and REQ-AUDIT-001 keeps free text out of the audit payload --
     // so the dialog no longer asks for one either. Collecting a justification and discarding it is

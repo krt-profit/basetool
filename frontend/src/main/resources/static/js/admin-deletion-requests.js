@@ -69,7 +69,7 @@
     /**
      * The request the open dialog is about. Held here rather than on the dialog, because the row it
      * came from is replaced by the next swap and its id would go with it.
-     * @type {{ id: string, handle: string } | null}
+     * @type {{ id: string, handle: string, version: number | null } | null}
      */
     let current = null;
 
@@ -135,10 +135,16 @@
         if (!row) {
             return;
         }
-        current = {
+        const version = row.getAttribute('data-version');
+        const selected = {
             id: row.getAttribute('data-id') || '',
             handle: row.getAttribute('data-handle') || '',
+            // Echoed back on both writes (REQ-FE-003). Null rather than 0 when the attribute is
+            // absent: the backend reads null as "decide whatever is there", and 0 would be a claim
+            // about the row's state that the page is not in a position to make.
+            version: version === null || version === '' ? null : Number(version),
         };
+        current = selected;
         const action = button.getAttribute('data-action');
         if (action === 'decline') {
             /** @type {HTMLTextAreaElement | null} */
@@ -158,7 +164,7 @@
             }
             const memberSlot = document.querySelector('[data-execute-member]');
             if (memberSlot) {
-                memberSlot.textContent = fillHandle(i18n.confirmMember, current.handle);
+                memberSlot.textContent = fillHandle(i18n.confirmMember, selected.handle);
             }
             clearErrors('execute-modal');
             openModal('execute-modal');
@@ -189,7 +195,7 @@
             window.krtFetch.write({
                 method: 'POST',
                 url: '/admin/deletion-requests/' + current.id + '/decline',
-                payload: { note: text },
+                payload: { note: text, version: current.version },
                 successMessage: i18n.declined,
                 errorMessage: i18n.error,
                 onSuccess: function () {
@@ -213,6 +219,11 @@
                 url: '/admin/deletion-requests/' + current.id + '/execute',
                 payload: {
                     grantHistoryErasure: erase ? erase.checked : false,
+                    // The execute path is irreversible and @Version cannot protect it on its own:
+                    // it never writes the request row, it deletes the account and lets the cascade
+                    // take it. The echo plus a pessimistic read is what stops an admin acting on a
+                    // queue page the member has already withdrawn from.
+                    version: current.version,
                 },
                 successMessage: i18n.executed,
                 errorMessage: i18n.error,

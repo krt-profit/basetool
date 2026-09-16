@@ -102,7 +102,7 @@ public class AdminDeletionRequestController {
   public DeletionRequestDto decline(
       @PathVariable UUID id, @Valid @RequestBody DecideDeletionRequestRequest request) {
     return DeletionRequestController.toDto(
-        deletionRequestService.decline(id, request.requiredNote()), null);
+        deletionRequestService.decline(id, request.requiredNote(), request.version()), null);
   }
 
   /**
@@ -139,7 +139,7 @@ public class AdminDeletionRequestController {
     // request.note() is deliberately not read here: an execution has nowhere durable to
     // record a note (see DeletionRequestService#decline). The field stays on the shared
     // request record because a refusal requires it.
-    deletionRequestService.execute(id, request.grantHistoryErasure());
+    deletionRequestService.execute(id, request.grantHistoryErasure(), request.version());
     return ResponseEntity.noContent().build();
   }
 }

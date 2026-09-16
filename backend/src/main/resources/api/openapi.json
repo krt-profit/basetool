@@ -62210,6 +62210,10 @@
             "type" : "string",
             "maxLength" : 4000,
             "minLength" : 0
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },
