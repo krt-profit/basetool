@@ -1321,10 +1321,64 @@ neither option is currently acceptable.
 - **Stale packages.** podman 6.1.0, passt `0^20260728`, netavark 2.1.0, and `dnf check-update`
   reports nothing newer. This is the distribution's current best.
 
-Upstream states the intent plainly — pesto binds both `0.0.0.0` and `[::]` "so IPv6 networks work
-out of the box", and both sockets do appear. Only the forwarding does not happen. The PR that added
-the option carries no documented IPv6 test, which is consistent with a feature shipped as
-**experimental**.
+#### Why it fails — traced, 2026-09-16
+
+The first write-up of this finding implied the feature simply had no IPv6 path. **That was wrong,
+and the correction matters**, because it changes what kind of problem this is. Podman's own release
+notes for **6.1.0 — the version on this host** — say:
+
+> The Pesto rootless port forwarding tool now supports IPv6 port forwarding with source IP
+> preservation.
+
+So IPv6 is a **documented, shipped feature of exactly this version**, and it does not work. That is a
+defect against a promise, not a gap waiting to be filled.
+
+The cause is an addressing asymmetry inside the rootless network namespace. `pasta --config-net`
+copies the host's **IPv4** address and route into the namespace, but Podman starts it with
+`--address fc00::3 --gateway fc00::1`, which overrides the IPv6 template with a private ULA:
+
+|      |                               in the rootless netns                                |
+|------|------------------------------------------------------------------------------------|
+| IPv4 | `inet 10.9.0.14/24 … eth0` — **the host's real address**, copied from the template |
+| IPv6 | `inet6 fc00::3/64` — a private ULA; the host's `2003:…` address is **nowhere**     |
+
+netavark enters its host-port DNAT chain through **`fib daddr type local`**. A v4 packet addressed
+to `10.9.0.14` is local in the namespace, so it reaches DNAT and the container. A v6 packet
+addressed to the host's global address is **not local there**, never reaches the chain, and is
+reset — even though the correct v6 DNAT rule exists and was read out of the namespace.
+
+The PR that added the option states the requirement in as many words: netavark's rules inside the
+rootless netns "must not restrict on destination address". On this host they do.
+
+**Tested directly.** Adding the host's global v6 to the namespace's `eth0` changed the failure from
+**reset to timeout** — the packet stops being rejected outright, which is what the explanation
+predicts for the first hop. It did not become a 200, and the remaining leg was not chased further:
+a probe from the host to the host's own address is not a clean rig for the return path, and the
+external client needed for a clean one was not available a second time.
+
+> [!note] There is no configuration that fixes this from the outside
+> `containers.conf` offers `pasta_options`, and it does reach the right process — passing
+> `--address <host v6>` appears on pasta's command line. Podman's own `--address fc00::3` still
+> wins, and the namespace still receives only the ULA. Verified, not assumed.
+
+#### No newer version fixes it either
+
+Checked against the actual package archives rather than from impression:
+
+|                                  |                   podman                    | netavark  |      passt       |
+|----------------------------------|---------------------------------------------|-----------|------------------|
+| **this host** (CentOS Stream 10) | **6.1.0**                                   | **2.1.0** | **`0^20260728`** |
+| Fedora 45 / rawhide              | 6.1.1                                       | 2.1.0     | `0^20260611`     |
+| Fedora 44 / 43                   | 5.8.4 — no `rootless_port_forwarder` at all | 1.17.2    | —                |
+
+The only upgrade available anywhere is podman 6.1.1, and **its port-forwarding fix is for
+`rootlessport` on WSL**, not for pesto on Linux. 6.1.2 carries no bugfixes at all. netavark 2.1.0 is
+the newest build in any branch and is already installed, and this host's passt is *newer* than
+Fedora's.
+
+So there is nothing to upgrade to. The nearest neighbouring report — podman issue #29772, "v4-only
+`-a` silently disables guest IPv6", on Fedora 44 with **the same passt build** — was closed as *not
+planned*.
 
 > [!danger] The choice, as it stands, is between two unacceptable options
 > **pasta** gives correct client addresses and **no IPv6 service**. **rootlessport** gives IPv6 and
@@ -1334,12 +1388,15 @@ the option carries no documented IPv6 test, which is consistent with a feature s
 > suite already makes today.
 >
 > **This is a decision for @greluc, not a problem to engineer around quietly.** ADR-0163 chose this
-> platform specifically to obtain the pasta forwarder; that premise now holds only for IPv4.
+> platform specifically to obtain the pasta forwarder; that premise now holds only for IPv4 — and
+> it holds only for IPv4 because of a **defect**, not because the feature was never meant to do it.
 
 #### The options, stated honestly
 
-1. **Report it upstream and wait.** The feature is experimental and its IPv6 path looks untested.
-   This is the cheapest option and the one with no timeline.
+1. **Report it upstream.** Stronger than it first looked: this is a **defect against a documented
+   feature** of the installed version, with a traced cause and a one-line reproducer, not a
+   request for something unbuilt. Still no timeline, so it is not a plan on its own — but it is
+   worth filing whichever option is chosen, and the evidence for it already exists.
 2. **Ship with `rootlessport` and stop depending on `$remote_addr`.** That means rebuilding the
    rate limiter's key and replacing the Keycloak admin allow-list with something that is not a peer
    address — a real redesign of two security controls, not a configuration change.
