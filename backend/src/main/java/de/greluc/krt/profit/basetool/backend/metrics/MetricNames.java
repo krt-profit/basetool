@@ -149,6 +149,21 @@ public final class MetricNames {
    */
   public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
 
+  /**
+   * Counter {@code basetool_account_deletion_keycloak_failures_total} (untagged). Bumped when an
+   * erasure's local half has committed but the Keycloak user could not be deleted (REQ-SEC-061).
+   *
+   * <p>Access-control-relevant, and the only signal there is. The local row is gone, so the
+   * surviving account cannot show up in {@link #USERS_PENDING_DELETION} — that gauge counts the
+   * opposite orphan, a local row whose Keycloak account has already gone. The person can still log
+   * in, and the reconciliation then creates a fresh row for them: PENDING and refusable for an
+   * ordinary member, but <b>ACTIVE</b> for anyone holding the ADMIN realm role, because the
+   * approval gate carves admins out for bootstrap safety. Normally zero; any increment wants a
+   * human to delete that account in the Keycloak console (REQ-OBS-011).
+   */
+  public static final String ACCOUNT_DELETION_KEYCLOAK_FAILURES =
+      "basetool.account.deletion.keycloak.failures";
+
   // --- Identity (UserReconciliationService) ----------------------------------------------
 
   /**

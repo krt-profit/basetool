@@ -172,8 +172,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
   body, the requester/supplier handle, or any location.
 - **Datenschutz / Betroffenenrechte** (`AuditDomain.ROLE`, REQ-SEC-058 / -060 / -061 / -062) — the
-  data-subject-rights surfaces, added 2026-09-16. Six event types, and two of them audit a **read**
-  (the deliberate exception above):
+  data-subject-rights surfaces, added 2026-09-16. Eight event types, and two of them audit a
+  **read** (the deliberate exception above). This sentence said "Six" while listing seven
+  until 2026-09-17, which is the kind of count a reader checks a coverage list against:
   - `PERSONAL_DATA_EXPORTED` — one row per served Art. 15 / Art. 20 export. The payload names the
     `format` (`json` / `pdf`), the `rows` count and `bySelf`, which is the distinction the trail
     exists to make answerable: a member reading their own record is unremarkable, an admin reading
@@ -187,6 +188,13 @@ Coverage is **complete**, including the cross-area writers and the system/automa
     by `actor_user_id` and `target_user_id` only. That is not a style choice: a name in the label
     survived the erasure for the full 24-month retention, because the erasure rewrites
     `actor_handle` and the label sat on the same row untouched.
+  - `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` — the local half of an erasure committed and
+    the Keycloak account could not be deleted. Written in its own transaction **after** the
+    business transaction, because there is nothing left to attach it to: the `app_user` row and
+    the request have already gone. That is also why the deleted id sits in `subject_id` with a
+    `null` `target_user_id` — the target column is a foreign key to a row that no longer
+    exists. The payload carries the request id and the exception's **class name**, never its
+    message, which can echo Keycloak's own description of the account.
   - `HANDLE_SNAPSHOTS_ANONYMISED` — the receipt for a granted erasure, written to **both** trails
     *after* the updates so the marker is not scrubbed by them. The payload carries the per-table row
     counts and the number of spellings matched, and never the name that was removed — writing it

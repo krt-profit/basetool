@@ -1072,6 +1072,17 @@ transaction per pass) rather than per-scrape.
   other steps still run, so `scwiki_sync` records `success` with a non-zero item tally and a
   reliably-failing step is invisible to `UserSyncStale` / `SyncZeroItems` / `ExternalSyncStale`. They
   back `KeycloakSyncFetchFailing` and `ScWikiStepFailing` (logging audit).
+- `basetool_account_deletion_keycloak_failures_total` counter (untagged,
+  `DeletionRequestService.execute`) covers the third swallowed failure of that kind, and the
+  one nothing could see at all. An Art. 17 erasure commits its local half first and deletes
+  the Keycloak user last (REQ-SEC-026, ADR-0111); when that last step throws, the account has
+  no local row left, so it cannot appear in `basetool_users_pending_deletion_count` — that
+  gauge counts the opposite orphan. The surviving Keycloak account can still log in, and the
+  reconciliation then inserts a fresh row: PENDING and refusable for an ordinary member, but
+  **ACTIVE** for an ADMIN-realm-role holder, because the approval gate carves admins out for
+  bootstrap safety. Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
+  warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
+  the account id the Keycloak console needs (added 2026-09-17).
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from

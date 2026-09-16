@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepositor
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.Instant;
 import java.util.List;
@@ -73,6 +75,7 @@ public class DeletionRequestService {
   private final AuditService auditService;
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
+  private final MeterRegistry meterRegistry;
 
   /**
    * Self-injection (lazy {@link ObjectProvider} to avoid an eager construction cycle) so {@link
@@ -338,14 +341,56 @@ public class DeletionRequestService {
     try {
       keycloakService.deleteUser(userId);
     } catch (RuntimeException e) {
-      // The local data is gone, which is what the member asked for. The Keycloak account remaining
-      // is visible and resolvable: the roster sync recreates a fresh PENDING registration for it,
-      // which an admin can refuse -- unlike the reverse failure, which leaves personal data behind.
+      // The local data is gone, which is what the member asked for -- unlike the reverse failure,
+      // this one leaves no personal data behind. What it does leave is a Keycloak account that can
+      // still log in, and it needs a human in the Keycloak console. It cannot be found by the
+      // REQ-SEC-059 orphan gauge: that counts a local row whose Keycloak account has gone, the
+      // opposite direction, and this account has no local row left at all.
+      //
+      // Nor is the recreated row a reliable backstop. On the next login or roster sync the
+      // reconciliation inserts a fresh one, PENDING and refusable for an ordinary member -- but
+      // UserRegistrationService#stampNewPendingRegistration carves ADMIN-realm-role holders out
+      // for bootstrap safety, so an admin's row lands on the ACTIVE entity default with full
+      // authority. So this path leaves a counter an alert watches and an audit row that outlives
+      // the request, rather than a log line nothing reads.
+      selfProvider.getObject().recordKeycloakDeleteFailure(requestId, userId, e);
       log.warn(
           "Deletion request {} executed locally, but the Keycloak user remains: {}",
           requestId,
           e.toString());
     }
+  }
+
+  /**
+   * Records a half-finished erasure: the local half committed, the Keycloak delete did not.
+   *
+   * <p>{@code REQUIRES_NEW} rather than the caller's transaction, because {@link #execute} is
+   * {@code NOT_SUPPORTED} by design and has no transaction at this point — the database half has
+   * already committed, which is the only reason the Keycloak delete was attempted at all. {@link
+   * AuditService#record} is {@code MANDATORY}, so without a transaction of its own this would throw
+   * inside a catch block and replace one swallowed failure with another.
+   *
+   * <p>The audit row carries the deleted account's id as its <b>subject</b> and a {@code null}
+   * target: {@code target_user_id} is a foreign key to an {@code app_user} row that no longer
+   * exists. Only the exception's class name goes into the payload — its message can echo Keycloak's
+   * own description of the account, and the details payload takes no free text (REQ-AUDIT-001). The
+   * full message is in the log line beside this call.
+   *
+   * @param requestId the request that was carried out
+   * @param userId the account whose Keycloak user survived
+   * @param failure what the Keycloak delete threw
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void recordKeycloakDeleteFailure(
+      @NotNull UUID requestId, @NotNull UUID userId, @NotNull RuntimeException failure) {
+    meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).increment();
+    auditService.record(
+        AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED,
+        userId,
+        // See the note in raise(): the subject is identified by id, never by name.
+        null,
+        null,
+        AuditDetails.of("requestId", requestId).with("error", failure.getClass().getSimpleName()));
   }
 
   /**

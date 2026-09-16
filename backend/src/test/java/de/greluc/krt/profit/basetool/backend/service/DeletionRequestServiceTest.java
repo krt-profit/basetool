@@ -21,9 +21,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -34,6 +38,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
+import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
@@ -41,12 +46,15 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -87,6 +95,9 @@ class DeletionRequestServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<DeletionRequestService> selfProvider;
 
+  /** Real, not a mock: the assertions read the counter back rather than verifying a call. */
+  private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private DeletionRequestService service;
 
   @BeforeEach
@@ -101,6 +112,7 @@ class DeletionRequestServiceTest {
             auditService,
             authHelperService,
             eventPublisher,
+            meterRegistry,
             selfProvider);
     // execute() reaches its transactional half through the proxy; in a unit test the proxy is the
     // instance itself.
@@ -356,11 +368,70 @@ class DeletionRequestServiceTest {
   void aFailingKeycloakDeleteDoesNotUndoTheLocalDeletion() {
     when(deletionRequestRepository.findByIdForDecision(REQUEST))
         .thenReturn(Optional.of(pending(false)));
-    Mockito.doThrow(new RuntimeException("keycloak down")).when(keycloakService).deleteUser(USER);
+    Mockito.doThrow(new IllegalStateException("keycloak down"))
+        .when(keycloakService)
+        .deleteUser(USER);
 
     // Must not propagate: the member's data is gone, which is what they asked for.
     service.execute(REQUEST, false, null);
 
     verify(userDeletionService).deleteUser(eq(USER), any());
+  }
+
+  /**
+   * The half-finished erasure has to be findable afterwards.
+   *
+   * <p>It used to leave a {@code log.warn} and nothing else. The surviving Keycloak account cannot
+   * show up in the REQ-SEC-059 orphan gauge — that counts a local row whose Keycloak account has
+   * gone, and this account has no local row left at all — so the counter and the audit row are the
+   * only signals there are. The audit row carries a {@code null} target because {@code
+   * target_user_id} is a foreign key to an {@code app_user} row that has already been deleted, and
+   * only the exception's class name, because its message can echo Keycloak's own view of the
+   * account.
+   */
+  @Test
+  void aFailingKeycloakDeleteLeavesACounterAndAnAuditRow() {
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
+    Mockito.doThrow(new IllegalStateException("keycloak down"))
+        .when(keycloakService)
+        .deleteUser(USER);
+
+    service.execute(REQUEST, false, null);
+
+    assertEquals(
+        1.0,
+        meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count(),
+        "a swallowed Keycloak delete must bump the counter its alert reads");
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED),
+            eq(USER),
+            isNull(),
+            isNull(),
+            details.capture());
+    String payload = details.getValue().toString();
+    assertTrue(
+        payload.contains("error=IllegalStateException"),
+        "the payload names the failure's class: " + payload);
+    assertFalse(
+        payload.contains("keycloak down"),
+        "the exception message never goes into the details payload: " + payload);
+  }
+
+  /** A successful Keycloak delete leaves neither the counter nor the failure row. */
+  @Test
+  void aSucceedingKeycloakDeleteRecordsNoFailure() {
+    when(deletionRequestRepository.findByIdForDecision(REQUEST))
+        .thenReturn(Optional.of(pending(false)));
+
+    service.execute(REQUEST, false, null);
+
+    assertEquals(
+        0.0, meterRegistry.counter(MetricNames.ACCOUNT_DELETION_KEYCLOAK_FAILURES).count());
+    verify(auditService, never())
+        .record(
+            eq(AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED), any(), any(), any(), any());
   }
 }

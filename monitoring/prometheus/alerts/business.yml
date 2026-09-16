@@ -584,6 +584,38 @@ groups:
             Administration -> Mitglieder (the delete action appears for accounts the sync no longer
             finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
 
+      # (2026-09-17) The opposite direction of UserDeletionUnfinished, and the one nothing watched.
+      # An erasure commits its local half first and deletes the Keycloak user last (REQ-SEC-026,
+      # ADR-0111). When that last step throws, the catch block logged a warning and returned -- and
+      # nothing else could see it: the account has no local row left, so it cannot appear in
+      # basetool_users_pending_deletion_count, which counts a local row whose Keycloak account has
+      # gone.
+      #
+      # Why it matters: the surviving Keycloak account can still log in. The reconciliation then
+      # inserts a fresh row -- PENDING and refusable for an ordinary member, but ACTIVE for anyone
+      # holding the ADMIN realm role, because the approval gate carves admins out for bootstrap
+      # safety (UserRegistrationService#stampNewPendingRegistration). So a member who asked to be
+      # erased can come back with full admin authority and no approval.
+      #
+      # Any occurrence, and a long window: this is a manual remedy in the Keycloak console, so the
+      # alert must still be up when somebody reads it. The series is absent until the first failure,
+      # so it cannot fire before one happens. The matching audit row is
+      # ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED, which carries the account id the console needs.
+      - alert: AccountErasureKeycloakDeleteFailed
+        expr: sum(increase(basetool_account_deletion_keycloak_failures_total[24h])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An erasure deleted the local data but not the Keycloak account"
+          description: >-
+            An Art. 17 erasure committed its local half and then failed to delete the Keycloak
+            account, so that account still exists and can still log in. Delete it in the Keycloak
+            console; until then a re-login recreates the member's row, and for an ADMIN-realm-role
+            holder that row is ACTIVE immediately. The account id is in the
+            ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED audit event (Administration -> Protokoll,
+            Rollen tab).
+
       - alert: BankBookingApprovalOverdue
         expr: basetool_bank_booking_request_pending_oldest_age_seconds > 172800
         for: 10m

@@ -3897,9 +3897,25 @@ account: database half first, Keycloak last, the ordering of REQ-SEC-026 /
 [ADR-0111](../adr/0111-admin-mediated-discord-registration-linking.md), with the live presence probe
 waived exactly as `AccountConsolidationService` waives it (the caller removes the Keycloak user
 itself). Leaving the second act to a human is the state REQ-SEC-059 exists to detect; this path does
-not create it. A failing Keycloak delete is logged and swallowed — the member's data is gone, which
-is what they asked for, and the leftover Keycloak account resurfaces as a fresh pending
-registration an admin can refuse.
+not create it.
+
+> [!warning] Corrected 2026-09-17 — a failing Keycloak delete is not self-resolving
+> This paragraph used to say the failure "is logged and swallowed — the member's data is gone,
+>
+>> which is what they asked for, and the leftover Keycloak account resurfaces as a fresh pending
+>> registration an admin can refuse". The first half is true; the second is not, in two ways.
+>
+> The recreated row is only PENDING for an ordinary member. `UserRegistrationService`'s
+> `stampNewPendingRegistration` carves ADMIN-realm-role holders out for bootstrap safety, so an
+> admin's row lands on the `ACTIVE` entity default with full authority and no approval step. And
+> nothing watched the failure: the account has no local row left, so it cannot appear in the
+> REQ-SEC-059 orphan gauge, which counts the opposite direction.
+>
+> Since 2026-09-17 the path bumps `basetool_account_deletion_keycloak_failures_total` and writes
+> an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row in its own transaction (the business
+> transaction has already committed), carrying the account id the Keycloak console needs.
+> `AccountErasureKeycloakDeleteFailed` alerts on any occurrence. The remedy is manual and stays
+> manual: delete that account in Keycloak.
 
 **The history checkbox is a wish, not an instruction** (REQ-SEC-062). The member may additionally
 ask for the handle snapshots that survive a deletion to be anonymised. Nothing acts on that

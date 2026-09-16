@@ -504,6 +504,24 @@ public enum AuditEventType {
   ACCOUNT_DELETION_REQUEST_EXECUTED(AuditDomain.ROLE),
 
   /**
+   * An erasure's local half committed, but the Keycloak account could not be deleted (REQ-SEC-061).
+   *
+   * <p>The durable record of a half-finished erasure, written in its own transaction after the
+   * business transaction has committed — there is nothing left to attach it to otherwise, because
+   * the {@code app_user} row and the request itself are already gone. That is also why its {@code
+   * target_user_id} is {@code null} while the deleted account's id sits in {@code subject_id}: the
+   * target column is a foreign key to a row that no longer exists.
+   *
+   * <p>It records an <b>operational</b> failure rather than a member-visible one: the local data is
+   * gone, which is what the member asked for, but the surviving Keycloak account can still log in
+   * and the reconciliation will create a fresh row for it — PENDING and refusable for an ordinary
+   * member, ACTIVE for an ADMIN-realm-role holder. The payload carries the request id and the
+   * failing exception's class name, never its message, which can echo Keycloak's own view of the
+   * account.
+   */
+  ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED(AuditDomain.ROLE),
+
+  /**
    * An admin granted a member's Art. 17 wish and anonymised that member's surviving handle
    * snapshots (REQ-SEC-062) across both audit trails, the bank booking history, the booking
    * requests and the two handover recipients.

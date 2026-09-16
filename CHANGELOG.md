@@ -64,6 +64,11 @@
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
   Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
 
+- **Eine halb ausgeführte Kontolöschung fällt jetzt auf.** Konnte nach dem Löschen der lokalen
+  Daten der Zugang selbst nicht entfernt werden, stand das nur im Log — das Konto konnte sich
+  weiter anmelden. Das wird jetzt im Protokoll vermerkt und gemeldet, damit es jemand in der
+  Zugangsverwaltung nachholt (REQ-SEC-061).
+
 - **Betrieb: einen Aufräumlauf wie dokumentiert abzuschalten löste einen dauerhaften Alarm aus.**
   Die Überwachung konnte „noch nie erfolgreich gelaufen“ nicht von „absichtlich ausgeschaltet“
   unterscheiden, weil ein abgeschalteter Lauf gar keinen Messwert veröffentlicht. Jeder Lauf meldet
