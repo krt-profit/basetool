@@ -3155,8 +3155,17 @@ if (document.readyState === 'loading') {
                 window.location.reload();
             }
         } else if (window.showFrontendErrorToast) {
+            // Shared, not re-derived: this handler bypasses krtFetch's handleProblem, so without
+            // the branch the `problem.detail` fallback below renders the backend's English
+            // owner-picker sentence in a German toast (REQ-ORG-023).
+            const ownerRequired =
+                window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
+                    ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                    : null;
             window.showFrontendErrorToast(
-                (problem && problem.detail) || msg('mission.conflict.toast.detail', FAILED),
+                ownerRequired ||
+                    (problem && problem.detail) ||
+                    msg('mission.conflict.toast.detail', FAILED),
             );
         }
     }

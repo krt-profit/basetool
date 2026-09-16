@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.MembershipRole;
@@ -1706,9 +1707,11 @@ class OwnerScopeServiceTest {
   }
 
   @Test
-  void resolveSquadronForPickerOutput_multipleMemberships_nullPicker_throwsBadRequest() {
+  void resolveSquadronForPickerOutput_multipleMemberships_nullPicker_throwsOwnerRequired() {
     // User in Staffel + at least one SK. Plan §5.5.1: ambiguous, must reject. Before R6.b
     // this path silently stamped the legacy Staffel — exactly the audit regression #4.
+    // Since REQ-ORG-023 the refusal is its own type, so the frontend can render a localized
+    // instruction instead of echoing this English message into a German toast.
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1720,11 +1723,13 @@ class OwnerScopeServiceTest {
                 staffelMembership(user.getId(), homeStaffelId),
                 skMembership(user.getId(), UUID.randomUUID())));
 
-    BadRequestException ex =
+    OwnerOrgUnitRequiredException ex =
         assertThrows(
-            BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, null));
+            OwnerOrgUnitRequiredException.class,
+            () -> service.resolveSquadronForPickerOutput(user, null));
     assertTrue(
         ex.getMessage().toLowerCase().contains("owningorgunitid is required"), ex.getMessage());
+    assertEquals("OWNER_ORG_UNIT_REQUIRED", ex.code());
     verify(orgUnitRepository, never()).findById(any());
   }
 
@@ -1769,7 +1774,8 @@ class OwnerScopeServiceTest {
         .thenReturn(UUID.randomUUID().toString());
 
     assertThrows(
-        BadRequestException.class, () -> service.resolveSquadronForPickerOutput(user, null));
+        OwnerOrgUnitRequiredException.class,
+        () -> service.resolveSquadronForPickerOutput(user, null));
     verify(orgUnitRepository, never()).findById(any());
   }
 
