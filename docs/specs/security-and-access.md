@@ -2999,6 +2999,81 @@ throwing chain, filter order) · `SessionAttributeDiagnosticMapperTest` · **Cod
 [ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md),
 [ADR-0154](../adr/0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
 
+### REQ-SEC-063 — A session that cannot be read is no session, never a 500
+
+REQ-SEC-049 and REQ-SEC-050 are about an unreadable **value** inside a session. This requirement is
+about the session **hash itself**, and it exists because the two are not the same failure and only
+one of them was survivable.
+
+`RedisSessionMapper` requires three hash fields — `creationTime`, `lastAccessedTime`,
+`maxInactiveInterval` — and throws `IllegalStateException` when the hash it is handed is non-empty
+and carries none of one of them. Nothing on Spring Session's read path catches that. It leaves
+`SessionRepositoryFilter` and reaches the container, so **every** request carrying that cookie
+answers HTTP 500 — and the cookie is never cleared on that path
+(`SessionRepositoryFilter#commitSession` expires it only after an explicit `invalidate()`), so the
+member is locked out of the whole application, for up to the 720-hour authenticated window
+(REQ-SEC-025), until they delete the cookie by hand.
+
+**Spring Session produces that hash on its own.** `RedisSession#saveDelta` writes the session back
+with a plain `HSET` of the changed fields only, and `creationTime` is put into that delta solely
+`if (isNew)`. A request that reads a live session and commits after the hash has vanished — a Redis
+restart, an AOF truncation (`appendfsync everysec`), the hash's own TTL, a purge run against live
+traffic — therefore **re-creates** the key holding `lastAccessedTime` alone, and `saveDelta` then
+sets `expire(maxInactiveInterval + 5 min)` on it. The half-written state is not a blip; it carries
+the full session TTL.
+
+This ran in production unseen for months: 286 such 500s on 2026-09-14 (the burst opens in the hour
+Redis restarted), 18 on 2026-09-16, 8–10 a day on nine scattered days back to July — with **zero**
+`basetool_session_value_dropped_total` increments beside them, which is what rules out REQ-SEC-049's
+failure mode and proves the key was never written rather than dropped.
+
+**The rule:** a session hash the mapper cannot map reads as *no session*, not as an exception.
+`SessionAttributeDiagnosticMapper` catches the `IllegalStateException`, counts it, logs it once per
+distinct missing key, and returns `null` — a contract both upstream call sites already honour:
+`RedisIndexedSessionRepository#getSession` null-checks the mapper's result and returns `null` to the
+filter, which mints a fresh session, and `#onMessage` skips the `SessionCreatedEvent`. The member is
+signed out and a login fixes it, which is the same bargain REQ-SEC-049 struck for an unreadable
+value.
+
+**The hash is deliberately not repaired.** Deleting or rewriting it would be a Redis write on the
+session *read* path, which ADR-0157 rules out for the subsystem that took the whole application down
+twice inside two releases. The orphan is left to expire with its TTL; nothing reads it again, because
+the browser is now carrying a different session id.
+
+> [!warning] The degradation is only allowed to be quiet because it is measured
+> If every session lost a required key at once — a genuine wire-format break — a silent `null` would
+> sign the whole organisation out with no signal anywhere. `basetool_session_unmappable_total` and
+> `SessionUnmappableSustained` are what make the quiet safe, and the alert sums **across** the
+> `missing_key` tag so a break that loses all three fields cannot hide below a per-series threshold.
+> Widening the catch beyond `IllegalStateException`, or dropping the counter as noise, re-opens
+> exactly that hole.
+
+**Acceptance**
+
+- [ ] A session hash missing any one of the three required fields yields `null` from the mapper, not
+  a thrown exception — for each of the three, not just the first one read.
+- [ ] Such a request is served as if it carried no session; the member is signed out rather than
+  answered 500, and a login restores them.
+- [ ] Every give-up increments `basetool_session_unmappable_total`, tagged with the field that was
+  absent; the tag is resolved from the hash and can only take four literals.
+- [ ] The mapper writes nothing to Redis on that path — the half-written hash is left untouched.
+- [ ] A poisoned *attribute* (REQ-SEC-049) still yields a usable session with that attribute unset;
+  the two failure modes do not collapse into each other.
+- [ ] The required-key literals are pinned against the real upstream mapper, so a rename upstream
+  fails a test instead of silently reporting every failure as `other`.
+
+**Enforced by:** `HalfWrittenSessionHashIntegrationTest` (against a real Redis and the real
+`RedisIndexedSessionRepository`: a delta write after the hash vanishes re-creates it half-written and
+re-TTLs it; the half-written hash reads as no session and is counted; it is not repaired; a healthy
+session is unaffected) · `SessionAttributeDiagnosticMapperTest` (each required key parameterised, the
+`other` bucket, the upstream-literal pin, and the two failure modes staying apart) · **Code:**
+`SessionAttributeDiagnosticMapper#apply`, `RedisSessionConfig#sessionRepositoryCustomizer` ·
+**Monitoring:** `SessionUnmappableSustained`, `basetool_session_unmappable_total`
+([`observability.md`](observability.md)) · **ADR:**
+[ADR-0186](../adr/0186-an-unmappable-session-hash-reads-as-no-session.md), and
+[ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) for why
+the repair does not live here · **Related:** REQ-SEC-025, REQ-SEC-049, REQ-SEC-050, REQ-OBS-006
+
 ### REQ-SEC-051 — A relayed request parameter is bound to the backend's own type
 
 The frontend is a proxy: a page or proxy controller binds a request parameter, drops it into a

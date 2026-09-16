@@ -11,6 +11,12 @@
 
 ### Fixed
 
+- **Ein beschädigter Sitzungseintrag sperrte einzelne Mitglieder komplett aus.** Verlor der
+  Sitzungsspeicher einen Eintrag, während gerade eine Anfrage lief, blieb ein halb geschriebener
+  Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
+  bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
+  sich neu anmelden (REQ-SEC-063).
+  
 - **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
   `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
   Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt

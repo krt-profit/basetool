@@ -206,6 +206,27 @@ public final class MetricNames {
   public static final String SESSION_VALUE_DROPPED = "basetool.session.value.dropped";
 
   /**
+   * Counter {@code basetool_session_unmappable_total} — tag {@code missing_key}; bumped every time
+   * a session hash in Redis is non-empty but lacks one of the three fields {@code
+   * RedisSessionMapper} requires, so {@code SessionAttributeDiagnosticMapper} answers {@code null}
+   * and the request is served as if it carried no session (REQ-SEC-063).
+   *
+   * <p>The sibling of {@link #SESSION_VALUE_DROPPED}, and it exists for the same reason: a fault
+   * made survivable is a fault made invisible. Until 2026-09-16 this hash threw {@code
+   * IllegalStateException: creationTime key must not be null} straight out of Spring Session's
+   * filter — 286 HTTP 500s on 2026-09-14 alone, and no meter and no alert anywhere, because
+   * `LogbackErrorSpike` needs 0.2/s and the worst hour of it reached 0.045/s. Now that the read
+   * degrades to a signed-out member, this counter is the only thing standing between a graceful
+   * degradation and a silent one.
+   *
+   * <p>A steady near-zero rate is the expected shape — one half-written hash per session that lost
+   * its key. A rate that climbs means session hashes are being lost in volume ({@code Redis}
+   * restarting, an AOF truncation, a purge run against live traffic); a rate that jumps to the
+   * whole population means the wire format broke and every member is being signed out at once.
+   */
+  public static final String SESSION_UNMAPPABLE = "basetool.session.unmappable";
+
+  /**
    * Counter {@code basetool_client_error_total} — tag {@code kind} ({@link
    * #CLIENT_ERROR_SCRIPT_ERROR} / {@link #CLIENT_ERROR_UNHANDLED_REJECTION} / {@link
    * #CLIENT_ERROR_RESOURCE_ERROR}); browser-side failures reported by the client error beacon. A JS
@@ -308,6 +329,14 @@ public final class MetricNames {
    * class name, which would be an unbounded label.
    */
   public static final String TAG_CAUSE = "cause";
+
+  /**
+   * Tag key: which required session-hash field was absent on {@link #SESSION_UNMAPPABLE} — {@code
+   * creationTime}, {@code lastAccessedTime}, {@code maxInactiveInterval}, or {@code other} when all
+   * three were present and the mapper refused the hash for some other reason. A closed set of four
+   * literals resolved from the hash itself, never from the upstream exception's message text.
+   */
+  public static final String TAG_MISSING_KEY = "missing_key";
 
   /**
    * Tag key: the bounded live-sync {@code topic_class} on the relay counters and {@link
