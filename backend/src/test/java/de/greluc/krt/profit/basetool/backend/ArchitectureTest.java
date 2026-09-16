@@ -2268,6 +2268,25 @@ class ArchitectureTest {
             "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository");
+    // The single named exception, approved by @greluc on 2026-09-16 (ADR-0183, REQ-SEC-062).
+    //
+    // A granted Art. 17 request replaces the member's handle in `bank_transaction`
+    // .counterparty_handle with a placeholder. That is an UPDATE on a ledger table, which this rule
+    // forbids — so the exception is by METHOD NAME, not by relaxing the rule: every other
+    // @Modifying method on these repositories still fails, including a second anonymisation-shaped
+    // one somebody adds later.
+    //
+    // Why it is admissible at all: the rule exists so a ledger CORRECTION cannot be made by update
+    // (corrections are reversal transactions, REQ-BANK-004). This changes no booking fact — not an
+    // amount, not an account, not a date, not a posting row — only a denormalised display column
+    // carrying a name. The alternatives were weighed and rejected: leaving the booking history out
+    // of the erasure would contradict the privacy policy, which names „Buchungseinträge" as
+    // something an Art. 17 request can reach; and a reversal-plus-rebooking pair would double every
+    // affected member's ledger rows and disturb balance history for a name change.
+    //
+    // ADR-0010's insert-only consequence is therefore amended, and ADR-0183 records that amendment
+    // rather than leaving it to be inferred from this test.
+    Set<String> approvedLedgerMutations = Set.of("anonymiseCounterpartyHandle");
     noMethods()
         .that()
         .areDeclaredInClassesThat(
@@ -2275,6 +2294,13 @@ class ArchitectureTest {
               @Override
               public boolean test(JavaClass input) {
                 return ledgerRepositories.contains(input.getFullName());
+              }
+            })
+        .and(
+            new DescribedPredicate<>("are not the one approved Art. 17 anonymisation") {
+              @Override
+              public boolean test(com.tngtech.archunit.core.domain.JavaMethod input) {
+                return !approvedLedgerMutations.contains(input.getName());
               }
             })
         .should()

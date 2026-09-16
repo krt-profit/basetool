@@ -99,4 +99,83 @@
             version: version,
         };
     });
+
+    // ---------------------------------------------------------------- Art. 17 erasure request
+    //
+    // The member raises or withdraws a deletion request (REQ-SEC-061). Both writes go through
+    // krtFetch and are followed by a server-rendered fragment swap of the card, so the three
+    // states -- no request / pending / declined-with-reason -- stay decided in ONE place. Nothing
+    // here rebuilds the card in JavaScript: a client-side second opinion on which state to show is
+    // exactly how a swapped card comes to disagree with a freshly loaded page.
+    //
+    // No optimistic-lock version is echoed. The writes are not edits of a row the member is
+    // looking at: raising is idempotent (a partial unique index decides, not a version), and
+    // withdrawing is a state transition guarded by the status itself.
+
+    const DELETION_URL = '/profile/deletion-request';
+
+    // Reloads the card fragment in place. Nothing needs rebinding afterwards: the modal trigger
+    // inside the card is a `data-trigger` handled by the document-level delegation in
+    // event-delegation.js, and the withdraw button is delegated on the host below.
+    function refreshDeletionCard() {
+        if (!window.krtFetch.swap) {
+            return undefined;
+        }
+        return window.krtFetch.swap({
+            url: DELETION_URL,
+            container: '#profile-deletion-host',
+            fragmentValue: 'card',
+            errorMessage: i18n.deletionError,
+        });
+    }
+
+    // The submit button lives in the modal, which sits OUTSIDE the swapped host, so one direct
+    // binding survives every swap.
+    const deletionSubmit = document.getElementById('profile-deletion-submit');
+    if (deletionSubmit) {
+        deletionSubmit.addEventListener('click', function () {
+            /** @type {HTMLInputElement | null} */
+            const eraseHistory = document.querySelector('#profile-deletion-erase-history');
+            window.krtFetch.write({
+                method: 'POST',
+                url: DELETION_URL,
+                payload: { eraseHistory: eraseHistory ? eraseHistory.checked : false },
+                successMessage: i18n.deletionRequested,
+                errorMessage: i18n.deletionError,
+                onSuccess: function () {
+                    const overlay = document.getElementById('profile-deletion-modal');
+                    if (overlay) {
+                        overlay.style.display = 'none';
+                    }
+                    if (eraseHistory) {
+                        eraseHistory.checked = false;
+                    }
+                    return refreshDeletionCard();
+                },
+            });
+        });
+    }
+
+    // The withdraw button lives INSIDE the swapped fragment, so it is bound by delegation on the
+    // host rather than by id: a direct listener would be lost with the element it was attached to
+    // the first time the card is swapped.
+    const deletionHost = document.getElementById('profile-deletion-host');
+    if (deletionHost) {
+        deletionHost.addEventListener('click', function (event) {
+            const target = event.target;
+            if (!(target instanceof Element)) {
+                return;
+            }
+            if (!target.closest('#profile-deletion-withdraw')) {
+                return;
+            }
+            window.krtFetch.write({
+                method: 'DELETE',
+                url: DELETION_URL,
+                successMessage: i18n.deletionWithdrawn,
+                errorMessage: i18n.deletionError,
+                onSuccess: refreshDeletionCard,
+            });
+        });
+    }
 })();

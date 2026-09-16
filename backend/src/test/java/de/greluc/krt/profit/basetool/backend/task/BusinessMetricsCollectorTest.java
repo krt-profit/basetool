@@ -27,10 +27,12 @@ import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
+import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeRequestRepository;
@@ -40,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +60,7 @@ class BusinessMetricsCollectorTest {
   @Mock private UserRepository userRepository;
   @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private DeletionRequestRepository deletionRequestRepository;
   @Mock private OperationRepository operationRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private P4kImportJobRepository p4kImportJobRepository;
@@ -73,6 +77,7 @@ class BusinessMetricsCollectorTest {
         new BusinessMetricsCollector(
             registry,
             userRepository,
+            deletionRequestRepository,
             bankBookingRequestRepository,
             jobOrderRepository,
             operationRepository,
@@ -122,6 +127,39 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(MetricNames.REGISTRATION_PENDING)).isEqualTo(0.0d);
     assertThat(gauge(MetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
     assertThat(statusGauge(MetricNames.JOB_ORDER_OPEN, JobOrderStatus.OPEN.name())).isEqualTo(0.0d);
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(0.0d);
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isEqualTo(0.0d);
+    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING)).isEqualTo(0.0d);
+    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
+  }
+
+  // covers REQ-SEC-061 — the erasure-request queue is sampled, and its age gauge is what the
+  // Art. 12(3) deadline is measured against
+  @Test
+  void refresh_populatesTheDeletionRequestQueueGauges() {
+    when(deletionRequestRepository.countByStatus(DeletionRequestStatus.PENDING)).thenReturn(1L);
+    when(deletionRequestRepository.findOldestCreatedAtByStatus(DeletionRequestStatus.PENDING))
+        .thenReturn(Instant.now().minus(20, ChronoUnit.DAYS));
+
+    collector.refresh();
+
+    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING)).isEqualTo(1.0d);
+    // Past the 14-day DeletionRequestOverdue threshold, still inside the one-month statutory limit.
+    assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isGreaterThan(1209600.0d);
+  }
+
+  // covers REQ-SEC-059 — the half-finished-deletion gauges are sampled and report the OLDEST wait
+  @Test
+  void refresh_populatesTheUnfinishedDeletionGauges() {
+    when(userRepository.countByInKeycloakFalse()).thenReturn(2L);
+    when(userRepository.findOldestKeycloakAbsentSince())
+        .thenReturn(Instant.now().minus(9, ChronoUnit.DAYS));
+
+    collector.refresh();
+
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
+    // Past the 7-day UserDeletionUnfinished threshold, which is the number the alert compares.
+    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isGreaterThan(604800.0d);
   }
 
   @Test

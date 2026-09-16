@@ -141,7 +141,9 @@ public class AdminAuditLogPageController {
               "BOOKING_REQUEST_OWNER_APPROVAL_REVOKED",
               "BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED",
               "CARTEL_APPROVAL_TIERS_SET",
-              "CARTEL_APPROVAL_TIERS_CLEARED"),
+              "CARTEL_APPROVAL_TIERS_CLEARED",
+              // The one bank event that records a mutation of the trail itself (REQ-SEC-062).
+              "HANDLE_SNAPSHOTS_ANONYMISED"),
           "INVENTORY",
           List.of(
               "INVENTORY_ITEM_CREATED",
@@ -275,6 +277,16 @@ public class AdminAuditLogPageController {
               "KOMMANDO_GROUP_DELETED",
               "USER_DELETED",
               "USER_MERGED",
+              // Data-protection events (REQ-SEC-058/060/061/062). They sit on the ROLE tab because
+              // that is where the member lifecycle already lives; each names the member as its
+              // target, so filtering the tab by actor or by type finds them.
+              "ACCOUNT_DELETION_REQUESTED",
+              "ACCOUNT_DELETION_REQUEST_WITHDRAWN",
+              "ACCOUNT_DELETION_REQUEST_DECLINED",
+              "ACCOUNT_DELETION_REQUEST_EXECUTED",
+              "HANDLE_SNAPSHOTS_ANONYMISED",
+              "PERSONAL_DATA_EXPORTED",
+              "PERSON_SEARCH_PERFORMED",
               "ROLE_AUDIT_EXPORTED",
               "ROLE_AUDIT_PURGED"),
           "PROMOTION",

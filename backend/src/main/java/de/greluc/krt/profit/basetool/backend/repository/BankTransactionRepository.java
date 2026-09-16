@@ -23,7 +23,9 @@ import de.greluc.krt.profit.basetool.backend.model.BankTransaction;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -102,4 +104,23 @@ public interface BankTransactionRepository extends JpaRepository<BankTransaction
       AND NOT EXISTS (SELECT 1 FROM BankAuditEvent e WHERE e.transactionId = t.id)
       """)
   List<UUID> findTransactionsWithoutAuditEvent();
+
+  /**
+   * Replaces this member's counterparty handle snapshot with the erasure sentinel, for a granted
+   * Art. 17 request (REQ-SEC-062).
+   *
+   * <p>The booking history is the record the privacy policy names as kept permanently under Art.
+   * 6(1)(f); this is the path by which a member can have their name taken out of it without the
+   * bookings themselves being rewritten. Amounts, dates, accounts and the transaction's own
+   * identity are untouched — the counterparty simply stops being named.
+   *
+   * @param userId the member whose handle snapshot is erased
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE BankTransaction t SET t.counterpartyHandle = :sentinel"
+          + " WHERE t.counterpartyUserId = :userId AND t.counterpartyHandle <> :sentinel")
+  int anonymiseCounterpartyHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

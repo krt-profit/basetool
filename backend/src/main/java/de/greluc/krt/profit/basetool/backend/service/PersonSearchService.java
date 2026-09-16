@@ -1,0 +1,232 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.service;
+
+import de.greluc.krt.profit.basetool.backend.model.dto.PersonSearchHitDto;
+import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
+import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets.Target;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Finds every mention of a name across the application's free-text surfaces (REQ-SEC-060).
+ *
+ * <p><b>Why this exists.</b> A person's name can sit where no foreign key points: an external
+ * mission participant, a party lead without an account, a job-order handover recipient, an
+ * org-chart placeholder, a booking reason, an admin's note. An Art. 16 rectification or Art. 17
+ * erasure request from such a person could not be served, because nothing could find the entries —
+ * and a rectification that fixes one of four occurrences is not a rectification. This is the search
+ * that makes those requests answerable, and {@code docs/privacy/data-subject-requests.md} tells the
+ * reader to run it for <em>every</em> Art. 16/17 request, members included.
+ *
+ * <p><b>ADMIN only</b>, and not merely because it is expensive: a query that returns every place a
+ * given name appears is a profile of that person assembled across the whole system.
+ *
+ * <p><b>Bounded by construction.</b> One statement, a {@code UNION ALL} over the registry with a
+ * per-branch {@code LIMIT}, then an overall cap. A multi-table {@code ILIKE} sweep with no ceiling
+ * is a denial-of-service waiting for a one-character search term, so:
+ *
+ * <ul>
+ *   <li>the term must be at least {@value #MIN_TERM_LENGTH} characters
+ *   <li>each branch returns at most {@value #PER_TARGET_LIMIT} rows
+ *   <li>the whole result is capped at {@value #TOTAL_LIMIT}, and the caller is told when it was
+ *       truncated rather than being left to assume it saw everything
+ * </ul>
+ *
+ * <p><b>Case-insensitive, always.</b> Whoever typed the name was not copying it from a roster, so
+ * matching case would miss the very entries this exists to find.
+ */
+@Service
+@Slf4j
+public class PersonSearchService {
+
+  /** Shortest search term accepted; below this the result is noise rather than an answer. */
+  public static final int MIN_TERM_LENGTH = 3;
+
+  /** Rows returned per searched column. */
+  public static final int PER_TARGET_LIMIT = 25;
+
+  /** Rows returned in total. */
+  public static final int TOTAL_LIMIT = 300;
+
+  /** Characters of surrounding text kept per hit, so an admin can judge it without opening it. */
+  private static final int SNIPPET_LENGTH = 200;
+
+  /**
+   * Identifier shape the registry is allowed to contain. The table and column names are
+   * interpolated into SQL — they cannot be bound as parameters — so they are validated against this
+   * before a statement is built, even though they come from a compile-time constant list. Defence
+   * in depth against a future edit that pastes something else into the registry.
+   */
+  private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-z_][a-z0-9_]{0,62}$");
+
+  @PersistenceContext private EntityManager entityManager;
+
+  /**
+   * The outcome of one search.
+   *
+   * @param hits the matches, in registry order (member record first, audit trails last)
+   * @param truncated whether the overall cap was reached, so the admin knows the list is partial
+   */
+  public record PersonSearchResult(List<PersonSearchHitDto> hits, boolean truncated) {}
+
+  /**
+   * Searches every registered free-text column for the term, case-insensitively.
+   *
+   * @param term the name to look for; matched as a substring anywhere in the column
+   * @return the hits and whether the result was truncated
+   * @throws IllegalArgumentException when the term is shorter than {@link #MIN_TERM_LENGTH} after
+   *     trimming
+   */
+  @Transactional(readOnly = true)
+  public @NotNull PersonSearchResult search(@NotNull String term) {
+    String trimmed = term.trim();
+    if (trimmed.length() < MIN_TERM_LENGTH) {
+      throw new IllegalArgumentException(
+          "A person search needs at least " + MIN_TERM_LENGTH + " characters");
+    }
+
+    Query query = entityManager.createNativeQuery(buildSql());
+    // The term is a bound parameter; only the identifiers are interpolated, and those are validated
+    // against SAFE_IDENTIFIER while the SQL is assembled.
+    query.setParameter("term", "%" + escapeLikeWildcards(trimmed) + "%");
+    query.setMaxResults(TOTAL_LIMIT + 1);
+
+    List<?> rows = query.getResultList();
+    boolean truncated = rows.size() > TOTAL_LIMIT;
+    List<PersonSearchHitDto> hits = new ArrayList<>();
+    for (Object row : rows.subList(0, Math.min(rows.size(), TOTAL_LIMIT))) {
+      Object[] cells = (Object[]) row;
+      hits.add(
+          new PersonSearchHitDto(
+              (String) cells[0],
+              (String) cells[1],
+              (String) cells[2],
+              cells[3] == null ? null : String.valueOf(cells[3]),
+              (String) cells[4],
+              (String) cells[5]));
+    }
+    log.info(
+        "Person search returned {} hit(s) across {} column(s){}",
+        hits.size(),
+        PersonSearchTargets.TARGETS.size(),
+        truncated ? " (truncated)" : "");
+    return new PersonSearchResult(hits, truncated);
+  }
+
+  /**
+   * Assembles the {@code UNION ALL} over the registry.
+   *
+   * <p>One statement rather than one query per column: the planner sees the whole thing, the trip
+   * to the database happens once, and a per-branch {@code LIMIT} keeps any single column from
+   * dominating the result.
+   *
+   * @return the SQL, with {@code :term} left to be bound
+   */
+  private @NotNull String buildSql() {
+    StringBuilder sql = new StringBuilder(PersonSearchTargets.TARGETS.size() * 220);
+    boolean first = true;
+    for (Target t : PersonSearchTargets.TARGETS) {
+      requireSafeIdentifier(t.table());
+      requireSafeIdentifier(t.column());
+      requireSafeIdentifier(t.idColumn());
+      if (!first) {
+        sql.append(" UNION ALL ");
+      }
+      first = false;
+      sql.append("(SELECT ")
+          .append(quote(t.area()))
+          .append(" AS area, ")
+          .append(quote(t.table()))
+          .append(" AS src_table, ")
+          .append(quote(t.column()))
+          .append(" AS src_column, ")
+          .append("CAST(")
+          .append(t.idColumn())
+          .append(" AS text) AS row_id, ")
+          .append("left(")
+          .append(t.column())
+          .append(", ")
+          .append(SNIPPET_LENGTH)
+          .append(") AS snippet, ")
+          .append(t.linkKind() == null ? "CAST(NULL AS text)" : quote(t.linkKind()))
+          .append(" AS link_kind")
+          .append(" FROM ")
+          .append(t.table())
+          .append(" WHERE ")
+          .append(t.column())
+          .append(" ILIKE :term")
+          .append(" LIMIT ")
+          .append(PER_TARGET_LIMIT)
+          .append(')');
+    }
+    return sql.toString();
+  }
+
+  /**
+   * Rejects an identifier the registry should never contain.
+   *
+   * @param identifier a table or column name from the registry
+   * @throws IllegalStateException when it is not a plain lower-case SQL identifier
+   */
+  private static void requireSafeIdentifier(@NotNull String identifier) {
+    if (!SAFE_IDENTIFIER.matcher(identifier).matches()) {
+      throw new IllegalStateException(
+          "PersonSearchTargets contains an identifier that is not a plain SQL name: " + identifier);
+    }
+  }
+
+  /**
+   * Renders a registry constant as a SQL string literal.
+   *
+   * <p>These are compile-time constants from the registry, not input, and {@link
+   * #requireSafeIdentifier} has already rejected anything unexpected for the identifiers. The
+   * doubling is here so an area or link-kind label containing an apostrophe could not break the
+   * statement either.
+   *
+   * @param value the literal
+   * @return the quoted literal
+   */
+  private static @NotNull String quote(@NotNull String value) {
+    return "'" + value.replace("'", "''") + "'";
+  }
+
+  /**
+   * Escapes the {@code LIKE} wildcards in a search term.
+   *
+   * <p>Without this, searching for {@code %} matches every row of every column — an accident that
+   * looks exactly like a deliberate attempt to dump the database, and one an admin could make by
+   * pasting.
+   *
+   * @param term the raw search term
+   * @return the term with {@code \}, {@code %} and {@code _} escaped
+   */
+  private static @NotNull String escapeLikeWildcards(@NotNull String term) {
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+  }
+}

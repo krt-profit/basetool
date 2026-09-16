@@ -529,6 +529,56 @@ groups:
           summary: "Oldest pending registration >48h"
           description: "A user registration has been awaiting approval for more than 48 hours."
 
+      # Members' Art. 17 erasure requests waiting for an admin decision (REQ-SEC-061, ADR-0181).
+      #
+      # The one queue alert in this file whose threshold comes from a STATUTE rather than from an
+      # operational preference: Art. 12(3) GDPR gives the controller one month to respond to a
+      # data-subject request. 14 days is set well inside that, so an admin still has two weeks to
+      # weigh the request -- in particular the "also erase my audit and bank history" wish, which is
+      # a judgement about competing interests and not a click.
+      #
+      # Empty queues report 0 seconds (BusinessMetricsCollector.ageSeconds), so there is no absent()
+      # ambiguity: a value over threshold means a real request has been waiting that long.
+      - alert: DeletionRequestOverdue
+        expr: basetool_deletion_request_pending_oldest_age_seconds > 1209600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest account-deletion request >14d"
+          description: >-
+            A member asked for their account to be erased more than 14 days ago and no admin has
+            decided it. Art. 12(3) allows one month to respond. Decide it in Administration ->
+            Loeschantraege; refusing requires a recorded reason, which the member is then told.
+
+      # Half-finished account deletions (REQ-SEC-059, ADR-0182).
+      #
+      # Deleting a member is two acts: remove the Keycloak account, then delete the local row. The
+      # member list only offers the second once the roster sync has flipped in_keycloak = false, so
+      # a forgotten click leaves the e-mail address, handle, Discord snowflake, guild nickname and
+      # profile description of somebody who has already left, indefinitely, with nothing watching.
+      #
+      # 7 days, not 48h: the wait is legitimate for as long as an admin is mid-task and the roster
+      # sync is nightly, so a same-week deletion must not page anybody. This is a hygiene signal,
+      # not an incident -- the data is not exposed, it is merely retained past its basis.
+      #
+      # Age, not count: a count above zero for 7 days would also fire when a stream of accounts was
+      # each cleared within a day, because the count never reaches zero in between. The age comes
+      # from app_user.keycloak_absent_since (V241); rows predating that migration were backfilled
+      # with the deploy time, so shortly after deploy this alert reports a LOWER BOUND.
+      - alert: UserDeletionUnfinished
+        expr: basetool_users_pending_deletion_oldest_age_seconds > 604800
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An account has been awaiting local deletion for >7d"
+          description: >-
+            A Keycloak account was removed but its local row was never deleted, so it still holds
+            the member's e-mail address, handle, Discord id and description. Finish it in
+            Administration -> Mitglieder (the delete action appears for accounts the sync no longer
+            finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
+
       - alert: BankBookingApprovalOverdue
         expr: basetool_bank_booking_request_pending_oldest_age_seconds > 172800
         for: 10m

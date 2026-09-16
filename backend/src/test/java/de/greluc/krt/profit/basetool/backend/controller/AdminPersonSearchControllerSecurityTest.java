@@ -1,0 +1,156 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.PersonSearchService;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
+/**
+ * MockMvc gate matrix for the admin Personensuche (REQ-SEC-060).
+ *
+ * <p>Admin-only, and the reason is worth restating where it is tested: the endpoint returns every
+ * place a given name appears, which is a profile of that person assembled across the whole system.
+ * An officer or bank employee has no business assembling one.
+ *
+ * <p>The class also pins down the audit rule, because it is the kind of thing a later refactor
+ * "tidies up": the recorded payload must carry the term's <b>length</b> and never the term. A trail
+ * of every name an admin searched for would be a second store of exactly the data this search
+ * exists to help remove.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+class AdminPersonSearchControllerSecurityTest {
+
+  @Autowired private WebApplicationContext context;
+  private MockMvc mockMvc;
+
+  @MockitoBean private PersonSearchService personSearchService;
+  @MockitoBean private AuditService auditService;
+  @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void setUp() {
+    mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  @Test
+  void personSearch_member_isForbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/admin/person-search")
+                .param("q", "somebody")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
+
+    verify(personSearchService, never()).search(any());
+  }
+
+  @Test
+  void personSearch_officer_isForbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/admin/person-search")
+                .param("q", "somebody")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_OFFICER"))))
+        .andExpect(status().isForbidden());
+
+    verify(personSearchService, never()).search(any());
+  }
+
+  @Test
+  void personSearch_bankManagement_isForbidden() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/admin/person-search")
+                .param("q", "somebody")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_MANAGEMENT"))))
+        .andExpect(status().isForbidden());
+
+    verify(personSearchService, never()).search(any());
+  }
+
+  @Test
+  void personSearch_admin_isAllowed() throws Exception {
+    when(personSearchService.search(any()))
+        .thenReturn(new PersonSearchService.PersonSearchResult(List.of(), false));
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/person-search")
+                .param("q", "somebody")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+  }
+
+  // covers REQ-SEC-060 — the search is recorded, and the recorded payload never holds the name
+  @Test
+  void personSearch_isAuditedWithoutTheSearchTerm() throws Exception {
+    when(personSearchService.search(any()))
+        .thenReturn(new PersonSearchService.PersonSearchResult(List.of(), false));
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/person-search")
+                .param("q", "SomeVeryDistinctiveHandle")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(UUID.randomUUID().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
+    verify(auditService)
+        .record(eq(AuditEventType.PERSON_SEARCH_PERFORMED), any(), any(), any(), details.capture());
+    String payload = details.getValue().toString();
+    assertThat(payload).doesNotContain("SomeVeryDistinctiveHandle");
+    assertThat(payload).contains("termLength");
+    // The length is the whole point: 25 characters, not the 25 characters.
+    assertThat(payload).contains("25");
+  }
+}

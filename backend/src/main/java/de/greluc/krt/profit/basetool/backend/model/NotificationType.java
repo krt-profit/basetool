@@ -109,5 +109,24 @@ public enum NotificationType {
    * name to the owner is permitted because the notification is delivered only to the owner
    * (REQ-MARKET-019 anonymity is owner-only).
    */
-  MATERIAL_REQUEST_FULFILLMENT_SIGNALLED
+  MATERIAL_REQUEST_FULFILLMENT_SIGNALLED,
+
+  /**
+   * A member raised an Art. 17 erasure request (REQ-SEC-061). The seeded default rule notifies
+   * every admin; the frontend renders it under {@code
+   * notifications.type.ACCOUNT_DELETION_REQUESTED} with the {@code handle} render parameter. Naming
+   * the member is the point — an admin cannot act on an anonymous request — and the recipients are
+   * admins, who already see the member list.
+   */
+  ACCOUNT_DELETION_REQUESTED,
+
+  /**
+   * An admin refused a member's erasure request (REQ-SEC-061). The seeded default rule notifies the
+   * requesting member; the frontend renders it under {@code
+   * notifications.type.ACCOUNT_DELETION_REQUEST_DECLINED} with <b>no</b> parameters. The admin's
+   * reasoning is deliberately not a render parameter: a notification message is a bounded template,
+   * and free text in one would put an admin's prose into the inbox payload. The member reads the
+   * reason on their profile page.
+   */
+  ACCOUNT_DELETION_REQUEST_DECLINED
 }

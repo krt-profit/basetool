@@ -590,6 +590,7 @@ interface Window {
     // --- localized label dictionaries injected by the layout bootstrap
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
+    krtDeletionRequestsI18n?: KrtI18nDict;
     krtP4kImportI18n?: KrtI18nDict;
     krtBlueprintsImportI18n?: KrtI18nDict;
     krtBlueprintsRecipeI18n?: KrtI18nDict;

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{admin.deletionRequests.title} + ' - ' + ${appTitle}">L&ouml;schantr&auml;ge - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<style th:attr="nonce=${cspNonce}">
+        .dr-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .dr-when { color: var(--color-gray-2-text); font-size: 0.85rem; }
+        #decline-note {
+            width: 100%; min-height: 80px; padding: 0.5rem; box-sizing: border-box;
+            background-color: var(--color-surface-input); border: 1px solid var(--color-gray-3);
+            color: var(--color-gray-1); font-family: var(--font-body);
+        }
+    </style>
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+
+<main>
+    <div class="greeting hud-box">
+        <h1 th:text="#{admin.deletionRequests.title}">L&ouml;schantr&auml;ge</h1>
+        <p th:text="#{admin.deletionRequests.subtitle}">Antr&auml;ge von Mitgliedern auf L&ouml;schung ihres Kontos entscheiden.</p>
+    </div>
+
+    <div th:if="${error}" class="hud-box mt-2 krtm-border-color-var-color-danger-b169">
+        <p th:text="#{${error}}">Fehler beim Laden.</p>
+    </div>
+
+    <!-- The deadline note is the reason this page exists rather than an inbox message: Art. 12(3)
+         allows one month to respond, the queue is ordered oldest first, and DeletionRequestOverdue
+         alerts at 14 days. -->
+    <div class="hud-box mt-2 krtm-border-color-var-color-warning-display-flex-1b12" role="note">
+        <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+            <use href="#krt-icon-info"/></svg>
+        <p class="krtm-margin-0-2a0c" th:text="#{admin.deletionRequests.deadline}">Ein Antrag ist innerhalb eines Monats zu beantworten. Die Liste ist nach Alter sortiert.</p>
+    </div>
+
+    <div class="hud-box mt-2">
+        <div class="table-responsive" id="deletionRequestsHost">
+            <!-- The rows are a fragment so a decision refreshes the table in place instead of
+                 reloading the page (REQ-FE-001). -->
+            <th:block th:fragment="rows">
+            <table id="deletionRequestsTable">
+                <thead>
+                    <tr>
+                        <th th:text="#{admin.deletionRequests.col.member}">Mitglied</th>
+                        <th th:text="#{admin.deletionRequests.col.requestedAt}">Beantragt</th>
+                        <th th:text="#{admin.deletionRequests.col.eraseHistory}">Protokolle</th>
+                        <th th:text="#{admin.deletionRequests.col.actions}">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody id="deletionRequestsBody">
+                    <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
+                        th:attr="data-id=${req.id},data-handle=${req.handle}">
+                        <td>
+                            <span th:text="${req.handle}">Mitglied</span>
+                        </td>
+                        <td class="dr-when"
+                            th:text="${#temporals.format(req.requestedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>
+                        <td>
+                            <span th:if="${req.eraseHistoryRequested}" class="chip chip--warning"
+                                  th:title="#{admin.deletionRequests.eraseHistory.hint}"
+                                  th:text="#{admin.deletionRequests.eraseHistory.yes}">Auch anonymisieren</span>
+                            <span th:unless="${req.eraseHistoryRequested}" class="dr-when" aria-hidden="true">&mdash;</span>
+                        </td>
+                        <td>
+                            <div class="dr-actions">
+                                <button type="button" class="btn btn--danger" data-action="execute"
+                                        th:text="#{admin.deletionRequests.execute}">Konto l&ouml;schen</button>
+                                <button type="button" class="btn btn-outline" data-action="decline"
+                                        th:text="#{admin.deletionRequests.decline}">Ablehnen</button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr id="deletionRequestsEmpty" th:if="${#lists.isEmpty(requests)}">
+                        <td colspan="4" th:text="#{admin.deletionRequests.empty}">Keine offenen L&ouml;schantr&auml;ge.</td>
+                    </tr>
+                </tbody>
+            </table>
+            </th:block>
+        </div>
+    </div>
+</main>
+
+<th:block th:replace="~{fragments/toast :: toast}" />
+
+<!--
+  Refusal dialog. The reason is mandatory in three places - here, in the proxy and in a database
+  CHECK - because Art. 12(4) obliges the controller to tell the requester WHY a request was
+  refused, and a reason nobody wrote down cannot be told to them.
+-->
+<div th:replace="~{fragments/modal-wrapper :: modal(modalId='decline-modal', titleKey='admin.deletionRequests.decline.title', variant=null, body=~{::.decline-form})}">
+    <div class="decline-form">
+        <div class="krt-modal-body">
+            <p class="bank-field-hint" th:text="#{admin.deletionRequests.decline.hint}">Die Begr&uuml;ndung wird dem Mitglied mitgeteilt und gespeichert.</p>
+            <div class="bank-form-row">
+                <label for="decline-note" th:text="#{admin.deletionRequests.decline.note}">Begr&uuml;ndung</label>
+                <textarea id="decline-note" rows="4" data-testid="decline-note"></textarea>
+                <span class="bank-field-error" data-error-for="note"></span>
+            </div>
+            <span class="bank-field-error" data-error-for="_global"></span>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="close-modal-display" data-modal-id="decline-modal"
+                    th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--danger" id="decline-submit"
+                    data-testid="decline-submit"
+                    th:text="#{admin.deletionRequests.decline.submit}">Antrag ablehnen</button>
+        </div>
+    </div>
+</div>
+
+<!--
+  Execution dialog. Two separate confirmations in one place, because they are two decisions: the
+  deletion itself, and whether the member's Art. 17 wish to anonymise the surviving handle
+  snapshots is granted. The checkbox starts UNTICKED even when the member asked - granting is a
+  deliberate act, and pre-ticking it would turn the wish into the default.
+-->
+<div th:replace="~{fragments/modal-wrapper :: modal(modalId='execute-modal', titleKey='admin.deletionRequests.execute.title', variant=null, body=~{::.execute-form})}">
+    <div class="execute-form">
+        <div class="krt-modal-body">
+            <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert">
+                <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                    <use href="#krt-icon-warning"/></svg>
+                <p class="krtm-margin-0-2a0c" th:text="#{admin.deletionRequests.execute.warning}">Das Konto und der zugeh&ouml;rige Keycloak-Zugang werden endg&uuml;ltig entfernt. Das l&auml;sst sich nicht zur&uuml;cknehmen.</p>
+            </div>
+            <p class="bank-field-hint" data-execute-member></p>
+            <div class="check-row">
+                <input type="checkbox" id="execute-erase-history" data-testid="execute-erase-history">
+                <div>
+                    <label for="execute-erase-history" th:text="#{admin.deletionRequests.execute.eraseHistory}">Spielernamen in Protokollen und Buchungshistorie anonymisieren</label>
+                    <p class="form-hint" th:text="#{admin.deletionRequests.execute.eraseHistory.hint}">Betrifft beide Audit-Protokolle, die Buchungshistorie, Buchungsantr&auml;ge und die &Uuml;bergabe-Empf&auml;nger. Die Zeilen bleiben bestehen, nur der Name verschwindet.</p>
+                </div>
+            </div>
+            <div class="bank-form-row">
+                <label for="execute-note" th:text="#{admin.deletionRequests.execute.note}">Notiz (optional)</label>
+                <textarea id="execute-note" rows="3" data-testid="execute-note"></textarea>
+            </div>
+            <span class="bank-field-error" data-error-for="_global"></span>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost"
+                    data-trigger="close-modal-display" data-modal-id="execute-modal"
+                    th:text="#{general.cancel}">Abbrechen</button>
+            <button type="button" class="btn btn--danger" id="execute-submit"
+                    data-testid="execute-submit"
+                    th:text="#{admin.deletionRequests.execute.submit}">Endg&uuml;ltig l&ouml;schen</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
+    window.krtDeletionRequestsI18n = {
+        declined: /*[[#{admin.deletionRequests.toast.declined}]]*/ 'Request declined.',
+        executed: /*[[#{admin.deletionRequests.toast.executed}]]*/ 'Account deleted.',
+        error: /*[[#{admin.deletionRequests.toast.error}]]*/ 'The decision could not be applied.',
+        noteRequired: /*[[#{admin.deletionRequests.decline.noteRequired}]]*/ 'A reason is required.',
+        confirmMember: /*[[#{admin.deletionRequests.execute.member}]]*/ 'Member: {handle}'
+    };
+</script>
+<script th:src="@{/js/admin-deletion-requests.js}" th:attr="nonce=${cspNonce}"></script>
+</body>
+</html>

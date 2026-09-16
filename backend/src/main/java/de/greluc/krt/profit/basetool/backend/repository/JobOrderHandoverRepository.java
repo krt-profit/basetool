@@ -23,6 +23,9 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Spring Data repository for Job Order Handover. */
@@ -40,4 +43,30 @@ public interface JobOrderHandoverRepository extends JpaRepository<JobOrderHandov
    * @return {@code true} iff any {@link JobOrderHandover} references the order.
    */
   boolean existsByJobOrderId(UUID jobOrderId);
+
+  /**
+   * Replaces a handle typed into the {@code recipient_handle} free-text field with the erasure
+   * sentinel, matching <b>case-insensitively</b> (REQ-SEC-062).
+   *
+   * <p>Unlike every other handle snapshot this column has <b>no user id beside it</b>: a handover
+   * recipient is typed in by hand and may name somebody who has no account at all. So the match can
+   * only be on the text, and it has to ignore case, because whoever typed it was not copying from a
+   * roster. That also makes this the one anonymisation target that works for an <em>already
+   * deleted</em> account, and the reason the admin Personensuche (REQ-SEC-060) exists at all.
+   *
+   * <p><b>A handle is not a unique key.</b> Two people could in principle have used the same
+   * spelling, so this can over-match. That is the correct direction of error for an erasure request
+   * and is stated in {@code docs/privacy/data-subject-requests.md}: the admin reviews the
+   * Personensuche hits before granting.
+   *
+   * @param handle the recipient spelling to erase; compared case-insensitively
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE JobOrderHandover h SET h.recipientHandle = :sentinel"
+          + " WHERE lower(h.recipientHandle) = lower(:handle)"
+          + " AND h.recipientHandle <> :sentinel")
+  int anonymiseRecipientHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

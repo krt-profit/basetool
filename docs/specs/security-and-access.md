@@ -3465,7 +3465,7 @@ but should one arrive holding data anyway, that service reassigns the shared agg
 destroying them.
 
 **Ordering is load-bearing.** Per row the database half commits *first* and the Keycloak user is
-deleted *last*, the ordering REQ-SEC-026 / [ADR-0111](../adr/0111-account-consolidation-deletes-the-keycloak-user-last.md)
+deleted *last*, the ordering REQ-SEC-026 / [ADR-0111](../adr/0111-admin-mediated-discord-registration-linking.md)
 established for the same reason: a rolled-back database half leaves the Keycloak user intact, so the
 next run re-reads a whole registration. The reverse order would strand the exact thing this sweep
 exists to delete — an `app_user` row whose Keycloak account is already gone. Each row commits in its
@@ -3493,6 +3493,392 @@ one event type.
 · **Code:** `RejectedRegistrationRetentionService`, `RejectedRegistrationRetentionTask`,
 `UserRepository.findRejectedDecidedBefore`, `ScheduledJob`, `application.yml` · **Decision:**
 [ADR-0178](../adr/0178-a-refused-registration-is-purged-on-a-retention-window.md)
+
+### REQ-SEC-059 — A half-finished account deletion is observable
+
+Deleting a member is two acts, and the application MUST notice when only the first has happened.
+An admin removes the account in the Keycloak console; the nightly roster sync then flips
+`app_user.in_keycloak` to `false`; and only then does the member list render its delete action
+(`members.html` gates on `!user.inKeycloak`, and `UserDeletionService` refuses an account the flag
+still claims is present). The second act is therefore **not offered until the first is done, and not
+performed unless somebody comes back for it.**
+
+When nobody comes back, the row keeps the e-mail address, the display name / handle, the Discord
+snowflake, the guild nickname and the free-text profile description of a person who has already
+left, indefinitely — and until now nothing in the system said so. The data is not *exposed* by this
+(the account cannot sign in), it is simply *retained with no basis*, which is a retention defect
+rather than an access one, and the reason this is a hygiene signal rather than an incident.
+
+**Two gauges, sampled by `BusinessMetricsCollector` (REQ-OBS-011):**
+
+|                        Gauge                         |                Reads                 |
+|------------------------------------------------------|--------------------------------------|
+| `basetool_users_pending_deletion_count`              | `COUNT(*) WHERE in_keycloak = false` |
+| `basetool_users_pending_deletion_oldest_age_seconds` | `now() - MIN(keycloak_absent_since)` |
+
+**The age needs a column, and V241 adds it.** No existing timestamp carries "when did this account
+stop being present": `created_at` is when the account was created — for a member who joined in April
+and left in September it overstates the wait by five months — and `updated_at` is `@UpdateTimestamp`,
+which a **bulk JPQL update** does not even write (Hibernate skips the entity lifecycle), besides
+moving on every unrelated profile edit. So `app_user.keycloak_absent_since` is assigned explicitly by
+`UserRepository#markMissingUsers` and cleared by `UserReconciliationService` when the account
+reappears — an account that comes back is not waiting for deletion, and a stamp left behind would
+alert forever.
+
+**It is a first-observation stamp, not a last-seen one.** The update's existing `in_keycloak = true`
+predicate restricts it to rows that actually flip, so a row already flagged is never rewritten.
+Without that the value would be refreshed every nightly run and the age would report the sync's
+cadence — never older than a day — instead of how long the account has been waiting.
+
+**Rows flagged before V241 are backfilled with the migration's own timestamp.** Nothing recorded when
+they disappeared, which is the defect being fixed, so there is no value to recover; the deploy time
+is the only honest stand-in and is documented as a lower bound in the migration and in the alert's
+comment.
+
+**The alert is on age, not on count** (`UserDeletionUnfinished`, > 7 days, `for: 30m`). A count above
+zero held for seven days would also fire on a stream of accounts each cleared within a day, because
+the count never reaches zero in between. Seven days rather than 48 hours because the wait is
+legitimate while an admin is mid-task and the roster sync is nightly.
+
+**Acceptance**
+
+- [x] An account removed from Keycloak is counted by `basetool_users_pending_deletion_count` after
+  the next roster sync, and stops being counted when its local row is deleted.
+- [x] The absence stamp is written by the sweep that flips the flag, and a later sweep does not move
+  it forward.
+- [x] An account that reappears in Keycloak has both the flag and the stamp cleared, so it leaves
+  both gauges.
+- [x] The age gauge reports the oldest waiting account, not the newest.
+- [x] `UserDeletionUnfinished` fires past seven days and not on a count that merely stays non-zero.
+
+**Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
+`BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
+`repository/UserRepository#markMissingUsers` / `#countByInKeycloakFalse` /
+`#findOldestKeycloakAbsentSince`, `service/UserReconciliationService#syncUser`,
+`task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
+`db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
+`monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
+[ADR-0182](../adr/0182-an-unfinished-account-deletion-is-measured-from-a-recorded-absence.md) ·
+**Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)
+
+### REQ-SEC-058 — Art. 15 / Art. 20 data export
+
+Every member MUST be able to export their own data from the application, and an admin MUST be able
+to export another account's for a request from somebody who cannot sign in.
+
+**Two formats, not two alternatives.** JSON is the full disclosure and the Art. 20 portable copy.
+PDF is the readable answer: master data in full, plus an **inventory naming every section with its
+row count and legal basis**, so the document is complete about *what* is held even where it does not
+print it. A PDF of several thousand warehouse movements and audit rows serves the right of access
+worse than a short document that says exactly what exists and points at the machine-readable file
+(decision by @greluc, 2026-09-15).
+
+**Every section is marked with its legal basis**, so the portable subset is identifiable without
+re-deriving it:
+
+|   Marker    |                                          Meaning                                           |
+|-------------|--------------------------------------------------------------------------------------------|
+| `ART_15`    | the right of access                                                                        |
+| `ART_15_20` | access **and** portable under Art. 20 — data the member *provided*, on consent or contract |
+
+**Third-party data is excluded by the projections, not scrubbed afterwards.** Each section is a
+written statement that lists the columns it returns, and no statement selects another member's id or
+handle. A counterparty leak would therefore have to be written into a visible `SELECT` list. Three
+places where that is the whole point:
+
+- a **mission participation** returns the requester's own row and the mission it belongs to, and
+  nothing about who else was there;
+- a **booking** returns the member's side; `initiated_by` — the bank employee — is not selected;
+- an **audit row where the member is the target** does not select `actor_handle`, because the acting
+  person is somebody else. This is the section where the distinction matters most.
+
+**Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
+member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
+where no `SELECT` list can reach. `HandleScrubber` replaces the handles of other members,
+case-insensitively, longest match first (or "Val" would leave "kyrie" behind from "Valkyrie"), and
+skips handles under three characters because a two-character handle occurs inside ordinary words and
+replacing it would shred every note.
+
+> [!warning] The residue is real and is covered by a human, not by code
+> The scrubber cannot recognise somebody who has no account, a nickname or a misspelling — nothing
+> can, from text alone. That is why Art. 15(4) and
+> [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md) require an admin to
+> **read** the free text before releasing an export, and why the export reports whether it removed
+> anything: it tells the reviewer whether there is something to look for. The code makes that review
+> short; it does not replace it.
+
+**The subject's own handle is never scrubbed.** It is the one name the export is about, and removing
+it from the entries they wrote themselves would be absurd.
+
+**Out of scope, named in the document itself** so the export and the privacy record agree: platform
+logs, metrics and traces (not retrievable per person by design, and swept in 31 / 14 days); backups
+(not searched or altered — the data ceases to exist when the backup expires); and Keycloak's own
+account record (visible in the account console).
+
+**Bounded**: 5000 rows per section, and a truncated section is marked as truncated.
+
+**Both paths are audited** (`PERSONAL_DATA_EXPORTED`) with `bySelf` distinguishing them — a member
+reading their own record is unremarkable, an admin reading somebody else's is what an audit exists to
+make answerable. The payload carries the format and the row count, never the content. The **subject's
+id, not their handle**, appears in the log line and in the PDF filename: a filename reaches shells,
+logs and mail clients, and a name there is a leak nobody chose.
+
+**The admin export is not a fuller export.** Same projections, same anonymisation. A third party's
+data is no more disclosable to an admin serving somebody's Art. 15 request than to the member.
+
+**Acceptance**
+
+- [x] A member exports their own data as JSON and as PDF; no endpoint on the self-service path
+  accepts a user id.
+- [x] **No other member's handle appears anywhere in an export** — asserted across the whole
+  document, not per section.
+- [x] The member's own free text survives with the other name replaced, rather than being dropped.
+- [x] The subject's own handle is not scrubbed from their own entries.
+- [x] Every section runs against the real schema, and every section carries a legal-basis marker.
+- [x] The export reports whether third-party names were removed.
+- [x] The admin variant is ADMIN-only; a member, an officer and bank management are refused.
+- [x] Both paths write `PERSONAL_DATA_EXPORTED`, with `bySelf` telling them apart.
+
+**Enforced by:** `DataExportIntegrationTest`, `HandleScrubberTest`,
+`DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
+`support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
+`service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
+`controller/AdminDataExportController`, `templates/fragments/profile-deletion-card.html` (the
+member's buttons live beside the erasure request), `static/js/profile.js` · **Decision:**
+[ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
+**Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
+
+### REQ-SEC-060 — Admin Personensuche across every free-text surface
+
+An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
+free-text surface of the application.
+
+**Why.** A name can sit where no foreign key points: an external mission participant
+(`mission_participant.guest_name`), a party lead with no account, a job-order handover recipient, an
+org-chart placeholder, a booking reason, an admin's note on a refused registration. Before this, an
+Art. 16 rectification or Art. 17 erasure request from such a person **could not be served at all** —
+nothing could find the entries. And for a member it was no better than partial: a rectification that
+fixes one of four occurrences is not a rectification.
+[`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md) therefore tells the
+reader to run this for **every** Art. 16/17 request, members included.
+
+**ADMIN only**, and the reason is not only cost: a query returning every place a name appears is a
+profile of that person assembled across the whole system.
+
+**Case-insensitive, always.** Whoever typed the name was not copying it from a roster, so a
+case-sensitive match would miss the very entries the search exists to find. `ILIKE`, with the
+term's `%`, `_` and `\` escaped — an unescaped pasted `%` would match every row of every searched
+column, an accident indistinguishable from a deliberate dump.
+
+**A written registry, checked against the schema.** `PersonSearchTargets.TARGETS` names each
+searched `(area, table, column, idColumn, linkKind)`. It is a list rather than a reflection sweep
+because "every column of type text" would include ~200 columns of catalogue data synced from UEX and
+the SC wiki — planet names, manufacturer nicknames, brochure URLs — which cannot name a member in
+any sense that matters and would bury the real hits.
+
+> [!important] The registry is gate-enforced, and that is what makes the claim true
+> `PersonSearchCoverageTest` sweeps `information_schema` for every text column of every base table
+> and **fails the build** unless each one is either searched or recorded in `EXEMPT_COLUMNS` /
+> `EXEMPT_TABLES` with a reason. So a new free-text column cannot be added silently — its author
+> has to decide which it is. Without that gate, the instruction in the privacy record would go
+> quietly false the first time somebody added a notes field, and the person whose data it is would
+> have no way to know. The test also asserts that every registered column and id column still
+> exists, so a rename fails here rather than during a real request.
+
+**Bounded by construction**, because a multi-table `ILIKE` sweep with no ceiling is a
+denial-of-service waiting for a one-character term: at least 3 characters, 25 hits per column, 300
+in total, and **the response says when it was capped**. A capped list that looked complete would
+make an erasure look complete when it is not, so the page states it as a warning rather than a
+footnote.
+
+**One statement.** A `UNION ALL` over the registry with a per-branch `LIMIT`: one plan, one round
+trip, and no single column able to crowd out the rest. Table and column names cannot be bound as
+parameters, so they are interpolated — and validated against `^[a-z_][a-z0-9_]{0,62}$` first, even
+though they come from a compile-time constant, as defence against a future edit pasting something
+else into the registry.
+
+**The search is audit-logged, and the term is not.** A read in an otherwise mutation-only trail,
+recorded because its misuse would leave no other trace. The payload carries the **length** of the
+term, the hit count and whether the result was capped — never the term, which is somebody's name
+(REQ-AUDIT-001 keeps user free text out of the payload). A trail recording every name an admin
+searched for would be a second store of exactly the data the search exists to help remove. The term
+is likewise kept out of every log line.
+
+**Hits are listed, not edited.** Each carries its area, the `table.column` it came from, the matched
+text clipped to 200 characters, and a link where the row has a page of its own. Rectification
+happens on the record's own screen; an edit-in-place here would be a second write path to a dozen
+aggregates.
+
+**Acceptance**
+
+- [x] A name typed into any registered free-text column is found, whatever the case.
+- [x] A text column that is neither searched nor exempted fails the build.
+- [x] A registered column or id column that no longer exists fails the build.
+- [x] The assembled statement runs against the real schema (not only against mocks).
+- [x] A term under 3 characters is refused; `%` and `_` in a term match literally.
+- [x] A capped result is reported as capped.
+- [x] The search is ADMIN-only; a member, an officer and bank management are refused.
+- [x] The audit event records the term's length and never the term.
+
+**Enforced by:** `PersonSearchCoverageTest`, `AdminPersonSearchControllerSecurityTest` · **Code:**
+`support/PersonSearchTargets`, `service/PersonSearchService`,
+`controller/AdminPersonSearchController`, `model/dto/PersonSearchHitDto`,
+`frontend/controller/AdminPersonSearchPageController`, `templates/admin/person-search.html`,
+`static/js/admin-person-search.js` · **Decision:**
+[ADR-0184](../adr/0184-the-person-search-is-a-checked-registry-not-a-schema-sweep.md) ·
+**Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
+
+### REQ-SEC-061 — Self-service deletion is a request an admin decides
+
+A member MUST be able to ask, in the application, for their account to be erased (Art. 17 GDPR).
+The request lands in an admin queue; it is **never** carried out by the member's own click.
+
+**Why a request and not a self-delete.** The deletion removes the Keycloak account, purges the
+member's warehouse stock, hangar, personal inventory, blueprints, notifications and grades, and
+reassigns their missions and refinery orders to an admin (REQ-DATA-008). None of that is
+reversible. A control on one's own profile page that did all of it on one click would be the most
+destructive button in the application, placed where a mis-click is cheapest.
+
+**The lifecycle** — `deletion_request` (V242), modelled on the registration-approval queue rather
+than a second pattern:
+
+|    State    |        Reached by        |                                             Notes                                             |
+|-------------|--------------------------|-----------------------------------------------------------------------------------------------|
+| `PENDING`   | the member raises it     | at most one per member, a **partial unique index** on `(user_id)` where the status is pending |
+| `WITHDRAWN` | the member takes it back | kept, not deleted — "asked and changed their mind" is a different fact from "never asked"     |
+| `DECLINED`  | an admin refuses it      | `decision_note` is **mandatory**, DB-enforced                                                 |
+
+**There is deliberately no executed state.** Carrying the request out deletes the `app_user` row,
+and `deletion_request.user_id` is `ON DELETE CASCADE`, so the request goes with the account — which
+is the point of an erasure. The record of the deletion is the audit trail
+(`ACCOUNT_DELETION_REQUEST_EXECUTED` written before the delete, plus REQ-DATA-008's `USER_DELETED`),
+not a surviving row about a member who asked to be forgotten.
+
+**A refusal must carry a reason, in three places.** Art. 12(4) obliges the controller to tell the
+requester *why* a request is refused, together with their right to complain to a supervisory
+authority and their right to a judicial remedy. So the note is required by the client, by the
+service, and by a database `CHECK` — and the member is notified and reads it on their own profile
+page, which is why the member-facing `GET` returns their **latest** request rather than only a
+pending one.
+
+**Carrying it out does both halves.** The admin's click deletes the local row *and* the Keycloak
+account: database half first, Keycloak last, the ordering of REQ-SEC-026 /
+[ADR-0111](../adr/0111-admin-mediated-discord-registration-linking.md), with the live presence probe
+waived exactly as `AccountConsolidationService` waives it (the caller removes the Keycloak user
+itself). Leaving the second act to a human is the state REQ-SEC-059 exists to detect; this path does
+not create it. A failing Keycloak delete is logged and swallowed — the member's data is gone, which
+is what they asked for, and the leftover Keycloak account resurfaces as a fresh pending
+registration an admin can refuse.
+
+**The history checkbox is a wish, not an instruction** (REQ-SEC-062). The member may additionally
+ask for the handle snapshots that survive a deletion to be anonymised. Nothing acts on that
+automatically: the admin's own checkbox starts **unticked** even when the member asked, because
+granting it is a deliberate act and a pre-ticked box would make the wish the default.
+
+**Notifications** (V243): raising notifies every admin — Art. 12(3) allows one month to respond and
+a queue nobody is told about is how that month passes; refusing notifies the member. There is no
+rule for a carried-out request, because its recipient no longer exists.
+
+**Observability** — `basetool_deletion_request_pending_count` and
+`basetool_deletion_request_pending_oldest_age_seconds` (REQ-OBS-011), with
+`DeletionRequestOverdue` at **14 days**: the one queue alert in this system whose threshold comes
+from a statute rather than from operational taste.
+
+**Acceptance**
+
+- [x] A member raises a request from their profile; nothing is deleted, the request appears in the
+  admin queue, and every admin is notified.
+- [x] Raising twice yields one request, under a genuine race as well — the partial unique index
+  decides, not a pre-read.
+- [x] The member can withdraw a pending request; the row survives as `WITHDRAWN`.
+- [x] A refusal without a reason is rejected by the client, the service and the database; a refused
+  member is notified and can read the reason on their profile.
+- [x] Carrying a request out deletes the local row and the Keycloak account, in that order, and
+  anonymises the handle snapshots first **only** when the admin granted it.
+- [x] Every state change is audit-logged, and no audit payload carries the member's free text.
+- [x] The queue is ADMIN-only at the URL matcher and the method gate; a member, an officer and bank
+  management are all refused.
+
+**Enforced by:** `DeletionRequestServiceTest`, `DeletionRequestControllerSecurityTest`,
+`BusinessMetricsCollectorTest` · **Code:** `model/DeletionRequest`,
+`model/DeletionRequestStatus`, `repository/DeletionRequestRepository`,
+`service/DeletionRequestService`, `controller/DeletionRequestController`,
+`controller/AdminDeletionRequestController`, `event/AccountDeletionRequestedEvent`,
+`event/AccountDeletionRequestDeclinedEvent`, `db/migration/V242`, `db/migration/V243`,
+`frontend/controller/DeletionRequestProxyController`,
+`frontend/controller/AdminDeletionRequestsPageController`,
+`templates/fragments/profile-deletion-card.html`, `templates/admin/deletion-requests.html`,
+`static/js/profile.js`, `static/js/admin-deletion-requests.js` · **Decision:**
+[ADR-0181](../adr/0181-self-service-deletion-is-a-request-an-admin-executes.md) ·
+**Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
+
+### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
+
+When an admin grants the member's wish, the member's handle MUST be replaced by a sentinel in
+**every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
+about what happened is altered — only the name goes.
+
+**The six places**, and the reason it is all six: erasing five reads as a completed erasure while
+still naming the person on the sixth.
+
+|                                   Where                                   |                         Matched by                          |
+|---------------------------------------------------------------------------|-------------------------------------------------------------|
+| `audit_event.actor_handle`                                                | `actor_user_id`                                             |
+| `bank_audit_event.actor_handle`                                           | `actor_user_id`                                             |
+| `bank_transaction.counterparty_handle`                                    | `counterparty_user_id`                                      |
+| `bank_booking_request` — requester, decider, counterparty, owner approver | the four id columns, in one statement                       |
+| `job_order_handover.recipient_handle`                                     | **the text, case-insensitively** — there is no id beside it |
+| `job_order_item_handover.recipient_handle`                                | likewise                                                    |
+
+**The two handover columns have no user id at all**: a recipient is typed in by hand and may name
+somebody with no account. So the match is on the text and must ignore case, because whoever typed it
+was not copying from a roster. That also makes these two the only targets reachable for an
+*already deleted* account — and it can over-match, since a handle is not a unique key, which is why
+the admin reviews the Personensuche hits (REQ-SEC-060) before granting.
+
+**A sentinel, not `NULL`.** Four of the six columns are `NOT NULL`, and that constraint is the
+guarantee that a row always says who acted (REQ-AUDIT-001). Relaxing it to make room for an erasure
+would weaken the invariant for every row ever written afterwards. The stored value is
+`#ANONYMISED#` — deliberately not a word in any language, because it is rendered in two and the
+i18n rule admits no hardcoded user-visible text; every human-facing surface maps it to
+`general.anonymisedHandle`, while machine-readable exports keep the raw token so two exports of the
+same rows stay comparable.
+
+**It leaves a receipt.** A `HANDLE_SNAPSHOTS_ANONYMISED` marker is written to **both** trails, after
+the updates so it is not scrubbed by them, carrying the per-table row counts and **never** the
+handle that was removed — writing the value back would undo the erasure in the very row that records
+it.
+
+**One transaction.** A partial anonymisation is the one outcome that must not be possible.
+
+> [!note] Why this is not a contradiction of REQ-AUDIT-006
+> The retention sweep deliberately **deletes** rather than anonymises, and
+> [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md) rejected
+> anonymisation for it. That was a decision about *every row on a schedule*: a blanket scrub turns
+> each old row into the "action by nobody" the snapshot exists to prevent. This is a *targeted act
+> on request*, where removing the name is exactly what was asked for and the alternative is
+> deleting rows a counterparty still needs.
+
+**Acceptance**
+
+- [x] All six places are reached in one act, and the totals are reported.
+- [x] The marker events are written after the updates, and their payload does not contain the
+  erased handle.
+- [x] The two text-matched columns are skipped, not matched against an empty string, when no handle
+  is known.
+- [x] The match on the handover columns is case-insensitive.
+- [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
+
+**Enforced by:** `HandleAnonymisationServiceTest` · **Code:**
+`service/HandleAnonymisationService`, `support/HandleAnonymisation`,
+`repository/AuditEventRepository#anonymiseActorHandle`,
+`repository/BankAuditEventRepository#anonymiseActorHandle`,
+`repository/BankTransactionRepository#anonymiseCounterpartyHandle`,
+`repository/BankBookingRequestRepository#anonymiseHandles`,
+`repository/JobOrderHandoverRepository#anonymiseRecipientHandle`,
+`repository/JobOrderItemHandoverRepository#anonymiseRecipientHandle`,
+`frontend/support/HandleDisplay` · **Decision:**
+[ADR-0183](../adr/0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)
 
 ## Out of scope
 

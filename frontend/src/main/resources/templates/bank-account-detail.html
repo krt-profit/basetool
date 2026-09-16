@@ -249,7 +249,7 @@
                             <span th:if="${b.type() == 'TRANSFER' and b.counterAccountNo() != null}"
                                   th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterAccountNo()}">&#8594; KB-0002</span>
                             <span th:if="${b.counterpartyHandle() != null}"
-                                  th:text="${b.counterpartyHandle()} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
+                                  th:text="${@handles.display(b.counterpartyHandle())} + (${b.counterpartyOrgUnitName() != null} ? ' (' + ${b.counterpartyOrgUnitName()} + ')' : '')">carol (Staffel Rot)</span>
                         </td>
                         <td class="text-right">
                             <span class="bank-amount"

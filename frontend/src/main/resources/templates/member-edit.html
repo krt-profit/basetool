@@ -193,6 +193,28 @@
         </form>
     </div>
 
+    <!-- Art. 15 data export for this member (REQ-SEC-058, ADR-0185). For a request from somebody
+         who cannot sign in: a locked-out member, or an account already disabled in Keycloak. Same
+         projections and same third-party anonymisation as the member's own export - an admin
+         export is not a fuller one. Plain GET links, straight at the ADMIN-gated backend endpoint:
+         a download is a navigation, and there is nothing for a proxy to add. -->
+    <div class="hud-box mt-2" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
+        <h2 th:text="#{members.export.title}">Datenauskunft</h2>
+        <p class="form-hint" th:text="#{members.export.hint}">F&uuml;r eine Auskunftsanfrage eines Mitglieds, das sich nicht anmelden kann. Namen anderer Mitglieder sind entfernt.</p>
+        <div class="acct-actions">
+            <a th:href="@{/admin/members/{id}/export/pdf(id=${user.id})}" class="btn btn-outline"
+               data-testid="member-export-pdf">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                <span th:text="#{members.export.pdf}">Als PDF</span>
+            </a>
+            <a th:href="@{/admin/members/{id}/export/json(id=${user.id})}" class="btn btn-ghost"
+               data-testid="member-export-json">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                <span th:text="#{members.export.json}">Als JSON</span>
+            </a>
+        </div>
+    </div>
+
     <!-- SPEZIALKOMMANDO_PLAN.md §7.4 — read-only Memberships-Übersicht. Each row links through to
          the corresponding management surface: Staffel rows to /admin/mission-data (squadron CRUD)
          or /members/{id}/edit (this page) for flag-toggles; SK rows to /admin/special-commands/{id}

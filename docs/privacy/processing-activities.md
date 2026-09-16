@@ -55,6 +55,14 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Retention:** for the duration of the account; on deletion the account-owned rows are purged and
   the shared aggregates are reassigned (REQ-DATA-008).
 
+> [!note] Added 2026-09-15 — two free-text handles nothing had named
+> `job_order_handover.recipient_handle` and `job_order_item_handover.recipient_handle` record who
+> collected material on a job order. They are **typed in by hand**, so they can name somebody with
+> no account at all, and they **survive the deletion of the account** they describe — which this
+> record did not say and the privacy policy did not disclose. Both are now named in
+> `privacy.p_2_2`, reachable by the admin name search (REQ-SEC-060) and covered by a granted Art. 17
+> erasure (REQ-SEC-062).
+
 ### A3 — Banking and settlement
 
 - **Purpose:** keep the organisation's in-game ledger auditable.
@@ -103,10 +111,39 @@ requires it and duplicating it into further files spreads personal data for no g
   (`ObservationPrivacyFilter`).
 - **Legal basis:** Art. 6(1)(f).
 - **Keycloak's own event store** (login and admin events) is a separate record from the log stream
-  above. The hardening runbook documents it as disabled with the enablement step carrying a 30-day
-  expiry; **whether it is enabled in production is to be verified on the host** and this entry
-  corrected accordingly (see the handover). If it is enabled, its expiry belongs in the table below.
+  above, and it is **enabled in production** — verified against the realm on 2026-09-16:
+  `events_enabled` and `admin_events_enabled` both true, both expiring after **30 days**
+  (`events_expiration` / the `adminEventsExpiration` realm attribute = 2592000 s), and
+  `admin_events_details_enabled` **false**, so an admin event records *that* a change was made and
+  not the changed representation. It is disclosed in the privacy policy's security-monitoring
+  section and its expiry is in the table below.
+
+  > An earlier revision of this entry said the store was disabled and that this had to be verified
+  > on the host. The hardening step had in fact been carried out; this line is the correction.
+
 - **Retention:** see [Retention](#retention).
+
+### A9 — Handling data-subject requests
+
+- **Purpose:** serve the rights under Art. 15–21 and be able to show that they were served
+  (REQ-SEC-058, REQ-SEC-060, REQ-SEC-061).
+- **Data:** the erasure request itself (who raised it, when, whether they also asked for the handle
+  snapshots to be anonymised, the deciding admin, the decision and its recorded reason); an audit
+  event per export, per person search and per state change of a request.
+- **Legal basis:** Art. 6(1)(c) — a legal obligation of the controller. Serving these rights is not
+  optional, and neither is being able to demonstrate it (Art. 5(2)).
+- **Where:** `deletion_request`; `audit_event` rows of the `PERSONAL_DATA_EXPORTED`,
+  `PERSON_SEARCH_PERFORMED`, `ACCOUNT_DELETION_*` and `HANDLE_SNAPSHOTS_ANONYMISED` types.
+- **Retention:** the request row goes with the account when the request is carried out
+  (`ON DELETE CASCADE`) — keeping a record that somebody asked to be forgotten would defeat the
+  erasure. The audit events fall under the 24-month ceiling like every other row.
+- **Data minimisation worth recording here:** a person search records the **length** of the search
+  term, never the term. A trail of every name an admin ever searched for would be a second store of
+  exactly the data these rights exist to remove.
+- **Kept outside this system:** the request file itself — when it arrived, from whom, what was
+  asked, what was answered — per the procedure in
+  [`data-subject-requests.md`](data-subject-requests.md). It is personal data and does not belong in
+  a git repository.
 
 ### A8 — Backups
 
@@ -129,19 +166,22 @@ requires it and duplicating it into further files spreads personal data for no g
 
 The single table every other statement about retention must agree with.
 
-|                      What                       |                                     Window                                     |                      Enforced by                       |                      Configuration                      |
-|-------------------------------------------------|--------------------------------------------------------------------------------|--------------------------------------------------------|---------------------------------------------------------|
-| Account and its owned data                      | Life of the account                                                            | Deletion purges, reassigns or unlinks per REQ-DATA-008 | —                                                       |
-| Refused registration                            | **90 days** after the refusal                                                  | `RejectedRegistrationRetentionTask` (REQ-SEC-057)      | `app.registrations.rejected-retention.max-age`          |
-| Read notifications                              | **90 days** after being read                                                   | `NotificationRetentionTask` (REQ-NOTIF-009)            | `app.notifications.retention.max-age`                   |
-| Unread notifications                            | **180 days** after being raised                                                | `NotificationRetentionTask` (REQ-NOTIF-009)            | `app.notifications.retention.unread-max-age`            |
-| Activity + bank audit trail                     | **See REQ-AUDIT-004 / the audit retention sweep**                              | scheduled sweep + the admin purge                      | `app.audit.retention.max-age`                           |
-| Application + platform logs                     | **31 days**                                                                    | Loki compactor retention                               | `retention_period` in `monitoring/loki/loki-config.yml` |
-| Traces                                          | **14 days**                                                                    | Tempo retention                                        | `monitoring/`                                           |
-| Metrics (no personal data)                      | 180 days                                                                       | Prometheus TSDB retention                              | `--storage.tsdb.retention.time`                         |
-| Sessions                                        | 30 days idle for an authenticated session                                      | Spring Session / Redis (REQ-SEC-025)                   | `app.session.authenticated-timeout`                     |
-| Backups                                         | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                          | `scripts/backup.sh`                                     |
-| Bank booking history and audit handle snapshots | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request | —                                                      | —                                                       |
+|                  What                   |                                     Window                                     |                                Enforced by                                 |                      Configuration                      |
+|-----------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------|---------------------------------------------------------|
+| Account and its owned data              | Life of the account                                                            | Deletion purges, reassigns or unlinks per REQ-DATA-008                     | —                                                       |
+| Refused registration                    | **90 days** after the refusal                                                  | `RejectedRegistrationRetentionTask` (REQ-SEC-057)                          | `app.registrations.rejected-retention.max-age`          |
+| Read notifications                      | **90 days** after being read                                                   | `NotificationRetentionTask` (REQ-NOTIF-009)                                | `app.notifications.retention.max-age`                   |
+| Unread notifications                    | **180 days** after being raised                                                | `NotificationRetentionTask` (REQ-NOTIF-009)                                | `app.notifications.retention.unread-max-age`            |
+| Activity + bank audit trail             | **24 months** after the recorded activity                                      | `AuditRetentionTask` (REQ-AUDIT-006), plus the admin purge (REQ-AUDIT-004) | `app.audit.retention.max-age`                           |
+| Application + platform logs             | **31 days**                                                                    | Loki compactor retention                                                   | `retention_period` in `monitoring/loki/loki-config.yml` |
+| Traces                                  | **14 days**                                                                    | Tempo retention                                                            | `monitoring/`                                           |
+| Keycloak realm events (login + admin)   | **30 days**                                                                    | Keycloak realm event expiration                                            | `events/config` + the `adminEventsExpiration` attribute |
+| Metrics (no personal data)              | 180 days                                                                       | Prometheus TSDB retention                                                  | `--storage.tsdb.retention.time`                         |
+| Sessions                                | 30 days idle for an authenticated session                                      | Spring Session / Redis (REQ-SEC-025)                                       | `app.session.authenticated-timeout`                     |
+| Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `scripts/backup.sh`                                     |
+| Bank booking history (handle snapshots) | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request | —                                                                          | —                                                       |
+| Audit trail handle snapshots            | Outlive the account, but only to the 24-month ceiling above                    | `AuditRetentionTask` (REQ-AUDIT-006)                                       | `app.audit.retention.max-age`                           |
+| Erasure requests (`deletion_request`)   | Life of the account; removed with it when carried out                          | `ON DELETE CASCADE` (REQ-SEC-061)                                          | —                                                       |
 
 **Every number in this table is also a sentence in the privacy policy.** Changing one without the
 other publishes a false statement — see the note in [`README.md`](README.md).

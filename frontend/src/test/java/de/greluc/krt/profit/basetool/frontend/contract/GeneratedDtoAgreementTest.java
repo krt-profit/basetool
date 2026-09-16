@@ -80,6 +80,12 @@ class GeneratedDtoAgreementTest {
    */
   private static final Map<String, String> ALIASES =
       Map.ofEntries(
+          // The admin queue mirror of the backend's DeletionRequestDto (REQ-SEC-061): same
+          // fields, a name that says which surface reads it.
+          Map.entry("AdminDeletionRequestDto", "DeletionRequestDto"),
+          // The person-search response is a nested record on the service, so springdoc names
+          // it without the Dto suffix (REQ-SEC-060).
+          Map.entry("PersonSearchResultDto", "PersonSearchResult"),
           Map.entry("DefaultBlueprintDto", "DefaultBlueprintResponse"),
           Map.entry("MaterialCreateAjaxRequest", "MaterialCreateDto"),
           Map.entry("MemberEvaluationDto", "MemberEvaluationResponse"),
@@ -216,7 +222,10 @@ class GeneratedDtoAgreementTest {
         .as(
             "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"
                 + " each one is established by an identical property set rather than by the name")
-        .hasSize(16);
+        // 16 -> 18 on 2026-09-16: the two data-protection mirrors (REQ-SEC-058/061). Both are
+        // established the way this assertion asks for -- an identical property set, differing only
+        // in the name springdoc gave the schema.
+        .hasSize(18);
     assertThat(KNOWN_DRIFT)
         .as(
             "pre-existing drifts, frozen with their reasons. This number goes DOWN when one is"

@@ -294,8 +294,15 @@ native dialogs). The backend does **not** force a prior export — the warning i
 The purge **is itself audit-logged**: it writes one `*_AUDIT_PURGED` event (the bank's
 `AUDIT_LOG_PURGED`) carrying the deleted count and the cutoff in its details. That marker's timestamp
 is newer than the cutoff, so it survives its own purge — a deletion always leaves a trace. The
-endpoints return the deleted count, which the page reports back to the admin. There is **no automatic
-retention sweep**; purging is always an explicit admin action.
+endpoints return the deleted count, which the page reports back to the admin.
+
+This purge is the **deliberate, admin-chosen** cutoff and stays exactly as described. It is not the
+only deletion path any more: since 2026-09-15 an automatic sweep enforces an outer *ceiling* on both
+trails ([REQ-AUDIT-006](#req-audit-006--automatic-retention-ceiling-on-both-audit-trails)). The two
+are complementary — an admin purges to a cutoff of their choosing, the sweep only stops
+"indefinitely" from being the default — and they share one code path, so they can never diverge in
+what they remove. Earlier revisions of this requirement stated that there was "no automatic retention
+sweep"; that was true when written and is no longer.
 
 **Acceptance**
 
@@ -303,6 +310,8 @@ retention sweep**; purging is always an explicit admin action.
   logs are untouched, and exactly one `*_AUDIT_PURGED` marker (with count + cutoff) is written.
 - [ ] The delete modal shows the backup-recommended warning; non-admins get 403 on every purge
   endpoint.
+- [ ] The purge modal tells the admin that an automatic ceiling also applies, and names it, so rows
+  vanishing without a manual purge do not read as data loss.
 
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
 **Code:** `service/AuditService#purgeBefore`, `service/BankAuditService#purgeBefore`,
@@ -396,3 +405,68 @@ than a feature, so the viewer offers the identical list everywhere.
 [ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
 [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md) ·
 **Source:** private security advisory GHSA-2vq5-8p8w-5r64
+
+### REQ-AUDIT-006 — Automatic retention ceiling on both audit trails
+
+Both audit trails are swept on a schedule: rows whose `occurredAt` is older than a configured
+maximum age are deleted, across **every** activity domain and the bank trail, without an admin
+acting. The default window is **730 days** (two years), configurable per deployment.
+
+**Why an audit log needs a ceiling at all.** Every row carries a denormalised snapshot of the
+actor's handle and, where one exists, the target member's — deliberately, because the FK is
+`ON DELETE SET NULL` and a trail that forgets who acted records "an action by nobody"
+(REQ-AUDIT-001). That same design makes an unbounded trail a permanent record of a named person
+which outlives their account: deleting a member leaves their handle in the log forever. Nothing
+obliges the organisation to keep it, so "forever" was not a retention decision — it was the absence
+of one, and REQ-AUDIT-004's manual purge is not a retention period because nobody is required to
+run it.
+
+**The number is a judgement, not a derivation.** No statute sets it. Two years is chosen to outlast
+the organisation's own operating cycles, so an old dispute stays reconstructible, and to stop there.
+
+**It reuses the manual purge.** The sweep calls `AuditService#purgeBefore` and
+`BankAuditService#purgeBefore` rather than issuing its own deletes, so the two paths cannot diverge
+in what they remove, and an automatic purge leaves the same `*_AUDIT_PURGED` marker a deliberate one
+does — an automatic deletion is exactly as visible in the trail as an admin's.
+
+**Each domain is asked first whether it holds anything that old, and skipped when it does not.**
+That guard is not an optimisation and must not be removed. `purgeBefore` writes its marker event
+*unconditionally*, which is right for an admin who purged deliberately and found nothing, and wrong
+for a job that runs daily: without the guard the sweep would mint ten marker rows a day forever,
+growing the very table it exists to bound.
+
+**One domain cannot cost the run.** Each domain is purged in its own transaction (`purgeBefore`
+opens one per call) with its own `try`/`catch`, so a domain that deadlocks is logged and left for
+the next sweep while the others commit.
+
+**Configuration** — `app.audit.retention.*`: `enabled` (default `true`, forced `false` under the
+`test` profile so the sweep never races assertions), `max-age` (default `P730D`), `interval`
+(default `PT24H`). Expressed in days because `Duration` has no month unit; the precision is
+irrelevant at a retention boundary.
+
+**Observability** — the sweep publishes the `audit_retention` scheduled-job metrics through
+`TaskMetrics` and is covered by the `ScheduledJobStale` alert (REQ-OBS-008). Failures are recorded
+and swallowed there, so the scheduler thread survives a bad run.
+
+> [!warning] First run after deploy
+> Enabling this on an existing deployment deletes every audit row older than two years on the first
+> sweep, irreversibly. Set `IRI_AUDIT_RETENTION_ENABLED=false` before deploying if any of it must be
+> kept, and export it (REQ-AUDIT-003) first.
+
+**Acceptance**
+
+- [x] Every `AuditDomain` value and the bank trail are swept in one run.
+- [x] A domain holding no row older than the cutoff is skipped, and mints no `*_AUDIT_PURGED`
+  marker.
+- [x] A domain whose purge throws is logged and the remaining domains — and the bank trail — are
+  still purged.
+- [x] The cutoff is `now - max-age`; the job reports the deleted count as its `items` metric.
+- [x] The sweep is disabled under the `test` profile.
+
+**Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest` · **Code:**
+`service/AuditRetentionService`, `task/AuditRetentionTask`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
+`repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
+**Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
+amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
+**Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)

@@ -414,6 +414,23 @@ public final class KrtPdfSupport {
   }
 
   /**
+   * Adds a small italic explanatory note paragraph.
+   *
+   * <p>For a sentence the document has to say about itself rather than about its data — why a
+   * summary is a summary, or that third-party names were removed. Rendered small and italic so it
+   * reads as an annotation and not as content.
+   *
+   * @param krt the open document handle
+   * @param text the localized note
+   */
+  public static void addNote(@NotNull KrtDocument krt, @NotNull String text) {
+    Paragraph note = new Paragraph(text, italic(8, COLOR_LIGHT_GRAY));
+    note.setSpacingBefore(4f);
+    note.setSpacingAfter(4f);
+    krt.document().add(note);
+  }
+
+  /**
    * Adds the centered footer line {@code "Generiert von Profit Basetool am <date> <time> UTC"},
    * preceded by a spacer. The generation timestamp is always rendered in UTC — independent of any
    * per-request user zone used for the document's other timestamps — so the footer is an

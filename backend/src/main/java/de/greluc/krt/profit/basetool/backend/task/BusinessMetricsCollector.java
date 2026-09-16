@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestStatus;
+import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeOfferStatus;
 import de.greluc.krt.profit.basetool.backend.model.MaterialExchangeRequestStatus;
@@ -31,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.repository.BankBookingRequestRepository;
+import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeRequestRepository;
@@ -83,6 +85,7 @@ public class BusinessMetricsCollector {
 
   private final MeterRegistry meterRegistry;
   private final UserRepository userRepository;
+  private final DeletionRequestRepository deletionRequestRepository;
   private final BankBookingRequestRepository bankBookingRequestRepository;
   private final JobOrderRepository jobOrderRepository;
   private final OperationRepository operationRepository;
@@ -94,6 +97,10 @@ public class BusinessMetricsCollector {
 
   private final AtomicLong registrationPending = new AtomicLong();
   private final AtomicLong registrationOldestAge = new AtomicLong();
+  private final AtomicLong deletionRequestPending = new AtomicLong();
+  private final AtomicLong deletionRequestOldestAge = new AtomicLong();
+  private final AtomicLong usersPendingDeletion = new AtomicLong();
+  private final AtomicLong usersPendingDeletionOldestAge = new AtomicLong();
   private final AtomicLong bankRequestPending = new AtomicLong();
   private final AtomicLong bankRequestOldestAge = new AtomicLong();
   private final AtomicLong jobOrderOpen = new AtomicLong();
@@ -119,6 +126,12 @@ public class BusinessMetricsCollector {
   void registerGauges() {
     countGauge(MetricNames.REGISTRATION_PENDING, registrationPending);
     ageGauge(MetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
+
+    countGauge(MetricNames.DELETION_REQUEST_PENDING, deletionRequestPending);
+    ageGauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE, deletionRequestOldestAge);
+
+    countGauge(MetricNames.USERS_PENDING_DELETION, usersPendingDeletion);
+    ageGauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE, usersPendingDeletionOldestAge);
 
     countGauge(MetricNames.BANK_BOOKING_REQUEST_PENDING, bankRequestPending);
     ageGauge(MetricNames.BANK_BOOKING_REQUEST_PENDING_OLDEST_AGE, bankRequestOldestAge);
@@ -182,6 +195,21 @@ public class BusinessMetricsCollector {
     registrationPending.set(userRepository.countByApprovalStatus(ApprovalStatus.PENDING));
     registrationOldestAge.set(
         ageSeconds(userRepository.findOldestCreatedAtByApprovalStatus(ApprovalStatus.PENDING)));
+
+    // Members' Art. 17 erasure requests awaiting a decision (REQ-SEC-061). Art. 12(3) sets a
+    // one-month response deadline, so this queue's age gauge measures against a statute rather
+    // than against an operational preference.
+    deletionRequestPending.set(
+        deletionRequestRepository.countByStatus(DeletionRequestStatus.PENDING));
+    deletionRequestOldestAge.set(
+        ageSeconds(
+            deletionRequestRepository.findOldestCreatedAtByStatus(DeletionRequestStatus.PENDING)));
+
+    // Accounts already gone from Keycloak but still present locally: a deletion whose second
+    // half was forgotten (REQ-SEC-059). Unlike the queues above nothing enqueues these, so a
+    // non-zero value is always somebody's unfinished work rather than normal throughput.
+    usersPendingDeletion.set(userRepository.countByInKeycloakFalse());
+    usersPendingDeletionOldestAge.set(ageSeconds(userRepository.findOldestKeycloakAbsentSince()));
 
     bankRequestPending.set(
         bankBookingRequestRepository.countByStatus(BankBookingRequestStatus.PENDING));

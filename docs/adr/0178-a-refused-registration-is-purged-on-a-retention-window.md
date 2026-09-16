@@ -7,7 +7,7 @@
   (`REQ-SEC-017` the approval lifecycle, `REQ-SEC-026` the link flow, `REQ-SEC-034` the reopen) ·
   [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-008`, the deletion cascade) ·
   [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`) ·
-  [ADR-0111](0111-account-consolidation-deletes-the-keycloak-user-last.md) (the commit ordering this
+  [ADR-0111](0111-admin-mediated-discord-registration-linking.md) (the commit ordering this
   reuses) · [ADR-0038](0038-admin-retention-purge-of-audit-logs.md) (the manual purge this is
   deliberately *not* modelled on)
 

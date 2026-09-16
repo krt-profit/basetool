@@ -372,6 +372,42 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 
 ² The „Org-Einheitsübersicht" (formerly „Staffelübersicht") spans **all** visible org units: without an actively pinned unit a Member sees the ships of all their own Staffeln and SKs, a Bereichsleitung additionally those of the subordinate units of their Bereich (REQ-ORG-015), and an OL member **every** ship in the system — including the ownerless ships of members entirely without an org unit (`owningOrgUnit == null`); this OL extension is read-only and limited to this one overview (ADR-0048). With a pinned unit the overview shows only that unit for every caller. The per-ship breakdown (owner/location/fitted) stays ADMIN/OFFICER-only — Member/BL/OL see only the counters.
 
+### 3.2a Data protection: export, erasure, name search (REQ-SEC-058/060/061/062)
+
+| Function (gate)                                                                                     | Member | Log. | MM | Officer | Admin |
+|:----------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
+| Export **own** data, JSON + PDF (`/api/v1/users/me/export`, `isAuthenticated()`)                    |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Export **another member's** data (`/api/v1/admin/users/{id}/export`, `hasRole('ADMIN')`)            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Raise / withdraw **own** erasure request (`/api/v1/users/me/deletion-request`, `isAuthenticated()`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read the erasure-request queue (`/api/v1/admin/deletion-requests`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Refuse an erasure request, with a mandatory reason (`…/decline`, `hasRole('ADMIN')`)                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Carry out an erasure request — deletes the account **and** the Keycloak login (`…/execute`)         |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Grant the Art. 17 wish: anonymise the surviving handle snapshots (`grantHistoryErasure`)            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+| Personensuche across every free-text surface (`/api/v1/admin/person-search`, `hasRole('ADMIN')`)    |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
+
+**Why the self-service rows are open to every member and still safe:** those endpoints take **no
+user id**. The subject is derived from the token, so there is no parameter with which one member
+could export, raise or withdraw for another — the gate has nothing to get wrong.
+
+**Why the admin rows are ADMIN and not OFFICER**, including the read-only ones:
+
+- The **queue** names every member who has asked to be erased, which is itself information about
+  them.
+- The **Personensuche** returns every place a given name appears, which is a profile of that person
+  assembled across the whole system — exactly what an Art. 16/17 request needs, and exactly why
+  nobody else may run it.
+- **Execute** deletes an account and its Keycloak login in one act and cannot be undone.
+
+**An admin export is not a fuller export.** It uses the same projections and the same third-party
+anonymisation as the member's own: a third party's data is no more disclosable to an admin serving
+somebody's Art. 15 request than to the member themselves.
+
+> [!note] The one write path onto the audit trails
+> Granting the history wish rewrites `actor_handle` / `recipient_handle` / the bank handle columns in
+> place — the only mutation of those tables besides REQ-AUDIT-004's purge and REQ-AUDIT-006's sweep.
+> It is ADMIN-only, deliberate per request, and leaves a `HANDLE_SNAPSHOTS_ANONYMISED` marker in both
+> trails.
+
 ### 3.3 Inventory (Lager) & Job Orders
 
 | Function (gate)                                                                                                                                                                                                                                                                                                                                                          | Member | Log. | MM  | Officer | Admin |

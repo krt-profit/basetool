@@ -205,5 +205,19 @@ public enum BankAuditEventType {
   CARTEL_APPROVAL_TIERS_SET,
 
   /** The KRT-account 3-stage approval thresholds were cleared (REQ-BANK-047). */
-  CARTEL_APPROVAL_TIERS_CLEARED
+  CARTEL_APPROVAL_TIERS_CLEARED,
+
+  /**
+   * An admin granted a member's Art. 17 wish and anonymised that member's surviving handle
+   * snapshots in the bank's records (REQ-SEC-062): {@code bank_audit_event.actor_handle}, {@code
+   * bank_transaction.counterparty_handle} and the four handle columns on {@code
+   * bank_booking_request}.
+   *
+   * <p>The one event type in this enum that records a <b>mutation of the trail itself</b>. It is
+   * written after the update and is therefore not anonymised by it, so the anonymisation always
+   * leaves a receipt — the same property that makes {@link #AUDIT_LOG_PURGED} safe. Its details
+   * payload carries the per-column row counts and never the handle that was removed: writing the
+   * value back would undo the erasure in the very row that records it.
+   */
+  HANDLE_SNAPSHOTS_ANONYMISED
 }

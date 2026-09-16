@@ -351,6 +351,10 @@ public class UserReconciliationService {
 
     if (!user.isInKeycloak()) {
       user.setInKeycloak(true);
+      // Clear the absence stamp with the flag it belongs to (REQ-SEC-059). An account that comes
+      // back is no longer waiting for deletion, and leaving the instant behind would keep it in the
+      // orphan-age gauge forever — a permanently firing alert for an account that is present.
+      user.setKeycloakAbsentSince(null);
       changed = true;
     }
 
@@ -517,7 +521,11 @@ public class UserReconciliationService {
     if (currentIds.isEmpty()) {
       return 0;
     }
-    return userRepository.markMissingUsers(currentIds);
+    // The instant is recorded so the orphan-age guard of REQ-SEC-059 can say how long an account
+    // has been waiting for the second half of its deletion. The update's `inKeycloak = true`
+    // predicate keeps this a FIRST-observation stamp: a row already flagged is not rewritten, so
+    // the value does not creep forward with every nightly run.
+    return userRepository.markMissingUsers(currentIds, Instant.now());
   }
 
   /**

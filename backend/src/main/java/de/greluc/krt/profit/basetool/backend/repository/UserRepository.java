@@ -458,13 +458,54 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * usable anomaly signal (an upstream mass-deletion or a truncated roster) and a constant. Rows
    * already flagged are unaffected either way, so the write is semantically unchanged.
    *
+   * <p>The same predicate is what makes {@code keycloakAbsentSince} a first-observation stamp
+   * rather than a last-seen one: only the rows that flip are written, so a row already flagged
+   * keeps the instant its absence was <em>first</em> noticed instead of being pushed forward on
+   * every nightly run. Without that, the orphan-age gauge of REQ-SEC-059 would read the sync's
+   * cadence (never older than a day) rather than how long the account has actually been waiting for
+   * its second deletion step.
+   *
    * @param ids the ids present in the current Keycloak roster; never {@code null}, never empty (the
    *     caller short-circuits on an empty set so an outage cannot flag the whole user base)
+   * @param absentSince the instant to record as when the absence was first observed
    * @return the number of users flagged as missing by this call (rows whose flag flipped)
    */
   @org.springframework.data.jpa.repository.Modifying
-  @Query("UPDATE User u SET u.inKeycloak = false WHERE u.inKeycloak = true AND u.id NOT IN :ids")
-  int markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
+  @Query(
+      "UPDATE User u SET u.inKeycloak = false, u.keycloakAbsentSince = :absentSince"
+          + " WHERE u.inKeycloak = true AND u.id NOT IN :ids")
+  int markMissingUsers(
+      @Param("ids") @NotNull java.util.Collection<java.util.UUID> ids,
+      @Param("absentSince") @NotNull Instant absentSince);
+
+  /**
+   * Counts the accounts that are waiting for the second half of their deletion: present locally but
+   * already gone from Keycloak (REQ-SEC-059). Backs the {@code
+   * basetool_users_pending_deletion_count} gauge.
+   *
+   * <p>In normal service this is {@code 0} or briefly {@code 1}. A value that stays above zero
+   * means an admin removed a Keycloak account and never came back to delete the local row, which
+   * leaves the e-mail address, handle, Discord snowflake and description in place indefinitely.
+   *
+   * @return the number of local users the last roster sync could not find in Keycloak
+   */
+  long countByInKeycloakFalse();
+
+  /**
+   * Finds when the longest-waiting orphaned account was first observed missing, for the {@code
+   * basetool_users_pending_deletion_oldest_age_seconds} gauge (REQ-SEC-059).
+   *
+   * <p>Reads only rows that carry the stamp. A row flagged before V241 shipped was backfilled with
+   * the migration's own timestamp, so its age is a lower bound rather than a measurement — the
+   * migration says so in as many words.
+   *
+   * @return the earliest {@code keycloakAbsentSince} among the orphaned accounts, or {@code null}
+   *     when none is waiting
+   */
+  @Query(
+      "SELECT MIN(u.keycloakAbsentSince) FROM User u"
+          + " WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL")
+  Instant findOldestKeycloakAbsentSince();
 
   /**
    * Returns the ids of every local user that already carries a Discord account link ({@code

@@ -297,6 +297,46 @@ public final class MetricNames {
   public static final String REGISTRATION_PENDING_OLDEST_AGE =
       "basetool.registration.pending.oldest.age";
 
+  /**
+   * Gauge {@code basetool_deletion_request_pending_count} — members' Art. 17 erasure requests
+   * awaiting an admin decision (REQ-SEC-061).
+   */
+  public static final String DELETION_REQUEST_PENDING = "basetool.deletion.request.pending.count";
+
+  /**
+   * Gauge {@code basetool_deletion_request_pending_oldest_age_seconds} — how long the
+   * longest-waiting erasure request has waited (REQ-SEC-061).
+   *
+   * <p>The one queue gauge in this class with a <b>statutory</b> threshold behind it: Art. 12(3)
+   * gives the controller one month to respond to a data-subject request, so the alert is set well
+   * inside that rather than at an operational comfort level.
+   */
+  public static final String DELETION_REQUEST_PENDING_OLDEST_AGE =
+      "basetool.deletion.request.pending.oldest.age";
+
+  /**
+   * Gauge {@code basetool_users_pending_deletion_count} — accounts present locally but already gone
+   * from Keycloak, i.e. waiting for the second half of their deletion (REQ-SEC-059).
+   *
+   * <p>Not a work queue like the others: nothing enqueues these. The row appears when the roster
+   * sync notices the Keycloak account is gone, and it leaves only when an admin clicks delete in
+   * the member list. A value that stays above zero is a deletion somebody started and did not
+   * finish, which keeps an e-mail address, a handle and a Discord snowflake for a person who has
+   * already left.
+   */
+  public static final String USERS_PENDING_DELETION = "basetool.users.pending.deletion.count";
+
+  /**
+   * Gauge {@code basetool_users_pending_deletion_oldest_age_seconds} — how long the longest-waiting
+   * orphaned account has been waiting (REQ-SEC-059).
+   *
+   * <p>Measured from {@code app_user.keycloak_absent_since}, which V241 added because no existing
+   * timestamp carries the fact. Rows that predate V241 were backfilled with the deploy time, so
+   * their age is a lower bound.
+   */
+  public static final String USERS_PENDING_DELETION_OLDEST_AGE =
+      "basetool.users.pending.deletion.oldest.age";
+
   /** Gauge {@code basetool_bank_booking_request_pending_count} — tag {@code required_approver}. */
   public static final String BANK_BOOKING_REQUEST_PENDING =
       "basetool.bank.booking.request.pending.count";

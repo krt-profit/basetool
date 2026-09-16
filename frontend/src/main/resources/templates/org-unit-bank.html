@@ -317,7 +317,7 @@
                                             <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
                                             <option th:if="${r.counterpartyUserId() != null}"
                                                     th:value="${r.counterpartyUserId()}" th:selected="true"
-                                                    th:text="${r.counterpartyHandle()}">greluc</option>
+                                                    th:text="${@handles.display(r.counterpartyHandle())}">greluc</option>
                                         </select>
                                         <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
                                     </div>
@@ -413,7 +413,7 @@
                             <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                             <td class="text-right bank-amount"
                                 th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                            <td th:text="${r.requesterHandle()}">greluc</td>
+                            <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
                             <td>
                                 <span class="chip"
                                       th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"

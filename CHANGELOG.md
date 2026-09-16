@@ -4,6 +4,22 @@
 
 ### Added
 
+- **Du kannst deine Daten jetzt selbst exportieren.** Im Profil gibt es unter „Meine Daten exportieren“ eine PDF- und eine JSON-Datei mit allem, was das Tool zu dir gespeichert hat. Das PDF ist die lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, die JSON-Datei die vollständige Auskunft. Namen anderer Mitglieder sind in beiden entfernt (REQ-SEC-058).
+
+- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“. Der Antrag geht an die Administration – mit dem Absenden wird nichts gelöscht, und du kannst ihn bis zur Entscheidung zurückziehen. Optional kannst du zusätzlich beantragen, deinen Spielernamen in den Protokollen und der Buchungshistorie zu anonymisieren; darüber entscheidet ein Administrator gesondert. Wird ein Antrag abgelehnt, erfährst du den Grund (REQ-SEC-061, REQ-SEC-062).
+
+- **Administration: neue Seite „Löschanträge“.** Offene Löschanträge entscheiden – ältester zuerst, weil ein Antrag innerhalb eines Monats zu beantworten ist. Eine Ablehnung braucht eine Begründung, die dem Mitglied mitgeteilt wird. Das Ausführen entfernt Konto und Zugang in einem Schritt (REQ-SEC-061).
+
+- **Administration: neue Seite „Personensuche“.** Findet jede Stelle, an der ein Name vorkommt – auch in Freitextfeldern ohne Kontoverknüpfung, etwa bei externen Einsatzteilnehmern, Übergabe-Empfängern oder Organigramm-Platzhaltern. Gedacht für Auskunfts-, Berichtigungs- und Löschanfragen, bei denen eine Korrektur an einer von vier Stellen keine Korrektur ist (REQ-SEC-060).
+
+- **Administration: Datenauskunft für ein anderes Mitglied.** Auf der Mitglieder-Bearbeitungsseite, für eine Anfrage von jemandem, der sich nicht selbst anmelden kann. Inhalt und Anonymisierung sind identisch mit dem Selbstexport (REQ-SEC-058).
+
+- **Halbfertige Kontolöschungen fallen jetzt auf.** Wurde ein Keycloak-Zugang entfernt, die lokale Zeile aber nie gelöscht, blieben E-Mail-Adresse, Spielername, Discord-ID und Beschreibung unbegrenzt liegen, ohne dass es irgendwo auffiel. Die Überwachung meldet das jetzt nach sieben Tagen (REQ-SEC-059).
+
+- **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung durch einen Administrator bleibt unverändert bestehen. Die Datenschutzerklärung nennt die Frist (REQ-AUDIT-006).
+
+  > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `IRI_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
+
 - **Abgelehnte Registrierungen werden nicht mehr dauerhaft gespeichert.** Wurde eine Anmeldung von
   einem Administrator abgelehnt, blieben Konto, Anmeldedaten und die Ablehnungsbegründung bisher
   unbegrenzt liegen — im Tool gab es keinen Weg, sie zu entfernen. Sie werden jetzt 90 Tage nach der

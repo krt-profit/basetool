@@ -130,7 +130,7 @@
                     <tbody>
                     <tr th:each="e : ${events.content()}" data-testid="audit-row">
                         <td><span class="utc-time" th:text="${e.occurredAt()}">2026-06-12T18:30:00Z</span></td>
-                        <td th:text="${e.actorHandle()}">greluc</td>
+                        <td th:text="${@handles.display(e.actorHandle())}">greluc</td>
                         <td>
                             <span class="chip krtm-font-size-0-55rem-eff3"
                                   th:text="#{${e.eventLabelKey()}}">Ereignis</span>
@@ -204,7 +204,10 @@
     <!-- Period retention purge (REQ-AUDIT-004): deletes the active tab's audit entries older than a
          cutoff. A prominent warning recommends exporting a PDF/JSON backup first; the deletion is
          irreversible and itself audit-logged. No native dialogs; validation + the deleted-count
-         result render inline (audit-log.js, via krtFetch.write DELETE). -->
+         result render inline (audit-log.js, via krtFetch.write DELETE).
+         The ceiling note below is REQ-AUDIT-006: an automatic sweep also removes rows past a
+         configured age, so an admin who finds entries gone without having purged is told why here
+         rather than having to guess. -->
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-purge-modal', titleKey='admin.audit.purge.title', variant=null, body=~{::.audit-purge-form})}">
             <form class="audit-purge-form no-track"
                   th:attr="data-endpoint=${purgeEndpoint},data-period-required=#{admin.audit.purge.beforeRequired},data-delete-error=#{admin.audit.purge.error},data-success-template=#{admin.audit.purge.success}">
@@ -215,6 +218,7 @@
                         <p class="krtm-margin-0-2a0c" th:text="#{admin.audit.purge.warning}">Erstelle vorher eine Sicherungskopie als PDF oder JSON &ndash; gel&ouml;schte Eintr&auml;ge lassen sich nicht wiederherstellen.</p>
                     </div>
                     <p class="bank-field-hint" th:text="#{admin.audit.purge.hint}">Alle Eintr&auml;ge dieses Logs, die &auml;lter als der gew&auml;hlte Zeitpunkt sind, werden unwiderruflich gel&ouml;scht.</p>
+                    <p class="bank-field-hint" data-testid="audit-purge-ceiling" th:text="#{admin.audit.purge.ceiling}">Unabh&auml;ngig davon l&ouml;scht das System Eintr&auml;ge automatisch, sobald sie 24 Monate alt sind.</p>
                     <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
                         <label for="audit-purge-before-date" th:text="#{admin.audit.purge.before}">Eintr&auml;ge &auml;lter als</label>
                         <input type="hidden" name="before">

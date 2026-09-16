@@ -1,0 +1,247 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryItem;
+import de.greluc.krt.profit.basetool.backend.model.PersonalInventoryLocationType;
+import de.greluc.krt.profit.basetool.backend.model.User;
+import de.greluc.krt.profit.basetool.backend.repository.PersonalInventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
+import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Integration coverage for the Art. 15 / Art. 20 data export against the real Postgres test
+ * container (REQ-SEC-058).
+ *
+ * <p>The property this class exists for is the one the handover plan called the hardest thing to
+ * get subtly wrong, and asked to be treated as a test rather than a review comment: <b>no other
+ * member's handle appears in an export.</b> It is asserted here across the whole document, not per
+ * section, because a leak introduced by a future section would otherwise only be caught by somebody
+ * re-reading that section's SQL.
+ *
+ * <p>It also runs all ~29 statements against the real schema. A registry of hand-written SQL is
+ * exactly the kind of thing that compiles and type-checks while naming a column that was renamed
+ * two migrations ago, and the first person to find out must not be somebody answering a legal
+ * request.
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+class DataExportIntegrationTest {
+
+  /**
+   * Distinctive enough that a match cannot be a coincidence, and long enough to clear the
+   * scrubber's minimum length.
+   */
+  private static final String OTHER_HANDLE = "ZzzOtherMemberHandleZzz";
+
+  @Autowired private DataExportService dataExportService;
+  @Autowired private DataExportReportService dataExportReportService;
+  @Autowired private UserRepository userRepository;
+  @Autowired private PersonalInventoryItemRepository personalInventoryItemRepository;
+  @Autowired private TransactionTemplate transactionTemplate;
+
+  private final Set<UUID> seededUsers = new HashSet<>();
+  private final Set<UUID> seededItems = new HashSet<>();
+
+  /**
+   * Removes what this class committed into the container the whole suite shares.
+   *
+   * <p>The items go first: deleting the user cascades them, but doing it explicitly keeps the
+   * cleanup true if that cascade ever changes.
+   */
+  @AfterEach
+  void cleanUp() {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          personalInventoryItemRepository.deleteAllById(seededItems);
+          userRepository.deleteAllById(seededUsers);
+          seededItems.clear();
+          seededUsers.clear();
+        });
+  }
+
+  /**
+   * Creates a committed user.
+   *
+   * @param username the username, which is also the effective name
+   * @return the new user's id
+   */
+  private UUID user(String username) {
+    UUID id = UUID.randomUUID();
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          User u = new User();
+          u.setId(id);
+          u.setUsername(username);
+          userRepository.save(u);
+        });
+    seededUsers.add(id);
+    return id;
+  }
+
+  /**
+   * Creates a committed personal-inventory item with a free-text note.
+   *
+   * @param owner the owning member
+   * @param note the note, which the export scrubs
+   */
+  private void personalItem(UUID owner, String note) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          PersonalInventoryItem item = new PersonalInventoryItem();
+          item.setOwnerUserId(owner);
+          item.setName("Probe");
+          item.setQuantity(1);
+          item.setNote(note);
+          // The three location columns are NOT NULL; the values are irrelevant to this test but
+          // the insert is not valid without them.
+          item.setLocationUexId(1);
+          item.setLocationType(PersonalInventoryLocationType.values()[0]);
+          item.setLocationNameSnapshot("Testort");
+          seededItems.add(personalInventoryItemRepository.save(item).getId());
+        });
+  }
+
+  /**
+   * Every string value anywhere in the export, flattened.
+   *
+   * @param export the assembled export
+   * @return the values
+   */
+  private static List<String> allStrings(DataExportService.DataExport export) {
+    return export.sections().stream()
+        .flatMap(s -> s.rows().stream())
+        .flatMap(r -> r.values().stream())
+        .filter(String.class::isInstance)
+        .map(String.class::cast)
+        .toList();
+  }
+
+  // covers REQ-SEC-058 — every registered statement runs against the real schema
+  @Test
+  void everySectionRunsAndIsReported() {
+    UUID subject = user("ZzzSubjectZzz");
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    assertThat(export.sections()).hasSameSizeAs(DataExportSections.SECTIONS);
+    assertThat(export.subjectId()).isEqualTo(subject);
+    assertThat(export.subjectHandle()).isEqualTo("ZzzSubjectZzz");
+    // The account section is the one that must always have exactly one row.
+    assertThat(export.sections().stream().filter(s -> s.key().equals("account")).findFirst())
+        .get()
+        .satisfies(s -> assertThat(s.rows()).hasSize(1));
+  }
+
+  // covers REQ-SEC-058 — the section order and legal-basis marking survive into the document
+  @Test
+  void everySectionCarriesItsLegalBasis() {
+    UUID subject = user("ZzzBasisZzz");
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    assertThat(export.sections())
+        .allSatisfy(
+            s ->
+                assertThat(s.legalBasis())
+                    .isIn(DataExportSections.ART_15, DataExportSections.ART_15_20));
+    assertThat(export.sections().stream().map(DataExportService.ExportSection::key).toList())
+        .containsExactlyElementsOf(
+            DataExportSections.SECTIONS.stream().map(DataExportSections.Section::key).toList());
+  }
+
+  // covers REQ-SEC-058 — THE test the handover plan asked for: no other member's handle anywhere
+  @Test
+  void noOtherMembersHandleAppearsInTheExport() {
+    UUID subject = user("ZzzSubjectTwoZzz");
+    user(OTHER_HANDLE);
+    personalItem(subject, "Uebergabe an " + OTHER_HANDLE + " erledigt");
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    assertThat(allStrings(export))
+        .withFailMessage(
+            "An export leaked another member's handle. The projections in DataExportSections must "
+                + "not select another member's handle column, and free text must go through "
+                + "HandleScrubber.")
+        .noneMatch(v -> v.contains(OTHER_HANDLE));
+    assertThat(export.thirdPartyHandlesRemoved()).isTrue();
+  }
+
+  // covers REQ-SEC-058 — the scrub replaces rather than drops, so the member keeps their own entry
+  @Test
+  void theMembersOwnFreeTextSurvivesWithTheOtherNameReplaced() {
+    UUID subject = user("ZzzSubjectThreeZzz");
+    user(OTHER_HANDLE);
+    personalItem(subject, "Uebergabe an " + OTHER_HANDLE + " erledigt");
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    List<Map<String, Object>> rows =
+        export.sections().stream()
+            .filter(s -> s.key().equals("personalInventory"))
+            .findFirst()
+            .orElseThrow()
+            .rows();
+    assertThat(rows).hasSize(1);
+    String note = String.valueOf(rows.get(0).get("note"));
+    assertThat(note).contains("Uebergabe an").contains("erledigt");
+    assertThat(note).contains(HandleScrubber.REPLACEMENT);
+  }
+
+  // covers REQ-SEC-058 — the subject's OWN handle must not be scrubbed out of their own entries
+  @Test
+  void theSubjectsOwnHandleIsNotScrubbed() {
+    UUID subject = user("ZzzSelfNamedZzz");
+    personalItem(subject, "Notiz von ZzzSelfNamedZzz");
+
+    DataExportService.DataExport export = dataExportService.export(subject);
+
+    assertThat(allStrings(export)).anyMatch(v -> v.contains("ZzzSelfNamedZzz"));
+    assertThat(export.thirdPartyHandlesRemoved()).isFalse();
+  }
+
+  // covers REQ-SEC-058 — the PDF renders for a real subject without a label blowing up
+  @Test
+  void thePdfRenders() {
+    UUID subject = user("ZzzPdfZzz");
+
+    byte[] pdf = dataExportReportService.renderPdf(subject);
+
+    assertThat(pdf).isNotEmpty();
+    // %PDF- magic: proves a document came out rather than an empty buffer.
+    assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1))
+        .isEqualTo("%PDF-");
+  }
+}

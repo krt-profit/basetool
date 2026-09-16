@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.repository.AuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.AuditLogPdfFormat;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -91,7 +92,11 @@ public class AuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        e.getActorHandle(),
+                        // An actor whose handle an Art. 17 request erased renders as the
+                        // placeholder, not as the raw sentinel (REQ-SEC-062). The PDF is read by a
+                        // person; the JSON export keeps the token so two exports stay comparable.
+                        HandleAnonymisation.humanise(
+                            e.getActorHandle(), label("general.anonymisedHandle")),
                         // The audit document prints the raw, language-neutral event code (the
                         // on-screen viewer shows the localized label); this keeps the trail
                         // unambiguous and avoids duplicating ~50 labels into the backend bundle.

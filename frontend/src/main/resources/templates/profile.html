@@ -138,6 +138,76 @@
                 </div>
             </div>
 
+            <!-- Data export (REQ-SEC-058, ADR-0185). Plain GET links: a download is a
+                 navigation, not a mutation, so routing it through krtFetch would only mean
+                 buffering the whole document in JavaScript to hand it back to the browser. -->
+            <div class="card card--inset" id="profile-export-card">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.export.title}">Meine Daten exportieren</h2>
+                </div>
+                <p class="acct-note">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+                    <span th:text="#{profile.export.hint}">Du kannst jederzeit eine Kopie deiner Daten herunterladen.</span>
+                </p>
+                <p class="form-hint" th:text="#{profile.export.formats}">Das PDF ist die lesbare Zusammenfassung, die JSON-Datei die vollst&auml;ndige Auskunft.</p>
+                <div class="acct-actions">
+                    <a th:href="@{/api/proxy/me/export/pdf}" class="btn btn-outline"
+                       data-testid="profile-export-pdf">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-pdf"/></svg>
+                        <span th:text="#{profile.export.pdf}">Als PDF</span>
+                    </a>
+                    <a th:href="@{/api/proxy/me/export/json}" class="btn btn-ghost"
+                       data-testid="profile-export-json">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
+                        <span th:text="#{profile.export.json}">Als JSON</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Art. 17 erasure request (REQ-SEC-061, ADR-0181). The card is a fragment so
+                 profile.js can swap it in place after a write (REQ-FE-001) instead of
+                 reloading; this host div is the swap container. -->
+            <div id="profile-deletion-host">
+                <div th:replace="~{fragments/profile-deletion-card :: card}"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!--
+      Confirmation for the erasure request. Not a native dialog (REQ-UI-*): the canonical
+      .krt-modal shell via the shared fragment. The checkbox records the member's Art. 17 wish to
+      have the surviving handle snapshots anonymised too — a wish, not an instruction: an admin
+      weighs it and decides it deliberately, which the hint says in as many words so nobody ticks
+      it expecting it to happen by itself.
+    -->
+    <div th:replace="~{fragments/modal-wrapper :: modal(modalId='profile-deletion-modal', titleKey='profile.deletion.modal.title', variant=null, body=~{::.profile-deletion-form})}">
+        <div class="profile-deletion-form">
+            <div class="krt-modal-body">
+                <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert">
+                    <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                        <use href="#krt-icon-warning"/></svg>
+                    <p class="krtm-margin-0-2a0c" th:text="#{profile.deletion.modal.warning}">Your warehouse stock, hangar, personal inventory and blueprints are deleted; missions and refinery orders you created are reassigned to an administrator.</p>
+                </div>
+                <p class="bank-field-hint" th:text="#{profile.deletion.modal.hint}">An administrator decides the request. Nothing is deleted when you submit it.</p>
+                <div class="check-row">
+                    <input type="checkbox" id="profile-deletion-erase-history"
+                           data-testid="profile-deletion-erase-history">
+                    <div>
+                        <label for="profile-deletion-erase-history" th:text="#{profile.deletion.modal.eraseHistory}">Also anonymise my entries in the logs and the booking history</label>
+                        <p class="form-hint" th:text="#{profile.deletion.modal.eraseHistory.hint}">An administrator weighs this separately against the interest in an auditable ledger and decides it.</p>
+                    </div>
+                </div>
+                <span class="bank-field-error" data-error-for="_global"></span>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-ghost"
+                        data-trigger="close-modal-display" data-modal-id="profile-deletion-modal"
+                        th:text="#{general.cancel}">Cancel</button>
+                <button type="button" class="btn btn--danger" id="profile-deletion-submit"
+                        data-testid="profile-deletion-submit"
+                        th:text="#{profile.deletion.modal.submit}">Submit request</button>
+            </div>
         </div>
     </div>
 </main>
@@ -159,7 +229,10 @@
         conflictReload: /*[[#{frontend.ajax.conflict.reload}]]*/ 'Load current values',
         conflictDismiss: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Close',
         conflictQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Load current values?',
-        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.'
+        conflictDetail: /*[[#{frontend.ajax.conflict.detail}]]*/ 'The data was changed in the meantime.',
+        deletionRequested: /*[[#{profile.deletion.requested}]]*/ 'Deletion request submitted.',
+        deletionWithdrawn: /*[[#{profile.deletion.withdrawn}]]*/ 'Deletion request withdrawn.',
+        deletionError: /*[[#{profile.deletion.error}]]*/ 'The deletion request could not be processed.'
     };
 </script>
 <script th:src="@{/js/profile.js}" th:attr="nonce=${cspNonce}"></script>

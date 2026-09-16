@@ -45,12 +45,20 @@ The member exports their own data in the application: **Profile → Meine Daten 
 export covers every category the tool holds about them. For the categories it deliberately leaves
 out, and why, see [the export's limits](#what-the-export-does-not-contain).
 
-If the requester cannot use the application (deleted account, or a non-registered third party), an
-admin produces the same content and sends it through a channel the requester controls.
+If the requester cannot sign in — locked out, or an account already disabled — an admin produces
+the identical document from **Administration → Mitglieder → the member → Datenauskunft**. Identical
+is meant literally: the same projections and the same third-party anonymisation. An admin export is
+not a fuller one, because a third party's data is no more disclosable to an admin serving somebody's
+request than to the member. For a non-registered third party there is no account to export at all;
+their request is served through the [name search](#finding-every-mention-of-a-person).
 
-**Art. 15(4) — the rights of others.** Free-text fields can name third parties. Before releasing free
-text verbatim, read it: if a note names another member, redact that name rather than withholding the
-whole entry. The right is to a copy of *their* data, not to everything that mentions them.
+**Art. 15(4) — the rights of others.** Free-text fields can name third parties. **The export already
+replaces the handles of other members** in the free text it contains, and it tells you whether it
+removed any — so when the document says nothing was removed, there is nothing to look for. It cannot
+recognise somebody with no account, a nickname or a misspelling, and nothing can, from text alone.
+So the read-through remains part of the procedure: before releasing free text verbatim, read it, and
+if an entry names another person redact that name rather than withholding the whole entry. The right
+is to a copy of *their* data, not to everything that mentions them.
 
 ### Art. 16 — Rectification
 
@@ -79,14 +87,32 @@ In short:
 - **Unlinked**: mission participation survives as *"Gelöschter Nutzer"* with no name; the
   material-claim stamp is nulled.
 - **Kept**: the audit trail and bank booking history, including the **handle used at the time**,
-  under Art. 6(1)(f).
+  under Art. 6(1)(f). The two are not kept for the same length of time: the **bank booking history
+  is permanent**, while the **audit trail is bounded at 24 months** after the recorded activity
+  (REQ-AUDIT-006). So a deletion leaves the audit handle snapshot in place for at most two years
+  and the booking handle indefinitely.
 
 **If the requester asks for the kept records to go as well**, that is a legitimate Art. 17 request
-and the privacy policy already says so. Weigh it: the interest in an auditable ledger is real but not
+and the privacy policy already says so. The request form carries a checkbox for it, and the queue
+shows whether the member ticked it. Weigh it: the interest in an auditable ledger is real but not
 automatically overriding, it weakens as the records age, and a request that names a specific booking
 is easier to grant than one asking to rewrite the ledger. Decide it explicitly, record the reasoning,
 and tell the requester the outcome either way — Art. 12(4) requires telling them **why** if the
 answer is no, together with their right to complain and to a judicial remedy.
+
+**What granting it does** (REQ-SEC-062): the member's handle is replaced by a placeholder in all six
+places a handle snapshot survives a deletion — both audit trails, the bank booking history, the four
+handle columns on the booking requests, and the two job-order handover recipients. **No row is
+removed** and no fact about what happened changes; only the name goes. That is why it can be granted
+at all: deleting the rows would take a counterparty's own evidence with it. It leaves a marker event
+in both trails, and it runs **before** the account is deleted — four of the six updates match on the
+foreign key the deletion nulls out.
+
+> [!warning] Two of the six are matched by text, so review the hits first
+> The two handover recipients have no user id beside them: the recipient was typed in by hand. They
+> are matched on the handle text, case-insensitively, which means the anonymisation can **over-match**
+> if two people ever used the same spelling. Run the [name search](#finding-every-mention-of-a-person)
+> and look at the hits before granting. That is also why granting is never automatic.
 
 **Do not confuse an erasure request with leaving the organisation.** A departing member whose account
 is deleted for organisational reasons gets the standard deletion; someone exercising Art. 17 is
@@ -139,6 +165,18 @@ them instead of the ones somebody happened to remember.
 
 Use it for **every** Art. 16 or Art. 17 request, including from members — a member's handle can appear
 in free text written by someone else, where no account link exists to follow.
+
+Three things to know before relying on it:
+
+- **It is case-insensitive and matches substrings**, because whoever typed the name was not copying
+  it from a roster.
+- **It is capped** at 25 hits per field and 300 in total, and it says so when it capped. A capped
+  list that looked complete would make an erasure look complete when it is not — narrow the term and
+  search again.
+- **Which fields it covers is gate-enforced**, not a list somebody maintains by hand:
+  `PersonSearchCoverageTest` fails the build when a text column is neither searched nor recorded as
+  deliberately out of scope. So this instruction cannot quietly go out of date the next time a notes
+  field is added.
 
 ---
 
