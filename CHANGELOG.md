@@ -64,6 +64,10 @@
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
   Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
 
+- **Im Auskunfts-PDF standen technische Spaltennamen statt Bezeichnungen.** In den vollständig
+  abgedruckten Abschnitten hieß die linke Spalte etwa ‚discord_guild_nickname‘ oder ‚join_date‘.
+  Alle Felder haben jetzt eine deutsche Bezeichnung (REQ-SEC-058).
+
 - **Eine halb ausgeführte Kontolöschung fällt jetzt auf.** Konnte nach dem Löschen der lokalen
   Daten der Zugang selbst nicht entfernt werden, stand das nur im Log — das Konto konnte sich
   weiter anmelden. Das wird jetzt im Protokoll vermerkt und gemeldet, damit es jemand in der

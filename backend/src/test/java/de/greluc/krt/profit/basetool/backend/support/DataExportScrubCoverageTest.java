@@ -24,13 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -63,24 +59,15 @@ import org.junit.jupiter.api.Test;
  */
 class DataExportScrubCoverageTest {
 
-  /** The alias a selected expression yields, when it names one explicitly. */
-  private static final Pattern EXPLICIT_ALIAS = Pattern.compile("\\bAS\\s+(\\w+)\\s*$");
-
-  /** The tables a statement reads, whether through {@code FROM} or a {@code JOIN}. */
-  private static final Pattern TABLE = Pattern.compile("\\b(?:FROM|JOIN)\\s+(\\w+)");
-
-  /** Everything between the statement's {@code SELECT} and its first top-level {@code FROM}. */
-  private static final Pattern SELECT_LIST =
-      Pattern.compile("SELECT\\s+(.*?)\\s+FROM\\b", Pattern.DOTALL);
-
   // covers REQ-SEC-058 - a column that can name a person is scrubbed, or exempted with a reason
   @Test
   void everyPersonNameColumnIsEitherScrubbedOrExemptedWithAReason() {
     List<String> unaccounted = new ArrayList<>();
 
     for (Section section : DataExportSections.SECTIONS) {
-      Set<String> tables = tablesOf(section.sql());
-      for (Map.Entry<String, String> selected : selectedColumns(section.sql()).entrySet()) {
+      Set<String> tables = DataExportProjection.tablesOf(section.sql());
+      for (Map.Entry<String, String> selected :
+          DataExportProjection.selectedColumns(section.sql()).entrySet()) {
         String alias = selected.getKey();
         String column = selected.getValue();
         if (!namesAPerson(tables, column)) {
@@ -232,98 +219,7 @@ class DataExportScrubCoverageTest {
   private static Map<String, Set<String>> aliasesBySection() {
     Map<String, Set<String>> out = new LinkedHashMap<>();
     for (Section section : DataExportSections.SECTIONS) {
-      out.put(section.key(), selectedColumns(section.sql()).keySet());
-    }
-    return out;
-  }
-
-  /**
-   * The statement's selected expressions, as alias to underlying column name.
-   *
-   * <p>Deliberately a small parser rather than a real one: every statement in the registry is a
-   * flat {@code SELECT col, t.col, t.col AS alias FROM ...}, which is a property worth keeping, and
-   * a construct this cannot read is a construct that should not be added to a projection whose
-   * whole job is to be reviewable by eye.
-   *
-   * @param sql the section's statement
-   * @return the aliases in statement order, each mapped to the column it comes from
-   */
-  private static Map<String, String> selectedColumns(String sql) {
-    Matcher list = SELECT_LIST.matcher(sql);
-    assertThat(list.find()).as("every section is a SELECT ... FROM: " + sql).isTrue();
-    String columns = list.group(1).replaceAll("\\s+", " ").trim();
-
-    Map<String, String> out = new LinkedHashMap<>();
-    for (String item : splitTopLevel(columns)) {
-      String expression = item.trim();
-      Matcher alias = EXPLICIT_ALIAS.matcher(expression);
-      String name;
-      String body;
-      if (alias.find()) {
-        name = alias.group(1);
-        body = expression.substring(0, alias.start()).trim();
-      } else {
-        body = expression;
-        name = lastIdentifier(expression);
-      }
-      out.put(name, lastIdentifier(body));
-    }
-    return out;
-  }
-
-  /**
-   * Splits a select list on commas that are not inside parentheses.
-   *
-   * @param columns the select list
-   * @return the individual expressions
-   */
-  private static List<String> splitTopLevel(String columns) {
-    List<String> out = new ArrayList<>();
-    StringBuilder current = new StringBuilder();
-    int depth = 0;
-    for (char c : columns.toCharArray()) {
-      if (c == '(') {
-        depth++;
-      } else if (c == ')') {
-        depth--;
-      }
-      if (c == ',' && depth == 0) {
-        out.add(current.toString());
-        current.setLength(0);
-      } else {
-        current.append(c);
-      }
-    }
-    if (!current.isEmpty()) {
-      out.add(current.toString());
-    }
-    return out;
-  }
-
-  /**
-   * The last bare identifier of an expression — {@code m.note} yields {@code note}.
-   *
-   * @param expression the selected expression
-   * @return the identifier, lower-cased
-   */
-  private static String lastIdentifier(String expression) {
-    String trimmed = expression.trim();
-    int dot = trimmed.lastIndexOf('.');
-    String tail = dot < 0 ? trimmed : trimmed.substring(dot + 1);
-    return tail.replaceAll("[^A-Za-z0-9_]", "").toLowerCase(Locale.ROOT);
-  }
-
-  /**
-   * The tables a statement reads.
-   *
-   * @param sql the statement
-   * @return the table names, lower-cased
-   */
-  private static Set<String> tablesOf(String sql) {
-    Set<String> out = new LinkedHashSet<>();
-    Matcher m = TABLE.matcher(sql);
-    while (m.find()) {
-      out.add(m.group(1).toLowerCase(Locale.ROOT));
+      out.put(section.key(), DataExportProjection.selectedColumns(section.sql()).keySet());
     }
     return out;
   }

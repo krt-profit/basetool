@@ -69,8 +69,15 @@ public final class DataExportPdfFormat {
   /** Not instantiable. */
   private DataExportPdfFormat() {}
 
-  /** Sections printed in full because they are short and are the point of the document. */
-  private static final List<String> VERBATIM_SECTIONS =
+  /**
+   * Sections printed in full because they are short and are the point of the document.
+   *
+   * <p>Package-private rather than private so {@code DataExportPdfFieldLabelCoverageTest} can hold
+   * their projections against the {@code pdf.export.field.*} bundle keys. Every field name in these
+   * tables is rendered through the bundle, and a missing key falls back to the key itself — which
+   * is how the raw column aliases reached the member in the first place.
+   */
+  static final List<String> VERBATIM_SECTIONS =
       List.of("account", "termsAcceptances", "orgUnitMemberships", "registrationDecisions");
 
   private static final DateTimeFormatter TIMESTAMP =
@@ -144,12 +151,18 @@ public final class DataExportPdfFormat {
         table.setWidths(new float[] {1.4f, 3f});
         KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.field"));
         KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.value"));
+        // The field name is a bundle label, not the projection's alias. It used to be the alias, so
+        // a member exercising their right of access read `discord_guild_nickname` and
+        // `share_blueprints_globally` -- untranslated user-visible text in a document that answers
+        // a legal request, and unintelligible to the person it is addressed to.
+        // DataExportPdfFieldLabelCoverageTest fails when a projection yields a column with no key.
         boolean rowAlt = false;
         for (Map<String, Object> row : section.rows()) {
           for (Map.Entry<String, Object> cell : row.entrySet()) {
             Color bg = KrtPdfSupport.rowBackground(rowAlt);
             rowAlt = !rowAlt;
-            KrtPdfSupport.addTableCell(table, cell.getKey(), bg, false);
+            KrtPdfSupport.addTableCell(
+                table, label.apply("pdf.export.field." + cell.getKey()), bg, false);
             KrtPdfSupport.addTableCell(table, renderValue(cell.getValue()), bg, false);
           }
         }

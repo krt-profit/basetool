@@ -3611,6 +3611,20 @@ print it. A PDF of several thousand warehouse movements and audit rows serves th
 worse than a short document that says exactly what exists and points at the machine-readable file
 (decision by @greluc, 2026-09-15).
 
+> [!warning] Corrected 2026-09-17 — the PDF printed raw column names to the member
+> The four sections the document prints in full render one row per column as a FELD/WERT pair,
+> and the FELD cell was the projection's own alias. A member exercising their right of access
+> read `discord_guild_nickname`, `user_rank`, `join_date` and `share_blueprints_globally`.
+> Every other string in the document comes from the bundle; these twenty-six did not, and no
+> `pdf.export.field.*` key existed at all.
+>
+> In a document answering a legal request a schema identifier is wrong twice over: it is
+> untranslated user-visible text, which the i18n rule admits no exception for, and it is not
+> intelligible to the person it is addressed to. The keys exist in all three backend bundles
+> now, and `DataExportPdfFieldLabelCoverageTest` fails the build when a projection selects a
+> column the bundle cannot name — necessary because a missing key resolves to the key
+> itself by design, which is exactly how the aliases got through.
+
 **Every section is marked with its legal basis**, so the portable subset is identifiable without
 re-deriving it:
 
