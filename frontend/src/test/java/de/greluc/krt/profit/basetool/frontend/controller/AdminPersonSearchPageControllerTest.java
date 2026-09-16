@@ -61,7 +61,8 @@ class AdminPersonSearchPageControllerTest {
   private static final PersonSearchResultDto ONE_HIT =
       new PersonSearchResultDto(
           List.of(new PersonSearchHitDto("MEMBER", "app_user", "username", "id", "Snippet", null)),
-          false);
+          false,
+          List.of());
 
   private static final String SEARCH_URI = "/api/v1/admin/person-search?q={q}";
 
@@ -143,7 +144,8 @@ class AdminPersonSearchPageControllerTest {
                 List.of(
                     new PersonSearchHitDto(
                         "MEMBER", "app_user", "username", "id", "Snippet", "MEMBER")),
-                true));
+                true,
+                List.of("mission_participant.comment")));
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
     Model model = new ConcurrentModel();
 
@@ -151,6 +153,9 @@ class AdminPersonSearchPageControllerTest {
 
     assertEquals(true, model.getAttribute("searched"));
     assertEquals(true, model.getAttribute("truncated"));
+    // The per-column cap is carried separately, because it is reached far more often than the
+    // overall one and "narrow the term" is not the remedy for it.
+    assertEquals(List.of("mission_participant.comment"), model.getAttribute("cappedColumns"));
     assertEquals(1, ((List<?>) model.getAttribute("hits")).size());
     assertFalse(model.containsAttribute("error"));
   }
@@ -166,6 +171,7 @@ class AdminPersonSearchPageControllerTest {
 
     assertEquals(List.of(), model.getAttribute("hits"));
     assertEquals(false, model.getAttribute("truncated"));
+    assertEquals(List.of(), model.getAttribute("cappedColumns"));
     assertEquals(true, model.getAttribute("searched"));
   }
 

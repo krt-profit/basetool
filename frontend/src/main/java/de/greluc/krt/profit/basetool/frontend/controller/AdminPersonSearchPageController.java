@@ -85,6 +85,7 @@ public class AdminPersonSearchPageController {
     model.addAttribute("term", term);
     model.addAttribute("hits", List.of());
     model.addAttribute("truncated", false);
+    model.addAttribute("cappedColumns", List.of());
     model.addAttribute("searched", false);
 
     if (term.length() >= 3) {
@@ -101,6 +102,12 @@ public class AdminPersonSearchPageController {
             backendApiClient.get("/api/v1/admin/person-search?q={q}", RESULT_TYPE, term);
         model.addAttribute("hits", result == null ? List.of() : result.hits());
         model.addAttribute("truncated", result != null && result.truncated());
+        // Reported separately from the overall cap, which almost never fires: 75 targets at 25
+        // hits each means a name occurring 40 times in ONE column produced a union total far
+        // below 300 and truncated == false, so the page said the list was complete.
+        model.addAttribute(
+            "cappedColumns",
+            result == null || result.cappedColumns() == null ? List.of() : result.cappedColumns());
         model.addAttribute("searched", true);
       } catch (BackendServiceException e) {
         // No term in the message: see the class comment.

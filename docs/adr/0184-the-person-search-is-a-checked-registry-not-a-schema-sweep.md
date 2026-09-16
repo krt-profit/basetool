@@ -72,8 +72,20 @@ column, which is indistinguishable from a deliberate attempt to dump the databas
 accident an admin could have by pasting.
 
 **Bounded by construction:** at least 3 characters, 25 hits per column, 300 in total — and **the
-response says when it was capped**, surfaced as a warning rather than a footnote. A capped list that
-looked complete would make an erasure look complete when it is not.
+response says when either cap was reached**, surfaced as a warning rather than a footnote. A capped
+list that looked complete would make an erasure look complete when it is not.
+
+The per-column cap is reported by **naming the columns**, because the two caps have different
+remedies: the overall one means the term is too broad, the per-column one means one area has more
+than a list can show and has to be worked through there.
+
+> [!warning] Corrected 2026-09-17 — only the overall cap was reported
+> This decision claimed both. Each `UNION ALL` branch carried `LIMIT 25` with no `ORDER BY` inside
+> it, and `truncated` compared the union total against 300 — with 75 registered targets. So the
+> per-column cap was the one that fired in practice and the only one that said nothing: 25 hits out
+> of 40 in one column, a union total nowhere near 300, and a page reporting a complete list. The
+> branch now orders deterministically and asks for one row past its limit, which is what makes the
+> cap observable at all; the extra row is counted and never shown.
 
 **One `UNION ALL` statement** with a per-branch `LIMIT`: one plan, one round trip, no column able to
 crowd out the others. Identifiers cannot be bound as parameters, so they are interpolated — and

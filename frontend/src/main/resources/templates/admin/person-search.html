@@ -78,6 +78,22 @@
             <p class="krtm-margin-0-2a0c" th:text="#{admin.personSearch.truncated}">Die Liste ist gek&uuml;rzt. Bitte den Suchbegriff eingrenzen.</p>
         </div>
 
+        <!-- The per-column cap, which is reached far more often than the overall one: 75 searched
+             columns at 25 hits each means a name occurring 40 times in ONE column produced a union
+             total far below 300, so the banner above stayed silent and the list looked complete.
+             The affected columns are named, because "narrow the term" is not the remedy here --
+             the remedy is to open that one area and work through it. -->
+        <div th:if="${!#lists.isEmpty(cappedColumns)}"
+             class="hud-box krtm-border-color-var-color-warning-display-flex-1b12"
+             role="alert" data-testid="person-search-capped">
+            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                <use href="#krt-icon-warning"/></svg>
+            <p class="krtm-margin-0-2a0c">
+                <span th:text="#{admin.personSearch.capped}">In diesen Feldern gibt es weitere Treffer, die hier nicht angezeigt werden:</span>
+                <span class="data-value" th:text="${#strings.listJoin(cappedColumns, ', ')}">tabelle.spalte</span>
+            </p>
+        </div>
+
         <div class="hud-box" th:if="${searched}">
             <p class="ps-where" data-testid="person-search-count"
                th:text="#{admin.personSearch.count(${#lists.size(hits)})}">0 Treffer</p>

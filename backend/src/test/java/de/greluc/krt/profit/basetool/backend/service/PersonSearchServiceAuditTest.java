@@ -59,7 +59,7 @@ class PersonSearchServiceAuditTest {
     PersonSearchService service = new PersonSearchService(auditService);
 
     service.recordSearch(
-        TERM, new PersonSearchService.PersonSearchResult(List.of(hit(), hit()), true));
+        TERM, new PersonSearchService.PersonSearchResult(List.of(hit(), hit()), true, List.of()));
 
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
@@ -78,7 +78,8 @@ class PersonSearchServiceAuditTest {
     PersonSearchService service = new PersonSearchService(auditService);
 
     service.recordSearch(
-        "  " + TERM + "  ", new PersonSearchService.PersonSearchResult(List.of(), false));
+        "  " + TERM + "  ",
+        new PersonSearchService.PersonSearchResult(List.of(), false, List.of()));
 
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService).record(any(), any(), any(), any(), details.capture());

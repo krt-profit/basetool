@@ -112,7 +112,7 @@ class AdminPersonSearchControllerSecurityTest {
   @Test
   void personSearch_admin_isAllowed() throws Exception {
     when(personSearchService.search(any()))
-        .thenReturn(new PersonSearchService.PersonSearchResult(List.of(), false));
+        .thenReturn(new PersonSearchService.PersonSearchResult(List.of(), false, List.of()));
 
     mockMvc
         .perform(
@@ -129,7 +129,7 @@ class AdminPersonSearchControllerSecurityTest {
   @Test
   void personSearch_isHandedToTheAuditingSeam() throws Exception {
     PersonSearchService.PersonSearchResult result =
-        new PersonSearchService.PersonSearchResult(List.of(), false);
+        new PersonSearchService.PersonSearchResult(List.of(), false, List.of());
     when(personSearchService.search(any())).thenReturn(result);
 
     mockMvc

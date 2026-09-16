@@ -28,4 +28,5 @@ import java.util.List;
  * @param truncated whether the overall cap was reached - shown to the admin, because a capped list
  *     that looked complete would make an erasure look complete when it is not
  */
-public record PersonSearchResultDto(List<PersonSearchHitDto> hits, boolean truncated) {}
+public record PersonSearchResultDto(
+    List<PersonSearchHitDto> hits, boolean truncated, List<String> cappedColumns) {}

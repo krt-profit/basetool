@@ -129,6 +129,42 @@ class PersonSearchIntegrationTest {
         .contains(HANDLE);
   }
 
+  // covers REQ-SEC-060 - the per-column cap is reported, not swallowed
+  @Test
+  void aColumnThatHitsItsOwnCapIsNamed() {
+    // 75 searched columns at 25 hits each: a name occurring 40 times in ONE column produced 25
+    // hits, a union total far below the overall 300, and truncated == false. The admin read a
+    // complete-looking list and never learned 15 occurrences had been dropped -- on the surface
+    // whose whole purpose is to be exhaustive, and while the privacy record claimed in as many
+    // words that it "says so when it capped".
+    for (int i = 0; i < PersonSearchService.PER_TARGET_LIMIT + 3; i++) {
+      seedMember(HANDLE + "Nr" + i, null);
+    }
+
+    PersonSearchService.PersonSearchResult result = personSearchService.search(HANDLE);
+
+    assertThat(result.hits())
+        .as("still capped at the per-column limit")
+        .hasSize(PersonSearchService.PER_TARGET_LIMIT);
+    assertThat(result.cappedColumns())
+        .as("and the column is named, because narrowing the term is not the remedy here")
+        .containsExactly("app_user.username");
+    assertThat(result.truncated())
+        .as("the overall cap is a different number and was nowhere near it")
+        .isFalse();
+  }
+
+  // covers REQ-SEC-060 - a column comfortably under its cap is not named
+  @Test
+  void aColumnUnderItsCapIsNotNamed() {
+    seedMember(HANDLE, null);
+
+    PersonSearchService.PersonSearchResult result = personSearchService.search(HANDLE);
+
+    assertThat(result.cappedColumns()).isEmpty();
+    assertThat(result.truncated()).isFalse();
+  }
+
   /**
    * Commits a member so the native query can see it.
    *

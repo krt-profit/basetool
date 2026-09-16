@@ -29,7 +29,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -108,8 +112,15 @@ public class PersonSearchService {
    *
    * @param hits the matches, in registry order (member record first, audit trails last)
    * @param truncated whether the overall cap was reached, so the admin knows the list is partial
+   * @param cappedColumns the columns that hit the <b>per-column</b> cap, as {@code table.column}.
+   *     <p>Reported separately because the two caps are reached independently and the overall one
+   *     almost never fires: with 75 registered targets and 25 hits allowed per column, a name
+   *     occurring 40 times in a single column produced 25 hits, a union total far below 300, and
+   *     {@code truncated == false}. The admin read a complete-looking list while 15 occurrences
+   *     were dropped — on the one surface whose whole purpose is to be exhaustive.
    */
-  public record PersonSearchResult(List<PersonSearchHitDto> hits, boolean truncated) {}
+  public record PersonSearchResult(
+      List<PersonSearchHitDto> hits, boolean truncated, List<String> cappedColumns) {}
 
   /**
    * Searches every registered free-text column for the term, case-insensitively.
@@ -142,13 +153,27 @@ public class PersonSearchService {
     // cleverness
     // that stops being obviously correct.
     query.setParameter("term_plain", trimmed);
-    query.setMaxResults(TOTAL_LIMIT + 1);
+    // One past the overall cap, plus room for one probe row per target: the probes are consumed
+    // while counting and never shown, so they must not push a real hit out of the window.
+    query.setMaxResults(TOTAL_LIMIT + 1 + PersonSearchTargets.TARGETS.size());
 
     List<?> rows = query.getResultList();
     boolean truncated = rows.size() > TOTAL_LIMIT;
     List<PersonSearchHitDto> hits = new ArrayList<>();
+    // Per column, because each branch asked for one row more than it is allowed to return: a
+    // branch that comes back with PER_TARGET_LIMIT + 1 rows has more the admin is not being shown.
+    Map<String, Integer> perColumn = new LinkedHashMap<>();
+    Set<String> capped = new LinkedHashSet<>();
+
     for (Object row : rows.subList(0, Math.min(rows.size(), TOTAL_LIMIT))) {
       Object[] cells = (Object[]) row;
+      String column = cells[1] + "." + cells[2];
+      int seen = perColumn.merge(column, 1, Integer::sum);
+      if (seen > PER_TARGET_LIMIT) {
+        // The probe row. Not shown, and its only job is to prove there is more.
+        capped.add(column);
+        continue;
+      }
       hits.add(
           new PersonSearchHitDto(
               (String) cells[0],
@@ -159,11 +184,12 @@ public class PersonSearchService {
               (String) cells[5]));
     }
     log.info(
-        "Person search returned {} hit(s) across {} column(s){}",
+        "Person search returned {} hit(s) across {} column(s){}{}",
         hits.size(),
         PersonSearchTargets.TARGETS.size(),
-        truncated ? " (truncated)" : "");
-    return new PersonSearchResult(hits, truncated);
+        truncated ? " (truncated)" : "",
+        capped.isEmpty() ? "" : " (" + capped.size() + " column(s) capped)");
+    return new PersonSearchResult(hits, truncated, List.copyOf(capped));
   }
 
   /**
@@ -250,8 +276,15 @@ public class PersonSearchService {
           .append(" WHERE ")
           .append(t.column())
           .append(" ILIKE :term")
+          // Deterministic inside the branch, and one row past the cap. Without the ORDER BY it was
+          // unspecified WHICH 25 of 40 matches came back -- so the same search could return
+          // different rows on two runs, on a surface an admin uses to decide whether a name still
+          // appears anywhere. Without the extra row the cap was invisible: 25 hits look identical
+          // whether there were 25 matches or 400.
+          .append(" ORDER BY ")
+          .append(t.idColumn())
           .append(" LIMIT ")
-          .append(PER_TARGET_LIMIT)
+          .append(PER_TARGET_LIMIT + 1)
           .append(')');
     }
     // A deterministic order for the outer LIMIT. Without one, which hits survive the 300-row cap

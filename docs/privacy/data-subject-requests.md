@@ -198,9 +198,20 @@ Three things to know before relying on it:
 
 - **It is case-insensitive and matches substrings**, because whoever typed the name was not copying
   it from a roster.
-- **It is capped** at 25 hits per field and 300 in total, and it says so when it capped. A capped
-  list that looked complete would make an erasure look complete when it is not — narrow the term and
-  search again.
+- **It is capped** at 25 hits per field and 300 in total, and it says so in **both** cases. A capped
+  list that looked complete would make an erasure look complete when it is not. The two caps need
+  different remedies: for the overall one, narrow the term and search again; for a per-field one,
+  the page **names the field**, and that area has to be worked through on its own — narrowing the
+  term will not reveal more of it.
+
+  > [!warning] Corrected 2026-09-17 — it only said so for the overall cap
+  > This bullet claimed the search reports every cap. It reported the 300 and not the 25, which is
+  > the one that actually fires: there are 75 searched fields, so a name occurring 40 times in a
+  > single field produced 25 hits, a union total far below 300, and a page that said the list was
+  > complete. Fifteen occurrences dropped with nothing said, on the surface this document tells you
+  > to trust for **every** Art. 16 and Art. 17 request. If you served a request before that date,
+  > the hits you saw were correct; there may have been more.
+
 - **Which fields it covers is gate-enforced**, not a list somebody maintains by hand:
   `PersonSearchCoverageTest` fails the build when a text column is neither searched nor recorded as
   deliberately out of scope. So this instruction cannot quietly go out of date the next time a notes

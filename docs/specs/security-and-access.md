@@ -3791,9 +3791,24 @@ any sense that matters and would bury the real hits.
 
 **Bounded by construction**, because a multi-table `ILIKE` sweep with no ceiling is a
 denial-of-service waiting for a one-character term: at least 3 characters, 25 hits per column, 300
-in total, and **the response says when it was capped**. A capped list that looked complete would
-make an erasure look complete when it is not, so the page states it as a warning rather than a
-footnote.
+in total, and **the response says which of the two caps it reached**. A capped list that looked
+complete would make an erasure look complete when it is not, so the page states it as a warning
+rather than a footnote — and for the per-column cap it **names the columns**, because the two need
+different remedies: the overall cap means the term is too broad, a per-column cap means one area has
+more than the list can show.
+
+> [!warning] Corrected 2026-09-17 — the per-column cap was silent
+> Each `UNION ALL` branch carried `LIMIT 25` with no `ORDER BY` inside it, and `truncated` compared
+> the union total against 300 while the registry holds 75 targets. So a name occurring 40 times in
+> one column yielded 25 hits, a total far below 300, and `truncated == false`: the page reported a
+> complete list with 15 occurrences dropped. The overall cap — the one that almost never fires —
+> was the only one being reported, and three documents including the privacy record claimed
+> otherwise in as many words.
+>
+> Each branch now orders by its id column and asks for `PER_TARGET_LIMIT + 1` rows. The extra row
+> is the probe: it is counted, it names the column as capped, and it is never shown. The ordering
+> matters independently — without it, which 25 of 40 matches came back was unspecified, so two runs
+> of the same search could return different rows.
 
 **One statement.** A `UNION ALL` over the registry with a per-branch `LIMIT`: one plan, one round
 trip, and no single column able to crowd out the rest. Table and column names cannot be bound as
