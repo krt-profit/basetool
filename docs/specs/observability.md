@@ -1755,9 +1755,9 @@ instead of trusting the one-time rollout verification:
   weaker. The navigation shape is load-bearing: the same paths answer `401` to a background call by
   design (REQ-SEC-012), so a probe without those headers would assert the wrong half of the
   contract.
-- **Public surface stays public** — the `blackbox-public-surface` job probes the seven frontend
+- **Public surface stays public** — the `blackbox-public-surface` job probes the eight frontend
   paths REQ-SEC-052 keeps `permitAll` (`/`, `/impressum`, `/privacy`, `/terms`, `/robots.txt`,
-  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`) with
+  `/.well-known/assetlinks.json`, `/manifest.webmanifest?locale=de`, `/app/link-help`) with
   `http_public_200_no_redirect` — exactly `200`, **redirects not followed**;
   `EdgePublicSurfaceNot200` (warning, 15 min) fires on drift. This is the inverse of the
   members-only probe and, until 2026-09-13, the half that had none. **`follow_redirects: false` is
@@ -1772,6 +1772,25 @@ instead of trusting the one-time rollout verification:
   probe naming one type would assert content negotiation rather than reachability. The probe
   declares itself with `X-Basetool-Probe: public-surface` so the frontend's request cache does not
   mint a Redis session per hit, for the same reason as the members-only probe.
+- **The Android App Link fallback still redirects** — the `blackbox-app-link` job probes
+  `/app/callback` with `http_app_link_fallback_303`: exactly `303`, redirects not followed, and a
+  `Location` naming `/app/link-help`; `EdgeAppLinkFallbackBroken` (warning, 15 min) fires on drift.
+  It is a separate job because it is the one public path whose contract is **not** `200` — the URL
+  carries a live authorization code, and the redirect is what keeps that code out of the address
+  bar and the history entry (`REQ-SEC-038`). Every regression it guards is silent and lands on a
+  member mid-login: a `200` leaves the code where the redirect removed it, a `302` into
+  `/oauth2/authorization/keycloak` means the `permitAll` entry was lost and the member is sent back
+  into a login they cannot finish, and a `404` means `AppLinkController` is missing from the image
+  — which is how this last surfaced, as two `No mapping for GET /app/callback` WARN lines found in
+  a log archive a day after a member's login broke. `AppLinkControllerTest` runs in-process against
+  MockMvc and stays green through all three.
+
+  **Do not measure how often the fallback is used from `http_server_requests_seconds_count{uri="/app/callback"}`.**
+  This probe puts a constant `0.033 req/s` floor on that series, which drowns the handful of real
+  hits — and the counter could not tell a member's phone from a crawler anyway (a `Google-Read-Aloud`
+  fetch requested the full callback URL twice on 2026-09-15). That measurement belongs in Loki over
+  the edge access log, which carries the user agent. Both `/app/callback` and `/app/link-help` are
+  therefore excluded from the `SsePushChannelDead` traffic guard alongside the other probe targets.
 - **HSTS** — the `blackbox-hsts` job asserts `Strict-Transport-Security` on the **first**
   response of `https://profit-base.online` (app-side HSTS, security-audit finding H-9);
   `EdgeHstsHeaderMissing` (warning). Extended to the grafana/ingest vhosts once their

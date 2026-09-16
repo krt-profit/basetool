@@ -285,6 +285,11 @@ scrape_configs:
   # ADR-0164). assetlinks.json is the same trap on the Android side, and it is the one that has
   # already sprung. ?locale=de is passed because the manifest keys its cache on it — probing the
   # bare path would exercise a URL no page ever links.
+  #
+  # /app/link-help is the page a member reaches when their App Link did not open the app
+  # (REQ-SEC-038) — they are mid-login and hold no session, so behind the authenticated catch-all
+  # it would redirect into the OAuth2 entry point, which is the loop the page exists to break. Its
+  # partner /app/callback must answer 303 rather than 200 and is probed by blackbox-app-link below.
   - job_name: blackbox-public-surface
     metrics_path: /probe
     scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
@@ -299,6 +304,38 @@ scrape_configs:
           - https://profit-base.online/robots.txt
           - https://profit-base.online/.well-known/assetlinks.json
           - https://profit-base.online/manifest.webmanifest?locale=de
+          - https://profit-base.online/app/link-help
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # The one public path whose contract is a redirect rather than a page (REQ-SEC-038). /app/callback
+  # is where a member's Android login lands when the App Link did not open the app, and it must
+  # answer 303 to /app/link-help: the URL carries a live authorization code, and a redirect is what
+  # keeps that code out of the address bar and the history entry. It therefore cannot ride in
+  # blackbox-public-surface, whose module asserts 200.
+  #
+  # Two device-side ways into this route survive a correct assetlinks.json and neither can be closed
+  # from the server (a sticky failed domain verification; a desktop browser with no app to hand the
+  # link to), so the route is permanently live rather than vestigial — it was used from the wild on
+  # 2026-09-16, the day after it shipped.
+  #
+  # Note for anyone measuring how often the fallback is used: this probe puts a constant floor of
+  # 0.033 req/s on `http_server_requests_seconds_count{uri="/app/callback"}`, which drowns the
+  # handful of real hits. That measurement belongs in Loki over the edge access log, which carries
+  # the user agent and can tell a member's phone from this probe and from a crawler.
+  - job_name: blackbox-app-link
+    metrics_path: /probe
+    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    params:
+      module: [http_app_link_fallback_303]
+    static_configs:
+      - targets:
+          - https://profit-base.online/app/callback
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
