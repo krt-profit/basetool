@@ -1,6 +1,7 @@
 # ADR-0163 — The container runtime becomes rootless Podman on Debian 13, on a rebuilt host
 
-- **Status:** Proposed
+- **Status:** Proposed — **needs re-ruling.** The measurement this ADR names as able to stop it
+  came back **negative** on 2026-09-16; see *The measurement came back negative* below.
 - **Date:** 2026-09-12
 - **Deciders:** @greluc (four choices recorded below), Claude (analysis and measurement)
 - **Related:** [ADR-0049](0049-host-configuration-as-a-promotable-artifact.md) ·
@@ -162,6 +163,87 @@ moves to the new production host, which exists and is idle before it serves traf
 A negative result does not mean "work around it". It means this ADR is rejected and the host stays
 on Docker.
 
+### The measurement came back negative — 2026-09-16
+
+**It did not need a host, and it rejects choices 1 and 2 as a pair.** The question above is phrased
+as "whether `pasta` preserves the client source address". Pasta does. The question that decides this
+ADR is a different one, and the evidence table missed it:
+
+> **Pasta is the default network mode for rootless containers. It is not what forwards published
+> ports into a container attached to user-defined bridge networks.**
+
+The edge sits on six bridges (`net-edge-ingress` plus five `net-proxy-*`). Podman's documentation on
+`main`: "By default, rootless bridge networks use `rootlessport` for port forwarding, which is a
+userspace proxy that **does not preserve client source IPs**." The fix exists and arrived in
+**Podman 6.0** — `rootless_port_forwarder="pasta"` in `containers.conf`, routing bridge port
+forwarding through pasta's `pesto` — and the v6.0.0 release notes state the rest plainly: "The
+default remains `rootlessport` (**the default for Podman 5.x**)", and the option is **experimental**.
+
+Debian 13 "trixie" ships **Podman 5.4.2**. There is no `podman` in `trixie-backports`; `forky` and
+`sid` carry 5.8.6, which is also below 6.0; only `experimental` has 6.1.1. Ubuntu 26.04 LTS ships
+5.7.0. **No current Debian or Ubuntu stable release ships a Podman that can preserve the source
+address for a bridge-networked rootless edge.** Verified against `packages.debian.org`,
+`packages.ubuntu.com` and `apt-cache policy` on the Debian 13 testing host itself.
+
+So the two choices defeat each other: **choice 1** (Debian 13, to match the testing host) combined
+with **choice 2** (the distribution's own Podman, no third-party repository) forecloses the only
+configuration that satisfies `REQ-SEC-023` and ADR-0112.
+
+What that costs is not a degraded rate limiter. Six surfaces in this repository read `$remote_addr`,
+and one of them **inverts** rather than degrades: the Keycloak admin console ACL
+(`location ^~ /auth/admin`) allows exactly the bridge gateway addresses, because under Docker the
+operator's tunnelled traffic arrives with a gateway peer address and internet traffic does not.
+rootlessport gives every request the same peer address, so the ACL either admits the internet or
+locks the operator out. `docker-compose.yml`'s own comment on `net-edge-ingress` names this
+mechanism as the **2026-07-20 outage** — "the userland docker-proxy relays every IPv6 client through
+the bridge gateway, so nginx sees ONE address for all of them and the per-IP limiter collapses into
+a single bucket" — and rootlessport is that userland proxy for IPv4 and IPv6 alike, with no
+"give the bridge a real subnet" escape.
+
+**This ADR therefore needs a re-ruling by @greluc before any further phase runs.** Four paths, set
+out with their costs in [`PODMAN_MIGRATION_PLAN.md` §7](../PODMAN_MIGRATION_PLAN.md): (A) Podman 6.x
+from a source newer than Debian 13 stable, dropping choice 2; (B) the edge in the host network
+namespace, trading five segments for a correct source address; (C) the hybrid with a rootful edge
+this ADR rejected, which is worth re-reading now; (D) stay on Docker, which is what this ADR's own
+closing sentence prescribes for a negative result.
+
+**Path A was examined on 2026-09-16 and is feasible — on a different distribution.** Podman 6.1.0,
+`passt 0^20260728` and `/usr/bin/pesto` all ship in the **base repositories of CentOS Stream 10**,
+and `rootless_port_forwarder` is present in its shipped `containers.conf` and documented in its
+`containers.conf(5)`; Fedora 45 carries Podman 6.1.1 and the same passt. Both were verified by
+installing the distribution's own package in a throwaway container and asking the binary, against a
+`debian:13` control that answered `podman 5.4.2`, no `pesto`, and zero matches for the option in
+either the config or the man page. Rocky Linux 10 and AlmaLinux 10 carry 5.8.2 and do **not**
+qualify — they are rebuilds of released RHEL while Stream is its forward branch.
+
+So A costs **choice 1**, not choice 2: it is still distribution packages only, from a distribution
+that is not Debian 13. The consequences that follow are SELinux in place of AppArmor (every bind
+mount needs a label), a `dnf`-shaped host bootstrap, and — the one that matters — **the testing host
+diverging again unless it moves too**, which is the exact condition choice 1 existed to end. Two
+things remain true regardless: the upstream feature is experimental and off by default, and Debian
+keeps Podman 6.x out of `sid`. Full examination, including why a Debian 13 backport is not a
+backport but an adoption of six source packages: `PODMAN_MIGRATION_PLAN.md` §8.
+
+There is also no architectural escape that would keep Debian 13: **pasta and bridge networks are
+mutually exclusive on one container** (`cannot set multiple networks without bridge network mode,
+selected mode pasta`), and upstream carries this deployment's exact shape — a reverse proxy that
+must see the client address while its upstreams stay unreachable from the host — as the known
+limitation `rootless_port_forwarder` was written to answer.
+
+Two further corrections to this ADR's consequences, from the same verification:
+
+- **`prometheus-podman-exporter` is not a replacement for cAdvisor here, it is a subset.** The
+  monitoring reads 17 distinct `container_*` series; the exporter's `podman_container_*` family has
+  no equivalent for `container_oom_events_total` (which `ContainerOomKilled` reads), for the
+  `container_threads` / `container_threads_max` pair (the most-used series in the configuration, and
+  the thread-OOM detection from *Three thread-OOMs…*), for `container_memory_working_set_bytes`,
+  `container_memory_rss`, or for the three CFS-throttling series. Choice 4 said observability is
+  rebuilt with the migration; it is now clear that "rebuilt" includes deciding which alerts survive.
+- **Quadlet 5.4.2 has no `Memory=`** — confirmed against that version's `podman-systemd.unit(5)`
+  rather than by report, so `REQ-OPS-020`'s limits would go through `PodmanArgs=--memory=…`. It does
+  carry `PidsLimit=`, the full `Health*` family and `Notify=healthy`, the last of which is a
+  genuinely better health gate than `docker compose up --wait`.
+
 ### Cost
 
 One additional server for the overlap, an IP change (DNS, SSH, any address-based rules), and a
@@ -171,6 +253,7 @@ per week and two were used on 2026-09-12.
 
 ## Status of this decision
 
-Proposed. The plan it governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
-has been touched. The phases are sequenced so that the measurements which could reject this ADR come
-first and cost nothing but time.
+Proposed, and **blocked on a re-ruling by @greluc**. The plan it governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
+has been touched. The phases were sequenced so that the measurements which could reject this ADR came
+first and cost nothing but time — and that is what happened: §3.1 was answered from vendor
+documentation on 2026-09-16, before a host was built, and it rejected the platform as specified.

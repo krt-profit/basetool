@@ -5,10 +5,14 @@
 > the reworked delivery section of [`docs/deployment.md`](deployment.md), and the `REQ-OPS-*` /
 > `REQ-OBS-014` amendments in [`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md) and
 > [`docs/specs/observability.md`](specs/observability.md)).
-> **Status:** Phase 0 not started. **No host has been touched.**
+> **Status:** **Phase 0 is done** (2026-09-16); Phases 1-6 are **blocked on an owner re-ruling**.
+> **No host has been touched.**
+> §3.1 — the one measurement the plan says can reject ADR-0163 — was answered on 2026-09-16 from
+> vendor documentation, without needing a host, and **its answer rejects the platform ADR-0163
+> chose**. See §3.1 for the finding and §7 for the paths out.
 > **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md)
-> (Proposed) — the four owner choices and the alternatives that were rejected.
-> **Last updated:** 2026-09-12 (testing-host facts from the PVE operator; §3.1 moved to Phase 5).
+> (Proposed, **needs re-ruling** — choice 1 and choice 2 are the ones that fail).
+> **Last updated:** 2026-09-16 (§3 answered; §4 re-verified against both hosts; §6 and §7 added).
 
 ---
 
@@ -79,6 +83,57 @@ every individual check has been shown red at least once.
 **Rollback:** none needed — nothing outside the repository changes.
 **Value if the migration is abandoned:** the suite stays. It is the missing external assertion for
 the edge, and it makes every future host change checkable.
+
+### Phase 0 — **done, 2026-09-16**
+
+`scripts/check-conformance.py` and `scripts/check-conformance.test.sh`, with the self-test wired
+into `repo-lint.yml` as the `conformance-selftest` job. Both halves of the acceptance passed.
+
+**Green against production-on-Docker** — the baseline a Podman run has to reproduce:
+
+|          Check           |      Requirement       |                                    Baseline observed 2026-09-16                                     |
+|--------------------------|------------------------|-----------------------------------------------------------------------------------------------------|
+| `vhost-reachable`        | REQ-OPS-014            | four vhosts answer; nothing 5xx                                                                     |
+| `certificate-valid`      | REQ-OPS-026            | all four covered by the SAN set, soonest expiry 86 d                                                |
+| `certificate-shared`     | REQ-OPS-026 / ADR-0162 | **one** leaf served across all four                                                                 |
+| `http-redirects`         | REQ-SEC-023            | all four redirect `:80`                                                                             |
+| `ipv6-reachable`         | ADR-0112               | all four answer over IPv6                                                                           |
+| `client-address-visible` | REQ-SEC-023 / ADR-0112 | the edge logged the probe from the **client's own public address**; 25-28 distinct clients per hour |
+| `containers-running`     | REQ-OPS-003            | 9/9 prod containers up and healthy                                                                  |
+| `scrape-targets-up`      | REQ-OBS-005            | 4/4 application targets `up`                                                                        |
+| `container-metrics`      | REQ-OBS-006            | 6/6 required `container_*` series populated                                                         |
+| `log-streams`            | REQ-OBS-005            | Loki ingesting ~11 lines/s                                                                          |
+| `rate-limit-active`      | REQ-SEC-023            | skipped - opt-in, it is load against the target                                                     |
+
+**Every check demonstrably red** — 37 assertions, no host, no daemon, loopback only. The external
+checks run against a local TLS fixture with throwaway certificates generated per run; the
+host-side checks against a stub that prints what the host would have printed.
+
+> [!important] A red for the wrong reason reads as proof, and the first draft produced twelve
+> Every red assertion now also names a substring its failure message must contain, and the
+> coverage gate counts only scenarios that **ran and behaved** rather than scenarios that were
+> written down. The draft's twelve host-side reds were all red because Windows could not execute
+> the stub at all - twelve green ticks asserting nothing about the checks they named.
+
+Building it found three defects that a configuration review would not have:
+
+1. **The external `/healthz` assertion was wrong about the deployment.** `/healthz` is declared in
+   `05-default.conf` on the **default** server behind `allow 127.0.0.1; allow ::1; deny all;`,
+   because it exists for the container `HEALTHCHECK`, which runs inside the container. Asserting
+   it from the internet asserted something the design forbids. Replaced by `scrape-targets-up`,
+   which reads Prometheus's `up` for the four application targets - a genuinely different signal
+   from container state, and the pair has been fooled separately before.
+2. **Three host commands were mis-quoted in ways only a real shell would show.** `awk {print $1}`
+   unquoted lets the *remote* shell expand `$1` to the empty string, so the distinct-client count
+   was always 1; `--format {{.Names}}\t{{.Status}}` loses its backslash and docker receives a
+   literal `t`; and one command carried a single quote, which the runner's own guard rejects.
+3. **`ipv6-reachable` conflated two different failures.** Its preflight probed the target, so a
+   runner with no IPv6 and a target with no IPv6 produced the same answer. A missing AAAA or a
+   refused connection is now a failure; no route from this machine is a skip.
+
+**Value if the migration is abandoned:** the suite stays. It is the missing external assertion for
+the edge, and `client-address-visible` is the check that turns §3.1 from an argument into a
+measurement - on Docker today, and on whatever runs the edge tomorrow.
 
 ### Phase 1 — Measurements on the testing host
 
@@ -163,81 +218,240 @@ old host still serving the public names.
 
 ---
 
-## 3. The questions that can stop this
+## 3. The questions that can stop this — answered 2026-09-16
 
-These come first because a negative answer is cheap now and expensive later. **A negative result
+These came first because a negative answer is cheap now and expensive later. **A negative result
 rejects ADR-0163 rather than triggering a workaround.**
 
-### 3.1 Does `pasta` preserve the client source address — IPv4 *and* IPv6?
+Every answer below was established on 2026-09-16 from vendor documentation and from read-only
+inspection of both hosts. Nothing here is recalled, and nothing is inferred from another
+deployment's result. Where a question still needs an experiment, it says so.
 
-The decisive one. `REQ-SEC-023`'s per-IP limiter and [ADR-0112](adr/0112-edge-per-ip-limit-keys-on-the-ipv6-64-prefix.md)'s
-`/64` key both read `$remote_addr`. If rootless port forwarding presents a gateway address, the
-limiter collapses into one bucket and the access log identifies nobody — the exact shape of the
-2026-07-20 outage.
+### 3.1 Does the edge see the client's source address? — **NO. This rejects ADR-0163 as written.**
 
-**Neither half can be measured on the testing host** — established with the PVE operator on
-2026-09-12, and it invalidates the first version of this plan. The guest firewall runs
-`policy_in: DROP` and admits exactly one source for application traffic, the reverse proxy in front
-of it; there is no public port forward, and the interface the traffic arrives on carries only
-link-local IPv6. It is not an inference from the firewall rules either: every line of that host's
-proxy access log carries the same single client address. The testing edge already sees one bucket
-for every request, under Docker, today.
+The plan asked the wrong question, and asking it correctly answers it without a host.
 
-That closes the *production-shaped* rehearsal: traffic arriving the way real traffic arrives cannot
-carry a distinct client address there. **It does not close the measurement itself**, and the first
-version of this section overstated it.
+**The question is not "does pasta preserve the source address".** It does. The question is whether
+*this* deployment's edge gets pasta at all — and it does not, because the edge is on bridge
+networks. Pasta is the default for the rootless **default network mode**; a container attached to
+user-defined bridges is forwarded by something else.
 
-What pasta has to be shown to do is preserve *whatever* source address reaches the host. The testing
-VM's DMZ interface `eth0` has a global IPv6 address and a working v6 default route, and its guest
-firewall admits the two management networks **in full** — so a client on the owner's LAN connecting
-directly to that interface arrives with its own address, proxied by nothing. That is exactly the
-property under test.
+Podman's own documentation, on `main`:
 
-So §3.1 splits:
+> By default, rootless bridge networks use `rootlessport` for port forwarding, which is a userspace
+> proxy that does not preserve client source IPs.
 
-- **The mechanism** — does pasta hand the container the client's real address? — is measurable on the
-  testing host by connecting to `eth0` directly from a LAN client, for IPv4 and, if the management
-  network carries v6, for IPv6 too. To be confirmed by one experiment in Phase 1 rather than assumed
-  here.
-- **The behaviour under production-shaped traffic** — the `/64` bucket key, 429-not-503 under load —
-  moves to Phase 5, on the new host while it is idle.
+`containers.conf(5)` has said the same thing about the underlying mechanism for years:
 
-Corroborating but not sufficient: the PVE operator migrated a different VM in the same estate to
-rootless Podman on 2026-09-11 and reports pasta preserving the source address there. Another host's
-result on another network shape informs the risk; it does not discharge the measurement.
+> `port_handler=rootlesskit`: Use rootlesskit for port forwarding. Default. Note: Rootlesskit
+> changes the source IP address of incoming packets to a IP address in the container network
+> namespace …
 
-### 3.2 Can the edge bind :80 and :443 rootless, and at what cost?
+There **is** a fix, and it is too new for the platform ADR-0163 picked. From the Podman **v6.0.0**
+release notes:
 
-`net.ipv4.ip_unprivileged_port_start` is 1024 today. Lowering it to 80 is host-wide and
-security-relevant: it lets *any* unprivileged process bind those ports. The alternatives — a
-socket-activated forwarder, or `CAP_NET_BIND_SERVICE` on a single unit — need to be weighed against
-it rather than assumed away.
+> A new experimental option for the `rootless_port_forwarder` field in `containers.conf` has been
+> added, `rootless_port_forwarder="pasta"`. When set, rootless bridge networks will use Pasta's
+> kernel-level port forwarding via Pesto instead of rootlessport, preserving the original client
+> source IP in network traffic in rootless containers. **The default remains `rootlessport` (the
+> default for Podman 5.x)**, but we will investigate switching at a later date when stability is
+> more certain.
 
-### 3.3 Do the network semantics survive?
+That last clause is the whole finding: *rootlessport is the default for Podman 5.x*, and Debian 13
+ships Podman 5.4.2.
 
-`internal: true`, the no-masquerade driver option, the pinned subnets, and the dual-stack ingress
-bridge. Netavark equivalents exist for most of this. Each one is measured the way the Docker
-behaviour was measured on 2026-09-12 — by observing it, because `internal: true` turned out to
-remove inbound DNAT as well as outbound NAT, which no documentation said.
+|                  Suite                   |        Podman        | `rootless_port_forwarder` |                passt                | `pesto` |
+|------------------------------------------|----------------------|---------------------------|-------------------------------------|---------|
+| **Debian 13 trixie** (ADR-0163's choice) | **5.4.2+ds1-2+b2**   | **absent**                | `0.0~git20250503.587980c-2+deb13u1` | no      |
+| trixie-backports                         | — (no podman)        | —                         | `0.0~git20260728.f8df3f1-1~bpo13+1` | yes     |
+| Debian forky / sid                       | 5.8.6+ds1-2          | **absent**                | `0.0~git20260728.f8df3f1-1`         | yes     |
+| Debian experimental                      | 6.1.1+ds1-1          | present                   | —                                   | —       |
+| Ubuntu 24.04 LTS (today's host)          | 4.9.3+ds1-1ubuntu0.2 | absent                    | —                                   | —       |
+| Ubuntu 26.04 LTS "resolute"              | 5.7.0+ds2-3build1    | **absent**                | —                                   | —       |
 
-### 3.4 Does the certificate handover survive user-namespace mapping?
+Read against the requirement (`>= passt-0^20260507.g1afd4ed`, tightened to `>= 0:20260526.g038c51e`
+for pesto): **no current Debian or Ubuntu stable release ships a Podman that can do this.** The
+newest Podman is 6.1.2, released 2026-09-16; 6.0.0 landed on 2026-06-24, after Debian 13 froze. The
+`podman` column was re-verified on the testing host itself with `apt-cache policy` — trixie/main
+offers 5.4.2 and **trixie-backports carries no podman at all**, only the newer passt.
 
-`acme` writes as root-in-container and hands the files to uid 101 so the edge can read them. Under
-rootless, both uids are subuids on the host. `REQ-OPS-026` and its check exist because this broke
-twice under Docker; it is the single most likely thing to break differently under Podman.
+#### What it costs here, specifically
 
-### 3.5 Do healthchecks and resource limits work under a user slice?
+This is not "the rate limiter gets less accurate". Six things in this repository read
+`$remote_addr`, and every one of them is an access-control or forensic surface:
 
-Podman implements rootless healthchecks with transient systemd timers, and cgroup limits need
-delegation for the user slice. `REQ-OPS-003`'s health gate and `REQ-OPS-020`'s measured limits both
-depend on these.
+|                           Surface                           |               Under rootlessport               |
+|-------------------------------------------------------------|------------------------------------------------|
+| `limit_req_zone $krt_limit_key` — REQ-SEC-023, ADR-0112     | one bucket for the entire internet             |
+| `location ^~ /auth/admin` allow-list of the bridge gateways | **inverts** — see below                        |
+| `05-default.conf` `allow 127.0.0.1; allow ::1; deny all;`   | same class                                     |
+| `api-allowlist.conf` default-deny (ADR-0135)                | same class                                     |
+| `X-Forwarded-For` / `X-Real-IP` set from `$remote_addr`     | every module's view of the client              |
+| the edge access log                                         | the only record of a rejected request's origin |
 
-### 3.6 Is there a container-metrics source with the same series?
+> [!danger] The Keycloak admin ACL does not degrade, it inverts
+> `10-frontend.conf.template` allows exactly the bridge gateways — `172.28.15.1`, `fd00:28:15::1`,
+> `172.28.3.1`, `172.28.4.1`, `172.28.7.1`, `172.28.13.1` — and the comment above it states the
+> reason: the ACL matches `$remote_addr`, which is the TCP peer, and traffic tunnelled from the host
+> reaches the edge through docker-proxy, so its peer address is the bridge gateway rather than the
+> operator's address. The rule's entire security rests on operator traffic and internet traffic
+> arriving with **different** peer addresses.
+>
+> rootlessport collapses that distinction. Every request — tunnel and internet alike — arrives
+> from the forwarder's address inside the container network namespace. Either that address is in
+> the allow-list, and the admin console is open to the internet, or it is not, and the operator is
+> locked out. There is no third outcome, and `nginx -t` cannot see it.
 
-Not "does an exporter exist" — whether the specific series the alerts read are present, with a label
-vocabulary that keeps `REQ-OBS-006`'s cardinality bounds.
+None of this is a new class of failure here. It is one the deployment has already survived once and
+wrote down at the time.
 
----
+> [!bug] `docker-compose.yml` already names this exact failure, as a past outage
+> The comment on `net-edge-ingress` records the 2026-07-20 outage: the userland docker-proxy relayed
+> every IPv6 client through the bridge gateway, so nginx saw ONE address for all of them and the
+> per-IP limiter collapsed into a single bucket. Giving that bridge a real IPv6 subnet is what made
+> Docker install the kernel DNAT, so the client address survived.
+>
+> **rootlessport is that userland proxy.** It applies to IPv4 and IPv6 alike, and the escape Docker
+> offered — give the bridge a real IPv6 subnet so the kernel does the DNAT — does not exist,
+> because there is no kernel DNAT to reach. The migration would re-introduce, for every client, the
+> outage ADR-0112 fixed for IPv6 clients.
+
+#### What this does **not** say
+
+It does not say rootless Podman cannot do this. It says **the version Debian 13 ships cannot**, and
+that ADR-0163's choice 2 ("the distribution's own Podman, no third-party repository") is what
+makes choice 1 fail. The paths out are in §7 and the choice between them belongs to @greluc.
+
+It also does not close the *empirical* half. Once a platform is chosen, the behaviour is still
+measured before anything is built on it — the documentation says what is supposed to happen, and
+this project's own history is a list of things that were supposed to happen.
+
+### 3.2 Can the edge bind :80 and :443 rootless, and at what cost? — open, and now cheaper
+
+`net.ipv4.ip_unprivileged_port_start` is **1024** on the production host, re-verified 2026-09-16.
+
+The edge already listens on **8080/8443 inside the container** (`nginxinc/nginx-unprivileged`,
+`user: 101:101`) and compose publishes `80:8080` / `443:8443`. So nginx itself never binds a
+privileged port and never will; the bind is done by whatever forwards the host side. Three options,
+unchanged in shape but now attached to a smaller problem:
+
+- lower `net.ipv4.ip_unprivileged_port_start` to 80 — host-wide, lets *any* unprivileged process
+  bind those ports;
+- `AmbientCapabilities=CAP_NET_BIND_SERVICE` on the single generated unit — narrower, and the one
+  worth measuring first;
+- socket activation — systemd owns the listener. Note nginx speaks no `LISTEN_FDS`, so this only
+  works for the forwarder, not for nginx directly.
+
+**Decide after §3.1**, because the answer depends on which process does the binding.
+
+### 3.3 Do the network semantics survive? — mostly, with one real gap
+
+Read off `podman-network-create(1)` on 2026-09-16:
+
+|                                  Compose today                                  |       netavark equivalent        |                   Verdict                    |
+|---------------------------------------------------------------------------------|----------------------------------|----------------------------------------------|
+| `ipam.config.subnet` / `gateway` (all 18 nets)                                  | `--subnet`, `--gateway`          | direct                                       |
+| `enable_ipv6: true` (3 app nets + `net-blackbox-v6`)                            | `--ipv6`, or a second `--subnet` | direct                                       |
+| `internal: true` (5 `net-proxy-*` + `net-docker-proxy`)                         | `--internal`                     | direct in name; **measure the inbound half** |
+| `com.docker.network.bridge.enable_ip_masquerade: "false"` on `net-edge-ingress` | **none**                         | **gap**                                      |
+
+> [!warning] There is no netavark option to turn masquerading off on a managed, non-internal bridge
+> The documented driver options are `mtu`, `metric`, `no_default_route`, `vlan`, `isolate`, `vrf`,
+> `mode`, `com.docker.network.bridge.name`, `com.docker.network.driver.mtu`. None disables NAT. The
+> only "no NAT, no port forwarding" setting is `mode: unmanaged`, which means an existing bridge
+> Podman does not manage — not what this is.
+>
+> The candidate equivalent is **`-o no_default_route=true`** on `net-edge-ingress`: the edge is on
+> that one non-internal network and five `internal: true` ones, so with no default route anywhere it
+> has no egress, which is the property the masquerade switch was buying. That is a hypothesis about
+> a security control and it gets measured, not assumed.
+
+`--internal` is documented as disabling IP forwarding and preventing default routes. Under Docker,
+`internal: true` turned out to remove **inbound DNAT as well** — which no documentation said, and
+which is the reason `net-edge-ingress` exists at all. Whether netavark's `--internal` behaves the
+same way decides whether the ingress bridge is still needed. **Measure it; do not read it.**
+
+### 3.4 Does the certificate handover survive user-namespace mapping? — sharpened, and testable
+
+The handover is more delicate than §3.4 assumed, and reading the actual `acme` command makes the
+constraint precise. `acme` runs as root-in-container with `cap_drop: [ALL]` plus
+**`cap_add: [CHOWN]`**, and for each host it writes a temp file, `chmod`s it, `chown 101:101`s it
+and renames it into place — mode **before** ownership, because `CAP_FOWNER` is dropped and root may
+not chmod a file it does not own. The directories stay `0:0` deliberately; a `chown -R` broke this
+on 2026-09-12.
+
+Under a user namespace, "root in container" is the service user on the host and uid 101 is
+`subuid_base + 100`. Three conditions have to hold, and all three are checkable in an afternoon:
+
+1. `CAP_CHOWN` inside the userns is enough to chown to a uid **inside the mapping** — it should be,
+   and 101 sits well inside a 65536-wide range;
+2. `acme` and `edge` must share **one** mapping. `--userns=auto` gives each container its own range
+   and would break the handover outright — so the units must take the default mapping, and that has
+   to be stated in the unit files rather than left to whoever writes them;
+3. the `edge-certs` volume must be a Podman-managed named volume, as it is under compose today.
+
+`REQ-OPS-026` (a renewed certificate is not delivered until the edge can open it) is the acceptance
+here, unchanged.
+
+### 3.5 Do healthchecks and resource limits work under a user slice? — yes, with one spelling change
+
+Measured on the Debian 13 testing host, 2026-09-16: cgroup v2, and **`user.slice` already delegates
+`cpuset cpu io memory hugetlb pids rdma misc`**. The memory and pids controllers a rootless service
+needs are therefore present without further host work.
+
+Read off the **Podman 5.4.2** `podman-systemd.unit(5)` man page — the version Debian 13 ships, not
+the latest:
+
+|             Need             |                    5.4.2 Quadlet                    |   6.x Quadlet    |
+|------------------------------|-----------------------------------------------------|------------------|
+| memory limit (`REQ-OPS-020`) | **no `Memory=`** → `PodmanArgs=--memory=…`          | `Memory=` exists |
+| pids limit                   | `PidsLimit=`                                        | `PidsLimit=`     |
+| health gate (`REQ-OPS-003`)  | the full `Health*` family, and **`Notify=healthy`** | same             |
+| image update                 | `AutoUpdate=`                                       | `AutoUpdate=`    |
+
+This confirms the PVE operator's third finding against the primary source rather than by report.
+`Notify=healthy` is worth calling out as an **improvement**: it postpones the unit's startup
+notification until Podman marks the container healthy, which is a stronger and simpler health gate
+than `docker compose up --wait`.
+
+Lingering is **not** configured on the production host today (`/var/lib/systemd/linger` is empty,
+verified 2026-09-16), and `/etc/subuid` and `/etc/subgid` exist but are **empty** — so a rootless
+service user needs both, as ADR-0163 said.
+
+### 3.6 Is there a container-metrics source with the same series? — **NO. This is a rebuild, not a re-point.**
+
+`prometheus-podman-exporter` prefixes everything `podman_`, and its series are a **subset** of
+cAdvisor's. The monitoring configuration reads **17 distinct `container_*` series**; this is what
+happens to them:
+
+|                               cAdvisor series (uses in `monitoring/`)                               |                Podman exporter                |
+|-----------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| `container_threads` (15), `container_threads_max` (15)                                              | **none**                                      |
+| `container_memory_rss` (14)                                                                         | **none**                                      |
+| `container_spec_memory_limit_bytes` (12)                                                            | `podman_container_mem_limit_bytes`            |
+| `container_memory_working_set_bytes` (11)                                                           | **none** (only `mem_usage_bytes`)             |
+| `container_label_com_docker_compose_service` (7)                                                    | **none** — the whole label vocabulary changes |
+| `container_start_time_seconds` (6), `container_last_seen` (5)                                       | partial                                       |
+| `container_memory_mapped_file` (5)                                                                  | **none**                                      |
+| `container_cpu_cfs_periods_total` / `_throttled_periods_total` / `_throttled_seconds_total` (4/4/2) | **none**                                      |
+| `container_oom_events_total` (2)                                                                    | **none**                                      |
+| `container_network_receive_bytes_total` / `_transmit_bytes_total` (1/1)                             | to be confirmed                               |
+| `container_cpu_usage_seconds_total` (1)                                                             | `podman_container_cpu_seconds_total`          |
+
+> [!danger] Two of the losses are alerts ADR-0163 named as the reason not to proceed blind
+> `container_oom_events_total` is what `ContainerOomKilled` reads, and the `container_threads` /
+> `container_threads_max` pair — the most-used series in the whole configuration — is the thread-OOM
+> detection that came out of *Three thread-OOMs, and a wget that leaked one process every 30
+> seconds*. Neither has a Podman-exporter equivalent.
+
+Version matrix, for whichever platform is chosen: exporter **v2 → Podman 6**, **≥ 1.11 → Podman
+5.x**, **≤ 1.10 → Podman 4.x**.
+
+So Phase 4 is not "re-point the alerts". It is: decide, per alert, whether the signal is
+reconstructable from `podman_container_*` plus the applications' own `/actuator/prometheus` (which
+already carries JVM thread counts and is unaffected by the runtime), or whether the alert is
+retired. That is an owner decision with a security-monitoring consequence, and it belongs in the
+re-ruling of ADR-0163 rather than after it.
 
 ## 4. The testing host — answered 2026-09-12
 
@@ -281,6 +495,46 @@ user). Until then the host is read-only to us.
 exist only for `sysadm`, so a rootless service user needs its own range; the VM's disk is marked
 `backup=0`, so ZFS snapshots are the only net — there is no vzdump copy behind them.
 
+### Re-verified 2026-09-16 — three of the facts above have changed
+
+Read directly off `sysadm@10.9.0.12`, not reported:
+
+- **`sudo` works now.** `sudo -n true` succeeds. The paragraph above says the locked password makes
+  `sudo` impossible and "until then the host is read-only to us" — that is **superseded**. Phase 1
+  is no longer blocked on the owner, and the host can be prepared, snapshotted and broken freely.
+- **`trixie-backports` is enabled on it**, which is how the newer `passt` above is visible to
+  `apt-cache policy`. It carries no `podman`, so it does not rescue §3.1.
+- **Debian 13 does not restrict unprivileged user namespaces.**
+  `kernel.apparmor_restrict_unprivileged_userns` is **absent** there, while the Ubuntu production
+  host has it set to `1`. AppArmor is active on both. This is one obstacle *fewer* than the current
+  host, and it is worth knowing before somebody debugs a rootless failure that was never going to
+  happen.
+- Unchanged and re-confirmed: Debian 13 trixie, Docker 26.1.5+dfsg1 / Compose 2.26.1-4, cgroup v2,
+  `subuid`/`subgid` only for `sysadm` (`100000:65536`), a global IPv6 address on `eth0`
+  (`2003:c5:5f03:e509::/64`).
+
+### The trap, re-assessed 2026-09-16 — smaller than recorded
+
+The section below says the edge's `server_name` directives are "literal `profit-base.online` names
+with no substitution". **They are not.** All four vhosts are templated — `${EDGE_HOST_FRONTEND}`,
+`${EDGE_HOST_INGEST}`, `${EDGE_HOST_GRAFANA}`, `${EDGE_HOST_API}` — and
+`docker/edge/render-and-run.sh` **refuses to start** when any of them is unset:
+
+```
+edge: refusing to start — unset host variable(s): …
+```
+
+So a `:testing` promotion onto a host without those variables produces a container that fails
+loudly and is rolled back by the health gate, not an edge quietly serving production host names.
+The `acme` half is likewise guarded: an empty `ACME_HOSTS` makes the container **idle** by design
+(`"acme: ACME_HOSTS is empty — no certificates are managed on this host"`) rather than request
+certificates for the production names.
+
+What remains true: `deploy.sh` still hardcodes `PROFILE=prod` (line 190), so the testing host will
+still swap `npm` for `edge` on its next `:testing` promotion, and it needs `EDGE_HOST_*` in its
+`.env` before that happens. That is a **configuration task on the testing host**, not a defect to
+fix in the repository first — which is a different and much cheaper conclusion than the one below.
+
 ### The trap this plan has to clear first
 
 `deploy.sh` hardcodes `PROFILE=prod` (line 190), and ADR-0162 put `edge` and `acme` in the `prod`
@@ -312,4 +566,276 @@ has been quiet for a few days.
   on Podman afterwards is decided once production has.
 - **Anything about the application.** No image, no schema and no endpoint changes here. If this
   migration requires an application change, that is a finding worth stopping for.
+
+---
+
+## 6. The production host, as measured 2026-09-16
+
+Read-only inspection under the standing read permission. Every line below was observed, not
+recalled, and the commands were `cat /etc/os-release`, `uname -a`, `docker --version`,
+`docker compose version`, `stat -fc %T /sys/fs/cgroup`, `sysctl net.ipv4.ip_unprivileged_port_start`,
+`nproc`, `free -h`, `df -h`, `lsblk`, `ip -brief addr`, `docker network ls`, `docker ps -a`,
+`systemctl list-units/list-timers "iri-*"`, `du -shx`, `ls -la /var/iri`, `getent passwd deploy`,
+`cat /etc/subuid /etc/subgid`, `ss -ltnp`, `journalctl --disk-usage`, `sha256sum`, and the Hetzner
+metadata endpoint.
+
+### What it is
+
+|                     |                                                                                                                                                                                                |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Provider / location | Hetzner vServer, `eu-central`, **`nbg1-dc3`**, instance-id `124332793`                                                                                                                         |
+| CPU                 | **8 vCPU**, AMD EPYC-Genoa                                                                                                                                                                     |
+| Memory              | **15 982 920 kB** (16 GB)                                                                                                                                                                      |
+| Disk                | **327 684 194 304 B** (305.2 GiB) on a single `/dev/sda`, one root partition                                                                                                                   |
+| OS                  | Ubuntu 24.04.5 LTS, kernel 6.8.0-139                                                                                                                                                           |
+| Runtime             | Docker **29.8.0**, Compose **v5.5.1**, storage driver `overlayfs`, cgroup driver `systemd`, cgroup **v2**                                                                                      |
+| Addresses           | `178.104.94.14/32`, `2a01:4f8:1c19:6462::1/64`, working IPv4 **and** IPv6 default routes                                                                                                       |
+| Published ports     | **only** `:80`, `:443` (both via `docker-proxy`, v4 and v6) and `:22`                                                                                                                          |
+| Containers          | **22 running**, 3 exited (`npm` in the `rollback` profile, two `edge-probe*`)                                                                                                                  |
+| Networks            | **18 project bridges** (`net-*` and `code_net-*`) plus the stock three                                                                                                                         |
+| Rootless readiness  | `/etc/subuid` and `/etc/subgid` exist and are **empty**; `/var/lib/systemd/linger` **empty**; `net.ipv4.ip_unprivileged_port_start = 1024`; `kernel.apparmor_restrict_unprivileged_userns = 1` |
+| `deploy` user       | uid 999, gid 987, in group `docker`, shell `/sbin/nologin`                                                                                                                                     |
+
+> [!success] The `deploy.sh` staleness gap recorded on 2026-09-12 is closed
+> `sha256sum /var/iri/code/scripts/deploy.sh` on the host and `git show origin/main:scripts/deploy.sh
+> | sha256sum` both answer `b61d8b7b207f5c25b43a5581c2f85ecbe8688cd2d9ecc8a38fa6133506a80e6f`. The
+> host is running the current deployer. The *mechanism* that let it drift is unchanged, so this is a
+> point-in-time fact and not a fix.
+
+### How much actually has to move
+
+`/` is 41 % used — 116 GB of 301 GB — and most of that is not data:
+
+|                        Path                         |               Size               |                                        Migrate?                                         |
+|-----------------------------------------------------|----------------------------------|-----------------------------------------------------------------------------------------|
+| `/var/iri-http2`                                    | **37 GB**                        | **no** — a full copy of `/var/iri` taken 2026-09-11, referenced by no running container |
+| `/var/lib/containerd`                               | **35 GB**                        | no — the image store; the new host pulls its own                                        |
+| `/var/iri-userid`                                   | **26 GB**                        | **no** — a full copy of `/var/iri` taken 2026-08-29, likewise unreferenced              |
+| `/var/iri/monitoring/data`                          | 15 GB                            | a decision — Prometheus TSDB, Loki and Tempo history                                    |
+| `/var/iri/frontend` · `backend`                     | 191 MB · 155 MB                  | yes (app state)                                                                         |
+| `/var/iri/db-backend` · `db-keycloak`               | 188 MB · 71 MB                   | **restored from backup, not copied**                                                    |
+| `/var/iri/redis`                                    | 22 MB                            | yes                                                                                     |
+| `/var/iri/code` · `secrets` · `keycloak` · `ingest` | 2.9 MB · 20 KB · 116 KB · 496 KB | yes                                                                                     |
+| `/var/iri/npm`                                      | 143 MB                           | no — the retired proxy; its Let's Encrypt archive is superseded by `edge-certs`         |
+| journal                                             | 1.6 GB                           | no                                                                                      |
+
+**The live application state is under a gigabyte**, plus whatever monitoring history is judged worth
+carrying. The 63 GB in `/var/iri-userid` and `/var/iri-http2` are two undocumented pre-change
+snapshots; they are named here so the next person does not size a server around them, and whether
+they are deleted is a separate decision (a host write, and therefore the owner's).
+
+### The "equivalent" Hetzner VM — one thing that cannot be read from inside
+
+The measured shape is **8 vCPU / 16 GB / 327.68 GB**. The current Hetzner Cloud catalogue holds
+`CX43` (8 shared vCPU, 16 GB, **160 GB**) and `CCX33` (8 dedicated vCPU, **32 GB**, 240 GB) — neither
+matches, and the metadata endpoint does not expose the plan name. The hostname `ubuntu-8gb-nbg1-1`
+records what the server was created as, not what it is now, so it cannot settle it either.
+
+**Do not infer the plan.** It is one glance in the Hetzner Console (Server → type) and it decides
+both the cost of the overlap and whether the new host needs a Volume to hold the same disk. What the
+measurements *do* settle is the floor: 8 vCPU and 16 GB are in use today, and the disk requirement
+for a clean host is far below 327 GB once the two dead snapshots and the image store are excluded.
+
+> [!note] Debian 13 images are offered by Hetzner Cloud; the ARM lines are not a candidate
+> Every application image in this deployment is `linux/amd64` **and** `linux/arm64` (the release
+> matrix builds both), but Keycloak, the exporters and the monitoring images are pinned by digest
+> per architecture, and `check-monitoring-image-pins.sh` compares those pins against the documents.
+> Moving to `CAX`-class ARM would be a second migration riding inside this one. Out of scope.
+
+## 7. The paths out of §3.1 — the owner's choice
+
+Four, and they are genuinely different amounts of work. Each keeps rootless Podman except the last
+two; none of them is "work around §3.1", because there is nothing to work around — the address is
+either preserved or it is not.
+
+**A — Podman 6.x, from a source newer than Debian 13 stable.** **Examined on 2026-09-16 — see §8: feasible, on CentOS Stream 10 or Fedora 45, not on Debian 13.** The only path that keeps the
+architecture ADR-0163 describes intact: bridge networks, the 18 segments, the edge where it is.
+Costs choice 2 of the ADR ("the distribution's own Podman"). The feature is **experimental and
+off by default upstream**, which for an internet-facing rate limiter is the part to weigh, not the
+packaging. Needs: a Podman ≥ 6.0 source Debian 13 can carry, `passt ≥ 0:20260526` (trixie-backports
+already has it), and `rootless_port_forwarder="pasta"` measured against a real client before
+anything else is built.
+
+**B — the edge in the host network namespace.** No port forwarding at all, so the source address is
+the client's by construction, and §3.2 shrinks to one `CAP_NET_BIND_SERVICE`. The price is the
+topology: the edge stops being on `net-proxy-*` and reaches its five upstreams over host-published
+loopback ports, so those five services become reachable by anything else on the host. That is a real
+loss against `Topology`'s "a container can reach exactly the containers it has a named network in
+common with", and it is bounded — the data networks and every other segment are untouched.
+
+**C — a hybrid: the edge stays rootful, everything else goes rootless.** ADR-0163 already considered
+and rejected this as "halving the benefit". It is worth re-reading now rather than re-rejecting from
+memory, because the benefit it halves is smaller than it looked: the edge is already uid 101,
+`cap_drop: [ALL]`, `read_only: true`, no egress. What stays rootful is one hardened container and
+the daemon under it.
+
+**D — stay on Docker.** ADR-0163's own stated consequence of a negative §3.1: "A negative result does
+not mean 'work around it'. It means this ADR is rejected and the host stays on Docker." Cheapest, and
+it keeps a root daemon and the socket that two monitoring components can reach through a GET-only
+proxy.
+
+> [!important] Phase 0 is worth doing under **all four**
+> The conformance suite asserts the invariants against a running host and has to go green against
+> today's Docker stack first. It is the missing external assertion for the edge whatever happens
+> next, and it is the only part of this plan that needs no decision. It is also the thing that would
+> have caught §3.1 empirically, three phases later and after the work.
+
+---
+
+## 8. Path A, examined — 2026-09-16
+
+**Verdict: A is feasible, and not on Debian 13.** It is available today, entirely from a
+distribution's own base repositories, on **CentOS Stream 10** and on **Fedora 45**. Choosing it
+therefore does not cost ADR-0163's choice 2 (no third-party repositories, no cross-release pinning);
+it costs choice 1, the Debian-13-to-match-testing decision.
+
+### Measured by running it, not by reading about it
+
+Both sides were checked by installing the distribution's own package in a throwaway container and
+asking the binary. No inference.
+
+|                                                            |        Debian 13 `debian:13`        |                                          CentOS Stream 10 `quay.io/centos/centos:stream10`                                           |
+|------------------------------------------------------------|-------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `podman --version`                                         | **5.4.2**                           | **6.1.0**                                                                                                                            |
+| `passt`                                                    | `0.0~git20250503.587980c-2+deb13u1` | `0^20260728.gf8df3f1-1.el10`                                                                                                         |
+| `/usr/bin/pesto`                                           | **No such file or directory**       | present, 40 920 bytes                                                                                                                |
+| `rootless_port_forwarder` in the shipped `containers.conf` | **absent**                          | line 424, `#rootless_port_forwarder = "rootlessport"`                                                                                |
+| the same name in `containers.conf(5)`                      | **0 matches**                       | documented: *Select the port forwarding mechanism for rootless bridge networks. Valid options are rootlessport (default) and pasta.* |
+
+### The distribution matrix, as measured
+
+|     Distribution     |  podman   |    passt     | `pesto` | netavark | satisfies A |
+|----------------------|-----------|--------------|---------|----------|-------------|
+| **CentOS Stream 10** | **6.1.0** | `0^20260728` | **yes** | 2.1.0    | **yes**     |
+| **Fedora 45**        | **6.1.1** | `0^20260728` | **yes** | 2.1.0    | **yes**     |
+| Rocky Linux 10       | 5.8.2     | `0^20251210` | no      | 1.17.2   | no          |
+| AlmaLinux 10         | 5.8.2     | `0^20251210` | no      | 1.17.2   | no          |
+| Debian 13 trixie     | 5.4.2     | `0^20250503` | no      | 1.14.0   | no          |
+| Ubuntu 26.04 LTS     | 5.7.0     | —            | —       | —        | no          |
+
+CentOS Stream 10 also carries aardvark-dns 2.1.0, crun 1.29.1 and conmon 2.2.1; Fedora 45 matches on
+the first two.
+
+> [!note] Rocky and AlmaLinux are behind by construction, not by neglect
+> Both are rebuilds of *released* RHEL — 10.2 at the time of writing — while Stream is the branch RHEL
+> is cut from. They will get Podman 6 when a RHEL minor rebases container-tools onto it, and Red Hat
+> documents that stream as rebasing on the latest stable upstream Podman up to four times a year.
+> That is a direction, not a date, and a migration cannot be scheduled against it.
+
+### Why Debian 13 cannot get there
+
+Four independent reasons, any one of which is sufficient:
+
+1. **No official Podman apt repository exists.** The Podman project's own installation page directs
+   Debian and Ubuntu users to `apt-get install podman` from the distribution and offers nothing of
+   its own. The retired Kubic repositories are not a fallback.
+2. **Debian has 6.x in `experimental` only** — not in `sid`, where `5.8.6` still sits. That is
+   Debian's own judgement of readiness, and it is worth reading next to upstream's: the feature in
+   question is flagged **experimental** by Podman too.
+3. **Installing the experimental package on trixie means a library transition.** It depends on
+   `libgpgme45 (>= 2.2.0)`, and `libgpgme45` exists **only in forky and sid**; trixie has
+   `libgpgme11t64` at gpgme 1.24.2. Pulling gpgme 2.2 into a stable host, for the library Podman
+   verifies image signatures with, is exactly the supply chain ADR-0163 rejected when it turned down
+   APT pinning from a non-LTS Ubuntu.
+4. **Rebuilding it for trixie is not a backport, it is adopting the stack.** The source package
+   build-depends on `golang-github-containers-buildah-dev (>= 1.45.0~)`, `-common-dev (>= 0.69.1~)`,
+   `-image-dev (>= 5.41.1~)`, `-storage-dev (>= 1.64.0~)`, `-gvisor-tap-vsocks-dev (>= 0.7.4)`,
+   `-psgo-dev (>= 1.10)` and `golang-github-opencontainers-runc-dev (>= 1.3)` — trixie carries the
+   5.4.2-era versions of all of them. That is six or more source packages to maintain, with their
+   security updates, forever.
+
+### And there is no architectural way around it
+
+Confirmed on 2026-09-16, and it closes the last alternative that would have kept Debian 13:
+**pasta and bridge networks are mutually exclusive on one container.** Podman refuses with `cannot
+set multiple networks without bridge network mode, selected mode pasta`. Upstream carries the exact
+shape of this deployment as a known limitation — a reverse proxy that must see the client address
+while its upstreams are reachable only to it, and not to the host — and `rootless_port_forwarder`
+is the answer that was written for it.
+
+So the edge cannot take pasta for ingress and bridges for its five upstreams. It is Podman 6 or a
+different topology.
+
+### CentOS Stream 10 against Fedora Server — the one that decides it is the lifecycle
+
+Both satisfy A today. They differ in what they cost afterwards, and the difference is not subtle.
+
+|                          |                                            CentOS Stream 10                                            |                                      Fedora Server                                      |
+|--------------------------|--------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
+| Podman today             | 6.1.0                                                                                                  | 6.1.1                                                                                   |
+| Supported until          | **2030-05-31**                                                                                         | ~13 months per release (F43 ends 2026-12-09; F44, released 2026-04-28, ends 2027-06-02) |
+| New release every        | ~3 years                                                                                               | ~6 months                                                                               |
+| How Podman stays current | **container-tools is a rolling AppStream that rebases on the latest stable upstream, up to 4x a year** | by upgrading the whole distribution                                                     |
+| Host rebuilds implied    | one, then roughly 2030                                                                                 | **roughly one a year**                                                                  |
+| Relationship to upstream | Red Hat is upstream for Podman, Quadlet, netavark and passt; Stream is the branch RHEL is cut from     | closest to upstream of anything shipping                                                |
+| Confinement              | SELinux enforcing                                                                                      | SELinux enforcing                                                                       |
+| Offered by Hetzner       | yes (version to confirm in the Console)                                                                | yes (version to confirm in the Console)                                                 |
+
+> [!important] The decisive argument is not stability, it is where the Podman version comes from
+> This migration failed on Debian 13 for one structural reason: **the distribution freezes Podman and
+> the project needed a newer one.** Fedora solves that by making you replace the distribution every
+> year. CentOS Stream solves it by moving the container stack *inside* a base supported to 2030 —
+> which is the same property, without an annual rebuild and DNS cutover on a host this project's own
+> rules say must be rebuilt rather than upgraded.
+
+Where Fedora genuinely wins: if the experimental `rootless_port_forwarder` needs a fix, Fedora gets
+it first. That is worth something precisely because the feature is experimental. It is not worth an
+annual production rebuild, and Stream's four-times-a-year rebase is not far behind.
+
+Where Stream genuinely loses: it is the *forward* branch of RHEL, not a frozen one. Packages reach it
+before RHEL customers see them, so a regression can arrive here first — and the container stack in
+particular will keep moving under the deployment. For a stack that would be resting on an
+experimental flag, that cuts both ways and should be said out loud rather than filed under
+"enterprise distribution".
+
+Rocky Linux 10 and AlmaLinux 10 are the frozen alternative and they do not qualify: 5.8.2, measured.
+
+> [!question] The option that is not on the list, and should be
+> If the only reason to leave Debian is Podman 6, then **waiting** is a real option, not a
+> non-answer. Debian 14 "forky" is at 5.8.6 today and would very likely carry 6.x at release. That
+> is path D with an expiry date attached: stay on Docker, re-run §3.1 against forky when it freezes,
+> and migrate then onto a Debian that matches the testing host — which is what ADR-0163 wanted in the
+> first place. It costs the security case another year and costs nothing else.
+
+### What choosing the RHEL family costs
+
+None of these is a blocker; all of them are work that has to be planned rather than discovered.
+
+- **SELinux replaces AppArmor**, enforcing by default. Every bind mount in the stack needs a correct
+  label — `:z` / `:Z` on the Quadlet `Volume=` lines, or a matching `semanage fcontext` rule. This
+  is the RHEL-family equivalent of the certificate-handover question in §3.4, and it should be
+  measured on the same afternoon. It is also a genuine gain: a second confinement layer under the
+  user namespace.
+- **The bootstrap documentation is Debian/Ubuntu-shaped.** `docs/deployment.md` speaks `apt`. The
+  host preparation becomes `dnf`, and the unattended-upgrades equivalent is `dnf-automatic`.
+- **The testing host diverges again.** ADR-0163's choice 1 existed to end exactly that. Either the
+  testing host moves to CentOS Stream 10 as well — it is a PVE VM with ZFS snapshots, so this is
+  cheap — or the rehearsal environment stops proving what it is there to prove. **This is the real
+  cost of A, and it should be decided together with A rather than after it.**
+- Nothing about the images changes. All five published images are OCI and architecture-matched; the
+  host distribution is invisible to them.
+
+### The risk that does not go away
+
+`rootless_port_forwarder="pasta"` is **experimental and off by default**, by upstream's own
+description, and the control it would be carrying is an internet-facing rate limiter plus an admin
+allow-list. Two separate parties have said *not yet* about this code path: upstream by defaulting it
+off, Debian by keeping 6.x out of unstable.
+
+That does not make A wrong. It makes A conditional on a measurement that has to be done properly,
+and on a decision about what happens if the flag regresses in a later Podman.
+
+> [!important] The acceptance test for A, before anything is built on it
+> Not "does it start". On a host with the real edge configuration, from a client outside the host:
+>
+> 1. the edge access log shows the **client's own** address, for IPv4 and for IPv6;
+> 2. `limit_req_zone` buckets two different clients separately, and the IPv6 `/64` key from ADR-0112
+>    still collapses one subscriber's rotating addresses into one bucket;
+> 3. the `location ^~ /auth/admin` allow-list still **admits** the tunnelled operator and **refuses**
+>    an external client — both directions asserted, because a rule that admits everyone and a rule
+>    that admits no one look identical from one side;
+> 4. all of the above survives a container recreate and a host reboot.
+>
+> That is four assertions, and they are the same four the Phase 0 conformance suite has to make
+> against the current Docker stack anyway. **Build the suite first; it is the acceptance test.**
 
