@@ -1,4 +1,4 @@
-# ADR-0186 — The host bootstrap is an Ansible role, and provisioning stays separate from delivery
+# ADR-0188 — The host bootstrap is an Ansible role, and provisioning stays separate from delivery
 
 - **Status:** Accepted
 - **Date:** 2026-09-16

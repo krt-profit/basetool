@@ -88,6 +88,16 @@ CERT_MIN_DAYS = 21
 
 #: The prod-profile containers the app deploy owns. ``npm`` is the retired proxy and lives in the
 #: ``rollback`` profile, so it is deliberately absent.
+#: Containers that must not be running as root inside themselves, and the uid each must be.
+#: The same numbers scripts/generate-quadlet.py pins with RUN_AS and the bootstrap role owns the
+#: data directories as -- see ADR-0189. Deliberately NOT derived from either at runtime: this suite
+#: has to be able to disagree with them, which is the whole point of an acceptance check.
+UNPRIVILEGED_CONTAINERS = {
+    "db-backend": 70,
+    "db-keycloak": 70,
+    "redis": 999,
+}
+
 EXPECTED_APP_CONTAINERS = (
     "edge",
     "acme",
@@ -916,6 +926,95 @@ def _promql(ctx: Context, query: str) -> dict:
     return payload
 
 
+def _translate_uid(host_uid: int, uid_map: list) -> int | None:
+    """Translate a host uid into the uid a container sees, using that container's ``uid_map``.
+
+    Each row is ``(container_start, host_start, count)``, the triple ``/proc/<pid>/uid_map``
+    prints. A container with no user namespace carries the identity map, so the same code answers
+    for rootful Docker and for rootless Podman without having to know which it is looking at.
+
+    Args:
+        host_uid: the uid the host sees the process running as.
+        uid_map: the parsed rows of the container's uid_map.
+
+    Returns:
+        The uid inside the container, or ``None`` when the host uid is in no mapped range.
+    """
+    for container_start, host_start, count in uid_map:
+        if host_start <= host_uid < host_start + count:
+            return container_start + (host_uid - host_start)
+    return None
+
+
+def check_containers_unprivileged(ctx: Context) -> str:
+    """The stateful containers run as their own uid, not as root inside the container.
+
+    This exists because of a measurement on 2026-09-16 that went the wrong way. Dropping redis's
+    ``SETUID``/``SETGID`` does **not** stop it: its entrypoint tests ``has_cap setuid && has_cap
+    setgid`` and, finding neither, skips the privilege drop and carries on as root. The container
+    is up, answers ``PING``, and passes ``containers-running``. It then writes its append-only
+    files as ``0:0``, and the correct configuration afterwards refuses to start on them. A
+    hardening change that reads as a success is how that happens, and no other check here notices.
+
+    Read from the HOST, without ``docker exec``: the container's pid, that pid's real uid, and its
+    ``uid_map``. Translating the host uid back through the map gives the uid **as the container
+    sees it**, which is the number that matters -- and makes the check identical on a rootful
+    Docker host, where the map is the identity, and on a rootless Podman one, where the same
+    container uid appears as a subuid. On Podman it therefore asserts the translation as well.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming each container and the container-side uid it runs as.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when a container is absent, unreadable, or running as a uid other than the
+            one the units and the bootstrap role agree on.
+    """
+    problems, good = [], []
+    for name, expected in sorted(UNPRIVILEGED_CONTAINERS.items()):
+        cmd = (
+            "pid=$(docker inspect --format '{{.State.Pid}}' " + name + " 2>/dev/null); "
+            'if [ -z "$pid" ] || [ "$pid" = 0 ]; then echo ABSENT; exit 0; fi; '
+            "grep ^Uid: /proc/$pid/status; "
+            "sed 's/^/MAP /' /proc/$pid/uid_map"
+        )
+        out = ctx.runner.run(cmd).strip()
+        if "ABSENT" in out:
+            problems.append(f"{name} is not running, so nothing can be said about its uid")
+            continue
+
+        host_uid, uid_map = None, []
+        for line in out.splitlines():
+            fields = line.split()
+            if fields[:1] == ["Uid:"] and len(fields) >= 2 and fields[1].isdigit():
+                host_uid = int(fields[1])
+            elif fields[:1] == ["MAP"] and len(fields) == 4 and all(f.isdigit() for f in fields[1:]):
+                uid_map.append(tuple(int(f) for f in fields[1:]))
+        if host_uid is None or not uid_map:
+            problems.append(
+                f"{name}: could not read the uid of pid 1 ({out!r}). That is not a pass -- it "
+                "says nothing about whether the process dropped its privileges")
+            continue
+
+        inside = _translate_uid(host_uid, uid_map)
+        if inside is None:
+            problems.append(
+                f"{name}: host uid {host_uid} is outside the container's own uid_map {uid_map}, "
+                "which should be impossible for its own pid 1")
+        elif inside != expected:
+            extra = " -- it is running as ROOT inside the container" if inside == 0 else ""
+            problems.append(f"{name} runs as container uid {inside}, expected {expected}{extra}")
+        else:
+            good.append(f"{name}={inside}")
+
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return "container-side uid of pid 1: " + ", ".join(good)
+
+
 def check_container_metrics(ctx: Context) -> str:
     """The container metric series the alert rules read are present and populated.
 
@@ -1137,6 +1236,8 @@ CHECKS: tuple[Check, ...] = (
     Check("rate-limit-active", "REQ-SEC-023", False, check_rate_limit_active),
     Check("edge-not-directly-reachable", "ADR-0187 / REQ-SEC-023", True,
           check_edge_not_directly_reachable),
+    Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True,
+          check_containers_unprivileged),
 )
 
 

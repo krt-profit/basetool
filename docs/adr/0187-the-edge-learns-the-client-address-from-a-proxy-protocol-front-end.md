@@ -122,7 +122,7 @@ Fedora 45 carries the same netavark.
 ## Consequences
 
 - **One more host service**, which Ansible provisions and which belongs in the promotable
-  configuration artifact (`REQ-OPS-004`, ADR-0186's boundary: Ansible provisions, `deploy.sh`
+  configuration artifact (`REQ-OPS-004`, ADR-0188's boundary: Ansible provisions, `deploy.sh`
   deploys). It sits in front of everything and is a single point of failure outside the Quadlet
   lifecycle.
 - **The loopback-only publish becomes a security invariant, not a detail.** If the container's port

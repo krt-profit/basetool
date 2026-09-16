@@ -35,7 +35,7 @@ for RHEL.
 **What this costs, stated plainly:** every Phase 1 measurement was taken on Podman 6.1.0 with
 netavark 2.1.0. Rocky 10 carries an older netavark, so `no_default_route` as an egress block and
 `--internal` against inbound DNAT are **re-measured there before production**, together with the
-certificate handover, the subuid base, cgroup delegation and ADR-0186's full chain.
+certificate handover, the subuid base, cgroup delegation and ADR-0188's full chain.
 - **Date:** 2026-09-12, re-ruled 2026-09-16
 - **Deciders:** @greluc (four choices recorded below), Claude (analysis and measurement)
 - **Related:** [ADR-0049](0049-config-as-promotable-oci-artifact.md) ·

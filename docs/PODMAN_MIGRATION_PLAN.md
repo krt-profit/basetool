@@ -1201,7 +1201,7 @@ has only ever been tested against one host.**
 
 ## 12. The host bootstrap is an Ansible role — ruled 2026-09-16
 
-[ADR-0186](adr/0186-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
+[ADR-0188](adr/0188-the-host-bootstrap-is-an-ansible-role.md). @greluc's decision, and it follows
 from §11 rather than from a preference for the tool: **the testing host is built first and
 production is built from the same procedure afterwards.** A prose checklist executed twice by a
 human is not the same procedure twice. It is two procedures that resemble each other, and the
@@ -1687,7 +1687,7 @@ anything is promoted:
 3. the certificate handover under userns with SELinux enforcing, and **the subuid base**, which
    differed between the two platforms already and is the reason the Ansible role derives it (§3.4)
 4. cgroup delegation in the user slice (§3.5)
-5. ADR-0186's full chain, plus the two properties it left open — the exact `set_real_ip_from`
+5. ADR-0187's full chain, plus the two properties it left open — the exact `set_real_ip_from`
    address, and unreachability of the edge port **from a different machine**
 
 Quadlet's `Memory=` needs Podman 6, so on 5.6 the generator emits `PodmanArgs=--memory=` instead.
@@ -1697,7 +1697,7 @@ time it has been useful.
 > [!note] What does *not* need re-measuring
 > The pasta findings in §13 are not re-run. They rejected an option that is no longer taken, and
 > repeating them on Rocky would establish nothing that changes a decision. They stay recorded because
-> they are why ADR-0186 exists.
+> they are why ADR-0187 exists.
 
 ## 15. Re-measured on Rocky Linux 10.2 — 2026-09-16
 
@@ -1795,7 +1795,7 @@ was then run inside a single invocation.
 
 ## 16. The Ansible role, run for real — 2026-09-16
 
-[ADR-0186](adr/0186-the-host-bootstrap-is-an-ansible-role.md) exists because a prose checklist
+[ADR-0188](adr/0188-the-host-bootstrap-is-an-ansible-role.md) exists because a prose checklist
 executed twice is two procedures that resemble each other. The role that replaced it had itself
 never been executed — only linted — and running it against Rocky 10.2 found **nine defects**, one of
 which would have stopped it at the first task.
@@ -1851,7 +1851,7 @@ testing : ok=45  changed=0  unreachable=0  failed=0  skipped=5
 
 **Zero.** Not one task reports a change on a re-run — stricter than expected, since `restorecon` and
 `semanage` tasks commonly report `changed` on every pass for want of a clean idempotence check.
-That is the property ADR-0186 was written to obtain: the testing host and the production host are
+That is the property ADR-0188 was written to obtain: the testing host and the production host are
 built by the same procedure, and "the same procedure" only means anything if running it twice is a
 no-op.
 
@@ -2114,7 +2114,7 @@ Every uid inside a container maps to a **subuid** on the host, and subuids delib
 - the **image store** — `containers/storage/overlay/*/diff/etc/shadow` and its neighbours, owned by
   whatever uid the image built them as;
 - the **data directories this role creates**, with exactly the namespace-translated ownership that
-  ADR-0186 derives rather than writes down: `/var/iri/redis` at `100998`, `/var/iri/db-backend` at
+  ADR-0188 derives rather than writes down: `/var/iri/redis` at `100998`, `/var/iri/db-backend` at
   `100069`, the three application modules at `110000`.
 
 Those are correct. They are also, to CIS, ownerless.
@@ -2179,18 +2179,18 @@ silently makes it *more* privileged.
 Every arm is judged by a health probe **and** a real write, and reports the **uid of pid 1**,
 because *the container came up* stopped being evidence of anything partway through this.
 
-| Service | Configuration | Result | pid 1 |
-|---------|---------------|--------|-------|
-| postgres | the compose set: `CHOWN DAC_OVERRIDE FOWNER SETGID SETUID` | OK | 70 |
-| postgres | **without `FOWNER`** | OK | 70 |
-| postgres | without `CHOWN` / without `DAC_OVERRIDE` | FAIL | — |
-| postgres | without `SETGID` / without `SETUID` | FAIL | — |
-| postgres | **`--user 70:70`, `--cap-drop=ALL`** | OK | 70 |
-| redis | the compose set (same five) | OK | 999 |
-| redis | **`SETGID`+`SETUID` only** | OK | 999 |
-| redis | `CHOWN`+`DAC_OVERRIDE`+`FOWNER`, no gosu caps | **OK** | **0** |
-| redis | `--cap-drop=ALL` | FAIL | — |
-| redis | **`--user 999:999`, `--cap-drop=ALL`** | OK | 999 |
+| Service  |                       Configuration                        | Result | pid 1 |
+|----------|------------------------------------------------------------|--------|-------|
+| postgres | the compose set: `CHOWN DAC_OVERRIDE FOWNER SETGID SETUID` | OK     | 70    |
+| postgres | **without `FOWNER`**                                       | OK     | 70    |
+| postgres | without `CHOWN` / without `DAC_OVERRIDE`                   | FAIL   | —     |
+| postgres | without `SETGID` / without `SETUID`                        | FAIL   | —     |
+| postgres | **`--user 70:70`, `--cap-drop=ALL`**                       | OK     | 70    |
+| redis    | the compose set (same five)                                | OK     | 999   |
+| redis    | **`SETGID`+`SETUID` only**                                 | OK     | 999   |
+| redis    | `CHOWN`+`DAC_OVERRIDE`+`FOWNER`, no gosu caps              | **OK** | **0** |
+| redis    | `--cap-drop=ALL`                                           | FAIL   | —     |
+| redis    | **`--user 999:999`, `--cap-drop=ALL`**                     | OK     | 999   |
 
 So postgres needs **four** of its five, redis needs **two** of its five, and both need **none** if
 the container is started as its own uid instead of dropping to it.
@@ -2220,7 +2220,7 @@ the host, owned by 70, does **not** buy the capability back — measured, becaus
 
 ### What this means for the units
 
-`--user` is the better shape for both, and the number it needs already exists: ADR-0186's role owns
+`--user` is the better shape for both, and the number it needs already exists: ADR-0188's role owns
 each data directory as `basetool_subuid_base + container_uid - 1`, with `container_uid` written once
 per service in `basetool_container_owners` — 70 for postgres, 999 for redis.
 
@@ -2228,12 +2228,28 @@ It is not free. The entrypoint's root phase also *repairs*: if a data directory'
 wrong, root fixes it, and `--user` merely fails. The trade is a container that cannot repair itself
 against one with no root phase to escape from.
 
-> [!warning] Adopting `--user` puts the same number in two files
-> The role owns the directory as container uid 70; the unit would run the process as uid 70. Today
-> that number lives in `basetool_container_owners` only. A Quadlet `User=` line makes a second place
-> for it to be true, and a first place for it to drift. If this is adopted, the conformance suite has
-> to assert the two against each other — and it should assert the **uid of pid 1** regardless of
-> which shape is chosen, because that is the check redis's root fallback would have failed.
+**Ruled by @greluc on 2026-09-16: take `--user`.** Recorded as
+[ADR-0189](adr/0189-stateful-containers-run-as-their-own-uid.md), and built the same day:
+
+- `scripts/generate-quadlet.py` grows a `RUN_AS` table beside `FRONT_END` and emits `User=`,
+  `Group=`, `ReadOnly=true` and `DropCapability=ALL` **as one set**, with no way to express half of
+  it. A compose `user:` on the same service is a refusal rather than a silent precedence rule.
+- The generator **reads the bootstrap role** and refuses to emit anything when `RUN_AS` and
+  `basetool_container_owners` stop agreeing about a uid. That closes the drift this section warned
+  about: the same number in two files, checked at build time instead of at boot.
+- `check-conformance.py` gains `containers-unprivileged`, which reads the container's pid from the
+  host, that pid's real uid and its `uid_map`, and translates back to the uid **as the container
+  sees it**. The identity map makes it right on rootful Docker and the subuid map on rootless
+  Podman, so on Podman it asserts the namespace translation too. Four red scenarios plus a green
+  one through a rootless map; the suite's coverage gate accepts nothing less.
+
+Net effect on the units: fifteen granted capabilities disappear and three root filesystems become
+read-only.
+
+> [!note] The check is about the uid, not about the capability list
+> A capability list records what was asked for. This whole section exists because of a case where
+> what was asked for and what happened differed silently, and `containers-running` was green
+> throughout. Redis running as root is invisible to every other check in the suite.
 
 ### Podman mounts `/run` for you, and copies the image into it
 

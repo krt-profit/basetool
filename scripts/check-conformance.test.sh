@@ -284,6 +284,32 @@ case "$cmd" in
       exit 1
     fi
     ;;&
+  *"uid_map"*)
+    # One invocation per container, so the name in the command says which one is being asked
+    # about. The suite reads the HOST's view of pid 1 and translates it, so the stub speaks in
+    # host uids: the identity map is a rootful Docker host, the 100000-based map a rootless one.
+    name=db-backend
+    case "$cmd" in *db-keycloak*) name=db-keycloak ;; *redis*) name=redis ;; esac
+    case "$scenario" in
+      container-gone)  [ "$name" = redis ] && { echo ABSENT; exit 0; } ;;
+      uid-unreadable)  [ "$name" = redis ] && { echo "Uid:"; exit 0; } ;;
+    esac
+    case "$scenario" in
+      rootless-podman)
+        # container uid N arrives as subuid base + N - 1: 100069 -> 70, 100998 -> 999
+        case "$name" in redis) host_uid=100998 ;; *) host_uid=100069 ;; esac
+        printf 'Uid:\t%s\t%s\t%s\t%s\n' "$host_uid" "$host_uid" "$host_uid" "$host_uid"
+        printf 'MAP 0 1000 1\nMAP 1 100000 65536\n'
+        ;;
+      *)
+        case "$name" in redis) host_uid=999 ;; *) host_uid=70 ;; esac
+        [ "$scenario" = redis-root ] && [ "$name" = redis ] && host_uid=0
+        [ "$scenario" = db-wrong-uid ] && [ "$name" = db-backend ] && host_uid=26
+        printf 'Uid:\t%s\t%s\t%s\t%s\n' "$host_uid" "$host_uid" "$host_uid" "$host_uid"
+        printf 'MAP 0 0 4294967295\n'
+        ;;
+    esac
+    ;;
   *"docker ps -a"*)
     printf 'edge|Up 15 hours (healthy)\nacme|Up 2 days\nkeycloak|Up 15 hours (healthy)\n'
     printf 'backend|Up 9 hours (healthy)\nfrontend|Up 9 hours (healthy)\ningest|Up 9 hours (healthy)\n'
@@ -512,6 +538,11 @@ export STUB_SCENARIO=healthy
 assert_status "client-address-visible passes" client-address-visible pass "203.0.113.42" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 assert_status "containers-running passes" containers-running pass "up and healthy" -- "${STUB_ARGS[@]}"
+assert_status "containers-unprivileged passes" containers-unprivileged pass "redis=999" -- "${STUB_ARGS[@]}"
+# The same three containers on a ROOTLESS host, where each uid arrives as a subuid. Green only if
+# the uid_map translation works -- the half of this check a Docker-shaped stub cannot exercise, and
+# the half the migration depends on.
+STUB_SCENARIO=rootless-podman assert_status "containers-unprivileged passes through a rootless uid_map" containers-unprivileged pass "db-backend=70" -- "${STUB_ARGS[@]}"
 assert_status "redis-requires-auth passes" redis-requires-auth pass "NOAUTH" -- "${STUB_ARGS[@]}"
 assert_status "scrape-targets-up passes"  scrape-targets-up  pass "targets up"     -- "${STUB_ARGS[@]}"
 assert_status "container-metrics passes"  container-metrics  pass "populated"      -- "${STUB_ARGS[@]}"
@@ -543,6 +574,14 @@ STUB_SCENARIO=container-down assert_status \
 STUB_SCENARIO=container-unhealthy assert_status \
   "containers-running fails on an unhealthy container" \
   containers-running fail "unhealthy" -- "${STUB_ARGS[@]}"
+
+# The failure this check exists for: redis skips its own privilege drop when SETUID/SETGID are
+# missing and keeps running AS ROOT, healthy and answering PING. containers-running is green in
+# exactly that state, which is why it cannot stand in for this check.
+STUB_SCENARIO=redis-root assert_status "containers-unprivileged fails when redis runs as root inside the container" containers-unprivileged fail "running as ROOT" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=db-wrong-uid assert_status "containers-unprivileged fails on a uid that is neither root nor the expected one" containers-unprivileged fail "expected 70" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=uid-unreadable assert_status "containers-unprivileged fails rather than passes when the uid cannot be read" containers-unprivileged fail "could not read" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=container-gone assert_status "containers-unprivileged fails when the container is not running at all" containers-unprivileged fail "not running" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=container-absent assert_status \
   "containers-running fails on a missing container" \
   containers-running fail "is absent" -- "${STUB_ARGS[@]}"

@@ -5,12 +5,10 @@ StartLimitIntervalSec=0
 [Container]
 Image=docker.io/postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
 ContainerName=db-keycloak
+User=70
+Group=70
+ReadOnly=true
 DropCapability=ALL
-AddCapability=CHOWN
-AddCapability=DAC_OVERRIDE
-AddCapability=FOWNER
-AddCapability=SETGID
-AddCapability=SETUID
 NoNewPrivileges=true
 Network=net-db-keycloak.network
 Volume=/var/iri/db-keycloak:/var/lib/postgresql/data

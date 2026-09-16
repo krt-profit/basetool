@@ -349,25 +349,35 @@ needs:
   (10001 for the JVM apps, 1000 for Keycloak/Quarkus) and bind only high ports, so they need **no**
   capabilities — `cap_drop: [ALL]` with an empty add-back.
 - **`postgres` (db-backend, db-keycloak) and `redis`** boot as root to chown their data dir and then
-  drop to their service user via gosu, so they keep exactly `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
+  drop to their service user via gosu, so under Docker they keep `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
   `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
-  not a setuid binary.
-- **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
-  capabilities at all — an empty add-back on the one service most exposed to the internet.
-- **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
-  to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
-  nothing and holds no inbound surface.
-- **`npm`** is retained only as the rollback path (`profiles: ["rollback"]`, ADR-0162) and keeps its
-  empirically-verified s6-overlay set (`NET_BIND_SERVICE`, `CHOWN`, `SETUID`, `SETGID`, `FOWNER`,
-  `DAC_OVERRIDE`, `KILL`) for as long as it exists.
+  not a setuid binary. **That set was measured on 2026-09-16 and is wrong in both directions**
+  (`PODMAN_MIGRATION_PLAN.md` §20): Postgres needs four of the five, `FOWNER` never among them, and
+  redis needs only `SETGID`/`SETUID`. Under Quadlet all three instead run **as their own uid** — 70,
+  70 and 999 — read-only and with no capabilities at all ([ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md)).
+
+> [!danger] For redis, a partial capability set is worse than the full one
+> Its entrypoint tests `has_cap setuid && has_cap setgid` before dropping privileges and, finding
+> neither, **skips the drop and runs as root** — healthy, answering `PING`, and green on every other
+> check here. It then writes its append-only files as `0:0`, which the correct configuration can no
+> longer open. Never remove `SETGID`/`SETUID` from redis without giving it a uid in the same edit,
+> and assert the **uid of pid 1** rather than the capability list: `check-conformance.py`'s
+> `containers-unprivileged` is what does that.
+> - **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
+> capabilities at all — an empty add-back on the one service most exposed to the internet.
+> - **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
+> to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
+> nothing and holds no inbound surface.
 
 Because the add-back set is not upstream-documented for the third-party images, it **must be
-re-verified on every image bump** of that service before the bump is promoted (a clean boot, its
-healthcheck passing, and — for `npm` — a working `nginx -s reload`). The deploy health-gate is the
-safety net: a wrong cap set fails the container at start and is rolled back rather than shipped. A
-read-only root filesystem is **not** part of the shared baseline — the JVM and DB working dirs write
-across the filesystem — but it is required of `edge` specifically (`read_only: true` plus tmpfs for
-nginx's temp paths and its pid file), because that service exists to face the internet.
+re-verified on every image bump** of that service before the bump is promoted (a clean boot and its
+healthcheck passing). The deploy health-gate is the safety net: a wrong cap set fails the container
+at start and is rolled back rather than shipped. A read-only root filesystem is **not** part of the
+shared baseline — the JVM working dirs write across the filesystem — but it is required of `edge`
+specifically (`read_only: true` plus tmpfs for nginx's temp paths and its pid file), because that
+service exists to face the internet, and of the three stateful services under Quadlet, where it was
+measured to work with their real mounts and needs no tmpfs at all (Podman mounts `/run`, `/tmp` and
+`/var/tmp` itself under `--read-only`, copying the image's content up into them).
 
 **Acceptance**
 

@@ -85,6 +85,42 @@ FRONT_END = {
     }
 }
 
+# ADR-0189: the stateful services run AS their own uid instead of dropping to it.
+#
+# Measured on Rocky 10.2 / Podman 5.8.2 with the real digests, data mounts and persistence
+# (plan section 20). Each of these images boots as root, chowns its data directory and steps down
+# with gosu; giving it the uid up front removes the root phase, and with it every capability:
+#
+#   postgres   five capabilities -> none.  Four were load-bearing; FOWNER never was.
+#   redis      five capabilities -> none.  Only SETGID/SETUID were load-bearing.
+#
+# The reason this is an override rather than a `user:` in compose is the same as FRONT_END's: the
+# Docker deployment still runs these containers, and changing how IT starts a live database is a
+# separate change with its own deploy. Compose stays authoritative for everything else.
+#
+# It is emitted as a SET -- User, Group, ReadOnly, DropCapability=ALL -- because that is the
+# combination that was measured. Shipping half of it would ship something nobody ran.
+#
+# What it costs: the root phase also REPAIRS. If a data directory's ownership is ever wrong, root
+# fixes it and `User=` merely fails. That trade is deliberate, and it is safe only because the
+# ownership is not a hope: the bootstrap role owns each directory as
+# `basetool_subuid_base + container_uid - 1`, and `_verify_run_as_against_role` below refuses to
+# generate anything if these numbers and the role's stop agreeing.
+#
+# And the reason it matters more than a tidier unit file: dropping redis's capabilities WITHOUT
+# giving it a uid does not fail. Its entrypoint tests `has_cap setuid && has_cap setgid` and
+# silently skips the privilege drop, so redis runs as root, answers PING, and writes AOF files as
+# 0:0 that the correct configuration can no longer open. A partial capability set is the dangerous
+# state here, which is why there is no way to express one.
+RUN_AS = {
+    "db-backend":  {"uid": 70,  "role_path": "db-backend"},
+    "db-keycloak": {"uid": 70,  "role_path": "db-keycloak"},
+    "redis":       {"uid": 999, "role_path": "redis"},
+}
+
+#: The bootstrap role's own view of those uids. Read at generation time, never transcribed.
+ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "defaults", "main.yml")
+
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
@@ -480,20 +516,36 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     container.append(f"Image={_qualify(_image_defaults(spec['image'], service))}")
     container.append(f"ContainerName={service}")
 
-    if "user" in spec:
-        user = str(spec["user"])
-        if ":" in user:
-            uid, gid = user.split(":", 1)
-            container += [f"User={uid}", f"Group={gid}"]
-        else:
-            container.append(f"User={user}")
+    run_as = RUN_AS.get(service)
+    if run_as is not None:
+        if "user" in spec:
+            raise Refusal(
+                f"{service}: compose says user: {spec['user']!r} and RUN_AS says "
+                f"{run_as['uid']}. Two answers to one question -- delete one of them rather "
+                "than letting the generator pick."
+            )
+        # Emitted together because it was measured together; see RUN_AS.
+        container += [
+            f"User={run_as['uid']}",
+            f"Group={run_as['uid']}",
+            "ReadOnly=true",
+            "DropCapability=ALL",
+        ]
+    else:
+        if "user" in spec:
+            user = str(spec["user"])
+            if ":" in user:
+                uid, gid = user.split(":", 1)
+                container += [f"User={uid}", f"Group={gid}"]
+            else:
+                container.append(f"User={user}")
 
-    if spec.get("read_only"):
-        container.append("ReadOnly=true")
-    for cap in spec.get("cap_drop", []) or []:
-        container.append(f"DropCapability={cap}")
-    for cap in spec.get("cap_add", []) or []:
-        container.append(f"AddCapability={cap}")
+        if spec.get("read_only"):
+            container.append("ReadOnly=true")
+        for cap in spec.get("cap_drop", []) or []:
+            container.append(f"DropCapability={cap}")
+        for cap in spec.get("cap_add", []) or []:
+            container.append(f"AddCapability={cap}")
     if any("no-new-privileges" in str(o) for o in spec.get("security_opt", []) or []):
         container.append("NoNewPrivileges=true")
     for tmpfs in spec.get("tmpfs", []) or []:
@@ -634,6 +686,39 @@ def render_vars(service: str, spec: dict[str, Any]) -> str:
 # ============================================================================================
 # Driving
 # ============================================================================================
+def _verify_run_as_against_role() -> None:
+    """Refuse if RUN_AS and the bootstrap role disagree about a container uid.
+
+    ``User=70`` in a unit and a data directory owned as if the container were uid 70 are the same
+    fact written in two repositories' worth of tooling. They agree today. This is what notices the
+    day one of them is edited and the other is not -- at generation time, where the answer is a
+    failed build, rather than at boot, where it is a database that will not start.
+
+    Raises:
+        Refusal: when a service in RUN_AS has no owner entry in the role, or has one with a
+            different ``container_uid``.
+    """
+    doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
+    by_path: dict[str, int] = {}
+    for entry in doc.get("basetool_container_owners") or []:
+        for path in entry.get("paths") or []:
+            by_path[str(path)] = int(entry["container_uid"])
+
+    for service, run_as in sorted(RUN_AS.items()):
+        path, uid = run_as["role_path"], run_as["uid"]
+        if path not in by_path:
+            raise Refusal(
+                f"{service}: RUN_AS runs it as uid {uid}, but basetool_container_owners has no "
+                f"entry for {path!r}. Nothing would own its data directory as that uid, so the "
+                "container would start as a user with no write access to its own state."
+            )
+        if by_path[path] != uid:
+            raise Refusal(
+                f"{service}: RUN_AS says uid {uid}, the bootstrap role owns {path!r} as "
+                f"{by_path[path]}. One of the two was changed without the other."
+            )
+
+
 def generate() -> tuple[dict[str, str], list[str]]:
     """Build every unit and allow-list.
 
@@ -645,6 +730,8 @@ def generate() -> tuple[dict[str, str], list[str]]:
         Refusal: on anything that cannot be translated faithfully, or a service with no recorded
             disposition.
     """
+    _verify_run_as_against_role()
+
     files: dict[str, str] = {}
     notes: list[str] = []
     net_defs: dict[str, dict[str, Any]] = {}
