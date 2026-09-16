@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.UUID;
@@ -235,6 +236,6 @@ public class JobOrderAssigneeService {
    * @return the {@code #<displayId> '<handle>'} label
    */
   private static String orderLabel(JobOrder jobOrder) {
-    return "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'";
+    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 }

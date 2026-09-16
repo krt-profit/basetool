@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -175,6 +176,6 @@ public class JobOrderPriorityService {
    * @return the {@code #<displayId> '<handle>'} label
    */
   private static String orderLabel(JobOrder jobOrder) {
-    return "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'";
+    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 }

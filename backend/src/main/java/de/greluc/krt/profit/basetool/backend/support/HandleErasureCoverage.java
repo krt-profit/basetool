@@ -107,8 +107,11 @@ public final class HandleErasureCoverage {
                   + " still exists."),
           anonymised(
               "audit_event.subject_label",
-              "Matched where the whole label IS the member's name. A label that merely contains it"
-                  + " is a job-order title naming that order's contact, which is somebody else."),
+              "Matched where the whole label IS the member's name. Rows written before 2026-09-17"
+                  + " can instead hold a job-order label with the contact's name composed in"
+                  + " (#<id> '<handle>'), which whole-value equality cannot reach and a substring"
+                  + " rewrite must not: see JobOrderAuditLabel. Those are an administrator's"
+                  + " manual step, found through the Personensuche."),
           byHand(
               "audit_event.details",
               "A name concatenated into the payload against REQ-AUDIT-001. The erasure used to"

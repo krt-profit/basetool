@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -1280,7 +1281,7 @@ public class JobOrderService {
    * @return the {@code #<displayId> '<handle>'} label
    */
   private static String orderLabel(JobOrder jobOrder) {
-    return "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'";
+    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 
   /**

@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialExchangeOfferRep
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -400,7 +401,7 @@ public class JobOrderHandoverService {
     auditService.record(
         AuditEventType.JOB_ORDER_HANDOVER_CREATED,
         jobOrderId,
-        "#" + managedJobOrder.getDisplayId() + " '" + managedJobOrder.getHandle() + "'",
+        JobOrderAuditLabel.of(managedJobOrder.getDisplayId()),
         null,
         AuditDetails.of("handover", savedHandover.getId())
             .with("items", handedItems.size())
