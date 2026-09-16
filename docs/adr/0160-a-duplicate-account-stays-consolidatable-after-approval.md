@@ -123,4 +123,3 @@ marked the row absent is not in the middle of disposing of it.
   that has already moved the account's identity away and will delete its Keycloak user when the
   transaction commits; the enum name is the documentation, and `UserDeletionServiceTest` pins both
   halves.
-

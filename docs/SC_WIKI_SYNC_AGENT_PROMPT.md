@@ -553,4 +553,3 @@ To prevent scope creep — these are R2+ concerns; do not touch them in R1:
   repo's style.
 - [ ] No live sync traffic was sent during R1 (scheduler stays disabled).
 - [ ] You stop and report back. No R2 work without explicit go-ahead.
-

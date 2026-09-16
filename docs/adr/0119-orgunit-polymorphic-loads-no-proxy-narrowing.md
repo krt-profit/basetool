@@ -59,4 +59,3 @@ counts/aggregates) stay as they are. The rule is recorded as REQ-DATA-013.
   proxy-prone path is a review defect.
 - `@ConcreteProxy` stays available as defence-in-depth if a new narrowing source appears, but only
   after load-shape profiling of the hot list/gate paths.
-

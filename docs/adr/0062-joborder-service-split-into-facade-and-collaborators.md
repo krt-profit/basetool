@@ -70,4 +70,3 @@ sub-services that need it rather than shared.
 - **`InventoryItemService` is out of scope** for this PR: issue #921's second half
   (`InventoryCheckoutService` + `InventoryAggregationService` + the `bookOutInventoryItem`
   decomposition) ships as a follow-up PR.
-

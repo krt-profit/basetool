@@ -134,4 +134,3 @@ is the defect.
 - *A cancelled E2E run is still not a verdict.* Merging a PR mid-run cancels it and it still reads
   as `fail`. This ADR removes one cause of spurious cancellations, not the ambiguity of the
   rendering.
-

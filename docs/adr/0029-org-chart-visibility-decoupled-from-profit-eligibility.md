@@ -66,4 +66,3 @@ regardless of the Job-Order flag.
   descriptive and org-wide by definition; "active" is the right and only gate.
 - **Filter the chart's *Bereiche* to Profit only instead** — rejected: REQ-ORG-018 deliberately
   renders every Bereich; the goal is a complete organisation chart, not a narrower one.
-

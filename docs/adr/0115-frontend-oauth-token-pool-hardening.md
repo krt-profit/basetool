@@ -92,4 +92,3 @@ rotation semantics are identical — only the socket the request travels on chan
   token calls onto a separate HTTP stack with its own pool, but adds a second client dependency and
   diverges from the app's reactor-netty-everywhere transport. The reactor-netty pool with eviction is
   the smaller, consistent change.
-

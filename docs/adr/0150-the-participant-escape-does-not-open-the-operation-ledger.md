@@ -66,4 +66,3 @@ Two knobs were available: narrow the escape, or narrow what the escape carries.
   self-service sign-up, which is a far larger product change than the leak justifies.
 - **Leave it and document it.** Rejected: the payload includes other members' callsigns paired with
   aUEC amounts, and the key costs one request.
-

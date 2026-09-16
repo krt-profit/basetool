@@ -101,4 +101,3 @@ the question was asked. Evidence is written once, at the moment of the act.
 - The write costs one extra read of the current authentication per audited mutation, taken from the
   same `AuthHelperService` call path the actor already comes from, so "who" and "through what"
   can never describe different requests.
-

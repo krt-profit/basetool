@@ -80,4 +80,3 @@ Single-use, per-`sub` scoping, the TTL, and the masked stage/consume correlator 
   prefetch, which this decision fixes without weakening the single-use guarantee.
 - No new role, metric, migration, or audited mutation — the consume deletes a transient Redis pickup
   and persists nothing (ROLES_AND_PERMISSIONS.md, monitoring, and the audit log are untouched).
-

@@ -110,4 +110,3 @@ they are re-checked whenever the surface they describe is touched.
   (`/api/v1/org-units/bank/accounts/{id}/approval-limit/**`, `REQ-APP-BANK-017`) are admitted by no
   rule and are not listed among the deliberate exclusions either — the same class of gap, a
   different feature, and its own change.
-

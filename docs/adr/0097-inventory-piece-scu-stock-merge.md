@@ -82,4 +82,3 @@ offer-exclusion so the deployed dataset matches the new write behaviour.
 - **A unique constraint on the PIECE stock identity to make merge race-free.** Rejected: it cannot
   coexist with the append-only SCU rows on the same table, and the group-on-read display already
   masks the rare tail race.
-

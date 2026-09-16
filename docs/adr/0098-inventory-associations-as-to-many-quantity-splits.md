@@ -77,4 +77,3 @@ quantity splits** ("Modell G"), replacing the scalar columns.
 - **Auto-proportional SELL income split across missions.** Rejected in favour of a seller-chosen
   split — the operator decides which missions earn how much (and only missions they participate in
   are creditable), which the automatic split could not express.
-

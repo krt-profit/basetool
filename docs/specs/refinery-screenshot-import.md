@@ -441,4 +441,3 @@ message key and one URL.
   governs it if it is ever revived.
 - `blueprint_external_alias` — the blueprint import keeps its own alias table and matching
   rules, specced in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md).
-

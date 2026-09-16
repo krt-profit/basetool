@@ -104,4 +104,3 @@ Record the carved-out fee on the transaction header and credit the destination t
   must be non-zero regardless; recording it on the header (and crediting the destination the
   net) is the smallest honest representation.
 - **A separate bank fee rate** — rejected: the owner wants one rate for the whole org.
-

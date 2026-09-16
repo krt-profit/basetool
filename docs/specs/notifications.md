@@ -587,4 +587,3 @@ bundle) · **Code:** `frontend controller/NotificationPageController#page` / `#p
 - OS / browser push notifications.
 - Multi-backend-instance push fan-out (Redis pub/sub).
 - A dedicated user-group entity (the `GROUP` selector kind is reserved for it).
-

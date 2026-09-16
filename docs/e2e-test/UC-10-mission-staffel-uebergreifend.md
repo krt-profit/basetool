@@ -40,4 +40,3 @@ Staffel A öffnet einen Einsatz für staffel-übergreifende Teilnahme.
 - **Public-Escape ist die einzige Cross-Staffel-Sichtbarkeit für Einsätze:** Das Repository-`searchMissions` setzt die Klausel `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false` — interne Einsätze bleiben strikt bei der Eigentümer-Staffel.
 - **`MissionParticipant.squadron`** ist eine der wenigen grandfatherten `squadron_id`-Referenzen; sie hält fest, *aus welcher* Staffel ein Teilnehmer kommt — Grundlage für staffel-übergreifende Beteiligungsabrechnung.
 - Anlegen ist `isAuthenticated()` (jeder Auth-User, auch ein einfaches Mitglied); **Editieren/Verwalten** gaten `canEditMission` / `MissionSecurityService.canManageMission` auf Eigentümer-Staffel + Admins.
-

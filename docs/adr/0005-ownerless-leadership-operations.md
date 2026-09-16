@@ -76,4 +76,3 @@ editable by any mission manager (`hasRole('MISSION_MANAGER')`) and deletable by 
   it mis-attributes an org-wide operation to one Staffel, leaks it into that Staffel's scope, and
   forces a meaningless choice on the user — the same reasons ADR-0004 rejected the equivalent for
   missions.
-

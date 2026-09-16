@@ -39,4 +39,3 @@ Ein Spezialkommando wird als eigene OrgUnit aufgesetzt und betrieben.
 - **SK als besitzende/anfragende OrgUnit von Aggregaten 400t aktuell.** Die Legacy-Spalte `owning_squadron_id` ist noch `NOT NULL`; `requesting_org_unit_id` akzeptiert ein SK laut Design, aber die Persistenz lehnt es bis zur **destruktiven Cleanup-Release** mit 400 ab. Ein E2E-Fall „SK als requesting OrgUnit eines Job Orders" muss daher aktuell **400 erwarten** (oder bis nach der Cleanup-Release vertagt werden).
 - **Keine Promotion für SK:** Das Beförderungssubsystem ist per DB-CHECK (`kind = 'SQUADRON' OR is_promotion_enabled = FALSE`), V101-Trigger und JPA-Guards für SK gesperrt.
 - **Lead-Scope ist eng:** `is_lead` gilt nur in *diesem einen* SK (kein cross-SK-Carry-over) und nur für die Mitgliederverwaltung — keine sonstigen erhöhten Rechte.
-

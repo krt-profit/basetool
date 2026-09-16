@@ -69,4 +69,3 @@ matrix's material/system/loading-dock/auto-load filters keep working in both vie
 - Should the preference move to a server-side user setting so it follows the user across
   devices? Deferred — `localStorage` matches every other UI-state preference in the app
   today. Promote to an ADR if cross-device sync is ever requested.
-

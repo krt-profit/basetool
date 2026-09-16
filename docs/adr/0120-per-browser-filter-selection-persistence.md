@@ -55,4 +55,3 @@ state are migrated to `localStorage`.
   convention adds no new network mechanisms.
 - Stored keys are additive and unversioned; a page that changes its filter shape must tolerate an
   older stored object (the guarded-read + shape-check idiom already does).
-

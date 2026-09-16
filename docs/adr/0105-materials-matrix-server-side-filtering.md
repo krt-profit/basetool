@@ -83,4 +83,3 @@ paged collection is rendered — not add a parallel assembly mechanism.**
   full table (ADR-0069). Page-walking it preserves that UX with no new controls.
 - **Raise the `size` numbers.** Rejected — it moves the cliff, not removes it, and `MAX_PAGE_SIZE`
   is a hard security clamp; the page-walk is the actual remedy.
-

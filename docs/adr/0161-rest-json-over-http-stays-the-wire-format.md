@@ -254,4 +254,3 @@ mission-detail and the materials matrix, and `http_client_requests_seconds` p95 
   hand-maintained, and an ETag buffer being paid for on every API response with no client able to
   redeem it. The question was worth asking; the answer is not "everything is fine", it is "the wins are
   elsewhere, and cheaper".
-

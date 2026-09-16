@@ -1805,4 +1805,3 @@ These need user input before R3 / R4 work begins. R1 + R2 can ship without resol
   - `detail-wiki/construction-pieces.json` / `-rubble.json` / `-salvage.json` / `construction-materials.json` — §4.2.1 ambiguous-construction verification (held out of seed)
   - `detail-wiki/wo-junk-*.json` (15 files) + `wo-real-*.json` (16 files) — §4.3 wiki-only classification (flag-based heuristic proved unreliable; revised to name-pattern-only hard junk)
   - `detail-wiki/uo-*.json` (20 files) — §4.4 UEX-only verification via wiki search (18/20 confirmed empty; 1 false hit on PLACEHOLDER; 1 partial match on Jaclium that resolves as catalog-granularity-difference)
-

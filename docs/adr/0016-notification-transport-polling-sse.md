@@ -65,4 +65,3 @@ proxy-keepalive purposes.
 
 This **refines, not reverses**, the SSE-as-enhancement decision above: polling remains the
 guaranteed fallback and SSE remains best-effort. Status stays **Accepted**.
-

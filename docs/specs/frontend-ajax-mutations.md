@@ -1820,4 +1820,3 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
   swaps the pre-filled create-form fragment in place via the `importExtractAjax` twin (see REQ-FE-005
   above), and `datetime-splitter.js` was made swap-safe in the process. The whole refinery surface is
   now reload-free.
-

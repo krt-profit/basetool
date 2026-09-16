@@ -43,4 +43,3 @@ API-Edges (rein über die REST-API): erneutes Einlagern eines bereits `COMPLETED
 - **Output-Material = Eingangsmaterial** für ein manuelles RAW ohne `refinedMaterial`; deshalb verifiziert der Test das Lager über die Material-Id des Eingangsmaterials.
 - **Stempelung auf die OrgUnit des Empfängers** (nicht des Auftrags) — siehe UC-21; dieser Flow nutzt durchgehend `test-admin`/IRIDIUM, sodass Auftrag und Empfänger denselben Pool teilen.
 - **UI treiben, API verifizieren.** Die gruppierte Lager-Ansicht lädt lazy; gegen die gescopten Endpunkte zu assertieren ist die etablierte, race-freie Methode (vgl. UC-13/UC-14).
-

@@ -259,4 +259,3 @@ owner later wants a shorter login window, that is a separate product decision.
   Deferred as a follow-up rather than half-built here. **Done in #1193 / ADR-0089:** the all-users
   pickers were switched to the combobox `remoteSource` mode (server-side `/users/search`, and the
   bank-audience `/users/search-bank`), so no converted picker ships the full roster anymore.
-

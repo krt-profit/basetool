@@ -312,4 +312,3 @@ has been quiet for a few days.
   on Podman afterwards is decided once production has.
 - **Anything about the application.** No image, no schema and no endpoint changes here. If this
   migration requires an application change, that is a finding worth stopping for.
-
