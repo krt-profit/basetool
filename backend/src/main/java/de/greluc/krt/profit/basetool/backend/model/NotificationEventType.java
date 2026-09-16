@@ -100,5 +100,16 @@ public enum NotificationEventType {
    * controller to tell them. The reasoning does not ride the event — it is shown on the member's
    * profile page, where the request is.
    */
-  ACCOUNT_DELETION_REQUEST_DECLINED
+  ACCOUNT_DELETION_REQUEST_DECLINED,
+
+  /**
+   * A member's erasure request reached a terminal state that notifies nobody — a withdrawal, or the
+   * execution itself (REQ-SEC-061, REQ-NOTIF-018).
+   *
+   * <p>Seeds no rule and creates no notification. It exists so the administrators' {@code
+   * ACCOUNT_DELETION_REQUESTED} items are cleared on <b>every</b> terminal path, not only the
+   * refusal — and so the member's handle stops sitting in other people's inbox payloads the moment
+   * the request is decided rather than until the 180-day unread sweep.
+   */
+  ACCOUNT_DELETION_REQUEST_RESOLVED
 }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
+import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
@@ -210,6 +211,11 @@ public class DeletionRequestService {
         null,
         userId,
         AuditDetails.of("requestId", request.getId()));
+
+    // Clears the administrators' "member requests erasure" items, which carry the member's handle
+    // in their render parameters (REQ-NOTIF-018). Withdrawal used to publish nothing, so the
+    // request kept showing in every admin's bell after the member took it back.
+    eventPublisher.publishEvent(new AccountDeletionRequestResolvedEvent(userId));
     log.info("Member {} withdrew their account-deletion request", userId);
     return Optional.of(request);
   }
@@ -383,6 +389,13 @@ public class DeletionRequestService {
         AuditDetails.of("requestId", request.getId())
             .with("historyErasureGranted", grantHistoryErasure)
             .with("historyErasureRequested", request.isEraseHistoryRequested()));
+
+    // Same clearing as withdraw and decline, and on this path it is also the erasure: the request
+    // notification names the member, one row per administrator, and UserDeletionService removes
+    // notifications by RECIPIENT -- which these are not. Superseding them here means the name is
+    // gone when the account is, on every path, rather than only when the history checkbox was
+    // ticked and granted.
+    eventPublisher.publishEvent(new AccountDeletionRequestResolvedEvent(userId));
 
     user.setInKeycloak(false);
     userRepository.saveAndFlush(user);

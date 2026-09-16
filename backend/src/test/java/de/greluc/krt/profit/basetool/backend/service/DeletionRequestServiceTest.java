@@ -32,10 +32,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestDeclinedEvent;
+import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestResolvedEvent;
 import de.greluc.krt.profit.basetool.backend.event.AccountDeletionRequestedEvent;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequest;
 import de.greluc.krt.profit.basetool.backend.model.DeletionRequestStatus;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -190,6 +192,9 @@ class DeletionRequestServiceTest {
 
     assertThat(withdrawn).isPresent();
     assertThat(withdrawn.get().getStatus()).isEqualTo(DeletionRequestStatus.WITHDRAWN);
+    // Withdrawal used to publish nothing, so the request kept showing in every administrator's
+    // bell -- with the member's name in it -- after the member took it back (REQ-NOTIF-018).
+    verify(eventPublisher).publishEvent(any(AccountDeletionRequestResolvedEvent.class));
     assertThat(withdrawn.get().getDecidedAt()).isNotNull();
     verify(auditService)
         .record(
@@ -231,6 +236,10 @@ class DeletionRequestServiceTest {
     assertThat(declined.getDecidedAt()).isNotNull();
     assertThat(declined.getDecidedById()).isNotNull();
     verify(eventPublisher).publishEvent(any(AccountDeletionRequestDeclinedEvent.class));
+    // The refusal also clears the administrators' stale "member requests erasure" items, which
+    // carry the member's handle in their render parameters (REQ-NOTIF-018).
+    assertThat(new AccountDeletionRequestDeclinedEvent(USER).resolvesNotificationTypes())
+        .containsExactly(NotificationType.ACCOUNT_DELETION_REQUESTED);
   }
 
   @Test
@@ -263,6 +272,20 @@ class DeletionRequestServiceTest {
             USER,
             UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
     order.verify(keycloakService).deleteUser(USER);
+  }
+
+  // covers REQ-SEC-061, REQ-NOTIF-018 - the execution clears the administrators' stale items too
+  @Test
+  void executingResolvesTheAdministratorsPendingNotifications() {
+    when(deletionRequestRepository.findById(REQUEST)).thenReturn(Optional.of(pending(false)));
+
+    service.execute(REQUEST, false);
+
+    // UserDeletionService removes notifications by RECIPIENT, and these recipients are other
+    // people -- so without this the departed member's name sat in every administrator's inbox
+    // payload until the 180-day unread sweep reaped it. Superseding beats rewriting the payload:
+    // it happens on every path, not only when the history checkbox was ticked and granted.
+    verify(eventPublisher).publishEvent(any(AccountDeletionRequestResolvedEvent.class));
   }
 
   // covers REQ-SEC-061 — the wish is not an instruction: an ungranted wish anonymises nothing

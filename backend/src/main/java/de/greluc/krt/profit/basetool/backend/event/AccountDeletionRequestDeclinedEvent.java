@@ -21,7 +21,9 @@ package de.greluc.krt.profit.basetool.backend.event;
 
 import de.greluc.krt.profit.basetool.backend.model.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -90,5 +92,20 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
   @Override
   public UUID contextRecipientUserId() {
     return userId;
+  }
+
+  /**
+   * The refusal settles the request, so the administrators' "member requests erasure" items are
+   * stale and get cleared (REQ-NOTIF-018).
+   *
+   * <p>Without this the request kept showing in every administrator's bell after it was refused —
+   * with the member's handle in its render parameters. The bank's booking lifecycle is the
+   * precedent, and was the only one implementing this override.
+   *
+   * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
+   */
+  @Override
+  public Set<NotificationType> resolvesNotificationTypes() {
+    return Set.of(NotificationType.ACCOUNT_DELETION_REQUESTED);
   }
 }
