@@ -1,13 +1,13 @@
 # Host provisioning
 
-The Basetool host bootstrap, as an Ansible role. [ADR-0185](../docs/adr/0185-the-host-bootstrap-is-an-ansible-role.md).
+The Basetool host bootstrap, as an Ansible role. [ADR-0188](../docs/adr/0188-the-host-bootstrap-is-an-ansible-role.md).
 
 > [!important] This tree provisions. It does not deploy.
 > Images, unit files and configuration bundles reach the host by `REQ-OPS-001`'s **pull-only** path,
 > driven by `deploy.sh` on a timer. This playbook installs packages, creates the service user and
 > its subuid range, lays out and owns the directories, sets SELinux contexts, and writes
 > `containers.conf`. **It must never be run against a host that is serving traffic, and it must
-> never grow into a second delivery path.** That boundary is the load-bearing half of ADR-0185:
+> never grow into a second delivery path.** That boundary is the load-bearing half of ADR-0188:
 > once a playbook configures the host, running the playbook is one short step from pushing the
 > next compose file with it, and the pull-only property is gone by convenience rather than by
 > decision.

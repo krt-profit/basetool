@@ -234,7 +234,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # ADR-0185. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
+      # ADR-0188. `ansible/` provisions hosts; it never deploys, and REQ-OPS-001's pull-only
       # delivery is untouched by it. The role is the reason "production is built from the same
       # procedure as testing" can be asserted rather than hoped for, so it is worth having CI
       # notice when it stops parsing -- it cannot be exercised against a real host here, and an

@@ -3,7 +3,7 @@
 #
 # Everything a host might legitimately differ on lives here. The testing host and the production
 # host are built from the SAME role with the same values except where they genuinely differ, which
-# is the property ADR-0185 exists to buy -- see docs/PODMAN_HOST_BOOTSTRAP.md for why each of these
+# is the property ADR-0188 exists to buy -- see docs/PODMAN_HOST_BOOTSTRAP.md for why each of these
 # is what it is.
 
 # --- the rootless service user ----------------------------------------------------------------
