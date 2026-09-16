@@ -86,4 +86,3 @@ Anmeldung dorthin, wohin er zeigte.
   prüft der Test beide Richtungen.
 - **Staging.** Der Deep-Link-Teil läuft nur im ephemeren Modus (`assumeTrue(managesStack)`), weil er
   den geseedeten `test-member` braucht.
-

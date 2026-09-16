@@ -84,4 +84,3 @@ amended to record this.
 - **Reuse the ownerless `NULL` owner for all leadership data** — rejected: `NULL` means "org-wide,
   visible to all members-or-above", which violates the strict Bereich silo; a Bereich's own data must be
   scoped to that Bereich, which needs a concrete owner.
-

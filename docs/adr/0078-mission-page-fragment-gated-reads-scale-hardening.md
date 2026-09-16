@@ -96,4 +96,3 @@ version-safe.
   199 identical concurrent reads), but the redaction contract requires caching the un-redacted
   aggregate and redacting per-viewer after the cache; fragment-gating removes the dominant cost
   first with no redaction risk. Reconsider if a single mission's read rate still bites post-gating.
-

@@ -98,4 +98,3 @@ mapper sync mode. Three layers, defence-in-depth:
   the backend is a resource server that only sees the token; reaching into the Keycloak Admin API on
   the request path would add latency and coupling. The mapper puts the fact where the backend already
   reads it — the token.
-

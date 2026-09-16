@@ -131,4 +131,3 @@ The signal that matters is that the drop counter now *can* reach zero.
 - If some future value really is re-written unreadably on every request, the repair costs one extra
   write per drop and the rate is unchanged. That was the case `SessionAttributeDiagnosticMapper`
   named when it deferred this decision, and it is a bounded cost rather than a new failure mode.
-

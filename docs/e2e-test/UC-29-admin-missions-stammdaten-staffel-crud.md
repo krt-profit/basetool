@@ -33,4 +33,3 @@ Nach dem Anlegen ist die Staffel in `#squadrons-results` sichtbar, nach dem Lös
 
 - **Hermetisch:** Der Flow legt seine eigene `E2E Mission Data Squad` an und löscht sie wieder — eine mitgliederlose Staffel löscht sauber (eine noch genutzte würde mit 409 abbrechen), es bleibt kein Rückstand für Schwester-Suiten.
 - **Repräsentativ, nicht erschöpfend:** `/admin/mission-data` steht stellvertretend für den Admin-CRUD-Cluster; die reinen Lese-Adminseiten deckt der [`AdminPagesSmokeE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/AdminPagesSmokeE2eTest.java) als Page-Load-Smoke ab (`/admin/locations`, `/admin/uex-data`, `/admin/announcement`, `/members`, `/organisation/leitung`, …).
-

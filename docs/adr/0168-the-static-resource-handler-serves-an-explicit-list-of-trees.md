@@ -128,4 +128,3 @@ from a second hand-written list, so adding `static/audio/` without a handler fai
 - **Adding an asset tree is now a two-file change** — the directory, and a line in `WebMvcConfig`.
   That is the price of the guarantee, and the test names it rather than leaving it to be discovered
   as a 404.
-

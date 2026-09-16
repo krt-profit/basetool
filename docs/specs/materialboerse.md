@@ -608,4 +608,3 @@ EN + base bundles, `{lieferant}`/`{material}` placeholders).
 ## Open questions
 
 - Whether to surface a lightweight per-offer "kontaktieren" shortcut (Discord handle) later — parked.
-

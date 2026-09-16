@@ -96,4 +96,3 @@ Concrete choices:
 - **A separate write endpoint for stock-backed item release.** Rejected — the existing
   `POST /offers` release already carries the Lager row id; branching on the row's kind inside the
   service reuses the one release path, the one picker and the one modal.
-

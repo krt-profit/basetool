@@ -80,4 +80,3 @@ certificate validation, so a trust failure simply fails open rather than connect
   (which REQ-DATA-006 forbids) and knows nothing about the Discord per-guild server nickname.
 - **Plain HTTP or a trust-all `SSLContext`** for the backend call — rejected outright: HTTPS only, and
   certificate validation is never disabled; an untrusted cert fails open instead.
-

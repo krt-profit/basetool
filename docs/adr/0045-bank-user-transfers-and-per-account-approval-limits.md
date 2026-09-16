@@ -95,4 +95,3 @@ and the org-unit-blind confirm path are untouched. The only guard left on a depo
 account-active check in `BankBookingRequestService.create` (`BANK_ACCOUNT_CLOSED`). The org-unit bank
 page shows the request CTA whenever any active account exists and offers a merged source picker (all
 active accounts for a deposit, the caller's request-capable accounts for a withdrawal/transfer).
-

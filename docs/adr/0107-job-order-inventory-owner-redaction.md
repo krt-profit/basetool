@@ -65,4 +65,3 @@ as `MissionGuestRedactor`. The frontend renders a blanked owner/location as `—
   now.
 - The SK-public escape (ADR-0091) is unchanged for *visibility of the order itself*; this ADR only
   carves the owner/location fields out of it, so the two decisions stay consistent.
-

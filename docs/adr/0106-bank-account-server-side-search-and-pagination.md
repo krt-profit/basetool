@@ -103,4 +103,3 @@ fetched by its own `?type=CARTEL&size=1` lookup rather than scanned out of the p
   option metadata.** That surface is unbounded on the dashboard/requests (every active account), so
   it must convert too; the `window.krtBankAccountMeta` map carries the mandate without a component
   change and keeps the combobox generic. Rejected leaving it unconverted.
-

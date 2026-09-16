@@ -61,4 +61,3 @@ One `ACTIVE` offer per item is enforced by a partial-unique index (V210).
 - **Staffel-scoped board.** Rejected (D3) — the design is an org-wide marketplace ("für alle sichtbar").
 - **No peer sync (acting-user live update only) + amended REQ-FE-010.** Rejected (D4) — the board is a
   shared surface, so REQ-FE-010 applies as written.
-

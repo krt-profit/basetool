@@ -76,4 +76,3 @@ recipient set, not the data.
   retention sweep; not worth serializing the two async tasks for. Not chosen: a synchronous delete in
   the decision transaction (would couple the bank service to the notification repo and still race the
   async create the same way).
-

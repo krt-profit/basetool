@@ -60,4 +60,3 @@ admins.
   marker give the needed safety without a fragile precondition.
 - **No purge; solve growth at the DB/ops layer** — rejected: it pushes a routine product need
   (compact an oversized log) onto manual DB surgery, with no in-app trace and no per-log scoping.
-

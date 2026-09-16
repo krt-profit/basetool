@@ -47,4 +47,3 @@ requests contribute no postings and are excluded from the ledger-integrity sweep
   mutable, breaking ADR-0010 and the integrity/ArchUnit guarantees, and pollutes balance sums.
 - **Book immediately, reverse if wrong** — rejected: the whole point is that money has *not*
   moved yet; booking-then-reversing would show phantom balances and misstate holder custody.
-

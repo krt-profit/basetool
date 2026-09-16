@@ -105,4 +105,3 @@ that atomically records manufacture and draws down the order's linked stock.
 - **Map the quantity violation to 400 or 409.** Rejected — a version-current, well-formed request
   with an out-of-range amount is neither malformed nor stale; a distinct 422
   (`PRODUCTION_ALLOCATION`) lets the client keep the edit and correct the allocation inline.
-

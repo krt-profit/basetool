@@ -130,4 +130,3 @@ read-only partition of the presence store.**
   frontend replica today. Rejected because the follow-up is cheap at the seam the ADR itself
   predicted ("the store is already the single seam, so it retrofits cleanly"), and leaving it undone
   means the first horizontal scale-out ships a silently wrong UI cue with no signal that it is wrong.
-

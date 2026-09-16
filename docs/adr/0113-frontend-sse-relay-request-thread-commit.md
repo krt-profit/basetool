@@ -67,4 +67,3 @@ so a unit test can assert the initial commit on a mock emitter.
 - **Switch the frontend relay to WebFlux** — rejected as disproportionate: it would fork the
   frontend's servlet stack for one endpoint. Kept as the long-term option if the workaround ever
   stops holding.
-

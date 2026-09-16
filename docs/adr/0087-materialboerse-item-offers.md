@@ -71,4 +71,3 @@ and one live-sync relay.
   and the issue asks only for a quantity; adding one is model + UI weight with no source.
 - **One active item offer per (owner, product) partial-unique.** Rejected — @greluc chose to allow
   multiple active listings of the same item.
-

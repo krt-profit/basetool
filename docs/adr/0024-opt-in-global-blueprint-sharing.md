@@ -68,4 +68,3 @@ is counted in **both** views for **every** org unit, regardless of their own mem
 - **Widen the viewer gate instead of the data** (let any leader see every unit's owners) —
   rejected: that weakens *who may open* the views for everyone, the opposite of a narrow,
   user-consented carve-out; it would expose non-consenting members.
-

@@ -787,4 +787,3 @@ Still deliberately out of scope:
 - None. All former owner decisions were resolved on 2026-07-16 (§11); §4.4 and §6.6 are
   binding implementation checklists derived from verified code behaviour, not open
   designs.
-

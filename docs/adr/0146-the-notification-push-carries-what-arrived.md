@@ -67,4 +67,3 @@ constraint enters the deploy.
   client assembles it from type + params so it can localise and degrade honestly — see the app's
   `REQ-APP-NOTIF-005`); and a new event name (it would break the frozen contract to add data the
   existing name can carry).
-

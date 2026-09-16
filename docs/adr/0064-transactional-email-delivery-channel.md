@@ -79,4 +79,3 @@ account approval/rejection mail.
   transport now (the hard, shared part) and defer the routing policy — the seam is ready for it.
 - **A durable outbox/queue with retries.** Rejected for v1: overkill for a courtesy notice; best-
   effort with loud logging is proportionate. The seam does not preclude adding an outbox later.
-

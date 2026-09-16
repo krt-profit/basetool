@@ -49,4 +49,3 @@ server-side image processing of any kind — images never leave the user's machi
 - **Browser-side inference (WebGPU):** rejected — model size and VRAM control are
   impractical in-browser, and the squadron already uses the blueprint desktop extractor,
   so a desktop workflow is established.
-

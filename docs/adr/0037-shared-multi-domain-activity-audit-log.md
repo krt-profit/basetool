@@ -74,4 +74,3 @@ layer through a shared `AuditLogPdfFormat` renderer; the bank export feeds the s
 - **A single generic event type (string) with no per-domain enum** — rejected: the typed enum with a
   `domain()` accessor keeps the persisted `domain` column and the event type from ever disagreeing
   and lets the viewer derive each tab's filter list from the enum.
-

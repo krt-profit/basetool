@@ -143,4 +143,3 @@ nothing at all when clicked, and looks perfect in a screenshot.
   set as `.krt-modal`. Cheaper, and it cements three shapes and their three contracts rather than
   removing them. It would also have left the live-sync probe blind, since that keys on the root
   class and not on the box.
-

@@ -35,4 +35,3 @@ Der Save landet: kein Fehler-Toast, kein Optimistic-Lock-Reload-Dialog (`.krt-co
 - **Bisherige Lücke:** `RoleAppointmentMatrixE2eTest` prüft nur die Backend-Appointment-API, `RolePermissionsE2eTest` nur das `sec:authorize`-Gating der Auftragssicht — die In-Place-Bearbeitung der Mitgliederseite selbst war ungetestet.
 - **Persistenz-Read-back:** Der Zielrang wird deterministisch über die Backend-API zurückgelesen (analog `AdminSettingsInPlaceE2eTest`), nicht über das DOM, das den Client-Writeback rennen könnte.
 - **Keine Mitgliedschafts-Mutation:** Nur der Rang wird geändert; die Staffel-Sektion (`staffelDetailLoaded`) bleibt unangetastet, damit der geteilte Fixture-User sauber bleibt.
-

@@ -89,4 +89,3 @@ bridging each to its PIECE `material` exactly as the job-order path does — sup
 - **Reclassify these gems as RESOURCE materials at sync time** — rejected: it would fight the wiki's
   own `kind` classification, ripple into every other consumer of the recipe graph, and still need a
   bridge for items the reclassification missed; bridging at read time is local and reversible.
-
