@@ -27,6 +27,16 @@
 *.css text eol=lf
 *.js text eol=lf
 *.svg text eol=lf
+
+# Quadlet units and their environment allow-lists (ADR-0163). These are read by systemd on
+# a Linux host, and a CRLF does not merely look untidy there: the carriage return becomes
+# part of the VALUE, so `Image=foo` silently becomes `Image=foo` and the pull fails on a
+# reference nobody can see is wrong. The config bundle can be built from a Windows checkout,
+# so this is not hypothetical.
+*.container text eol=lf
+*.network text eol=lf
+*.volume text eol=lf
+*.vars text eol=lf
 *.json text eol=lf
 *.xml text eol=lf
 *.sql text eol=lf
