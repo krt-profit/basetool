@@ -53,7 +53,9 @@ it against `podman unshare` on the host.
 ## Before the role: the machine has to exist and let you in
 
 [`cloud-init/hetzner-rocky10.yaml`](cloud-init/hetzner-rocky10.yaml) does that and **nothing else** —
-one user, one key, sudo. Paste it into Hetzner's *Cloud config* field when creating the server.
+one user, two keys, sudo. Two, because on this host `root` and `sysadm` are password-locked and
+the console accepts no login: the operator's key is the way in when the automation's cannot be
+used, and a single key is a single point of failure that fails on the day it is needed. Paste it into Hetzner's *Cloud config* field when creating the server.
 
 The restraint is the design. This migration's safety argument is that testing and production come
 out of the *same* procedure; anything cloud-init configures that the role also configures exists in
