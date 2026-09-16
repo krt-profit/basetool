@@ -98,6 +98,14 @@ UNPRIVILEGED_CONTAINERS = {
     "redis": 999,
 }
 
+#: Containers whose root filesystem must be read-only, and the one that cannot be.
+#: Measured service by service (PODMAN_MIGRATION_PLAN.md section 21, ADR-0190). `keycloak` is
+#: absent on purpose: `kc.sh start` without `--optimized` re-augments the Quarkus application into
+#: /opt/keycloak/lib at every boot, which read-only stops dead -- and the augmentation is required
+#: because the SPI provider arrives as a JAR mounted in at deploy time.
+#: Written out here rather than derived, for the same reason as UNPRIVILEGED_CONTAINERS.
+READ_ONLY_EXEMPT = ("keycloak",)
+
 EXPECTED_APP_CONTAINERS = (
     "edge",
     "acme",
@@ -1015,6 +1023,67 @@ def check_containers_unprivileged(ctx: Context) -> str:
     return "container-side uid of pid 1: " + ", ".join(good)
 
 
+def check_containers_read_only(ctx: Context) -> str:
+    """Every app container but the recorded exception runs on a read-only root filesystem.
+
+    Read-only is not defence in depth here so much as a statement about what the image is allowed
+    to become: a container that cannot rewrite its own installation cannot be persistently
+    modified by anything that gets inside it, and the next restart is the image again.
+
+    Measured service by service before it was required of them (section 21 of the migration plan).
+    Nine of the ten third-party images write nothing outside their mounts or write only under
+    /tmp; a healthy Spring Boot module writes Tomcat's work directory, its docbase and the JVM
+    perf data, all three under /tmp. Podman mounts /run, /tmp and /var/tmp as tmpfs under
+    ``--read-only`` and copies the image's content up into them, which is why none of them needs
+    an explicit tmpfs -- and why this is expressed in the Quadlet units rather than in the compose
+    file, since Docker does not do that.
+
+    ``keycloak`` is exempt and the exemption is asserted rather than assumed: if it ever becomes
+    read-only, that is a change worth noticing, not a silent improvement.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming how many containers were verified read-only.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when a container that should be read-only is not, when one cannot be read,
+            or when the exempt container has become read-only without the record being updated.
+    """
+    out = ctx.runner.run(
+        'docker inspect --format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" '
+        + " ".join(EXPECTED_APP_CONTAINERS)
+    )
+    state: dict[str, str] = {}
+    for line in out.splitlines():
+        if "|" in line:
+            name, value = line.split("|", 1)
+            state[name.strip().lstrip("/")] = value.strip().lower()
+
+    problems = []
+    verified = 0
+    for name in EXPECTED_APP_CONTAINERS:
+        value = state.get(name)
+        exempt = name in READ_ONLY_EXEMPT
+        if value is None:
+            problems.append(f"{name}: no container, so its root filesystem says nothing")
+        elif exempt and value == "true":
+            problems.append(
+                f"{name} is read-only, and it is recorded as the one that cannot be. Either the "
+                "record is stale or something else changed -- both are worth reading before this "
+                "check is edited to agree with the host")
+        elif not exempt and value != "true":
+            problems.append(f"{name} has a writable root filesystem")
+        elif not exempt:
+            verified += 1
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    return (f"{verified} of {len(EXPECTED_APP_CONTAINERS)} app containers read-only; "
+            f"{', '.join(READ_ONLY_EXEMPT)} exempt as recorded")
+
+
 def check_container_metrics(ctx: Context) -> str:
     """The container metric series the alert rules read are present and populated.
 
@@ -1238,6 +1307,8 @@ CHECKS: tuple[Check, ...] = (
           check_edge_not_directly_reachable),
     Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True,
           check_containers_unprivileged),
+    Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True,
+          check_containers_read_only),
 )
 
 

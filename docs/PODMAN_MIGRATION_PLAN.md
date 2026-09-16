@@ -2266,9 +2266,10 @@ The container ran as uid 70 with `--cap-drop=ALL` against a `/run` owned by root
 not have made that directory. `--read-only-tmpfs=false` leaves all three unmounted, which is the
 control that proves who did it.
 
-**Docker does not do this**, and that is why `edge` carries explicit `tmpfs:` entries. Under Podman
-they become redundant rather than wrong — so they stay, because they are what makes the requirement
-legible.
+**Docker does not do this**, and that is why `edge` carries explicit `tmpfs:` entries. Only one of
+its two becomes redundant under Podman: `/tmp` is supplied, **`/var/cache/nginx` is not** — Podman
+covers `/run`, `/tmp` and `/var/tmp` and nothing else. Both stay, because the redundant one is what
+makes the requirement legible to a reader who does not know the defaults.
 
 ### Four failures that were mine, not the software's
 
@@ -2290,3 +2291,131 @@ to @greluc as findings before they were checked.
    the explanation printed beside it was a substring match. A failing arm now prints its log
    verbatim.
 
+## 21. Phase 2 — read-only for everything else, and the one that cannot — 2026-09-16
+
+`REQ-OPS-014` said a read-only root filesystem is **not** part of the baseline, required only of
+`edge`, because *the JVM and DB working dirs write across the filesystem*. Nobody had run that.
+Fourteen services, two arms each, and the sentence was wrong about both halves.
+
+**The method, because it is what made this cheap.** Guessing which paths an image writes is how a
+`Tmpfs=` list ends up half right. `podman diff` answers it directly: it lists exactly what a
+container put on its own root filesystem. So each service runs **writable** first and is asked that
+question, and then runs **`--read-only`** to see whether it still comes up. The first arm produces
+the tmpfs list; the second proves it was not needed.
+
+### The result
+
+|          Service          |    Writes to its own root filesystem    | Read-only |
+|---------------------------|-----------------------------------------|-----------|
+| prometheus                | nothing                                 | runs      |
+| tempo                     | nothing                                 | runs      |
+| alertmanager              | nothing                                 | runs      |
+| blackbox-exporter         | nothing                                 | runs      |
+| postgres-exporter (both)  | nothing                                 | runs      |
+| redis-exporter            | nothing                                 | runs      |
+| acme                      | nothing                                 | runs      |
+| loki                      | `/tmp/loki-rules/…`                     | runs      |
+| grafana                   | `/tmp` only                             | runs¹     |
+| backend, frontend, ingest | `/tmp` only — see below                 | runs      |
+| **keycloak**              | **476 paths under `/opt/keycloak/lib`** | **fails** |
+
+¹ with one environment variable; see below.
+
+Seventeen of the eighteen units now carry `ReadOnly=true`. The decision is
+[ADR-0190](adr/0190-every-container-but-keycloak-runs-read-only.md).
+
+### Keycloak is not a missing tmpfs
+
+`kc.sh start` **without `--optimized` re-augments the Quarkus application into its own installation
+directory at every boot**. Measured: 476 paths under `/opt/keycloak/lib`, plus
+`/opt/keycloak/data/transaction-logs`. Read-only stops it dead:
+
+```
+Caused by: java.nio.file.FileSystemException: /opt/keycloak/lib/quarkus/transformed-…
+```
+
+And the augmentation is **required here**, which is the part that settles it. The Keycloak SPI
+provider arrives as a JAR mounted into `/opt/keycloak/providers` at deploy time, and a provider that
+appears at runtime is exactly what forces the rebuild. A read-only Keycloak means baking the
+provider into a custom image and running `start --optimized` — a change to how the provider is
+promoted, not a hardening flag. Left open deliberately.
+
+> [!warning] A tmpfs over `/opt/keycloak/lib` would have looked like it worked
+> The container would start. What it started would be an augmentation held in memory, thrown away
+> on restart, over an installation directory the image had put there. That is the shape of a fix
+> that passes every check and is wrong.
+
+### The JVM modules write three things, and all three are under `/tmp`
+
+Their own source contains **no filesystem write API at all** — no `new File`, no `Files.*`, no
+`FileOutputStream`, no `createTempFile`, in any of the three main source trees. The only writer is
+logback, whose path is relative to `/app` and therefore lands in the log directory that is already
+mounted.
+
+Measured against the built images rather than taken from that: `ingest` came up **healthy on a
+read-only root filesystem**, and `podman diff` on its writable twin shows the whole of what a
+running Spring Boot service writes:
+
+```
+/tmp/tomcat.11262.<random>/work/Tomcat/localhost/ROOT
+/tmp/tomcat-docbase.11262.<random>
+/tmp/hsperfdata_app/1
+```
+
+`backend` and `frontend` stop at the same line in both arms — a missing database configuration, not
+a read-only one. **Identical failure points are the evidence**; the read-only arm blocked nothing
+the writable arm did not also hit.
+
+> [!note] These three were measured with Docker, on the workstation
+> Their images are private and the testing host has no credential for the registry — correctly, and
+> it is not getting one. `podman diff` and `docker diff` answer the same question about the same
+> image, and the paths an image writes do not depend on which runtime started it. What *is*
+> runtime-specific is which of them are already covered, and that was measured on Podman (§20).
+
+### Grafana: one error line per boot, and a switch that removes it
+
+Grafana's background installer tries to refresh a **bundled** plugin inside its own installation
+directory:
+
+```
+level=error msg="Failed to install plugin" pluginId=elasticsearch
+  error="unlinkat /usr/share/grafana/data/plugins-bundled/elasticsearch: read-only file system"
+```
+
+It serves regardless — `GET /login` answered **HTTP 200** on the read-only container. But an error
+line at every start is what the log-based alerting reads, so it is not free.
+`GF_PLUGINS_PREINSTALL_DISABLED=true` removes it; measured both ways, both still serving. Nothing
+this deployment uses changes: the datasources are provisioned from files and Elasticsearch is not
+one of them. It also removes an outbound call at every start.
+
+### Four harness faults, each of which answered instead of failing
+
+The first three runs produced a full table of results and all of it was wrong.
+
+1. **The test material lived under `$HOME`, which is `0700`.** Every image running as a non-root uid
+   got `permission denied` on its own config. That reads as a property of the image and is a
+   property of the path. Moved to `/tmp` with `0755` directories.
+2. **`podman run`'s pull progress goes to stderr**, and the harness treated any stderr as a run
+   failure. Eight services reported `FAILEDRUN: Writing manifest to image destination`. Pre-pull,
+   and check the **exit status**.
+3. **Fixing "short-name resolution enforced" lost the digest pins.** Qualifying `prom/prometheus` to
+   `docker.io/prom/prometheus` silently dropped the `@sha256:…`, so that run measured whatever the
+   tag pointed at that afternoon. Qualified **and** pinned.
+4. **The `podman diff` filter had the path test backwards.** It excluded directories *above* a mount
+   target and not the mounted content itself, so every file inside a read-only config mount came
+   back looking like something the image had written. Prometheus appeared to write seven paths; it
+   writes none.
+
+> [!note] Only the fourth was visible as nonsense
+> The other three produced plausible tables. A service reporting `permission denied` on its config
+> looks exactly like a service that needs a writable path — which is the very thing being measured,
+> so the wrong answer agreed with the question.
+
+### Found on the way, and not part of this
+
+All three application images **ship the log files their CDS training run wrote during the build**,
+owned by `root`, because the training run executes before the `USER 10001` line. The backend image
+carries 60 KB of build-time startup log. Without the `/app/logs` bind mount the container does not
+start at all — `openFile(logs/backend.log) … Permission denied`, then
+`Logback configuration error detected`, exit 1. Production mounts over it, so this is latent rather
+than live, and the content carries no credential (checked). Recorded as its own piece of work.

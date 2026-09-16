@@ -5,6 +5,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=quay.io/prometheus/alertmanager:v0.34.0@sha256:690c7b525f4367aa91f73e2f91c632206d32e97c6384bdbf2fb7a861b420340d
 ContainerName=alertmanager
+ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
 Network=net-monitoring-core.network

@@ -7,6 +7,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=ghcr.io/krt-profit/basetool-frontend:stable
 ContainerName=frontend
+ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
 Network=net-backend-frontend.network

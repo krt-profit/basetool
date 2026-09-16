@@ -121,6 +121,52 @@ RUN_AS = {
 #: The bootstrap role's own view of those uids. Read at generation time, never transcribed.
 ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "defaults", "main.yml")
 
+# ADR-0190: every remaining container gets a read-only root filesystem, except one.
+#
+# Measured service by service on Rocky 10.2 / Podman 5.8.2 (plan section 21), in two arms each: the
+# image run WRITABLE, with `podman diff` asked what it put on its own root filesystem, and then the
+# same thing `--read-only` to see whether it still comes up. Nine of the ten public images write
+# NOTHING outside their mounts, or write only under /tmp -- which podman mounts as tmpfs under
+# `--read-only` anyway. The application modules were measured the same way against their built
+# images: a healthy Spring Boot service writes Tomcat's work directory, its docbase and the JVM
+# perf data, all three under /tmp, and nothing else. Their own code contains no filesystem write
+# at all.
+#
+# It is a Quadlet-side table and not `read_only: true` in compose for a reason that is not
+# stylistic: **podman mounts /run, /tmp and /var/tmp as tmpfs under `--read-only` and Docker does
+# not**. The same line in the compose file would break most of these services on the Docker host
+# that still runs them. What was measured is podman's behaviour, so it is expressed where podman
+# reads it.
+#
+# `keycloak` is deliberately absent, and section 21 records why: `kc.sh start` without
+# `--optimized` re-augments the Quarkus application into /opt/keycloak/lib at every boot -- 476
+# paths, measured -- and read-only stops it dead with
+# `FileSystemException: /opt/keycloak/lib/quarkus/transformed-...`. That is not a missing tmpfs:
+# the augmentation is REQUIRED here, because the Keycloak SPI provider arrives as a JAR mounted
+# into /opt/keycloak/providers at deploy time. Read-only for keycloak means changing how that
+# provider is delivered, which is a separate decision.
+READ_ONLY: dict[str, dict[str, Any]] = {
+    "prometheus": {},
+    "loki": {},
+    "tempo": {},
+    # Grafana's background installer tries to refresh a BUNDLED plugin inside its own installation
+    # directory and logs `unlinkat /usr/share/grafana/data/plugins-bundled/elasticsearch:
+    # read-only file system` at every start. It serves regardless -- measured, HTTP 200 on /login --
+    # but an error line per boot is exactly what the log-based alerting reads. Disabling the
+    # preinstaller removes it and changes nothing this deployment uses: the datasources are
+    # provisioned from files and elasticsearch is not one of them. Measured both ways.
+    "grafana": {"environment": {"GF_PLUGINS_PREINSTALL_DISABLED": "true"}},
+    "alertmanager": {},
+    "blackbox-exporter": {},
+    "postgres-exporter-backend": {},
+    "postgres-exporter-keycloak": {},
+    "redis-exporter": {},
+    "acme": {},
+    "backend": {},
+    "frontend": {},
+    "ingest": {},
+}
+
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
@@ -540,12 +586,23 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
             else:
                 container.append(f"User={user}")
 
-        if spec.get("read_only"):
+        if spec.get("read_only") and service in READ_ONLY:
+            raise Refusal(
+                f"{service}: compose already sets read_only: true, and READ_ONLY names it again. "
+                "Remove the table entry -- a second place to say the same thing is a first place "
+                "for the two to differ."
+            )
+        if spec.get("read_only") or service in READ_ONLY:
             container.append("ReadOnly=true")
         for cap in spec.get("cap_drop", []) or []:
             container.append(f"DropCapability={cap}")
         for cap in spec.get("cap_add", []) or []:
             container.append(f"AddCapability={cap}")
+        for key, value in (READ_ONLY.get(service, {}).get("environment") or {}).items():
+            # A literal value, set because the unit is read-only -- it never belongs in the host's
+            # .env, and it is not a secret, so it is written into the unit rather than routed
+            # through EnvironmentFile.
+            container.append(f"Environment={key}={value}")
     if any("no-new-privileges" in str(o) for o in spec.get("security_opt", []) or []):
         container.append("NoNewPrivileges=true")
     for tmpfs in spec.get("tmpfs", []) or []:
@@ -687,7 +744,7 @@ def render_vars(service: str, spec: dict[str, Any]) -> str:
 # Driving
 # ============================================================================================
 def _verify_run_as_against_role() -> None:
-    """Refuse if RUN_AS and the bootstrap role disagree about a container uid.
+    """Refuse if the hardening tables disagree with the bootstrap role, or with each other.
 
     ``User=70`` in a unit and a data directory owned as if the container were uid 70 are the same
     fact written in two repositories' worth of tooling. They agree today. This is what notices the
@@ -695,8 +752,9 @@ def _verify_run_as_against_role() -> None:
     failed build, rather than at boot, where it is a database that will not start.
 
     Raises:
-        Refusal: when a service in RUN_AS has no owner entry in the role, or has one with a
-            different ``container_uid``.
+        Refusal: when a service in RUN_AS has no owner entry in the role or has one with a
+            different ``container_uid``; when a service is named by both RUN_AS and READ_ONLY;
+            or when READ_ONLY names something that does not become a container.
     """
     doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
     by_path: dict[str, int] = {}
@@ -716,6 +774,23 @@ def _verify_run_as_against_role() -> None:
             raise Refusal(
                 f"{service}: RUN_AS says uid {uid}, the bootstrap role owns {path!r} as "
                 f"{by_path[path]}. One of the two was changed without the other."
+            )
+
+    overlap = sorted(set(RUN_AS) & set(READ_ONLY))
+    if overlap:
+        raise Refusal(
+            f"{', '.join(overlap)}: listed in RUN_AS and in READ_ONLY. RUN_AS already emits "
+            "ReadOnly=true as part of its set, so the second entry is either redundant or a "
+            "disagreement, and neither should be resolved by whichever table is read last."
+        )
+
+    for service in sorted(READ_ONLY):
+        kind = DISPOSITION.get(service, ("absent", ""))[0]
+        if kind != "container":
+            raise Refusal(
+                f"{service}: READ_ONLY names it, but its disposition is {kind!r}. A read-only "
+                "root filesystem for something that never becomes a container is a line nobody "
+                "will notice has stopped applying."
             )
 
 
