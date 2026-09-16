@@ -105,6 +105,30 @@ public enum AppExceptionKind {
       "Production allocation",
       ErrorDisclosurePolicy.STANDARD),
 
+  /**
+   * {@code OwnerOrgUnitRequiredException} — the caller belongs to more than one org unit, supplied
+   * no {@code owningOrgUnitId} and has no honourable active-context pin, so §5.5.1's "pin, else
+   * choose" rule cannot resolve an owner for the aggregate being created (REQ-ORG-017).
+   *
+   * <p>Split out of {@link #BAD_REQUEST} because this is the one 400 on that path the member can
+   * actually fix, and only if they are told how. Under the generic code the frontend had nothing to
+   * branch on and fell through to echoing the backend's own English {@code detail} into a German
+   * toast — "User belongs to multiple org units; owningOrgUnitId is required" — which is both an
+   * i18n violation and an instruction nobody can act on. A stable code lets each picker surface
+   * render its own localized "please choose an org unit" and point at the field (REQ-ORG-023).
+   *
+   * <p>Still a {@code 400}: the request is malformed for this caller, not a conflict and not a
+   * permission refusal. A pick the caller may not make stays an {@code AccessDeniedException}.
+   */
+  OWNER_ORG_UNIT_REQUIRED(
+      HttpStatus.BAD_REQUEST,
+      "OWNER_ORG_UNIT_REQUIRED",
+      "problem.owner_org_unit_required.title",
+      "problem.owner_org_unit_required.detail",
+      "owner-org-unit-required",
+      "Owning org unit required",
+      ErrorDisclosurePolicy.STANDARD),
+
   /** {@code DuplicateEntityException} — service-layer uniqueness check. */
   DUPLICATE_ENTITY(
       HttpStatus.CONFLICT,
