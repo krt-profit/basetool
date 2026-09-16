@@ -1,0 +1,88 @@
+# promtool unit tests for SessionUnmappableSustained (REQ-SEC-063, ADR-0186).
+#
+# The rule watches a fault that was made quiet on purpose. A session hash that exists in Redis and
+# is missing a required field used to answer HTTP 500 on every request carrying that cookie, for up
+# to the 720-hour authenticated window; since ADR-0186 it reads as "no session" and the member is
+# simply signed out. The counter is what stands between a graceful degradation and a silent one, so
+# both directions matter here:
+#   - the volume event must fire. The 2026-09-14 production burst (90 in one hour, then 163 in
+#     another) is the shape a Redis restart produces, and it is exactly what nothing alerted on.
+#   - the ordinary trickle must not. Eight to ten singles a day were normal on this deployment long
+#     before anyone noticed the fault, and waking someone for one member's lost hash is how a
+#     meter gets ignored.
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/session_unmappable_alert_test.yml'
+
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Hashes being lost in volume and not stopping — a Redis that keeps restarting, or a purge running
+  # against live traffic. 3/min clears the >20-per-15m threshold and holds well past the 30m `for`.
+  - name: fires - session hashes unmappable in volume and sustained
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_unmappable_total{missing_key="creationTime",app="basetool-frontend"}'
+        values: "0+3x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionUnmappableSustained
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Frontend cannot map session hashes (45 per 15m)"
+              description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
+
+  # The observed steady state of this deployment before the guard existed: a few scattered singles a
+  # day, each one browser that lost its hash once and got a fresh session. Real, logged, and not
+  # something to wake anyone for.
+  - name: silent - the ordinary trickle of one lost hash at a time
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_unmappable_total{missing_key="creationTime",app="basetool-frontend"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionUnmappableSustained
+        exp_alerts: []
+
+  # A Redis restart: every browser mid-request at that moment loses its hash, gets one unmappable
+  # read, and then a fresh session. increase[15m] spikes hard and falls back once the burst leaves
+  # the window, so it cannot hold the 30m `for`. The alert must ride that out, or a routine restart
+  # pages someone every time.
+  - name: silent - a one-off burst from a Redis restart, decaying on its own
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_unmappable_total{missing_key="creationTime",app="basetool-frontend"}'
+        values: "0+30x10 300x110"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionUnmappableSustained
+        exp_alerts: []
+
+  # The label is bounded but plural, and the rule sums across it on purpose: a format break loses
+  # every required field at once, and three series each below the threshold must still add up to it.
+  # A rule written per-series would miss exactly the case it exists for.
+  - name: fires - the threshold is met across missing_key values, not within one
+    interval: 1m
+    input_series:
+      - series: 'basetool_session_unmappable_total{missing_key="creationTime",app="basetool-frontend"}'
+        values: "0+1x120"
+      - series: 'basetool_session_unmappable_total{missing_key="lastAccessedTime",app="basetool-frontend"}'
+        values: "0+1x120"
+      - series: 'basetool_session_unmappable_total{missing_key="maxInactiveInterval",app="basetool-frontend"}'
+        values: "0+1x120"
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: SessionUnmappableSustained
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Frontend cannot map session hashes (45 per 15m)"
+              description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."

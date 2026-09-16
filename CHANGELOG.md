@@ -11,6 +11,12 @@
 
 ### Fixed
 
+- **Ein beschädigter Sitzungseintrag sperrte einzelne Mitglieder komplett aus.** Verlor der
+  Sitzungsspeicher einen Eintrag, während gerade eine Anfrage lief, blieb ein halb geschriebener
+  Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
+  bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
+  sich neu anmelden (REQ-SEC-063).
+
 - **Betrieb: der Backend-Dienst benannte seinen Garbage Collector nicht.** Die Regel, dass jeder
   Dienst seinen Collector ausdrücklich setzt, war für Frontend und Ingest umgesetzt, für das Backend
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren

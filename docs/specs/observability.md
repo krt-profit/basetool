@@ -1510,6 +1510,38 @@ A third frontend meter was added by the 2026-09-02 production log triage:
   will rewrite it" is an assumption about *other* code that has to be checked in that code, not
   asserted from the one being fixed.
 
+A fourth frontend meter was added by the 2026-09-16 production log triage, on the *other* way a
+session read can fail:
+
+- `basetool_session_unmappable_total{missing_key}` — counter bumped by
+  `SessionAttributeDiagnosticMapper` every time a session hash in Redis is non-empty but carries
+  none of one of the three fields `RedisSessionMapper` requires, so the mapper answers `null` and
+  the request is served as if it had no session (REQ-SEC-063, ADR-0186). `missing_key` is a closed
+  set of four literals — `creationTime`, `lastAccessedTime`, `maxInactiveInterval`, `other` —
+  resolved from the hash itself rather than parsed out of the upstream exception message
+  (REQ-OBS-006).
+
+  **It is the price of a degradation, not a nicety.** Until 2026-09-16 that hash threw
+  `IllegalStateException: creationTime key must not be null` straight out of
+  `SessionRepositoryFilter` and answered **HTTP 500** — on every request carrying that cookie, for
+  up to the 720-hour window, because nothing on the read path catches it and nothing clears the
+  cookie. Production served 286 of those on 2026-09-14 and 18 more on 2026-09-16, plus 8–10 a day
+  on nine scattered days back to July, and **nothing fired**: `LogbackErrorSpike` needs 0.2/s held
+  10 m and the worst hour of it reached 0.045/s. Now that the read degrades to a signed-out member,
+  this counter is the only thing separating a graceful failure from a silent one.
+
+  The producer is a delta write — `RedisSession#saveDelta` issues a plain `HSET` of the changed
+  fields only, and `creationTime` is in that delta solely `if (isNew)` — so a request committing
+  after its hash has gone re-creates the key holding `lastAccessedTime` alone and puts the full TTL
+  back on it. One lost hash therefore yields exactly **one** increment and then that browser gets a
+  fresh session: the counter is a step per affected browser, never a plateau. A burst after a Redis
+  restart, an AOF truncation or a session purge run against live traffic is expected and decays; a
+  rate that climbs with no such event means hashes are being lost in volume and Redis is where to
+  look; a rate covering the whole active population at once means the session wire format broke and
+  everybody is being signed out. Backs `SessionUnmappableSustained` (> 20 per 15 m held 30 m,
+  warning), which sums **across** `missing_key` precisely so a format break that loses all three
+  fields at once cannot hide below a per-series threshold.
+
 Two frontend meters were added by the 2026-08 logging audit:
 
 - `basetool_session_evicted_total` — unlabelled counter, bumped by `SessionEvictionLoggingStrategy`

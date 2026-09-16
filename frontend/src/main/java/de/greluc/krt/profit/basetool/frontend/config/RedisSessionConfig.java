@@ -127,7 +127,8 @@ public class RedisSessionConfig {
    *
    * <p>{@code @EnableRedisIndexedHttpSession} disables Spring Boot's auto-configuration bridge, so
    * this value is NOT applied automatically; without it the repository default of 1800 s (30 min)
-   * would apply. Injected here and applied via {@link #sessionRepositoryCustomizer()}.
+   * would apply. Injected here and applied via {@link
+   * #sessionRepositoryCustomizer(ObjectProvider)}.
    */
   @Value("${app.session.anonymous-timeout:30m}")
   private Duration anonymousSessionTimeout;
@@ -141,7 +142,7 @@ public class RedisSessionConfig {
    * the {@link RedisIndexedSessionRepository}. Without explicit configuration the default namespace
    * {@code spring:session} is used — sessions are stored under {@code spring:session:*} keys, not
    * under the configured {@code basetool:session:*} keys. This field is injected here and applied
-   * via {@link #sessionRepositoryCustomizer()}.
+   * via {@link #sessionRepositoryCustomizer(ObjectProvider)}.
    */
   @Value("${spring.session.redis.namespace:basetool:session}")
   private String redisNamespace;
@@ -149,7 +150,7 @@ public class RedisSessionConfig {
   /**
    * Raw {@code spring.session.redis.flush-mode} string (default {@code IMMEDIATE}), turned into a
    * {@link FlushMode} by {@link #resolveFlushMode()} and applied via {@link
-   * #sessionRepositoryCustomizer()}.
+   * #sessionRepositoryCustomizer(ObjectProvider)}.
    *
    * <p>{@code @EnableRedisIndexedHttpSession} bypasses Spring Boot's auto-configuration, so this
    * property is NOT applied to the {@link RedisIndexedSessionRepository} automatically. The default
@@ -419,15 +420,28 @@ public class RedisSessionConfig {
    * hash; that map is deserialized in a single serializer call, so it can never contain an {@link
    * UnreadableSessionValue}, and a brand-new session has nothing stale in it to be poisoned by.
    *
+   * <p>Since 2026-09-16 that mapper also answers {@code null} for a hash that is missing one of the
+   * three fields the upstream mapper requires, instead of letting {@code IllegalStateException}
+   * escape into the container as an HTTP 500 (REQ-SEC-063, ADR-0186). Both call sites above already
+   * null-check the mapper's result, so the read degrades to a signed-out member on {@code
+   * getSession} and to a skipped {@code SessionCreatedEvent} on {@code onMessage}.
+   *
+   * @param meterRegistry provider for the registry {@code basetool_session_unmappable_total} binds
+   *     to, handed to the mapper. An {@link ObjectProvider} for the same reason {@link
+   *     #springSessionDefaultRedisSerializer(ObjectProvider)} takes one: this bean is consumed by
+   *     the configuration {@code @EnableRedisIndexedHttpSession} imports onto this very class, so a
+   *     hard {@code MeterRegistry} dependency would drag Micrometer's auto-configuration into
+   *     session-repository creation.
    * @return a customizer that sets timeout, namespace, flush mode and the diagnostic session mapper
    */
   @Bean
-  public SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizer() {
+  public SessionRepositoryCustomizer<RedisIndexedSessionRepository> sessionRepositoryCustomizer(
+      ObjectProvider<MeterRegistry> meterRegistry) {
     return repository -> {
       repository.setDefaultMaxInactiveInterval(anonymousSessionTimeout);
       repository.setRedisKeyNamespace(redisNamespace);
       repository.setFlushMode(resolveFlushMode());
-      repository.setRedisSessionMapper(new SessionAttributeDiagnosticMapper());
+      repository.setRedisSessionMapper(new SessionAttributeDiagnosticMapper(meterRegistry));
     };
   }
 
