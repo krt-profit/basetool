@@ -424,6 +424,38 @@ public final class PersonSearchTargets {
           "default_blueprint.scwiki_key");
 
   /**
+   * The exemptions that rest on <b>reachability</b> rather than on absence: a name can be inside
+   * these, and the reason they are not searched is that finding it there adds nothing.
+   *
+   * <p>A subset of {@link #EXEMPT_COLUMNS}, and the distinction matters outside the search. The
+   * Art. 15 export has to know whether a column it selects can carry a third party's name, which is
+   * a different question from whether searching it is useful: {@code notification.params} holds the
+   * handle {@code AccountDeletionRequestedEvent} writes into one row per administrator, and the
+   * export scrubs it for that reason while the search skips it because it would return one hit per
+   * admin inbox for the same event.
+   *
+   * <p><b>Why it is a named set and not a sentence.</b> {@code DataExportScrubCoverageTest} asked
+   * {@link #TARGETS} alone, so an exempt column left its question entirely: {@code
+   * notifications.params} was scrubbed by the export and required by nothing, and deleting that one
+   * line would have shipped the handle with both coverage gates passing (found 2026-09-17). Asking
+   * the whole of {@code EXEMPT_COLUMNS} instead is no good either — most exemptions really are
+   * enum-like values, codes and identifiers, and flagging ~40 of them would have buried the one
+   * that matters. So the class is named here, next to the reasons it is drawn from, and {@code
+   * PersonSearchCoverageTest} holds it inside {@code EXEMPT_COLUMNS}.
+   *
+   * <p>The other technical payloads in that block are here for the same reason: an import
+   * diagnostic, its serialised result and the uploaded file's own name can each contain whatever
+   * the uploader put there. {@code client_id} and {@code entity_type} are not, being bounded
+   * vocabularies.
+   */
+  public static final Set<String> EXEMPT_BUT_MAY_HOLD_A_NAME =
+      Set.of(
+          "notification.params",
+          "p4k_import_job.error_message",
+          "p4k_import_job.result_json",
+          "p4k_import_job.source_filename");
+
+  /**
    * Table-name prefixes whose every text column is synced catalogue data, exempt wholesale.
    *
    * <p>Enumerating their ~200 columns individually would be a list nobody could keep true, and the

@@ -193,6 +193,14 @@ rather than omits, and therefore the one part where a defect is a leak rather th
    that, `notificationRuleTargets` could select an administrator's free text unscrubbed (it did),
    and a renamed key could drop out of the scrub set while the export kept reporting success.
 
+   **Widened 2026-09-17:** the gate asked the *searched* half of `PersonSearchTargets` only,
+   so a column the search exempts left its question entirely. The technical-payload exemptions
+   rest on reachability rather than absence — `notification.params` holds a handle and is
+   skipped because searching it returns one hit per admin inbox for the same event — so
+   `notifications.params` was scrubbed by the export and required by nothing, the single entry
+   in the registry whose deletion no test would have caught. `EXEMPT_BUT_MAY_HOLD_A_NAME` names
+   that class and the gate reads it as well.
+
 6. **The per-section legal prose is no longer shipped.** `Section.portableHint` was ~30 English
    sentences serialised into the member's JSON download, which the i18n rule forbids and which the
    PDF never rendered — user-visible text with no bundle key anywhere. The wire carries

@@ -50,6 +50,13 @@ import org.junit.jupiter.api.Test;
  * reason — that is the leak direction. And every entry in either registry must name a section and a
  * column that actually exist — that is the drift direction, the one that fails silently.
  *
+ * <p><b>Widened 2026-09-17.</b> The leak direction asked {@link PersonSearchTargets#TARGETS} only,
+ * so a column the search exempts was invisible to it — and {@code notifications.params} is exactly
+ * that: scrubbed by the export because the payload carries a handle, exempt from the search because
+ * searching it returns one hit per admin inbox for the same event. It was the single entry in the
+ * scrub registry whose deletion no test would have caught. The question now includes {@link
+ * PersonSearchTargets#EXEMPT_BUT_MAY_HOLD_A_NAME}.
+ *
  * <p>The SQL is parsed rather than executed, so this is a plain unit test: no container, no schema,
  * and it runs in milliseconds on every build. {@code DataExportIntegrationTest} covers the part
  * that needs a database.
@@ -95,6 +102,24 @@ class DataExportScrubCoverageTest {
                 + " UNSCRUBBED_PERSON_COLUMNS. Add it to whichever is true -- leaving it absent is"
                 + " the state that ships a third party's name in somebody's Art. 15 export.")
         .isEmpty();
+  }
+
+  /**
+   * The named payload class has to stay a subset of the exemptions it is drawn from.
+   *
+   * <p>It is a second list of the same strings, so it can drift: a renamed or searched-again column
+   * would leave {@code EXEMPT_COLUMNS} while still being named here, and then this gate would be
+   * demanding a scrub decision about a column that is searched anyway (harmless) or about one that
+   * no longer exists (misleading). Checked here rather than in {@code PersonSearchCoverageTest}
+   * because that one needs a database, and this is the gate that depends on the subset.
+   */
+  @Test
+  void theNameBearingExemptionsAreRealExemptions() {
+    assertThat(PersonSearchTargets.EXEMPT_COLUMNS)
+        .as(
+            "EXEMPT_BUT_MAY_HOLD_A_NAME names the exemptions that can still contain somebody's"
+                + " name, so every entry must be an exemption")
+        .containsAll(PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME);
   }
 
   // covers REQ-SEC-058 - the scrub registry cannot drift out of step with the sections it names
@@ -311,12 +336,32 @@ class DataExportScrubCoverageTest {
    * the joined tables has to be accounted for even when the reader has to work out which. That is
    * the safe direction for a registry whose failure mode is a name nobody noticed.
    *
+   * <p><b>Searched targets plus the exemptions that can still hold a name.</b> Asking {@link
+   * PersonSearchTargets#TARGETS} alone tied this gate to the search's *classification* rather than
+   * to its inventory, and the two are not the same question: a column is exempt from the search
+   * when finding a name there adds nothing, not only when no name can be there. {@code
+   * notification.params} is the case in point — it holds the handle {@code
+   * AccountDeletionRequestedEvent} writes into one row per administrator, the export scrubs it for
+   * exactly that reason, and this gate did not require it. It was the one entry in the whole scrub
+   * registry that could be deleted with every gate still green.
+   *
+   * <p>{@link PersonSearchTargets#EXEMPT_BUT_MAY_HOLD_A_NAME} names that class beside the reasons
+   * it is drawn from. Asking all of {@code EXEMPT_COLUMNS} instead would flag some forty status
+   * codes, enum values and identifiers and bury the one that matters.
+   *
    * @param tables the tables the statement reads
    * @param column the underlying column name
-   * @return {@code true} when the pair is registered in {@link PersonSearchTargets}
+   * @return {@code true} when the pair is a searched target, or an exemption that can still hold a
+   *     name
    */
   private static boolean namesAPerson(Set<String> tables, String column) {
-    return PersonSearchTargets.TARGETS.stream()
-        .anyMatch(t -> tables.contains(t.table()) && t.column().equals(column));
+    boolean searched =
+        PersonSearchTargets.TARGETS.stream()
+            .anyMatch(t -> tables.contains(t.table()) && t.column().equals(column));
+    return searched
+        || tables.stream()
+            .anyMatch(
+                table ->
+                    PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME.contains(table + "." + column));
   }
 }

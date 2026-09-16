@@ -3681,6 +3681,18 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > and unless every entry in either map names a section and a column that exist. Without that gate
 > `notificationRuleTargets` shipped selecting an administrator's free text unscrubbed, and a renamed
 > key would have dropped out of the scrub set while the export kept reporting success.
+>
+> **Widened 2026-09-17.** The gate asked `PersonSearchTargets.TARGETS` — the columns the
+> Personensuche *searches* — which is a different question from whether a column can hold
+> somebody's name. A column may instead be `EXEMPT_COLUMNS`, and the exemptions for technical
+> payloads rest on reachability rather than absence: `notification.params` holds the handle
+> `AccountDeletionRequestedEvent` writes into one row per administrator, and it is skipped by the
+> search because searching it returns one hit per admin inbox for the same event. So the export
+> scrubbed it while nothing required the scrub, and `notifications.params` was the one entry in
+> the whole registry whose deletion no test would have caught. `PersonSearchTargets`
+> `.EXEMPT_BUT_MAY_HOLD_A_NAME` names that class beside the reasons it is drawn from, and the gate
+> asks for it too. Asking all of `EXEMPT_COLUMNS` instead would flag some forty status codes and
+> identifiers and bury the one that matters.
 
 The scrubbing half had three defects of its own, and it is the half where a defect is a leak rather
 than a gap.
