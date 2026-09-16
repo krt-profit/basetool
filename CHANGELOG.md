@@ -11,6 +11,11 @@
 
 ### Fixed
 
+- **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
+  `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
+  Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
+  stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
+  
 - **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
   Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
   und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
