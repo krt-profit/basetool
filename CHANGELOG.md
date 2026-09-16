@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Betrieb: die Ersatzseite für eine Android-Anmeldung, die im Browser landet, wird jetzt von außen
+  überwacht.** `/app/callback` muss auf `/app/link-help` weiterleiten — das ist es, was den
+  Anmeldecode aus Adresszeile und Verlauf nimmt — und `/app/link-help` muss ohne Anmeldung
+  antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
+  Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
+
 ### Changed
 
 - **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen

@@ -2178,6 +2178,18 @@ replaces rather than appends breaks every installed copy for the length of the r
 - [x] Neither path can quietly lose its `permitAll`: the anonymous sweep asserts the redirect
   target rather than skipping the route (`AnonymousSurfaceSweepMvcTest`), and the fallback page is
   swept at every device class (`FrontendPageRoutes.PAGES`).
+- [x] Both are asserted **from outside**, because every test above runs in-process against MockMvc
+  and stays green through an edge rule, a cache, or a `permitAll` entry lost in a merge:
+  `/app/link-help` is a target of the `blackbox-public-surface` job (`200`, no redirect) and
+  `/app/callback` of the `blackbox-app-link` job (`303` with a `Location` naming the help page),
+  alerting as `EdgePublicSurfaceNot200` and `EdgeAppLinkFallbackBroken` (REQ-OBS-012).
+
+> [!note] Added 2026-09-16 after a log triage
+> The two routes shipped on 2026-09-15 with in-process tests only. The triage that found the last
+> two `No mapping for GET /app/callback` lines — both timestamped **before** the fallback deployed
+> that same day, so the log signature was already closed — found the probes missing instead, which
+> is the half of this requirement that can regress in production without any test noticing. The
+> fallback is not vestigial: it was used from the wild on 2026-09-16, the day after it shipped.
 
 **Code:** `frontend/…/controller/AssetLinksController.java`,
 `frontend/…/controller/AppLinkController.java`,

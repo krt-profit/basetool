@@ -21,7 +21,7 @@ groups:
       # KEEPS the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and every
       # non-probe job in scope. REQ-OBS-008/-012.
       - alert: TargetDown
-        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns).*"} == 0
+        expr: up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0
         for: 3m
         labels:
           severity: critical
@@ -549,6 +549,30 @@ groups:
         annotations:
           summary: "Public path no longer answers 200: {{ $labels.instance }}"
           description: "{{ $labels.instance }} stopped answering 200 on its first response. REQ-SEC-052 lists it as permitAll, so this is either a lost SecurityConfig entry (the path now 302s into /oauth2/authorization/keycloak) or an edge rule ahead of the app. For /manifest.webmanifest this is user-visible: new installs take their name and icon from whatever the redirect returns (REQ-UI-020, ADR-0164). Note http_2xx would NOT catch this — it follows redirects and would report the Keycloak 200 as success."
+
+      # The third posture on the same surface, and the only public path whose contract is a redirect
+      # (REQ-SEC-038). /app/callback catches an Android login whose App Link did not open the app,
+      # and it must answer 303 to /app/link-help. What the redirect buys is not convenience: the
+      # URL carries a live authorization code, and 303-ing keeps it out of the address bar and the
+      # history entry. Rendering a page there puts it back, and losing the permitAll entry sends the
+      # member into OAuth again holding a dead code.
+      #
+      # Before the route existed this failure looked like `No mapping for GET /app/callback` in the
+      # frontend log and was found from a member's report, two log archives later — which is why it
+      # is asserted from outside rather than only by AppLinkControllerTest in-process.
+      #
+      # `warning` and 15m, like its public-surface sibling: the exposure needs a crawler or a shared
+      # device to become a loss, and 15m absorbs a deploy. Same `and on()` outage guard.
+      - alert: EdgeAppLinkFallbackBroken
+        expr: >-
+          probe_success{job="blackbox-app-link"} == 0
+          and on() (probe_success{job="blackbox-http", instance="https://profit-base.online"} == 1)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Android App Link fallback broken: {{ $labels.instance }}"
+          description: "https://profit-base.online/app/callback no longer answers 303 to /app/link-help on its first response (REQ-SEC-038). A 200 means the authorization code is being left in the member's address bar and history; a 302 into /oauth2/authorization/keycloak means the permitAll entry was lost and the member is sent back into a login they cannot finish; a 404 means AppLinkController is gone from the image. Check the frontend SecurityConfig anonymous matchers, AppLinkController, and the NPM proxy host for a rule ahead of the app."
 
       # Regex, not the bare job name: blackbox-hsts-auth (the API vhost, whose probeable paths
       # answer 401 and therefore need the http_2xx_or_401_hsts module) is a separate job.

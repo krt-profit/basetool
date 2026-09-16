@@ -161,4 +161,3 @@ per-series threshold.
   their own TTL, and until then each affected browser gets one sign-out instead of a lockout.
 - `RedisSessionConfig#sessionRepositoryCustomizer` now takes an `ObjectProvider<MeterRegistry>`, for
   the same bean-ordering reason `springSessionDefaultRedisSerializer` does.
-
