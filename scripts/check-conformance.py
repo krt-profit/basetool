@@ -224,8 +224,8 @@ class HostRunner:
         """Execute one read-only command on the host and return its stdout.
 
         Args:
-            command: a POSIX ``sh`` command line. It is passed through single quotes to the
-                remote shell, so it must not contain a single quote of its own.
+            command: a shell command line, run by the remote login shell. Both hosts run bash,
+                which a couple of probes rely on.
 
         Returns:
             The command's stdout, with trailing whitespace stripped.
@@ -236,8 +236,6 @@ class HostRunner:
         """
         if not self.available:
             raise Skip("no --ssh target and no --host-stub")
-        if "'" in command:
-            raise CheckFailed(f"internal: host command must not contain a single quote: {command}")
 
         if self.stub:
             # A command LINE, not a path: the stub has to be launchable on every platform the
@@ -248,8 +246,11 @@ class HostRunner:
             ssh = shutil.which("ssh")
             if not ssh:
                 raise Skip("ssh not found on PATH")
+            # The command is passed as one argument and ssh runs it through the remote login
+            # shell. An earlier version wrapped it in `sh -c '...'`, which forbade single quotes
+            # in every probe for no benefit -- ssh was already going to invoke a shell.
             argv = [ssh, "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-                    self.ssh_target or "", f"sh -c '{command}'"]
+                    self.ssh_target or "", command]
 
         try:
             proc = subprocess.run(argv, capture_output=True, text=True, timeout=self.timeout)
@@ -765,6 +766,73 @@ def check_client_address_visible(ctx: Context) -> str:
     return f"edge logged our probe from {first_field}{matched}; {count} distinct clients in 60m"
 
 
+def check_redis_requires_auth(ctx: Context) -> str:
+    """An unauthenticated client must not be able to talk to Redis.
+
+    This exists because of a specific production defect, on 2026-07-10. Redis is started with
+    ``--aclfile``, and once that is in play the file is the source of truth for **every** user
+    including ``default`` -- a file omitting a ``default`` entry makes Redis reset it to
+    ``nopass ~* &* +@all`` at load. Production shipped exactly that, leaving the session store,
+    OAuth2 refresh tokens included, readable and writable with no authentication on the internal
+    network.
+
+    ``--requirepass`` did not save it and never could: measured against ``redis:8-alpine`` on
+    2026-09-16, an ACL file without a ``default`` line leaves Redis open **whether or not**
+    ``--requirepass`` is given, and an ACL file with one wins over it. It was removed on that
+    evidence, which makes the ACL file the whole of the protection -- and makes asserting it worth
+    a check rather than a runbook line nobody runs.
+
+    The probe needs **no credential**: it opens a socket and sends ``PING``. A Redis that answers
+    ``+PONG`` to that is open; one that answers ``-NOAUTH`` is doing its job. Nothing is written,
+    and no password is read from anywhere.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming what Redis answered.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when Redis answers an unauthenticated PING, or cannot be found.
+    """
+    # Everything is reported on stdout with exit 0, so the outcome is read from the ANSWER rather
+    # than from an exception. The first draft raised on a non-zero exit and then matched the reason
+    # out of the error text -- which happily matched the marker in the command it was quoting, and
+    # reported "no redis container" for what was really a read timeout.
+    #
+    # `head -n 1`, not `head -c N`: Redis keeps the connection open, so a byte count blocks until
+    # it is reached and -NOAUTH is shorter than any sensible count. That cost one confusing run.
+    cmd = (
+        'addr=$(docker inspect redis --format "{{range .NetworkSettings.Networks}}{{.IPAddress}} '
+        '{{end}}" | cut -d" " -f1); '
+        'if [ -z "$addr" ]; then echo ABSENT; exit 0; fi; '
+        "exec 3<>/dev/tcp/$addr/6379 || { echo UNREACHABLE; exit 0; }; "
+        "printf 'PING\\r\\n' >&3; timeout 5 head -n 1 <&3 || echo NO_REPLY"
+    )
+    reply = ctx.runner.run(cmd).strip()
+
+    if reply == "ABSENT":
+        raise CheckFailed("no running redis container on this host")
+    if reply in ("UNREACHABLE", "NO_REPLY", ""):
+        raise CheckFailed(
+            f"could not complete an unauthenticated probe against redis ({reply or 'no output'}). "
+            "That is not a pass: it says nothing about whether Redis requires authentication.")
+    if reply.upper().startswith("+PONG"):
+        raise CheckFailed(
+            "Redis answered +PONG to an UNAUTHENTICATED ping. The session store -- OAuth2 refresh "
+            "tokens included -- is readable and writable by anything that can reach it on the "
+            "internal network. The cause is almost certainly a users.acl with no `user default` "
+            "line, which makes Redis reset default to nopass at load: check with "
+            "`grep -c '^user default ' /var/iri/redis/users.acl`, which must answer 1.")
+    if "NOAUTH" not in reply.upper():
+        raise CheckFailed(
+            f"Redis answered {reply!r} to an unauthenticated ping - expected -NOAUTH. That is "
+            "neither the healthy answer nor the known failure, so it is worth reading before "
+            "assuming either.")
+    return "an unauthenticated ping is refused with -NOAUTH"
+
+
 def check_containers_running(ctx: Context) -> str:
     """Every prod-profile container is up, and none is unhealthy.
 
@@ -821,8 +889,6 @@ def _promql(ctx: Context, query: str) -> dict:
         CheckFailed: when Prometheus cannot be reached or does not answer ``status: success``.
     """
     secret = "/var/iri/monitoring/secrets/prometheus_web_password"
-    if "'" in query:
-        raise CheckFailed(f"internal: PromQL must not contain a single quote: {query}")
     cmd = (
         'addr=$(docker inspect prometheus '
         '--format "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}" '
@@ -993,6 +1059,7 @@ CHECKS: tuple[Check, ...] = (
     Check("ipv6-reachable", "ADR-0112", False, check_ipv6_reachable),
     Check("client-address-visible", "REQ-SEC-023 / ADR-0112", True, check_client_address_visible),
     Check("containers-running", "REQ-OPS-003", True, check_containers_running),
+    Check("redis-requires-auth", "REQ-SEC-023 / ADR-0088", True, check_redis_requires_auth),
     Check("scrape-targets-up", "REQ-OBS-005", True, check_scrape_targets_up),
     Check("container-metrics", "REQ-OBS-006", True, check_container_metrics),
     Check("log-streams", "REQ-OBS-005", True, check_log_streams),

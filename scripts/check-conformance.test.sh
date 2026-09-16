@@ -242,6 +242,15 @@ case "$cmd" in
       *)            echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
     esac
     ;;
+  *"/dev/tcp/"*)
+    case "$scenario" in
+      redis-open)     echo "+PONG" ;;
+      redis-absent)   echo "ABSENT" ;;
+      redis-no-reply) echo "NO_REPLY" ;;
+      redis-strange)  echo "+SOMETHING ELSE" ;;
+      *)              echo "-NOAUTH Authentication required." ;;
+    esac
+    ;;
   *"docker inspect acme"*)
     case "$scenario" in
       no-acme) echo "" ;;
@@ -482,6 +491,7 @@ export STUB_SCENARIO=healthy
 assert_status "client-address-visible passes" client-address-visible pass "203.0.113.42" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 assert_status "containers-running passes" containers-running pass "up and healthy" -- "${STUB_ARGS[@]}"
+assert_status "redis-requires-auth passes" redis-requires-auth pass "NOAUTH" -- "${STUB_ARGS[@]}"
 assert_status "scrape-targets-up passes"  scrape-targets-up  pass "targets up"     -- "${STUB_ARGS[@]}"
 assert_status "container-metrics passes"  container-metrics  pass "populated"      -- "${STUB_ARGS[@]}"
 assert_status "log-streams passes"        log-streams        pass "ingesting"      -- "${STUB_ARGS[@]}"
@@ -515,6 +525,24 @@ STUB_SCENARIO=container-unhealthy assert_status \
 STUB_SCENARIO=container-absent assert_status \
   "containers-running fails on a missing container" \
   containers-running fail "is absent" -- "${STUB_ARGS[@]}"
+
+# The 2026-07-10 defect, as a scenario. An ACL file without a `user default` line makes Redis
+# reset default to nopass at load, and --requirepass did not save it -- measured on
+# redis:8-alpine, which is why --requirepass was removed and this check took over the job of
+# noticing. It is the only thing standing between that mistake and a session store, OAuth2
+# refresh tokens included, readable by anything on the internal network.
+STUB_SCENARIO=redis-open assert_status \
+  "redis-requires-auth fails when an unauthenticated ping is answered" \
+  redis-requires-auth fail "UNAUTHENTICATED ping" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=redis-absent assert_status \
+  "redis-requires-auth fails when there is no redis container" \
+  redis-requires-auth fail "no running redis" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=redis-no-reply assert_status \
+  "redis-requires-auth fails when the probe cannot complete" \
+  redis-requires-auth fail "says nothing about" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=redis-strange assert_status \
+  "redis-requires-auth fails on an answer that is neither" \
+  redis-requires-auth fail "neither the healthy answer" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=target-down assert_status \
   "scrape-targets-up fails on up=0" scrape-targets-up fail "up=0" -- "${STUB_ARGS[@]}"

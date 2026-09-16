@@ -1180,7 +1180,21 @@ services:
     # the whole session store becomes readable/writable with NO auth on the internal net. Prod shipped
     # exactly this until it was caught. The host-provisioned `users.acl` therefore MUST define
     # `default` WITH a password (`user default on >…REDIS_PASSWORD… ~* &* +@all`) alongside the
-    # restricted `monitoring` user; `--requirepass` below is kept only as redundant belt-and-braces.
+    # restricted `monitoring` user.
+    #
+    # `--requirepass` WAS here as “redundant belt-and-braces” and has been removed (2026-09-16).
+    # It is not belt-and-braces, it is inert — measured against redis:8-alpine, all three cases:
+    #   ACL with a `default` line, no --requirepass      → the ACL password authenticates, no-auth refused
+    #   ACL with a `default` line + --requirepass OTHER   → the ACL password still wins; OTHER is rejected
+    #   ACL WITHOUT a `default` line + --requirepass PW   → NO AUTH AT ALL (the 2026-07-10 incident)
+    # So it protected nothing in either direction, while putting the password on redis-server's
+    # argv where any process in the container can read it out of `ps`. The `default` line in the
+    # ACL file is the whole of the protection, which is why the runbook's
+    # `grep -c '^user default '` check is the one that matters.
+    #
+    # It also blocked the Podman migration: Quadlet's Exec= becomes argv and never passes through
+    # a shell, so `${REDIS_PASSWORD:?…}` would have reached redis-server literally and every client
+    # would have been refused (scripts/generate-quadlet.py refused to translate it).
     # A missing/empty ACL file makes redis exit at startup, which the deploy health-gate turns into a
     # clean rollback rather than a silent breakage. Untouched for redis-dev.
     # ADR-0094 / ADR-0126: the live-sync + notification fan-outs PUBLISH/SUBSCRIBE on the pub/sub
@@ -1189,9 +1203,15 @@ services:
     # `default` user's `&*` grant (above) already covers all three — a new channel needs no ACL
     # change as long as that grant stays a wildcard; the restricted `monitoring` user must NOT gain
     # `&*`. Pub/sub adds no keys, so the 384mb noeviction budget (ADR-0079) is unaffected.
-    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
     # alongside the read-only ACL mount.
+    # The healthcheck authenticates, so the password has to reach the container. It is an
+    # environment variable rather than an argument: under Quadlet the health command is expanded
+    # by a shell inside the container from its own environment (measured on podman 6.1.0), so the
+    # value never has to be written into a unit file on the host.
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
     volumes:
       - /var/iri/redis:/data
       - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro

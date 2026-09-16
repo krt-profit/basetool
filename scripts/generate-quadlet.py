@@ -83,17 +83,7 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     "ingest": ("container", ""),
     "db-backend": ("container", ""),
     "db-keycloak": ("container", ""),
-    "redis": (
-        "pending",
-        "its `command:` carries --requirepass ${REDIS_PASSWORD:?...}. Compose interpolates that at "
-        "load time; Quadlet's Exec= is argv and never sees a shell, so the literal string would "
-        "reach redis-server and every client would be rejected. Two ways out, and it is a DECISION "
-        "rather than a translation: extract the command to a script as acme's loop was, with "
-        "REDIS_PASSWORD added to redis's environment map so it expands inside the container; or "
-        "move the default user's password into users.acl, which redis already mounts and already "
-        "reads via --aclfile. The second touches the authentication model and is not a generator's "
-        "call to make.",
-    ),
+    "redis": ("container", ""),
     # --- the monitoring plane ----------------------------------------------------------------
     "prometheus": ("container", ""),
     "grafana": ("container", ""),
