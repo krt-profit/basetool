@@ -121,8 +121,133 @@
           - "{{ basetool_state_dir }}/hardening/report-remediated-{{ ansible_date_time.date }}.html"
           - "{{ basetool_hardening_datastream }}"
       register: basetool_remediate
+      # oscap exits 2 when rules still fail, which is the normal state afterwards -- some rules have
+      # no automated fix. Only 1 is an error of the tool itself.
       failed_when: basetool_remediate.rc == 1
-      changed_when: true
+      # NOT changed_when: true. That reported a change on every run including one that had nothing
+      # left to do, which makes the idempotence of the whole role unreadable -- exactly the noise
+      # that hides a real change. The honest signal is below: did the number of passing rules move?
+      changed_when: false
+
+    # A SECOND scan, and it is not redundant. `oscap --remediate` prints the evaluation it made
+    # BEFORE applying anything, so comparing its stdout against the first scan compares one state
+    # with itself -- it reported "0 newly passing" on a run that had just rewritten 131 files under
+    # /etc. Measured on 2026-09-16, in the very task written to avoid a meaningless green.
+    #
+    # Only a fresh evaluation says what the host looks like now. It costs a couple of minutes and it
+    # is the only thing that distinguishes "remediation did nothing" from "remediation worked".
+    - name: Scan again, to find out what the remediation actually achieved
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --profile
+          - "{{ basetool_hardening_profile }}"
+          - --results-arf
+          - "{{ basetool_state_dir }}/hardening/arf-verify-{{ ansible_date_time.date }}.xml"
+          - --report
+          - "{{ basetool_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_hardening_datastream }}"
+      register: basetool_rescan
+      failed_when: basetool_rescan.rc == 1
+      changed_when: false
+
+    - name: Count what actually moved
+      ansible.builtin.set_fact:
+        basetool_pass_before: >-
+          {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+        basetool_pass_after: >-
+          {{ basetool_rescan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+
+    - name: Report the remediation as changed only if it changed something
+      ansible.builtin.debug:
+        msg: >-
+          {{ basetool_pass_before }} rules passed before, {{ basetool_pass_after }} after
+          ({{ basetool_pass_after | int - basetool_pass_before | int }} newly passing).
+      changed_when: basetool_pass_after | int > basetool_pass_before | int
+
+    - name: Say so when remediation moved nothing at all
+      ansible.builtin.debug:
+        msg: >-
+          The remediation changed no rule's outcome. That is either a host already at this profile,
+          or a profile whose remaining failures have no automated fix -- and those are very different
+          situations. Read {{ basetool_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html
+          before concluding the first.
+      when: basetool_pass_after | int <= basetool_pass_before | int
+
+
+    # --- the three things that do not announce themselves ------------------------------------------
+    #
+    # A remediation report can show a perfect score on a host that is about to become unreachable.
+    # These read the specific settings whose effect is DELAYED -- to the next boot, or to the day a
+    # partition fills -- because a delayed effect is invisible in the run that caused it.
+
+    - name: Did the remediation arm tmp.mount?
+      ansible.builtin.command: systemctl is-enabled tmp.mount
+      register: basetool_tmp_mount
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Say so, loudly, because it only takes effect at the next boot
+      ansible.builtin.debug:
+        msg: >-
+          tmp.mount is now '{{ basetool_tmp_mount.stdout | trim }}'. CIS wants /tmp as its own
+          filesystem, and the usual remediation enables this unit -- which does nothing until the
+          host reboots and then mounts /tmp as tmpfs with noexec,nosuid,nodev. Anything that executes
+          from /tmp stops working at that point, and the cause is a run that finished cleanly hours
+          or weeks earlier.
+      when: basetool_tmp_mount.stdout | trim == 'enabled'
+
+    - name: What will auditd do when its partition fills?
+      ansible.builtin.command: awk -F= '/^[[:space:]]*admin_space_left_action/ {gsub(/ /,"",$2); print tolower($2)}' /etc/audit/auditd.conf
+      register: basetool_audit_action
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Refuse to leave a self-shutdown armed without saying it out loud
+      ansible.builtin.debug:
+        msg: >-
+          auditd admin_space_left_action is '{{ basetool_audit_action.stdout | trim }}'. That is a
+          mechanism by which this host SWITCHES ITSELF OFF when the audit partition fills -- not
+          today, but in three weeks, and by then nobody is looking at the hardening run. Decide
+          whether that is wanted here; the alternative is a value that keeps the host serving.
+      when: basetool_audit_action.stdout | trim in ['halt', 'single']
+
+    # --- does sshd still accept the operator's key? ------------------------------------------------
+    #
+    # `sshd -t` checks syntax, and a syntactically perfect configuration can still lock everyone out:
+    # PubkeyAuthentication no, an AuthorizedKeysFile that moved, an AllowGroups that does not include
+    # this user, a crypto policy that drops the key's algorithm. The only honest answer comes from a
+    # real authentication against the new configuration.
+    #
+    # A SECOND instance on a spare port, against loopback, while the running one is untouched. If it
+    # refuses, that is learned with the working sshd still in place rather than after a restart.
+    - name: Check the new sshd configuration for syntax
+      ansible.builtin.command: /usr/sbin/sshd -t -f /etc/ssh/sshd_config
+      register: basetool_sshd_syntax
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Stop if sshd would not even parse its own configuration
+      ansible.builtin.assert:
+        that: basetool_sshd_syntax.rc == 0
+        fail_msg: >-
+          sshd will not parse /etc/ssh/sshd_config after remediation: {{ basetool_sshd_syntax.stderr }}
+          DO NOT restart sshd. The running instance still has the old configuration in memory and is
+          the only way into this host.
+
+    - name: State what still has to be proved by hand
+      ansible.builtin.debug:
+        msg: >-
+          sshd parses its new configuration. That is NOT the same as accepting your key. Before
+          restarting it, run a second instance on a spare port and authenticate against it for real:
+          `sudo /usr/sbin/sshd -D -p 2222 -f /etc/ssh/sshd_config &` and then, from the client you
+          actually use, `ssh -p 2222 -i <key> {{ ansible_user_id }}@<host> true`. Only restart sshd
+          once that succeeds -- if it fails, the old instance is still running and still yours.
 
     - name: Say what has to happen next, because the scan cannot
       ansible.builtin.debug:

@@ -1885,3 +1885,87 @@ plus the container uids 999 and 70. Not one of those numbers is written down any
 > installs the collection every time now. Worth recording because the message points squarely at the
 > role, and the cause was one directory above it.
 
+## 17. The SCAP remediation, applied for the first time — 2026-09-16
+
+`basetool_hardening_remediate` had been `false` since the role was written, and the block behind it
+had never run. Turning it on against Rocky 10.2 changed **131 files under `/etc`** — `sshd_config`,
+the whole PAM/authselect stack, `auditd`, file modes — and produced three findings, two of which are
+about the *procedure* rather than about the host.
+
+### The remediation reported that it had changed nothing
+
+```
+166 rules passed before, 166 after (0 newly passing).
+```
+
+That was written hours earlier, in the task whose entire purpose was to replace a `changed_when: true`
+that always lied. It lies differently: **`oscap --remediate` prints the evaluation it made BEFORE
+applying anything**, so comparing its stdout against the pre-scan compares one state with itself.
+
+The honest signal needs a **third** evaluation. The role now re-scans after remediating and compares
+that, which costs a couple of minutes and is the only thing that distinguishes *"the host was already
+compliant"* from *"the remediation did nothing"* — two situations that look identical and are not.
+
+> [!warning] This is the fourth variant of the same mistake in one day
+> A filter that matched its own documentation, a version grep that found a number in a title, a
+> `--check` run that compared against empty strings, and now a comparison of a state with itself.
+> Each returned a plausible value **in the right shape**. The question that catches them is asked
+> before the first hypothesis, not after the second: *what would this check look like if it were not
+> working?* If the answer is "the same", it is not a check yet.
+
+### `nohup` does not detach far enough
+
+The run was started with `nohup` so a dropped SSH connection could not abort it half-way — a
+partially remediated host being worse than either end state. It survived. But `nohup` detaches from
+the **process group**, not from the **cgroup**: the process stayed in `session-81.scope`, and
+`systemd-logind` would have killed it on session close had `KillUserProcesses` been `yes` — which is
+systemd's own default since v230, and `no` here only because the distribution package overrides it.
+
+**It worked because of a distribution default, not because the construction guaranteed it.** The
+right tool makes no such assumption:
+
+```bash
+systemd-run --unit=remediation --collect \
+  --property=StandardOutput=file:/var/log/remediation.log \
+  ansible-playbook -i inventory/hosts.yml site.yml
+```
+
+A transient unit outside any session, `systemctl status remediation` at any time, and `--collect`
+cleans it up afterwards.
+
+### What the host actually did, and the order that mattered
+
+|                          |              |
+|--------------------------|--------------|
+| `sshd` restarted at      | **18:45:16** |
+| `sshd_config` written at | **18:45:48** |
+
+The service was restarted **before** its new configuration was written, so the running instance still
+held the old one in memory. Restarting it blind would have been the first moment anyone learned what
+the new configuration does — on a host where `root` and the service account are both password-locked,
+the serial console accepts no login, and `guest-exec` is disabled. **The snapshot is not a safety
+net there; it is the only way back.**
+
+So the new configuration was authenticated against **for real**, on a spare port, while the working
+instance kept running:
+
+```bash
+sudo /usr/sbin/sshd -D -p 2222 -f /etc/ssh/sshd_config &
+ssh -p 2222 -i <key> sysadm@<host> true      # from the client that actually has to get in
+```
+
+It answered. `sshd -t` would not have: a syntactically perfect configuration can still refuse a key
+through `PubkeyAuthentication`, `AuthorizedKeysFile`, `AllowGroups`, or a crypto policy that drops
+its algorithm — and `usepam yes` with a freshly rebuilt authselect stack is exactly the case that
+parses cleanly and rejects. Only then was `sshd` restarted, and only then was a new connection made.
+
+### The two delayed effects, neither of which fired
+
+Both are things that do nothing on the day they are applied, which is why the role now reads them
+explicitly rather than trusting the report:
+
+|                                  |    Measured    |                                                                       Why it is checked                                                                        |
+|----------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `tmp.mount`                      | **`disabled`** | CIS wants `/tmp` as its own filesystem; the usual fix enables this unit, which does nothing until the next boot and then mounts `/tmp` `noexec`                |
+| `auditd admin_space_left_action` | **`SUSPEND`**  | `halt` there is a mechanism by which the host switches itself off when the audit partition fills — in three weeks, when nobody is looking at the hardening run |
+
