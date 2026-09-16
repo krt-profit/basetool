@@ -172,13 +172,32 @@ class OrphanedAccountRepositoryIntegrationTest {
     Instant older = Instant.now().minus(40, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
     Instant newer = Instant.now().minus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
 
-    long before = userRepository.countByInKeycloakFalse();
+    long before = userRepository.countOrphanedMemberAccounts();
     user(false, older);
     user(false, newer);
     user(true, null);
 
-    assertThat(userRepository.countByInKeycloakFalse()).isEqualTo(before + 2);
-    assertThat(userRepository.findOldestKeycloakAbsentSince()).isNotNull().isBeforeOrEqualTo(older);
+    assertThat(userRepository.countOrphanedMemberAccounts()).isEqualTo(before + 2);
+    assertThat(userRepository.findOldestOrphanedMemberAbsenceStamp())
+        .isNotNull()
+        .isBeforeOrEqualTo(older);
+  }
+
+  // covers REQ-SEC-059 - a service-account row is not somebody's unfinished deletion
+  @Test
+  void aServiceAccountRowIsNotCountedAsAnOrphan() {
+    // Production holds exactly one such row and can never clear it: an unfiltered GET /users omits
+    // service accounts, so the roster sync never reports one and nothing calls setInKeycloak(true).
+    // The first exclusion was conditional on app.security.ingest-gateway.client-ids, which defaults
+    // empty -- and empty is exactly the configuration in which the row gets created, because the
+    // machine-identity carve-out is gated on the same property. Unconditional now.
+    long before = userRepository.countOrphanedMemberAccounts();
+    serviceAccount("service-account-basetool-ingest");
+    serviceAccount("SERVICE-ACCOUNT-Basetool-Other");
+
+    assertThat(userRepository.countOrphanedMemberAccounts())
+        .as("neither casing is counted; Keycloak treats usernames case-insensitively")
+        .isEqualTo(before);
   }
 
   // covers REQ-SEC-059 — clearing the stamp is what stops a returning account alerting forever
@@ -197,5 +216,23 @@ class OrphanedAccountRepositoryIntegrationTest {
     User back = reload(returning);
     assertThat(back.isInKeycloak()).isTrue();
     assertThat(back.getKeycloakAbsentSince()).isNull();
+  }
+
+  /**
+   * Commits a flagged, stamped row under Keycloak's service-account naming convention.
+   *
+   * @param username the generated username, in whatever casing the test is about
+   */
+  private void serviceAccount(String username) {
+    transactionTemplate.executeWithoutResult(
+        status -> {
+          User machine = new User();
+          machine.setId(UUID.randomUUID());
+          machine.setUsername(username);
+          machine.setInKeycloak(false);
+          machine.setKeycloakAbsentSince(Instant.now().minusSeconds(86_400L * 30));
+          seeded.add(machine.getId());
+          userRepository.save(machine);
+        });
   }
 }

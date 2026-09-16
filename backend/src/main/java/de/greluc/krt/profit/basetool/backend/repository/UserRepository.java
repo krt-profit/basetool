@@ -508,67 +508,55 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @Param("absentSince") @NotNull Instant absentSince);
 
   /**
-   * Counts the accounts that are waiting for the second half of their deletion: present locally but
-   * already gone from Keycloak (REQ-SEC-059). Backs the {@code
-   * basetool_users_pending_deletion_count} gauge.
+   * The same count with service-account rows left out — the gauge's actual query (REQ-SEC-059).
    *
-   * <p>In normal service this is {@code 0} or briefly {@code 1}. A value that stays above zero
-   * means an admin removed a Keycloak account and never came back to delete the local row, which
-   * leaves the e-mail address, handle, Discord snowflake and description in place indefinitely.
+   * <p>A Keycloak service account is not somebody's unfinished deletion, and its row can never
+   * leave this state: an unfiltered {@code GET /users} omits service accounts, so the roster sync
+   * never reports one, {@code markMissingUsers} flags it, and {@code syncUser} — the only place
+   * that clears the flag — runs only for a user the roster reports. Production holds exactly such a
+   * row. Counted, it made the gauge permanently non-zero and {@code UserDeletionUnfinished} fire
+   * seven days after deploy and never resolve, for a machine that holds no personal data at all.
    *
-   * @return the number of local users the last roster sync could not find in Keycloak
-   */
-  long countByInKeycloakFalse();
-
-  /**
-   * The same count, with the given usernames excluded — the gauge's actual query (REQ-SEC-059).
+   * <p><b>Matched on the username convention, unconditionally.</b> The first version of this
+   * excluded {@code service-account-<clientId>} for the <em>configured</em> gateway clients — and
+   * that list defaults empty, while the machine-identity carve-out in {@code
+   * CustomJwtGrantedAuthoritiesConverter} is gated on the same property. So with the property unset
+   * the carve-out does not fire, the gateway's first call provisions the row, and the exclusion is
+   * empty: it could only ever protect a deployment that would not have created the row.
+   * Lower-cased, matching the convention this file already states for usernames.
    *
-   * <p>The exclusion is the ingest gateway's service account, and it is not a nicety. An unfiltered
-   * {@code GET /users} omits service accounts, so the roster sync never sees one and {@code
-   * markMissingUsers} flags it; nothing can ever clear the flag, because {@code syncUser} only runs
-   * for a user the roster reports. Production holds exactly such a row. Counted, it made the gauge
-   * permanently non-zero and the {@code UserDeletionUnfinished} alert fire seven days after deploy
-   * and never resolve — for a machine row that holds no personal data at all.
+   * <p>{@code service-account-} is a Keycloak display convention and <b>not</b> a reserved
+   * namespace — an ordinary user can be created with that name. That is why it must never carry a
+   * security decision, and {@code UserDeletionService} still asks Keycloak which user backs a
+   * configured client before it waives its delete guard. For a gauge it is proportionate: a
+   * hand-made lookalike missing from a monitoring count is a nuisance, not a hole.
    *
-   * @param usernames the usernames to leave out; must not be empty, because {@code NOT IN ()} is
-   *     not valid SQL — the caller falls back to {@link #countByInKeycloakFalse()} instead
    * @return the number of orphaned member accounts
    */
-  long countByInKeycloakFalseAndUsernameNotIn(@NotNull Collection<String> usernames);
+  @Query(
+      """
+      SELECT COUNT(u) FROM User u
+      WHERE u.inKeycloak = false AND LOWER(u.username) NOT LIKE 'service-account-%'
+      """)
+  long countOrphanedMemberAccounts();
 
   /**
-   * Finds when the longest-waiting orphaned account was first observed missing, for the {@code
-   * basetool_users_pending_deletion_oldest_age_seconds} gauge (REQ-SEC-059).
+   * The earliest absence stamp among those same rows (REQ-SEC-059).
    *
-   * <p>Reads only rows that carry the stamp. A row flagged before V241 shipped was backfilled with
-   * the migration's own timestamp, so its age is a lower bound rather than a measurement — the
-   * migration says so in as many words.
+   * <p>Paired with {@link #countOrphanedMemberAccounts()}: excluding a service account from the
+   * count and not from the age would leave the age gauge growing without bound from the deploy
+   * timestamp V241 backfilled, which is the half of the pair the alert compares.
    *
-   * @return the earliest {@code keycloakAbsentSince} among the orphaned accounts, or {@code null}
-   *     when none is waiting
+   * @return the earliest {@code keycloakAbsentSince} among the orphaned member accounts, or {@code
+   *     null} when none is waiting
    */
   @Query(
-      "SELECT MIN(u.keycloakAbsentSince) FROM User u"
-          + " WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL")
-  Instant findOldestKeycloakAbsentSince();
-
-  /**
-   * The same earliest stamp, with the given usernames excluded (REQ-SEC-059).
-   *
-   * <p>Paired with {@link #countByInKeycloakFalseAndUsernameNotIn}: excluding the service account
-   * from the count and not from the age would leave the age gauge growing without bound from the
-   * deploy timestamp V241 backfilled, which is the half of the pair the alert reads.
-   *
-   * @param usernames the usernames to leave out; must not be empty
-   * @return the earliest {@code keycloakAbsentSince} among the remaining orphaned accounts, or
-   *     {@code null} when none is waiting
-   */
-  @Query(
-      "SELECT MIN(u.keycloakAbsentSince) FROM User u"
-          + " WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL"
-          + " AND u.username NOT IN :usernames")
-  Instant findOldestKeycloakAbsentSinceExcluding(
-      @Param("usernames") @NotNull Collection<String> usernames);
+      """
+      SELECT MIN(u.keycloakAbsentSince) FROM User u
+      WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL
+        AND LOWER(u.username) NOT LIKE 'service-account-%'
+      """)
+  Instant findOldestOrphanedMemberAbsenceStamp();
 
   /**
    * Returns the ids of every local user that already carries a Discord account link ({@code

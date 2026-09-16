@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.task;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,12 +41,9 @@ import de.greluc.krt.profit.basetool.backend.repository.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.repository.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RefineryOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
-import de.greluc.krt.profit.basetool.backend.support.IngestGatewayProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,12 +68,6 @@ class BusinessMetricsCollectorTest {
   @Mock private MaterialExchangeOfferRepository materialExchangeOfferRepository;
   @Mock private MaterialExchangeRequestRepository materialExchangeRequestRepository;
 
-  /**
-   * No gateway configured, which is the default and the shape the existing assertions expect: the
-   * orphaned-account gauges then use the unfiltered queries. The exclusion path has its own test.
-   */
-  private final IngestGatewayProperties ingestGatewayProperties = new IngestGatewayProperties();
-
   private SimpleMeterRegistry registry;
   private BusinessMetricsCollector collector;
 
@@ -96,7 +86,6 @@ class BusinessMetricsCollectorTest {
             p4kImportJobRepository,
             materialExchangeOfferRepository,
             materialExchangeRequestRepository,
-            ingestGatewayProperties,
             new TaskMetrics(registry));
     // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();
@@ -160,11 +149,11 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isGreaterThan(1209600.0d);
   }
 
-  // covers REQ-SEC-059 — the half-finished-deletion gauges are sampled and report the OLDEST wait
+  // covers REQ-SEC-059 - the half-finished-deletion gauges are sampled and report the OLDEST wait
   @Test
   void refresh_populatesTheUnfinishedDeletionGauges() {
-    when(userRepository.countByInKeycloakFalse()).thenReturn(2L);
-    when(userRepository.findOldestKeycloakAbsentSince())
+    when(userRepository.countOrphanedMemberAccounts()).thenReturn(2L);
+    when(userRepository.findOldestOrphanedMemberAbsenceStamp())
         .thenReturn(Instant.now().minus(9, ChronoUnit.DAYS));
 
     collector.refresh();
@@ -174,41 +163,18 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isGreaterThan(604800.0d);
   }
 
-  // covers REQ-SEC-059 - a configured gateway's service account is not somebody's unfinished work
+  // covers REQ-SEC-059 - the service-account exclusion is in the query, not in a config lookup
   @Test
-  void refresh_excludesTheIngestGatewaysServiceAccountFromTheUnfinishedDeletionGauges() {
-    // Production holds exactly one such row and can never clear it: an unfiltered GET /users omits
-    // service accounts, so the roster sync never reports one and markMissingUsers leaves the flag
-    // set forever. Counted, it made the gauge permanently non-zero, V241 backfilled its age with
-    // the deploy timestamp, and UserDeletionUnfinished fired at T+7d and never resolved -- telling
-    // an admin to finish a deletion for a machine row that holds no personal data at all.
-    IngestGatewayProperties configured = new IngestGatewayProperties();
-    configured.setClientIds(List.of("basetool-ingest"));
-    BusinessMetricsCollector withGateway =
-        new BusinessMetricsCollector(
-            registry,
-            userRepository,
-            deletionRequestRepository,
-            bankBookingRequestRepository,
-            jobOrderRepository,
-            operationRepository,
-            refineryOrderRepository,
-            p4kImportJobRepository,
-            materialExchangeOfferRepository,
-            materialExchangeRequestRepository,
-            configured,
-            new TaskMetrics(registry));
+  void refresh_readsTheOrphanQueriesThatExcludeServiceAccounts() {
+    // The exclusion used to depend on app.security.ingest-gateway.client-ids, which defaults
+    // empty -- and empty is exactly the configuration in which the orphan row gets created, because
+    // the machine-identity carve-out is gated on the same property. So it could only ever protect
+    // a deployment that would not have created the row. It is unconditional now, which is what
+    // these two verifications pin: the unfiltered counts must not be reachable at all.
+    collector.refresh();
 
-    Set<String> excluded = Set.of("service-account-basetool-ingest");
-    when(userRepository.countByInKeycloakFalseAndUsernameNotIn(excluded)).thenReturn(0L);
-    when(userRepository.findOldestKeycloakAbsentSinceExcluding(excluded)).thenReturn(null);
-
-    withGateway.refresh();
-
-    verify(userRepository, never()).countByInKeycloakFalse();
-    verify(userRepository, never()).findOldestKeycloakAbsentSince();
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isZero();
-    assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isZero();
+    verify(userRepository).countOrphanedMemberAccounts();
+    verify(userRepository).findOldestOrphanedMemberAbsenceStamp();
   }
 
   @Test
