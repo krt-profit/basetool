@@ -66,9 +66,9 @@
                 </thead>
                 <tbody id="deletionRequestsBody">
                     <tr th:each="req : ${requests}" th:id="'dr-row-' + ${req.id}"
-                        th:attr="data-id=${req.id},data-handle=${req.handle}">
+                        th:attr="data-id=${req.id},data-handle=${@handles.display(req.handle)}">
                         <td>
-                            <span th:text="${req.handle}">Mitglied</span>
+                            <span th:text="${@handles.display(req.handle)}">Mitglied</span>
                         </td>
                         <td class="dr-when"
                             th:text="${#temporals.format(req.requestedAt, 'dd.MM.yyyy HH:mm', 'UTC')}">20.06.2026 00:00</td>

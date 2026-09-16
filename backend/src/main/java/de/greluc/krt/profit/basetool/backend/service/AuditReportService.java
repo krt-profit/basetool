@@ -101,7 +101,14 @@ public class AuditReportService {
                         // on-screen viewer shows the localized label); this keeps the trail
                         // unambiguous and avoids duplicating ~50 labels into the backend bundle.
                         e.getEventType().name(),
-                        e.getSubjectLabel() != null ? e.getSubjectLabel() : "—",
+                        // Humanised like the actor handle above. A subject label that IS
+                        // a member's name is rewritten by a granted erasure, so raw it
+                        // printed the sentinel next to an actor cell already reading
+                        // "Anonymisiert" (REQ-SEC-062).
+                        e.getSubjectLabel() == null
+                            ? "—"
+                            : HandleAnonymisation.humanise(
+                                e.getSubjectLabel(), label("general.anonymisedHandle")),
                         e.getDetails() != null ? e.getDetails() : ""))
             .toList();
 

@@ -151,7 +151,7 @@
                           th:text="${order.requestingOrgUnit.shorthand()}">IRI</span>
                     <span th:if="${order.requestingOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
                     <br>
-                    <span th:text="${order.handle}"></span>
+                    <span th:text="${@handles.display(order.handle)}"></span>
                 </td>
                 <td class="p-0" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
                     <!-- Collapsible material sublist (default collapsed, per-BROWSER localStorage

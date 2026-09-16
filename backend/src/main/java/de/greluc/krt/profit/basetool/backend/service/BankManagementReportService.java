@@ -263,7 +263,15 @@ public class BankManagementReportService {
                   row.amount().signum());
       KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-      KrtPdfSupport.addTableCell(table, holder, bg, false);
+      // Humanised like the Gegenpartei column below, and for the same reason: bank_holder.user_id
+      // is ON DELETE SET NULL, so after a deletion the display name falls back to the handle
+      // snapshot -- which a granted erasure has rewritten. Raw, that printed #ANONYMISED# in the
+      // Halter column while the next column on the same row read "Anonymisiert" (REQ-SEC-062).
+      KrtPdfSupport.addTableCell(
+          table,
+          HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
+          bg,
+          false);
       KrtPdfSupport.addTableCell(
           table,
           counterpartyCell(row, accountLegsByTx, label("general.anonymisedHandle")),

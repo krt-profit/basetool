@@ -238,9 +238,9 @@
                         </td>
                         <td>
                             <span th:if="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="${b.holderHandle()} + ' &#8594; ' + ${b.counterHolderHandle()}">A &#8594; B</span>
+                                  th:text="${@handles.display(b.holderHandle())} + ' &#8594; ' + ${@handles.display(b.counterHolderHandle())}">A &#8594; B</span>
                             <span th:unless="${b.type() == 'TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="${b.holderHandle()}">greluc</span>
+                                  th:text="${@handles.display(b.holderHandle())}">greluc</span>
                         </td>
                         <!-- Quell-/Zielkonto (REQ-BANK-044): the far side of the booking — a transfer's
                              counter-account with direction (&#8594; to / &#8592; from), or the

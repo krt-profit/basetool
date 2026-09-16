@@ -265,7 +265,16 @@ public class BankStatementReportService {
                   : matchHolderHandle(
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
-          KrtPdfSupport.addTableCell(table, holder, bg, false);
+          // Humanised like the Gegenpartei column four lines below, and for the same reason.
+          // bank_holder.user_id is ON DELETE SET NULL, so after a deletion the display name falls
+          // back to the handle snapshot -- which a granted erasure has rewritten. Rendering it raw
+          // put #ANONYMISED# in the Halter column while the next column on the same row already
+          // read "Anonymisiert" (REQ-SEC-062).
+          KrtPdfSupport.addTableCell(
+              table,
+              HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
+              bg,
+              false);
         }
         KrtPdfSupport.addTableCell(
             table,

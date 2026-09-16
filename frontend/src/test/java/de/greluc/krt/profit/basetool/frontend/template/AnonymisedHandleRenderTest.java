@@ -29,7 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -59,16 +59,33 @@ import org.junit.jupiter.api.Test;
  */
 class AnonymisedHandleRenderTest {
 
-  /** The accessors whose value can be the erasure sentinel. */
-  private static final Set<String> SNAPSHOT_ACCESSORS =
-      Set.of(
-          "handle()",
-          "actorHandle()",
-          "recipientHandle()",
-          "counterpartyHandle()",
-          "requesterHandle()",
-          "deciderHandle()",
-          "subject()");
+  /**
+   * A navigation onto something whose value can be the erasure sentinel.
+   *
+   * <p><b>A pattern, not a set of literal strings, and both halves of it are a correction.</b> The
+   * first version of this gate held {@code Set.of("handle()", "actorHandle()", …)} and matched with
+   * a case-sensitive {@code indexOf}, which is blind twice over: {@code ${order.handle}} contains
+   * no {@code handle()} at all, and {@code "handle()"} is not a substring of {@code
+   * "holderHandle()"}. Simulated over every template, that matcher flagged <b>nothing</b> while
+   * nine sites were unwrapped — and two sites that <em>are</em> wrapped use property navigation, so
+   * unwrapping them would have left the suite green. It never did the wrapping it appeared to pin.
+   *
+   * <p>So: any dotted segment whose name ends in {@code handle} in either case, or is {@code
+   * subject}, with or without the call parentheses. That over-flags — a hypothetical {@code
+   * hasHandle()} would match — which is the right direction for a gate whose failure mode is a name
+   * nobody noticed.
+   */
+  private static final Pattern SNAPSHOT_ACCESSOR =
+      Pattern.compile("\\.(\\w*[Hh]andle|subject)(\\(\\))?\\b");
+
+  /**
+   * A message-bundle lookup, which is a key and not an expression.
+   *
+   * <p>{@code #{orders.create.handle}} and {@code #{admin.audit.col.subject}} are column captions.
+   * They match the accessor pattern and are not renders of anything, so they are cut out before the
+   * scan rather than exempted one by one.
+   */
+  private static final Pattern MESSAGE_LOOKUP = Pattern.compile("#\\{[^}]*\\}");
 
   /** The attributes that put a value on the page as text. */
   private static final Pattern RENDERING_ATTRIBUTE =
@@ -86,16 +103,16 @@ class AnonymisedHandleRenderTest {
       String content = Files.readString(template, StandardCharsets.UTF_8);
       Matcher attribute = RENDERING_ATTRIBUTE.matcher(content);
       while (attribute.find()) {
-        String expression = attribute.group(1);
-        for (String accessor : SNAPSHOT_ACCESSORS) {
-          int at = expression.indexOf(accessor);
-          while (at >= 0) {
-            if (!isPredicate(expression, at) && !isWrapped(expression, at)) {
-              unwrapped.add(
-                  template.getFileName() + ": " + accessor + " in " + oneLine(expression));
-            }
-            at = expression.indexOf(accessor, at + accessor.length());
+        // Blanked rather than removed, so every offset below still addresses the same character.
+        String expression = MESSAGE_LOOKUP.matcher(attribute.group(1)).replaceAll(this::blanked);
+        Matcher accessor = SNAPSHOT_ACCESSOR.matcher(expression);
+        while (accessor.find()) {
+          if (isPredicate(expression, accessor.start(), accessor.end())
+              || isWrapped(expression, accessor.start() + 1)) {
+            continue;
           }
+          unwrapped.add(
+              template.getFileName() + ": " + accessor.group() + " in " + oneLine(expression));
         }
       }
     }
@@ -109,20 +126,60 @@ class AnonymisedHandleRenderTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-062 - the scan has to actually be looking at something
+  // covers REQ-SEC-062 - the matcher has to be able to see an unwrapped render at all
   @Test
-  void theScanCoversTheTemplatesThatRenderHandles() throws IOException {
-    long wrapped =
-        templates().stream()
-            .map(AnonymisedHandleRenderTest::read)
-            .filter(content -> content.contains(WRAPPER))
-            .count();
+  void theMatcherFlagsAnUnwrappedRenderInEitherSpelling() {
+    // The previous anti-vacuity check counted files containing "@handles.display(" and asserted
+    // "> 5", which is true of a matcher that finds nothing: it measured the templates, not the
+    // scan. This exercises the matcher against both spellings it used to be blind to.
+    assertThat(findUnwrapped("th:text=\"${order.handle}\""))
+        .as("property navigation, the spelling two already-wrapped sites use")
+        .isNotEmpty();
+    assertThat(findUnwrapped("th:text=\"${b.holderHandle()}\""))
+        .as("a capitalised suffix, which a case-sensitive indexOf of \"handle()\" misses")
+        .isNotEmpty();
+    assertThat(findUnwrapped("th:text=\"${@handles.display(order.handle)}\""))
+        .as("and the wrapped form is not flagged")
+        .isEmpty();
+    assertThat(findUnwrapped("th:text=\"#{orders.create.handle}\""))
+        .as("a message key is a caption, not a render")
+        .isEmpty();
+    assertThat(findUnwrapped("th:if=\"${r.deciderHandle() != null}\""))
+        .as("and a presence check is not a render either")
+        .isEmpty();
+  }
 
-    assertThat(wrapped)
-        .as(
-            "templates that wrap at least one handle -- if this drops to zero the pattern was"
-                + " renamed and the assertion above has become vacuous")
-        .isGreaterThan(5);
+  /**
+   * Runs the scan over one fragment of markup.
+   *
+   * @param markup the attribute to scan
+   * @return the findings, empty when the fragment is clean
+   */
+  private List<String> findUnwrapped(String markup) {
+    List<String> out = new ArrayList<>();
+    Matcher attribute = RENDERING_ATTRIBUTE.matcher(markup);
+    while (attribute.find()) {
+      String expression = MESSAGE_LOOKUP.matcher(attribute.group(1)).replaceAll(this::blanked);
+      Matcher accessor = SNAPSHOT_ACCESSOR.matcher(expression);
+      while (accessor.find()) {
+        if (isPredicate(expression, accessor.start(), accessor.end())
+            || isWrapped(expression, accessor.start() + 1)) {
+          continue;
+        }
+        out.add(accessor.group());
+      }
+    }
+    return out;
+  }
+
+  /**
+   * As many spaces as the match was long.
+   *
+   * @param match the message lookup to blank out
+   * @return the replacement
+   */
+  private String blanked(MatchResult match) {
+    return " ".repeat(match.group().length());
   }
 
   /**
@@ -134,11 +191,14 @@ class AnonymisedHandleRenderTest {
    * wrong question — so only the branch counts.
    *
    * @param expression the whole attribute value
-   * @param at the index of the accessor
+   * @param at the index of the accessor's leading dot
+   * @param end the index just past the accessor
    * @return {@code true} when this occurrence feeds a comparison or an emptiness test
    */
-  private static boolean isPredicate(String expression, int at) {
-    String after = expression.substring(at).replaceFirst("^[A-Za-z0-9_()]*", "").stripLeading();
+  private static boolean isPredicate(String expression, int at, int end) {
+    // The trailing "()" may sit outside the match: the pattern's word boundary cannot hold between
+    // ")" and a space, so it backtracks and the call parentheses are left for us to step over.
+    String after = expression.substring(end).replaceFirst("^\\(\\)", "").stripLeading();
     if (after.startsWith("!=") || after.startsWith("==")) {
       return true;
     }
