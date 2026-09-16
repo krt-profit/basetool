@@ -16,6 +16,8 @@ HealthRetries=5
 HealthStartPeriod=20s
 Notify=healthy
 Memory=48M
+PidsLimit=512
+PodmanArgs=--oom-score-adj=500
 
 [Service]
 Restart=always

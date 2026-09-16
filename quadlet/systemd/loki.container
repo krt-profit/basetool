@@ -11,6 +11,8 @@ Volume=/var/iri/monitoring/data/loki:/loki
 EnvironmentFile=/var/iri/code/env.d/loki.env
 Exec=-config.file=/etc/loki/loki-config.yml
 Memory=384M
+PidsLimit=512
+PodmanArgs=--oom-score-adj=500
 
 [Service]
 Restart=always

@@ -20,6 +20,7 @@ HealthTimeout=5s
 HealthRetries=5
 Notify=healthy
 Memory=1536M
+PidsLimit=512
 PodmanArgs=--cpus=4.0
 
 [Service]

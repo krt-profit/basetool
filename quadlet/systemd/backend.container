@@ -27,6 +27,7 @@ HealthStartPeriod=90s
 HealthStartupInterval=5s
 Notify=healthy
 Memory=2048M
+PidsLimit=2048
 PodmanArgs=--cpus=3.0 --ulimit nofile=65536:65536
 
 [Service]

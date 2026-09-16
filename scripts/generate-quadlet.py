@@ -131,6 +131,22 @@ TRANSLATED_PROFILES = {"prod"}
 VAR_RE = r"\$\{([A-Za-z_][A-Za-z0-9_]*)"
 
 
+#: Compose service keys this tool knows how to translate. Anything else fails the run rather than
+#: being dropped: a unit that is missing a control still starts, and nothing downstream can tell
+#: the difference between "not configured" and "quietly lost in translation".
+KNOWN_SERVICE_KEYS = {
+    "image", "container_name", "profiles", "user", "read_only", "cap_drop", "cap_add",
+    "security_opt", "tmpfs", "ports", "networks", "volumes", "environment", "command",
+    "entrypoint", "healthcheck", "deploy", "ulimits", "pids_limit", "restart",
+    "stop_grace_period", "depends_on", "logging", "sysctls", "group_add", "shm_size",
+    "extra_hosts", "dns", "labels", "init", "working_dir", "hostname",
+    "oom_score_adj",
+}
+
+#: The resource limits understood under `deploy.resources.limits`. Same rule, same reason.
+KNOWN_LIMIT_KEYS = {"memory", "cpus", "pids"}
+
+
 class Refusal(Exception):
     """Raised when a service cannot be translated faithfully."""
 
@@ -422,6 +438,14 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     Raises:
         Refusal: when something cannot be translated faithfully.
     """
+    unknown = set(spec) - KNOWN_SERVICE_KEYS
+    if unknown:
+        raise Refusal(
+            f"{service}: unrecognised compose key(s) {sorted(unknown)}. Add them to "
+            "KNOWN_SERVICE_KEYS once they are translated, or the unit ships without whatever they "
+            "configured and nothing downstream can tell that from 'not configured'."
+        )
+
     unit: list[str] = []
     container: list[str] = []
     service_section: list[str] = []
@@ -469,12 +493,32 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     container += _exec(service, spec)
     container += _health(spec.get("healthcheck") or {})
 
+    podman_args: list[str] = []
     limits = (spec.get("deploy") or {}).get("resources", {}).get("limits", {})
+    unknown_limits = set(limits) - KNOWN_LIMIT_KEYS
+    if unknown_limits:
+        raise Refusal(
+            f"{service}: unrecognised resource limit(s) {sorted(unknown_limits)} under "
+            "deploy.resources.limits. Teach the generator, or the unit ships without them and "
+            "looks complete."
+        )
     if "memory" in limits:
         container.append(f"Memory={limits['memory']}")
-    podman_args: list[str] = []
+    # The pids cap bounds a fork bomb and a worker/zombie leak. It is not decoration: the
+    # 2026-07-12 native-thread-OOM accumulated one <defunct> per 30s health probe until this cap
+    # stopped it, and ContainerPidsHigh measures against it. Compose spells it under
+    # deploy.resources.limits, NOT as the top-level `pids_limit` key -- reading only the latter is
+    # how all nineteen units lost it once.
+    if "pids" in limits:
+        container.append(f"PidsLimit={limits['pids']}")
     if "cpus" in limits:
         podman_args.append(f"--cpus={limits['cpus']}")
+    # All nine monitoring containers carry oom_score_adj: 500 -- deliberately MORE attractive to
+    # the OOM killer than the application, so that under memory pressure the kernel takes Grafana
+    # before it takes the backend. Quadlet has no key for it; podman run does. A POSITIVE
+    # adjustment is what an unprivileged process is allowed to set, so this survives rootless.
+    if "oom_score_adj" in spec:
+        podman_args.append(f"--oom-score-adj={spec['oom_score_adj']}")
     nofile = (spec.get("ulimits") or {}).get("nofile")
     if isinstance(nofile, dict):
         podman_args.append(f"--ulimit nofile={nofile['soft']}:{nofile['hard']}")
