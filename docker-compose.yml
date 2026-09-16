@@ -482,10 +482,14 @@ x-backend: &backend-template
   # `/auth` on the app origin and has no hostname, vhost or certificate of its own —
   # `render-and-run.sh` says so where `EDGE_HOST_KEYCLOAK` used to be. This example still
   # read `keycloak.basetool.greluc.me` and was the last straggler from that cutover, while
-  # `.env.example` had already been corrected. It cost a testing environment: aliasing a
-  # retired name resolves it to the edge, which does not serve it, and the handshake fails
-  # with `tls: unrecognized name` — a TLS error that reads as a broken proxy and is a name
-  # that no longer exists.
+  # `.env.example` had already been corrected — so the two contradicted each other, and this
+  # is the file somebody reads first.
+  #
+  # Following it would alias a retired name to the edge, which does not serve it: the
+  # handshake then fails with `tls: unrecognized name`, a TLS error that reads as a broken
+  # proxy and is a hostname that no longer exists. That failure was seen in the testing
+  # environment on 2026-09-16 — from a stale proxy entry, NOT from this comment, whose
+  # `.env` was already correct. Corrected here as a trap removed, not as a cause found.
   # The default is a no-op: `localhost` already resolves to 127.0.0.1, so production —
   # which sets nothing — gets an entry that changes nothing (REQ-OPS-022).
   extra_hosts:
