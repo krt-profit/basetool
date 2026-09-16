@@ -641,7 +641,16 @@ function syncPersonalAllocations() {
             errorMessage: INV_ADD_MSG.failed,
             onError: function (status, problem) {
                 let msg = INV_ADD_MSG.failed;
-                if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
+                // The owner-picker branch comes first and is shared rather than re-derived: this
+                // handler returns true, so krtFetch's own handleProblem never runs and the
+                // `problem.detail` fallback below would put the backend's English sentence into a
+                // German toast — the REQ-ORG-023 defect, observed in production on 2026-09-16.
+                const ownerRequired =
+                    window.krtFetch && window.krtFetch.ownerOrgUnitRequiredMessage
+                        ? window.krtFetch.ownerOrgUnitRequiredMessage(problem)
+                        : null;
+                if (ownerRequired) msg = ownerRequired;
+                else if (problem && problem.code === 'INVENTORY_PERSONAL_ASSIGNMENT')
                     msg = INV_ADD_MSG.personalAssignment;
                 else if (problem && problem.code === 'VALIDATION') msg = INV_ADD_MSG.validation;
                 else if (problem && problem.detail) msg = problem.detail;

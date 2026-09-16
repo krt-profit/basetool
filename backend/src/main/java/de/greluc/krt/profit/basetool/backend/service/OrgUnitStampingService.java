@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
@@ -146,7 +147,11 @@ public class OrgUnitStampingService {
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          throw new BadRequestException(
+          // Its own type, and therefore its own stable problem code: this is the one rejection on
+          // the stamping path the member can actually fix, and the frontend needs something to
+          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
+          // the picker surfaces echoed this very English sentence into a German toast.
+          throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
       }
@@ -207,9 +212,11 @@ public class OrgUnitStampingService {
    *     de.greluc.krt.profit.basetool.backend.model.SpecialCommand}, or (Phase 4) a {@link
    *     de.greluc.krt.profit.basetool.backend.model.Bereich} / {@link
    *     de.greluc.krt.profit.basetool.backend.model.Organisationsleitung}; never {@code null}.
-   * @throws BadRequestException on 0 memberships, a &gt;1-membership {@code null} picker, or an
-   *     explicit pick that is neither a direct membership of the target user nor within the
-   *     caller's editable scope.
+   * @throws BadRequestException on 0 memberships, or an explicit pick that is neither a direct
+   *     membership of the target user nor within the caller's editable scope.
+   * @throws OwnerOrgUnitRequiredException on a &gt;1-membership {@code null} picker with no
+   *     honourable active-context pin — the one rejection here the member can fix, which is why it
+   *     carries its own stable problem code (REQ-ORG-023).
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
@@ -355,8 +362,9 @@ public class OrgUnitStampingService {
    *     path.
    * @return the resolved {@link OrgUnit}; never {@code null}.
    * @throws BadRequestException on a pick that is neither a direct membership nor within the
-   *     caller's editable scope, a &gt;1-membership {@code null} choice, or a resolved id that no
-   *     longer exists / is not an ownable kind.
+   *     caller's editable scope, or a resolved id that no longer exists / is not an ownable kind.
+   * @throws OwnerOrgUnitRequiredException on a &gt;1-membership {@code null} choice with no
+   *     honourable active-context pin (REQ-ORG-023).
    */
   @NotNull
   private OrgUnit resolveStampedOrgUnit(@NotNull Set<UUID> memberOrgUnitIds, UUID owningOrgUnitId) {
@@ -376,7 +384,11 @@ public class OrgUnitStampingService {
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          throw new BadRequestException(
+          // Its own type, and therefore its own stable problem code: this is the one rejection on
+          // the stamping path the member can actually fix, and the frontend needs something to
+          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
+          // the picker surfaces echoed this very English sentence into a German toast.
+          throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
       }

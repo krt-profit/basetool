@@ -104,6 +104,22 @@ truncated link), a `maxParameterCount` breach, a malformed `POST` body — onto 
 `DEBUG`. The exception message is never logged at any level: it quotes the offending chunk verbatim,
 i.e. raw attacker-controlled bytes that may contain line breaks (CWE-117, REQ-OBS-004).
 
+**A 404 the application answers deliberately does not also warn.** Spring's `DispatcherServlet`
+writes `No mapping for GET /favicon.ico` through its dedicated `org.springframework.web.servlet
+.PageNotFound` logger, at `WARN`, **unconditionally** — before `throwExceptionIfNoHandlerFound` is
+consulted and therefore before this application's own handler ever sees the request. The frontend
+already answers that path correctly: `GlobalExceptionHandler.handleNotFound` renders the 404 page for
+both `NoHandlerFoundException` and `NoResourceFoundException`, and `WebMvcConfig` states in writing
+that `/favicon.ico` and `/sm/**` are `permitAll` while nothing ships a file at either — the favicons
+are declared by `<link rel="icon">` against `/logos/`, and `/sm/` is a path browser extensions probe.
+The 404 is the designed answer, so the `WARN` is a warning about working as intended, and it lands in
+the same stream REQ-OBS-004's asset-shaped mismatch and the bot rules were demoted out of. The logger
+is therefore pinned to `ERROR` in the frontend's `logging.level` — the narrowest pin that silences it,
+leaving every other `org.springframework.web` logger at `INFO`. Nothing is lost: the request is still
+counted and still access-logged, and a 404 that is *not* deliberate shows up as the rendered error
+page and in the access log exactly as before. The pin is frontend-only because the backend does not
+set `spring.web.resources.add-mappings: false` and so does not reach that branch.
+
 **A masking keyword only counts when a separator follows it.** `PiiMasker`'s keyword rule
 (`bearer` / `token` / `session-id` / `authorization`) previously treated the `:`/`=`/whitespace
 separator as optional, so the keyword matched **inside** any identifier containing it and the value

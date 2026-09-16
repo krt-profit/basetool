@@ -57,10 +57,10 @@ import org.springframework.http.HttpStatus;
  * other {@code AppException} for consistency, even though that dedicated handler does not consult
  * it.
  *
- * <p>The permits-list below is exhaustive over the {@code exception} package — all ten subclasses
- * live here, so the seal is well-formed with zero external subclasses (verified, ADR-0047: no
- * package-cycle risk since {@code exception} already depends only on {@code support} / the JDK /
- * Spring framework types).
+ * <p>The permits-list below is exhaustive over the {@code exception} package — all eleven
+ * subclasses live here, so the seal is well-formed with zero external subclasses (verified,
+ * ADR-0047: no package-cycle risk since {@code exception} already depends only on {@code support} /
+ * the JDK / Spring framework types).
  */
 public abstract sealed class AppException extends RuntimeException
     permits BadRequestException,
@@ -71,6 +71,7 @@ public abstract sealed class AppException extends RuntimeException
         ExternalServiceException,
         NotFoundException,
         OverAllocationException,
+        OwnerOrgUnitRequiredException,
         ProductionAllocationException,
         ReportGenerationException {
 
