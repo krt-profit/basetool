@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
 import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
+import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -39,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -254,7 +254,7 @@ public class DataExportService {
     List<String> others =
         roster.stream()
             .filter(u -> !u.getId().equals(subjectId))
-            .flatMap(DataExportService::everySpellingOf)
+            .flatMap(HandleSpellings::of)
             .filter(h -> h != null && !h.isBlank())
             .toList();
     // The subject's own names go in as PROTECTED terms rather than being left out. Excluding them
@@ -265,26 +265,9 @@ public class DataExportService {
     List<String> own =
         roster.stream()
             .filter(u -> u.getId().equals(subjectId))
-            .flatMap(DataExportService::everySpellingOf)
+            .flatMap(HandleSpellings::of)
             .filter(h -> h != null && !h.isBlank())
             .toList();
     return new HandleScrubber(others, own);
-  }
-
-  /**
-   * Every column of one member that holds a name somebody might have typed into free text.
-   *
-   * <p>Kept beside {@link #scrubberForOthers} rather than on {@code User}, because it is a
-   * statement about this export's scrubbing and not about the entity: the same three columns are
-   * registered in {@link PersonSearchTargets} for the search, and {@code
-   * HandleAnonymisationService} erases the same three on a granted Art. 17 request. Adding a fourth
-   * name column means adding it in all three places, and {@code HandleSpellingCoverageTest} fails
-   * until it is.
-   *
-   * @param user the member
-   * @return their username, display name and Discord guild nickname, in any order, nulls included
-   */
-  private static @NotNull Stream<String> everySpellingOf(@NotNull User user) {
-    return Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname());
   }
 }

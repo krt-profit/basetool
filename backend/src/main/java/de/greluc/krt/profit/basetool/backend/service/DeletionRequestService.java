@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.DeletionRequestRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
@@ -38,7 +39,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -419,14 +419,15 @@ public class DeletionRequestService {
       // Before the delete: the id-matched updates only reach rows while the FK still points at the
       // account, and the text-matched ones need the names the account still carries.
       //
-      // All three spellings, not the effective name alone. A handover or a job-order contact is
-      // typed by hand, and whoever typed it wrote what they call the person -- as likely the
-      // Discord nickname as the display name. Passing one spelling left the others standing.
+      // Every spelling, not the effective name alone. A handover or a job-order contact is typed
+      // by hand, and whoever typed it wrote what they call the person -- as likely the Discord
+      // nickname as the display name. Passing one spelling left the others standing.
+      //
+      // The list comes from HandleSpellings so this and the Art. 15 export cannot disagree about
+      // what a member's names are; HandleSpellingCoverageTest holds it against the person-search
+      // registry, which is itself swept against information_schema.
       handleAnonymisationService.anonymise(
-          userId,
-          Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname())
-              .filter(Objects::nonNull)
-              .toList());
+          userId, HandleSpellings.of(user).filter(Objects::nonNull).toList());
     }
 
     auditService.record(

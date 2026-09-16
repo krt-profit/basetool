@@ -160,6 +160,15 @@ Three things changed, and only the third of them is a fix rather than a lesson:
    is `displayName ?: username`, so a handover typed with the member's username or Discord nickname
    was never reached. All three spellings are passed now — the same correction `HandleScrubber`
    needed, for the same reason.
+
+   Since 2026-09-17 the list of spellings is one shared constant, `support.HandleSpellings`,
+   rather than a `Stream.of(...)` written out here and again in the Art. 15 export. Both places
+   need every name the member is known by, and a fourth name column added to one and missed in
+   the other fails silently in both directions: an export that reports a complete third-party
+   redaction, or an erasure that reports a completed erasure while rows still name the member.
+   `HandleSpellingCoverageTest` holds the list against `PersonSearchTargets`, which is itself
+   swept against `information_schema` — a `DataExportService` Javadoc named that test
+   before it existed.
 2. **The four deletion-request events carry a `null` subject label.** REQ-AUDIT-001 limits it to a
    non-personal display label; the member is identified by `actor_user_id` and `target_user_id`,
    which the viewer resolves against the live roster.

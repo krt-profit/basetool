@@ -3694,6 +3694,19 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > asks for it too. Asking all of `EXEMPT_COLUMNS` instead would flag some forty status codes and
 > identifiers and bury the one that matters.
 
+> [!note] The spelling list is shared, and gate-enforced, since 2026-09-17
+> Both data-protection surfaces need **every** name a member is stored under, not their
+> effective name: the export scrubs other members' handles out of the subject's free text, and
+> the erasure matches the text-only snapshots that carry no foreign key to the account. Each
+> wrote the three columns out for itself, and a `DataExportService` Javadoc claimed a
+> `HandleSpellingCoverageTest` held them together while no such class existed.
+>
+> `support.HandleSpellings` is that list now, and the test exists: every searched `app_user`
+> name column is a spelling or is declared `NOT_A_SPELLING` with a reason, and the projection
+> yields exactly one value per declared column. Since `PersonSearchCoverageTest` sweeps
+> `information_schema`, a new name column cannot reach the schema without being registered for
+> the search, and cannot be registered without being classified here.
+
 The scrubbing half had three defects of its own, and it is the half where a defect is a leak rather
 than a gap.
 
