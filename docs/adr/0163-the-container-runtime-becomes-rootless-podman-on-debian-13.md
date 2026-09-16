@@ -1,8 +1,12 @@
-# ADR-0163 — The container runtime becomes rootless Podman on Debian 13, on a rebuilt host
+# ADR-0163 — The container runtime becomes rootless Podman on CentOS Stream 10, on a rebuilt host
 
-- **Status:** Proposed — **needs re-ruling.** The measurement this ADR names as able to stop it
-  came back **negative** on 2026-09-16; see *The measurement came back negative* below.
-- **Date:** 2026-09-12
+- **Status:** **Accepted 2026-09-16**, with choice 1 amended. The measurement this ADR names as
+  able to stop it came back **negative** for Debian 13 on the same day, and the re-ruling moved
+  the platform rather than the decision. Read *The re-ruling* first, then *The measurement came
+  back negative* for why.
+- **Published title:** this ADR shipped as *… rootless Podman on Debian 13 …*, and the file name
+  keeps that spelling so no link breaks. The decision is CentOS Stream 10.
+- **Date:** 2026-09-12, re-ruled 2026-09-16
 - **Deciders:** @greluc (four choices recorded below), Claude (analysis and measurement)
 - **Related:** [ADR-0049](0049-host-configuration-as-a-promotable-artifact.md) ·
   [ADR-0072](0072-monitoring-stack-decoupled-from-the-app-deploy.md) ·
@@ -52,10 +56,106 @@ the identical `deploy.sh` on the identical timer over a separate promotion tag �
 distribution from production. Every rehearsal there has therefore been proving slightly less than it
 appeared to.
 
+## The re-ruling — @greluc, 2026-09-16
+
+**Path A, on CentOS Stream 10.** The negative measurement below rejected the *platform*, not the
+decision: rootless Podman with Quadlet on a rebuilt host stands, and choice 1 changes.
+
+|          Choice           |                        Was                        |                      Is                      |
+|---------------------------|---------------------------------------------------|----------------------------------------------|
+| 1 — distribution          | Debian 13 "trixie", to match the testing host     | **CentOS Stream 10**                         |
+| 2 — Podman version        | the distribution's own, no third-party repository | **unchanged** — CentOS Stream 10's own 6.1.0 |
+| 3 — orchestration         | Quadlet                                           | unchanged                                    |
+| 4 — observability         | rebuilt with the migration                        | unchanged                                    |
+| 5 — rebuilt, not upgraded | a fresh host beside the current one               | unchanged                                    |
+
+Choice 2 is what survived, and it is the one that mattered: this is still distribution packages
+only, from a distribution that is not Debian. The reason Debian 13 cannot serve is set out below —
+four independent blockers, any one sufficient.
+
+**What CentOS Stream 10 brings, measured rather than read.** `dnf install podman` in a throwaway
+`quay.io/centos/centos:stream10` container answers `podman 6.1.0`, ships `/usr/bin/pesto`, carries
+`#rootless_port_forwarder = "rootlessport"` at line 424 of its own `containers.conf`, and documents
+the option in its own `containers.conf(5)`. Alongside: `passt 0^20260728.gf8df3f1` (the pesto
+requirement is `>= 0:20260526`), `netavark 2.1.0`, `aardvark-dns 2.1.0`, `crun 1.29.1`,
+`conmon 2.2.1`. The control, `debian:13`, answers `podman 5.4.2`, has no `pesto`, and matches the
+option **zero** times in either its config or its man page.
+
+**The decisive property is not the version, it is where the version comes from.** Debian 13 froze
+Podman at 5.4.2 and the project needed a newer one; Fedora would solve that by replacing the
+distribution every ~13 months. CentOS Stream 10 is supported to **2030-05-31**, and its
+container-tools is a rolling AppStream that rebases on the latest stable upstream Podman up to four
+times a year. That is a current Podman without an annual host rebuild — on a host this project's own
+rules say must be rebuilt rather than upgraded in place.
+
+Rocky Linux 10 and AlmaLinux 10 were measured and do not qualify (`podman 5.8.2`,
+`passt 0^20251210`, no `pesto`). They are rebuilds of *released* RHEL while Stream is the branch
+RHEL is cut from, so they trail by construction.
+
+### What the re-ruling costs, and what it does not
+
+- **SELinux replaces AppArmor**, enforcing by default. Every bind mount needs a correct label —
+  `:z` / `:Z` on the Quadlet `Volume=` lines, or a matching `semanage fcontext` rule. This is now a
+  first-class work item of the same rank as the certificate handover, and it is also a gain: a
+  second confinement layer under the user namespace.
+- **The host bootstrap becomes `dnf`-shaped.** `docs/deployment.md` speaks `apt` throughout.
+- **The rehearsal environment diverges again unless it follows.** Choice 1 existed to end exactly
+  that. The PVE testing host is Debian 13 and has room for a second, short-lived VM, so the
+  recommendation is to run Phases 1-4 on a CentOS Stream 10 VM there and decide separately whether
+  the permanent testing host moves. **Open, and it belongs to the owner.**
+- **Nothing about the images changes.** All five published images are OCI and the host distribution
+  is invisible to them.
+
+### Three things Podman 6.1 changes against the plan as written
+
+The plan measured Debian's 5.4.2. The chosen platform is two minor versions and one major ahead, and
+three of its findings move:
+
+1. **Quadlet has `Memory=`** — verified in the shipped `podman-systemd.unit(5)` on CentOS Stream 10.
+   `REQ-OPS-020`'s measured limits need no `PodmanArgs=--memory=` workaround.
+2. **`isolate` defaults to `strict`** on netavark 2, and the man page names `isolate=false` as the
+   way to "restore the pre-Podman 6 / Netavark 2 behavior". Bridge networks no longer reach each
+   other by default. That **aligns with** this deployment's model, which never routes between
+   bridges and treats membership as the only path — but it is a default that changed under us and
+   must be asserted rather than assumed.
+3. **Still no masquerade switch.** netavark 2.1's documented bridge options remain `mtu`, `metric`,
+   `no_default_route` and `isolate`; masquerading is tied to `mode=managed`. So
+   `net-edge-ingress`'s `enable_ip_masquerade=false` still has no direct equivalent, and
+   `-o no_default_route=true` remains the candidate to be measured.
+
+Podman 6.0 also removed slirp4netns, CNI, iptables (in favour of nftables), cgroups v1 and BoltDB.
+None of those is used here, but the nftables change is worth knowing before anybody reads a firewall
+rule on the new host and expects `iptables` output.
+
+### The target host
+
+The current production server is a Hetzner **CPX42** — 8 shared AMD vCPU, 16 GB RAM, 320 GB NVMe,
+20 TB traffic — in `nbg1-dc3`, which matches the measured 8 vCPU / 15 982 920 kB /
+327 684 194 304 B. An equivalent new host is therefore a second CPX42 in `nbg1`, and Hetzner offers
+a CentOS Stream 10 image. Sizing note from the inventory: of the 116 GB in use on the current host,
+63 GB are two undocumented pre-change copies of `/var/iri` and 35 GB is the containerd image store,
+so the data that actually has to move is **under a gigabyte** plus whatever monitoring history is
+judged worth carrying.
+
+### Still open after this ruling
+
+The ruling settles the platform. It does not settle: whether the permanent testing host moves to
+CentOS Stream 10; which `container_*` alerts survive Phase 4 and which are retired; and the
+acceptance measurement for `rootless_port_forwarder="pasta"` itself, which is **experimental and
+off by default upstream** and has to be demonstrated on a real host before anything is built on it.
+That measurement is four assertions, and they are the ones the Phase 0 conformance suite already
+makes against the current Docker stack.
+
 ## Decision
 
-**The container runtime becomes rootless Podman 5.4.2 on Debian 13 "trixie", orchestrated by
-Quadlet, on a production host that is rebuilt rather than upgraded in place.**
+**The container runtime becomes rootless Podman on CentOS Stream 10, orchestrated by Quadlet, on
+a production host that is rebuilt rather than upgraded in place.**
+
+> [!note] As originally written, 2026-09-12
+> The sentence above read "rootless Podman 5.4.2 on Debian 13 trixie". The four choices below
+> are the originals and are kept verbatim, because the reasoning behind choices 2 to 5 is
+> unchanged and choice 1's rejection is only legible next to what it claimed. See *The
+> re-ruling* above.
 
 Four choices, made by @greluc on 2026-09-12:
 
@@ -253,7 +353,8 @@ per week and two were used on 2026-09-12.
 
 ## Status of this decision
 
-Proposed, and **blocked on a re-ruling by @greluc**. The plan it governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
+**Accepted** on 2026-09-16 by @greluc, with choice 1 amended to CentOS Stream 10. The plan it
+governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
 has been touched. The phases were sequenced so that the measurements which could reject this ADR came
 first and cost nothing but time — and that is what happened: §3.1 was answered from vendor
 documentation on 2026-09-16, before a host was built, and it rejected the platform as specified.

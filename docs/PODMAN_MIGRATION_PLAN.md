@@ -1,18 +1,21 @@
-# Rootless Podman on Debian 13 — Migration Plan
+# Rootless Podman on CentOS Stream 10 — Migration Plan
 
 > **Doc type:** Implementation plan — **living** until shipped, then freeze and point at the living
 > truth (planned: [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md),
 > the reworked delivery section of [`docs/deployment.md`](deployment.md), and the `REQ-OPS-*` /
 > `REQ-OBS-014` amendments in [`docs/specs/deployment-delivery.md`](specs/deployment-delivery.md) and
 > [`docs/specs/observability.md`](specs/observability.md)).
-> **Status:** **Phase 0 is done** (2026-09-16); Phases 1-6 are **blocked on an owner re-ruling**.
-> **No host has been touched.**
-> §3.1 — the one measurement the plan says can reject ADR-0163 — was answered on 2026-09-16 from
-> vendor documentation, without needing a host, and **its answer rejects the platform ADR-0163
-> chose**. See §3.1 for the finding and §7 for the paths out.
+> **Status:** **Phase 0 is done** and the platform is **decided** (2026-09-16): path A on
+> **CentOS Stream 10**, on a second Hetzner CPX42. Phases 1-6 are ready to start. **No host has
+> been touched.** What the decision changes is in §9.
+> §3.1 — the one measurement the plan says can reject ADR-0163 — was answered on the same day from
+> vendor documentation, without needing a host. It **rejected Debian 13**, which is what the
+> ruling in §9 responds to. Read §3.1 for the finding, §8 for how path A was examined, §9 for
+> what was decided.
 > **Decision record:** [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md)
-> (Proposed, **needs re-ruling** — choice 1 and choice 2 are the ones that fail).
-> **Last updated:** 2026-09-16 (§3 answered; §4 re-verified against both hosts; §6 and §7 added).
+> — **Accepted 2026-09-16** with choice 1 amended from Debian 13 to CentOS Stream 10. The file
+> name keeps the old spelling so no link breaks.
+> **Last updated:** 2026-09-16 (§3 answered; §4 re-verified; §6-§8 added; §9 records the ruling).
 
 ---
 
@@ -410,6 +413,9 @@ the latest:
 | image update                 | `AutoUpdate=`                                       | `AutoUpdate=`    |
 
 This confirms the PVE operator's third finding against the primary source rather than by report.
+**It no longer applies to the chosen platform:** CentOS Stream 10 ships Podman 6.1, whose Quadlet
+does have `Memory=` — verified in its own shipped man page. The 5.4.2 column is kept because it
+is why the workaround was ever planned.
 `Notify=healthy` is worth calling out as an **improvement**: it postpones the unit's startup
 notification until Podman marks the container healthy, which is a stronger and simpler health gate
 than `docker compose up --wait`.
@@ -624,17 +630,18 @@ carrying. The 63 GB in `/var/iri-userid` and `/var/iri-http2` are two undocument
 snapshots; they are named here so the next person does not size a server around them, and whether
 they are deleted is a separate decision (a host write, and therefore the owner's).
 
-### The "equivalent" Hetzner VM — one thing that cannot be read from inside
+### The "equivalent" Hetzner VM — answered by the owner, 2026-09-16
 
-The measured shape is **8 vCPU / 16 GB / 327.68 GB**. The current Hetzner Cloud catalogue holds
-`CX43` (8 shared vCPU, 16 GB, **160 GB**) and `CCX33` (8 dedicated vCPU, **32 GB**, 240 GB) — neither
-matches, and the metadata endpoint does not expose the plan name. The hostname `ubuntu-8gb-nbg1-1`
-records what the server was created as, not what it is now, so it cannot settle it either.
+The measured shape is **8 vCPU / 16 GB / 327.68 GB**. The metadata endpoint does not expose the
+plan name and the hostname `ubuntu-8gb-nbg1-1` records what the server was created as rather than
+what it is, so this was the one fact the inventory could not settle from inside. The owner read it
+off the Console.
 
-**Do not infer the plan.** It is one glance in the Hetzner Console (Server → type) and it decides
-both the cost of the overlap and whether the new host needs a Volume to hold the same disk. What the
-measurements *do* settle is the floor: 8 vCPU and 16 GB are in use today, and the disk requirement
-for a clean host is far below 327 GB once the two dead snapshots and the image store are excluded.
+**It is a CPX42** — 8 shared AMD vCPU, 16 GB RAM, 320 GB NVMe, 20 TB traffic — which matches the
+measurements exactly and is a current type rather than a legacy one (the older CPX41 carries the
+same CPU and RAM with 240 GB). An equivalent new host is a second CPX42 in `nbg1`, and no Volume
+is needed: the data that has to move is under a gigabyte plus whatever monitoring history is
+carried, once the two dead snapshots and the image store are excluded.
 
 > [!note] Debian 13 images are offered by Hetzner Cloud; the ARM lines are not a candidate
 > Every application image in this deployment is `linux/amd64` **and** `linux/arm64` (the release
@@ -642,7 +649,7 @@ for a clean host is far below 327 GB once the two dead snapshots and the image s
 > per architecture, and `check-monitoring-image-pins.sh` compares those pins against the documents.
 > Moving to `CAX`-class ARM would be a second migration riding inside this one. Out of scope.
 
-## 7. The paths out of §3.1 — the owner's choice
+## 7. The paths out of §3.1 — **A was chosen, 2026-09-16**
 
 Four, and they are genuinely different amounts of work. Each keeps rootless Podman except the last
 two; none of them is "work around §3.1", because there is nothing to work around — the address is
@@ -838,4 +845,81 @@ and on a decision about what happens if the flag regresses in a later Podman.
 >
 > That is four assertions, and they are the same four the Phase 0 conformance suite has to make
 > against the current Docker stack anyway. **Build the suite first; it is the acceptance test.**
+
+---
+
+## 9. The decision, and what it changes in the phases — 2026-09-16
+
+**Path A, on CentOS Stream 10.** Ruled by @greluc on 2026-09-16; ADR-0163 is Accepted with choice 1
+amended. The platform moved; the decision did not. It is still rootless Podman under Quadlet on a
+rebuilt host, and still distribution packages only — from a distribution that is not Debian.
+
+The target host is a second Hetzner **CPX42** (8 shared AMD vCPU, 16 GB RAM, 320 GB NVMe, 20 TB
+traffic) in `nbg1`, matching the current one, on Hetzner's CentOS Stream 10 image.
+
+### What is now settled
+
+|                         |                                                                                                                                                         |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| §3.1 the source address | **answerable** — `rootless_port_forwarder="pasta"` exists on the chosen platform. Still to be *measured*, because it is experimental and off by default |
+| §3.2 binding :80/:443   | unchanged in shape; decide `AmbientCapabilities=CAP_NET_BIND_SERVICE` against the host-wide sysctl once it is known which process binds                 |
+| §3.5 memory limits      | **closed** — Quadlet 6.1 has `Memory=`; the `PodmanArgs=--memory=` workaround is unnecessary                                                            |
+| §3.6 container metrics  | unchanged as a problem; the exporter version is now pinned by the platform — **v2 pairs with Podman 6**                                                 |
+
+### What the phases gain
+
+Three work items that did not exist while the target was Debian, and one that got smaller.
+
+**SELinux is a first-class work item.** It is enforcing by default on the RHEL family, and every
+bind mount in the stack needs a correct label — `:z` / `:Z` on the Quadlet `Volume=` lines, or a
+matching `semanage fcontext` rule. It ranks with the certificate handover in §3.4 and belongs in the
+same Phase 2 afternoon, because the two interact: `acme` writing files that `edge` must open, under
+a user namespace **and** a label transition. The payoff is a second confinement layer beneath the
+user namespace, which is the security case this ADR was made for in the first place.
+
+**The host bootstrap becomes `dnf`-shaped.** `docs/deployment.md` speaks `apt` throughout, and the
+unattended-upgrade equivalent is `dnf-automatic`. Straightforward, but it is a rewrite rather than a
+translation, and it is the document a future rebuild is driven from.
+
+**`isolate` now defaults to `strict`.** Netavark 2 isolates bridge networks from one another unless
+told otherwise, and `podman-network-create(1)` names `isolate=false` as the way to restore the
+pre-Podman-6 behaviour. This **agrees with** the design — the topology's model never routes between
+bridges and treats shared membership as the only path — but it is a default that changed underneath
+the plan, so it gets asserted rather than assumed. A change in the friendly direction is still a
+change.
+
+**Still no masquerade switch**, on netavark 2.1 either: the documented bridge options are `mtu`,
+`metric`, `no_default_route` and `isolate`, and masquerading is tied to `mode=managed`. So
+`net-edge-ingress`'s `enable_ip_masquerade=false` has no direct equivalent and
+`-o no_default_route=true` remains the candidate to measure.
+
+> [!warning] Podman 6.0 removed five things. None is used here, and one will still surprise a reader
+> slirp4netns, CNI, iptables (in favour of **nftables**), cgroups v1 and BoltDB. The nftables move
+> is the one to remember: somebody reading firewall state on the new host and expecting `iptables`
+> output will conclude the rules are missing.
+
+### The rehearsal environment — open, and it belongs to the owner
+
+Choice 1 existed so production and testing would match. Moving production to CentOS Stream 10
+re-opens exactly that, and there are two honest answers:
+
+- **Run Phases 1-4 on a short-lived CentOS Stream 10 VM on PVE**, which §4 already establishes there
+  is room for, and leave the permanent testing host on Debian 13. Cheap, and it rehearses the real
+  platform — but the *permanent* rehearsal ground then differs from production again.
+- **Move the testing host to CentOS Stream 10 as well.** It is a PVE VM with ZFS snapshots that roll
+  back in seconds, so the cost is low and the property is restored.
+
+The second is what choice 1 was asking for. It is not decided here.
+
+### Sequencing from here
+
+1. **Phase 1 on a CentOS Stream 10 VM**: the §3 questions re-asked against Podman 6.1 — pasta port
+   forwarding with a real external client, `--internal` inbound behaviour, `no_default_route` as the
+   egress block, cgroup delegation on a user slice, and SELinux labels on the acme/edge handover.
+2. **Phase 2**, the Quadlet translation, with `Memory=` and `Notify=healthy` rather than the 5.4.2
+   spellings.
+3. **Phases 3-6** unchanged in shape.
+
+Phase 0 is done and does not need redoing: the conformance suite is platform-agnostic by
+construction, and `client-address-visible` is the acceptance test for step 1.
 
