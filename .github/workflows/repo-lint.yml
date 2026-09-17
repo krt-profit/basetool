@@ -226,6 +226,62 @@ jobs:
       - name: Self-test the cgroup metrics collector
         run: bash scripts/cgroup-container-metrics.test.sh
 
+  render-env-d-selftest:
+    name: render-env-d-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Phase 2 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/render-env-d.py` fills the per-service
+      # environment templates from the host `.env`. Under compose this interpolation was compose's
+      # own; under Quadlet there is no compose, so it is code -- and it is code whose failure mode
+      # is silence. A variable that renders empty does not stop a container: postgres starts on its
+      # built-in defaults, in the wrong directory, on the wrong port, behind a health check that can
+      # never pass, and the whole thing reads as a database that is simply unwell.
+      #
+      # So the half worth gating is the refusal. The suite asserts that a missing ${NAME:?...}
+      # aborts the run, names every missing variable rather than the first, and leaves NO file
+      # behind -- plus the semantics compose defines (`:-` versus `-`, nesting, a `$` inside a
+      # secret) and that the generated header's own ${...} EXAMPLES survive un-interpolated.
+      # Needs only python3 and bash; no host, no containers, no secrets.
+      - name: Self-test the environment renderer
+        run: bash scripts/render-env-d.test.sh
+
+      # The templates in the tree must still render against a complete .env. This catches a
+      # generator change that emits a reference the renderer cannot resolve, which would otherwise
+      # only surface on the host at deploy time.
+      - name: Render the real templates against a synthetic complete .env
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, pathlib
+          required = set()
+          for name in os.listdir("quadlet/env.d"):
+              if not name.endswith(".env.tmpl"):
+                  continue
+              for line in open(os.path.join("quadlet/env.d", name), encoding="utf-8"):
+                  if line.lstrip().startswith("#"):
+                      continue
+                  required.update(re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*):\?", line))
+          pathlib.Path("synthetic.env").write_text(
+              "".join(f"{k}=ci-{k.lower()}\n" for k in sorted(required)), encoding="utf-8")
+          print(f"synthetic .env carries {len(required)} required variable(s)")
+          PY
+          python3 scripts/render-env-d.py \
+            --env synthetic.env --templates quadlet/env.d --out rendered
+          echo "--- assignment lines still carrying an unresolved reference (must be none) ---"
+          # The needle is written "\${" rather than '${' so it is plainly a literal two-character
+          # string to shellcheck as well as to a reader. Comment lines are excluded first: the
+          # generated header documents the ${NAME:-default} forms BY EXAMPLE, and matching those
+          # would report every file as broken.
+          if grep -h -E '^[A-Za-z_][A-Za-z0-9_]*=' rendered/*.env | grep -F "\${"; then
+            echo "::error title=render-env-d::a rendered assignment still contains \${...}"
+            exit 1
+          fi
+          echo "none"
+
   ansible-lint:
     name: ansible-lint
     runs-on: ubuntu-latest

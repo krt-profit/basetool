@@ -2462,3 +2462,98 @@ carried no credential (checked).
 Found while measuring read-only for the JVM modules, and **fixed in `#1932`** before this branch
 merged: the three Dockerfiles now clear the directory in the same `RUN` layer that produces the CDS
 archive, so nothing is stacked as a whiteout over files that still ship.
+
+---
+
+## 22. Phase 2 — the first configured bring-up, as the user it will actually run as — 2026-09-17
+
+§20 and §21 measured the containers one at a time. This is the first run against a real
+configuration rather than a harness, and it moved four things from "written down" to "observed".
+
+### The environment templates had no renderer, and nothing said so
+
+The generator emits `quadlet/env.d/<service>.env.tmpl` — the compose right-hand side verbatim —
+and the units name `/var/iri/code/env.d/<service>.env` in `EnvironmentFile=`. **Nothing turned one
+into the other.** Under compose the interpolation was compose's own; under Quadlet there is no
+compose, so it is code that did not exist. The gap was invisible because the first bring-up filled
+the files with an ad-hoc shell loop, which is precisely how §20's fourth harness fault happened:
+`set -e` is inert inside an `if` condition, so a failed read of the `.env` reported success and
+produced empty values.
+
+`scripts/render-env-d.py` is that renderer, with `scripts/render-env-d.test.sh` and a CI job. It
+implements compose's semantics including the nesting the real templates contain — the Keycloak
+issuer is `${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-…}/realms/iri}` — and it **refuses
+rather than half-rendering**: a missing `${NAME:?…}` aborts the run, names *every* missing variable
+instead of the first, and writes nothing at all.
+
+Two of its tests exist because the mistake had already been made once. One pins that a
+`${NAME:?…}` appearing in the generated header's own *documentation* does not refuse the render.
+The other pins that a `$` inside a generated password survives byte for byte.
+
+### The testing host's `.env` was a bring-up scaffold, and the databases depended on it
+
+What sat at `/var/iri/code/.env` carried `vhost1.bringup.invalid` … `vhost5.bringup.invalid` and an
+`EDGE_HOST_KEYCLOAK` that ADR-0166 removed. Replacing it wholesale was the obvious move and would
+have been **destructive**: both Postgres clusters are initialised (`PG_VERSION` present) and redis
+holds an `appendonlydir`, so eight values — the two database triples, the redis password and the
+keystore password — are baked into state on disk. They were carried across verbatim, on the host,
+without being read; the other nine were generated fresh.
+
+### `pg_isready` is a liveness probe, not an authentication one
+
+All three data services reported `healthy`, which proves less than it appears to. The Postgres
+health command is `pg_isready`, which asks whether the server *accepts connections*. A wrong
+password reports healthy.
+
+The first attempt to prove the passwords connected to `127.0.0.1` — and the postgres image's
+generated `pg_hba.conf` carries `host all all 127.0.0.1/32 trust`, so **no password was requested
+and a deliberately wrong one was accepted**. Only the falsification arm caught it. Re-run against
+each container's own network address, which falls to `host all all all scram-sha-256`, the wrong
+password is refused with `FATAL: password authentication failed` and the `.env` password
+authenticates. Redis needed no second pass: its health command is `redis-cli -a $REDIS_PASSWORD
+ping`, which authenticates by construction.
+
+> [!important] A check whose failure arm is never exercised is decoration
+> Three separate checks in this session reported green while measuring nothing: the loopback trust
+> path above, a `grep -iE 'error'` that matched `log_error_verbosity=terse` in a postgres `Exec=`
+> line, and two file comparisons that globbed a `0750` directory as a user who cannot enter it, so
+> "hash of nothing ≠ hash of content" printed as a difference. All three were the harness, and all
+> three agreed with what was expected.
+
+### The stack runs as `iri`, and that is measurable rather than declared
+
+`/var/iri`'s ownership settles it: `db-backend` is uid **100069**, and `iri`'s subuid base is
+100000, so `100000 + 70 − 1` is postgres's uid 70 under the documented translation. redis is
+100998, keycloak 100999, the JVM modules 110000. `sysadm`'s base is 524288 and matches nothing.
+
+This has an operational consequence that looked fine and was not: the GHCR credential was created
+by a `podman login` **as `sysadm`**, which wrote `/run/user/1000/containers/auth.json`. Pulls
+succeeded — as the wrong user, into the wrong image store, on a tmpfs that a reboot clears. The
+stack user's store was empty and stayed empty.
+
+### State at the end of this section
+
+| | |
+|---|---|
+| quadlet units installed for `iri` | 39 — 18 containers, 18 networks, 3 volumes |
+| podman's generator | accepts all 39, exit 0, no diagnostics |
+| `env.d` | 18 files, 185 assignments, no unresolved reference |
+| `db-backend`, `db-keycloak`, `redis` | healthy, read-only, own uid, zero capabilities |
+| both clusters | initialised and **empty** — no migration has run |
+| `haproxy` | already provisioned, `0.0.0.0:80/443` and `[::]:80/443` bound **separately** |
+| SELinux | `http_port_t` already carries 8080 and 8443; ADR-0187's `semanage` step is done |
+
+### What blocks the rest, and neither is a defect in this work
+
+**The edge cannot start without a certificate.** Its vhosts are unconditionally `listen 8443 ssl`
+and nginx will not start without the files. On this host `ACME_HOSTS` is empty by design — the
+Caddy front end owns ACME and the real certificates — so nothing populates `edge-certs`. A
+self-signed throwaway was the obvious answer and is **refuted**: Caddy validates the upstream
+against a pinned `tls_trust_pool` file, so a new certificate returns 502 with the failure one layer
+above its symptom. Either the matching private key is restored from the 1004 backup, or the pin
+moves; both are @greluc's call.
+
+**Two of the four vhosts are not reachable from outside**, whatever the edge does.
+`api.basetool.greluc.me` answers 404 by a deliberate default-deny decision, and
+`grafana.basetool.greluc.me` is not configured at all and falls into Caddy's `handle { abort }`.
+The monitoring plane is therefore measurable from inside the host and not from the internet.
