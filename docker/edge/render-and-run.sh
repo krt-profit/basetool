@@ -81,6 +81,10 @@ if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
 fi
 export EDGE_LISTEN_OPTS
 
+# shellcheck disable=SC2016  # the literal token is the point: this is envsubst's allow-list of
+# names to substitute, not an expansion. Expanding it here would hand envsubst the VALUE and it
+# would then substitute nothing, which fails silently -- every listener would render without its
+# options and the proxy_protocol shape would quietly become the plain one.
 SHELL_FORMAT='${EDGE_LISTEN_OPTS}'
 for v in ${EDGE_VARS}; do
   SHELL_FORMAT="${SHELL_FORMAT}\${${v}}"
