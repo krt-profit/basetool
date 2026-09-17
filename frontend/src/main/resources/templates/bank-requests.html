@@ -145,7 +145,7 @@
                               th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</span>
                     </td>
                     <td th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                    <td th:text="${r.requesterHandle()}">greluc</td>
+                    <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
                     <td>
                         <span class="chip"
                               th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
@@ -179,7 +179,7 @@
                                     th:text="#{bank.request.action.reject}">Ablehnen</button>
                         </div>
                         <span th:unless="${r.status() == 'PENDING'}" class="text-muted"
-                              th:text="${r.deciderHandle() != null} ? ${r.deciderHandle()} : '&ndash;'">&ndash;</span>
+                              th:text="${r.deciderHandle() != null} ? ${@handles.display(r.deciderHandle())} : '&ndash;'">&ndash;</span>
                     </td>
                 </tr>
                 <!-- Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first (more important), then Notiz;
@@ -273,7 +273,7 @@
                         <select id="bank-confirm-holder" name="holderId" required data-krt-combobox data-testid="bank-confirm-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
                             <option th:each="h : ${holders}" th:value="${h.id()}"
-                                    th:text="${h.active()} ? ${h.handle()} : (${h.handle()} + ' ' + #{bank.holder.inactive})">greluc</option>
+                                    th:text="${h.active()} ? ${@handles.display(h.handle())} : (${@handles.display(h.handle())} + ' ' + #{bank.holder.inactive})">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="holderId"></span>
                     </div>
@@ -285,7 +285,7 @@
                         <select id="bank-confirm-destination-holder" name="destinationHolderId" disabled
                                 data-krt-combobox data-testid="bank-confirm-destination-holder">
                             <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
-                            <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${h.handle()}">greluc</option>
+                            <option th:each="h : ${activeHolders}" th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
                         </select>
                         <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                     </div>

@@ -120,6 +120,10 @@ public final class FrontendPageRoutes {
           "/promotion/admin/topics",
           "/promotion/admin/rank-requirements",
           "/admin/audit-log",
+          // The two data-protection admin pages (REQ-SEC-060, REQ-SEC-061). Both render the
+          // app shell and both carry the 44px touch floor, so both belong in the sweeps.
+          "/admin/deletion-requests",
+          "/admin/person-search",
           "/admin/bank",
           "/admin/bank-audit",
           "/admin/sync-reports",
@@ -195,6 +199,10 @@ public final class FrontendPageRoutes {
           // HTML fragments: a view name, rendered without the app shell, swapped into a page by
           // `krtFetch`. Indistinguishable from a page by return type, which is why neither list is
           // derived from one.
+          // The member's erasure-request card, swapped into /profile after a raise or a withdrawal
+          // (REQ-SEC-061). A fragment, not a page: the same route also answers POST and DELETE,
+          // which the sweeps would not exercise anyway.
+          "/profile/deletion-request",
           "/inventory/all/stack/entries",
           "/inventory/all/game-item-stack/entries",
           "/inventory/my/stack/entries",

@@ -126,4 +126,70 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
   @Query("DELETE FROM AuditEvent e WHERE e.domain = :domain AND e.occurredAt < :before")
   int deleteByDomainAndOccurredAtBefore(
       @Param("domain") AuditDomain domain, @Param("before") Instant before);
+
+  /**
+   * Whether one domain holds any audit row older than a cutoff. Asked by the scheduled retention
+   * sweep (REQ-AUDIT-006) before it purges that domain.
+   *
+   * <p>The sweep needs this because {@code purgeBefore} writes its {@code *_AUDIT_PURGED} marker
+   * unconditionally, which is right for an admin's deliberate act — "I purged, and nothing matched"
+   * is a fact worth recording — and wrong for a daily job, which would otherwise mint ten markers a
+   * day forever and turn the retention mechanism into its own retention problem. Asking first keeps
+   * the manual purge's semantics untouched.
+   *
+   * @param domain the area to check
+   * @param before the exclusive cutoff
+   * @return {@code true} when at least one row of that domain is older than the cutoff
+   */
+  boolean existsByDomainAndOccurredAtBefore(AuditDomain domain, Instant before);
+
+  /**
+   * Replaces this member's handle snapshot with the erasure sentinel, for a granted Art. 17 request
+   * (REQ-SEC-062).
+   *
+   * <p><b>This is the only mutation of an otherwise append-only table, and it is deliberate.</b>
+   * The trail's worth rests on rows never being rewritten, so the operation is admin-gated, is
+   * itself audit-logged (a {@code HANDLE_SNAPSHOTS_ANONYMISED} marker written afterwards, which the
+   * update therefore does not touch), and changes nothing about <em>what happened</em> — only who
+   * it names. Row counts, timestamps, event types and subjects are untouched.
+   *
+   * <p>Matched by {@code actorUserId}, so it only reaches rows while the account still exists. Once
+   * the FK has nulled out, the handle is the only remaining link and the admin Personensuche
+   * (REQ-SEC-060) is the way to find those rows.
+   *
+   * @param userId the member whose handle snapshots are erased
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE AuditEvent e SET e.actorHandle = :sentinel"
+          + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
+  int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
+
+  /**
+   * Replaces a subject label that <em>is</em> this member's name with the erasure sentinel
+   * (REQ-SEC-062).
+   *
+   * <p>A second column on the same rows, and it was missed the first time: {@code
+   * anonymiseActorHandle} scrubs {@code actor_handle} and never touches {@code subject_label}, so a
+   * granted erasure left rows literally half-anonymised — scrubbed actor, intact name, same row —
+   * and the deletion-request events were themselves labelled with the requester's name. Those call
+   * sites now pass {@code null}, per the REQ-AUDIT-001 convention that a subject label is a
+   * non-personal display label; this query is what reaches the rows already written.
+   *
+   * <p><b>Exact match, not a substring replace.</b> A label that merely <em>contains</em> the
+   * handle is a job-order title naming that order's contact person, which is a different person's
+   * name on a row about a different act; rewriting it would erase somebody who did not ask.
+   * Case-insensitive because a label can be assembled from text a human typed.
+   *
+   * @param handle the spelling to erase; compared case-insensitively against the whole label
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE AuditEvent e SET e.subjectLabel = :sentinel"
+          + " WHERE lower(e.subjectLabel) = lower(:handle) AND e.subjectLabel <> :sentinel")
+  int anonymiseSubjectLabel(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

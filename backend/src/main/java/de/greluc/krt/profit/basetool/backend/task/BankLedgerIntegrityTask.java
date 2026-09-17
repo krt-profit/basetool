@@ -140,4 +140,18 @@ public class BankLedgerIntegrityTask {
         .get(MetricNames.CATEGORY_TRANSACTION_WITHOUT_AUDIT)
         .set(report.transactionsWithoutAudit().size());
   }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="bank_ledger_integrity"} = 1}.
+   *
+   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
+   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
+   * Without it, following the documented instruction to disable a sweep before its first
+   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
+   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    taskMetrics.markEnabled(ScheduledJob.BANK_LEDGER_INTEGRITY);
+  }
 }

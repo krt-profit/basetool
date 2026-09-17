@@ -468,6 +468,94 @@ public enum AuditEventType {
    */
   USER_MERGED(AuditDomain.ROLE),
 
+  /**
+   * A member raised an Art. 17 erasure request on their own profile (REQ-SEC-061). The subject is
+   * the requesting member (their id and handle snapshot); the details payload carries only the
+   * {@code eraseHistoryRequested} flag — the member writes no free text, so there is none to keep
+   * out.
+   */
+  ACCOUNT_DELETION_REQUESTED(AuditDomain.ROLE),
+
+  /**
+   * A member took their own pending erasure request back before it was decided (REQ-SEC-061).
+   * Recorded rather than deleted, because "asked and changed their mind" is a different fact from
+   * "never asked" and it is the difference an admin needs when a second request arrives.
+   */
+  ACCOUNT_DELETION_REQUEST_WITHDRAWN(AuditDomain.ROLE),
+
+  /**
+   * An admin refused a member's erasure request (REQ-SEC-061). The reasoning is recorded on the
+   * request row, where Art. 12(4) obliges the controller to be able to tell the requester why —
+   * <b>not</b> in the details payload, which carries no user free text (REQ-AUDIT-001).
+   */
+  ACCOUNT_DELETION_REQUEST_DECLINED(AuditDomain.ROLE),
+
+  /**
+   * An admin carried out a member's erasure request (REQ-SEC-061): the account was deleted and,
+   * when the Art. 17 wish was granted, its surviving handle snapshots anonymised first.
+   *
+   * <p>Written <b>before</b> the delete, in the same transaction, because {@code deletion_request}
+   * cascades away with the {@code app_user} row and the request's own id would otherwise be
+   * unrecoverable. It sits alongside the {@code USER_DELETED} marker REQ-DATA-008 writes; this one
+   * records that the deletion answered a request the member made, which is the fact a later "why
+   * was this account removed" question needs. The payload carries the request id and the two
+   * booleans — what the member asked for and what the admin granted — and no free text.
+   */
+  ACCOUNT_DELETION_REQUEST_EXECUTED(AuditDomain.ROLE),
+
+  /**
+   * An erasure's local half committed, but the Keycloak account could not be deleted (REQ-SEC-061).
+   *
+   * <p>The durable record of a half-finished erasure, written in its own transaction after the
+   * business transaction has committed — there is nothing left to attach it to otherwise, because
+   * the {@code app_user} row and the request itself are already gone. That is also why its {@code
+   * target_user_id} is {@code null} while the deleted account's id sits in {@code subject_id}: the
+   * target column is a foreign key to a row that no longer exists.
+   *
+   * <p>It records an <b>operational</b> failure rather than a member-visible one: the local data is
+   * gone, which is what the member asked for, but the surviving Keycloak account can still log in
+   * and the reconciliation will create a fresh row for it — PENDING and refusable for an ordinary
+   * member, ACTIVE for an ADMIN-realm-role holder. The payload carries the request id and the
+   * failing exception's class name, never its message, which can echo Keycloak's own view of the
+   * account.
+   */
+  ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED(AuditDomain.ROLE),
+
+  /**
+   * An admin granted a member's Art. 17 wish and anonymised that member's surviving handle
+   * snapshots (REQ-SEC-062) across both audit trails, the bank booking history, the booking
+   * requests and the two handover recipients.
+   *
+   * <p>The one event type in the activity trail that records a <b>mutation of the trail itself</b>,
+   * which is why it exists: the update relaxes an append-only guarantee, so it must leave a
+   * receipt. It is written after the update and is therefore not anonymised by it. Its details
+   * payload carries the per-column row counts and never the handle that was removed — writing the
+   * value back would undo the erasure in the very row that records it.
+   */
+  HANDLE_SNAPSHOTS_ANONYMISED(AuditDomain.ROLE),
+
+  /**
+   * An admin ran the Personensuche for a name (REQ-SEC-060).
+   *
+   * <p>A <b>read</b> in an otherwise mutation-only trail, recorded because of what it reads: every
+   * place a named person appears, across the whole system. Without a record its misuse would leave
+   * no trace at all, which is not a property this particular query should have.
+   *
+   * <p>The payload carries the <b>length</b> of the search term, the hit count and whether the
+   * result was capped &mdash; never the term itself. The term is somebody's name, and the details
+   * payload takes no user free text (REQ-AUDIT-001). A trail that recorded every name an admin ever
+   * searched for would be a second store of exactly the data the search exists to help remove.
+   */
+  PERSON_SEARCH_PERFORMED(AuditDomain.ROLE),
+
+  /**
+   * A member exported their own data under Art. 15 / Art. 20, or an admin exported another
+   * account's (REQ-SEC-058). Recorded because a data export is a read of everything the system
+   * holds about a person and the one operation whose misuse would otherwise leave no trace; the
+   * details payload carries the format and the section count, never the content.
+   */
+  PERSONAL_DATA_EXPORTED(AuditDomain.ROLE),
+
   /** The role &amp; membership audit log was exported as a PDF or JSON for a period. */
   ROLE_AUDIT_EXPORTED(AuditDomain.ROLE),
 

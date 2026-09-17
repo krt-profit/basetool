@@ -87,6 +87,9 @@ public class TaskMetrics {
   private final MeterRegistry registry;
   private final Map<ScheduledJob, AtomicLong> lastSuccessHolders = new ConcurrentHashMap<>();
 
+  /** One holder per job whose bean exists, so the enabled gauge is registered once. */
+  private final Map<ScheduledJob, AtomicLong> enabledJobs = new ConcurrentHashMap<>();
+
   /**
    * Binds the wrapper to the auto-configured Micrometer registry.
    *
@@ -254,6 +257,37 @@ public class TaskMetrics {
           .counter(MetricNames.SCHEDULED_JOB_ITEMS, MetricNames.TAG_JOB, job.label())
           .increment(items.doubleValue());
     }
+  }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task} = 1} for this job.
+   *
+   * <p>Called once, from the scheduled task's own {@code @PostConstruct} — so a bean that
+   * {@code @ConditionalOnProperty} never created publishes nothing, and that absence is the signal.
+   * {@code ScWikiScheduler} is the one job whose switch is a runtime property rather than bean
+   * existence, so it calls this only when that property is on; the metric means "this job is
+   * configured to run", not "this bean exists". It is what lets {@code ScheduledJobStale}
+   * distinguish "has never succeeded" from "was switched off on purpose": without it, following the
+   * documented instruction to disable a retention sweep before its first irreversible run raised a
+   * permanent warning, because the last-success gauge is registered lazily on first success and
+   * never appeared.
+   *
+   * <p>Idempotent: registering twice for the same job is a no-op rather than a duplicate series.
+   *
+   * @param job the job whose bean has just been created
+   */
+  public void markEnabled(@NotNull ScheduledJob job) {
+    enabledJobs.computeIfAbsent(
+        job,
+        registered -> {
+          AtomicLong holder = new AtomicLong(1L);
+          Gauge.builder(MetricNames.SCHEDULED_JOB_ENABLED, holder, AtomicLong::doubleValue)
+              .tag(MetricNames.TAG_JOB, registered.label())
+              .description(
+                  "1 while this scheduled job's bean exists; absent when it is switched off.")
+              .register(registry);
+          return holder;
+        });
   }
 
   /**

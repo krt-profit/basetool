@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.service.SyncCoordinator;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
 import java.util.function.IntSupplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -162,6 +163,24 @@ public class ScWikiScheduler {
               label)
           .increment();
       return 0;
+    }
+  }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="scwiki_sync"} = 1} when the sync is
+   * switched on.
+   *
+   * <p>The one job that reads its switch rather than being defined by bean existence: unlike every
+   * other wrapped job, this component is not {@code @ConditionalOnProperty}-gated — the bean is
+   * always created and {@link #scheduleScWikiSync()} early-returns on {@code
+   * krt.scwiki.scheduler-enabled=false}. Publishing unconditionally would therefore claim a
+   * switched-off sync is enabled, and {@code ExternalSyncStale}'s {@code absent()} leg would fire a
+   * false stale for a sync nobody expects to run.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    if (Boolean.TRUE.equals(properties.getSchedulerEnabled())) {
+      taskMetrics.markEnabled(ScheduledJob.SCWIKI_SYNC);
     }
   }
 }

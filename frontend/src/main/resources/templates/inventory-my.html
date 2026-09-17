@@ -236,7 +236,7 @@
                                     <input type="checkbox" id="jobOrderAll" value="ALL" data-trigger="inv-my-toggle-all" data-all-id="jobOrderAll" data-check-class="jobOrderCheck" data-header-id="jobOrderHeader">
                                 </label>
                                 <label class="multi-select-option" th:each="jo : ${jobOrders}">
-                                    <span th:text="|#${jo.displayId} - ${jo.handle}|">#1 - handle</span>
+                                    <span th:text="|#${jo.displayId} - ${@handles.display(jo.handle)}|">#1 - handle</span>
                                     <input type="checkbox" class="jobOrderCheck" name="jobOrderIds" th:value="${jo.id}" th:checked="${selectedJobOrderIds != null and selectedJobOrderIds.contains(jo.id)}" data-trigger="inv-my-update-state" data-all-id="jobOrderAll" data-check-class="jobOrderCheck" data-header-id="jobOrderHeader">
                                 </label>
                             </div>
@@ -333,7 +333,7 @@
                                     <input type="checkbox" id="itemJobOrderAll" value="ALL" data-trigger="inv-my-toggle-all" data-all-id="itemJobOrderAll" data-check-class="jobOrderCheck" data-header-id="itemJobOrderHeader">
                                 </label>
                                 <label class="multi-select-option" th:each="jo : ${jobOrders}">
-                                    <span th:text="|#${jo.displayId} - ${jo.handle}|">#1 - handle</span>
+                                    <span th:text="|#${jo.displayId} - ${@handles.display(jo.handle)}|">#1 - handle</span>
                                     <input type="checkbox" class="jobOrderCheck" name="jobOrderIds" th:value="${jo.id}" th:checked="${selectedJobOrderIds != null and selectedJobOrderIds.contains(jo.id)}" data-trigger="inv-my-update-state" data-all-id="itemJobOrderAll" data-check-class="jobOrderCheck" data-header-id="itemJobOrderHeader">
                                 </label>
                             </div>

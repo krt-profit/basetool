@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.task;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.UserSyncService;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -59,5 +60,19 @@ public class UserSyncTask {
       zone = "${app.keycloak.sync.zone:Europe/Berlin}")
   public void syncUsers() {
     taskMetrics.recordCounting(ScheduledJob.USER_SYNC, userSyncService::syncFromKeycloak);
+  }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="user_sync"} = 1}.
+   *
+   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
+   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
+   * Without it, following the documented instruction to disable a sweep before its first
+   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
+   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    taskMetrics.markEnabled(ScheduledJob.USER_SYNC);
   }
 }

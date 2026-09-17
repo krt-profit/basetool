@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -85,4 +87,27 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
    * @return the active holders auto-created from a bank role
    */
   List<BankHolder> findByRoleManagedTrueAndActiveTrue();
+
+  /**
+   * Replaces this custodian's handle snapshot with the erasure sentinel, for a granted Art. 17
+   * request (REQ-SEC-062).
+   *
+   * <p>The column exists precisely so the registry survives the account: {@code user_id} is {@code
+   * ON DELETE SET NULL} and {@code handle} is {@code NOT NULL}, and {@code
+   * BankHolder#getDisplayName()} falls back to it the moment the foreign key nulls out. So it is
+   * the one snapshot that becomes <em>more</em> visible after a deletion, and it was the most
+   * conspicuous omission from the first version of this erasure.
+   *
+   * <p>Matched by the user id, so it reaches the row while the account still exists — which is
+   * ordered, {@code HandleAnonymisationService} runs before the deletion.
+   *
+   * @param userId the member whose custodian registration is anonymised
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE BankHolder h SET h.handle = :sentinel"
+          + " WHERE h.user.id = :userId AND h.handle <> :sentinel")
+  int anonymiseHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

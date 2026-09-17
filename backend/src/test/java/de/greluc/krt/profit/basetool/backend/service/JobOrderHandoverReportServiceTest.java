@@ -46,11 +46,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openpdf.text.pdf.PdfReader;
 import org.openpdf.text.pdf.parser.PdfTextExtractor;
+import org.springframework.context.MessageSource;
 
 @ExtendWith(MockitoExtension.class)
 class JobOrderHandoverReportServiceTest {
 
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
+  // The report now resolves one label from the bundle: the placeholder an Art. 17 erasure
+  // leaves in a recipient handle (REQ-SEC-062). Without the mock the field is null and
+  // every PDF fails at that lookup.
+  @Mock private MessageSource messageSource;
 
   @InjectMocks private JobOrderHandoverReportService service;
 

@@ -173,6 +173,21 @@ class DatabaseIndexMigrationTest {
     // index on the fulfilment-signal child table.
     assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_status");
     assertIndexExists(jdbc, "material_exchange_request", "idx_material_exchange_request_owner");
+    // V244 (REQ-SEC-058, REQ-NOTIF-009): the four queries the data-subject-rights surfaces ran
+    // without an index. Three sections of the member-reachable export were sequential scans of the
+    // two audit tables, and the unread half of the notification sweep scanned daily while its read
+    // sibling had had a partial index since V155.
+    assertIndexExists(jdbc, "audit_event", "idx_audit_event_target");
+    assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_actor");
+    assertIndexExists(jdbc, "bank_audit_event", "idx_bank_audit_event_target");
+    // The predicate is the point here: an index over all of notification would not serve a sweep
+    // that only ever reads the unread rows.
+    assertIndexDefContains(
+        jdbc,
+        "notification",
+        "idx_notification_created_unread",
+        "created_at",
+        "where (is_read = false)");
     assertIndexExists(
         jdbc, "material_exchange_request_interest", "uq_material_exchange_request_interest");
   }

@@ -210,7 +210,7 @@
                                  blueprint consumes the picked material (the "no/all/some orders" filter bug).
                                  data-game-items is its item-mode sibling (REQ-INV-031): the CSV of gameItems
                                  the ITEM order's lines request, filtering by the picked gameItem the same way. -->
-                            <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.requiredMaterialIds != null and !order.requiredMaterialIds.isEmpty() ? #strings.listJoin(order.requiredMaterialIds, ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + order.handle + ' (' + order.status + ')'}"></option>
+                            <option th:each="order : ${jobOrders}" th:value="${order.id}" th:data-materials="${order.requiredMaterialIds != null and !order.requiredMaterialIds.isEmpty() ? #strings.listJoin(order.requiredMaterialIds, ',') : ''}" th:data-game-items="${order.requiredGameItemIds != null and !order.requiredGameItemIds.isEmpty() ? #strings.listJoin(order.requiredGameItemIds, ',') : ''}" th:text="${'#' + order.displayId + ' - ' + @handles.display(order.handle) + ' (' + order.status + ')'}"></option>
                             </select>
                             <input type="number" class="assoc-menge-input" data-alloc-amount step="0.001" min="0" th:placeholder="#{inventory.assoc.amount}">
                             <button type="button" class="btn btn-ghost" data-trigger="inv-input-remove-alloc" th:title="#{inventory.assoc.remove}" th:aria-label="#{inventory.assoc.remove}">&#215;</button>

@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.support.InventoryAuditLabels;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.QuantityTypeRounding;
 import java.util.ArrayList;
@@ -342,7 +343,7 @@ public class JobOrderItemProductionService {
     auditService.record(
         AuditEventType.JOB_ORDER_PRODUCTION_BOOKED,
         jobOrderId,
-        "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'",
+        JobOrderAuditLabel.of(jobOrder.getDisplayId()),
         null,
         AuditDetails.of("item", jobOrderItemId)
             .with("amount", amount)

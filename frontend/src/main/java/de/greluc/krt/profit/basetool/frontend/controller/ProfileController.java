@@ -195,6 +195,28 @@ public class ProfileController {
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
+    // The member's own Art. 17 erasure request, if they have one (REQ-SEC-061). Isolated like the
+    // two sub-fetches above, so a backend hiccup does not fail the whole profile page.
+    //
+    // A failure is reported as a failure, though, and that is a correction. It used to render as
+    // the no-request state, which means a DECLINED request could quietly disappear from the page
+    // -- and that card is the surface Art. 12(4) obliges the controller to carry the refusal
+    // reason on. The member could not tell the difference between "you never asked" and "we
+    // cannot show you what you asked". The flag also suppresses the raise action, so nobody
+    // submits a second request on top of one they cannot see.
+    Map<String, Object> deletionRequest = null;
+    boolean deletionRequestUnavailable = false;
+    try {
+      deletionRequest =
+          backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
+    } catch (Exception e) {
+      // Debug, not error: 204 (no request) is the normal case, and this path is not an outage.
+      log.debug("Could not load the member's deletion request; the card says so", e);
+      deletionRequestUnavailable = true;
+    }
+    model.addAttribute("deletionRequest", deletionRequest);
+    model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
+
     // Identity-tile initials for the read-only identity block (Variante A profile redesign).
     // Derived from the already-resolved display name (token, then DB overlay) with a username
     // fallback — no new avatar/upload feature, just the squared monogram the design calls for.

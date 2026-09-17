@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:lang="${#locale.language}" lang="de">
 <head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
-    <title th:text="${holder != null ? holder.handle() : ''} + ' - ' + ${appTitle}">Halter - Profit Basetool</title>
+    <title th:text="${holder != null ? @handles.display(holder.handle()) : ''} + ' - ' + ${appTitle}">Halter - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/bank.css}">
     </th:block>
@@ -29,7 +29,7 @@
          their own history, bank management sees everyone's (gated server-side via canSeeHolder). -->
     <div class="greeting hud-box flex-between">
         <div>
-            <h1 th:text="${holder.handle()}" data-testid="bank-holder-handle">greluc</h1>
+            <h1 th:text="${@handles.display(holder.handle())}" data-testid="bank-holder-handle">greluc</h1>
             <p class="text-muted krtm-margin-0-25rem-0-0-font-size-0-8rem-cb15">
                 <span class="status-pill"
                       th:classappend="${holder.active()} ? ' status-active' : ' status-completed'"
@@ -131,7 +131,7 @@
                             <!-- Umbuchung: the counter holder with a direction arrow (paid out vs received);
                                  every account-touching type: the account this leg moved on. -->
                             <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
-                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${b.counterHolderHandle()}">&#8594; carol</span>
+                                  th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
                             <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
                                   th:text="${b.counterAccountNo()} + ' &#8212; ' + ${b.counterAccountName()}">KB-0001 &#8212; Staffel IRIDIUM</span>
                             <span th:if="${(b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() == null) or (b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() == null)}"

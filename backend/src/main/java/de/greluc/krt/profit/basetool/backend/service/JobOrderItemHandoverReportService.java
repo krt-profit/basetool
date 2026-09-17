@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.ReportGenerationException
 import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandover;
 import de.greluc.krt.profit.basetool.backend.repository.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.ZoneId;
@@ -31,11 +32,13 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.openpdf.text.pdf.PdfPTable;
+import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,6 +64,7 @@ public class JobOrderItemHandoverReportService {
           .thenComparing(Comparator.comparingInt(ItemRow::amount).reversed());
 
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
+  private final MessageSource messageSource;
 
   /**
    * Generates the delivery-note PDF for a persisted item handover.
@@ -122,7 +126,13 @@ public class JobOrderItemHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      KrtPdfSupport.addMetaRow(metaTable, "EMPFÄNGER (HANDLE)", recipientHandle);
+      // A recipient whose handle an Art. 17 request erased renders as the
+      // placeholder rather than as the raw sentinel (REQ-SEC-062). The handover
+      // itself is untouched; only the name is gone.
+      KrtPdfSupport.addMetaRow(
+          metaTable,
+          "EMPFÄNGER (HANDLE)",
+          HandleAnonymisation.humanise(recipientHandle, label("general.anonymisedHandle")));
       krt.document().add(metaTable);
 
       KrtPdfSupport.addSectionHeader(krt, "ÜBERGEBENE GÜTER");
@@ -156,4 +166,19 @@ public class JobOrderItemHandoverReportService {
 
   /** Internal value record for one delivered-item row in the PDF. */
   private record ItemRow(String itemName, int amount) {}
+
+  /**
+   * Resolves one German PDF label from the backend message bundle.
+   *
+   * <p>This document is German by construction (its headers are literals), so the locale is fixed.
+   * The one label that is resolved rather than written inline is the erased-handle placeholder: it
+   * is shared with every other surface that renders a handle snapshot, and a second spelling of it
+   * here would be a second thing to keep in step (REQ-SEC-062).
+   *
+   * @param key the message key
+   * @return the resolved label
+   */
+  private @NotNull String label(@NotNull String key) {
+    return messageSource.getMessage(key, null, Locale.GERMAN);
+  }
 }

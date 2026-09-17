@@ -85,6 +85,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   List<User> findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus approvalStatus);
 
   /**
+   * Returns the ids of registrations rejected longer ago than {@code cutoff}, backing the scheduled
+   * rejected-registration retention sweep (REQ-SEC-057).
+   *
+   * <p>Anchored on {@code approvedAt} — the column {@code decide} stamps for both verdicts — rather
+   * than on {@code createdAt}: the retention clock starts when the decision was made, not when the
+   * person applied, so a registration that sat in the queue for months still gets its full window
+   * after being refused. {@code approvedAt} is non-null for every {@code REJECTED} row by
+   * construction, and {@code reopenRegistration} clears it when returning a row to {@code PENDING},
+   * so a reopened registration drops out of this result on both counts.
+   *
+   * <p>Returns ids rather than entities: each is purged in its own transaction by a caller that
+   * re-reads and re-checks the row, so hydrating a batch of {@link User} aggregates here would be
+   * work thrown away — and stale by the time it is used.
+   *
+   * @param cutoff return registrations rejected strictly before this instant
+   * @return the matching user ids, oldest rejection first
+   */
+  @Query(
+      "SELECT u.id FROM User u WHERE u.approvalStatus ="
+          + " de.greluc.krt.profit.basetool.backend.model.ApprovalStatus.REJECTED"
+          + " AND u.approvedAt IS NOT NULL AND u.approvedAt < :cutoff ORDER BY u.approvedAt ASC")
+  List<UUID> findRejectedDecidedBefore(@Param("cutoff") Instant cutoff);
+
+  /**
    * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective
    * name with username fallback, rank) ordered by display name. Used to populate user pickers
    * without pulling the full User aggregate.
@@ -385,6 +409,35 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           java.util.Collection<String> lowerNames);
 
   /**
+   * Whether any <em>other</em> account already carries this name, as its login {@code username} or
+   * its in-app {@code displayName} (REQ-SEC-062).
+   *
+   * <p>The self-service display name is what the Art. 17 erasure's text-matched statements are
+   * driven by, and those statements carry no owner predicate: they rewrite {@code
+   * job_order.handle}, both {@code recipient_handle} columns and {@code audit_event.subject_label}
+   * wherever the value equals the name. Without this check a departing member could set their
+   * display name to a victim's handle and have an admin, acting through the intended workflow,
+   * rewrite the victim's rows to the erasure sentinel — which every viewer renders as "this person
+   * requested erasure".
+   *
+   * <p>Compared lower-cased, because the erasure matches case-insensitively and a check that did
+   * not would be trivially sidestepped. The row being edited is excluded, so re-saving one's own
+   * unchanged name is not a collision.
+   *
+   * @param lowerName the candidate name, already lower-cased and trimmed by the caller
+   * @param selfId the account being edited, excluded from the comparison
+   * @return {@code true} when somebody else already answers to this name
+   */
+  @Query(
+      """
+      SELECT (COUNT(u) > 0) FROM User u
+      WHERE u.id <> :selfId
+        AND (LOWER(u.username) = :lowerName OR LOWER(u.displayName) = :lowerName)
+      """)
+  boolean existsOtherAccountWithName(
+      @Param("lowerName") String lowerName, @Param("selfId") UUID selfId);
+
+  /**
    * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
    * the given e-mail (already lower-cased by the caller)? Case-insensitive counterpart to the
    * case-sensitive {@link #findByEmail(String)}; returns the bare existence fact so no PII is
@@ -434,13 +487,76 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * usable anomaly signal (an upstream mass-deletion or a truncated roster) and a constant. Rows
    * already flagged are unaffected either way, so the write is semantically unchanged.
    *
+   * <p>The same predicate is what makes {@code keycloakAbsentSince} a first-observation stamp
+   * rather than a last-seen one: only the rows that flip are written, so a row already flagged
+   * keeps the instant its absence was <em>first</em> noticed instead of being pushed forward on
+   * every nightly run. Without that, the orphan-age gauge of REQ-SEC-059 would read the sync's
+   * cadence (never older than a day) rather than how long the account has actually been waiting for
+   * its second deletion step.
+   *
    * @param ids the ids present in the current Keycloak roster; never {@code null}, never empty (the
    *     caller short-circuits on an empty set so an outage cannot flag the whole user base)
+   * @param absentSince the instant to record as when the absence was first observed
    * @return the number of users flagged as missing by this call (rows whose flag flipped)
    */
   @org.springframework.data.jpa.repository.Modifying
-  @Query("UPDATE User u SET u.inKeycloak = false WHERE u.inKeycloak = true AND u.id NOT IN :ids")
-  int markMissingUsers(@NotNull java.util.Collection<java.util.UUID> ids);
+  @Query(
+      "UPDATE User u SET u.inKeycloak = false, u.keycloakAbsentSince = :absentSince"
+          + " WHERE u.inKeycloak = true AND u.id NOT IN :ids")
+  int markMissingUsers(
+      @Param("ids") @NotNull java.util.Collection<java.util.UUID> ids,
+      @Param("absentSince") @NotNull Instant absentSince);
+
+  /**
+   * The same count with service-account rows left out — the gauge's actual query (REQ-SEC-059).
+   *
+   * <p>A Keycloak service account is not somebody's unfinished deletion, and its row can never
+   * leave this state: an unfiltered {@code GET /users} omits service accounts, so the roster sync
+   * never reports one, {@code markMissingUsers} flags it, and {@code syncUser} — the only place
+   * that clears the flag — runs only for a user the roster reports. Production holds exactly such a
+   * row. Counted, it made the gauge permanently non-zero and {@code UserDeletionUnfinished} fire
+   * seven days after deploy and never resolve, for a machine that holds no personal data at all.
+   *
+   * <p><b>Matched on the username convention, unconditionally.</b> The first version of this
+   * excluded {@code service-account-<clientId>} for the <em>configured</em> gateway clients — and
+   * that list defaults empty, while the machine-identity carve-out in {@code
+   * CustomJwtGrantedAuthoritiesConverter} is gated on the same property. So with the property unset
+   * the carve-out does not fire, the gateway's first call provisions the row, and the exclusion is
+   * empty: it could only ever protect a deployment that would not have created the row.
+   * Lower-cased, matching the convention this file already states for usernames.
+   *
+   * <p>{@code service-account-} is a Keycloak display convention and <b>not</b> a reserved
+   * namespace — an ordinary user can be created with that name. That is why it must never carry a
+   * security decision, and {@code UserDeletionService} still asks Keycloak which user backs a
+   * configured client before it waives its delete guard. For a gauge it is proportionate: a
+   * hand-made lookalike missing from a monitoring count is a nuisance, not a hole.
+   *
+   * @return the number of orphaned member accounts
+   */
+  @Query(
+      """
+      SELECT COUNT(u) FROM User u
+      WHERE u.inKeycloak = false AND LOWER(u.username) NOT LIKE 'service-account-%'
+      """)
+  long countOrphanedMemberAccounts();
+
+  /**
+   * The earliest absence stamp among those same rows (REQ-SEC-059).
+   *
+   * <p>Paired with {@link #countOrphanedMemberAccounts()}: excluding a service account from the
+   * count and not from the age would leave the age gauge growing without bound from the deploy
+   * timestamp V241 backfilled, which is the half of the pair the alert compares.
+   *
+   * @return the earliest {@code keycloakAbsentSince} among the orphaned member accounts, or {@code
+   *     null} when none is waiting
+   */
+  @Query(
+      """
+      SELECT MIN(u.keycloakAbsentSince) FROM User u
+      WHERE u.inKeycloak = false AND u.keycloakAbsentSince IS NOT NULL
+        AND LOWER(u.username) NOT LIKE 'service-account-%'
+      """)
+  Instant findOldestOrphanedMemberAbsenceStamp();
 
   /**
    * Returns the ids of every local user that already carries a Discord account link ({@code

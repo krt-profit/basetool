@@ -278,12 +278,42 @@ app:
       # drifted away from the ordered item after an SC-Wiki re-sync. Disable or retune per env.
       enabled: ${APP_JOBORDER_INTEGRITY_ENABLED:true}
       interval: ${APP_JOBORDER_INTEGRITY_INTERVAL:PT1H}
+  audit:
+    retention:
+      # Scheduled retention sweep over the activity and bank audit trails (REQ-AUDIT-006). Every
+      # audit row carries a denormalised actor-handle snapshot that outlives the user's deletion by
+      # design, so an unbounded trail is a permanent record of a named person. No statutory
+      # retention obligation applies here; 730 days (two years) outlasts the organisation's own
+      # operating cycles and then stops. Days, not months: Duration has no month unit.
+      # This does NOT replace the admin purge (REQ-AUDIT-004), which stays available for a shorter,
+      # deliberate cutoff.
+      enabled: ${APP_AUDIT_RETENTION_ENABLED:true}
+      max-age: ${APP_AUDIT_RETENTION_MAX_AGE:P730D}
+      interval: ${APP_AUDIT_RETENTION_INTERVAL:PT24H}
+  registrations:
+    rejected-retention:
+      # Scheduled purge of registrations refused longer ago than max-age (REQ-SEC-057). A rejection
+      # ends the purpose the data was collected for, and until this sweep existed nothing removed
+      # it: the member list only offers deletion for a user already gone from Keycloak, while a
+      # rejection deliberately leaves the Keycloak user in place.
+      # max-age doubles as the window in which an erroneous rejection can still be reversed through
+      # the reopen action (REQ-SEC-034) -- purging the row ends that possibility, so shortening this
+      # shortens the recovery window too. Disable or retune per environment.
+      enabled: ${APP_REGISTRATIONS_REJECTED_RETENTION_ENABLED:true}
+      max-age: ${APP_REGISTRATIONS_REJECTED_RETENTION_MAX_AGE:P90D}
+      interval: ${APP_REGISTRATIONS_REJECTED_RETENTION_INTERVAL:PT24H}
   notifications:
     retention:
-      # Scheduled cleanup of READ notifications older than max-age (REQ-NOTIF-009). User-initiated
-      # deletes (REQ-NOTIF-005) are independent of this sweep. Disable or retune per environment.
+      # Scheduled cleanup of notifications past their retention window (REQ-NOTIF-009).
+      # Two windows, swept in one run: a READ notification ages from readAt (max-age), an UNREAD one
+      # has no read timestamp and ages from createdAt (unread-max-age). The unread window is longer
+      # on purpose, but it is finite — while only read rows were swept, an inbox nobody opened kept
+      # the triggering member's handle forever, so the retention period stated in the privacy policy
+      # held for attentive members and not for absent ones.
+      # User-initiated deletes (REQ-NOTIF-005) are independent of this sweep. Retune per environment.
       enabled: ${APP_NOTIFICATIONS_RETENTION_ENABLED:true}
       max-age: ${APP_NOTIFICATIONS_RETENTION_MAX_AGE:P90D}
+      unread-max-age: ${APP_NOTIFICATIONS_RETENTION_UNREAD_MAX_AGE:P180D}
       interval: ${APP_NOTIFICATIONS_RETENTION_INTERVAL:PT24H}
     redis-fanout:
       # Cross-replica real-time notification push (REQ-FE-015, ADR-0094). Off by default: the

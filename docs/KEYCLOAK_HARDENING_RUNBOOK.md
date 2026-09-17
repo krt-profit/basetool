@@ -336,13 +336,29 @@ send the reset mail at all.
 
 ## Step 4 — Turn on events ⚠ version-sensitive
 
-|           |                                                                                                   |
-|-----------|---------------------------------------------------------------------------------------------------|
-| **Now**   | `eventsEnabled: false`, `adminEventsEnabled: false`, no expirations set                           |
-| **After** | both on, user events expiring after 30 d, admin events likewise, **`Include representation` off** |
+|         |                                                                                                   |
+|---------|---------------------------------------------------------------------------------------------------|
+| **Was** | `eventsEnabled: false`, `adminEventsEnabled: false`, no expirations set                           |
+| **Now** | both on, user events expiring after 30 d, admin events likewise, **`Include representation` off** |
 
-Today there is no login-failure, token-error or client-disable event anywhere: the *detect* half of
-the security ladder is blind on the token endpoint.
+> [!success] Done on production — verified 2026-09-16
+> The realm reports `events_enabled = t`, `admin_events_enabled = t`,
+> `admin_events_details_enabled = f`, `events_expiration = 2592000` and the
+> `adminEventsExpiration` realm attribute `= 2592000`. Both halves of the step — the events-config
+> resource *and* the separate realm attribute — are in place, which is the combination this section
+> warns looks finished when only the first is done.
+>
+> Read with a `SELECT`-only session against `db-keycloak` rather than through `kcadm.sh`, so no
+> credential was touched. The step below is kept as the record of what was applied and as the
+> instruction for a rebuilt realm.
+>
+> Consequence now disclosed rather than pending: the store holds login and admin events with
+> timestamps, accounts and IP addresses for 30 days, which
+> [`docs/privacy/processing-activities.md`](privacy/processing-activities.md) records as part of A7
+> and the privacy policy states in its security-monitoring section.
+
+Before this was applied there was no login-failure, token-error or client-disable event anywhere:
+the *detect* half of the security ladder was blind on the token endpoint.
 
 **Console:**
 - *Realm settings* → *Events* tab → *User events settings* → **Save events** on → **Expiration**

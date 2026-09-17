@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
@@ -206,6 +207,7 @@ public class UserService {
       user.setDescription(description);
     }
     if (displayName != null) {
+      requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
     // joinDate can be explicitly set to null (clear the date)
@@ -240,6 +242,7 @@ public class UserService {
       user.setDescription(description);
     }
     if (displayName != null) {
+      requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
     // saveAndFlush so the bumped @Version is in the response — the profile page writes the returned
@@ -597,6 +600,49 @@ public class UserService {
       default ->
           throw new IllegalArgumentException(
               "Unsupported SpecialCommandChange action: " + change.action());
+    }
+  }
+
+  /**
+   * Rejects a display name a member must not be able to give themselves.
+   *
+   * <p>Two reserved cases, and both are about the Art. 17 erasure (REQ-SEC-062), whose text-matched
+   * statements are driven by exactly this field and carry no owner predicate.
+   *
+   * <ul>
+   *   <li><b>The erasure sentinel.</b> It is only meaningful because nothing else equals it; a
+   *       member naming themselves {@code #ANONYMISED#} would put it into their own audit rows and
+   *       make a live account read as an erased one.
+   *   <li><b>Another live account's name.</b> Without this a departing member could set their
+   *       display name to a victim's handle, tick "also erase my history", and have an admin
+   *       rewrite the <em>victim's</em> job orders, handover receipts and audit labels to the
+   *       sentinel — which every viewer renders as "this person requested erasure". A false
+   *       statement about a data subject who never asked, recoverable only from a backup plus
+   *       knowledge of the attacker's now-deleted display name.
+   * </ul>
+   *
+   * <p>Deliberately <b>not</b> a general uniqueness constraint on the column. Two members who
+   * happen to share a spelling is a situation the system has always tolerated and the erasure
+   * documents as acceptable over-matching; what is rejected is <em>changing</em> a name into a
+   * collision, which is the only way to aim it. Existing collisions stay editable in every other
+   * respect, and a member re-saving their own unchanged name is not a collision.
+   *
+   * @param displayName the candidate, as the client sent it; a blank one clears the field and is
+   *     never a collision
+   * @param selfId the account being edited
+   * @throws IllegalArgumentException when the name is reserved or already somebody else's
+   */
+  private void requireAssignableDisplayName(@NotNull String displayName, @NotNull UUID selfId) {
+    if (HandleAnonymisation.isReserved(displayName)) {
+      throw new IllegalArgumentException("This display name is reserved");
+    }
+    String candidate = displayName.trim();
+    if (candidate.isEmpty()) {
+      return;
+    }
+    if (userRepository.existsOtherAccountWithName(
+        candidate.toLowerCase(java.util.Locale.ROOT), selfId)) {
+      throw new IllegalArgumentException("This display name is already in use");
     }
   }
 }

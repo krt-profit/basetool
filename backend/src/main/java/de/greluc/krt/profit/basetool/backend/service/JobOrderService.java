@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.repository.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -1263,14 +1264,24 @@ public class JobOrderService {
 
   /**
    * Composes the audit subject label for a job order — {@code #<displayId> '<handle>'}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). The handle is a
-   * non-personal order title and is safe to snapshot.
+   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
+   *
+   * <p><b>The handle names a person.</b> It is the order's contact — {@code orders.create.handle}
+   * renders it as "Handle des Ansprechpartners" — and is frequently somebody outside the
+   * organisation with no account at all. The snapshot itself stays, because the trail has to remain
+   * readable once the order is gone; but it is why {@code audit_event.subject_label} is registered
+   * as a person-name surface in {@code PersonSearchTargets} and why the Art. 15 export does not
+   * select it (REQ-SEC-058).
+   *
+   * <p>Corrected 2026-09-16: this said the handle was "a non-personal order title and is safe to
+   * snapshot". It is neither non-personal nor safe to disclose, and that claim is why the export
+   * shipped without a guard on the column.
    *
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label
    */
   private static String orderLabel(JobOrder jobOrder) {
-    return "#" + jobOrder.getDisplayId() + " '" + jobOrder.getHandle() + "'";
+    return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 
   /**

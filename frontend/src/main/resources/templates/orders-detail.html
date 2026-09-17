@@ -397,7 +397,7 @@
                         <span th:if="${order.responsibleOrgUnit == null}" class="squadron-badge squadron-badge-muted">—</span>
                     </span>
                     <span class="kv-key" th:text="#{orders.detail.handle}">Handle</span>
-                    <span class="kv-val" th:text="${order.handle}">handle</span>
+                    <span class="kv-val" th:text="${@handles.display(order.handle)}">handle</span>
                 </div>
             </div>
         </div>
@@ -1114,7 +1114,7 @@
                     <tbody>
                     <tr th:each="ho : ${order.handovers}" data-testid="order-handover-row">
                         <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
-                        <td th:text="${ho.recipientHandle}"></td>
+                        <td th:text="${@handles.display(ho.recipientHandle)}"></td>
                         <td th:text="${ho.recipientSquadron != null ? ho.recipientSquadron : '-'}"></td>
                         <td>
                             <ul class="krtm-list-style-type-none-padding-0-margin-0-449e">
@@ -1186,7 +1186,7 @@
                     <tbody>
                     <tr th:each="ho : ${order.itemHandovers}" data-testid="item-handover-row">
                         <td class="handover-time-span" th:data-utc="${ho.handoverTime}"></td>
-                        <td th:text="${ho.recipientHandle}"></td>
+                        <td th:text="${@handles.display(ho.recipientHandle)}"></td>
                         <td>
                             <ul class="krtm-list-style-type-none-padding-0-margin-0-449e">
                                 <li th:each="entry : ${ho.entries}">

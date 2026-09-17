@@ -188,7 +188,7 @@
                                 <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
                                       th:text="' &mdash; ' + ${r.rejectReason()}"></span>
                             </td>
-                            <td th:text="${r.holderHandle() != null} ? ${r.holderHandle()} : '&ndash;'">&ndash;</td>
+                            <td th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</td>
                             <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                             <td>
                                 <!-- Edit is offered only while the request is still PENDING *and*
@@ -223,7 +223,7 @@
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                         <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
                                     </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>
@@ -317,7 +317,7 @@
                                             <option value="" th:text="#{bank.field.counterparty.placeholder}">Person w&auml;hlen &hellip;</option>
                                             <option th:if="${r.counterpartyUserId() != null}"
                                                     th:value="${r.counterpartyUserId()}" th:selected="true"
-                                                    th:text="${r.counterpartyHandle()}">greluc</option>
+                                                    th:text="${@handles.display(r.counterpartyHandle())}">greluc</option>
                                         </select>
                                         <span class="bank-field-error" data-error-for="counterpartyUserId"></span>
                                     </div>
@@ -413,7 +413,7 @@
                             <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                             <td class="text-right bank-amount"
                                 th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'POINT')} + ' aUEC'">5.000 aUEC</td>
-                            <td th:text="${r.requesterHandle()}">greluc</td>
+                            <td th:text="${@handles.display(r.requesterHandle())}">greluc</td>
                             <td>
                                 <span class="chip"
                                       th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
@@ -449,7 +449,7 @@
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                         <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                         <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
-                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${r.counterpartyHandle()} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${r.counterpartyHandle()}">greluc (IRIDIUM)</span>
+                                              th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (IRIDIUM)</span>
                                     </div>
                                     <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.justification())}">
                                         <span class="bank-detail-label" th:text="#{bank.booking.justification}">Begr&uuml;ndung</span>

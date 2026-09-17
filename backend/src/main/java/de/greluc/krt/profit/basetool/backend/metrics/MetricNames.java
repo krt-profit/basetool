@@ -50,6 +50,26 @@ public final class MetricNames {
   public static final String SCHEDULED_JOB_ITEMS = "basetool.scheduled.job.items";
 
   /**
+   * Gauge {@code basetool_scheduled_job_enabled} — {@code 1} while this job is configured to run,
+   * tag {@code task}.
+   *
+   * <p><b>What it is for.</b> The last-success gauge is registered lazily, on a job's first
+   * success, so {@code absent(last_success)} means "has never succeeded" — which covers two very
+   * different states: a job that is wedged, and a job that was switched off on purpose and was
+   * never going to run. All ten wrapped jobs can be switched off by configuration, and the {@code
+   * absent()} legs of the staleness alerts could not tell the two apart: following the documented
+   * instruction to disable a retention sweep before its first irreversible run raised a permanent
+   * warning for doing what the documentation asked.
+   *
+   * <p>Published at startup by each job's own bean, which is what makes it reliable — a bean
+   * {@code @ConditionalOnProperty} never created publishes nothing, and that absence is the signal.
+   * {@code ScWikiScheduler} is the one job whose switch is a runtime property rather than bean
+   * existence and publishes only when that property is on, which is why the metric means "this job
+   * is configured to run" rather than "this bean exists".
+   */
+  public static final String SCHEDULED_JOB_ENABLED = "basetool.scheduled.job.enabled";
+
+  /**
    * Counter {@code basetool_scheduled_job_step_failures_total} — tags {@code task}, {@code step}.
    * Bumped when one step of a multi-step sync job throws and is swallowed so the remaining steps
    * still run: the umbrella job then records {@code outcome=success} with a non-zero item tally
@@ -128,6 +148,48 @@ public final class MetricNames {
    * their local roles (REQ-OBS-011).
    */
   public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
+
+  /**
+   * Counter {@code basetool_account_deletion_keycloak_failures_total} (untagged). Bumped when an
+   * erasure's local half has committed but the Keycloak user could not be deleted (REQ-SEC-061).
+   *
+   * <p>Access-control-relevant, and the only signal there is. The local row is gone, so the
+   * surviving account cannot show up in {@link #USERS_PENDING_DELETION} — that gauge counts the
+   * opposite orphan, a local row whose Keycloak account has already gone. The person can still log
+   * in, and the reconciliation then creates a fresh row for them: PENDING and refusable for an
+   * ordinary member, but <b>ACTIVE</b> for anyone holding the ADMIN realm role, because the
+   * approval gate carves admins out for bootstrap safety. Normally zero; any increment wants a
+   * human to delete that account in the Keycloak console (REQ-OBS-011).
+   */
+  public static final String ACCOUNT_DELETION_KEYCLOAK_FAILURES =
+      "basetool.account.deletion.keycloak.failures";
+
+  /**
+   * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
+   * reconciliation inserts a brand-new {@code app_user} row that is {@code ACTIVE} on arrival
+   * because the subject holds the Keycloak ADMIN realm role (REQ-SEC-017 bootstrap carve-out).
+   *
+   * <p>The carve-out is deliberate — the first admin must never be lockable out by the approval
+   * gate — but it is the one way an account gains full authority with no admin decision behind it,
+   * and it used to leave no trace at all. Normally zero: an admin account is created once. A
+   * non-zero value is the bootstrap, a re-provisioning, or somebody who was granted the realm role
+   * in Keycloak, and each of those wants a human to confirm it was intended (REQ-OBS-011).
+   */
+  public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
+      "basetool.admin.registration.auto.activated";
+
+  /**
+   * Counter {@code basetool_notification_retention_deleted_total} — tag {@code kind} ({@code read}
+   * / {@code unread}), the two halves of the inbox retention sweep (REQ-NOTIF-009).
+   *
+   * <p>Beside, not instead of, {@code basetool_scheduled_job_items_total{task=
+   * "notification_retention"}}: that counter is the job's total and stays the job's total, but a
+   * sum of two windows cannot answer "did the unread half delete anything", which is the question a
+   * half that has stopped working raises. The two halves are isolated from each other in the task,
+   * so one can be stuck while the other keeps deleting — and then only a split count shows it.
+   */
+  public static final String NOTIFICATION_RETENTION_DELETED =
+      "basetool.notification.retention.deleted";
 
   // --- Identity (UserReconciliationService) ----------------------------------------------
 
@@ -296,6 +358,46 @@ public final class MetricNames {
   /** Gauge {@code basetool_registration_pending_oldest_age_seconds}. */
   public static final String REGISTRATION_PENDING_OLDEST_AGE =
       "basetool.registration.pending.oldest.age";
+
+  /**
+   * Gauge {@code basetool_deletion_request_pending_count} — members' Art. 17 erasure requests
+   * awaiting an admin decision (REQ-SEC-061).
+   */
+  public static final String DELETION_REQUEST_PENDING = "basetool.deletion.request.pending.count";
+
+  /**
+   * Gauge {@code basetool_deletion_request_pending_oldest_age_seconds} — how long the
+   * longest-waiting erasure request has waited (REQ-SEC-061).
+   *
+   * <p>The one queue gauge in this class with a <b>statutory</b> threshold behind it: Art. 12(3)
+   * gives the controller one month to respond to a data-subject request, so the alert is set well
+   * inside that rather than at an operational comfort level.
+   */
+  public static final String DELETION_REQUEST_PENDING_OLDEST_AGE =
+      "basetool.deletion.request.pending.oldest.age";
+
+  /**
+   * Gauge {@code basetool_users_pending_deletion_count} — accounts present locally but already gone
+   * from Keycloak, i.e. waiting for the second half of their deletion (REQ-SEC-059).
+   *
+   * <p>Not a work queue like the others: nothing enqueues these. The row appears when the roster
+   * sync notices the Keycloak account is gone, and it leaves only when an admin clicks delete in
+   * the member list. A value that stays above zero is a deletion somebody started and did not
+   * finish, which keeps an e-mail address, a handle and a Discord snowflake for a person who has
+   * already left.
+   */
+  public static final String USERS_PENDING_DELETION = "basetool.users.pending.deletion.count";
+
+  /**
+   * Gauge {@code basetool_users_pending_deletion_oldest_age_seconds} — how long the longest-waiting
+   * orphaned account has been waiting (REQ-SEC-059).
+   *
+   * <p>Measured from {@code app_user.keycloak_absent_since}, which V241 added because no existing
+   * timestamp carries the fact. Rows that predate V241 were backfilled with the deploy time, so
+   * their age is a lower bound.
+   */
+  public static final String USERS_PENDING_DELETION_OLDEST_AGE =
+      "basetool.users.pending.deletion.oldest.age";
 
   /** Gauge {@code basetool_bank_booking_request_pending_count} — tag {@code required_approver}. */
   public static final String BANK_BOOKING_REQUEST_PENDING =
@@ -477,7 +579,9 @@ public final class MetricNames {
   public static final String TAG_EVENT_TYPE = "event_type";
 
   /**
-   * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS}.
+   * Tag key: the P4K import job kind ({@code P4kImportJobKind#name()}) on {@link #P4K_IMPORT_JOBS},
+   * and the inbox retention half ({@code read} / {@code unread}) on {@link
+   * #NOTIFICATION_RETENTION_DELETED}. Bounded in both uses.
    */
   public static final String TAG_KIND = "kind";
 

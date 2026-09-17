@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.BankPdfFormat;
 import de.greluc.krt.profit.basetool.backend.service.pdf.KrtPdfSupport;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -264,9 +265,22 @@ public class BankStatementReportService {
                   : matchHolderHandle(
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
-          KrtPdfSupport.addTableCell(table, holder, bg, false);
+          // Humanised like the Gegenpartei column four lines below, and for the same reason.
+          // bank_holder.user_id is ON DELETE SET NULL, so after a deletion the display name falls
+          // back to the handle snapshot -- which a granted erasure has rewritten. Rendering it raw
+          // put #ANONYMISED# in the Halter column while the next column on the same row already
+          // read "Anonymisiert" (REQ-SEC-062).
+          KrtPdfSupport.addTableCell(
+              table,
+              HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
+              bg,
+              false);
         }
-        KrtPdfSupport.addTableCell(table, counterpartyCell(row, accountLegsByTx), bg, false);
+        KrtPdfSupport.addTableCell(
+            table,
+            counterpartyCell(row, accountLegsByTx, label("general.anonymisedHandle")),
+            bg,
+            false);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         String reason = row.justification() != null ? row.justification() : "";
@@ -310,15 +324,21 @@ public class BankStatementReportService {
    * @return the cell text, never {@code null}
    */
   private static @NotNull String counterpartyCell(
-      @NotNull BankBookingRow row, @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx) {
+      @NotNull BankBookingRow row,
+      @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
+      @NotNull String anonymisedLabel) {
     return switch (row.type()) {
       case DEPOSIT, WITHDRAWAL -> {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
+        // A counterparty whose handle an Art. 17 request erased renders as the placeholder rather
+        // than as the raw sentinel (REQ-SEC-062). The booking itself is untouched -- amount, date
+        // and account all stand; only the name is gone.
+        String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
-            ? row.counterpartyHandle()
-            : row.counterpartyHandle() + " (" + row.counterpartyOrgUnitName() + ")";
+            ? handle
+            : handle + " (" + row.counterpartyOrgUnitName() + ")";
       }
       case TRANSFER ->
           accountLegsByTx.getOrDefault(row.transactionId(), List.of()).stream()
