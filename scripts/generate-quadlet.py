@@ -54,8 +54,8 @@ COMPOSE_MON = os.path.join(REPO, "docker-compose.monitoring.yml")
 #: Where the per-service environment files land on the host. The compose `environment:` maps are
 #: CLOSED ALLOW-LISTS -- each service sees only the variables its own map names -- and that property
 #: has to survive the translation. `EnvironmentFile=` with the whole `.env` would hand every
-#: container every secret, so the deployer renders one file per service from the `.vars` list this
-#: tool emits.
+#: container every secret, so the deployer renders one file per service from the `.env.tmpl`
+#: template this tool emits. See render_vars for why it is a template and not a list of names.
 ENV_DIR_ON_HOST = "/var/iri/code/env.d"
 
 #: Host paths the compose files reach through a variable. Quadlet units are static, so these are
@@ -394,7 +394,7 @@ def _volume(spec: str, service: str) -> str:
     return ":".join([source] + parts[1:])
 
 
-def _health(hc: dict[str, Any]) -> list[str]:
+def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> list[str]:
     """Translate a compose healthcheck into Quadlet ``Health*`` keys.
 
     A ``CMD-SHELL`` test keeps its shell, and its ``$VAR`` references are left for the **container**
@@ -402,12 +402,29 @@ def _health(hc: dict[str, Any]) -> list[str]:
     form: compose interpolates them at file-load time from the host `.env`, which would put values
     such as the database user into a unit file on disk.
 
+    It only works if the NAME is one the container receives, and that is not automatic. Compose
+    writes host-side names in a health command because compose expands them on the host;
+    ``db-keycloak`` asks for ``@DOLLAR@{KC_POSTGRES_USER}`` while the container is handed that value as
+    ``POSTGRES_USER``. Passed through unchanged, the shell inside the container answers
+    ``KC_POSTGRES_USER: parameter not set or null`` and the service never reports healthy --
+    measured on the testing host, 2026-09-17, which is how this was found. ``db-backend`` survives
+    only because its two names happen to match.
+
+    So references are rewritten to the container-side name, taken from the service's own
+    environment map.
+
     Args:
         hc: the compose ``healthcheck`` mapping.
+        env: the service's compose ``environment`` map, which says what the container is handed.
+        service: the service name, for the refusal message.
 
     Returns:
         The ``Health…=`` lines, plus ``Notify=healthy`` so systemd's readiness matches what
         ``depends_on: condition: service_healthy`` meant.
+
+    Raises:
+        Refusal: when the command names a variable the container is handed under no name at all,
+            which cannot be translated and would fail only at health-check time.
     """
     test = hc.get("test")
     if not test or test == ["NONE"]:
@@ -420,6 +437,23 @@ def _health(hc: dict[str, Any]) -> list[str]:
         cmd = " ".join(test[1:])
     else:
         cmd = " ".join(test)
+
+    # Rewrite host-side names to the names the container actually receives -- see the note above.
+    inside = {}
+    for container_key, value in (env or {}).items():
+        for host in re.findall(r"\$\{([A-Z_0-9]+)", str(value)):
+            inside.setdefault(host, container_key)
+    for host in sorted(set(re.findall(r"\$\{([A-Z_0-9]+)", cmd))):
+        if host in (env or {}):
+            continue                      # the container gets this very name
+        if host not in inside:
+            raise Refusal(
+                f"{service}: the health command names ${{{host}}}, and the container is handed that "
+                "value under no name at all. Compose expanded it on the host; a shell inside the "
+                "container cannot. Add it to the service's environment, or write the health command "
+                "in terms of a name the container receives."
+            )
+        cmd = cmd.replace("${" + host, "${" + inside[host])
 
     lines = [f"HealthCmd={cmd}"]
     for compose_key, quadlet_key in (
@@ -652,7 +686,7 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         container.append(f"EnvironmentFile={ENV_DIR_ON_HOST}/{service}.env")
 
     container += _exec(service, spec)
-    container += _health(spec.get("healthcheck") or {})
+    container += _health(spec.get("healthcheck") or {}, spec.get("environment") or {}, service)
 
     podman_args: list[str] = []
     limits = (spec.get("deploy") or {}).get("resources", {}).get("limits", {})
@@ -734,28 +768,69 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 
 
 def render_vars(service: str, spec: dict[str, Any]) -> str:
-    """Render the per-service environment allow-list.
+    """Render the per-service environment TEMPLATE the deployer fills in.
 
-    The compose ``environment:`` maps are closed allow-lists: a service sees only the variables its
-    own map names. That is load-bearing -- the backend's database password and Grafana's OIDC
-    secret sit in the same host ``.env`` -- and `EnvironmentFile=` with the whole file would hand
-    every container every secret. So the deployer renders one file per service from this list.
+    This emitted a list of NAMES until 2026-09-17, on the theory that the deployer would look each
+    one up in the host ``.env``. Measured against the compose files before the units were ever
+    started, that theory covers **25 of 168** entries. The other 143 are not names to look up:
+
+    * **58 are literal values** -- ``PGPORT: 15432``, ``PGDATA: /var/lib/postgresql/data/pgdata``,
+      ``KC_DB: postgres``. They exist only in the compose file and are in no ``.env`` anywhere, so
+      a name list hands the container nothing. Postgres would have started on its built-in
+      defaults: a new empty cluster in the wrong directory, on the wrong port, behind a health
+      check that can never pass.
+    * **85 are composite or defaulted** -- ``jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB}``
+      interpolates INTO a longer string, and ``${KC_METRICS_ENABLED:-false}`` carries a default that
+      the name alone does not.
+
+    So the artifact is a template: the compose right-hand side, verbatim, one ``KEY=value`` per
+    line. The deployer renders it by interpolating against the host ``.env`` -- which is what
+    compose itself did, and is why the values survive the translation.
+
+    The closed-allow-list property that motivated the original design is unchanged, and is still
+    why this is one file per service: a service sees only the variables its own compose map names,
+    and one shared ``EnvironmentFile=`` would hand every container every secret. **No secret is in
+    this file.** A secret appears as the same ``${NAME:?...}`` reference compose carries, and its
+    value exists only on the host.
 
     Args:
         service: the service name.
         spec: the compose service mapping.
 
     Returns:
-        One variable name per line.
+        The template text, one ``KEY=value`` line per environment entry.
+
+    Raises:
+        Refusal: on a value containing a newline, which no env file can carry.
     """
     env = spec.get("environment") or {}
-    names = list(env.keys()) if isinstance(env, dict) else [e.split("=")[0] for e in env]
+    if isinstance(env, dict):
+        items = [(k, str(v)) for k, v in env.items()]
+    else:
+        items = [tuple(str(e).split("=", 1)) for e in env]
+
+    for key, value in items:
+        if "\n" in value:
+            raise Refusal(
+                f"{service}: the value of {key} contains a newline. An env file is one assignment "
+                "per line and cannot carry it -- put the value in a file the container mounts."
+            )
+
     header = (
-        f"# Generated by scripts/generate-quadlet.py -- do not edit. Run the generator.\n"
-        f"# The closed allow-list for {service}: the deployer renders\n"
-        f"# {ENV_DIR_ON_HOST}/{service}.env from the host .env using exactly these names.\n"
+        "# Generated by scripts/generate-quadlet.py -- do not edit. Run the generator.\n"
+        f"# The environment template for {service}. The deployer renders\n"
+        f"# {ENV_DIR_ON_HOST}/{service}.env from this, interpolating ${{...}} against the host\n"
+        "# .env the way compose did. A literal passes through; a ${NAME:-default} keeps its\n"
+        "# default when the host sets nothing; a ${NAME:?...} must be set or the render fails.\n"
+        "#\n"
+        "# NO SECRET IS IN THIS FILE. A secret appears as a reference, and its value exists only on\n"
+        "# the host -- which is also why this is one file per service: the compose environment maps\n"
+        "# are closed allow-lists, and one shared EnvironmentFile would hand every container every\n"
+        "# secret.\n"
     )
-    return header + "\n".join(sorted(names)) + "\n"
+    body = "\n".join(f"{k}={v}" for k, v in sorted(items))
+    return header + body + "\n"
+
 
 
 # ============================================================================================
@@ -859,7 +934,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 continue
             files[f"quadlet/systemd/{service}.container"] = render_container(service, spec)
             if spec.get("environment"):
-                files[f"quadlet/env.d/{service}.vars"] = render_vars(service, spec)
+                files[f"quadlet/env.d/{service}.env.tmpl"] = render_vars(service, spec)
 
             nets = spec.get("networks")
             used_networks.update(nets.keys() if isinstance(nets, dict) else (nets or []))

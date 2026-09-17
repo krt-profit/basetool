@@ -15,7 +15,7 @@ Volume=/var/iri/db-keycloak:/var/lib/postgresql/data
 EnvironmentFile=/var/iri/code/env.d/db-keycloak.env
 Exec=postgres -c shared_buffers=128MB -c effective_cache_size=384MB -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=120 -c log_error_verbosity=terse -c log_line_prefix='%m [%p] %q%u@%d/%a '
 
-HealthCmd=pg_isready -U ${KC_POSTGRES_USER:?} -d ${KC_POSTGRES_DB:?} -p 15433
+HealthCmd=pg_isready -U ${POSTGRES_USER:?} -d ${POSTGRES_DB:?} -p 15433
 HealthInterval=5s
 HealthTimeout=5s
 HealthRetries=5
