@@ -2373,6 +2373,16 @@ variable, `generated-bytecode.jar` **768 bytes larger** with the JAR present tha
 > but it fails, and the check belongs beside the capability re-verification REQ-OPS-014 already
 > requires.
 
+> [!success] Re-checked once already, on 26.7.4 — 2026-09-17
+> The first bump arrived the day after this was written: `main` took Keycloak from the digest
+> measured above to **26.7.4**, a six-CVE security patch. Re-measured against the new digest with
+> the real SPI provider staged: **ready, 466M of its 2560M limit**, with `build-system.properties`,
+> `generated-bytecode.jar` and `quarkus-application.dat` all present under the tmpfs. The narrow
+> mount still holds.
+>
+> Recorded because a rule that fires and is not written down is indistinguishable from one nobody
+> ran.
+
 ### The JVM modules write three things, and all three are under `/tmp`
 
 Their own source contains **no filesystem write API at all** — no `new File`, no `Files.*`, no

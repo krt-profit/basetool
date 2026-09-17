@@ -156,8 +156,10 @@ reason as ADR-0189's uid check: a unit file records what was asked for.
   gone at the next restart, and the image is the image.
 - Four `Tmpfs=` lines exist across the whole stack, on `keycloak` and `edge`, and each one is there
   because something was measured writing to that path.
-- **Keycloak's entry is the fragile one.** An upstream change to where the augmentation writes turns
-  into a container that fails at start — loud, health-gated, rolled back by `REQ-OPS-003` — but it
+- **Keycloak's entry is the fragile one**, and it was exercised immediately: `main` bumped Keycloak
+  to 26.7.4 the next day, and the re-measurement against the new digest came back ready at 466M with
+  the provider compiled in. The rule held on its first use. An upstream change to where the
+  augmentation writes turns into a container that fails at start — loud, health-gated, rolled back by `REQ-OPS-003` — but it
   has to be re-verified on every Keycloak image bump, the same rule `REQ-OPS-014` already applies to
   the capability sets.
 - Podman's `/tmp` tmpfs is now load-bearing for the JVM modules. It is a documented default rather
