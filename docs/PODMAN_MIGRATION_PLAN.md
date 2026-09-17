@@ -197,7 +197,11 @@ fire on the testing host when the condition is induced. Not "the metric exists" 
 
 ### Phase 5 — The new production host
 
-A fresh Debian 13 host, built from the (now Podman-shaped) bootstrap documentation, serving nobody.
+A fresh **Rocky Linux 10** host, built by the Ansible role of ADR-0188, serving nobody. (This said
+"Debian 13, built from the bootstrap documentation" when the phase was written; ADR-0163's platform
+moved once ADR-0187 removed the need for the pasta forwarder, and ADR-0188 replaced the prose
+checklist with a role. The sentence is corrected here rather than left to be read as a third
+option.)
 
 - Data restored from backup — which doubles as the disaster-recovery drill `restore-drill.sh` only
   partly rehearses today.
@@ -2608,3 +2612,117 @@ Three things this cost, each worth keeping:
 > directly, with certificates staged and `:z` added: `nginx -t` exits 0 with zero
 > warnings in both the plain and the PROXY-protocol shape, before and after the
 > change. CI runs Docker on Ubuntu, where the gate is green today.
+
+---
+
+## 23. The production cutover — measured 2026-09-17, and what actually blocks it
+
+Asked directly: how does production move without losing data, creating inconsistencies or
+introducing regressions, given that a long maintenance window is acceptable. The window turns out
+not to be the constraint.
+
+### The data move is small, and its mechanism already runs weekly
+
+Read from the production host under the standing read permission, `SELECT`-only and opened
+`READ ONLY`:
+
+|         |                                                                   |
+|---------|-------------------------------------------------------------------|
+| `db-backend`  | PostgreSQL **18.6**, 82 MB, **106 tables**, **65 239 live rows** |
+| `db-keycloak` | PostgreSQL **18.6**, 16 MB, **100 tables**, **1 822 live rows**  |
+| realm content | **2 realms · 87 users · 19 clients · 84 credentials**            |
+| Flyway        | **238 applied**, latest **V240**, **0 failed**                   |
+| redis · secrets · code | 44 MB · 20 KB · 2.9 MB                                  |
+
+**The live state is under a gigabyte.** And the path it moves along is not new: `iri-backup` ran
+2026-09-17 04:15 with `Result=success` in 53 s, and `iri-restore-drill` ran 2026-09-13 with
+`Result=success`, reporting `artifact_ok=1` for `db_backend`, `db_keycloak`, `grafana_sqlite` and
+`monitoring_secrets`. The drill restores both dumps into a throwaway Postgres and checks that
+`flyway_schema_history` has rows and the table counts clear a floor. **The cutover's central
+mechanism is exercised every week in production.**
+
+That is also why the move is a **restore and not a copy**, which the state table above already
+said. A file-level copy would additionally have to solve the uid translation — production writes
+that cluster as host uid 70, a rootless host writes it as `base + 70 - 1` — and a restore into a
+cluster the new container initialises itself never raises the question.
+
+> [!note] Correction to the state inventory in §"How much actually has to move"
+> `/var/iri/frontend`, `backend`, `ingest` and `keycloak` are listed there as "yes (app state)".
+> They are **378 MB of rotated log files** and nothing else — checked file by file. Only the two
+> databases, `redis`, `secrets` and `code` carry state. (One orphan noticed in passing:
+> `/var/iri/frontend/log/frontend-error.2026-08-18.0.log21679916952.tmp`, 18 MB.)
+
+### What actually blocks the cutover is not the data
+
+```
+scripts/deploy.sh          docker: 104   podman: 0
+scripts/backup.sh          docker:  20   podman: 0
+scripts/restore-drill.sh   docker:   9   podman: 0
+```
+
+A host cut over today would have **no deployer, no backup and no restore drill**: no digest pin, no
+signature check, no health gate, no automatic rollback (`REQ-OPS-003`, `REQ-OPS-015`), no daily
+dump, and no weekly recoverability proof (`REQ-OPS-011`). Phase 4 has not run either, so no
+container metrics and no log collection.
+
+**That is a larger data-loss risk than the migration night.** A week of production without a working
+backup outweighs any dump-and-restore cycle. Phases 3 and 4 are therefore prerequisites of the
+cutover rather than work that can follow it — which is what those phases already say, and this
+section exists because the question "can we move now" has an answer that is easy to get wrong when
+the data itself is a gigabyte and restores in thirteen seconds.
+
+### The order that satisfies all three constraints
+
+**Before the window** — on the testing host, which now runs the full stack: Phase 3 with a
+deliberately broken image that must roll back cleanly, Phase 4 with every `container_*` alert shown
+firing, and `backup.sh` plus `restore-drill.sh` working under Podman with one run against real data.
+
+**In the window:**
+
+1. **Stop `iri-deploy.timer` on both hosts.** It fires every five minutes and would pull an image
+   mid-migration. Measured on production: next run was 3 minutes away.
+2. `backup.sh` on the old host **with quiesce** — it stops `frontend`, `backend` and `ingest` first,
+   so the dump is a point in time with no write in flight.
+3. Record the baseline from the table above, per table rather than in total.
+4. Restore on the new host from **that** snapshot, not the newest one.
+5. Compare: table-by-table row counts, the Flyway count and latest version, and the realm's user,
+   client and credential counts.
+6. Seed the certificates from the old host rather than re-issuing (the Let's Encrypt duplicate limit
+   for this SAN set is five per week), plus `.env` and the redis ACL.
+7. Conformance suite green against the new host **by IP**, with the old host still serving.
+8. Only then DNS.
+9. Suite green against the public names; both hosts alive; soak.
+
+The long window buys steps 2–7 without time pressure, which is exactly where the verification lives.
+
+> [!warning] "Going back is a DNS change" is true for reachability and false for data
+> Phase 6 says the rollback is a DNS change rather than a restore. That holds until the **first
+> write on the new host**. After that, going back either loses those writes or needs its own
+> migration in the opposite direction. The cheap rollback exists in the gap between the cutover and
+> the first user action, and it should be stated that way rather than as a property of the whole
+> soak.
+
+### Two decisions, both ruled by @greluc on 2026-09-17: neither is carried
+
+**The 15 GB of monitoring history stays behind.** Prometheus TSDB, Loki and Tempo start empty on the
+new host. That removes the largest single item from the move and leaves the data set at well under a
+gigabyte.
+
+It has one consequence worth writing down rather than discovering: **every alert whose expression
+looks back over a window is blind until that window has filled.** A rule reading `[7d]` says nothing
+for seven days, and a `predict_linear` on disk usage says nothing useful for longer. During the soak
+those alerts are not quiet because the system is healthy — they are quiet because they have no data.
+Phase 4's acceptance is that each one is shown *firing* when its condition is induced, so that is
+where this is caught rather than assumed; the soak's alert silence must not be read as a signal on
+its own until the windows have filled.
+
+**The 44 MB of redis sessions stay behind.** Everyone is logged out once, which the maintenance
+window absorbs.
+
+> [!important] The ACL file is not session data and does move
+> `/var/iri/redis` holds three different things: `appendonlydir` and `dump.rdb`, which are the
+> sessions being dropped, and **`users.acl`, which is configuration**. Redis refuses to start
+> without the ACL file its command line names, and `ADR-0088` makes that file the actual access
+> control — `--requirepass` was measured inert. Dropping the directory wholesale takes the ACL with
+> it and the container then fails at start, which reads as a broken migration rather than a missing
+> file.
