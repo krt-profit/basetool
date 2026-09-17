@@ -839,15 +839,28 @@ sudo -u deploy /var/iri/code/scripts/deploy.sh --force
 
 ## Stateful-infra upgrades (operator-gated: postgres, Keycloak)
 
-A **postgres** or **Keycloak** image change is the one carve-out that does **not**
-auto-apply. A Postgres major recreated against the existing `PGDATA` bind mount
+A **postgres** or **Keycloak** image **tag** change is the one carve-out that does
+**not** auto-apply. A Postgres major recreated against the existing `PGDATA` bind mount
 won't start without `pg_upgrade`; a Keycloak major needs host-staged provider JARs
 and a keystore whose SAN carries `dns:keycloak` (see *Keycloak behind NPM* and
 *Keycloak custom providers* above). A blind `up -d` would fail these and the health
 gate would then roll back on a 5-minute loop.
 
+> [!important] A same-tag **digest** refresh is NOT gated — it auto-applies
+> `infra_image_pins()` strips the digest and compares the tag, so
+> `26.7@sha256:aaa…` → `26.7@sha256:bbb…` goes through on the next 5-minute tick like any
+> other compose edit, restarting the Keycloak container. That is deliberate: a rebuilt
+> base image is usually a security fix, and blocking it does the opposite of what this
+> gate is for.
+>
+> **Corrected 2026-09-17.** This section previously said any `postgres:` or
+> `quay.io/keycloak/keycloak:` *pin* change is refused. It has compared only the tag since
+> `031e75fed` (2026-09-12), which was written after the full-reference comparison froze the
+> testing host for seven days — 1901 skipped ticks over a Keycloak rebuild. The runbook,
+> not the code, was wrong.
+
 So when a promoted bundle changes a `postgres:` or `quay.io/keycloak/keycloak:`
-pin, `deploy.sh` refuses to apply it: it logs a `CARVE-OUT: …` line, writes
+tag, `deploy.sh` refuses to apply it: it logs a `CARVE-OUT: …` line, writes
 `/var/lib/iri/config-blocked.marker`, exits non-zero **once** (so journald /
 `OnFailure=` alert you), and then skips that target quietly on subsequent ticks
 until you either promote a different version or force it. To take the upgrade:
