@@ -282,7 +282,7 @@ def _format(value: float) -> str:
     """
     if value == math.inf:
         return "+Inf"
-    if value == float("-inf") or value != value:  # -Inf or NaN
+    if value == float("-inf") or math.isnan(value):
         return "-Inf" if value == float("-inf") else "NaN"
     if float(value).is_integer() and abs(value) < 2 ** 53:
         return str(int(value))
@@ -350,6 +350,9 @@ def write_atomically(target: str, content: str) -> None:
         try:
             os.unlink(tmp)
         except OSError:
+            # Best effort. The temp file is in the same directory as the target and will be
+            # overwritten by the next run; failing to unlink it must not replace the error that
+            # actually matters, which is raised below.
             pass
         raise CollectorError(f"could not write {target}: {exc}") from exc
 

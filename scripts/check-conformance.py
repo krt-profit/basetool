@@ -61,7 +61,6 @@ import dataclasses
 import datetime as dt
 import json
 import os
-import re
 import shlex
 import shutil
 import socket
@@ -153,6 +152,11 @@ def _ssl_context() -> ssl.SSLContext:
         this suite is for.
     """
     ctx = ssl.create_default_context()
+    # The default context still PERMITS TLS 1.0 and 1.1 -- CodeQL flags it, and it is right to.
+    # It matters more here than in a client: this suite asserts what the edge offers, and a probe
+    # willing to negotiate a protocol the edge should refuse cannot report that the edge stopped
+    # refusing it. The floor is the one the edge itself serves.
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     if CA_BUNDLE:
         ctx.load_verify_locations(cafile=CA_BUNDLE)
     return ctx

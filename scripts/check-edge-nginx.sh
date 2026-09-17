@@ -240,19 +240,26 @@ check_mode() {
   # The two shapes have to differ in the assembled configuration, or the gate is
   # green because the switch did nothing rather than because it worked.
   if [[ -n "${trusted}" ]]; then
-    grep -qE 'listen .*proxy_protocol' "${dump}" \n      || { echo "FAIL: ${mode}: no listener speaks proxy_protocol"; exit 1; }
-    grep -qF "set_real_ip_from ${trusted};" "${dump}" \n      || { echo "FAIL: ${mode}: the client address is not restored from the header"; exit 1; }
-    grep -qF 'real_ip_header proxy_protocol;' "${dump}" \n      || { echo "FAIL: ${mode}: real_ip_header is not set to proxy_protocol"; exit 1; }
+    grep -qE 'listen .*proxy_protocol' "${dump}" \
+      || { echo "FAIL: ${mode}: no listener speaks proxy_protocol"; exit 1; }
+    grep -qF "set_real_ip_from ${trusted};" "${dump}" \
+      || { echo "FAIL: ${mode}: the client address is not restored from the header"; exit 1; }
+    grep -qF 'real_ip_header proxy_protocol;' "${dump}" \
+      || { echo "FAIL: ${mode}: real_ip_header is not set to proxy_protocol"; exit 1; }
   else
-    grep -qE 'listen .*proxy_protocol' "${dump}" \n      && { echo "FAIL: ${mode}: a listener speaks proxy_protocol with no front end configured"; exit 1; }
-    grep -qF 'set_real_ip_from' "${dump}" \n      && { echo "FAIL: ${mode}: a header is trusted with nothing in front of the edge"; exit 1; }
+    grep -qE 'listen .*proxy_protocol' "${dump}" \
+      && { echo "FAIL: ${mode}: a listener speaks proxy_protocol with no front end configured"; exit 1; }
+    grep -qF 'set_real_ip_from' "${dump}" \
+      && { echo "FAIL: ${mode}: a header is trusted with nothing in front of the edge"; exit 1; }
   fi
 
   # The health listener must NEVER speak proxy_protocol, in either shape: the
   # container's own HEALTHCHECK is a plain wget, and a rejected check would hold
   # the whole stack down behind an edge that is working.
-  awk '/listen 127.0.0.1:8081/,/^}/' "${dump}" | grep -q 'proxy_protocol' \n    && { echo "FAIL: ${mode}: the health listener speaks proxy_protocol"; exit 1; }
-  grep -qE 'listen (127\.0\.0\.1|\[::1\]):8081;' "${dump}" \n    || { echo "FAIL: ${mode}: the loopback health listener is missing"; exit 1; }
+  awk '/listen 127.0.0.1:8081/,/^}/' "${dump}" | grep -q 'proxy_protocol' \
+    && { echo "FAIL: ${mode}: the health listener speaks proxy_protocol"; exit 1; }
+  grep -qE 'listen (127\.0\.0\.1|\[::1\]):8081;' "${dump}" \
+    || { echo "FAIL: ${mode}: the loopback health listener is missing"; exit 1; }
 
   echo "==> '${mode}' is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
 }
