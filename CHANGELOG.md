@@ -81,6 +81,25 @@
 
 ### Fixed
 
+- **Betrieb: das Redis-Passwort liegt nicht mehr in der Umgebung des laufenden Containers.** Es war
+  dort gelandet, um eine spätere Podman-Prüfung zu bedienen, wirkte aber sofort im heutigen
+  Docker-Betrieb — lesbar aus `/proc/1/environ` und `docker inspect`, für ein Deployment, das den
+  Wert gar nicht braucht.
+
+- **Betrieb: die Container-Kennzahlen haben jetzt Alarme und ein Dashboard.** Die Serien, die
+  cAdvisor bei der Podman-Umstellung ersetzen, wurden zwar erhoben, aber von nichts gelesen. Speicher,
+  OOM-Kills, CPU-Drosselung und Prozesszahl lösen jetzt dieselben Alarme wie bisher aus — unter
+  beiden Container-Laufzeiten, ohne Lücke während der Umstellung — und zwei neue Alarme melden,
+  wenn der Sammler selbst stehenbleibt oder nichts mehr findet (REQ-OBS-011, REQ-OBS-014).
+
+- **Betrieb: mehrere Prüfungen und Vorlagen der Podman-Umstellung waren fehlerhaft.** Die
+  Konformitätsprüfung stufte die häufigste Schreibweise einer Bridge-Adresse als öffentlich ein und
+  meldete grün für genau den Fehler, den sie finden soll; acht ihrer Prüfungen riefen ein
+  `docker`-Programm auf, das der neue Host nicht hat. Der Unit-Generator verlor Argumentgrenzen in
+  Health-Kommandos, setzte kein Startzeitlimit und reichte `%`-Platzhalter ungeschützt durch, wodurch
+  beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
+  gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
+
 - **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
   drei Aufräumläufe und dreier weiterer Einstellungen waren nirgends an das Backend durchgereicht
   — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind

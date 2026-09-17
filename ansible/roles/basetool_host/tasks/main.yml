@@ -1,5 +1,5 @@
 ---
-# basetool_host -- prepare a CentOS Stream 10 host to run the Basetool stack under rootless Podman.
+# basetool_host -- prepare a Rocky Linux 10 host to run the Basetool stack under rootless Podman.
 #
 # ADR-0188. This role PROVISIONS; it does not deploy. It installs packages, creates the service
 # user and its subuid range, lays out and owns the directories, sets SELinux contexts and writes

@@ -2874,3 +2874,83 @@ them.
 > Whatever the Discord SPI does with `KRT_BACKEND_PRECHECK_URL` over TLS is failing or silently
 > skipped, today, on production. Migrating faithfully would reproduce it; this is the moment to
 > decide instead.
+
+## 26. The two things a code review could not settle from the repository — measured 2026-09-18
+
+The PR #1933 review raised fourteen findings and closed with two caveats it explicitly refused to
+assert either way, because neither is answerable from the files. Both are one measurement on the
+testing host, and both were taken. They come out opposite, which is why guessing would have been
+expensive in both directions.
+
+### A. Quadlet does **not** escape `%`, and both databases were already running corrupted
+
+`db-backend` and `db-keycloak` carry `log_line_prefix='%m [%p] %q%u@%d/%a '` — six systemd
+specifiers. The question was whether podman 5.8.2's Quadlet escapes them before writing
+`ExecStart=`. It does not:
+
+```
+the unit file says:   log_line_prefix='%m [%p] %q%u@%d/%a '
+quadlet generated:    log_line_prefix=%m\x20[%p]\x20%q%u@%d/%a\x20"
+SHOW log_line_prefix, read from inside the running postgres:
+  5e63b03b1a1246fb831b5666c4976cbe [db-backend] basetool-rocky10iri@/run/user/992/credentials/db-backend.service/x86-64
+```
+
+Every specifier expanded: `%m` → the machine id, `%p` → the unit name, `%q` → the pretty hostname,
+`%u` → the user, `%d` → the credentials directory, `%a` → the architecture. `%d` did **not** make
+systemd refuse the setting, as the finding allowed it might — it resolved, which is worse, because
+the unit starts and looks healthy. The Alloy/Loki postgres pipeline keys off that prefix and had
+silently stopped matching.
+
+So the fix is the escape, not a refusal — and that took a second measurement, because an escape
+that Quadlet collapses is no escape:
+
+```
+written into the .container:   Exec=sh -c 'echo RAW=%m ESC=%%m LITPCT=%%'
+quadlet wrote into ExecStart:  sh -c "echo\x20RAW=%m\x20ESC=%%m\x20LITPCT=%%"      <- %% survived
+a unit file on disk, started:  RAW=5e63b03b…  ESC=%m  LITPCT=%
+the whole postgres prefix:     PREFIX=%m [%p] %q%u@%d/%a                            <- intact
+```
+
+`%%` passes through Quadlet unchanged and systemd renders it as one literal `%`.
+`generate-quadlet.py` now escapes `Exec=`, `Entrypoint=` and `HealthCmd=`, and **refuses** a raw
+`%` in any other `[Container]` key rather than escaping it silently — a `%` in a volume path is far
+more likely to be a mistake than an intention.
+
+> [!warning] `systemd-run` measures the wrong thing here
+> The first probe used `systemd-run --user --wait --pipe /bin/echo 'RAW=%m'` and printed `RAW=%m`
+> unexpanded — which flatly contradicts the live evidence above. Specifiers are not resolved in a
+> **transient** unit's argv. Only a unit **file on disk** answers this question.
+
+### B. The rootless cgroup layout is fine, and `DEFAULT_PATTERN` needs no change
+
+The second caveat was whether `--cgroups=split` puts the container's limits one level below what
+`scripts/cgroup-container-metrics.py` matches — if so,
+`basetool_container_memory_limit_bytes` reads `+Inf` for every container and any used-over-limit
+alert silently never fires.
+
+```
+/user.slice/user-992.slice/user@992.service/app.slice/db-backend.service/libpod-payload-<id>
+memory.max = 1610612736        (the unit declares Memory=1610612736)
+also present at .../app.slice/db-backend.service/memory.max
+parent: max
+```
+
+The limit sits on the **service** cgroup, which is exactly where `DEFAULT_PATTERN`'s `\.service$`
+anchor lands. Nothing to change.
+
+### What the measurements cost to take, and why they are written down
+
+Four of the probes above were wrong on their first run, each in a way that produced a plausible
+answer rather than an error:
+
+- a glob over `/home/iri/.config/...` run as `sysadm` expanded to nothing (the directory is `0750`),
+  so runtime detection fell back to the current user and bare `podman` reported `no such object`
+  for eight healthy containers;
+- a `sudo -u iri` command without `cd /` failed with `cannot chdir to /home/sysadm`, which arrived
+  as an empty result rather than as an error;
+- `promtool test rules ... | tail -30` printed `SUCCESS` and hid two failures above the cut;
+- `systemd-run` answered a different question than the one asked, as above.
+
+Each is the same shape: **a green answer from something that was not measuring.** That is the
+failure mode this whole plan exists to prevent, and it is cheaper to record the four than to
+re-learn them.

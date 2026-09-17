@@ -230,7 +230,11 @@ Environment=EDGE_HOST_FRONTEND=%E{EDGE_HOST_FRONTEND}
 
 Exec=/bin/sh /etc/nginx/edge/render-and-run.sh
 
-HealthCmd=wget -q -O /dev/null http://127.0.0.1:8080/healthz
+# :8081, NOT :8080. ADR-0187 made the public listener speak PROXY protocol, which rejects a
+# plain HTTP probe, so /healthz moved to a loopback-only listener on 8081
+# (docker/edge/conf.d/05-default.conf.template). A probe against :8080 now falls into
+# `location / { return 308 ... }` and follows a redirect to an unresolvable host.
+HealthCmd=wget -q -O /dev/null http://127.0.0.1:8081/healthz
 HealthInterval=30s
 HealthTimeout=5s
 HealthRetries=3
@@ -241,8 +245,13 @@ Memory=192M
 PodmanArgs=--cpus=1.0 --ulimit nofile=65536:65536
 
 [Service]
+# Derived from the health numbers above: start_period + retries x (interval + timeout), plus a
+# margin for the pull and the container's own creation. Notify=healthy makes this unit
+# Type=notify, and systemd's 90s default would otherwise kill a slow start.
+TimeoutStartSec=175
 Restart=always
-TimeoutStopSec=30
+# NO TimeoutStopSec here. An earlier revision of this document showed one; the generator emits it
+# only from a compose `stop_grace_period:`, and the edge service declares none.
 
 [Install]
 WantedBy=default.target

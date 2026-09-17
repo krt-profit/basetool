@@ -8,7 +8,7 @@
 basetool_hosts:
   hosts:
     testing:
-      ansible_host: 10.0.0.0          # the CentOS Stream 10 testing guest
+      ansible_host: 10.0.0.0          # the Rocky Linux 10 testing guest (ADR-0163)
       ansible_user: sysadm
     production:
       ansible_host: 203.0.113.0       # the new Hetzner CPX42

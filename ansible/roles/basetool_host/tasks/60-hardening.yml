@@ -2,8 +2,10 @@
 # Host hardening, from the platform's own versioned content rather than from anybody's idea of
 # what a hardened host looks like.
 #
-# CentOS Stream 10 ships scap-security-guide with a dedicated `cs10` datastream and seventeen
-# profiles -- CIS levels 1 and 2, DISA STIG, BSI SYS.1.1/SYS.1.3, ANSSI BP-028, PCI-DSS and more.
+# EL 10 ships scap-security-guide with a datastream per distribution -- Rocky Linux 10, the
+# platform this role targets, carries `ssg-rl10-ds.xml` -- and seventeen profiles: CIS levels 1
+# and 2, DISA STIG, BSI SYS.1.1/SYS.1.3, ANSSI BP-028, PCI-DSS and more. The candidate list in
+# defaults/main.yml is what keeps this working across all four; see the note there.
 # That content is versioned, reviewed, and matched to this exact distribution, which is the whole
 # reason to use it instead of a hand-written list of sysctls.
 #
