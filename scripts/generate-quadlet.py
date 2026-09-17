@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import io
+import math
 import os
 import re
 import sys
@@ -285,6 +286,43 @@ TRANSLATED_PROFILES = {"prod"}
 #: A compose interpolation. Used to refuse one in a place Quadlet cannot expand it.
 VAR_RE = r"\$\{([A-Za-z_][A-Za-z0-9_]*)"
 
+#: A COMPLETE compose interpolation, closing brace and all. VAR_RE above finds the NAME at the
+#: start of one; this matches the whole reference, which is what _sh_quote needs in order to tell
+#: "every dollar in this word belongs to a reference" from "there is a $( in this word".
+VAR_REF_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:-][^{}]*)?\}")
+
+
+#: Names a Quadlet container receives that the compose service deliberately does NOT put in its
+#: ``environment:``.
+#:
+#: There is exactly one, and it exists because the two deployments need the value in different
+#: places. Compose expands ``${REDIS_PASSWORD:?}`` inside the healthcheck **on the host**, at
+#: file-load time, so the running container never needs the name. Quadlet's ``HealthCmd=`` is
+#: expanded by a shell **inside** the container, so it does.
+#:
+#: Carrying it in compose's ``environment:`` to satisfy Quadlet put the password into the running
+#: Docker container's environment -- readable from ``/proc/1/environ`` and ``docker inspect`` --
+#: for a deployment that has no use for it. That is the exposure class the ``--requirepass``
+#: removal was justified by removing, so it is declared here instead: the env.d template carries
+#: it, the Docker container does not.
+#:
+#: Values are compose-shaped and go through the same renderer, so a missing host value still fails
+#: the render rather than producing a container that starts and cannot authenticate.
+QUADLET_ONLY_ENV: dict[str, dict[str, str]] = {
+    "redis": {"REDIS_PASSWORD": "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"},
+}
+
+
+#: Added to the worst case podman allows before systemd may call a start timed out.
+#:
+#: The worst case is ``start_period + retries x (interval + timeout)`` -- what podman itself waits
+#: before it gives up on a health check. Between ``systemctl start`` and the first probe there is
+#: also an image pull, a network join and the container's own creation, and none of those are in
+#: podman's health budget. Sixty seconds covers a cold pull on this link with room to spare; the
+#: number is deliberately generous because the cost of it being too big is a slow failure report,
+#: and the cost of it being too small is a restart loop that never reports healthy.
+START_TIMEOUT_MARGIN_SEC = 60
+
 
 #: Compose service keys this tool actually reads and turns into a unit directive.
 #:
@@ -501,7 +539,107 @@ def _volume(spec: str, service: str) -> str:
     return ":".join([source] + parts[1:])
 
 
-def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> list[str]:
+def _seconds(value: Any, where: str) -> int:
+    """Parse a compose duration into whole seconds.
+
+    Compose accepts ``1h2m3s`` style durations as well as a bare number of seconds. Only the units
+    that can plausibly appear in a health check are honoured; anything finer than a second rounds
+    **up**, because this feeds a timeout and rounding a budget down is how a unit gets killed just
+    before it would have succeeded.
+
+    Args:
+        value: the compose value -- an int, or a string such as ``30s`` or ``1m30s``.
+        where: the service and key, for the refusal message.
+
+    Returns:
+        The duration in whole seconds.
+
+    Raises:
+        Refusal: on a duration this parser does not understand, rather than a silent zero.
+    """
+    if isinstance(value, (int, float)):
+        return int(math.ceil(float(value)))
+    text = str(value).strip()
+    if re.fullmatch(r"\d+", text):
+        return int(text)
+    units = {"us": 1e-6, "ms": 1e-3, "s": 1.0, "m": 60.0, "h": 3600.0}
+    parts = re.findall(r"(\d+(?:\.\d+)?)(us|ms|h|m|s)", text)
+    if not parts or "".join(a + b for a, b in parts) != text:
+        raise Refusal(
+            f"{where}: {value!r} is not a duration this generator can read. It feeds "
+            "TimeoutStartSec=, and guessing a start budget is how a unit gets killed mid-start."
+        )
+    return int(math.ceil(sum(float(a) * units[b] for a, b in parts)))
+
+
+def _escape_percent(value: str) -> str:
+    """Escape ``%`` so systemd does not read it as a specifier.
+
+    Every ``[Container]`` key Quadlet translates lands inside the generated ``ExecStart=``, and
+    systemd expands ``%`` specifiers there. Measured on the testing host, podman 5.8.2 / systemd
+    257, 2026-09-18: Quadlet does **not** escape, and both postgres units were running with
+    ``log_line_prefix`` expanded to ``5e63b03b… [db-backend] basetool-rocky10iri@/run/user/992/…``
+    -- the machine id, the unit name, the pretty hostname, the user, the credentials directory and
+    the architecture, in place of the six literals postgres was configured with. The Alloy/Loki
+    postgres pipeline keys off that prefix, so it had silently stopped matching.
+
+    The same measurement settled the fix: ``%%`` written into a ``.container`` survives Quadlet
+    into ``ExecStart=`` unchanged, and systemd renders it as one literal ``%``. A probe unit with
+    ``%%m [%%p] %%q%%u@%%d/%%a`` handed its process exactly ``%m [%p] %q%u@%d/%a``.
+
+    Args:
+        value: the text as compose wrote it.
+
+    Returns:
+        The same text with every ``%`` doubled.
+    """
+    return value.replace("%", "%%")
+
+
+def _sh_quote(word: str) -> str:
+    """Quote one exec-form argv element for the shell podman runs ``HealthCmd=`` through.
+
+    Compose's exec form (``test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?}", …]``) passes
+    each element as one argv slot whatever it contains. ``HealthCmd=`` is a single string that
+    podman hands to ``/bin/sh -c``, so re-joining the elements on a space silently converts argv
+    boundaries into shell syntax: a password containing a space becomes two arguments and the
+    probe fails forever, and one containing ``;`` or ``$(`` runs whatever follows, inside the
+    container, on every interval.
+
+    Quoting restores the boundary. Which quote depends on whether the element is *meant* to
+    expand:
+
+    * an element made of literal text and **well-formed** ``${NAME}`` / ``${NAME:?…}`` references
+      is a deliberate interpolation -- the whole reason the Quadlet health command is a shell
+      string at all -- so it gets **double** quotes, which keep the expansion live. A
+      double-quoted expansion is not re-scanned by the shell, so the VALUE can no longer break out
+      however it is shaped.
+    * anything else gets **single** quotes, which are literal, and are the safe default. That
+      includes ``$(…)`` and a backtick, which stay live inside double quotes: a rule keyed on a
+      bare ``"$" in word`` re-creates the very injection this function exists to close, and did --
+      ``sh -c "echo $(id -u)"`` still substitutes. Single quotes are also the faithful
+      translation, because compose's exec form never passed those through a shell either.
+
+    Args:
+        word: one element of the compose exec-form list.
+
+    Returns:
+        The element, quoted so the re-joined string reproduces the original argv.
+    """
+    if not word:
+        return "''"
+    if "${" in word and not re.search(r"[`\\]", word):
+        # Every `$` in here accounted for by a complete reference: nothing else can expand.
+        if "$" not in VAR_REF_RE.sub("", word):
+            return '"' + word.replace('"', '\\"') + '"'
+    if re.fullmatch(r"[A-Za-z0-9_@%+=:,./-]+", word):
+        return word
+    return "'" + word.replace("'", "'\\''") + "'"
+
+
+def _health(
+    hc: dict[str, Any], env: dict[str, Any], service: str
+) -> tuple[list[str], list[str]]:
     """Translate a compose healthcheck into Quadlet ``Health*`` keys.
 
     A ``CMD-SHELL`` test keeps its shell, and its ``$VAR`` references are left for the **container**
@@ -526,24 +664,35 @@ def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> list[str]:
         service: the service name, for the refusal message.
 
     Returns:
-        The ``Health…=`` lines, plus ``Notify=healthy`` so systemd's readiness matches what
-        ``depends_on: condition: service_healthy`` meant.
+        A pair. The ``[Container]`` lines -- ``Health…=`` plus ``Notify=healthy``, so systemd's
+        readiness matches what ``depends_on: condition: service_healthy`` meant -- and the
+        ``[Service]`` lines, which is the ``TimeoutStartSec=`` that readiness now needs.
 
     Raises:
         Refusal: when the command names a variable the container is handed under no name at all,
-            which cannot be translated and would fail only at health-check time.
+            which cannot be translated and would fail only at health-check time; or when the
+            ``test:`` is a list whose first element is not one of compose's three keywords, which
+            means the form it is written in is a guess.
     """
     test = hc.get("test")
     if not test or test == ["NONE"]:
-        return []
+        return [], []
     if isinstance(test, str):
-        cmd = test
+        cmd = test                        # a bare string IS a shell command, per the compose spec
     elif test[0] == "CMD-SHELL":
-        cmd = " ".join(test[1:])
+        cmd = " ".join(str(w) for w in test[1:])
     elif test[0] == "CMD":
-        cmd = " ".join(test[1:])
+        # Exec form: each element is one argv slot. `HealthCmd=` is a single string podman runs
+        # through `/bin/sh -c`, so the elements have to be QUOTED back into one -- joining them on
+        # a space turns argv boundaries into shell syntax. See _sh_quote.
+        cmd = " ".join(_sh_quote(str(w)) for w in test[1:])
     else:
-        cmd = " ".join(test)
+        raise Refusal(
+            f"{service}: its healthcheck `test:` is a list starting with {test[0]!r}, which is "
+            "none of compose's three keywords (NONE, CMD, CMD-SHELL). Whether the rest is argv or "
+            "a shell command decides whether it must be quoted, and guessing wrong is either a "
+            "probe that never passes or a shell injection on every interval."
+        )
 
     # Rewrite host-side names to the names the container actually receives -- see the note above.
     inside = {}
@@ -560,9 +709,19 @@ def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> list[str]:
                 "container cannot. Add it to the service's environment, or write the health command "
                 "in terms of a name the container receives."
             )
-        cmd = cmd.replace("${" + host, "${" + inside[host])
+        # Bounded, not a bare-prefix replace. `cmd.replace("${" + host, …)` has no closing
+        # delimiter, and the loop runs over sorted() so a shorter name is always rewritten before
+        # a longer one that starts with it: with both ${POSTGRES_USER} and ${POSTGRES_USER_EXTRA}
+        # present, the second becomes ${<mapped>_EXTRA} -- a name the container is handed under no
+        # name at all, so the probe fails at run time with `parameter not set` and the unit never
+        # reports healthy. The refusal above runs BEFORE the replacement, so it cannot catch it.
+        cmd = re.sub(
+            r"\$\{" + re.escape(host) + r"(?![A-Za-z0-9_])",
+            lambda m, name=inside[host]: "${" + name,
+            cmd,
+        )
 
-    lines = [f"HealthCmd={cmd}"]
+    lines = [f"HealthCmd={_escape_percent(cmd)}"]
     for compose_key, quadlet_key in (
         ("interval", "HealthInterval"),
         ("timeout", "HealthTimeout"),
@@ -575,11 +734,36 @@ def _health(hc: dict[str, Any], env: dict[str, Any], service: str) -> list[str]:
     # The readiness half of compose's `depends_on: condition: service_healthy`. Requires= alone
     # orders startup; this is what makes a dependent wait for HEALTHY rather than for EXISTS.
     lines.append("Notify=healthy")
-    return lines
+
+    # And the start budget that readiness now needs. Notify=healthy makes the unit Type=notify, so
+    # systemd's DefaultTimeoutStartSec -- 90s -- begins to bound how long a container may take to
+    # report healthy. Compose's `depends_on: condition: service_healthy` had no such cap, so the
+    # default is a behaviour change smuggled in by the translation, and a silent one: together with
+    # the Restart=always + StartLimitIntervalSec=0 block, a start slower than 90s is not a failure
+    # that stops but a restart loop that never gives up and never reports healthy.
+    #
+    # Four of the eight services exceed 90s on their own numbers -- keycloak allows
+    # 30 + 15 x (10 + 10) = 330s and re-runs the whole Quarkus augmentation on every start, because
+    # ADR-0190 puts a tmpfs over lib/quarkus. So the budget is DERIVED from the same values podman
+    # gives the health check, not picked: anything podman is still willing to wait for, systemd is
+    # too, and the compose file stays the single place the timing is written.
+    budget = _seconds(hc.get("start_period", 0), f"{service}.healthcheck.start_period") + int(
+        hc.get("retries", 3)
+    ) * (
+        _seconds(hc.get("interval", "30s"), f"{service}.healthcheck.interval")
+        + _seconds(hc.get("timeout", "30s"), f"{service}.healthcheck.timeout")
+    )
+    return lines, [f"TimeoutStartSec={budget + START_TIMEOUT_MARGIN_SEC}"]
 
 
 def _exec(service: str, spec: dict[str, Any]) -> list[str]:
     """Translate ``entrypoint`` and ``command``.
+
+    Both are run through :func:`_escape_percent`, because systemd expands ``%`` specifiers in the
+    ``ExecStart=`` Quadlet builds out of them. Both postgres services carry
+    ``log_line_prefix='%m [%p] %q%u@%d/%a '``, which without the escape reached the running database
+    as the machine id, the unit name, the pretty hostname, the user and the architecture -- measured,
+    live, on the testing host.
 
     Args:
         service: the service name.
@@ -617,9 +801,9 @@ def _exec(service: str, spec: dict[str, Any]) -> list[str]:
                 "reviewable and testable instead of a YAML block scalar."
             )
     if entrypoint is not None:
-        lines.append(f"Entrypoint={flatten(entrypoint)}")
+        lines.append(f"Entrypoint={_escape_percent(flatten(entrypoint))}")
     if command is not None:
-        lines.append(f"Exec={flatten(command)}")
+        lines.append(f"Exec={_escape_percent(flatten(command))}")
     return lines
 
 
@@ -789,11 +973,20 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     for vol in spec.get("volumes", []) or []:
         container.append(f"Volume={_volume(str(vol), service)}")
 
-    if spec.get("environment"):
+    # QUADLET_ONLY_ENV counts: a service whose whole environment is Quadlet-only still needs the
+    # file mounted, and redis is exactly that case since its password was taken back out of the
+    # compose map. Keying this off `spec["environment"]` alone emitted a template nothing read.
+    if spec.get("environment") or QUADLET_ONLY_ENV.get(service):
         container.append(f"EnvironmentFile={ENV_DIR_ON_HOST}/{service}.env")
 
     container += _exec(service, spec)
-    container += _health(spec.get("healthcheck") or {}, spec.get("environment") or {}, service)
+    health_container, health_service = _health(
+        spec.get("healthcheck") or {},
+        {**(spec.get("environment") or {}), **QUADLET_ONLY_ENV.get(service, {})},
+        service,
+    )
+    container += health_container
+    service_section += health_service
 
     podman_args: list[str] = []
     limits = (spec.get("deploy") or {}).get("resources", {}).get("limits", {})
@@ -877,6 +1070,25 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     if grace:
         service_section.append(f"TimeoutStopSec={str(grace).rstrip('s')}")
 
+    # Everything in [Container] is folded by Quadlet into one ExecStart=, where systemd expands
+    # `%` specifiers. Exec=, Entrypoint= and HealthCmd= are escaped at the point they are built;
+    # the rest are refused rather than escaped, because a `%` in a volume path or a label is far
+    # more likely to be a mistake than an intention, and the only two that carry one today are the
+    # postgres commands. This is the guard that stops the next `command:` from reintroducing
+    # quietly what finding 4 found running.
+    for line in container:
+        key, _, value = line.partition("=")
+        if key in ("Exec", "Entrypoint", "HealthCmd"):
+            continue
+        if "%" in value:
+            raise Refusal(
+                f"{service}: {key}= carries a `%` ({value!r}). Quadlet folds every [Container] key "
+                "into ExecStart=, where systemd reads `%` as a specifier -- `%m` becomes the "
+                "machine id, `%d` is unresolvable outside a credential context. Measured on the "
+                "testing host 2026-09-18: Quadlet does NOT escape it. Double it to `%%` at the "
+                "place this value is built, the way _escape_percent does for Exec=."
+            )
+
     out = ["# Generated by scripts/generate-quadlet.py -- do not edit. Run the generator."]
     if unit:
         # StartLimitIntervalSec= belongs in [Unit]. systemd.service(5) does not mention it at all --
@@ -930,6 +1142,13 @@ def render_vars(service: str, spec: dict[str, Any]) -> str:
         items = [(k, str(v)) for k, v in env.items()]
     else:
         items = [tuple(str(e).split("=", 1)) for e in env]
+    # Plus the names only the Quadlet shape needs -- see QUADLET_ONLY_ENV for why they are not in
+    # the compose `environment:` map. They are part of this service's closed allow-list, so they
+    # belong in its template and nowhere else.
+    declared = {k for k, _ in items}
+    for key, value in QUADLET_ONLY_ENV.get(service, {}).items():
+        if key not in declared:
+            items.append((key, value))
 
     for key, value in items:
         if "\n" in value:
@@ -1055,7 +1274,10 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 notes.append(f"{service}: {kind} -- {reason}")
                 continue
             files[f"quadlet/systemd/{service}.container"] = render_container(service, spec)
-            if spec.get("environment"):
+            # QUADLET_ONLY_ENV counts here for the same reason it counts for EnvironmentFile=:
+            # redis's whole environment is Quadlet-only now, and keying off the compose map alone
+            # made --check report its template as stale on the very run that wrote it.
+            if spec.get("environment") or QUADLET_ONLY_ENV.get(service):
                 files[f"quadlet/env.d/{service}.env.tmpl"] = render_vars(service, spec)
 
             nets = spec.get("networks")

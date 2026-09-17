@@ -335,6 +335,17 @@ jobs:
       - name: Check the Quadlet units against the compose files
         run: python3 scripts/generate-quadlet.py --check
 
+      # The drift check above compares the generator against ITS OWN OUTPUT, so a translation that
+      # is uniformly wrong is uniformly consistent and reports clean. Four defects reached the tree
+      # behind that green check (PR #1933 review, 2026-09-18): an exec-form healthcheck re-joined
+      # into an unquoted shell string, `Notify=healthy` with no start timeout, raw systemd `%`
+      # specifiers copied into `Exec=` -- measured LIVE, both databases were running with a
+      # corrupted log_line_prefix -- and a prefix-unsafe variable rewrite. None of them is visible
+      # by diffing the generator against itself; all four are properties of the translation, which
+      # is what this asserts.
+      - name: Self-test the Quadlet generator's translation
+        run: bash scripts/generate-quadlet.test.sh
+
   probe-vs-allowlist:
     name: probe-vs-allowlist
     runs-on: ubuntu-latest

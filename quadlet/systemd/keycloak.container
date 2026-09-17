@@ -36,6 +36,7 @@ PidsLimit=2048
 PodmanArgs=--cpus=3.0
 
 [Service]
+TimeoutStartSec=390
 Restart=always
 RestartSec=1
 RestartSteps=6

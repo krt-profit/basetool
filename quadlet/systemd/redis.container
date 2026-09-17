@@ -17,7 +17,7 @@ Volume=/var/iri/redis:/data
 Volume=/var/iri/redis/users.acl:/etc/redis/users.acl:ro
 EnvironmentFile=/var/iri/code/env.d/redis.env
 Exec=redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
-HealthCmd=redis-cli -a ${REDIS_PASSWORD:?} --no-auth-warning ping
+HealthCmd=redis-cli -a "${REDIS_PASSWORD:?}" --no-auth-warning ping
 HealthInterval=5s
 HealthTimeout=5s
 HealthRetries=5
@@ -27,6 +27,7 @@ PidsLimit=512
 PodmanArgs=--cpus=1.0
 
 [Service]
+TimeoutStartSec=110
 Restart=always
 RestartSec=1
 RestartSteps=6

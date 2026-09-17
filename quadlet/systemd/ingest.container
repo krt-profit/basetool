@@ -31,6 +31,7 @@ AddHost=localhost:127.0.0.1
 PodmanArgs=--cpus=1.5 --init
 
 [Service]
+TimeoutStartSec=225
 Restart=always
 RestartSec=1
 RestartSteps=6

@@ -28,6 +28,7 @@ PidsLimit=512
 PodmanArgs=--oom-score-adj=500 --init
 
 [Service]
+TimeoutStartSec=300
 Restart=always
 RestartSec=1
 RestartSteps=6

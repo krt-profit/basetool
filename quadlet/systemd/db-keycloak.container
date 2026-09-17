@@ -13,7 +13,7 @@ NoNewPrivileges=true
 Network=net-db-keycloak.network
 Volume=/var/iri/db-keycloak:/var/lib/postgresql/data
 EnvironmentFile=/var/iri/code/env.d/db-keycloak.env
-Exec=postgres -c shared_buffers=128MB -c effective_cache_size=384MB -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=120 -c log_error_verbosity=terse -c log_line_prefix='%m [%p] %q%u@%d/%a '
+Exec=postgres -c shared_buffers=128MB -c effective_cache_size=384MB -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=120 -c log_error_verbosity=terse -c log_line_prefix='%%m [%%p] %%q%%u@%%d/%%a '
 
 HealthCmd=pg_isready -U ${POSTGRES_USER:?} -d ${POSTGRES_DB:?} -p 15433
 HealthInterval=5s
@@ -25,6 +25,7 @@ PidsLimit=512
 PodmanArgs=--cpus=1.0
 
 [Service]
+TimeoutStartSec=110
 Restart=always
 RestartSec=1
 RestartSteps=6

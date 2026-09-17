@@ -1286,12 +1286,20 @@ services:
     command: redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --loglevel notice --aclfile /etc/redis/users.acl
     # A service-level `volumes:` replaces the merged template value, so the data volume is re-listed
     # alongside the read-only ACL mount.
-    # The healthcheck authenticates, so the password has to reach the container. It is an
-    # environment variable rather than an argument: under Quadlet the health command is expanded
-    # by a shell inside the container from its own environment (measured on podman 6.1.0), so the
-    # value never has to be written into a unit file on the host.
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # The healthcheck authenticates, so the password has to reach redis-cli -- but the two
+    # deployments need it in different places, and for a while this file carried BOTH.
+    #
+    # Compose expands `${REDIS_PASSWORD:?}` in the healthcheck below on the HOST, at file-load
+    # time, so the running container never needs the name. Quadlet's HealthCmd= is expanded by a
+    # shell INSIDE the container, so it does. A service-level `environment:` was added here to
+    # satisfy Quadlet, and it took effect in the Docker deployment that is serving production
+    # today: the password became readable from /proc/1/environ by any process in the container and
+    # from `docker inspect redis`, for a deployment with no use for it. That is the same exposure
+    # class the --requirepass removal above was justified by removing, so it has been taken back
+    # out (2026-09-18).
+    #
+    # The Quadlet half is declared where only Quadlet reads it: QUADLET_ONLY_ENV in
+    # scripts/generate-quadlet.py, which puts it in quadlet/env.d/redis.env.tmpl and nowhere else.
     volumes:
       - /var/iri/redis:/data
       - ${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}:/etc/redis/users.acl:ro
@@ -1825,6 +1833,15 @@ services:
       # wildcard or a prefix, because the header asserts an address rather than
       # proving one.
       EDGE_TRUSTED_PROXY: ${EDGE_TRUSTED_PROXY:-}
+      # Also optional and also empty by design: extra addresses admitted to the
+      # Keycloak admin console. The six container-bridge gateways in
+      # 10-frontend.conf.template are what $remote_addr is on a PLAIN listener;
+      # once EDGE_TRUSTED_PROXY is set, $remote_addr is what the front end
+      # asserts, and render-and-run.sh adds the host loopback -- the address the
+      # operator's `ssh -L 443:127.0.0.1:443` tunnel then arrives on. This is for
+      # anything beyond that, such as a jump host, and is held to the same rule:
+      # literal addresses, whitespace-separated, never a prefix.
+      EDGE_ADMIN_ALLOW: ${EDGE_ADMIN_ALLOW:-}
     healthcheck:
       # The jc21 image shipped none, so the deploy pipeline's fail-on-unhealthy
       # gate could never fire for the edge. /healthz proves nginx is accepting and
