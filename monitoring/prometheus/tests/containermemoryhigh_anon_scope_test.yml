@@ -20,6 +20,10 @@
 #     prom/prometheus:v3.14.0 test rules tests/containermemoryhigh_anon_scope_test.yml
 
 rule_files:
+  # The alert reads the NORMALISED series since the Podman migration, so the recording
+  # rules that produce them have to be loaded too -- without this file the alert has no
+  # input and the test proves only that promtool can evaluate an empty vector.
+  - ../alerts/containers-runtime.yml
   - ../alerts/infrastructure.yml
 
 evaluation_interval: 1m

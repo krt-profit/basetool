@@ -849,6 +849,46 @@ shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.Busine
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
+#### The one family of `basetool_*` names no JVM module emits
+
+`basetool_container_*` and `basetool_container_metrics_*` are written by
+[`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) into
+node_exporter's textfile directory. They are registered here because the naming rule is
+repository-wide, not module-wide: anything called `basetool_*` obeys REQ-OBS-006, whoever produces
+it. Added 2026-09-18; the collector shipped without them being written down, which made the
+vocabulary look complete while eleven series sat outside it.
+
+They exist because the Podman migration deletes cAdvisor — its rootless-Podman support is closed
+upstream as *not planned* — and `prometheus-podman-exporter` is a **subset** of what cAdvisor
+published (ADR-0163). The collector supplies the remainder by reading the cgroup v2 tree, which
+needs no daemon, no socket and no privilege beyond reading `/sys/fs/cgroup`.
+
+| series | type | source file | replaces |
+|---|---|---|---|
+| `basetool_container_cpu_usage_seconds_total` | counter | `cpu.stat` `usage_usec` | `container_cpu_usage_seconds_total` |
+| `basetool_container_cpu_periods_total` | counter | `cpu.stat` `nr_periods` | `container_cpu_cfs_periods_total` |
+| `basetool_container_cpu_throttled_periods_total` | counter | `cpu.stat` `nr_throttled` | `container_cpu_cfs_throttled_periods_total` |
+| `basetool_container_cpu_throttled_seconds_total` | counter | `cpu.stat` `throttled_usec` | `container_cpu_cfs_throttled_seconds_total` |
+| `basetool_container_oom_kills_total` | counter | `memory.events` `oom_kill` | `container_oom_events_total` |
+| `basetool_container_memory_anon_bytes` | gauge | `memory.stat` `anon` | `container_memory_rss` |
+| `basetool_container_memory_usage_bytes` | gauge | `memory.current` | — |
+| `basetool_container_memory_working_set_bytes` | gauge | `memory.current` − reclaimable | `container_memory_working_set_bytes` |
+| `basetool_container_memory_limit_bytes` | gauge | `memory.max` | `container_spec_memory_limit_bytes` |
+| `basetool_container_pids` | gauge | `pids.current` | `container_threads` |
+| `basetool_container_pids_max` | gauge | `pids.max` | `container_threads_max` |
+| `basetool_container_metrics_containers` | gauge | the collector itself | — |
+| `basetool_container_metrics_timestamp_seconds` | gauge | the collector itself | — |
+
+**Labels.** Exactly one, `name`, holding the container name — bounded by the deployment's own
+container set, which is a fixed list in the compose files and the Quadlet units. cAdvisor's `id`,
+`image` and `container_label_*` are deliberately **not** reproduced: `id` changes on every
+recreation, which is unbounded cardinality by definition.
+
+**Consumers.** Nothing reads these names directly. `monitoring/prometheus/alerts/containers-runtime.yml`
+normalises them and the cAdvisor families into one `basetool:container:*` set of recording rules,
+and the alerts and `02-containers.json` read that — so the cutover changes nothing downstream and
+both shapes work while the two runtimes run side by side. See REQ-OBS-014.
+
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
 > success**, so `absent(last_success)` means "has never succeeded" — which covers two very
@@ -2180,6 +2220,30 @@ therefore alerts on:
   `node_filesystem_*`). The 2048 cap is
   hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
   the cap to silence the alert.
+- **One name per container signal, whichever runtime is serving it** (added 2026-09-18, ADR-0163).
+  The four alerts above read **normalised recording rules** —
+  `basetool:container:{memory_anon_bytes,memory_limit_bytes,pids,pids_max,oom_kills_total,cpu_periods_total,cpu_throttled_periods_total}`
+  — defined in `monitoring/prometheus/alerts/containers-runtime.yml`, not cAdvisor's series
+  directly. Each is `cAdvisor-family or cgroup-collector-family`, both reduced with `max by (name)`
+  so the two halves are substitutable and the ratio alerts divide without a runtime-specific
+  `on(...)` clause. The Podman migration renames every one of these families at once, and
+  production (Docker + cAdvisor) and the testing host (rootless Podman + the textfile collector)
+  run side by side for the length of the cutover: repointing the consumers at the new names would
+  blind production, and leaving them on the old ones ships a collector nothing reads. The `or`
+  makes the cutover invisible downstream — the left side simply stops producing samples, per
+  container, with no gap and no edit. Normalisation also **strips** cAdvisor's `id` / `image`
+  labels, so an alert keeps its identity across the cutover instead of every notification looking
+  new. Three cAdvisor panels have no cgroup equivalent and stay on the old names until
+  `prometheus-podman-exporter` lands with them (`container_memory_mapped_file`,
+  `container_start_time_seconds`, `container_network_*`); the per-alert mapping is
+  `docs/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
+  `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
+  the collector itself, because a collector that stops writing — or writes a **fresh** file
+  matching zero cgroups — takes the four alerts above down with it silently, which is the failure
+  mode the collector's own docstring names: *"an alert that never fires, which looks exactly like a
+  healthy system"*. Both are inert on a host that never runs it. All nine behaviours, including
+  the no-double-alert property during the cutover window, are locked by
+  `monitoring/prometheus/tests/container_runtime_normalisation_test.yml`.
 - **Alertmanager routing & root-cause suppression.** One real fault fans out into many true-positive
   downstream symptoms; the notification plane collapses them so an operator sees the cause, not the
   storm. The route groups by `alertname` only (`group_by: ['alertname']`) — grouping *also* by `job`
