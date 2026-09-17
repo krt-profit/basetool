@@ -173,18 +173,32 @@ bundle and fails the release on any secret-shaped file, and a final re-assertion
 
 ### REQ-OPS-006 — Stateful-infra changes are operator-gated
 
-A change to the **postgres** or **Keycloak** image pin is a stateful, choreographed upgrade
+A change to the **postgres** or **Keycloak** image **tag** is a stateful, choreographed upgrade
 (PGDATA major migration; Keycloak provider + keystore-SAN dance) that a blind `up -d` would
 break and the health gate would then roll back in a loop. `deploy.sh` must detect such a change
 and refuse to auto-apply it, alert once, then skip subsequent ticks quietly until a new
 promotion or an explicit operator `--force` after the documented manual upgrade. redis and npm
 image bumps are auto-applied.
 
+**The gate is on the tag, not on the whole pin.** A *same-tag digest refresh* — a rebuilt base
+image, which is normally a security fix — **must** auto-apply. Gating it inverts the purpose of
+the gate: it leaves the stack on the vulnerable build precisely when it should move fastest.
+
+> [!warning] Corrected 2026-09-17
+> This requirement said "image **pin**" and its first acceptance criterion said any `postgres:` or
+> `quay.io/keycloak/keycloak:` pin change is not auto-applied. That has been untrue since
+> 2026-09-12, when `031e75fed` narrowed the comparison to the tag after the full-reference
+> comparison froze the testing host for seven days (1901 skipped ticks, a compose file from
+> 2026-08-21) over a Keycloak rebuild. The code and `scenario_infra_digest_refresh_is_not_gated`
+> were right and this spec was stale; the wording is corrected here, the behaviour is unchanged.
+
 **Acceptance**
 
-- [ ] A promotion whose compose changes a `postgres:` or `quay.io/keycloak/keycloak:` pin is
+- [ ] A promotion whose compose changes a `postgres:` or `quay.io/keycloak/keycloak:` **tag** is
   not auto-applied; the run records the block and exits non-zero on first encounter, then
   skips quietly on repeat ticks.
+- [ ] A promotion that changes only the **digest** behind an unchanged `postgres:` or
+  `quay.io/keycloak/keycloak:` tag **is** auto-applied, with no `CARVE-OUT` line.
 - [ ] `deploy.sh --force` applies a previously-gated stateful-infra change.
 - [ ] A redis or npm image bump (no postgres/Keycloak change) is auto-applied.
 
