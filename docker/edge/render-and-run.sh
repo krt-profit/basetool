@@ -93,6 +93,59 @@ done
 mkdir -p "${CONF_OUT}"
 rm -f "${CONF_OUT}"/*.conf
 
+# --- the resolver, derived rather than hardcoded --------------------------------
+#
+# `proxy_pass` with a variable host defers resolution to run time, which is what
+# lets an upstream container be recreated with a new address without restarting
+# the edge. That needs a `resolver`, and the address is RUNTIME-SPECIFIC:
+#
+#   Docker  -> its embedded DNS at 127.0.0.11
+#   Podman  -> aardvark-dns, on the gateway of each attached network
+#
+# nginx.conf used to carry 127.0.0.11 literally. Under Podman nothing listens
+# there, so nginx sent each query into a void, waited the default
+# resolver_timeout of 30s, and answered 503 -- while TCP and TLS completed
+# normally, so the failure was invisible to every check short of a real request.
+#
+# /etc/resolv.conf is correct on both runtimes by construction: it is what the
+# container's own resolver uses. Measured on Podman 5.8.2 with the edge on six
+# networks: all nine addresses it lists answer for a container on any one of
+# them, so passing them all is safe and no round-robin can pick a server that
+# would say NXDOMAIN for a name another server knows.
+#
+# IPv6 addresses need brackets in an nginx resolver directive.
+RESOLVERS=''
+if [ -r /etc/resolv.conf ]; then
+  RESOLVERS=$(awk '/^nameserver[ \t]/ {
+    if ($2 ~ /:/) printf "[%s] ", $2; else printf "%s ", $2
+  }' /etc/resolv.conf)
+fi
+
+if [ -z "${RESOLVERS}" ]; then
+  if [ -n "${EDGE_RENDER_ONLY:-}" ]; then
+    # A configuration check has no network and no DNS: scripts/check-edge-nginx.sh
+    # renders with `--network none`, where /etc/resolv.conf does not merely lack a
+    # nameserver -- it does not exist. `nginx -t` still needs a syntactically valid
+    # directive, and which address it names cannot affect a parse.
+    #
+    # 192.0.2.1 is TEST-NET-1 (RFC 5737), reserved for documentation and routable
+    # nowhere, so this can never be mistaken for a working configuration if it
+    # somehow reaches a running edge.
+    RESOLVERS='192.0.2.1 '
+    echo "edge: no /etc/resolv.conf - placeholder resolver, validation only"
+  else
+    # Refuse at start rather than at the first proxied request. Without a resolver
+    # nginx starts happily and then fails every upstream with "no resolver defined
+    # to resolve <name>" -- an error that arrives hours later and reads as a DNS
+    # outage rather than as a missing line.
+    echo "edge: refusing to start - no nameserver in /etc/resolv.conf" >&2
+    echo "edge: a variable proxy_pass cannot resolve without one (ADR-0162)" >&2
+    exit 1
+  fi
+fi
+printf 'resolver %s valid=10s;\n' "${RESOLVERS% }" > "${CONF_OUT}/00-resolver.conf"
+echo "edge: resolver ${RESOLVERS% }"
+
 # After the wipe, or the next start deletes it again.
 if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
   # http context: `include /tmp/edge-conf.d/*.conf` sits inside `http`, the same

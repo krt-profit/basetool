@@ -2557,3 +2557,54 @@ moves; both are @greluc's call.
 `api.basetool.greluc.me` answers 404 by a deliberate default-deny decision, and
 `grafana.basetool.greluc.me` is not configured at all and falls into Caddy's `handle { abort }`.
 The monitoring plane is therefore measurable from inside the host and not from the internet.
+
+### The edge answered a handshake and nothing else, for thirty seconds
+
+The certificate went in and every TLS check passed — four vhosts, `Verify return
+code: 0`, through haproxy, the way the front end reaches it. That was reported as
+"the chain is up". **The PVE operator asked for layer 3 and it was not there:** a
+request returned zero bytes and timed out.
+
+```
+dns=0.000009  connect=0.000093  tls=0.002235  firstbyte=30.007130  code=503
+```
+
+Thirty seconds, to the millisecond, which is nginx's default `resolver_timeout`.
+`nginx.conf` carried
+
+```nginx
+resolver 127.0.0.11 valid=10s;   # "Docker's embedded resolver"
+```
+
+and **nothing listens at 127.0.0.11 under Podman** — measured from inside the
+container, `Connection refused`. The resolver is aardvark-dns on each network's
+gateway; the container's own `/etc/resolv.conf` named nine of them and every one
+answered in about 110 ms.
+
+The directive is now rendered from `/etc/resolv.conf` rather than written in the
+file, which is correct on **both** runtimes: Docker's resolv.conf names
+127.0.0.11, Podman's names the gateways. Measured after: **30.007 s → 0.0045 s.**
+
+Three things this cost, each worth keeping:
+
+- **A layer-2 measurement was reported as a layer-3 result.** `Verify return
+  code: 0` says the handshake completed and the chain validated. It says nothing
+  about whether anything answers. The claim went out anyway.
+- **The prediction was half wrong, which is how it earned its keep.** "Fast 502"
+  was predicted; a fast **503** arrived. The difference is not noise: each vhost
+  includes `maintenance.conf`, so an unreachable upstream deliberately becomes a
+  503 maintenance page with `retry-after: 60`. Checking why the code differed is
+  what turned an assumption into the behaviour.
+- **`--network none` has no `/etc/resolv.conf` at all**, not merely an empty one,
+  and `scripts/check-edge-nginx.sh` renders that way. The first version of the
+  fix turned that CI gate red. The refusal now applies only to a real start;
+  under `EDGE_RENDER_ONLY` a TEST-NET-1 placeholder keeps `nginx -t` parseable
+  and can never be mistaken for a working address.
+
+> [!note] Why the gate could not be run here, and what was run instead
+> `check-edge-nginx.sh` bind-mounts without `:z`, so SELinux blocks it under
+> rootless Podman — it fails identically against **unmodified** `HEAD`, which is
+> what established that the failure was the harness. Its substance was then run
+> directly, with certificates staged and `:z` added: `nginx -t` exits 0 with zero
+> warnings in both the plain and the PROXY-protocol shape, before and after the
+> change. CI runs Docker on Ubuntu, where the gate is green today.
