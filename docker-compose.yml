@@ -259,13 +259,21 @@ x-db-keycloak: &db-keycloak-template
 
 x-keycloak: &keycloak-template
   # Same digest pin policy as the Postgres images. Refresh with
-  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7`.
-  # TODO(2026-09-13): the version catalog's Keycloak SPI libs are already on 26.7.3 (a
-  # security release fixing 20 CVEs), but this digest still resolves 26.7 and could not be
-  # refreshed from this environment — quay.io is unreachable here. Refresh to 26.7.3 with
-  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7.3` from a host that can
-  # reach quay.io.
-  image: quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
+  # `docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7` and confirm which patch
+  # you actually got — the index digest alone does not say. Read it back from the image's own
+  # label, which is the only authority on that:
+  #   docker buildx imagetools inspect quay.io/keycloak/keycloak:26.7 --format '{{json .Image}}'
+  #   -> .["linux/amd64"].config.Labels["org.opencontainers.image.version"]
+  #
+  # CORRECTION(2026-09-17): a TODO here claimed this pin "still resolves 26.7" and had to be
+  # refreshed to 26.7.3. That was wrong — ff4257d0 WAS 26.7.3, set by the 26.7.3 bump itself
+  # (e120d1d18); its label reads 26.7.3. The TODO was written from an environment that could
+  # not reach quay.io, i.e. from the tag in the pin rather than from the image, and the `:26.7`
+  # tag is exactly what cannot tell 26.7.2 from 26.7.3. Hence the label recipe above. Nothing
+  # was missing from production; the note was.
+  #
+  # Now 26.7.4 (label-verified, built 2026-09-16): six CVEs, and `:26.7` resolves here too.
+  image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
   command: start --proxy-headers xforwarded --cache=local --log=console,file --log-file=/var/log/keycloak/keycloak.log
   restart: unless-stopped
   logging: *default-logging
