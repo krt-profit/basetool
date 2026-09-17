@@ -59,6 +59,7 @@ import argparse
 import concurrent.futures
 import dataclasses
 import datetime as dt
+import ipaddress
 import json
 import os
 import shlex
@@ -122,11 +123,20 @@ REQUIRED_CONTAINER_SERIES = (
     "container_cpu_usage_seconds_total",
 )
 
-#: Private ranges an edge must never report as a client address. If our own probe comes back
-#: wearing one of these, a userland port forwarder is rewriting the source - which is the
-#: 2026-07-20 outage, and the failure mode rootless Podman's ``rootlessport`` would reintroduce.
-PRIVATE_PREFIXES = ("10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.2", "172.30.",
-                    "172.31.", "192.168.", "127.", "fd", "fe80:", "::1")
+#: Ranges an edge must never report as a client address. If our own probe comes back wearing one,
+#: a userland port forwarder is rewriting the source - which is the 2026-07-20 outage, and the
+#: failure mode rootless Podman's ``rootlessport`` would reintroduce.
+#:
+#: These were TEXT PREFIXES until 2026-09-18, and the spelling was the whole problem twice over:
+#: `::ffff:172.28.15.10` -- the IPv4-mapped form a single dual-stack bind produces -- began with
+#: none of them and read as public, while the entry `"172.2"`, written to cover 172.20-172.29,
+#: also matched `172.2.3.4`, which is ordinary public space. Networks answer both correctly.
+NEVER_A_CLIENT = (
+    ipaddress.ip_network("10.0.0.0/8"),        # RFC 1918
+    ipaddress.ip_network("172.16.0.0/12"),     # RFC 1918 -- 172.16 through 172.31, and no further
+    ipaddress.ip_network("192.168.0.0/16"),    # RFC 1918
+    ipaddress.ip_network("fc00::/7"),          # RFC 4193 unique-local
+)
 
 PROBE_HEADER = "X-Basetool-Conformance"
 
@@ -224,6 +234,8 @@ class HostRunner:
         self.ssh_target = ssh_target
         self.stub = stub
         self.timeout = timeout
+        #: Cached container-runtime prefix; detected once, on first use. See `container_cli`.
+        self._container_cli: str | None = None
 
     @property
     def available(self) -> bool:
@@ -274,6 +286,95 @@ class HostRunner:
             err = (proc.stderr or proc.stdout).strip().splitlines()
             raise CheckFailed(f"host command failed ({proc.returncode}): {err[-1] if err else command}")
         return proc.stdout.strip()
+
+    @property
+    def container_cli(self) -> str:
+        """The command prefix that reaches THIS host's containers.
+
+        The suite shelled out to a literal ``docker`` in eight places while
+        ``ansible/roles/basetool_host`` installs podman, crun, netavark, aardvark-dns and passt --
+        and no ``podman-docker`` shim. On a host this repository bootstraps there is no ``docker``
+        binary at all, so the three checks written specifically to assert the new ADR-0189/0190
+        posture were the ones that could never run against the runtime they were written for.
+
+        It is detected, not configured, and detected by TRYING rather than by inferring. The first
+        version of this looked the owning user up with
+        ``ls /home/*/.config/containers/systemd/*.container``; ``/home/iri`` is ``0750`` and the
+        runner is ``sysadm``, so the glob expanded to nothing, the fallback picked the current
+        user, and bare ``podman`` answered ``no such object`` for eight healthy containers --
+        every arm of the suite would have reported a dead stack. So each candidate is asked
+        whether it can actually see containers, and the first that can is the answer.
+
+        Measured on the testing host, 2026-09-18: all eight command shapes the suite uses
+        (``ps --format``, ``inspect --format`` over ``.State.Pid``, ``.HostConfig.ReadonlyRootfs``,
+        ``.NetworkSettings.Networks``, ``.NetworkSettings.Ports``, ``.Config.Env``) return
+        identically under ``podman`` and ``docker``. ``logs`` does not -- see
+        :meth:`container_log_cmd`.
+
+        Returns:
+            ``docker``, ``podman``, or a ``sudo -n -u <user> XDG_RUNTIME_DIR=… podman`` prefix for
+            a rootless deployment the runner does not itself own.
+
+        Raises:
+            Skip: when no host access is configured, or the host has neither runtime.
+        """
+        if self._container_cli is None:
+            probe = (
+                "if command -v docker >/dev/null 2>&1 && docker ps >/dev/null 2>&1; then "
+                "  echo docker; "
+                "elif command -v podman >/dev/null 2>&1; then "
+                "  if podman ps --format '{{.Names}}' 2>/dev/null | grep -q .; then echo podman; "
+                "  else "
+                "    found=; "
+                "    for u in $(ls -1 /var/lib/systemd/linger 2>/dev/null); do "
+                "      uid=$(id -u \"$u\" 2>/dev/null) || continue; "
+                "      if sudo -n -u \"$u\" XDG_RUNTIME_DIR=/run/user/$uid podman ps "
+                "           --format '{{.Names}}' 2>/dev/null | grep -q .; then "
+                "        found=\"sudo -n -u $u XDG_RUNTIME_DIR=/run/user/$uid podman\"; break; "
+                "      fi; "
+                "    done; "
+                "    echo \"${found:-podman}\"; "
+                "  fi; "
+                "else echo NONE; fi"
+            )
+            answer = self.run(probe).strip().splitlines()[-1].strip()
+            if answer == "NONE" or not answer:
+                raise Skip("this host has neither a docker nor a podman binary")
+            self._container_cli = answer
+        return self._container_cli
+
+    def container_log_cmd(self, name: str, minutes: int) -> str:
+        """A command that prints one container's logs, bounded by time.
+
+        ``logs`` is the one shape that does **not** survive the runtime swap, which is why it has
+        its own method instead of riding on :attr:`container_cli`. Measured on the testing host,
+        2026-09-18: the Quadlet units run with podman's rootless default log driver, ``journald``,
+        and ``podman logs edge --since 60m`` returns **zero lines** for a container that is
+        logging -- while ``journalctl CONTAINER_NAME=edge`` over the same window returns 67
+        access-log lines. Swapping the binary alone would have left two checks reading an empty
+        log and reporting on it.
+
+        ``journalctl`` needs no ``sudo`` for this: the entries carry no ``_UID`` restriction and
+        the runner (``sysadm``, in ``wheel``) read them unprivileged in the same measurement.
+
+        Note this never merges stderr. The distinct-client-address count used ``2>&1`` and so
+        counted nginx's own error log as clients -- on real data the distinct first fields include
+        ``2026/09/17``, a date, from a ``[notice]`` line.
+
+        Args:
+            name: the container name.
+            minutes: how far back to read.
+
+        Returns:
+            A shell command line printing the log, one line per entry, stdout only.
+        """
+        cli = self.container_cli
+        if cli.endswith("docker"):
+            return f"{cli} logs {name} --since {minutes}m 2>/dev/null"
+        return (
+            f"journalctl CONTAINER_NAME={name} --since '{minutes} min ago' "
+            "--no-pager -o cat 2>/dev/null"
+        )
 
     def ssh_client_address(self) -> str | None:
         """Report the address this machine presents to the host over SSH.
@@ -418,17 +519,62 @@ def _san_covers(host: str, sans: Sequence[str]) -> bool:
     return False
 
 
+def _parse_address(text: str) -> ipaddress._BaseAddress | None:
+    """Parse one log field into an address, unwrapping the IPv4-mapped IPv6 form.
+
+    Args:
+        text: a candidate address, as it appears as the first field of an access-log line.
+
+    Returns:
+        The address, with ``::ffff:a.b.c.d`` reduced to ``a.b.c.d``, or ``None`` when the text is
+        not an address at all -- which on real data includes ``2026/09/17``, the first field of
+        every nginx ``[notice]`` line.
+    """
+    candidate = text.strip().lower().rstrip(",")
+    if not candidate:
+        return None
+    candidate = candidate.split("%", 1)[0]  # fe80::1%eth0 -- drop the zone id
+    try:
+        parsed = ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+    mapped = getattr(parsed, "ipv4_mapped", None)
+    return mapped or parsed
+
+
 def _is_private(address: str) -> bool:
     """Whether an address is one a first-hop edge must never report as a client.
 
+    This compared PREFIX STRINGS until 2026-09-18, and so classified ``::ffff:172.28.15.10`` --
+    the IPv4-mapped IPv6 form -- as **public**: none of ``"10."``, ``"172."…``, ``"127."``,
+    ``"fd"``, ``"::1"`` is a prefix of it. That is precisely the shape a single dual-stack bind
+    produces, and `check_client_address_visible`, documented as "the check the whole suite exists
+    for", therefore returned PASS on the exact collapse it was written to catch.
+
+    Parsing the address instead of its spelling removes the whole class: ``ipaddress`` knows that
+    ``::ffff:10.9.0.14`` is ``10.9.0.14``, and that ``10.9.0.14`` is private, without a table of
+    text prefixes that has to enumerate ``"172.2"`` to cover ``172.20``–``172.29``.
+
     Args:
-        address: an IPv4 or IPv6 address in text form.
+        address: an IPv4 or IPv6 address in text form, in any spelling.
+
+    The ranges are named explicitly rather than deferred to ``ipaddress.is_private``, which is a
+    wider question than this one: it answers "is this address special-purpose in any registry",
+    and so covers the RFC 5737 documentation ranges -- ``203.0.113.0/24`` and friends -- that this
+    repository's own fixtures use as stand-ins for a *public* client. A check that calls
+    ``203.0.113.42`` a bridge address is a false red on every test host.
 
     Returns:
-        ``True`` for loopback, RFC 1918, RFC 4193 and link-local addresses.
+        ``True`` for loopback, RFC 1918, RFC 4193 and link-local addresses -- and for anything
+        that is not an address at all, because a first-hop edge reporting a non-address as its
+        client is not a passing state either.
     """
-    a = address.strip().lower()
-    return any(a.startswith(p) for p in PRIVATE_PREFIXES)
+    parsed = _parse_address(address)
+    if parsed is None:
+        return True
+    if parsed.is_loopback or parsed.is_link_local or parsed.is_unspecified:
+        return True
+    return any(parsed in net for net in NEVER_A_CLIENT if net.version == parsed.version)
 
 
 # ============================================================================================
@@ -547,7 +693,8 @@ def check_certificate_shared(ctx: Context) -> str:
             # Only ACME_HOSTS is extracted, on the host. The same environment carries
             # ACME_EMAIL, and an address must not cross into this process or the report.
             managed = ctx.runner.run(
-                'docker inspect acme --format "{{range .Config.Env}}{{println .}}{{end}}" '
+                f'{ctx.runner.container_cli} inspect acme '
+                '--format "{{range .Config.Env}}{{println .}}{{end}}" '
                 '| grep "^ACME_HOSTS=" | cut -d= -f2-')
         except (Skip, CheckFailed):
             managed = ""
@@ -741,10 +888,12 @@ def check_client_address_visible(ctx: Context) -> str:
     except OSError as exc:
         raise CheckFailed(f"could not issue the marked probe to {frontend}: {exc}") from exc
 
-    # docker logs, never tail: /var/log/nginx/access.log inside the container is a symlink to
-    # /dev/stdout, so tail/grep/wc block on a pipe that never ends. Always bounded by --since.
+    # The container log, never tail: /var/log/nginx/access.log inside the container is a symlink
+    # to /dev/stdout, so tail/grep/wc block on a pipe that never ends. Always bounded by time, and
+    # always read through HostRunner.container_log_cmd -- under podman's journald driver
+    # `podman logs` returns nothing at all, measured.
     logs = ctx.runner.run(
-        f"docker logs edge --since {ctx.log_window}m 2>&1 | grep -F {marker} | head -5")
+        f"{ctx.runner.container_log_cmd('edge', ctx.log_window)} | grep -F {marker} | head -5")
     if not logs.strip():
         raise CheckFailed(
             f"the edge logged no line carrying our probe marker within {ctx.log_window}m - "
@@ -759,19 +908,33 @@ def check_client_address_visible(ctx: Context) -> str:
 
     ssh_addr = ctx.runner.ssh_client_address()
     matched = ""
-    if ssh_addr and ((":" in ssh_addr) == (":" in first_field)):
-        if ssh_addr != first_field:
+    logged = _parse_address(first_field)
+    ssh_parsed = _parse_address(ssh_addr or "")
+    # Compare the PARSED addresses, not the spellings. `(":" in a) == (":" in b)` was a test for
+    # "same family" that reads `::ffff:10.9.0.14` as IPv6 and `10.9.0.14` as IPv4, so it skipped
+    # the cross-check on the one pairing where the two are the same address written two ways.
+    if ssh_parsed is not None and logged is not None and ssh_parsed.version == logged.version:
+        if ssh_parsed != logged:
             raise CheckFailed(
                 f"the edge logged {first_field} but this machine reaches the host from "
                 f"{ssh_addr} - the address is being rewritten in flight")
         matched = ", and it matches our SSH source"
 
-    distinct = ctx.runner.run(
-        "docker logs edge --since 60m 2>&1 | cut -d\" \" -f1 | sort -u | wc -l")
-    try:
-        count = int(distinct.split()[-1])
-    except (ValueError, IndexError) as exc:
-        raise CheckFailed(f"could not count distinct client addresses: {distinct!r}") from exc
+    # Counted here rather than with `cut | sort -u | wc -l` on the host, and over stdout only.
+    # The old pipeline merged stderr, so nginx's error log contributed distinct first fields --
+    # on this deployment's real log the distinct set includes `2026/09/17`, the date that opens
+    # every [notice] line. A fully collapsed edge logging exactly ONE client address still reached
+    # `count >= 2` that way, and the check reported green on the failure it was added to catch.
+    raw_lines = ctx.runner.run(f"{ctx.runner.container_log_cmd('edge', 60)} | head -20000")
+    addresses = set()
+    for line in raw_lines.splitlines():
+        fields = line.split()
+        if not fields:
+            continue
+        parsed = _parse_address(fields[0])
+        if parsed is not None:
+            addresses.add(parsed)
+    count = len(addresses)
     if count < 2:
         raise CheckFailed(
             f"the edge saw {count} distinct client address in the last hour - an edge behind a "
@@ -818,7 +981,8 @@ def check_redis_requires_auth(ctx: Context) -> str:
     # `head -n 1`, not `head -c N`: Redis keeps the connection open, so a byte count blocks until
     # it is reached and -NOAUTH is shorter than any sensible count. That cost one confusing run.
     cmd = (
-        'addr=$(docker inspect redis --format "{{range .NetworkSettings.Networks}}{{.IPAddress}} '
+        f'addr=$({ctx.runner.container_cli} inspect redis '
+        '--format "{{range .NetworkSettings.Networks}}{{.IPAddress}} '
         '{{end}}" | cut -d" " -f1); '
         'if [ -z "$addr" ]; then echo ABSENT; exit 0; fi; '
         "exec 3<>/dev/tcp/$addr/6379 || { echo UNREACHABLE; exit 0; }; "
@@ -860,7 +1024,8 @@ def check_containers_running(ctx: Context) -> str:
         Skip: when no host access is configured.
         CheckFailed: when a container is missing, exited, restarting or unhealthy.
     """
-    out = ctx.runner.run('docker ps -a --format "{{.Names}}|{{.Status}}"')
+    out = ctx.runner.run(
+        f'{ctx.runner.container_cli} ps -a --format "{{{{.Names}}}}|{{{{.Status}}}}"')
     status_by_name = {}
     for line in out.splitlines():
         if "|" in line:
@@ -904,7 +1069,7 @@ def _promql(ctx: Context, query: str) -> dict:
     """
     secret = "/var/iri/monitoring/secrets/prometheus_web_password"
     cmd = (
-        'addr=$(docker inspect prometheus '
+        f'addr=$({ctx.runner.container_cli} inspect prometheus '
         '--format "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}" '
         '| cut -d" " -f1); '
         '[ -n "$addr" ] || { echo NO_PROMETHEUS_ADDRESS >&2; exit 1; }; '
@@ -980,7 +1145,8 @@ def check_containers_unprivileged(ctx: Context) -> str:
     problems, good = [], []
     for name, expected in sorted(UNPRIVILEGED_CONTAINERS.items()):
         cmd = (
-            "pid=$(docker inspect --format '{{.State.Pid}}' " + name + " 2>/dev/null); "
+            f"pid=$({ctx.runner.container_cli} inspect --format '{{{{.State.Pid}}}}' "
+            + name + " 2>/dev/null); "
             'if [ -z "$pid" ] || [ "$pid" = 0 ]; then echo ABSENT; exit 0; fi; '
             "grep ^Uid: /proc/$pid/status; "
             "sed 's/^/MAP /' /proc/$pid/uid_map"
@@ -1051,7 +1217,8 @@ def check_containers_read_only(ctx: Context) -> str:
         CheckFailed: when a container is not read-only, or when one cannot be read at all.
     """
     out = ctx.runner.run(
-        'docker inspect --format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" '
+        f'{ctx.runner.container_cli} inspect '
+        '--format "{{.Name}}|{{.HostConfig.ReadonlyRootfs}}" '
         + " ".join(EXPECTED_APP_CONTAINERS)
     )
     state: dict[str, str] = {}
@@ -1257,9 +1424,19 @@ def check_env_reaches_the_units(ctx: Context) -> str:
         Skip: when no host access is configured, or the host carries no `.env`.
         CheckFailed: when the `.env` sets a value that neither the unit nor a drop-in carries.
     """
-    env_raw = ctx.runner.run("cat /var/iri/code/.env 2>/dev/null || true")
+    # Only the seven keys this check is about, filtered ON THE HOST -- the same shape
+    # check_certificate_shared already uses. `cat /var/iri/code/.env` pulled the whole production
+    # credential set across the SSH boundary into this process, and although nothing here could
+    # print one (BAKED_INTO_UNITS holds image tags, a host alias and four paths, and the message
+    # loop iterates only over those), the narrower read means the values never arrive at all. The
+    # names are module constants, so nothing caller-supplied reaches the pattern.
+    wanted = "|".join(sorted(BAKED_INTO_UNITS))
+    env_raw = ctx.runner.run(
+        f"grep -E '^({wanted})=' /var/iri/code/.env 2>/dev/null || true")
     if not env_raw.strip():
-        raise Skip("no /var/iri/code/.env on this host")
+        if not ctx.runner.run("test -f /var/iri/code/.env && echo yes || true").strip():
+            raise Skip("no /var/iri/code/.env on this host")
+        raise Skip("the .env on this host sets none of the variables the units bake in")
 
     env = {}
     for line in env_raw.splitlines():
@@ -1340,7 +1517,8 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
         CheckFailed: when the edge answers on an address other than loopback.
     """
     published = ctx.runner.run(
-        "docker inspect edge --format '{{json .NetworkSettings.Ports}}' 2>/dev/null || echo ''"
+        f"{ctx.runner.container_cli} inspect edge "
+        "--format '{{json .NetworkSettings.Ports}}' 2>/dev/null || echo ''"
     ).strip()
     if not published or '127.0.0.1' not in published:
         raise Skip(
@@ -1361,14 +1539,23 @@ def check_edge_not_directly_reachable(ctx: Context) -> str:
     for addr in addrs:
         target = f"[{addr}]" if ":" in addr else addr
         for port in ("8080", "8443"):
-            out = ctx.runner.run(
-                f"curl -s -o /dev/null -w '%{{http_code}}' --max-time 4 "
-                f"http://{target}:{port}/ 2>/dev/null || true"
-            ).strip()
-            # 000 is curl's "no HTTP response", which is what a refused or filtered port gives.
-            # Anything else means something answered, and something answering here is the defect.
-            if out and out != "000":
-                reachable.append(f"{target}:{port} -> HTTP {out}")
+            # curl's EXIT CODE, not its %{http_code}. The question here is whether a TCP
+            # connection can be established from a routable address -- not whether HTTP came back
+            # over it. `%{http_code}` answers `000` for both "connection refused" and "connected,
+            # then the server said nothing usable", and the second is exactly what :8443 does when
+            # it speaks PROXY protocol at a client that does not: an edge fully reachable from the
+            # internet read as refused.
+            #
+            #   7  could not connect        -> refused or filtered. This is the passing state.
+            #   28 operation timed out      -> filtered. Also passing.
+            #   anything else, 0 included   -> the connection was ESTABLISHED, which is the defect;
+            #                                  52 (empty reply) and 35 (TLS error) both land here.
+            code = ctx.runner.run(
+                f"curl -s -o /dev/null --connect-timeout 4 --max-time 6 "
+                f"http://{target}:{port}/ >/dev/null 2>&1; echo $?"
+            ).strip().splitlines()[-1].strip()
+            if code not in ("7", "28"):
+                reachable.append(f"{target}:{port} -> connected (curl exit {code})")
 
     if reachable:
         raise CheckFailed(

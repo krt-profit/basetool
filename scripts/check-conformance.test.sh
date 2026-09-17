@@ -224,21 +224,43 @@ emit_prom() { printf '{"status":"success","data":{"resultType":"vector","result"
 sample() { printf '{"metric":{%s},"value":[0,"%s"]}' "$1" "$2"; }
 
 case "$cmd" in
+  *"command -v docker"*)
+    # The runtime probe. The stub answers for a Docker-era host by default, which is what the
+    # existing arms below are written against; STUB_RUNTIME=podman exercises the other branch,
+    # where the log reads move off `<cli> logs` and onto journalctl.
+    echo "${STUB_RUNTIME:-docker}"
+    ;;
   *"SSH_CONNECTION"*)
     # Deliberately empty: the address-equality branch is an extra assertion when an SSH source is
     # available, never a requirement, and the harness must exercise the path that does without it.
     echo ""
     ;;
-  *"docker logs edge"*"--since 60m"*)
+  *"docker logs edge"*"--since 60m"*|*"journalctl CONTAINER_NAME=edge"*"60 min ago"*)
+    # Access-log LINES now, not a pre-counted number: the check counts distinct addresses itself,
+    # in python, so that a first field which is not an address cannot be counted as a client.
     case "$scenario" in
-      single-bucket) echo "1" ;;
-      *)             echo "37" ;;
+      single-bucket)
+        # One real client, collapsed -- plus the nginx error-log lines that used to be counted
+        # alongside it. This scenario passed before 2026-09-18 with count=3.
+        echo "172.28.15.1 - - [16/Sep/2026:13:00:00 +0000] \"GET / HTTP/1.1\" 200"
+        echo "172.28.15.1 - - [16/Sep/2026:13:00:01 +0000] \"GET /x HTTP/1.1\" 200"
+        echo "2026/09/17 22:10:02 [notice] 1#1: using the \"epoll\" event method"
+        echo "edge: starting nginx"
+        ;;
+      *)
+        echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET / HTTP/1.1\" 200"
+        echo "198.51.100.7 - - [16/Sep/2026:13:00:01 +0000] \"GET /x HTTP/1.1\" 200"
+        echo "2026/09/17 22:10:02 [notice] 1#1: using the \"epoll\" event method"
+        ;;
     esac
     ;;
-  *"docker logs edge"*)
+  *"docker logs edge"*|*"journalctl CONTAINER_NAME=edge"*)
     case "$scenario" in
       no-log-line)  printf '' ;;
       private-addr) echo "172.28.15.1 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
+      # The same collapse written the way a single dual-stack bind produces it. The prefix-string
+      # classifier read this as PUBLIC and passed.
+      mapped-addr)  echo "::ffff:172.28.15.10 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
       *)            echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
     esac
     ;;
@@ -255,12 +277,18 @@ case "$cmd" in
         *)            printf '10.9.0.15\n2003:db8::1\n' ;;
       esac
       ;;
-    *"--max-time 4 http://"*)
+    *"--connect-timeout 4"*"http://"*)
+      # curl's EXIT CODE now, not %{http_code}: 7 is "could not connect", which is the only
+      # passing state. See check_edge_not_directly_reachable for why `000` could not tell a
+      # refused port from an established connection that returned nothing.
       case "$scenario" in
         # Something answered on a routable address: the invariant is gone, and the PROXY header the
         # edge trusts can be forged by anyone able to reach that port.
-        edge-open) echo "200" ;;
-        *)         echo "000" ;;
+        edge-open)     echo "0" ;;
+        # Connected, then got an empty reply -- what :8443 does to a client that does not speak
+        # PROXY protocol. Reachable from the internet, and the old probe read it as refused.
+        edge-proxyproto) echo "52" ;;
+        *)             echo "7" ;;
       esac
       ;;
   *"/dev/tcp/"*)
@@ -592,9 +620,25 @@ STUB_SCENARIO=private-addr assert_status \
   "client-address-visible fails on a private/bridge client address" \
   client-address-visible fail "private/bridge address" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
+# The same collapse, spelled the way a single dual-stack bind produces it. Until 2026-09-18 the
+# classifier compared text prefixes, so `::ffff:172.28.15.10` matched none of them and the check
+# billed as "the check the whole suite exists for" returned PASS on the failure it exists to
+# detect.
+STUB_SCENARIO=mapped-addr assert_status \
+  "client-address-visible fails on the IPv4-MAPPED form of a bridge address" \
+  client-address-visible fail "private/bridge address" \
+  -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
+# A collapsed edge whose log ALSO carries nginx error lines. The distinct count merged stderr and
+# counted `2026/09/17` and `edge:` as clients, so this scenario reported green with count=3.
 STUB_SCENARIO=single-bucket assert_status \
   "client-address-visible fails when the edge sees one distinct client" \
   client-address-visible fail "distinct client address" \
+  -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
+# The same host through the OTHER runtime: podman's journald driver, where `podman logs` returns
+# nothing and the read has to go to journalctl. Measured on the testing host 2026-09-18.
+STUB_RUNTIME=podman STUB_SCENARIO=private-addr assert_status \
+  "client-address-visible reads the log under podman too" \
+  client-address-visible fail "private/bridge address" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 STUB_SCENARIO=no-log-line assert_status \
   "client-address-visible fails when the probe never reached the log" \
@@ -668,6 +712,12 @@ STUB_SCENARIO=logs-absent assert_status \
 STUB_SCENARIO=edge-open assert_status \
   "edge-not-directly-reachable fails when the edge answers on a routable address" \
   edge-not-directly-reachable fail "can be forged" -- "${STUB_ARGS[@]}"
+# The case %{http_code} could not see: the connection is ESTABLISHED from a routable address and
+# the listener then says nothing usable, because it is waiting for a PROXY header. Reachable from
+# the internet; the old probe read curl's `000` as "refused" and passed.
+STUB_SCENARIO=edge-proxyproto assert_status \
+  "edge-not-directly-reachable fails when the port connects but answers nothing" \
+  edge-not-directly-reachable fail "can be forged" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=edge-world assert_status \
   "edge-not-directly-reachable skips when nothing is in front of the edge" \
   edge-not-directly-reachable skip "does not publish on loopback" -- "${STUB_ARGS[@]}"
@@ -706,6 +756,52 @@ STUB_SCENARIO=env-no-units assert_status \
 STUB_SCENARIO=healthy assert_status \
   "env-reaches-the-units passes when no per-host override is set at all" \
   env-reaches-the-units pass "uncontested" -- "${STUB_ARGS[@]}"
+
+# =============================================================================================
+say ""
+say "== the client-address classifier, on the spellings a scenario cannot reach =="
+# =============================================================================================
+# The scenarios above exercise _is_private through the check. This table exercises it directly,
+# because two of its cases have no scenario: `172.2.3.4` is ordinary public space that the old
+# text-prefix entry `"172.2"` called private -- a FALSE RED nothing would have caught -- and
+# `172.32.0.1` sits one address outside RFC 1918's 172.16/12.
+classifier_result="$("$PY" - "$SUITE" <<'PYEOF'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("cc", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules["cc"] = module          # dataclasses resolves a class's module by name
+spec.loader.exec_module(module)
+
+CASES = [
+    ("::ffff:172.28.15.10", True,  "the IPv4-mapped bridge address (finding 1)"),
+    ("::ffff:10.9.0.14",    True,  "the mapped shape this deployment measured"),
+    ("172.28.15.1",         True,  "the same address written bare"),
+    ("172.2.3.4",           False, "public, but the old '172.2' prefix called it private"),
+    ("172.31.255.254",      True,  "the top of RFC 1918's 172.16/12"),
+    ("172.32.0.1",          False, "one address outside it"),
+    ("203.0.113.42",        False, "TEST-NET-3, which the fixtures use as a public client"),
+    ("127.0.0.1",           True,  "loopback"),
+    ("::1",                 True,  "loopback, v6"),
+    ("fd00::1",             True,  "RFC 4193 unique-local"),
+    ("fe80::1%eth0",        True,  "link-local carrying a zone id"),
+    ("2026/09/17",          True,  "not an address at all -- an nginx [notice] line"),
+    ("8.8.8.8",             False, "plainly public"),
+]
+for text, want, why in CASES:
+    got = module._is_private(text)
+    print(f"{'ok' if got == want else 'FAIL'}|{text}|{got}|{why}")
+PYEOF
+)"
+while IFS='|' read -r verdict text got why; do
+  [[ -n "$verdict" ]] || continue
+  if [[ "$verdict" == "ok" ]]; then
+    ok "_is_private(${text}) = ${got} -- ${why}"
+  else
+    bad "_is_private(${text}) = ${got} -- ${why}"
+  fi
+done <<< "$classifier_result"
 
 # =============================================================================================
 say ""
