@@ -145,12 +145,43 @@ Accepted on the measurements above, taken on the CentOS Stream 10 testing VM. Th
 Rocky Linux 10** before production, because ADR-0163's platform changed with this decision — the
 only reason to be on a development stream was the pasta forwarder, and this ADR removes it.
 
+> [!note] The target platform, measured 2026-09-17 — the rejected alternative is not merely
+> unattractive there, it is absent
+> The Rocky 10.2 host runs **podman 5.8.2, netavark 1.17.2, passt `0^20251210`** — one major version
+> behind the CentOS Stream VM these measurements were taken on. That matters in the deployment's
+> favour twice. **`rootless_port_forwarder` does not exist on 5.8.2 at all**, so the option this ADR
+> weighed and rejected is not a choice anyone can make here by accident. And the IPv6 defect above
+> is specific to *"Podman 6.1.x plus netavark 2.1.0"*, neither of which is installed — so the
+> decision rests on the front end being the right shape, not on a defect that followed us.
+>
+> It also **removes a belt this ADR never claimed but a reader might assume**: measured by the PVE
+> operator on netavark 1.17.2, `--internal` does **not** strip inbound DNAT, so an internal network
+> is not an ingress control on this version. Checked against these units — only `edge` publishes a
+> port, and only on loopback, and the five `Internal=true` networks carry none — so nothing is
+> exposed by it. The consequence is that the loopback-only publish is the **sole** barrier, which is
+> exactly why the test below is not optional.
+
 Two things are deliberately **not** settled yet, and neither may be guessed at deployment time:
 
-1. **The exact address `set_real_ip_from` names.** The measurement above trusted a subnet, which is
-   good enough for a probe and not good enough for production. The address the edge actually sees
-   behind `rootlessport` on a one-member `net-edge-ingress` is measured on the target platform and
-   pinned as a single address.
+1. ~~**The exact address `set_real_ip_from` names.**~~ **Answered on 2026-09-16** — see the note
+   under *Decision*: measured on Rocky against the real `net-edge-ingress`, the pinned
+   `IP=172.28.15.10` produced `peer=172.28.15.10` across three recreations, and without the pin the
+   address moved. `EDGE_TRUSTED_PROXY` therefore names that single address, not the subnet the
+   first probe trusted.
 2. **Unreachability from a third machine.** The probe above established that the port is closed on
-   the host's own global addresses. The stronger test — a direct connection from another host on the
-   management network — runs on Rocky before this is built for real.
+   the host's own global addresses. The stronger test — a direct connection from somewhere else —
+   runs on Rocky before this is built for real, and the note above is why it carries the whole
+   invariant rather than confirming a second layer.
+
+   **Pick the vantage point deliberately.** A host on the management network is the *weaker* one:
+   the testing host's guest firewall admits `10.1.0.0/24` and `192.168.2.0/24` in full, so a
+   connection from there is more permissive than the internet and a success proves nothing. The
+   asymmetry is still useful — a **failure** from the permissive side is strong evidence — but the
+   claim being made is about the internet, so the test belongs on the internet. @greluc's
+   suggestion, recorded because it is the cheapest correct instrument: a **throwaway GitHub Actions
+   runner**, which is genuinely off-network, needs no standing infrastructure, and leaves a dated
+   log. Its one limitation has to be stated with it — GitHub-hosted runners have historically had
+   **no IPv6 egress**, so the v6 half of the assertion needs a different vantage point or an
+   explicit check that the runner can reach any v6 address at all before its result means anything.
+   Production is where this matters most: the Hetzner host has a public v4 and v6 and no proxy in
+   front, so the loopback publish is the only thing between the internet and a forgeable header.
