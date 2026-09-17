@@ -2726,3 +2726,48 @@ window absorbs.
 > control — `--requirepass` was measured inert. Dropping the directory wholesale takes the ACL with
 > it and the container then fails at start, which reads as a broken migration rather than a missing
 > file.
+
+---
+
+## 24. Phase 3 groundwork — the Quadlet primitives, measured 2026-09-17
+
+Before touching 1718 lines of `deploy.sh`, the four runtime operations it performs were measured
+against a throwaway unit on the testing host. The deployer's guarantees are a digest pin, cosign
+verification, a health gate, automatic rollback and an idempotence no-op over a verified running
+stack; four of those are runtime operations and each needed an answer.
+
+**The seam is smaller than the line count suggests.** Executable lines carry **36** runtime calls
+across 13 subcommands, and most map one-to-one because podman has `create`, `cp`, `rm`, `login`,
+`pull`, `inspect` and `ps` under the same names. The genuine differences are the apply path, the
+state query and the digest resolution.
+
+|                  operation                  |                   measured answer                   |
+|---------------------------------------------|-----------------------------------------------------|
+| does `systemctl --user start` wait for health? | **yes** — returned in 365 ms with `health=healthy`. `Notify=healthy` is the `compose up --wait` equivalent |
+| what if health never arrives?               | **exit 1**, `Result=timeout`, unit `failed`, **and the container is gone** — a rollback starts from a clean slate rather than having to tear one down |
+| reading the digest a service runs on        | `podman inspect --format '{{.ImageDigest}}'`, and it matched the unit's `Image=` exactly — which is the drift comparison `deploy.sh` already makes |
+| rollback                                    | rewrite `Image=`, `daemon-reload`, `restart` — **10.5 s**, exit 0, in both directions |
+
+So the apply path is: install the units from the bundle → `daemon-reload` → `systemctl start`, which
+blocks until healthy and fails loudly otherwise. The health gate and its rollback trigger come from
+systemd rather than from a `--wait` flag and a polling loop.
+
+### One thing is missing from the host, and it is not a package name
+
+`skopeo` replaces `docker buildx imagetools inspect` and is in AppStream (1.22.2, measured).
+
+**`cosign` is in no enabled repository on Rocky 10, and EPEL is not configured.** That is not a
+detail: `REQ-OPS-015` verifies every resolved digest against the release workflow's keyless
+signature *before* it is pulled, extracted or applied, and the deployer is **fail-closed** on it.
+Without cosign the Podman deployer cannot ship — a `:stable` tag moved out of band would be applied
+unverified, which is exactly the blind-pull hazard the verification exists to close.
+
+Two ways out, differing in what they cost, which is why it is the owner's decision:
+
+- **Enable EPEL** — one line, and a permanently wider supply-chain surface on a host deliberately
+  built from BaseOS, AppStream and Extras alone.
+- **Fetch the upstream static binary and verify it by published checksum** — no new repository, but
+  a bootstrap step the Ansible role has to own, including how that checksum is itself trusted.
+
+It was found by adding `- cosign` to the role's package list and checking availability before
+committing it; the line would have failed the role outright on a fresh host.
