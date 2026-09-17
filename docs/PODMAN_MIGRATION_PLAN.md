@@ -2771,3 +2771,106 @@ Two ways out, differing in what they cost, which is why it is the owner's decisi
 
 It was found by adding `- cosign` to the role's package list and checking availability before
 committing it; the line would have failed the role outright on a fresh host.
+
+---
+
+## 25. Keycloak, the edge and the certificates — what actually has to survive
+
+Two follow-up questions, both answered by measurement rather than by reading the compose file:
+*make sure every Keycloak setting survives so the clients keep working*, and *make sure the edge
+config, the certificates and the Cloudflare token come across*.
+
+### The restore drill does not prove the realm survived
+
+`restore-drill.sh` asserts `KEYCLOAK_TABLES >= 20`. **A restore that produced the schema and no rows
+has a hundred tables and passes.** The drill proves the dump is structurally restorable; it says
+nothing about the realm's content — which is precisely what "the clients still work" depends on.
+
+`scripts/keycloak-realm-fingerprint.sh` closes that. Run before the dump and after the restore, it
+emits **identities, not totals**: every client id with its flags, every redirect URI and web origin,
+every role, scope and protocol mapper, every flow and execution, every identity provider, every key
+provider, every required action, and per-realm counts for users, credentials and federated
+identities. A missing client is then a missing **line in a diff** rather than a number that moved by
+one. Measured against production: 551 lines, 19 clients, 79 mappers, no secret and no address in the
+output.
+
+> [!warning] The realm's sharpest edge is not in the realm
+> The `iri` realm's *First broker login - discord* flow contains an execution naming
+> **`discord-guild-role-gate`** — an authenticator supplied by the SPI JAR, not by Keycloak. The
+> fingerprint will match perfectly on a host where that JAR was never staged, and **50 users reach
+> this deployment through Discord** (`federated_identity = 50`). The JAR must be in
+> `keycloak/providers` **before Keycloak's first start**, not after it.
+>
+> Three more things live outside the database and are therefore outside the fingerprint: the theme
+> directory (the realm names `krt-theme` by string and silently falls back without it), the
+> keystore, and `KRT_DISCORD_SPI_SHARED_SECRET` with the `KRT_BACKEND_*` variables that configure
+> the SPI itself.
+
+> [!important] Pin Keycloak to the running digest across the cutover
+> Production runs **26.7.3** and its schema is at 26.7.3; the testing host runs 26.7.4. A restore
+> into a newer Keycloak **migrates the schema on first start**, which is one-way. The version bump
+> is its own operator-gated change afterwards — which is what the deployer's postgres/Keycloak
+> carve-out already requires, and this is the occasion it exists for.
+
+The signing keys need no special handling and it is worth saying why: each realm has four key
+providers (`rsa-generated`, `rsa-enc-generated`, `hmac-generated`, `aes-generated`) whose material
+lives in `component_config`, so `pg_dump` carries them. Had it not, every issued token and every
+session would have died at the cutover.
+
+### There is no Cloudflare token to carry, and Cloudflare still matters
+
+Production's ACME does **not** use DNS-01. `publish-loop.sh` invokes
+
+```
+/lego run --accept-tos --email … --http --http.webroot /webroot --renew-days 30 -d …
+```
+
+— **HTTP-01 over a webroot**. No DNS provider, no API token; the `.env` carries no Cloudflare key
+and nothing on the host references one. (The Cloudflare token in this estate belongs to the Caddy
+VM in front of the *testing* host, which is a different machine and a different problem.)
+
+What Cloudflare **is**, is the DNS, and that makes it the cutover mechanism:
+
+| | |
+|---|---|
+| nameservers | `chuck.ns.cloudflare.com`, `romina.ns.cloudflare.com` |
+| proxying | **off** — all four names resolve straight to the host's own `178.104.94.14` |
+| TTL | **59 s**, so the cutover propagates in about a minute |
+
+The orange cloud being off is not incidental: the edge carries **no `set_real_ip_from`** because
+nothing is in front of it. Turning proxying on at any point would make every client arrive as a
+Cloudflare address and collapse the per-IP rate limiter into one bucket — the outage this
+deployment has already had once.
+
+### What has to move, and what must not
+
+**The ACME account, not only the certificates.** `code_edge-acme-state` holds
+`accounts/acme-v02.api.letsencrypt.org/…/account.json` and its key, plus the issued multi-SAN
+certificate. Seeding only `code_edge-certs` leaves the new host registering a *fresh* ACME account
+— losing the renewal continuity and spending against a duplicate-certificate limit of five per week
+for this SAN set. Both volumes are tiny: 48 KB and 84 KB.
+
+**The certificates themselves**: one Let's Encrypt multi-SAN leaf, copied into five per-host
+directories, all valid to 2026-12-11.
+
+**The trust material**: `/var/iri/monitoring/certs/basetool-ca.crt` (the upstream anchor,
+`CN=basetool`, valid to 2036) and `grafana.crt`/`grafana.key`.
+
+**Not the edge's configuration tree.** `docker/edge/` arrives in the promoted GHCR bundle
+(ADR-0049), so it installs itself. Copying it by hand would pin a snapshot and break the promotion
+path that keeps it current.
+
+**Not the residue.** `/var/iri/code` holds five `kc-*.before.json` files from a September change, an
+`ingest-threaddump.txt`, two `.env.bak*` files and a `realm-export.json` nothing reads;
+`/var/iri/secrets` holds `keystore.p1` (a typo'd name, unused), `keystore.p12.bak` and
+`backend-truststore.p12`. Exactly three files there are live — and only `keystore.p12` is one of
+them.
+
+> [!danger] A production defect found while checking this, unrelated to the migration
+> `/var/iri/code/docker-compose.override.yml` mounts `backend-truststore.p12` into Keycloak. It is
+> **not in effect**: `deploy.sh` passes explicit `-f` flags, so compose never reads the automatic
+> override file. Keycloak's `KRT_BACKEND_TRUSTSTORE_PATH` therefore points at
+> `/run/secrets/backend-truststore.p12`, and inside the container that path **does not exist**.
+> Whatever the Discord SPI does with `KRT_BACKEND_PRECHECK_URL` over TLS is failing or silently
+> skipped, today, on production. Migrating faithfully would reproduce it; this is the moment to
+> decide instead.
