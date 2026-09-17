@@ -20,6 +20,14 @@
 
 ### Changed
 
+- **Keycloak auf 26.7.4 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sechs
+  Schwachstellen; zwei liegen auf Wegen, die hier wirklich benutzt werden — ein Überlastungsangriff
+  ohne Anmeldung über beliebige Sprachkennungen (CVE-2026-79651) und eine gezielte Aussperrung beim
+  Erstanmelden über Discord (CVE-2026-19607). Keine Funktions- oder Konfigurationsänderung:
+  Container-Image und die SPI-Artefakte des `keycloak-spi`-Moduls ziehen mit, weiterhin JDK 21.
+  **Deploy-Hinweis:** Anders als bisher dokumentiert ist das kein `deploy.sh --force`-Fall — der
+  Deploy wendet eine Digest-Auffrischung innerhalb desselben `26.7`-Tags seit 2026-09-12 selbst an;
+  der Keycloak-Container startet dabei neu.
 - **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**
   Neue optionale Variable `EDGE_TRUSTED_PROXY`: ist sie leer, ändert sich nichts. Trägt sie die
   Adresse eines Vorschalters, sprechen die öffentlichen Listener PROXY-Protocol und der Edge stellt
