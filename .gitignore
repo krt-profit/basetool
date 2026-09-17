@@ -95,3 +95,5 @@ ansible/collections/
 # with ordinary permissions it shows up as untracked on every machine that has run the
 # install once.
 ansible/gpg/
+# ansible-lint drops a cache here the first time it runs. Fetched state, like collections/.
+ansible/.ansible/

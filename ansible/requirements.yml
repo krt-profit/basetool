@@ -10,3 +10,13 @@ collections:
     # control node is unaffected by the ceiling; a host running it locally is not, and that is
     # the case this bound exists for.
     version: ">=10.0.0,<12.0.0"
+  - name: ansible.posix
+    # ansible.posix.firewalld, used by 65-firewall.yml and 70-frontend.yml. Those tasks used to
+    # shell out to `firewall-cmd`, which meant every one of them needed a hand-written
+    # `changed_when` and a separate `--reload` task afterwards -- and ansible-lint was right that a
+    # hand-written `changed_when` on a command that genuinely changes things is a guess. The module
+    # is idempotent, reports `changed` from what it actually did, and applies `permanent` and
+    # `immediate` together, so the reload tasks disappear with it.
+    # Ceiling for the same reason as community.general's: 3.x raises the ansible-core floor above
+    # the 2.16.16 the target platform ships.
+    version: ">=1.5.0,<3.0.0"

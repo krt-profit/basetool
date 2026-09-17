@@ -10,7 +10,7 @@
 #
 # The prose bootstrap tells a human to use `podman unshare chown`, because a hand-computed uid is
 # silently wrong the day the subuid base changes. This role does better: it DERIVES the host uid
-# from basetool_subuid_base -- the same variable that grants the range in 20-user.yml, so the two
+# from basetool_host_subuid_base -- the same variable that grants the range in 20-user.yml, so the two
 # cannot disagree -- and gets real idempotence, which a `command:` wrapping `podman unshare` could
 # not have.
 
@@ -18,32 +18,32 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0755"
   loop:
-    - "{{ basetool_root_dir }}"
-    - "{{ basetool_state_dir }}"
-    - "{{ basetool_token_dir }}"
+    - "{{ basetool_host_root_dir }}"
+    - "{{ basetool_host_state_dir }}"
+    - "{{ basetool_host_token_dir }}"
 
 - name: Create the directories container root writes to
   ansible.builtin.file:
-    path: "{{ basetool_root_dir }}/{{ item }}"
+    path: "{{ basetool_host_root_dir }}/{{ item }}"
     state: directory
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0755"
-  loop: "{{ basetool_service_user_dirs }}"
+  loop: "{{ basetool_host_service_user_dirs }}"
 
 - name: Create the directories a non-root container user writes to
   ansible.builtin.file:
-    path: "{{ basetool_root_dir }}/{{ item.1 }}"
+    path: "{{ basetool_host_root_dir }}/{{ item.1 }}"
     state: directory
     # container uid N  ->  host uid  base + N - 1.  Derived, never transcribed.
-    owner: "{{ basetool_subuid_base + item.0.container_uid - 1 }}"
-    group: "{{ basetool_subuid_base + item.0.container_uid - 1 }}"
+    owner: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"
+    group: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"
     mode: "0755"
-  loop: "{{ basetool_container_owners | subelements('paths') }}"
+  loop: "{{ basetool_host_container_owners | subelements('paths') }}"
   loop_control:
     label: "{{ item.1 }} -> container uid {{ item.0.container_uid }} ({{ item.0.reason }})"
 
@@ -51,19 +51,19 @@
   ansible.builtin.debug:
     msg: >-
       container uid {{ item.container_uid }} -> host uid
-      {{ basetool_subuid_base + item.container_uid - 1 }}
+      {{ basetool_host_subuid_base + item.container_uid - 1 }}
       ({{ item.paths | join(', ') }})
-  loop: "{{ basetool_container_owners }}"
+  loop: "{{ basetool_host_container_owners }}"
   loop_control:
     label: "{{ item.container_uid }}"
-  when: basetool_report_uid_map | default(false) | bool
+  when: basetool_host_report_uid_map | default(false) | bool
 
 # The deploy user's own state. 0700 because deploy.sh writes its registry credential in here and
 # nothing else has any business reading it.
 - name: Create the deploy state directory with an exclusive mode
   ansible.builtin.file:
-    path: "{{ basetool_state_dir }}/.containers"
+    path: "{{ basetool_host_state_dir }}/.containers"
     state: directory
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0700"

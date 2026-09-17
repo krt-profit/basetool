@@ -63,8 +63,8 @@ Compose stays authoritative for everything else, and the drift check still compa
 
 **The uid is checked against the bootstrap role at generation time.** `User=70` in a unit and a data
 directory owned as if the container were uid 70 are the same fact in two places. ADR-0188's role
-owns each directory as `basetool_subuid_base + container_uid - 1`; the generator reads
-`basetool_container_owners` and **refuses to generate anything** if the two stop agreeing. The
+owns each directory as `basetool_host_subuid_base + container_uid - 1`; the generator reads
+`basetool_host_container_owners` and **refuses to generate anything** if the two stop agreeing. The
 failure is a red build, not a database that will not start.
 
 **The conformance suite asserts the uid of pid 1.** `containers-unprivileged` reads the container's

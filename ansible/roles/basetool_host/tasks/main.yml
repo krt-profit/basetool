@@ -27,7 +27,7 @@
 
 - name: SELinux file contexts
   ansible.builtin.import_tasks: 40-selinux.yml
-  when: basetool_manage_selinux | bool
+  when: basetool_host_manage_selinux | bool
   tags: [selinux]
 
 - name: Podman configuration
@@ -36,15 +36,15 @@
 
 - name: Host hardening, from the platform's own SCAP content
   ansible.builtin.import_tasks: 60-hardening.yml
-  when: basetool_manage_hardening | default(true) | bool
+  when: basetool_host_manage_hardening | default(true) | bool
   tags: [hardening]
 
 - name: The host firewall, and what it deliberately does not allow
   ansible.builtin.import_tasks: 65-firewall.yml
-  when: basetool_manage_firewall | default(true) | bool
+  when: basetool_host_manage_firewall | default(true) | bool
   tags: [firewall]
 
 - name: The L4 front end that gives the edge back the client address
   ansible.builtin.import_tasks: 70-frontend.yml
-  when: basetool_manage_frontend | default(true) | bool
+  when: basetool_host_manage_frontend | default(true) | bool
   tags: [frontend]

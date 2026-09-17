@@ -15,35 +15,23 @@
 # in 70-frontend.yml, beside the service that binds them, because a port list that lives away from
 # the service it serves drifts from it.
 
-- name: Is firewalld installed and running?
-  ansible.builtin.command: systemctl is-active firewalld
-  register: basetool_firewalld_state
-  changed_when: false
-  failed_when: false
-  check_mode: false
+- name: Read the service state without shelling out to systemctl
+  ansible.builtin.service_facts:
 
 - name: Enable the firewall
   ansible.builtin.systemd_service:
     name: firewalld
     state: started
     enabled: true
-  when: basetool_manage_firewall | bool
+  when: basetool_host_manage_firewall | bool
 
 - name: Read the zone it puts new interfaces in
   ansible.builtin.command: firewall-cmd --get-default-zone
-  register: basetool_fw_zone
+  register: basetool_host_fw_zone
   changed_when: false
   failed_when: false
   check_mode: false
-  when: basetool_manage_firewall | bool
-
-- name: Read what that zone allows today
-  ansible.builtin.command: firewall-cmd --list-services
-  register: basetool_fw_services
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  when: basetool_manage_firewall | bool
+  when: basetool_host_manage_firewall | bool
 
 # cockpit is a root-privileged administration web UI. The default zone permits it whether or not it
 # is installed, so the rule is an open door waiting for someone to install the thing behind it --
@@ -54,18 +42,17 @@
 # probably unnecessary -- but "probably" is doing the work in that sentence, and the failure mode of
 # being wrong is a host that silently loses its IPv6 address at the next lease event. The cost of
 # closing UDP 546 does not buy enough to risk that.
+#
+# The module, not `firewall-cmd`: it queries before it writes, so it reports `changed` from what it
+# actually did rather than from a `changed_when` somebody guessed, and `permanent` + `immediate`
+# together remove the separate `--reload` task this file used to need.
 - name: Close the administration UI nobody here uses
-  ansible.builtin.command: "firewall-cmd --permanent --remove-service=cockpit"
-  when:
-    - basetool_manage_firewall | bool
-    - "'cockpit' in (basetool_fw_services.stdout | default(''))"
-  register: basetool_fw_cockpit
-
-- name: Load the changed rules
-  ansible.builtin.command: firewall-cmd --reload
-  when:
-    - basetool_manage_firewall | bool
-    - basetool_fw_cockpit is changed
+  ansible.posix.firewalld:
+    service: cockpit
+    state: disabled
+    permanent: true
+    immediate: true
+  when: basetool_host_manage_firewall | bool
 
 # CIS asks for loopback to be trusted explicitly, and here that is not box-ticking: this
 # deployment's whole front end routes through it. haproxy binds the public ports and forwards to
@@ -73,34 +60,23 @@
 # (ADR-0187). Measured on the testing host: `lo` was in NO zone at all, which happens to work
 # because firewalld's filter does not sit on it, and "happens to work" is the state this whole
 # migration keeps finding underneath things.
-- name: Which zone is loopback in?
-  ansible.builtin.command: firewall-cmd --get-zone-of-interface=lo
-  register: basetool_fw_lo
-  changed_when: false
-  failed_when: false
-  check_mode: false
-  when: basetool_manage_firewall | bool
-
 - name: Put loopback in the trusted zone
-  ansible.builtin.command: "firewall-cmd --permanent --zone=trusted --change-interface=lo"
-  when:
-    - basetool_manage_firewall | bool
-    - "'trusted' not in (basetool_fw_lo.stdout | default(''))"
-  register: basetool_fw_lo_changed
+  ansible.posix.firewalld:
+    interface: lo
+    zone: trusted
+    state: enabled
+    permanent: true
+    immediate: true
+  when: basetool_host_manage_firewall | bool
 
-- name: Load the loopback change
-  ansible.builtin.command: firewall-cmd --reload
-  when:
-    - basetool_manage_firewall | bool
-    - basetool_fw_lo_changed is changed
 
 - name: State the policy, so the next reader does not have to infer it
   ansible.builtin.debug:
     msg: >-
-      Firewall: {{ basetool_fw_zone.stdout | default('?') | trim }} zone, default-deny.
+      Firewall: {{ basetool_host_fw_zone.stdout | default('?') | trim }} zone, default-deny.
       Open: SSH, and the front end's ports (opened in 70-frontend.yml).
       Deliberately closed: everything else the stack publishes, because it publishes on LOOPBACK --
       the edge container binds 127.0.0.1 and [::1] only, which is what makes its PROXY header
       unforgeable (ADR-0187). If a container ever publishes to a routable address, it needs a rule
       here, and it needs a reason.
-  when: basetool_manage_firewall | bool
+  when: basetool_host_manage_firewall | bool

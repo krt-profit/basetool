@@ -44,10 +44,10 @@ Under a user namespace the container's uid is not the host's uid. Measured on 20
 
 The prose bootstrap tells a human to use `podman unshare chown`, because a hand-computed `110000`
 is silently wrong the day the subuid base changes. The role computes the host uid from
-`basetool_subuid_base` — **the same variable that grants the range** — so the two cannot disagree,
+`basetool_host_subuid_base` — **the same variable that grants the range** — so the two cannot disagree,
 and it gets real idempotence, which a `command:` wrapping `podman unshare` could never have.
 
-Set `basetool_report_uid_map: true` to have it print the translation it used, so a reader can check
+Set `basetool_host_report_uid_map: true` to have it print the translation it used, so a reader can check
 it against `podman unshare` on the host.
 
 ## Before the role: the machine has to exist and let you in

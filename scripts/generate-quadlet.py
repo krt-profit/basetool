@@ -104,7 +104,7 @@ FRONT_END = {
 # What it costs: the root phase also REPAIRS. If a data directory's ownership is ever wrong, root
 # fixes it and `User=` merely fails. That trade is deliberate, and it is safe only because the
 # ownership is not a hope: the bootstrap role owns each directory as
-# `basetool_subuid_base + container_uid - 1`, and `_verify_run_as_against_role` below refuses to
+# `basetool_host_subuid_base + container_uid - 1`, and `_verify_run_as_against_role` below refuses to
 # generate anything if these numbers and the role's stop agreeing.
 #
 # And the reason it matters more than a tidier unit file: dropping redis's capabilities WITHOUT
@@ -776,7 +776,7 @@ def _verify_run_as_against_role() -> None:
     """
     doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
     by_path: dict[str, int] = {}
-    for entry in doc.get("basetool_container_owners") or []:
+    for entry in doc.get("basetool_host_container_owners") or []:
         for path in entry.get("paths") or []:
             by_path[str(path)] = int(entry["container_uid"])
 
@@ -784,7 +784,7 @@ def _verify_run_as_against_role() -> None:
         path, uid = run_as["role_path"], run_as["uid"]
         if path not in by_path:
             raise Refusal(
-                f"{service}: RUN_AS runs it as uid {uid}, but basetool_container_owners has no "
+                f"{service}: RUN_AS runs it as uid {uid}, but basetool_host_container_owners has no "
                 f"entry for {path!r}. Nothing would own its data directory as that uid, so the "
                 "container would start as a user with no write access to its own state."
             )

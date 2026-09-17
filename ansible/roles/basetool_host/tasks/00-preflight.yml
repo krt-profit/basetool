@@ -16,17 +16,17 @@
 
 - name: Read the cgroup filesystem type
   ansible.builtin.command: stat -fc %T /sys/fs/cgroup
-  register: basetool_cgroup_fs
+  register: basetool_host_cgroup_fs
   changed_when: false
   check_mode: false
 
 - name: Assert cgroup v2
   ansible.builtin.assert:
-    that: basetool_cgroup_fs.stdout.strip() == 'cgroup2fs'
+    that: basetool_host_cgroup_fs.stdout.strip() == 'cgroup2fs'
     fail_msg: >-
       Rootless Podman needs cgroup v2 for resource limits to mean anything -- Memory= and
       PidsLimit= are silently decoration without it, and REQ-OPS-020's measured limits would not
-      be applied. Found '{{ basetool_cgroup_fs.stdout.strip() }}'.
+      be applied. Found '{{ basetool_host_cgroup_fs.stdout.strip() }}'.
 
 - name: Warn when SELinux is not enforcing
   ansible.builtin.debug:

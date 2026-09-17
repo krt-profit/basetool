@@ -5,14 +5,14 @@
 # so the dry run reported success for a task that could not work.
 - name: Create the service group
   ansible.builtin.group:
-    name: "{{ basetool_service_group }}"
+    name: "{{ basetool_host_service_group }}"
     system: true
     state: present
 
 - name: Create the rootless service user
   ansible.builtin.user:
-    name: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    name: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     system: true
     # A home, unlike the Docker bootstrap's --no-create-home: rootless Podman keeps its entire
     # state under $HOME -- the image store, the per-user configuration, and the generated units.
@@ -21,13 +21,13 @@
     shell: /sbin/nologin
     # No supplementary groups. There is no docker group to be in, which is the point.
     state: present
-  register: basetool_user
+  register: basetool_host_user
 
 - name: Grant the subordinate uid range
   ansible.builtin.lineinfile:
     path: /etc/subuid
-    regexp: "^{{ basetool_service_user }}:"
-    line: "{{ basetool_service_user }}:{{ basetool_subuid_base }}:{{ basetool_subuid_count }}"
+    regexp: "^{{ basetool_host_service_user }}:"
+    line: "{{ basetool_host_service_user }}:{{ basetool_host_subuid_base }}:{{ basetool_host_subuid_count }}"
     create: true
     owner: root
     group: root
@@ -36,8 +36,8 @@
 - name: Grant the subordinate gid range
   ansible.builtin.lineinfile:
     path: /etc/subgid
-    regexp: "^{{ basetool_service_user }}:"
-    line: "{{ basetool_service_user }}:{{ basetool_subuid_base }}:{{ basetool_subuid_count }}"
+    regexp: "^{{ basetool_host_service_user }}:"
+    line: "{{ basetool_host_service_user }}:{{ basetool_host_subuid_base }}:{{ basetool_host_subuid_count }}"
     create: true
     owner: root
     group: root
@@ -52,24 +52,24 @@
 # it is the reason this task must never be reordered after unit delivery, and the reason a
 # hand bootstrap enables lingering last. Measured on the testing VM, 2026-09-16.
 - name: Enable lingering so the user manager runs without a session
-  ansible.builtin.command: "loginctl enable-linger {{ basetool_service_user }}"
+  ansible.builtin.command: "loginctl enable-linger {{ basetool_host_service_user }}"
   args:
-    creates: "/var/lib/systemd/linger/{{ basetool_service_user }}"
+    creates: "/var/lib/systemd/linger/{{ basetool_host_service_user }}"
 
 # In --check the user was never created, so it has no uid to look up and there is no runtime
 # directory to confirm. That is not a gap in the dry run, it is what a dry run means -- and reading
-# `basetool_user.uid` there fails with a bare "'dict object' has no attribute 'uid'", which says
+# `basetool_host_user.uid` there fails with a bare "'dict object' has no attribute 'uid'", which says
 # nothing about why.
 - name: Confirm the user manager's runtime directory exists
   when: not ansible_check_mode
   ansible.builtin.stat:
-    path: "/run/user/{{ basetool_user.uid }}"
-  register: basetool_runtime_dir
+    path: "/run/user/{{ basetool_host_user.uid }}"
+  register: basetool_host_runtime_dir
 
 - name: Warn when the user manager has not come up yet
   ansible.builtin.debug:
     msg: >-
-      /run/user/{{ basetool_user.uid }} does not exist yet. Lingering was just enabled and systemd
+      /run/user/{{ basetool_host_user.uid }} does not exist yet. Lingering was just enabled and systemd
       usually creates it within a second or two; if it is still missing on the next run, the user
       manager is not starting and no Quadlet unit will ever run.
-  when: not ansible_check_mode and not basetool_runtime_dir.stat.exists
+  when: not ansible_check_mode and not basetool_host_runtime_dir.stat.exists

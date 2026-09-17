@@ -39,7 +39,7 @@
 
 - name: Create a directory for the scan reports
   ansible.builtin.file:
-    path: "{{ basetool_state_dir }}/hardening"
+    path: "{{ basetool_host_state_dir }}/hardening"
     state: directory
     owner: root
     group: root
@@ -48,27 +48,27 @@
 - name: Look for every datastream this role knows about
   ansible.builtin.stat:
     path: "{{ item }}"
-  loop: "{{ basetool_hardening_datastream_candidates }}"
-  register: basetool_datastreams
+  loop: "{{ basetool_host_hardening_datastream_candidates }}"
+  register: basetool_host_datastreams
   changed_when: false
   check_mode: false
 
 - name: Take the first one that exists
   ansible.builtin.set_fact:
-    basetool_hardening_datastream: >-
-      {{ basetool_hardening_datastream
-         or (basetool_datastreams.results | selectattr('stat.exists') | map(attribute='item') | first | default('')) }}
+    basetool_host_hardening_datastream: >-
+      {{ basetool_host_hardening_datastream
+         or (basetool_host_datastreams.results | selectattr('stat.exists') | map(attribute='item') | first | default('')) }}
 
 - name: Assert a datastream was found
   ansible.builtin.assert:
-    that: basetool_hardening_datastream | length > 0
+    that: basetool_host_hardening_datastream | length > 0
     fail_msg: >-
-      None of {{ basetool_hardening_datastream_candidates | join(', ') }} exists on this host.
+      None of {{ basetool_host_hardening_datastream_candidates | join(', ') }} exists on this host.
       scap-security-guide ships ONE datastream per distribution, and hardening against content
       written for a different one proves nothing about this host. Either the package is missing, or
-      this distribution names its file differently -- set basetool_hardening_datastream explicitly
+      this distribution names its file differently -- set basetool_host_hardening_datastream explicitly
       rather than letting the scan run against the wrong content.
-    success_msg: "{{ basetool_hardening_datastream }}"
+    success_msg: "{{ basetool_host_hardening_datastream }}"
 
 # Always. A report that is only produced when somebody remembers to ask is a report nobody has.
 - name: Scan against the profile
@@ -78,17 +78,17 @@
       - xccdf
       - eval
       - --profile
-      - "{{ basetool_hardening_profile }}"
+      - "{{ basetool_host_hardening_profile }}"
       - --results-arf
-      - "{{ basetool_state_dir }}/hardening/arf-{{ ansible_date_time.date }}.xml"
+      - "{{ basetool_host_state_dir }}/hardening/arf-{{ ansible_date_time.date }}.xml"
       - --report
-      - "{{ basetool_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html"
-      - "{{ basetool_hardening_datastream }}"
-  register: basetool_scan
+      - "{{ basetool_host_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html"
+      - "{{ basetool_host_hardening_datastream }}"
+  register: basetool_host_scan
   # oscap exits 0 when every rule passed, 2 when at least one failed, and 1 on an error. A failing
   # rule is the normal state of an unhardened host and is the reason we are scanning, so only 1 is
   # a failure of this task.
-  failed_when: basetool_scan.rc == 1
+  failed_when: basetool_host_scan.rc == 1
   changed_when: false
   # NOT check_mode: false. The scan changes no configuration, but it WRITES a report and an
   # ARF file -- and a --check run that leaves files behind is not a dry run. It is skipped
@@ -98,13 +98,13 @@
   when: not ansible_check_mode
   ansible.builtin.debug:
     msg: >-
-      {{ basetool_hardening_profile | regex_replace('^.*_profile_', '') }}:
-      {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }} passed,
-      {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'fail') | list | length }} failed.
-      Report: {{ basetool_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html
+      {{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') }}:
+      {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }} passed,
+      {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'fail') | list | length }} failed.
+      Report: {{ basetool_host_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html
 
 - name: Remediate
-  when: basetool_hardening_remediate | bool
+  when: basetool_host_hardening_remediate | bool
   block:
     - name: Apply the profile's remediations
       ansible.builtin.command:
@@ -114,16 +114,16 @@
           - eval
           - --remediate
           - --profile
-          - "{{ basetool_hardening_profile }}"
+          - "{{ basetool_host_hardening_profile }}"
           - --results-arf
-          - "{{ basetool_state_dir }}/hardening/arf-remediated-{{ ansible_date_time.date }}.xml"
+          - "{{ basetool_host_state_dir }}/hardening/arf-remediated-{{ ansible_date_time.date }}.xml"
           - --report
-          - "{{ basetool_state_dir }}/hardening/report-remediated-{{ ansible_date_time.date }}.html"
-          - "{{ basetool_hardening_datastream }}"
-      register: basetool_remediate
+          - "{{ basetool_host_state_dir }}/hardening/report-remediated-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_host_hardening_datastream }}"
+      register: basetool_host_remediate
       # oscap exits 2 when rules still fail, which is the normal state afterwards -- some rules have
       # no automated fix. Only 1 is an error of the tool itself.
-      failed_when: basetool_remediate.rc == 1
+      failed_when: basetool_host_remediate.rc == 1
       # NOT changed_when: true. That reported a change on every run including one that had nothing
       # left to do, which makes the idempotence of the whole role unreadable -- exactly the noise
       # that hides a real change. The honest signal is below: did the number of passing rules move?
@@ -143,38 +143,38 @@
           - xccdf
           - eval
           - --profile
-          - "{{ basetool_hardening_profile }}"
+          - "{{ basetool_host_hardening_profile }}"
           - --results-arf
-          - "{{ basetool_state_dir }}/hardening/arf-verify-{{ ansible_date_time.date }}.xml"
+          - "{{ basetool_host_state_dir }}/hardening/arf-verify-{{ ansible_date_time.date }}.xml"
           - --report
-          - "{{ basetool_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html"
-          - "{{ basetool_hardening_datastream }}"
-      register: basetool_rescan
-      failed_when: basetool_rescan.rc == 1
+          - "{{ basetool_host_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_host_hardening_datastream }}"
+      register: basetool_host_rescan
+      failed_when: basetool_host_rescan.rc == 1
       changed_when: false
 
     - name: Count what actually moved
       ansible.builtin.set_fact:
-        basetool_pass_before: >-
-          {{ basetool_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
-        basetool_pass_after: >-
-          {{ basetool_rescan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+        basetool_host_pass_before: >-
+          {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+        basetool_host_pass_after: >-
+          {{ basetool_host_rescan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
 
     - name: Report the remediation as changed only if it changed something
       ansible.builtin.debug:
         msg: >-
-          {{ basetool_pass_before }} rules passed before, {{ basetool_pass_after }} after
-          ({{ basetool_pass_after | int - basetool_pass_before | int }} newly passing).
-      changed_when: basetool_pass_after | int > basetool_pass_before | int
+          {{ basetool_host_pass_before }} rules passed before, {{ basetool_host_pass_after }} after
+          ({{ basetool_host_pass_after | int - basetool_host_pass_before | int }} newly passing).
+      changed_when: basetool_host_pass_after | int > basetool_host_pass_before | int
 
     - name: Say so when remediation moved nothing at all
       ansible.builtin.debug:
         msg: >-
           The remediation changed no rule's outcome. That is either a host already at this profile,
           or a profile whose remaining failures have no automated fix -- and those are very different
-          situations. Read {{ basetool_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html
+          situations. Read {{ basetool_host_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html
           before concluding the first.
-      when: basetool_pass_after | int <= basetool_pass_before | int
+      when: basetool_host_pass_after | int <= basetool_host_pass_before | int
 
 
     # --- the three things that do not announce themselves ------------------------------------------
@@ -183,26 +183,25 @@
     # These read the specific settings whose effect is DELAYED -- to the next boot, or to the day a
     # partition fills -- because a delayed effect is invisible in the run that caused it.
 
-    - name: Did the remediation arm tmp.mount?
-      ansible.builtin.command: systemctl is-enabled tmp.mount
-      register: basetool_tmp_mount
-      changed_when: false
-      failed_when: false
-      check_mode: false
+    # Gathered AFTER the remediation, not before: arming tmp.mount is one of the things the
+    # remediation does, so facts taken earlier would report the state it was asked to change.
+    - name: Read the unit states the remediation may have moved
+      ansible.builtin.service_facts:
 
     - name: Say so, loudly, because it only takes effect at the next boot
       ansible.builtin.debug:
         msg: >-
-          tmp.mount is now '{{ basetool_tmp_mount.stdout | trim }}'. CIS wants /tmp as its own
-          filesystem, and the usual remediation enables this unit -- which does nothing until the
-          host reboots and then mounts /tmp as tmpfs with noexec,nosuid,nodev. Anything that executes
-          from /tmp stops working at that point, and the cause is a run that finished cleanly hours
-          or weeks earlier.
-      when: basetool_tmp_mount.stdout | trim == 'enabled'
-
+          tmp.mount is now enabled. CIS wants /tmp as its own filesystem, and the usual
+          remediation enables this unit -- which does nothing until the host reboots and then
+          mounts /tmp as tmpfs with noexec,nosuid,nodev. Anything that executes from /tmp stops
+          working at that point, and the cause is a run that finished cleanly hours or weeks
+          earlier.
+      when: >-
+        ansible_facts.services['tmp.mount'] is defined
+        and ansible_facts.services['tmp.mount'].status == 'enabled'
     - name: What will auditd do when its partition fills?
       ansible.builtin.command: awk -F= '/^[[:space:]]*admin_space_left_action/ {gsub(/ /,"",$2); print tolower($2)}' /etc/audit/auditd.conf
-      register: basetool_audit_action
+      register: basetool_host_audit_action
       changed_when: false
       failed_when: false
       check_mode: false
@@ -210,11 +209,11 @@
     - name: Refuse to leave a self-shutdown armed without saying it out loud
       ansible.builtin.debug:
         msg: >-
-          auditd admin_space_left_action is '{{ basetool_audit_action.stdout | trim }}'. That is a
+          auditd admin_space_left_action is '{{ basetool_host_audit_action.stdout | trim }}'. That is a
           mechanism by which this host SWITCHES ITSELF OFF when the audit partition fills -- not
           today, but in three weeks, and by then nobody is looking at the hardening run. Decide
           whether that is wanted here; the alternative is a value that keeps the host serving.
-      when: basetool_audit_action.stdout | trim in ['halt', 'single']
+      when: basetool_host_audit_action.stdout | trim in ['halt', 'single']
 
     # --- does sshd still accept the operator's key? ------------------------------------------------
     #
@@ -227,16 +226,16 @@
     # refuses, that is learned with the working sshd still in place rather than after a restart.
     - name: Check the new sshd configuration for syntax
       ansible.builtin.command: /usr/sbin/sshd -t -f /etc/ssh/sshd_config
-      register: basetool_sshd_syntax
+      register: basetool_host_sshd_syntax
       changed_when: false
       failed_when: false
       check_mode: false
 
     - name: Stop if sshd would not even parse its own configuration
       ansible.builtin.assert:
-        that: basetool_sshd_syntax.rc == 0
+        that: basetool_host_sshd_syntax.rc == 0
         fail_msg: >-
-          sshd will not parse /etc/ssh/sshd_config after remediation: {{ basetool_sshd_syntax.stderr }}
+          sshd will not parse /etc/ssh/sshd_config after remediation: {{ basetool_host_sshd_syntax.stderr }}
           DO NOT restart sshd. The running instance still has the old configuration in memory and is
           the only way into this host.
 
@@ -282,7 +281,7 @@
         awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
              { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subuid - |
         wc -l
-      register: basetool_orphan_uids
+      register: basetool_host_orphan_uids
       changed_when: false
       failed_when: false
       check_mode: false
@@ -294,9 +293,7 @@
         awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
              { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subgid - |
         wc -l
-      register: basetool_orphans_real
-
-      register: basetool_orphans_real
+      register: basetool_host_orphan_gids
       changed_when: false
       failed_when: false
       check_mode: false
@@ -309,12 +306,11 @@
           uid inside a container is a subuid on the host, and subuids have no passwd entry by
           design. That covers the image store and the data directories this role creates. Do NOT
           chown them -- it rewrites the image store and misplaces every database's data directory.
-          Unexplained owners: {{ basetool_orphan_uids.stdout | trim | default('?', true) }}
+          Unexplained owners: {{ basetool_host_orphan_uids.stdout | trim | default('?', true) }}
           (uids outside every subuid range), unexplained groups:
-          {{ basetool_orphans_real.stdout | trim | default('?', true) }} (gids outside every subgid
+          {{ basetool_host_orphan_gids.stdout | trim | default('?', true) }} (gids outside every subgid
           range). Those two numbers are the ones worth watching; above zero is a real finding rather
           than this exception.
-
 
 
     - name: Say what has to happen next, because the scan cannot

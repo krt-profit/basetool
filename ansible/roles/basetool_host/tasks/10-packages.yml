@@ -27,7 +27,7 @@
 
 - name: Read the installed podman version
   ansible.builtin.command: podman --version
-  register: basetool_podman_version_raw
+  register: basetool_host_podman_version_raw
   changed_when: false
   check_mode: false
 
@@ -37,35 +37,35 @@
   # group raised 'NoneType' object has no attribute 'group' on ansible-core 2.16 when it did not
   # match -- an error that says nothing about which pattern or which input.
   ansible.builtin.set_fact:
-    basetool_podman_parts: "{{ basetool_podman_version_raw.stdout.split()[-1].split('.') }}"
+    basetool_host_podman_parts: "{{ basetool_host_podman_version_raw.stdout.split()[-1].split('.') }}"
 
 - name: Refuse a version string this role cannot read
   ansible.builtin.assert:
-    that: basetool_podman_parts | length >= 2
+    that: basetool_host_podman_parts | length >= 2
     fail_msg: >-
-      Could not read a version out of '{{ basetool_podman_version_raw.stdout }}'. Everything below
+      Could not read a version out of '{{ basetool_host_podman_version_raw.stdout }}'. Everything below
       compares numbers, and comparing against a value that was never parsed would pass silently.
 
 - name: Name the two numbers the assertions use
   ansible.builtin.set_fact:
-    basetool_podman_major: "{{ basetool_podman_parts[0] | int }}"
-    basetool_podman_minor: "{{ basetool_podman_parts[1] | int }}"
+    basetool_host_podman_major: "{{ basetool_host_podman_parts[0] | int }}"
+    basetool_host_podman_minor: "{{ basetool_host_podman_parts[1] | int }}"
 
 
 - name: Assert podman translates this stack's units completely
   ansible.builtin.assert:
     that:
-      - basetool_podman_major | int > basetool_min_podman_major | int or
-        (basetool_podman_major | int == basetool_min_podman_major | int and
-         basetool_podman_minor | int >= basetool_min_podman_minor | int)
+      - basetool_host_podman_major | int > basetool_host_min_podman_major | int or
+        (basetool_host_podman_major | int == basetool_host_min_podman_major | int and
+         basetool_host_podman_minor | int >= basetool_host_min_podman_minor | int)
     fail_msg: >-
-      Found {{ basetool_podman_version_raw.stdout }}, need >=
-      {{ basetool_min_podman_major }}.{{ basetool_min_podman_minor }}. Measured 2026-09-16: podman
+      Found {{ basetool_host_podman_version_raw.stdout }}, need >=
+      {{ basetool_host_min_podman_major }}.{{ basetool_host_min_podman_minor }}. Measured 2026-09-16: podman
       5.8.2 carries Memory=, PidsLimit=, ReadOnly=, DropCapability=, NoNewPrivileges=, AutoUpdate=
       and Notify=healthy in podman-systemd.unit(5); 5.4.2 has no Memory= at all. A missing Quadlet
       key does not fail the unit -- it is simply not applied, so the container runs without the
       limit that was measured for it.
-    success_msg: "{{ basetool_podman_version_raw.stdout }}"
+    success_msg: "{{ basetool_host_podman_version_raw.stdout }}"
 
 # Belt and braces on the key that degrades silently rather than loudly. The version floor above is
 # the rule; this reads the shipped manual page and checks the rule still describes reality, which a
@@ -73,17 +73,17 @@
 - name: Confirm Quadlet really carries Memory=
   ansible.builtin.shell: >-
     set -o pipefail && man podman-systemd.unit 2>/dev/null | col -b | grep -cE '^ +Memory='
-  register: basetool_quadlet_memory
+  register: basetool_host_quadlet_memory
   changed_when: false
   check_mode: false
   failed_when: false
 
 - name: Assert it, when the manual page could be read at all
   ansible.builtin.assert:
-    that: basetool_quadlet_memory.stdout | int > 0
+    that: basetool_host_quadlet_memory.stdout | int > 0
     fail_msg: >-
       podman-systemd.unit(5) on this host does not document Memory=, although podman reports
-      {{ basetool_podman_version_raw.stdout }}. Either the manual page is absent, or this build's
+      {{ basetool_host_podman_version_raw.stdout }}. Either the manual page is absent, or this build's
       Quadlet differs from the one measured -- and in the second case every Memory= line in the
       generated units would be ignored without a word. Check by hand before proceeding.
-  when: basetool_quadlet_memory.stdout | int >= 0 and basetool_quadlet_memory.rc | int == 0
+  when: basetool_host_quadlet_memory.stdout | int >= 0 and basetool_host_quadlet_memory.rc | int == 0

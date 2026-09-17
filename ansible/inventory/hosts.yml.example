@@ -17,4 +17,4 @@ basetool_hosts:
     # Everything else comes from roles/basetool_host/defaults/main.yml. Override here only what
     # genuinely differs between the two hosts -- every override is a way for the rehearsal to stop
     # rehearsing the real thing.
-    basetool_report_uid_map: true
+    basetool_host_report_uid_map: true

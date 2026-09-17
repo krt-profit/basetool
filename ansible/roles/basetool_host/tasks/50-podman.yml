@@ -1,18 +1,18 @@
 ---
 - name: Create the service user's containers configuration directory
   ansible.builtin.file:
-    path: "~{{ basetool_service_user }}/.config/containers"
+    path: "~{{ basetool_host_service_user }}/.config/containers"
     state: directory
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0755"
 
 - name: Create the Quadlet unit directory
   ansible.builtin.file:
-    path: "~{{ basetool_service_user }}/.config/containers/systemd"
+    path: "~{{ basetool_host_service_user }}/.config/containers/systemd"
     state: directory
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0755"
 
 # The setting the whole migration turns on. Without it, published ports on user-defined bridge
@@ -21,9 +21,9 @@
 - name: Configure rootless port forwarding
   ansible.builtin.template:
     src: containers.conf.j2
-    dest: "~{{ basetool_service_user }}/.config/containers/containers.conf"
-    owner: "{{ basetool_service_user }}"
-    group: "{{ basetool_service_group }}"
+    dest: "~{{ basetool_host_service_user }}/.config/containers/containers.conf"
+    owner: "{{ basetool_host_service_user }}"
+    group: "{{ basetool_host_service_group }}"
     mode: "0644"
 
 # In --check the service user does not exist, so becoming it is meaningless -- and `acl`,
@@ -33,9 +33,9 @@
 - name: Read back what podman actually resolved the setting to
   when: not ansible_check_mode
   become: true
-  become_user: "{{ basetool_service_user }}"
+  become_user: "{{ basetool_host_service_user }}"
   ansible.builtin.command: podman info --format '{{ "{{" }} .Host.RootlessNetworkCmd {{ "}}" }}'
-  register: basetool_rootless_netcmd
+  register: basetool_host_rootless_netcmd
   changed_when: false
   check_mode: false
   failed_when: false
@@ -43,7 +43,7 @@
 - name: Report it
   ansible.builtin.debug:
     msg: >-
-        podman reports rootless network command '{{ basetool_rootless_netcmd.stdout | default('?') }}'.
+        podman reports rootless network command '{{ basetool_host_rootless_netcmd.stdout | default('?') }}'.
         That is the DEFAULT network mode. The bridge port forwarder is a different thing and podman
         does not report it here -- and since ADR-0187 this host deliberately sets nothing for it:
         the edge gets the client address from the PROXY-protocol front end instead. The acceptance

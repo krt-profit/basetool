@@ -11,15 +11,17 @@
 
 - name: Label the data tree for container access
   community.general.sefcontext:
-    target: "{{ basetool_root_dir }}(/.*)?"
+    target: "{{ basetool_host_root_dir }}(/.*)?"
     setype: container_file_t
     state: present
-  register: basetool_fcontext
+  notify: Apply the SELinux labels
 
+# `notify` plus an immediate flush, not a plain task: ansible-lint reads `when: ... is changed` as
+# a handler written in the wrong place, and it is right. The flush is explicit because the labels
+# have to be on disk before anything else in this role touches the tree -- a handler left to run
+# at the end of the play would apply them after 50-podman has already used it.
 - name: Apply the labels
-  ansible.builtin.command: "restorecon -R {{ basetool_root_dir }}"
-  when: basetool_fcontext.changed
-  changed_when: true
+  ansible.builtin.meta: flush_handlers
 
 - name: Note where the first failure will be
   ansible.builtin.debug:

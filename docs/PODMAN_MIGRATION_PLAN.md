@@ -1835,7 +1835,7 @@ testing : ok=46  changed=18  unreachable=0  failed=0  skipped=5
 
 The datastream selection picked `ssg-rl10-ds.xml` on its own, and the scan reported
 `cis_server_l1: 166 passed, 124 failed` — the expected shape for a host that has not been remediated,
-since `basetool_hardening_remediate` defaults to **false**. The role scans and reports; it does not
+since `basetool_host_hardening_remediate` defaults to **false**. The role scans and reports; it does not
 rewrite `sshd` behind the operator's back.
 
 haproxy is installed, configured and **enabled but not started**, which is deliberate: the role
@@ -1887,7 +1887,7 @@ plus the container uids 999 and 70. Not one of those numbers is written down any
 
 ## 17. The SCAP remediation, applied for the first time — 2026-09-16
 
-`basetool_hardening_remediate` had been `false` since the role was written, and the block behind it
+`basetool_host_hardening_remediate` had been `false` since the role was written, and the block behind it
 had never run. Turning it on against Rocky 10.2 changed **131 files under `/etc`** — `sshd_config`,
 the whole PAM/authselect stack, `auditd`, file modes — and produced three findings, two of which are
 about the *procedure* rather than about the host.
@@ -2221,8 +2221,8 @@ the host, owned by 70, does **not** buy the capability back — measured, becaus
 ### What this means for the units
 
 `--user` is the better shape for both, and the number it needs already exists: ADR-0188's role owns
-each data directory as `basetool_subuid_base + container_uid - 1`, with `container_uid` written once
-per service in `basetool_container_owners` — 70 for postgres, 999 for redis.
+each data directory as `basetool_host_subuid_base + container_uid - 1`, with `container_uid` written once
+per service in `basetool_host_container_owners` — 70 for postgres, 999 for redis.
 
 It is not free. The entrypoint's root phase also *repairs*: if a data directory's ownership is ever
 wrong, root fixes it, and `--user` merely fails. The trade is a container that cannot repair itself
@@ -2235,7 +2235,7 @@ against one with no root phase to escape from.
   `Group=`, `ReadOnly=true` and `DropCapability=ALL` **as one set**, with no way to express half of
   it. A compose `user:` on the same service is a refusal rather than a silent precedence rule.
 - The generator **reads the bootstrap role** and refuses to emit anything when `RUN_AS` and
-  `basetool_container_owners` stop agreeing about a uid. That closes the drift this section warned
+  `basetool_host_container_owners` stop agreeing about a uid. That closes the drift this section warned
   about: the same number in two files, checked at build time instead of at boot.
 - `check-conformance.py` gains `containers-unprivileged`, which reads the container's pid from the
   host, that pid's real uid and its `uid_map`, and translates back to the uid **as the container

@@ -11,4 +11,12 @@
   ansible.builtin.systemd_service:
     name: haproxy
     state: reloaded
-  when: basetool_haproxy_active | default(false) | bool
+  when: basetool_host_haproxy_active | default(false) | bool
+
+# restorecon is what actually writes the labels sefcontext only declared. It runs on a change and
+# nowhere else: relabelling the whole tree on every run is slow, and doing it when nothing moved
+# says nothing. 40-selinux.yml flushes this immediately rather than leaving it to the end of the
+# play, because the labels have to exist before the rest of the role uses the tree.
+- name: Apply the SELinux labels
+  ansible.builtin.command: "restorecon -R {{ basetool_host_root_dir }}"
+  changed_when: true
