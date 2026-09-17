@@ -30,7 +30,28 @@ Every state-mutating activity in the eight areas writes exactly **one** row to a
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
 sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
 as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
-silent gaps**. Each event stores: timestamp (UTC), the acting user's id (FK `ON
+silent gaps**. `AuditService.record` is `@Transactional(propagation = MANDATORY)`, which is what
+makes "same transaction" a guard rather than a convention: a call with no transaction in progress
+throws instead of quietly opening one of its own.
+
+**The handful of audited *reads* are the deliberate exception, and they are not a relaxation of the
+rule.** A read has no business write for the row to be atomic with (see
+[REQ-SEC-058](security-and-access.md) exports and
+[REQ-SEC-060](security-and-access.md) person search — reads of everything the
+system holds about a person, whose misuse would otherwise leave no trace). Those call sites get
+their own short **writable** transaction in the service that owns the operation —
+`DataExportService#recordExport`, `PersonSearchService#recordSearch` — separate from the
+`readOnly = true` transaction that served the read, because Spring marks a read-only transaction's
+JDBC connection read-only and Postgres refuses the `INSERT` on it. What the separation costs is the
+case where the row is written and the response never reaches the caller: an access recorded that
+nobody received, which errs towards over-recording and is the safe direction for this trail.
+
+**A controller must never call `record` itself.** A request handler has no transaction
+(`open-in-view` is `false`, and nothing wraps the handler), so the call throws
+`IllegalTransactionStateException` and the endpoint returns 500. This is gate-enforced by
+`ArchitectureTest#controllerLayerMustNotWriteAuditRowsDirectly`, matched on the call site rather
+than the package dependency — `AuditAdminController` legitimately injects `AuditService` to *query*
+the trail for the viewer. Each event stores: timestamp (UTC), the acting user's id (FK `ON
 DELETE SET NULL`) **plus** a denormalized actor-handle snapshot (the trail must survive user
 deletion), the `domain`, the event type, the affected subject's id + a denormalized subject-label
 snapshot, an optional target-user reference, a compact details payload, and the bounded
@@ -150,14 +171,65 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
   the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
   body, the requester/supplier handle, or any location.
+- **Datenschutz / Betroffenenrechte** (`AuditDomain.ROLE`, REQ-SEC-058 / -060 / -061 / -062) — the
+  data-subject-rights surfaces, added 2026-09-16. Eight event types, and two of them audit a
+  **read** (the deliberate exception above). This sentence said "Six" while listing seven
+  until 2026-09-17, which is the kind of count a reader checks a coverage list against:
+  - `PERSONAL_DATA_EXPORTED` — one row per served Art. 15 / Art. 20 export. The payload names the
+    `format` (`json` / `pdf`), the `rows` count and `bySelf`, which is the distinction the trail
+    exists to make answerable: a member reading their own record is unremarkable, an admin reading
+    somebody else's is not. Nothing about the export's *contents* goes in.
+  - `PERSON_SEARCH_PERFORMED` — one row per admin Personensuche. The payload carries the term's
+    **length**, the hit count and the truncation flag, and **never the term**: the term is somebody's
+    name, and a trail of every name an admin searched for would be a second store of exactly the
+    data the search exists to help remove.
+  - `ACCOUNT_DELETION_REQUESTED` / `..._WITHDRAWN` / `..._DECLINED` / `..._EXECUTED` — the four
+    states of an Art. 17 request. All four carry a `null` subject **label**; the member is identified
+    by `actor_user_id` and `target_user_id` only. That is not a style choice: a name in the label
+    survived the erasure for the full 24-month retention, because the erasure rewrites
+    `actor_handle` and the label sat on the same row untouched.
+  - `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` — the local half of an erasure committed and
+    the Keycloak account could not be deleted. Written in its own transaction **after** the
+    business transaction, because there is nothing left to attach it to: the `app_user` row and
+    the request have already gone. That is also why the deleted id sits in `subject_id` with a
+    `null` `target_user_id` — the target column is a foreign key to a row that no longer
+    exists. The payload carries the request id and the exception's **class name**, never its
+    message, which can echo Keycloak's own description of the account.
+  - `HANDLE_SNAPSHOTS_ANONYMISED` — the receipt for a granted erasure, written to **both** trails
+    *after* the updates so the marker is not scrubbed by them. The payload carries the per-table row
+    counts and the number of spellings matched, and never the name that was removed — writing it
+    back would undo the erasure in the very row that records it.
+
+  The bank trail gains the same `HANDLE_SNAPSHOTS_ANONYMISED` marker, and
+  `CARTEL_APPROVAL_TIERS_CLEARED` for the unrelated approval-tier reset.
 
 The audit table is **business data, not logging** — the [`observability.md`](observability.md) rule
 (never write names, emails or tokens to the **log stream**) is unaffected and still applies. User
 **free text** (inventory/assignee notes, handover recipient handles) is **never** written into the
-details payload — only ids, counts and lengths (the actor handle and non-personal subject labels
-such as a material name or order title are snapshotted, exactly as the bank trail snapshots holder
-handles).
+details payload — only ids, counts and lengths (the actor handle and the subject label are
+snapshotted, exactly as the bank trail snapshots holder handles).
 
+> [!warning] Corrected 2026-09-16 — `details` is typed `CharSequence`, so the rule is not enforced
+> Nothing routes a caller of `AuditService.record` / `BankAuditService.record` through the
+> `AuditDetails` builder: the last parameter is a bare `CharSequence`, and two bank call sites
+> concatenate a handle straight into it (`BankHolderService` records `HOLDER_REGISTERED` with the
+> holder's handle **as** the payload; `BankLedgerService` writes `"+<amount> aUEC @<handle>"` on
+> every booking). `PersonSearchTargets` had exempted both `details` columns from the person search
+> **on the strength of this rule**, which made the exemption false. Both columns are searched now
+> (REQ-SEC-060) and a granted erasure rewrites them in place (REQ-SEC-062). The rule stands as a
+> rule; it is simply not a guarantee, and the two registries no longer assume it is.
+>
+> [!warning] Corrected 2026-09-16 — `subject_label` is **not** reliably non-personal
+> This paragraph used to give "a material name or order title" as examples of *non-personal*
+> subject labels. The order title is not non-personal: the job-order trails snapshot
+> `#<displayId> '<handle>'`, and that handle is the order's **contact person**
+> (`orders.create.handle` — "Handle des Ansprechpartners"), often an outsider with no account.
+> `ACCOUNT_DELETION_REQUEST_EXECUTED` likewise snapshots the member's own effective name. The
+> snapshot itself is correct and stays — the trail has to survive the aggregate — but the column is
+> a person-name surface in `PersonSearchTargets` (REQ-SEC-060) and the Art. 15 export deliberately
+> does **not** select it (REQ-SEC-058). The wrong wording here is what left the export unguarded,
+> so it is corrected rather than quietly dropped.
+>
 > [!note] A detail *value* may be renamed; the rows already written are not rewritten — 2026-09-07
 > `MISSION_PARTICIPANT_ADDED` writes `type=user|external` and `MISSION_PARTY_LEAD_CHANGED`
 > `kind=user|external|cleared`. Both said `guest` until ADR-0159 renamed the tier (decision D4), and
@@ -207,6 +279,14 @@ foreign key on both tables.
   (domain, type, actor, subject).
 - [ ] Audit write failures fail the business transaction (same TX — no silent gaps); the optimistic-
   locking landmine paths (book-out, handover, store, delete, completion, claim) record without a 409.
+- [ ] Every audited endpoint is exercised by at least one test that wires the **real** `AuditService`
+  and asserts both the success status and the written row. A test that replaces the bean with
+  `@MockitoBean` also removes its transactional proxy, so it cannot see a `MANDATORY` violation —
+  which is exactly how five endpoints shipped into review returning 500
+  (`DataSubjectRightsAuditIntegrationTest`).
+- [ ] No controller calls `record(...)` on either audit service (`ArchitectureTest`). The rule covers
+  `BankAuditService` too, which carries the same `MANDATORY` propagation — no controller calls it
+  today, which is the moment to fence it rather than after a second occurrence.
 - [ ] Non-admin access to `/api/v1/audit/**` and `/admin/audit-log`: 403; the sidebar link is hidden.
 
 A new event type is only half-wired until the viewer can filter for it: the per-area event-type list
@@ -294,8 +374,15 @@ native dialogs). The backend does **not** force a prior export — the warning i
 The purge **is itself audit-logged**: it writes one `*_AUDIT_PURGED` event (the bank's
 `AUDIT_LOG_PURGED`) carrying the deleted count and the cutoff in its details. That marker's timestamp
 is newer than the cutoff, so it survives its own purge — a deletion always leaves a trace. The
-endpoints return the deleted count, which the page reports back to the admin. There is **no automatic
-retention sweep**; purging is always an explicit admin action.
+endpoints return the deleted count, which the page reports back to the admin.
+
+This purge is the **deliberate, admin-chosen** cutoff and stays exactly as described. It is not the
+only deletion path any more: since 2026-09-15 an automatic sweep enforces an outer *ceiling* on both
+trails ([REQ-AUDIT-006](#req-audit-006--automatic-retention-ceiling-on-both-audit-trails)). The two
+are complementary — an admin purges to a cutoff of their choosing, the sweep only stops
+"indefinitely" from being the default — and they share one code path, so they can never diverge in
+what they remove. Earlier revisions of this requirement stated that there was "no automatic retention
+sweep"; that was true when written and is no longer.
 
 **Acceptance**
 
@@ -303,6 +390,8 @@ retention sweep**; purging is always an explicit admin action.
   logs are untouched, and exactly one `*_AUDIT_PURGED` marker (with count + cutoff) is written.
 - [ ] The delete modal shows the backup-recommended warning; non-admins get 403 on every purge
   endpoint.
+- [ ] The purge modal tells the admin that an automatic ceiling also applies, and names it, so rows
+  vanishing without a manual purge do not read as data loss.
 
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `AuditAdminControllerSecurityTest` ·
 **Code:** `service/AuditService#purgeBefore`, `service/BankAuditService#purgeBefore`,
@@ -396,3 +485,68 @@ than a feature, so the viewer offers the identical list everywhere.
 [ADR-0152](../adr/0152-the-audit-row-records-which-client-a-mutation-came-through.md),
 [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md) ·
 **Source:** private security advisory GHSA-2vq5-8p8w-5r64
+
+### REQ-AUDIT-006 — Automatic retention ceiling on both audit trails
+
+Both audit trails are swept on a schedule: rows whose `occurredAt` is older than a configured
+maximum age are deleted, across **every** activity domain and the bank trail, without an admin
+acting. The default window is **730 days** (two years), configurable per deployment.
+
+**Why an audit log needs a ceiling at all.** Every row carries a denormalised snapshot of the
+actor's handle and, where one exists, the target member's — deliberately, because the FK is
+`ON DELETE SET NULL` and a trail that forgets who acted records "an action by nobody"
+(REQ-AUDIT-001). That same design makes an unbounded trail a permanent record of a named person
+which outlives their account: deleting a member leaves their handle in the log forever. Nothing
+obliges the organisation to keep it, so "forever" was not a retention decision — it was the absence
+of one, and REQ-AUDIT-004's manual purge is not a retention period because nobody is required to
+run it.
+
+**The number is a judgement, not a derivation.** No statute sets it. Two years is chosen to outlast
+the organisation's own operating cycles, so an old dispute stays reconstructible, and to stop there.
+
+**It reuses the manual purge.** The sweep calls `AuditService#purgeBefore` and
+`BankAuditService#purgeBefore` rather than issuing its own deletes, so the two paths cannot diverge
+in what they remove, and an automatic purge leaves the same `*_AUDIT_PURGED` marker a deliberate one
+does — an automatic deletion is exactly as visible in the trail as an admin's.
+
+**Each domain is asked first whether it holds anything that old, and skipped when it does not.**
+That guard is not an optimisation and must not be removed. `purgeBefore` writes its marker event
+*unconditionally*, which is right for an admin who purged deliberately and found nothing, and wrong
+for a job that runs daily: without the guard the sweep would mint ten marker rows a day forever,
+growing the very table it exists to bound.
+
+**One domain cannot cost the run.** Each domain is purged in its own transaction (`purgeBefore`
+opens one per call) with its own `try`/`catch`, so a domain that deadlocks is logged and left for
+the next sweep while the others commit.
+
+**Configuration** — `app.audit.retention.*`: `enabled` (default `true`, forced `false` under the
+`test` profile so the sweep never races assertions), `max-age` (default `P730D`), `interval`
+(default `PT24H`). Expressed in days because `Duration` has no month unit; the precision is
+irrelevant at a retention boundary.
+
+**Observability** — the sweep publishes the `audit_retention` scheduled-job metrics through
+`TaskMetrics` and is covered by the `ScheduledJobStale` alert (REQ-OBS-008). Failures are recorded
+and swallowed there, so the scheduler thread survives a bad run.
+
+> [!warning] First run after deploy
+> Enabling this on an existing deployment deletes every audit row older than two years on the first
+> sweep, irreversibly. Set `APP_AUDIT_RETENTION_ENABLED=false` before deploying if any of it must be
+> kept, and export it (REQ-AUDIT-003) first.
+
+**Acceptance**
+
+- [x] Every `AuditDomain` value and the bank trail are swept in one run.
+- [x] A domain holding no row older than the cutoff is skipped, and mints no `*_AUDIT_PURGED`
+  marker.
+- [x] A domain whose purge throws is logged and the remaining domains — and the bank trail — are
+  still purged.
+- [x] The cutoff is `now - max-age`; the job reports the deleted count as its `items` metric.
+- [x] The sweep is disabled under the `test` profile.
+
+**Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest` · **Code:**
+`service/AuditRetentionService`, `task/AuditRetentionTask`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+`repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
+`repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
+**Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),
+amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
+**Record:** [`docs/privacy/processing-activities.md`](../privacy/processing-activities.md)

@@ -301,6 +301,14 @@ public class UserReconciliationService {
       user.setApprovedAt(Instant.now());
       changed = true;
     }
+    if (created && isAdmin) {
+      // The bootstrap carve-out is the one way a row reaches ACTIVE with no admin decision behind
+      // it, and until this counter existed it left no trace whatsoever. It is also what makes a
+      // failed Keycloak delete during an erasure dangerous rather than untidy: the recreated row
+      // of an ADMIN-realm-role holder is ACTIVE immediately, not a refusable PENDING registration
+      // (REQ-SEC-061, and the corrected note in security-and-access.md).
+      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
+    }
 
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
@@ -351,6 +359,10 @@ public class UserReconciliationService {
 
     if (!user.isInKeycloak()) {
       user.setInKeycloak(true);
+      // Clear the absence stamp with the flag it belongs to (REQ-SEC-059). An account that comes
+      // back is no longer waiting for deletion, and leaving the instant behind would keep it in the
+      // orphan-age gauge forever — a permanently firing alert for an account that is present.
+      user.setKeycloakAbsentSince(null);
       changed = true;
     }
 
@@ -430,6 +442,12 @@ public class UserReconciliationService {
         userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
     if (newPendingRegistration) {
       changed = true;
+    } else if (created
+        && localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
+      // Same signal as the interactive path: a brand-new row that is ACTIVE on arrival because of
+      // the REQ-SEC-017 bootstrap carve-out. Counted on whichever path inserts the row, so the two
+      // cannot double-count -- `created` is true exactly once per account.
+      meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (changed || user.isNew()) {
@@ -517,7 +535,11 @@ public class UserReconciliationService {
     if (currentIds.isEmpty()) {
       return 0;
     }
-    return userRepository.markMissingUsers(currentIds);
+    // The instant is recorded so the orphan-age guard of REQ-SEC-059 can say how long an account
+    // has been waiting for the second half of its deletion. The update's `inKeycloak = true`
+    // predicate keeps this a FIRST-observation stamp: a row already flagged is not rewritten, so
+    // the value does not creep forward with every nightly run.
+    return userRepository.markMissingUsers(currentIds, Instant.now());
   }
 
   /**

@@ -32,6 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -211,4 +212,40 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * @return {@code true} when at least one matching request exists
    */
   boolean existsByAccountIdAndStatus(UUID accountId, BankBookingRequestStatus status);
+
+  /**
+   * Replaces every handle snapshot of this member on the booking requests with the erasure
+   * sentinel, for a granted Art. 17 request (REQ-SEC-062).
+   *
+   * <p>Four columns in one statement, because a member can appear on the same request in more than
+   * one part: as the requester, as the bank employee who decided it, as the counterparty, and as
+   * the responsible holder who granted an over-limit approval. Erasing one and leaving another
+   * would leave the person named on a row the request claims no longer names them.
+   *
+   * <p><b>This bulk update does not bump {@code version}.</b> The entity carries an optimistic lock
+   * and a bulk statement bypasses it, so a request being edited in another session at this exact
+   * moment could write its own row back with the handle restored. Accepted: the operation is a
+   * deliberate one-off act by one admin on a leaver's rows, and the alternative — loading and
+   * saving every request a member ever touched — would 409 against unrelated concurrent bank work.
+   *
+   * @param userId the member whose handle snapshots are erased
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      """
+      UPDATE BankBookingRequest r SET
+        r.requesterHandle = CASE WHEN r.requestedBy = :userId THEN :sentinel
+                                 ELSE r.requesterHandle END,
+        r.deciderHandle = CASE WHEN r.decidedBy = :userId THEN :sentinel
+                               ELSE r.deciderHandle END,
+        r.counterpartyHandle = CASE WHEN r.counterpartyUserId = :userId THEN :sentinel
+                                    ELSE r.counterpartyHandle END,
+        r.ownerApprovalGrantedByHandle = CASE WHEN r.ownerApprovalGrantedBy = :userId THEN :sentinel
+                                              ELSE r.ownerApprovalGrantedByHandle END
+      WHERE r.requestedBy = :userId OR r.decidedBy = :userId
+         OR r.counterpartyUserId = :userId OR r.ownerApprovalGrantedBy = :userId
+      """)
+  int anonymiseHandles(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

@@ -73,8 +73,12 @@ import org.springframework.web.client.RestClientException;
 @Slf4j
 public class UserDeletionService {
 
-  /** Keycloak's generated username for a client's service account: {@code service-account-<id>}. */
-  private static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
+  /**
+   * Keycloak's generated username for a client's service account: {@code service-account-<id>}.
+   * Shared with the gauge that has to exclude such a row, so the two cannot spell it differently.
+   */
+  private static final String SERVICE_ACCOUNT_PREFIX =
+      IngestGatewayProperties.SERVICE_ACCOUNT_PREFIX;
 
   /**
    * Whether {@link #deleteUser(UUID, KeycloakPresenceCheck)} must verify against Keycloak that the

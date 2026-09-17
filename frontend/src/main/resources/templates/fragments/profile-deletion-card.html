@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  The profile page's "delete account" card (REQ-SEC-061, ADR-0181), as a fragment so
+  profile.js can swap it in place after the member raises or withdraws a request
+  (REQ-FE-001) rather than reloading the page. The proxy controller renders exactly this
+  fragment for GET /profile/deletion-request?fragment=card.
+
+  Four mutually exclusive states, all decided server-side:
+    * no request, or a withdrawn one -> offer to raise a new one
+    * PENDING                        -> show it, offer to withdraw
+    * DECLINED                       -> offer to raise a new one AND show the recorded
+                                        reason, which Art. 12(4) obliges the controller
+                                        to tell the requester
+    * could not be loaded            -> say so, and offer nothing
+
+  The fourth state is a correction. A backend failure used to render as the no-request
+  state, which means a DECLINED request -- the one state that carries the refusal reason
+  the member has a right to be told -- could vanish from the page with no indication that
+  anything had gone wrong. "I cannot show you this right now" is the honest answer, and
+  suppressing the actions with it stops the member raising a second request on top of one
+  they cannot see.
+-->
+<div th:fragment="card">
+    <div class="card card--inset" id="profile-deletion-card"
+         th:attr="data-status=${deletionRequest != null ? deletionRequest.status : ''}">
+        <div class="card-head">
+            <h2 class="card-title" th:text="#{profile.deletion.title}">Delete account</h2>
+        </div>
+
+        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="alert"
+             th:if="${deletionRequestUnavailable}"
+             data-testid="profile-deletion-unavailable">
+            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                <use href="#krt-icon-warning"/></svg>
+            <p class="krtm-margin-0-2a0c" th:text="#{profile.deletion.unavailable}">Your deletion
+                request could not be loaded. Please try again later.</p>
+        </div>
+
+        <p class="acct-note"
+           th:if="${!deletionRequestUnavailable and (deletionRequest == null or deletionRequest.status != 'PENDING')}">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg>
+            <span th:text="#{profile.deletion.hint}">You can request that your account be deleted. An administrator decides the request.</span>
+        </p>
+
+        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="status"
+             th:if="${deletionRequest != null and deletionRequest.status == 'PENDING'}"
+             data-testid="profile-deletion-pending">
+            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                <use href="#krt-icon-warning"/></svg>
+            <p class="krtm-margin-0-2a0c">
+                <span th:text="#{profile.deletion.pending}">Your deletion request is awaiting a decision.</span>
+                <span th:if="${deletionRequest.eraseHistoryRequested}"
+                      th:text="' ' + #{profile.deletion.pending.withHistory}"> You also asked for your entries in the logs and the booking history to be anonymised.</span>
+            </p>
+        </div>
+
+        <div class="hud-box krtm-border-color-var-color-warning-display-flex-1b12" role="status"
+             th:if="${deletionRequest != null and deletionRequest.status == 'DECLINED'}"
+             data-testid="profile-deletion-declined">
+            <svg class="krt-icon krtm-flex-0-0-auto-margin-top-0-1rem-f087" aria-hidden="true">
+                <use href="#krt-icon-info"/></svg>
+            <p class="krtm-margin-0-2a0c">
+                <span th:text="#{profile.deletion.declined}">Your deletion request was declined.</span>
+                <br>
+                <span class="data-value" th:text="${deletionRequest.decisionNote}">Reason</span>
+                <br>
+                <span th:text="#{profile.deletion.declined.remedy}">You may lodge a complaint with a supervisory authority or seek a judicial remedy.</span>
+            </p>
+        </div>
+
+        <div class="acct-actions">
+            <button type="button" class="btn btn-quiet-danger"
+                    th:if="${!deletionRequestUnavailable and (deletionRequest == null or deletionRequest.status != 'PENDING')}"
+                    data-trigger="open-modal-display" data-modal-id="profile-deletion-modal"
+                    data-testid="profile-deletion-open">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                <span th:text="#{profile.deletion.open}">Request deletion</span>
+            </button>
+            <button type="button" class="btn btn-outline" id="profile-deletion-withdraw"
+                    th:if="${deletionRequest != null and deletionRequest.status == 'PENDING'}"
+                    data-testid="profile-deletion-withdraw">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg>
+                <span th:text="#{profile.deletion.withdraw}">Withdraw request</span>
+            </button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

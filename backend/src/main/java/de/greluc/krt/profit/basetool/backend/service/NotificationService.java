@@ -186,6 +186,27 @@ public class NotificationService {
     return deleted;
   }
 
+  /**
+   * Deletes unread notifications raised before the cutoff; the second half of the scheduled
+   * retention sweep. Independent of the user-initiated delete.
+   *
+   * <p>Separate from {@link #purgeReadOlderThan(Instant)} because the two halves answer to
+   * different clocks and different windows: a read notification ages from when it was consumed, an
+   * unread one only from when it was raised. Both are bounded — an unbounded unread backlog is what
+   * let a triggering member's handle outlive every stated retention period.
+   *
+   * @param cutoff delete unread notifications created before this instant
+   * @return the number of notifications deleted
+   */
+  @Transactional
+  public int purgeUnreadOlderThan(@NotNull Instant cutoff) {
+    int deleted = notificationRepository.deleteUnreadOlderThan(cutoff);
+    if (deleted > 0) {
+      log.info("Retention: deleted {} unread notification(s) raised before {}", deleted, cutoff);
+    }
+    return deleted;
+  }
+
   @NotNull
   private Notification loadOwn(@NotNull UUID recipientUserId, @NotNull UUID id) {
     return notificationRepository

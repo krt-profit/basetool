@@ -31,6 +31,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -351,4 +352,27 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       nativeQuery = true)
   void removeAssignee(
       @org.springframework.data.repository.query.Param("userId") java.util.UUID userId);
+
+  /**
+   * Replaces a contact-person handle that is this member's with the erasure sentinel (REQ-SEC-062).
+   *
+   * <p>{@code job_order.handle} is the order's contact person — "Handle des Ansprechpartners" —
+   * typed in by hand, so like the two handover columns it has no user id beside it and can only be
+   * matched on the text, case-insensitively. Its two sibling handover columns were text-matched
+   * from the start; this one was not, and the omission is what let the name survive both in the
+   * order list and in the audit labels built from it.
+   *
+   * <p><b>A handle is not a unique key</b>, so this can over-match, which is the correct direction
+   * of error for an erasure request and is why the admin reviews the Personensuche hits before
+   * granting ({@code docs/privacy/data-subject-requests.md}).
+   *
+   * @param handle the contact spelling to erase; compared case-insensitively
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE JobOrder o SET o.handle = :sentinel"
+          + " WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel")
+  int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
 }

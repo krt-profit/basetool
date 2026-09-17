@@ -57,18 +57,23 @@ services:
           - host.docker.internal
     volumes: !override
       - ./realm-export.json:/opt/keycloak/data/import/realm-export.json
-  # The app images bake a ROOT-owned /app/logs/backend.log: the Dockerfile's
-  # AppCDS training run executes as root (before `USER 10001`) and Logback's
-  # FILE appender — active in every profile via <springProfile name="!prod"> —
-  # creates the file then. The prod/dev compose stacks hide this by overlaying
-  # /app/logs with a pre-chowned `/var/iri/.../log` bind mount; our isolation
-  # override dropped that mount, exposing the root-owned file to the non-root
-  # runtime user -> "logs/backend.log (Permission denied)" -> startup abort.
-  # Running the throwaway E2E container as root sidesteps it without any host
-  # bind mount, so the identical config also works on a clean CI runner (where
-  # a Docker-created bind dir would be root:root and equally unwritable by
-  # uid 10001). The proper long-term fix belongs in the Dockerfile (chown
-  # /app/logs after the CDS run, or point the training run's logs elsewhere).
+  # /app/logs needs a writable mount, and `volumes: !override` below replaces the whole list —
+  # so the tmpfs docker-compose.yml mounts there has to be repeated in it. It is not optional:
+  # Logback's FILE appender is active in every profile via <springProfile name="!prod">, and a
+  # failure to open its file happens during Spring Boot's logging initialisation, so the
+  # container EXITS rather than degrading -- compose then reports an unhealthy service whose
+  # real cause is buried in an appender stack trace.
+  #
+  # History, because the shape of it changed twice (corrected 2026-09-17). The images used to
+  # bake a ROOT-owned /app/logs/backend.log, created by the Dockerfile's AppCDS training run
+  # before `USER 10001`. Dropping the tmpfs was survivable then only because this override also
+  # runs the container as `user: "0:0"`: root owned that file and could append to it. #1932
+  # removed the baked files -- /app/logs now ships EMPTY, owned by 10001 -- so root has to
+  # CREATE a file in a directory it does not own, and `cap_drop: [ALL]` has taken
+  # CAP_DAC_OVERRIDE away from it. Every E2E job failed at compose-up until the tmpfs came
+  # back. `user: "0:0"` is now redundant (the tmpfs is 0777 and the image starts as 10001 on
+  # its own) and is kept only so this change carries one concern; it can go with the next edit
+  # to this file.
   backend-dev:
     user: "0:0"
     # Disable the backend rate limiter for the throwaway E2E stack. The limiter keys its Bucket4j
@@ -117,6 +122,13 @@ services:
       # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
       # the backend abort at start-up with "keystore password was incorrect".
       - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
+      # The /app/logs tmpfs from docker-compose.yml, restored on purpose: `!override` replaces
+      # the whole list, and dropping this one made every E2E job fail at compose-up (see the
+      # note above the service).
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
   frontend-dev:
     user: "0:0"
     # Serve HTTP/1.1 (not HTTP/2) for the throwaway E2E stack. The suite's dominant flake is an
@@ -148,6 +160,13 @@ services:
       # SERVER_SSL_KEY_STORE_PASSWORD to this keystore's password — mounting any other store makes
       # the backend abort at start-up with "keystore password was incorrect".
       - ./docker/test-tls/basetool-test-keystore.p12:/run/secrets/keystore.p12:ro
+      # The /app/logs tmpfs from docker-compose.yml, restored on purpose: `!override` replaces
+      # the whole list, and dropping this one made every E2E job fail at compose-up (see the
+      # note above the service).
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
 
 volumes:
   iri-e2e-db-backend:

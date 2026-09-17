@@ -79,6 +79,7 @@ final class WebClientTestSupport {
         new AppHttpProperties(
             Duration.ofSeconds(3),
             Duration.ofSeconds(10),
+            Duration.ofSeconds(120),
             Duration.ofSeconds(10),
             Duration.ofSeconds(10),
             protocol,

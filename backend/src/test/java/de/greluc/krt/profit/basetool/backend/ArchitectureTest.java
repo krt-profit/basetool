@@ -27,6 +27,7 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -37,6 +38,8 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.greluc.krt.profit.basetool.backend.service.AuditService;
+import de.greluc.krt.profit.basetool.backend.service.BankAuditService;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -572,6 +575,59 @@ class ArchitectureTest {
                 + "repository bypasses @Transactional boundaries, owner filtering and the "
                 + "@PreAuthorize seam, all of which live in services.")
         .check(CLASSES);
+  }
+
+  @Test
+  void controllerLayerMustNotWriteAuditRowsDirectly() {
+    // Reasoning: AuditService.record is @Transactional(propagation = MANDATORY) — writing the
+    // audit row in the same transaction as the mutation is what makes the trail gap-free, and the
+    // propagation is the guard that says so. A controller has no transaction of its own
+    // (open-in-view is false, and nothing wraps the handler), so the call throws
+    // IllegalTransactionStateException and the endpoint 500s.
+    //
+    // This is not hypothetical: the three GDPR controllers added in #1920 each called it straight
+    // from a handler, and all five endpoints 500'd. It survived review because the MockMvc gate
+    // matrices declare @MockitoBean AuditService — replacing the bean also removes the
+    // transactional proxy, so the propagation is never exercised and the tests stay green.
+    // A compile-time-visible rule is the only thing that catches the next one.
+    //
+    // Deliberately a call-site rule, not a package dependency: AuditAdminController and
+    // BankAdminController both legitimately inject their audit service to QUERY the trail for the
+    // admin viewer and to run the retention purge. Reading is fine; writing is the service layer's
+    // job.
+    //
+    // Both trails are covered. BankAuditService.record carries the same MANDATORY propagation and
+    // no controller calls it today — which is the moment to fence it, not after the second
+    // occurrence.
+    noClasses()
+        .that()
+        .resideInAPackage("..backend.controller..")
+        .should()
+        .callMethodWhere(callsAuditRecord())
+        .because(
+            "record(...) needs a surrounding transaction (MANDATORY) that a controller cannot "
+                + "provide. Put the call in the service that owns the operation — inside the "
+                + "business transaction for a mutation, or in a small @Transactional method of its "
+                + "own for an audited read (see DataExportService#recordExport / "
+                + "PersonSearchService#recordSearch).")
+        .check(CLASSES);
+  }
+
+  /**
+   * Matches a call to {@code record(..)} on either audit service, whatever its signature.
+   *
+   * @return the predicate, matched on owner and method name so a future parameter change cannot
+   *     silently disarm the rule
+   */
+  private static DescribedPredicate<JavaCall<?>> callsAuditRecord() {
+    Set<String> owners = Set.of(AuditService.class.getName(), BankAuditService.class.getName());
+    return new DescribedPredicate<>("a call to AuditService/BankAuditService.record(..)") {
+      @Override
+      public boolean test(JavaCall<?> call) {
+        return owners.contains(call.getTargetOwner().getFullName())
+            && "record".equals(call.getTarget().getName());
+      }
+    };
   }
 
   @Test
@@ -2268,6 +2324,33 @@ class ArchitectureTest {
             "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository");
+    // The single named exception, approved by @greluc on 2026-09-16 (ADR-0183, REQ-SEC-062).
+    //
+    // A granted Art. 17 request replaces the member's handle in `bank_transaction`
+    // .counterparty_handle with a placeholder. That is an UPDATE on a ledger table, which this rule
+    // forbids — so the exception is by METHOD NAME, not by relaxing the rule: every other
+    // @Modifying method on these repositories still fails, including one with this exact name on a
+    // different ledger repository.
+    //
+    // Why it is admissible at all: the rule exists so a ledger CORRECTION cannot be made by update
+    // (corrections are reversal transactions, REQ-BANK-004). This changes no booking fact — not an
+    // amount, not an account, not a date, not a posting row — only a denormalised display column
+    // carrying a name. The alternatives were weighed and rejected: leaving the booking history out
+    // of the erasure would contradict the privacy policy, which names „Buchungseinträge" as
+    // something an Art. 17 request can reach; and a reversal-plus-rebooking pair would double every
+    // affected member's ledger rows and disturb balance history for a name change.
+    //
+    // ADR-0010's insert-only consequence is therefore amended, and ADR-0183 records that amendment
+    // rather than leaving it to be inferred from this test.
+    // Fully qualified, not by bare method name. The predicate consulted input.getName() only, so a
+    // @Modifying method that happened to be called anonymiseCounterpartyHandle on
+    // BankPostingRepository or BankHolderPostingRepository would have inherited the exemption
+    // silently -- and those are the tables carrying amounts. The approval was for one method on one
+    // repository; the check now says so.
+    Set<String> approvedLedgerMutations =
+        Set.of(
+            "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository"
+                + ".anonymiseCounterpartyHandle");
     noMethods()
         .that()
         .areDeclaredInClassesThat(
@@ -2275,6 +2358,14 @@ class ArchitectureTest {
               @Override
               public boolean test(JavaClass input) {
                 return ledgerRepositories.contains(input.getFullName());
+              }
+            })
+        .and(
+            new DescribedPredicate<>("are not the one approved Art. 17 anonymisation") {
+              @Override
+              public boolean test(com.tngtech.archunit.core.domain.JavaMethod input) {
+                return !approvedLedgerMutations.contains(
+                    input.getOwner().getFullName() + "." + input.getName());
               }
             })
         .should()

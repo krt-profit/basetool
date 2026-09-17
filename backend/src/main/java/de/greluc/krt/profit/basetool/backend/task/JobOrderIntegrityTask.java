@@ -110,4 +110,18 @@ public class JobOrderIntegrityTask {
     blueprintDriftGauge.set(report.blueprintDrift().size());
     log.info("Job order integrity check finished — {} violation(s).", report.violationCount());
   }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="job_order_integrity"} = 1}.
+   *
+   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
+   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
+   * Without it, following the documented instruction to disable a sweep before its first
+   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
+   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    taskMetrics.markEnabled(ScheduledJob.JOB_ORDER_INTEGRITY);
+  }
 }

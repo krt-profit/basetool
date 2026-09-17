@@ -122,14 +122,14 @@ groups:
       # LAZILY, on a job's first success, and lives in the backend process — so a job that fails on
       # EVERY run since the last restart publishes no series at all, `time() - gauge` has nothing to
       # evaluate, and this alert stayed silent on exactly the failure it exists for. The companion is
-      # gated on backend uptime exceeding this rule's own window rather than being a bare absent():
+      # gated on backend uptime exceeding this rule's own window, AND on the job's bean existing:
       # a bare one would fire after every deploy, since (unlike the textfile metrics behind the
       # ops-automation alerts) this gauge does not survive a restart. Written per task, never once
       # over an alternation — absent() is 1 only when the selector matches NOTHING, so a combined
       # guard would stay false while one of two tasks was dead. Pinned by
       # tests/scheduled_job_never_succeeded_test.yml.
       - alert: UserSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="user_sync"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -144,7 +144,7 @@ groups:
       # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ExternalSyncStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="uex_sync"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="scwiki_sync"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -330,13 +330,20 @@ groups:
 
       # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
       # the two catalogue syncs; the daily notification-retention purge and the hourly default-
-      # blueprint back-fill had no staleness guard. No absent() — the last-success gauge is registered
-      # by TaskMetrics only on a job's first SUCCESS, so a job whose bean is config-gated off (or that
-      # has not yet completed a run in this process) never publishes it and cannot report a false
-      # stale (deliberate, per the issue; see the sentinel-guard note at the top of this group).
+      # blueprint back-fill had no staleness guard. The daily rejected-registration purge
+      # (REQ-SEC-057) joined them: a retention sweep that silently stops running is exactly the
+      # failure nobody notices from the outside, because its whole job is that nothing is left over.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
+      # This comment used to claim that a config-gated-off job "cannot report a false stale
+      # (deliberate, per the issue)". That stopped being true the moment the companion was added
+      # (2026-08-29): a bean @ConditionalOnProperty never created publishes no last-success gauge,
+      # which is exactly the state absent() fires on. Following .env.example's own instruction to
+      # disable a retention sweep before its first irreversible run therefore raised a PERMANENT
+      # warning from 26h of uptime onwards. The `basetool_scheduled_job_enabled` leg (2026-09-17)
+      # is what makes the claim true again: the job publishes 1 while it is configured to run, so
+      # absent-and-enabled means "never ran" and absent-and-not-enabled means "switched off".
       - alert: ScheduledJobStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -351,7 +358,7 @@ groups:
       # invariant it guards.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BankLedgerIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="bank_ledger_integrity"} == 1))
         for: 10m
         labels:
           severity: critical
@@ -364,7 +371,7 @@ groups:
       # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: JobOrderIntegritySweepStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="job_order_integrity"} == 1))
         for: 10m
         labels:
           severity: warning
@@ -377,7 +384,7 @@ groups:
       # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
       # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BusinessMetricsStale
-        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600)
+        expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m
         labels:
           severity: warning
@@ -526,6 +533,114 @@ groups:
         annotations:
           summary: "Oldest pending registration >48h"
           description: "A user registration has been awaiting approval for more than 48 hours."
+
+      # Members' Art. 17 erasure requests waiting for an admin decision (REQ-SEC-061, ADR-0181).
+      #
+      # The one queue alert in this file whose threshold comes from a STATUTE rather than from an
+      # operational preference: Art. 12(3) GDPR gives the controller one month to respond to a
+      # data-subject request. 14 days is set well inside that, so an admin still has two weeks to
+      # weigh the request -- in particular the "also erase my audit and bank history" wish, which is
+      # a judgement about competing interests and not a click.
+      #
+      # Empty queues report 0 seconds (BusinessMetricsCollector.ageSeconds), so there is no absent()
+      # ambiguity: a value over threshold means a real request has been waiting that long.
+      - alert: DeletionRequestOverdue
+        expr: basetool_deletion_request_pending_oldest_age_seconds > 1209600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oldest account-deletion request >14d"
+          description: >-
+            A member asked for their account to be erased more than 14 days ago and no admin has
+            decided it. Art. 12(3) allows one month to respond. Decide it in Administration ->
+            Loeschantraege; refusing requires a recorded reason, which the member is then told.
+
+      # Half-finished account deletions (REQ-SEC-059, ADR-0182).
+      #
+      # Deleting a member is two acts: remove the Keycloak account, then delete the local row. The
+      # member list only offers the second once the roster sync has flipped in_keycloak = false, so
+      # a forgotten click leaves the e-mail address, handle, Discord snowflake, guild nickname and
+      # profile description of somebody who has already left, indefinitely, with nothing watching.
+      #
+      # 7 days, not 48h: the wait is legitimate for as long as an admin is mid-task and the roster
+      # sync is nightly, so a same-week deletion must not page anybody. This is a hygiene signal,
+      # not an incident -- the data is not exposed, it is merely retained past its basis.
+      #
+      # Age, not count: a count above zero for 7 days would also fire when a stream of accounts was
+      # each cleared within a day, because the count never reaches zero in between. The age comes
+      # from app_user.keycloak_absent_since (V241); rows predating that migration were backfilled
+      # with the deploy time, so shortly after deploy this alert reports a LOWER BOUND.
+      - alert: UserDeletionUnfinished
+        expr: basetool_users_pending_deletion_oldest_age_seconds > 604800
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An account has been awaiting local deletion for >7d"
+          description: >-
+            A Keycloak account was removed but its local row was never deleted, so it still holds
+            the member's e-mail address, handle, Discord id and description. Finish it in
+            Administration -> Mitglieder (the delete action appears for accounts the sync no longer
+            finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
+
+      # (2026-09-17) A brand-new account that is ACTIVE on arrival. The REQ-SEC-017 approval gate
+      # carves ADMIN-realm-role holders out for bootstrap safety -- the first admin must never be
+      # lockable out -- which makes it the one way a row gains full authority with no admin decision
+      # behind it, and it left no trace at all. Normally zero: an admin account is created once.
+      #
+      # A firing is the bootstrap, a re-provisioning, or somebody who was granted the ADMIN realm
+      # role in Keycloak and then logged in. It is also the tail of a failed erasure: the recreated
+      # row of an ADMIN-realm-role holder is ACTIVE immediately rather than a refusable PENDING
+      # registration, which is why AccountErasureKeycloakDeleteFailed exists below.
+      #
+      # Untagged on purpose -- the callsign would be both unbounded and PII (REQ-OBS-004). Who it
+      # was is in the ROLE audit trail, by actor and by time.
+      - alert: AdminAccountAutoActivated
+        expr: sum(increase(basetool_admin_registration_auto_activated_total[24h])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A new account was activated as admin without an approval"
+          description: >-
+            A brand-new account arrived already holding the Keycloak ADMIN realm role and was
+            activated without passing the approval queue (REQ-SEC-017 bootstrap carve-out). Expected
+            for the first admin and for a deliberate re-provisioning; otherwise confirm who was
+            granted the ADMIN realm role in Keycloak, and check Administration -> Protokoll (Rollen
+            tab) for the account's arrival.
+
+      # (2026-09-17) The opposite direction of UserDeletionUnfinished, and the one nothing watched.
+      # An erasure commits its local half first and deletes the Keycloak user last (REQ-SEC-026,
+      # ADR-0111). When that last step throws, the catch block logged a warning and returned -- and
+      # nothing else could see it: the account has no local row left, so it cannot appear in
+      # basetool_users_pending_deletion_count, which counts a local row whose Keycloak account has
+      # gone.
+      #
+      # Why it matters: the surviving Keycloak account can still log in. The reconciliation then
+      # inserts a fresh row -- PENDING and refusable for an ordinary member, but ACTIVE for anyone
+      # holding the ADMIN realm role, because the approval gate carves admins out for bootstrap
+      # safety (UserRegistrationService#stampNewPendingRegistration). So a member who asked to be
+      # erased can come back with full admin authority and no approval.
+      #
+      # Any occurrence, and a long window: this is a manual remedy in the Keycloak console, so the
+      # alert must still be up when somebody reads it. The series is absent until the first failure,
+      # so it cannot fire before one happens. The matching audit row is
+      # ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED, which carries the account id the console needs.
+      - alert: AccountErasureKeycloakDeleteFailed
+        expr: sum(increase(basetool_account_deletion_keycloak_failures_total[24h])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "An erasure deleted the local data but not the Keycloak account"
+          description: >-
+            An Art. 17 erasure committed its local half and then failed to delete the Keycloak
+            account, so that account still exists and can still log in. Delete it in the Keycloak
+            console; until then a re-login recreates the member's row, and for an ADMIN-realm-role
+            holder that row is ACTIVE immediately. The account id is in the
+            ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED audit event (Administration -> Protokoll,
+            Rollen tab).
 
       - alert: BankBookingApprovalOverdue
         expr: basetool_bank_booking_request_pending_oldest_age_seconds > 172800

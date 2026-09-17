@@ -81,6 +81,30 @@ public class User extends AbstractEntity<UUID> {
   private boolean inKeycloak = true;
 
   /**
+   * When the roster sync last observed this account <em>missing</em> from Keycloak, i.e. when
+   * {@link #inKeycloak} became {@code false} (V241, REQ-SEC-059, ADR-0182).
+   *
+   * <p>{@code null} means present, which is the state of every account in normal service. It is
+   * cleared again when the sync sees the account return, so a re-created account does not stay
+   * flagged as waiting.
+   *
+   * <p><b>Why this exists as its own column.</b> Deleting a member is two acts — remove the
+   * Keycloak account, then delete the local row — and the second is only offered once this flag has
+   * flipped. A forgotten second act leaves the e-mail address, handle, Discord snowflake and
+   * description in place indefinitely. The guard that notices needs the <em>age</em> of the oldest
+   * waiting row, and neither existing timestamp carries it: {@code createdAt} is when the account
+   * was created, and {@code updatedAt} is not even written by the flip (it is a bulk JPQL update,
+   * which skips the entity lifecycle) and moves on every unrelated profile edit.
+   *
+   * <p><b>A value equal to the V241 deploy time is a placeholder, not a measurement</b> — rows
+   * already flagged when the column shipped disappeared at an unrecorded moment, and that missing
+   * record is precisely the defect the column fixes.
+   */
+  @Nullable
+  @Column(name = "keycloak_absent_since")
+  private Instant keycloakAbsentSince;
+
+  /**
    * The Keycloak account's {@code enabled} flag as of the last roster sync (V230, ADR-0129).
    *
    * <p>Separate from {@link #inKeycloak}, which records whether the sync still <em>saw</em> the

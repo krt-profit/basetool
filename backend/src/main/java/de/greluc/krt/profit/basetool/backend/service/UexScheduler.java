@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.AsyncConfig;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -196,5 +197,19 @@ public class UexScheduler {
       masterDataCacheEvictionService.evictUexSyncedMasterData();
     }
     return itemsProcessed;
+  }
+
+  /**
+   * Publishes {@code basetool_scheduled_job_enabled{task="uex_sync"} = 1}.
+   *
+   * <p>This bean is {@code @ConditionalOnProperty}-gated, so a UEX sync switched off via {@code
+   * krt.uex.scheduler-enabled=false} creates no bean and publishes nothing — and that absence is
+   * what lets {@code ExternalSyncStale}'s {@code absent()} leg tell "switched off on purpose" from
+   * "has never succeeded". Without it the leg could not distinguish the two, because the
+   * last-success gauge is registered lazily on first success and never appears in either case.
+   */
+  @PostConstruct
+  void publishEnabledGauge() {
+    taskMetrics.markEnabled(ScheduledJob.UEX_SYNC);
   }
 }

@@ -87,6 +87,7 @@ class WebClientConfigOauthTokenPoolTest {
         new AppHttpProperties(
             Duration.ofSeconds(2),
             Duration.ofSeconds(5),
+            Duration.ofSeconds(120),
             Duration.ofSeconds(3),
             Duration.ofSeconds(3),
             AppHttpProperties.BackendProtocol.H2,
@@ -193,6 +194,7 @@ class WebClientConfigOauthTokenPoolTest {
                 new AppHttpProperties(
                     Duration.ofSeconds(2),
                     Duration.ofSeconds(30),
+                    Duration.ofSeconds(120),
                     Duration.ofMillis(500),
                     Duration.ofMillis(500),
                     AppHttpProperties.BackendProtocol.H2,

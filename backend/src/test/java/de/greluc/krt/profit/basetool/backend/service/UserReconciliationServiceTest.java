@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -61,6 +63,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -265,6 +268,64 @@ class UserReconciliationServiceTest {
           1.0,
           meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).count(),
           "a callsign collision must be counted");
+    }
+
+    /**
+     * A brand-new row that is ACTIVE on arrival has to be counted.
+     *
+     * <p>{@code stampNewPendingRegistration} carves ADMIN-realm-role holders out of the approval
+     * gate for bootstrap safety (REQ-SEC-017), which is the one way an account gains full authority
+     * with no admin decision behind it \u2014 and it used to leave no trace at all. It is also the
+     * tail of a failed erasure: the recreated row of an ADMIN-realm-role holder is ACTIVE
+     * immediately rather than a refusable PENDING registration (REQ-SEC-061).
+     */
+    @Test
+    void countsTheAutoActivatedAdmin_soTheCarveOutIsNotSilent() {
+      Jwt jwt =
+          newJwt(
+              USER_ID.toString(),
+              Map.of(
+                  "preferred_username",
+                  "alice",
+                  "realm_access",
+                  Map.of("roles", List.of("ADMIN"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("ADMIN", "ADMIN")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(
+          1.0,
+          meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count(),
+          "an account that arrives already holding ADMIN must be counted");
+    }
+
+    /** A new ordinary member lands PENDING, which is the approval queue's own signal, not this. */
+    @Test
+    void doesNotCountANewOrdinaryMemberAsAnAutoActivatedAdmin() {
+      Jwt jwt =
+          newJwt(
+              USER_ID.toString(),
+              Map.of(
+                  "preferred_username",
+                  "alice",
+                  "realm_access",
+                  Map.of("roles", List.of("MEMBER"))));
+
+      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findIdsByUsername("alice")).thenReturn(List.of());
+      when(roleRepository.findAllWithPermissions())
+          .thenReturn(java.util.List.of(codeRole("MEMBER", "MEMBER")));
+      when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+      userReconciliationService.syncUser(jwt);
+
+      assertEquals(
+          0.0, meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).count());
     }
 
     /** No collision, no counter: an ordinary first login must not look like an incident. */
@@ -1158,7 +1219,7 @@ class UserReconciliationServiceTest {
       // (and potentially expensive) bulk-update query.
       userReconciliationService.markMissingUsers(List.of());
 
-      verify(userRepository, never()).markMissingUsers(any());
+      verify(userRepository, never()).markMissingUsers(any(), any());
     }
 
     @Test
@@ -1167,7 +1228,22 @@ class UserReconciliationServiceTest {
 
       userReconciliationService.markMissingUsers(ids);
 
-      verify(userRepository).markMissingUsers(ids);
+      verify(userRepository).markMissingUsers(eq(ids), any());
+    }
+
+    // covers REQ-SEC-059 — the absence stamp the orphan-age guard measures from is recorded here,
+    // and it is "now" rather than anything derived from the row.
+    @Test
+    void stampsWhenTheAbsenceWasObserved() {
+      Instant before = Instant.now();
+
+      userReconciliationService.markMissingUsers(List.of(USER_ID));
+
+      ArgumentCaptor<Instant> absentSince = ArgumentCaptor.forClass(Instant.class);
+      verify(userRepository).markMissingUsers(any(), absentSince.capture());
+      assertNotNull(absentSince.getValue());
+      assertFalse(absentSince.getValue().isBefore(before));
+      assertFalse(absentSince.getValue().isAfter(Instant.now()));
     }
 
     @Test
@@ -1175,7 +1251,7 @@ class UserReconciliationServiceTest {
       // The count used to be discarded at the JPA level (void), which is why a mass
       // soft-delete left no trace anywhere.
       List<UUID> ids = List.of(USER_ID);
-      when(userRepository.markMissingUsers(ids)).thenReturn(7);
+      when(userRepository.markMissingUsers(eq(ids), any())).thenReturn(7);
 
       assertEquals(7, userReconciliationService.markMissingUsers(ids));
     }

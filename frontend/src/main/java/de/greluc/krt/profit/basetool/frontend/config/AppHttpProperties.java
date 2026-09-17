@@ -34,6 +34,11 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param connectTimeout WebClient connect timeout
  * @param responseTimeout overall WebClient response timeout
+ * @param exportResponseTimeout the response timeout for a data-export download, which is the one
+ *     backend call that is expected to take a long time: an Art. 15 export runs ~29 statements
+ *     across the whole schema and then renders a PDF. On the shared 5 s bound a member with years
+ *     of history got a read timeout and a 500. Applied per request rather than by raising the
+ *     shared value, so an ordinary page render keeps failing fast.
  * @param readTimeout WebClient socket read timeout
  * @param writeTimeout WebClient socket write timeout
  * @param backendProtocol the wire protocol the request/response WebClient negotiates with the
@@ -53,6 +58,7 @@ import org.springframework.validation.annotation.Validated;
 public record AppHttpProperties(
     @NotNull @DefaultValue("3s") Duration connectTimeout,
     @NotNull @DefaultValue("5s") Duration responseTimeout,
+    @NotNull @DefaultValue("120s") Duration exportResponseTimeout,
     @NotNull @DefaultValue("5s") Duration readTimeout,
     @NotNull @DefaultValue("5s") Duration writeTimeout,
     @NotNull @DefaultValue("H2") BackendProtocol backendProtocol,

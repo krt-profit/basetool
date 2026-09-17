@@ -42,8 +42,32 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.security.ingest-gateway")
 public class IngestGatewayProperties {
 
+  /**
+   * Keycloak's naming convention for the user row backing a client's service account.
+   *
+   * <p>A display convention rather than a reserved namespace — an ordinary user can be created with
+   * that exact name — so it must never be the basis of a security decision. {@code
+   * UserDeletionService} therefore asks Keycloak which user backs a configured client before it
+   * waives its delete guard. It is good enough for a <em>gauge</em>, though, which is the one place
+   * it is used: excluding a hand-made lookalike from a monitoring count is a nuisance and not a
+   * hole, and the alternative is a Keycloak round trip on every metrics tick.
+   */
+  public static final String SERVICE_ACCOUNT_PREFIX = "service-account-";
+
   /** The {@code azp} values allowed to act for another member. Empty disables the mechanism. */
   private List<String> clientIds = List.of();
+
+  /**
+   * The usernames of the configured gateways' service accounts.
+   *
+   * @return one {@code service-account-<clientId>} per configured client, empty when none is
+   *     configured
+   */
+  public java.util.Set<String> serviceAccountUsernames() {
+    return clientIds.stream()
+        .map(clientId -> SERVICE_ACCOUNT_PREFIX + clientId)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+  }
 
   /**
    * Whether {@code azp} names a configured ingest gateway.

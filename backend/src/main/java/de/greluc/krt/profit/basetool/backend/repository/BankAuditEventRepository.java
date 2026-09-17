@@ -124,4 +124,38 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   @Modifying
   @Query("DELETE FROM BankAuditEvent e WHERE e.occurredAt < :before")
   int deleteByOccurredAtBefore(@Param("before") Instant before);
+
+  /**
+   * Whether any bank audit row is older than a cutoff. Asked by the scheduled retention sweep
+   * (REQ-AUDIT-006) before it purges, so the unconditional {@code AUDIT_LOG_PURGED} marker that is
+   * right for an admin's deliberate purge is not minted daily by a job that found nothing.
+   *
+   * @param before the exclusive cutoff
+   * @return {@code true} when at least one row is older than the cutoff
+   */
+  boolean existsByOccurredAtBefore(Instant before);
+
+  /**
+   * Replaces this member's handle snapshot with the erasure sentinel, for a granted Art. 17 request
+   * (REQ-SEC-062).
+   *
+   * <p><b>This is the only mutation of an otherwise append-only table, and it is deliberate.</b>
+   * The trail's worth rests on rows never being rewritten, so the operation is admin-gated, is
+   * itself audit-logged (a {@code HANDLE_SNAPSHOTS_ANONYMISED} marker written afterwards, which the
+   * update therefore does not touch), and changes nothing about <em>what happened</em> — only who
+   * it names. Row counts, timestamps, event types and subjects are untouched.
+   *
+   * <p>Matched by {@code actorUserId}, so it only reaches rows while the account still exists. Once
+   * the FK has nulled out, the handle is the only remaining link and the admin Personensuche
+   * (REQ-SEC-060) is the way to find those rows.
+   *
+   * @param userId the member whose handle snapshots are erased
+   * @param sentinel {@code HandleAnonymisation#SENTINEL}
+   * @return the number of rows rewritten
+   */
+  @Modifying
+  @Query(
+      "UPDATE BankAuditEvent e SET e.actorHandle = :sentinel"
+          + " WHERE e.actorUserId = :userId AND e.actorHandle <> :sentinel")
+  int anonymiseActorHandle(@Param("userId") UUID userId, @Param("sentinel") String sentinel);
 }

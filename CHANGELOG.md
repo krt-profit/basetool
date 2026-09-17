@@ -4,6 +4,30 @@
 
 ### Added
 
+- **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
+
+- **Du kannst die Löschung deines Kontos jetzt im Tool beantragen.** Im Profil unter „Konto löschen“ – mit dem Absenden wird nichts gelöscht, du kannst den Antrag bis zur Entscheidung zurückziehen, und wird er abgelehnt, erfährst du den Grund. Optional beantragst du zusätzlich, deinen Spielernamen dort zu anonymisieren, wo er eine Kontolöschung überdauert; darüber entscheidet ein Administrator gesondert (REQ-SEC-061, REQ-SEC-062).
+
+- **Administration: neue Seite „Löschanträge“.** Offene Löschanträge entscheiden – ältester zuerst, weil ein Antrag innerhalb eines Monats zu beantworten ist. Eine Ablehnung braucht eine Begründung, die dem Mitglied mitgeteilt wird. Das Ausführen entfernt Konto und Zugang in einem Schritt (REQ-SEC-061).
+
+- **Administration: neue Seite „Personensuche“.** Findet jede Stelle, an der ein Name vorkommt – auch in Freitextfeldern ohne Kontoverknüpfung, etwa bei externen Einsatzteilnehmern, Übergabe-Empfängern oder Organigramm-Platzhaltern. Gedacht für Auskunfts-, Berichtigungs- und Löschanfragen, bei denen eine Korrektur an einer von vier Stellen keine Korrektur ist (REQ-SEC-060).
+
+- **Benachrichtigung, wenn ein Mitglied die Löschung beantragt – und wenn ein Antrag abgelehnt wird.** Die Administration sieht den Antrag im Postfach mit dem Namen des Mitglieds, das Mitglied die Ablehnung mit dem Hinweis auf die Begründung im eigenen Profil (REQ-SEC-061).
+
+- **Administration: Datenauskunft für ein anderes Mitglied.** Auf der Mitglieder-Bearbeitungsseite, für eine Anfrage von jemandem, der sich nicht selbst anmelden kann. Inhalt und Anonymisierung sind identisch mit dem Selbstexport (REQ-SEC-058).
+
+- **Halbfertige Kontolöschungen fallen jetzt auf.** Wurde ein Keycloak-Zugang entfernt, die lokale Zeile aber nie gelöscht, blieben E-Mail-Adresse, Spielername, Discord-ID und Beschreibung unbegrenzt liegen, ohne dass es irgendwo auffiel. Die Überwachung meldet das jetzt nach sieben Tagen (REQ-SEC-059).
+
+- **Audit- und Bank-Protokolle werden nach 24 Monaten automatisch gelöscht.** Die Protokolle wuchsen bisher unbegrenzt und enthielten den Spielernamen dauerhaft — auch von Mitgliedern, deren Konto längst entfernt war. Einträge werden jetzt 24 Monate nach der protokollierten Aktivität entfernt; die manuelle Bereinigung und die in der Datenschutzerklärung genannte Frist bleiben davon unberührt (REQ-AUDIT-006).
+
+  > Beim ersten Lauf nach dem Deployment werden alle Einträge gelöscht, die älter als 24 Monate sind. Wer sie behalten will, setzt vorher `APP_AUDIT_RETENTION_ENABLED=false` oder exportiert sie.
+
+- **Abgelehnte Registrierungen werden nicht mehr dauerhaft gespeichert.** Wurde eine Anmeldung von
+  einem Administrator abgelehnt, blieben Konto, Anmeldedaten und die Ablehnungsbegründung bisher
+  unbegrenzt liegen — im Tool gab es keinen Weg, sie zu entfernen. Sie werden jetzt 90 Tage nach der
+  Ablehnung automatisch und vollständig gelöscht; bis dahin lässt sich eine irrtümliche Ablehnung
+  weiterhin zurücknehmen (REQ-SEC-057).
+
 - **Betrieb: die Ersatzseite für eine Android-Anmeldung, die im Browser landet, wird jetzt von außen
   überwacht.** `/app/callback` muss auf `/app/link-help` weiterleiten — das ist es, was den
   Anmeldecode aus Adresszeile und Verlauf nimmt — und `/app/link-help` muss ohne Anmeldung
@@ -19,6 +43,21 @@
   nicht automatisch gelöscht.
 
 ### Changed
+
+- **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
+  nur Mitgliedern der Organisation gewährt, für die dasselbe Mindestalter gilt — bisher stand das
+  aber nirgends. Weil sich der Text der Bedingungen ändert, müssen alle Mitglieder ihnen einmalig
+  erneut zustimmen; bis dahin ruht auch die Desktop-Anwendung (REQ-SEC-028).
+
+- **Die Datenschutzerklärung erklärt jetzt, wie lange Daten in Sicherungskopien verbleiben.** Nach
+  einer Löschung sind sie bis zu etwa sechs Monate in verschlüsselten Sicherungen weiterhin
+  vorhanden, bis diese auslaufen — das stand bisher nicht dort. Ergänzt wurde auch der Hinweis, dass
+  wissentlich keine Daten von Personen unter 18 Jahren verarbeitet werden.
+
+- **Ungelesene Benachrichtigungen werden jetzt ebenfalls gelöscht.** Die automatische Löschung
+  erfasste bisher nur gelesene; ein Postfach, das niemand öffnete, behielt seine Einträge dauerhaft.
+  Ungelesene werden jetzt 180 Tage nach ihrer Erstellung entfernt, gelesene unverändert 90 Tage nach
+  dem Lesen — beide Fristen stehen in der Datenschutzerklärung (REQ-NOTIF-009).
 
 - **Keycloak auf 26.7.4 angehoben (Sicherheitsupdate).** Das Patch-Release schließt sechs
   Schwachstellen; zwei liegen auf Wegen, die hier wirklich benutzt werden — ein Überlastungsangriff
@@ -41,6 +80,12 @@
   bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
 
 ### Fixed
+
+- **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
+  drei Aufräumläufe und dreier weiterer Einstellungen waren nirgends an das Backend durchgereicht
+  — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind
+  jetzt eingetragen, mit unveränderten Vorgabewerten (REQ-AUDIT-006, REQ-SEC-036, REQ-SEC-057,
+  REQ-NOTIF-009).
 
 - **Betrieb: die drei Dienst-Images konnten ohne ihr Log-Verzeichnis nicht starten.** Beim Bauen
   legte der Trainingslauf die Logdateien als `root` an; sie blieben im Image liegen, und der
@@ -69,7 +114,28 @@
   aber vergessen worden — es lief auf der automatischen Auswahl und hätte bei einer kleineren
   Speichergrenze unbemerkt auf den langsameren Collector umgeschaltet (REQ-OPS-028).
 
+- **Ein großer Datenexport lief nicht mehr in eine Zeitüberschreitung.** Der Download teilte sich
+  die 5-Sekunden-Grenze aller übrigen Aufrufe, obwohl er das gesamte Konto zusammenstellt — bei
+  langer Historie endete er mit einem Fehler. Er hat jetzt seine eigene Grenze
+  (`APP_HTTP_EXPORT_RESPONSE_TIMEOUT`, Vorgabe 120s).
+
+- **Im Auskunfts-PDF standen technische Spaltennamen statt Bezeichnungen.** In den vollständig
+  abgedruckten Abschnitten hieß die linke Spalte etwa ‚discord_guild_nickname‘ oder ‚join_date‘.
+  Alle Felder haben jetzt eine deutsche Bezeichnung (REQ-SEC-058).
+
+- **Eine halb ausgeführte Kontolöschung fällt jetzt auf.** Konnte nach dem Löschen der lokalen
+  Daten der Zugang selbst nicht entfernt werden, stand das nur im Log — das Konto konnte sich
+  weiter anmelden. Das wird jetzt im Protokoll vermerkt und gemeldet, damit es jemand in der
+  Zugangsverwaltung nachholt (REQ-SEC-061).
+
+- **Betrieb: einen Aufräumlauf wie dokumentiert abzuschalten löste einen dauerhaften Alarm aus.**
+  Die Überwachung konnte „noch nie erfolgreich gelaufen“ nicht von „absichtlich ausgeschaltet“
+  unterscheiden, weil ein abgeschalteter Lauf gar keinen Messwert veröffentlicht. Jeder Lauf meldet
+  jetzt, ob er überhaupt eingeschaltet ist (`basetool_scheduled_job_enabled`), und die Alarme fragen
+  das ab (REQ-OBS-011).
+
 ## [v1.8.6](https://github.com/krt-profit/basetool/releases/tag/v1.8.6) - 2026-09-15
+
 
 ### Fixed
 

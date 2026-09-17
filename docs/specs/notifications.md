@@ -184,15 +184,49 @@ freshly-promoted-but-not-yet-logged-in officer becomes a recipient only after th
 
 ### REQ-NOTIF-009 — Retention
 
-A scheduled sweep deletes **read** notifications older than the configured max age (default
-90 days), gated by `app.notifications.retention.enabled` and paced by
+A scheduled sweep bounds **every** notification, on two windows swept in one run:
+
+- **read** notifications older than `app.notifications.retention.max-age` (default 90 days),
+  measured from `readAt`;
+- **unread** notifications older than `app.notifications.retention.unread-max-age` (default
+  180 days), measured from `createdAt` — an unread row has no read timestamp to age from.
+
+Gated by `app.notifications.retention.enabled` and paced by
 `app.notifications.retention.interval`. Disabled under the `test` profile. The sweep is
 independent of the user-initiated delete (REQ-NOTIF-005).
 
+**The unread half is not an optimisation.** Until it existed the sweep reached read rows only, so an
+inbox nobody opened retained its notifications — including the triggering member's handle —
+indefinitely. The retention period the privacy policy states therefore held for attentive members
+and not for absent ones, which is the opposite of how a retention promise has to work. The unread
+window is deliberately the longer of the two (a notification still waiting to be seen is worth more
+than one already consumed), but it is finite.
+
+**The two halves are isolated from each other** (2026-09-17). They were two sequential
+statements, so a read purge that threw — a lock timeout on a large batch, a constraint the
+inbox fanout writes — returned before the unread purge was reached: the half that exists
+because an unopened inbox kept its rows forever would have silently stopped running, behind a
+plain job failure that said nothing about which half failed. `AuditRetentionService` isolates each
+audit domain for the same reason. Both halves are now attempted and the first failure is
+**rethrown**, so the run still records `outcome=failure`: isolating the halves buys the other half
+a run, it does not turn a broken sweep green.
+
+The halves are also counted apart, under
+`basetool_notification_retention_deleted_total{kind="read"|"unread"}` beside the job's own
+`items` total — a sum of two windows cannot answer "did the unread half delete anything",
+which is the question a half that has quietly stopped raises (REQ-OBS-011).
+
 **Acceptance**
 
-- [x] Read notifications past `max-age` are removed by the sweep; unread are kept.
+- [x] Read notifications past `max-age` are removed by the sweep.
+- [ ] Unread notifications past `unread-max-age` are removed by the sweep, measured from
+  `createdAt`; a read row of the same age is left to the read window.
+- [ ] The unread cutoff is strictly older than the read cutoff, so a notification is never reaped
+  sooner for being unread than it would have been for being read.
 - [x] The sweep never tears down the scheduler thread on failure.
+- [ ] A failure in one half still lets the other half run, and the run is still recorded as
+  failed.
+- [ ] The two halves are counted separately as well as together.
 
 **Enforced by:** `NotificationRetentionTaskTest`, `NotificationRepositoryIntegrationTest`
 (`deleteReadOlderThan`) · **Code:** `task/NotificationRetentionTask`,

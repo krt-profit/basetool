@@ -849,13 +849,37 @@ shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.Busine
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
+> [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
+> Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
+> success**, so `absent(last_success)` means "has never succeeded" — which covers two very
+> different states: a job that is stuck, and a job that was switched off on purpose and was never
+> going to run. **All ten** wrapped jobs can be switched off by configuration, and the `absent()`
+> legs could not distinguish the two: following `.env.example`'s own instruction to disable a
+> retention sweep before its first irreversible run raised a **permanent** `warning` from 26 hours
+> of uptime onwards — using the documented safeguard fired the alert.
+>
+> Each job publishes `1` from its own `@PostConstruct`, so a bean `@ConditionalOnProperty` never
+> created publishes nothing and that absence is the signal. That is why the gauge lives on the job
+> rather than being derived from configuration somewhere central: the publisher cannot disagree
+> with the thing it describes. `ScWikiScheduler` is the one exception and shows what the metric
+> actually means — its bean is always created and the sync early-returns on
+> `krt.scwiki.scheduler-enabled`, so it publishes only when that property is on. The gauge says
+> "this job is configured to run", not "this bean exists".
+>
+> Every `absent()` leg in `business.yml` now requires it, per task and never over an alternation —
+> for the same reason the `absent()` legs themselves are written per task. Pinned by
+> `tests/scheduled_job_never_succeeded_test.yml`, which covers both directions: a switched-off job
+> stays silent, and an enabled one that has never succeeded still fires.
+
 **Backend.**
 
 - `basetool_scheduled_job_executions_total{task,outcome}` counter,
   `basetool_scheduled_job_duration_seconds{task}` timer,
-  `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge and — for the jobs that
-  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the eight
+  `basetool_scheduled_job_last_success_timestamp_seconds{task}` gauge,
+  `basetool_scheduled_job_enabled{task}` gauge and — for the jobs that
+  process a countable batch — `basetool_scheduled_job_items_total{task}` counter for the ten
   wrapped jobs (`user_sync`, `notification_retention`, `default_blueprint_provisioning`,
+  `rejected_registration_retention`, `audit_retention`,
   `bank_ledger_integrity`, `job_order_integrity`, `uex_sync`, `scwiki_sync`, `business_metrics`) via `TaskMetrics` (`record`
   / `recordCounting`). The `business_metrics` job wraps `BusinessMetricsCollector.refresh()` (the 60s
   queue-depth sampler) so a wedged sampler surfaces via its frozen last-success (`BusinessMetricsStale`)
@@ -868,7 +892,8 @@ transaction per pass) rather than per-scrape.
   annotation marks the cutover). The last-success gauge is the source of the
   staleness alerts — `UserSyncStale` (`user_sync`, > 26h — daily 05:00 cadence, see `app.keycloak.sync.cron`), `ExternalSyncStale` (the catalogue syncs,
 
-  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning`, > 26 h),
+  > 48 h), `ScheduledJobStale` (`notification_retention` / `default_blueprint_provisioning` /
+  > `rejected_registration_retention` / `audit_retention`, > 26 h),
   > `BankLedgerIntegritySweepStale` (`bank_ledger_integrity`, > 6 h, **critical** — while stale the
   > violations gauge freezes and `BankLedgerIntegrityViolation` cannot fire),
   > `JobOrderIntegritySweepStale` (`job_order_integrity`, > 6 h — same frozen-gauge trap for
@@ -1063,6 +1088,37 @@ transaction per pass) rather than per-scrape.
   other steps still run, so `scwiki_sync` records `success` with a non-zero item tally and a
   reliably-failing step is invisible to `UserSyncStale` / `SyncZeroItems` / `ExternalSyncStale`. They
   back `KeycloakSyncFetchFailing` and `ScWikiStepFailing` (logging audit).
+- `basetool_account_deletion_keycloak_failures_total` counter (untagged,
+  `DeletionRequestService.execute`) covers the third swallowed failure of that kind, and the
+  one nothing could see at all. An Art. 17 erasure commits its local half first and deletes
+  the Keycloak user last (REQ-SEC-026, ADR-0111); when that last step throws, the account has
+  no local row left, so it cannot appear in `basetool_users_pending_deletion_count` — that
+  gauge counts the opposite orphan. The surviving Keycloak account can still log in, and the
+  reconciliation then inserts a fresh row: PENDING and refusable for an ordinary member, but
+  **ACTIVE** for an ADMIN-realm-role holder, because the approval gate carves admins out for
+  bootstrap safety. Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
+  warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
+  the account id the Keycloak console needs (added 2026-09-17).
+- `basetool_admin_registration_auto_activated_total` counter (untagged,
+  `UserReconciliationService`, both creation paths) counts a brand-new row that is `ACTIVE` on
+  arrival because the subject holds the Keycloak ADMIN realm role — the REQ-SEC-017
+  bootstrap carve-out, which is the one way an account gains full authority with no admin
+  decision behind it and which used to leave no trace. Counted on whichever path inserts the
+  row (`created` is true exactly once per account), so the interactive and scheduled paths
+  cannot double-count. Untagged because the callsign would be unbounded and PII (REQ-OBS-004);
+  who it was is in the ROLE audit trail. Backs `AdminAccountAutoActivated` (any occurrence in
+  24 h, warning; added 2026-09-17).
+- `basetool_notification_retention_deleted_total{kind}` counter (`read` / `unread`,
+  `NotificationRetentionTask`) splits the inbox sweep's two windows, which its `items` total
+  conflated. The halves are isolated from each other in the task, so one can be stuck while the
+  other keeps deleting — and then only a split count shows it (REQ-NOTIF-009, added
+  2026-09-17).
+
+  Each of the four metrics this round added carries a panel on `07-basetool-operations.json`
+  beside the erasure-queue stats, because an alert answers "is it broken now" and a panel
+  answers "since when, and how often" — which is the question a `warning` that fires once a
+  quarter actually raises. The enabled gauge sits under the last-success-age series on purpose:
+  a job missing from **both** is switched off, not wedged.
 - Frontend→backend seam (#1041 item 11): the frontend enables the `http.client.requests`
   percentile-histogram (same bounded 5ms..10s window as `http.server.requests`, so both stay on the
   same ~14 buckets) to drive a client-p95-vs-server-p95 overlay that separates "backend slow" from

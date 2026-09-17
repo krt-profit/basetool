@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -745,6 +746,6 @@ public class MaterialClaimService {
    * @return the {@code #<displayId> '<handle>'} label
    */
   private static String orderLabel(JobOrder order) {
-    return "#" + order.getDisplayId() + " '" + order.getHandle() + "'";
+    return JobOrderAuditLabel.of(order.getDisplayId());
   }
 }

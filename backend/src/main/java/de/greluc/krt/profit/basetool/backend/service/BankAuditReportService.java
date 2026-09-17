@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankAuditEventRepository;
 import de.greluc.krt.profit.basetool.backend.service.pdf.AuditLogPdfFormat;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
+import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -96,7 +97,10 @@ public class BankAuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        e.getActorHandle(),
+                        // Erased by an Art. 17 request -> the placeholder, not the raw sentinel
+                        // (REQ-SEC-062).
+                        HandleAnonymisation.humanise(
+                            e.getActorHandle(), label("general.anonymisedHandle")),
                         // Raw event code (the on-screen viewer shows the localized label).
                         e.getEventType().name(),
                         e.getAccountId() != null

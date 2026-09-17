@@ -202,6 +202,15 @@ public class UserAccountMergeService {
           // The approval history OF an account, and who decided it.
           "user_approval_event.user_id",
           "user_approval_event.decided_by_id",
+          // An erasure request and its decision, on exactly the same reasoning (REQ-SEC-061):
+          // the row says "THIS account asked to be erased, and here is what was decided", and
+          // re-pointing it would rewrite which account asked. A partial unique index also permits
+          // only one pending request per account, so moving one onto a target that already has one
+          // would fail. The merge deletes the emptied source, so a pending request on it cascades
+          // away with the account; the member raises a new one on the surviving account -- the same
+          // trade terms_acceptance makes just below.
+          "deletion_request.user_id",
+          "deletion_request.decided_by_id",
           // Not owned: re-derived from Keycloak, and recorded per account.
           "user_roles.user_id",
           "terms_acceptance.user_id");
