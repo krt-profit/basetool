@@ -31,16 +31,19 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Configuration properties under {@code krt.scwiki.*}.
  *
- * <p>Holds the SC Wiki (api.star-citizen.wiki) base URL and every endpoint path the upcoming {@code
+ * <p>Holds the SC Wiki (api.star-citizen.wiki) base URL and every endpoint path {@code
  * ScWikiClient} uses. The endpoints are stored here, not hardcoded in the client, so that a Wiki
  * schema rename is a one-line config change and so the {@code application-test.yml} can point the
  * client at a {@code MockWebServer} URL without touching code.
  *
- * <p>{@code schedulerEnabled} defaults to {@code false} in R1 on purpose: the R1 PR ships only the
- * scheduler skeleton (see {@code ScWikiScheduler}); the actual commodity / blueprint / item sync
- * services land in R3+. Flipping the flag on prematurely would yield no useful effect but would
- * burn upstream API budget for nothing. The R2 PR keeps the default; R3 flips it to {@code true}
- * once {@code ScWikiCommoditySyncService} ships.
+ * <p>{@code schedulerEnabled} is the master switch and defaults to {@code true}. It defaulted to
+ * {@code false} in R1/R2, while {@code ScWikiScheduler} was a skeleton with nothing to drive; R3
+ * flipped it when {@code ScWikiCommoditySyncService} shipped, and the field Javadoc below records
+ * that. Do not read the class default as "the Wiki sync is off by default": {@code
+ * application-prod.yml} and {@code application-dev.yml} both set it to {@code true} explicitly, and
+ * only {@code application-test.yml} (and the local test stack) sets {@code false}. The per-sync
+ * flags below are the opposite — each defaults to {@code false} and ships dark — so a ticking
+ * scheduler does not imply that any individual sync runs.
  *
  * <p>{@code requestsPerSecond} caps the inter-page sleep to a safe rate (default 5/s) — Wiki's
  * advertised limits are 60/min for search and 10/min for image search; plain list endpoints have no
