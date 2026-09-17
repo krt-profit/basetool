@@ -62,12 +62,39 @@ same line in the compose file would break most of these services on the Docker h
 them. What was measured is Podman's behaviour, so it is expressed where Podman reads it. The table
 sits beside `FRONT_END` and `RUN_AS`, which exist for the same reason.
 
-**`keycloak` gets two tmpfs entries with it**, and nothing else changes about how it is delivered:
+**`keycloak` gets three tmpfs entries with it**, and nothing else changes about how it is delivered:
 
 ```ini
 Tmpfs=/opt/keycloak/lib/quarkus:rw,tmpcopyup
 Tmpfs=/opt/keycloak/data/transaction-logs:rw
+Tmpfs=/opt/keycloak/data/tmp:rw
 ```
+
+> [!warning] The third was missing until 2026-09-17, and the cost was invisible
+> Keycloak serves a static theme resource two ways. Asked with `Accept-Encoding: identity` it
+> streams the file and answers **200**. Asked with `gzip` it serves a compressed copy from a cache
+> under `/opt/keycloak/data/tmp/kc-gzip-cache` — and on a read-only root filesystem that directory
+> cannot be created, so the answer is **404**. Not a fallback to the uncompressed file: a 404.
+>
+> Every browser sends `gzip`, and Go's `http.Transport` **adds it when a request has none**, so a Go
+> reverse proxy in front sends it too. `curl` on the host does not. The login page therefore rendered
+> **completely unstyled for every real client** while `curl` reported 200 on the same URL, which
+> reads as a proxy fault and is not one — the first hand-over of this went to the wrong team.
+>
+> Measured both ways against the same image, one variable: `gzip` 404 → 200, and `kc-gzip-cache`
+> appears. All eight assets of the login page now load, including the fonts.
+
+> [!important] What this says about the re-verification rule below
+> Keycloak **stayed healthy throughout**. `/health/ready` answered, the container was up, the
+> conformance suite's `containers-running` and `containers-read-only` both passed, and the realm
+> served its OIDC discovery document. Everything that is checked was fine; the thing that was
+> broken is not checked by anything.
+>
+> The rule this ADR already states — re-verify Keycloak's entry on every image bump — was followed
+> on 26.7.4 and still missed it, because what was re-verified was **that it starts and reports
+> ready**. A read-only posture has to be re-verified against what the service *serves*, not only
+> against whether it comes up. For Keycloak that means fetching the login page **with the headers a
+> browser sends** and checking that its assets arrive.
 
 **Grafana gets one literal environment variable.** Its background installer tries to refresh a
 *bundled* plugin inside its own installation directory and logs

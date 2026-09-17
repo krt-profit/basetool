@@ -174,8 +174,24 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "postgres-exporter-keycloak": {},
     "redis-exporter": {},
     "acme": {},
+    # The third entry was missing until 2026-09-17 and cost the login page its
+    # styling -- silently, because Keycloak stayed HEALTHY throughout.
+    #
+    # Keycloak serves a static theme resource two ways. Asked with
+    # `Accept-Encoding: identity` it streams the file: 200. Asked with `gzip` --
+    # which every browser sends, and which Go's http.Transport adds on its own, so
+    # a Go reverse proxy in front sends it too -- it serves a compressed copy from
+    # a cache under /opt/keycloak/data/tmp/kc-gzip-cache. On a read-only root
+    # filesystem that directory cannot be created, and the response is **404**, not
+    # a fallback to the uncompressed file.
+    #
+    # So: `curl` without the header said 200 and a browser said 404 on the same
+    # URL, which reads as a proxy fault and is not one. Measured both ways against
+    # the same image, with and without this line: gzip 404 -> gzip 200, and
+    # kc-gzip-cache appears.
     "keycloak": {"tmpfs": ["/opt/keycloak/lib/quarkus:rw,tmpcopyup",
-                           "/opt/keycloak/data/transaction-logs:rw"]},
+                           "/opt/keycloak/data/transaction-logs:rw",
+                           "/opt/keycloak/data/tmp:rw"]},
     "backend": {},
     "frontend": {},
     "ingest": {},

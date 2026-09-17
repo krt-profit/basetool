@@ -11,6 +11,7 @@ ReadOnly=true
 DropCapability=ALL
 Tmpfs=/opt/keycloak/lib/quarkus:rw,tmpcopyup
 Tmpfs=/opt/keycloak/data/transaction-logs:rw
+Tmpfs=/opt/keycloak/data/tmp:rw
 NoNewPrivileges=true
 Network=net-db-keycloak.network
 Network=net-proxy-keycloak.network
