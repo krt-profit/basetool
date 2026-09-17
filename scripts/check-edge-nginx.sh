@@ -261,6 +261,28 @@ check_mode() {
   grep -qE 'listen (127\.0\.0\.1|\[::1\]):8081;' "${dump}" \
     || { echo "FAIL: ${mode}: the loopback health listener is missing"; exit 1; }
 
+  # The /auth/admin allow-list has to move WITH the listener. Its six entries are
+  # container-bridge gateways, which is what $remote_addr is on a plain listener; under
+  # proxy_protocol $remote_addr is what haproxy asserts, and the operator's `ssh -L` tunnel then
+  # arrives as the host loopback instead. Neither half may leak into the other mode: a missing
+  # loopback grant is a lockout at cutover, and a loopback grant on a PLAIN listener would be a
+  # standing allow for anything inside the container's own netns.
+  local admin
+  admin="$(awk '/location \^~ \/auth\/admin/,/^[[:space:]]*}/' "${dump}")"
+  grep -q 'allow 172.28.15.1;' <<<"${admin}" \
+    || { echo "FAIL: ${mode}: the ingress-gateway grant is missing from /auth/admin"; exit 1; }
+  if [[ "${mode}" == "frontend" ]]; then
+    grep -q 'allow 127.0.0.1;' <<<"${admin}" \
+      || { echo "FAIL: frontend: /auth/admin does not admit the tunnel's loopback address - this is the #1885 lockout, reintroduced"; exit 1; }
+    grep -q 'allow ::1;' <<<"${admin}" \
+      || { echo "FAIL: frontend: /auth/admin admits 127.0.0.1 but not ::1 - one word of the ssh command would decide whether the console opens"; exit 1; }
+  else
+    grep -q 'allow 127.0.0.1;' <<<"${admin}" \
+      && { echo "FAIL: plain: /auth/admin grants loopback on a listener where it is not the tunnel"; exit 1; }
+  fi
+  grep -q 'deny all;' <<<"${admin}" \
+    || { echo "FAIL: ${mode}: /auth/admin lost its load-bearing 'deny all'"; exit 1; }
+
   echo "==> '${mode}' is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
 }
 
@@ -285,5 +307,24 @@ check_mode frontend '172.28.15.10'
 refuses 'an IPv4 wildcard' '0.0.0.0/0'
 refuses 'an IPv6 wildcard' '::/0'
 refuses 'a prefix'         '172.28.15.0/24'
+
+# EDGE_ADMIN_ALLOW widens the Keycloak admin console, so it is held to the same rule as the trust
+# above: literal addresses, never a range. A prefix there would hand the console to a whole subnet.
+refuses_admin() {
+  local label="$1" value="$2"
+  if docker run --rm --user 0:0 --network none "${ENV_ARGS[@]}" \
+       -e EDGE_RENDER_ONLY=1 -e EDGE_TRUSTED_PROXY='172.28.15.10' -e EDGE_ADMIN_ALLOW="${value}" \
+       -v "$(to_native "${EDGE_DIR}"):/edge:ro" --entrypoint sh "${IMAGE}" -c '
+         set -eu; cp -r /edge /etc/nginx/edge; sh /etc/nginx/edge/render-and-run.sh
+       ' >/dev/null 2>&1; then
+    echo "FAIL: EDGE_ADMIN_ALLOW='${value}' (${label}) was ACCEPTED - it must be refused"
+    exit 1
+  fi
+  echo "==> refused admin ${label}: ${value}"
+}
+
+refuses_admin 'a prefix'        '10.0.0.0/8'
+refuses_admin 'an IPv4 wildcard' '0.0.0.0'
+refuses_admin 'one good and one bad address' '10.9.0.7 192.168.0.0/16'
 
 echo "==> edge configuration is valid in BOTH shapes"

@@ -81,11 +81,66 @@ if [ -n "${EDGE_TRUSTED_PROXY:-}" ]; then
 fi
 export EDGE_LISTEN_OPTS
 
+# --- the /auth/admin allow-list, which has to move with the listener ----------
+#
+# The allow-list in 10-frontend.conf.template names six CONTAINER-BRIDGE gateways,
+# because that is what $remote_addr was before ADR-0187: the operator's
+# `ssh -L 443:127.0.0.1:443` tunnel entered the published port directly and
+# arrived on 172.28.15.1.
+#
+# Under proxy_protocol $remote_addr is whatever haproxy asserts, and the same
+# tunnel now arrives as 127.0.0.1 -- matching none of the six. That fails CLOSED,
+# so it is a lockout rather than a bypass, but it is a lockout in the middle of
+# the cutover, which reads as a broken tunnel and is not one. #1885 already cost
+# a day to this exact shape on the retired vhost.
+#
+# Measured on the testing host 2026-09-18, three ways, because "127.0.0.1 means
+# someone on this host" is the whole safety argument and it had to be shown:
+#
+#   from the host's loopback (the tunnel)      -> the edge logged 127.0.0.1
+#   from the host's routable address, which is
+#     also how the Caddy in front arrives      -> the edge logged 10.9.0.15
+#   from inside a container                    -> Network unreachable; a rootless
+#                                                 container on a netavark bridge
+#                                                 cannot reach the host at all
+#
+# So loopback here cannot be produced by a container, by a LAN peer, or by the
+# proxy in front: it means a process already running on the host, which has more
+# access than the admin console by definition.
+#
+# It is rendered rather than written into the template because it is only true in
+# ONE of the two modes. A blanket `allow 127.0.0.1;` in a file shared by both
+# would also be a standing grant on a host where something local forwards to
+# haproxy, and would read as intentional there.
+#
+# EDGE_ADMIN_ALLOW adds further addresses -- a jump host, a VPN endpoint -- under
+# the same rules as EDGE_TRUSTED_PROXY: literal addresses only, never a prefix.
+EDGE_ADMIN_ALLOW_EXTRA=''
+if [ -n "${EDGE_LISTEN_OPTS}" ]; then
+  EDGE_ADMIN_ALLOW_EXTRA='
+    # proxy_protocol mode: the operator tunnel arrives as the host loopback.
+    allow 127.0.0.1;
+    allow ::1;'
+fi
+for a in ${EDGE_ADMIN_ALLOW:-}; do
+  case "${a}" in
+    */*|0.0.0.0|::)
+      echo "edge: refusing to start - EDGE_ADMIN_ALLOW=${a}" >&2
+      echo "edge: the Keycloak admin console is not handed a range. Name each" >&2
+      echo "edge: address, the way EDGE_TRUSTED_PROXY is named (ADR-0187)." >&2
+      exit 1
+      ;;
+  esac
+  EDGE_ADMIN_ALLOW_EXTRA="${EDGE_ADMIN_ALLOW_EXTRA}
+    allow ${a};"
+done
+export EDGE_ADMIN_ALLOW_EXTRA
+
 # shellcheck disable=SC2016  # the literal token is the point: this is envsubst's allow-list of
 # names to substitute, not an expansion. Expanding it here would hand envsubst the VALUE and it
 # would then substitute nothing, which fails silently -- every listener would render without its
 # options and the proxy_protocol shape would quietly become the plain one.
-SHELL_FORMAT='${EDGE_LISTEN_OPTS}'
+SHELL_FORMAT='${EDGE_LISTEN_OPTS}${EDGE_ADMIN_ALLOW_EXTRA}'
 for v in ${EDGE_VARS}; do
   SHELL_FORMAT="${SHELL_FORMAT}\${${v}}"
 done

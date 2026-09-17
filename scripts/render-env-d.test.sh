@@ -252,6 +252,54 @@ fi
 
 # =============================================================================
 say ""
+say "== a retired service's rendered secrets do not stay on the host =="
+# =============================================================================
+# Until 2026-09-18 --check only compared templates that still EXIST against what
+# they render to. A <service>.env whose template had been retired was never
+# looked at: not drift, not removed, and the check printed "N file(s) match the
+# templates and the .env" over the top of a 0640 file holding that service's
+# secrets. The sibling generator reports its leftovers; this one has to remove
+# them, because these carry credentials rather than unit text.
+scenario "stale" 'A=yes' 'K=${A}'
+printf 'OLD_SECRET=leftover\n' > "${SC_DIR}/out/retired.env"
+
+if render --check >/dev/null 2>"${SC_DIR}/check.err"; then
+  bad "stale: --check reported success with an orphaned retired.env present"
+else
+  if grep -q 'retired.env' "${SC_DIR}/check.err"; then
+    ok "stale: --check names the orphaned file"
+  else
+    bad "stale: --check failed but did not name retired.env: $(cat "${SC_DIR}/check.err")"
+  fi
+fi
+
+# A file the tool does not own must survive, or "clean up the output directory"
+# becomes a licence to delete whatever else is in it.
+printf 'keep me\n' > "${SC_DIR}/out/notes.txt"
+render >"${SC_DIR}/write.out" 2>&1
+if [[ -e "${SC_DIR}/out/retired.env" ]]; then
+  bad "stale: a plain run left retired.env behind"
+else
+  ok "stale: a plain run removes it"
+fi
+if grep -q 'removed retired.env' "${SC_DIR}/write.out"; then
+  ok "stale: the removal is named, not silently counted"
+else
+  bad "stale: the removal was not reported: $(cat "${SC_DIR}/write.out")"
+fi
+if [[ -e "${SC_DIR}/out/notes.txt" ]]; then
+  ok "stale: a non-.env file in the same directory is left alone"
+else
+  bad "stale: notes.txt was deleted -- the removal is not bounded to *.env"
+fi
+if render --check >/dev/null 2>&1; then
+  ok "stale: --check is clean once the leftover is gone"
+else
+  bad "stale: --check still red after the cleanup run"
+fi
+
+# =============================================================================
+say ""
 say "=========================================="
 say "  passed: ${PASSED}   failed: ${FAILED}"
 say "=========================================="

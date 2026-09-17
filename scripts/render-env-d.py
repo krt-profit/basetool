@@ -229,6 +229,41 @@ def render_one(tmpl_path: str, env: dict[str, str], missing: list[str]) -> str:
     return "".join(rendered)
 
 
+def _stale(out_dir: str, produced: dict[str, str]) -> list[str]:
+    """Rendered environment files in ``out_dir`` that no template produces any more.
+
+    ``--check`` only ever compared templates that still exist against their rendered
+    counterparts, so a ``<service>.env`` whose template had been retired was never looked at: it
+    was not reported as drift, a plain run did not remove it, and the check printed
+    ``N file(s) match the templates and the .env`` over the top of it. What stayed behind is a
+    ``0640`` file holding that service's rendered **secrets**, on the host, indefinitely.
+
+    The sibling tool gets this right -- ``generate-quadlet.py --check`` walks its output
+    directories and reports anything it did not generate -- and the same loop belongs here, where
+    the leftovers carry credentials rather than unit text.
+
+    Only ``*.env`` files directly in ``out_dir`` are considered. Nothing recurses, and no other
+    extension is ever named, so the caller that acts on this list cannot reach anything but the
+    files this tool writes.
+
+    Args:
+        out_dir: the directory the rendered files live in.
+        produced: service name -> rendered content, for this run.
+
+    Returns:
+        The stale file NAMES, sorted, or an empty list when the directory does not exist.
+    """
+    if not os.path.isdir(out_dir):
+        return []
+    expected = {f"{service}.env" for service in produced}
+    return sorted(
+        name for name in os.listdir(out_dir)
+        if name.endswith(".env")
+        and name not in expected
+        and os.path.isfile(os.path.join(out_dir, name))
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Render every template, or report drift under ``--check``.
 
@@ -277,6 +312,8 @@ def main(argv: Sequence[str] | None = None) -> int:
               "comes up on its image defaults, which looks like a working service.", file=sys.stderr)
         return 1
 
+    stale = _stale(args.out, produced)
+
     if args.check:
         drift = []
         for service, content in produced.items():
@@ -287,8 +324,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                         drift.append(service)
             except OSError:
                 drift.append(f"{service} (absent)")
-        if drift:
-            print("render-env-d: DRIFT in " + ", ".join(sorted(drift)), file=sys.stderr)
+        if drift or stale:
+            if drift:
+                print("render-env-d: DRIFT in " + ", ".join(sorted(drift)), file=sys.stderr)
+            if stale:
+                print("render-env-d: STALE, no template produces these: "
+                      + ", ".join(sorted(stale)), file=sys.stderr)
             return 1
         print(f"render-env-d: {len(produced)} file(s) match the templates and the .env")
         return 0
@@ -301,6 +342,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(content)
         os.chmod(path, mode)
+
+    # And take the leftovers away. Retiring a service from compose used to leave its rendered
+    # `<service>.env` -- a 0640 file holding that service's secrets -- on the host forever, while
+    # --check printed "N file(s) match the templates and the .env". Removal is named file by file
+    # rather than counted, because deleting something on a deployment host is not a detail.
+    for name in sorted(stale):
+        os.unlink(os.path.join(args.out, name))
+        print(f"render-env-d: removed {name} - no template produces it any more")
 
     values = sum(1 for c in produced.values() for line in c.splitlines()
                  if line and not line.lstrip().startswith("#"))

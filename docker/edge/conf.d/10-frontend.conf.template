@@ -73,6 +73,10 @@ server {
     allow 172.28.4.1;    # net-proxy-keycloak gateway
     allow 172.28.7.1;    # net-proxy-ingest gateway
     allow 172.28.13.1;   # net-proxy-api gateway
+    # Rendered by render-and-run.sh, and EMPTY unless the listener speaks
+    # proxy_protocol -- under which the operator's tunnel arrives as the host
+    # loopback instead of on 172.28.15.1. See the long note there for why that
+    # cannot be written here as a blanket `allow 127.0.0.1;`.${EDGE_ADMIN_ALLOW_EXTRA}
     deny all;
 
     include /etc/nginx/edge/include/upstream-keycloak.conf;
