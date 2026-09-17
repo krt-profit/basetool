@@ -28,7 +28,8 @@ HealthStartupInterval=5s
 Notify=healthy
 Memory=1792M
 PidsLimit=2048
-PodmanArgs=--cpus=2.0 --ulimit nofile=65536:65536
+AddHost=localhost:127.0.0.1
+PodmanArgs=--cpus=2.0 --init --ulimit nofile=65536:65536
 
 [Service]
 Restart=always

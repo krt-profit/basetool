@@ -15,7 +15,7 @@ EnvironmentFile=/var/iri/code/env.d/tempo.env
 Exec=-target=all -config.expand-env=true -config.file=/etc/tempo/tempo.yaml
 Memory=1G
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500
+PodmanArgs=--oom-score-adj=500 --init
 
 [Service]
 Restart=always

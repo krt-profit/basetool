@@ -21,7 +21,7 @@ EnvironmentFile=/var/iri/code/env.d/prometheus.env
 Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --storage.tsdb.retention.time=180d --storage.tsdb.retention.size=40GB --web.enable-admin-api --web.config.file=/etc/prometheus/web.yml --web.enable-lifecycle --web.enable-remote-write-receiver
 Memory=1024M
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500
+PodmanArgs=--oom-score-adj=500 --init
 
 [Service]
 Restart=always

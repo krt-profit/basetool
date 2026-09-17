@@ -191,6 +191,27 @@ PATH_VARS = {
 #: Relative bind-mount sources in compose resolve against the project directory.
 PROJECT_DIR_ON_HOST = "/var/iri/code"
 
+#: Non-path compose interpolations, resolved to the value the PROMOTED BUNDLE carries.
+#:
+#: `IRI_KEYCLOAK_HOST_ALIAS` exists so a non-production environment can point the public Keycloak
+#: name at its own host (REQ-OPS-022). Production sets nothing and takes the no-op default, which
+#: is what is baked here -- the units are one artifact for every environment, so a host-specific
+#: alias cannot live in them.
+#:
+#: A host that needs a real alias supplies a systemd DROP-IN beside the unit, which is host
+#: configuration exactly like the `.env` and belongs to Ansible:
+#:
+#:     ~/.config/containers/systemd/frontend.container.d/10-host-alias.conf
+#:     [Container]
+#:     AddHost=basetool.greluc.me:10.98.0.13
+#:
+#: That is written down here rather than left to be rediscovered, because the failure it prevents
+#: is a container timing out against its own issuer at start-up -- which reads as a Keycloak
+#: outage and is a missing line.
+VALUE_VARS = {
+    "IRI_KEYCLOAK_HOST_ALIAS": "localhost:127.0.0.1",
+}
+
 #: What becomes of each service. Every service in either compose file must appear here, or the tool
 #: fails -- adding one to compose then blocks the build until somebody decides, which is the point.
 DISPOSITION: dict[str, tuple[str, str]] = {
@@ -249,17 +270,54 @@ TRANSLATED_PROFILES = {"prod"}
 VAR_RE = r"\$\{([A-Za-z_][A-Za-z0-9_]*)"
 
 
-#: Compose service keys this tool knows how to translate. Anything else fails the run rather than
-#: being dropped: a unit that is missing a control still starts, and nothing downstream can tell
-#: the difference between "not configured" and "quietly lost in translation".
-KNOWN_SERVICE_KEYS = {
-    "image", "container_name", "profiles", "user", "read_only", "cap_drop", "cap_add",
+#: Compose service keys this tool actually reads and turns into a unit directive.
+#:
+#: THIS LIST IS NOT A LIST OF NAMES THE TOOL HAS SEEN. Until 2026-09-17 there was one set, called
+#: "known", and the refusal below told the reader to add a key to it *once it is translated*.
+#: Eleven keys had been added without that second half, so the guard against silent loss was
+#: itself the thing losing them: `extra_hosts` and `init` were declared by the three JVM services
+#: and dropped without a word. `init` is the zombie-reaping fix for the 2026-07-12 native-thread
+#: OOM, so its silent loss re-creates a production incident the repository has a post-mortem for.
+#:
+#: The split is the fix. A key belongs here only when code below emits something for it, and in
+#: IGNORED_SERVICE_KEYS only with a reason. A key in neither fails the run.
+TRANSLATED_SERVICE_KEYS = {
+    "image", "profiles", "user", "read_only", "cap_drop", "cap_add",
     "security_opt", "tmpfs", "ports", "networks", "volumes", "environment", "command",
     "entrypoint", "healthcheck", "deploy", "ulimits", "pids_limit", "restart",
-    "stop_grace_period", "depends_on", "logging", "sysctls", "group_add", "shm_size",
-    "extra_hosts", "dns", "labels", "init", "working_dir", "hostname",
-    "oom_score_adj",
+    "stop_grace_period", "depends_on", "oom_score_adj",
+    "extra_hosts", "init",
 }
+
+#: Compose service keys that deliberately produce no unit directive, each with the reason. A key
+#: here is a decision on the record, not an omission -- which is the whole difference between this
+#: and what the single "known" set used to express.
+IGNORED_SERVICE_KEYS = {
+    "container_name": (
+        "the generator derives ContainerName= from the service name, and the two are asserted "
+        "equal for every translated service, so reading the key would add a second source for "
+        "one value"
+    ),
+    "logging": (
+        "compose pins json-file with max-size 10m / max-file 5 because the backend alone writes "
+        "~150 MB/day and would fill /var/lib/docker/containers. Podman's effective driver here is "
+        "journald, which rotates on its own budget instead -- so the SETTING is not translated but "
+        "the PROBLEM is not solved either: journald's SystemMaxUse has to carry it, and that is "
+        "host configuration (Ansible), not a unit directive"
+    ),
+}
+
+#: Anything in neither set fails. Keys that were previously listed and never implemented --
+#: dns, group_add, hostname, labels, shm_size, sysctls, working_dir -- are deliberately absent:
+#: no translated service declares one today, and if one ever does, the refusal must fire rather
+#: than the control vanish. Podman 5.8.2 supports DNS=, GroupAdd=, ShmSize=, Sysctl= and
+#: WorkingDir= (checked against `man 5 podman-systemd.unit` on the target host), so implementing
+#: one is a small change -- which is exactly why it should be made deliberately.
+KNOWN_SERVICE_KEYS = TRANSLATED_SERVICE_KEYS | set(IGNORED_SERVICE_KEYS)
+
+assert not (TRANSLATED_SERVICE_KEYS & set(IGNORED_SERVICE_KEYS)), \
+    "a compose key cannot be both translated and ignored"
+assert all(IGNORED_SERVICE_KEYS.values()), "every ignored key needs a stated reason"
 
 #: The resource limits understood under `deploy.resources.limits`. Same rule, same reason.
 KNOWN_LIMIT_KEYS = {"memory", "cpus", "pids"}
@@ -300,6 +358,39 @@ def _resolve(value: str, where: str) -> str:
             f"{where}: no recorded host path for {', '.join(sorted(set(unresolved)))}. Quadlet does "
             "not expand variables in a Volume= path, so this would mount a directory named after "
             "the variable. Add it to PATH_VARS, or render the units at bundle-build time (plan §3.1)."
+        )
+    return value
+
+
+def _resolve_value(value: str, where: str) -> str:
+    """Resolve a compose interpolation that is a **value** rather than a path.
+
+    Same contract as :func:`_resolve` and a separate table, because the two answer different
+    questions: ``PATH_VARS`` records where something lives on the host, ``VALUE_VARS`` records what
+    the promoted bundle carries for a setting an environment may override.
+
+    Args:
+        value: the raw compose string.
+        where: a label naming the service and key, used in the refusal message.
+
+    Returns:
+        The resolved string.
+
+    Raises:
+        Refusal: when a variable has no recorded value.
+    """
+    previous = None
+    while previous != value:
+        previous = value
+        for name, resolved in VALUE_VARS.items():
+            value = re.sub(r"\$\{" + name + r"(:-[^}]*)?\}", resolved, value)
+    unresolved = re.findall(r"\$\{([A-Za-z_][A-Za-z0-9_]*)", value)
+    if unresolved:
+        raise Refusal(
+            f"{where}: no recorded value for {', '.join(sorted(set(unresolved)))}. Quadlet does not "
+            "expand variables, so this would be written into the unit literally. Add it to "
+            "VALUE_VARS with the value the promoted bundle should carry, and let a host that needs "
+            "a different one override it with a systemd drop-in."
         )
     return value
 
@@ -714,6 +805,21 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     # adjustment is what an unprivileged process is allowed to set, so this survives rootless.
     if "oom_score_adj" in spec:
         podman_args.append(f"--oom-score-adj={spec['oom_score_adj']}")
+    # `init: true` runs a minimal init as PID 1 so orphaned children get reaped. This is not a
+    # nicety: the JVM runs as PID 1 and does NOT reap, the health probe's BusyBox wget forks an
+    # `ssl_client` helper it never waits on, and each probe left one <defunct> until the pids cap
+    # was reached -- the 2026-07-12 native-thread OOM, at roughly 17h uptime. Quadlet 5.8.2 has no
+    # Init= key (checked against `man 5 podman-systemd.unit` on the target host), so it goes
+    # through podman's own flag.
+    if spec.get("init"):
+        podman_args.append("--init")
+    # `extra_hosts` -> AddHost=, which Podman 5.8.2 documents with the same `hostname:ip` form
+    # compose uses and allows more than once. The value is a VALUE_VARS interpolation rather than
+    # a path, so it resolves against that table and refuses on anything unrecorded -- a literal
+    # `${IRI_...}` in an /etc/hosts entry would be a hostname nothing ever matches.
+    for entry in spec.get("extra_hosts") or []:
+        resolved = _resolve_value(str(entry), f"{service}.extra_hosts")
+        container.append(f"AddHost={resolved}")
     nofile = (spec.get("ulimits") or {}).get("nofile")
     if isinstance(nofile, dict):
         podman_args.append(f"--ulimit nofile={nofile['soft']}:{nofile['hard']}")
