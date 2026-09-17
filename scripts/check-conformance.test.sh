@@ -278,6 +278,26 @@ case "$cmd" in
       *)       echo "example.test ingest.example.test" ;;
     esac
     ;;
+  # --- env-reaches-the-units -----------------------------------------------------------------
+  # The host .env. Only variables the generator BAKES matter here; anything else is carried into
+  # the container by env.d and is not this check's business.
+  *"/var/iri/code/.env"*)
+    case "$scenario" in
+      env-no-env)  echo "" ;;
+      env-orphan)  printf 'IRI_TRUSTSTORE_HOST_PATH=/var/iri/secrets/truststore.p12\n' ;;
+      env-dropin)  printf 'IRI_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
+      *)           printf 'POSTGRES_DB=basetool\n' ;;
+    esac
+    ;;
+  # The units AND their drop-ins, concatenated the way the check reads them -- the drop-in is the
+  # supported way to give one host a different value, so it has to be part of the answer.
+  *".config/containers/systemd"*)
+    case "$scenario" in
+      env-no-units) echo "" ;;
+      env-dropin)   printf '[Container]\nAddHost=basetool.example.test:10.0.0.9\n' ;;
+      *)            printf '[Container]\nImage=ghcr.io/example/basetool-backend:stable\nVolume=/var/iri/secrets/keystore.p12:/run/secrets/truststore.p12:ro\n' ;;
+    esac
+    ;;
   *"docker inspect prometheus"*|*"query="*)
     if [ "$scenario" = "no-monitoring" ]; then
       echo "NO_PROMETHEUS_ADDRESS" >&2
@@ -663,6 +683,29 @@ STUB_SCENARIO=healthy assert_status \
 STUB_SCENARIO=no-monitoring assert_status \
   "container-metrics fails clearly when the host has no monitoring plane" \
   container-metrics fail "no monitoring plane" -- "${STUB_ARGS[@]}"
+
+# --- env-reaches-the-units -------------------------------------------------------------------
+# The failure this defends against is a line in the .env that looks effective and is not. It cost
+# three separate investigations in one day -- a container timing out against its own issuer, PKIX
+# errors against a private CA, and an image tag that was only harmless by coincidence. Each
+# presented as a different problem, and none of them as "that variable does nothing".
+STUB_SCENARIO=env-orphan assert_status \
+  "env-reaches-the-units fails when the .env sets a baked variable the units ignore" \
+  env-reaches-the-units fail "has no effect" -- "${STUB_ARGS[@]}"
+# The drop-in is the SUPPORTED way to give one host a different value, so it must pass -- a check
+# that flagged the correct mechanism would just teach people to switch it off.
+STUB_SCENARIO=env-dropin assert_status \
+  "env-reaches-the-units passes when a drop-in carries the override" \
+  env-reaches-the-units pass "reach the units" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=env-no-env assert_status \
+  "env-reaches-the-units skips when the host has no .env" \
+  env-reaches-the-units skip "no /var/iri/code/.env" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=env-no-units assert_status \
+  "env-reaches-the-units skips when the host has no Quadlet units anywhere" \
+  env-reaches-the-units skip "no Quadlet units found" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=healthy assert_status \
+  "env-reaches-the-units passes when no per-host override is set at all" \
+  env-reaches-the-units pass "uncontested" -- "${STUB_ARGS[@]}"
 
 # =============================================================================================
 say ""

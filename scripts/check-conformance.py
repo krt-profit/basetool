@@ -1210,6 +1210,105 @@ class Check:
     fn: Callable[[Context], str]
 
 
+#: The compose variables that `scripts/generate-quadlet.py` BAKES into the units at generation
+#: time, mapped to the unit directive each one ends up in. Quadlet performs no interpolation, so a
+#: `${VAR}` reaching a unit file would be written there literally -- the generator therefore
+#: resolves each one to the value the promoted bundle carries.
+#:
+#: That is correct, and it has a consequence nothing states: setting any of these in the host
+#: `.env` does NOTHING. The variable is in the file, it looks effective, and the unit ignores it.
+#: Three separate hours were spent on this in one day -- IRI_KEYCLOAK_HOST_ALIAS (a container
+#: timing out against its own issuer), IRI_TRUSTSTORE_HOST_PATH (PKIX failures against a private
+#: CA) and IRI_BASETOOL_VERSION (harmless only because both tags happened to point at one digest).
+#: Each looked like a different problem.
+BAKED_INTO_UNITS = {
+    "IRI_IMAGE_NAMESPACE": "Image=",
+    "IRI_BASETOOL_VERSION": "Image=",
+    "IRI_KEYCLOAK_HOST_ALIAS": "AddHost=",
+    "IRI_KEYSTORE_HOST_PATH": "Volume=",
+    "IRI_TRUSTSTORE_HOST_PATH": "Volume=",
+    "IRI_REDIS_ACL_HOST_PATH": "Volume=",
+    "IRI_UPSTREAM_CA_HOST_PATH": "Volume=",
+}
+
+
+def check_env_reaches_the_units(ctx: Context) -> str:
+    """A value set in the host `.env` must actually be in the units, or be absent from both.
+
+    Under compose, every one of these variables reached the container because compose interpolated
+    the file at `up` time. Under Quadlet there is no interpolation: the generator resolves them
+    once, into a promotable artifact that is the same on every host. A host that sets one of them
+    in its `.env` is therefore writing a line with no effect -- and the failure that follows is
+    never about a variable. It is a container that will not start, a PKIX error, or a service
+    quietly running the wrong image.
+
+    The check does not demand that the units follow the `.env`; the units are deliberately
+    host-independent. It demands that the two do not **disagree silently**. A host that needs a
+    different value supplies a systemd drop-in, and the drop-in is what this reads -- so the
+    intended mechanism passes and the trap fails.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming each variable and where its effective value came from.
+
+    Raises:
+        Skip: when no host access is configured, or the host carries no `.env`.
+        CheckFailed: when the `.env` sets a value that neither the unit nor a drop-in carries.
+    """
+    env_raw = ctx.runner.run("cat /var/iri/code/.env 2>/dev/null || true")
+    if not env_raw.strip():
+        raise Skip("no /var/iri/code/.env on this host")
+
+    env = {}
+    for line in env_raw.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            env[key.strip()] = value.strip()
+
+    # The effective unit text INCLUDING drop-ins, which is what podman actually generates from.
+    #
+    # NOT `~`. The first version of this used it and skipped with "no Quadlet units on this host"
+    # against a host that had thirty-nine of them: `~` is the home of whoever the runner executes
+    # as, and on a rootless deployment the units live in the DEPLOY user's home while the runner
+    # may be root or another account entirely. A check that looks in the wrong place does not fail,
+    # it skips -- which is indistinguishable from a host that has nothing to check.
+    #
+    # Both locations, no assumption about the user: /etc for a rootful install, every home for a
+    # rootless one.
+    units = ctx.runner.run(
+        "cat /etc/containers/systemd/*.container "
+        "/etc/containers/systemd/*.container.d/*.conf "
+        "/home/*/.config/containers/systemd/*.container "
+        "/home/*/.config/containers/systemd/*.container.d/*.conf 2>/dev/null || true"
+    )
+    if not units.strip():
+        raise Skip("no Quadlet units found under /etc/containers/systemd or any home directory")
+
+    problems, good = [], []
+    for var, directive in sorted(BAKED_INTO_UNITS.items()):
+        value = env.get(var, "")
+        if not value:
+            continue  # unset in the .env: the unit's baked default is the only claim, and it stands
+        if value in units:
+            good.append(f"{var} ({directive})")
+        else:
+            problems.append(
+                f"{var}={value} is set in .env but appears in no unit or drop-in. Quadlet does not "
+                f"interpolate, so the units carry the generator's baked default in {directive} and "
+                f"this line has no effect. Add a drop-in under "
+                f"~/.config/containers/systemd/<service>.container.d/ or remove the line."
+            )
+
+    if problems:
+        raise CheckFailed("; ".join(problems))
+    if not good:
+        return "no per-host override is set, so the units' baked defaults are uncontested"
+    return f"{len(good)} override(s) reach the units: {', '.join(good)}"
+
+
 def check_edge_not_directly_reachable(ctx: Context) -> str:
     """The edge's own port must be reachable from nothing but the front end.
 
@@ -1298,6 +1397,8 @@ CHECKS: tuple[Check, ...] = (
           check_edge_not_directly_reachable),
     Check("containers-unprivileged", "REQ-OPS-014 / ADR-0189", True,
           check_containers_unprivileged),
+    Check("env-reaches-the-units", "REQ-OPS-004 / REQ-OPS-022", True,
+          check_env_reaches_the_units),
     Check("containers-read-only", "REQ-OPS-014 / ADR-0190", True,
           check_containers_read_only),
 )
