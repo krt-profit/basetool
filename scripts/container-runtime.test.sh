@@ -36,8 +36,12 @@ mkdir -p "$BIN"
 # space-separated list of substrings; an invocation matching one exits 1.
 make_stub() {
   local name="$1" extra="${2:-}"
+  # An ABSOLUTE interpreter: `#!/usr/bin/env bash` makes env search PATH for
+  # bash, and the detection scenarios deliberately run under a PATH that may not
+  # contain it.
+  local bash_path; bash_path="$(command -v bash)"
   cat > "${BIN}/${name}" <<STUB
-#!/usr/bin/env bash
+#!${bash_path}
 printf '%s %s\n' "${name}" "\$*" >> "${LOG}"
 for pat in \${STUB_FAIL:-}; do
   case "\$*" in *"\${pat//_/ }"*) exit 1 ;; esac
@@ -119,18 +123,52 @@ say "== detecting the runtime, which is where this class of bug lives =="
 # glob over a 0750 directory it could not read, silently fell back to the wrong
 # user, and reported `no such object` for eight healthy containers. So detection
 # is asserted here rather than assumed: it must pick what actually answers.
+# The scenarios below must see ONLY the CLIs each one names, so the PATH they run
+# under carries the scenario directory plus a hand-built set of coreutils -- and
+# nothing else.
+#
+# `PATH="$1:/usr/bin:/bin"` was the first attempt and it is not isolation: a
+# GitHub runner has a real, working /usr/bin/docker, so "a host with only podman"
+# and "a host with neither" both detected docker and the suite went red there
+# while passing on a workstation that happens to have no docker in /usr/bin.
+# Green for the wrong reason, in the file whose whole subject is detection.
+MINIMAL="${WORK}/coreutils"
+mkdir -p "$MINIMAL"
+for util in bash sh env id basename getent cut ls sudo; do
+  util_path="$(command -v "$util" 2>/dev/null)" || continue
+  ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
+done
+if [[ ! -x "${MINIMAL}/bash" ]]; then
+  say "  FATAL: could not stage a minimal PATH (no bash found)"; exit 2
+fi
+
 detect_in() { # $1 = directory holding the CLIs that exist; prints the backend
   # shellcheck disable=SC2030,SC2031
   # Same reason as run_rt: a leaked RT_BACKEND would make detection untestable.
   (
     set +e
-    PATH="$1:/usr/bin:/bin"
+    PATH="$1:${MINIMAL}"
     unset RT_BACKEND RT_CLI RT_SYSTEMCTL
     # shellcheck disable=SC1090
     . "$LIB"
     rt_detect 2>/dev/null && printf '%s' "${RT_BACKEND}"
   )
 }
+# The isolation is itself asserted, because it is what silently failed: on a
+# runner with /usr/bin/docker the scenarios below are meaningless unless the PATH
+# they run under really cannot reach it. Checking the scenarios without checking
+# this is how the suite went green on a workstation and red in CI.
+if PATH="$MINIMAL" command -v docker >/dev/null 2>&1; then
+  bad "the minimal PATH can still reach a docker -- the detection cases prove nothing"
+else
+  ok "the minimal PATH reaches no docker, so a host-installed one cannot leak in"
+fi
+if PATH="$MINIMAL" command -v podman >/dev/null 2>&1; then
+  bad "the minimal PATH can still reach a podman"
+else
+  ok "...and no podman either"
+fi
+
 ONLY_DOCKER="${WORK}/only-docker"; mkdir -p "$ONLY_DOCKER"; cp "${BIN}/docker" "$ONLY_DOCKER/"
 ONLY_PODMAN="${WORK}/only-podman"; mkdir -p "$ONLY_PODMAN"; cp "${BIN}/podman" "$ONLY_PODMAN/"
 NEITHER="${WORK}/neither"; mkdir -p "$NEITHER"
