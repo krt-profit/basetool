@@ -113,6 +113,26 @@ near the **top or bottom viewport edge auto-scrolls the page** (speed eases with
 edge band) so units scrolled out of view stay reachable as drop targets; the scroll stops on drop /
 drag-end.
 
+**The board's labels name the click path first, because the drag path does not exist on touch**
+(#1936). Mobile browsers do not synthesise HTML5 drag events from touch input — a long press on a
+person row raises the browser's own context menu instead — so zone hints that read "Teilnehmer
+hierher ziehen" left a phone user with no visible way to assign anybody at all, while the click
+fallback had worked the whole time and nothing on screen said so. Each zone therefore renders a
+two-state `.drop-hint`: `.hint-idle` states the click path ahead of the drag one and then what the
+zone means ("Teilnehmer antippen, dann hierher tippen — oder hierher ziehen. Beliebig viele,
+Funktion frei wählbar." / "… Entfernt die Zuweisung zur Einheit."), and `.hint-armed` replaces it
+with the short call to action ("Hier tippen, um zuzuweisen" / "… um die Zuweisung zu entfernen")
+for as long as a participant is selected. The zone **holding** the selection keeps its
+idle text, because dropping a person where they already are is the one case `moveParticipant`
+refuses. The swap is driven by CSS alone —
+`#crew-board-results:has(.person-row.is-selected) .drop-zone:not(:has(.person-row.is-selected))` —
+deliberately **not** by a state class the board's JS parks on the wrapper: the board replaces its
+own `innerHTML` on every crew mutation, and a class that outlives the selection it described is a
+defect `:has()` cannot have. The section legend leads with the same click path, and each zone's
+`aria-label` is built from the idle hint, so the announced instruction and the visible one are the
+same sentence. Making the drag gesture itself work under touch is **not** covered here and stays
+open in #1936.
+
 Each person row shows: check-in status dot, name (+ "Extern" chip), org-unit badges (incl. SK),
 desired job, planned job, comment as a tooltip mark, on-board function(s), check-in/check-out
 (only while the mission is running and the participant's time state matches), edit, and

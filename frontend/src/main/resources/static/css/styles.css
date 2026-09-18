@@ -6243,6 +6243,38 @@ textarea:focus-visible,
     border-color: var(--color-primary);
     color: var(--color-primary);
 }
+/* Idle / armed hint text (#1936). The zones must advertise the click path, not only the
+   drag one: a mobile browser never turns touch input into HTML5 drag events, so a hint
+   reading "drag participants here" left a phone user with no visible way in at all. While
+   a participant is selected every OTHER zone trades its instruction for the short call to
+   action, in the same accent the drag-over state uses. The zone that HOLDS the selection
+   keeps its idle text — dropping a person where they already are is the one move
+   moveParticipant refuses, so offering it would be a lie.
+
+   Selector, not a JS state class, on purpose: the board replaces its own innerHTML on
+   every crew mutation, and a class parked on the wrapper is one more thing that can
+   survive a swap it no longer describes. :has() cannot desync. */
+.drop-hint .hint-armed {
+    display: none;
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint
+    .hint-idle {
+    display: none;
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint
+    .hint-armed {
+    display: block;
+}
 
 /* Chip-styled inline select — uppercase label + orange chevron; reads like a
    .chip but is editable (e.g. on-board function in a dense row). */
