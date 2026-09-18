@@ -226,6 +226,28 @@ jobs:
       - name: Self-test the cgroup metrics collector
         run: bash scripts/cgroup-container-metrics.test.sh
 
+  container-runtime-selftest:
+    name: container-runtime-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Phase 3 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/lib/container-runtime.sh` is the seam
+      # between the operational scripts and the container runtime, and it exists because BOTH
+      # shapes are live at once: production serves on Docker until the cutover, the testing host
+      # serves on Podman now. A change that only works on one of them breaks the other silently,
+      # and the one that breaks is whichever nobody ran that day.
+      #
+      # So every behaviour is asserted twice, against stubbed CLIs on PATH — including the ones
+      # that are easy to get wrong and impossible to see: that resolving a tag never PULLS, that a
+      # failed start is reported as a failure (which is what the health gate and the rollback hang
+      # off), that pruning never reaches a volume, and that the registry password is piped rather
+      # than passed on a command line.
+      - name: Self-test the container-runtime seam
+        run: bash scripts/container-runtime.test.sh
+
   render-env-d-selftest:
     name: render-env-d-selftest
     runs-on: ubuntu-latest
