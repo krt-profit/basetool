@@ -36,6 +36,14 @@
   antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
   Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
 
+### Removed
+
+- **Der alte Nginx Proxy Manager ist aus dem Stack entfernt.** Er lag seit der Umstellung auf den
+  neuen Edge-Proxy nur noch als Rückweg im `rollback`-Profil und startete im Normalbetrieb nicht.
+  Der Edge hat sich bewährt, also fällt die Rückfallebene weg (ADR-0162). Für Betreiber ändert sich
+  nichts am laufenden Betrieb; die Daten unter `/var/iri/npm` bleiben auf dem Host liegen und werden
+  nicht automatisch gelöscht.
+
 ### Changed
 
 - **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
@@ -61,6 +69,12 @@
   **Deploy-Hinweis:** Anders als bisher dokumentiert ist das kein `deploy.sh --force`-Fall — der
   Deploy wendet eine Digest-Auffrischung innerhalb desselben `26.7`-Tags seit 2026-09-12 selbst an;
   der Keycloak-Container startet dabei neu.
+- **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**
+  Neue optionale Variable `EDGE_TRUSTED_PROXY`: ist sie leer, ändert sich nichts. Trägt sie die
+  Adresse eines Vorschalters, sprechen die öffentlichen Listener PROXY-Protocol und der Edge stellt
+  die Client-Adresse daraus wieder her — nötig für den Umzug auf rootless Podman, weil dessen
+  Port-Weiterleitung die Adresse sonst ersetzt (ADR-0187). Der Health-Check des Containers läuft
+  jetzt über einen eigenen Loopback-Listener auf Port 8081.
 
 - **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
   Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
@@ -68,6 +82,37 @@
   bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
 
 ### Fixed
+
+- **Betrieb: die Sicherung erfasst jetzt die Zertifikate und die Redis-Zugriffskontrolle.** Beides
+  fehlte, und beides braucht eine Wiederherstellung: ohne die TLS-Dateien kann ein
+  wiederhergestellter Host kein HTTPS ausliefern und muss neu ausstellen, wogegen ein
+  Wochenlimit steht; ohne die ACL-Datei startet Redis gar nicht. Die Sicherung hielt stattdessen
+  weiter den Stand des längst entfernten alten Proxys. Der wöchentliche Wiederherstellungstest
+  prüft die drei Dateien jetzt mit und schlägt Alarm, wenn eine fehlt (REQ-OPS-010, REQ-OPS-011).
+
+- **Betrieb: das Redis-Passwort liegt nicht mehr in der Umgebung des laufenden Containers.** Es war
+  dort gelandet, um eine spätere Podman-Prüfung zu bedienen, wirkte aber sofort im heutigen
+  Docker-Betrieb — lesbar aus `/proc/1/environ` und `docker inspect`, für ein Deployment, das den
+  Wert gar nicht braucht.
+
+- **Betrieb: die Container-Kennzahlen haben jetzt Alarme und ein Dashboard.** Die Serien, die
+  cAdvisor bei der Podman-Umstellung ersetzen, wurden zwar erhoben, aber von nichts gelesen. Speicher,
+  OOM-Kills, CPU-Drosselung und Prozesszahl lösen jetzt dieselben Alarme wie bisher aus — unter
+  beiden Container-Laufzeiten, ohne Lücke während der Umstellung — und zwei neue Alarme melden,
+  wenn der Sammler selbst stehenbleibt oder nichts mehr findet (REQ-OBS-011, REQ-OBS-014).
+
+- **Betrieb: mehrere Prüfungen und Vorlagen der Podman-Umstellung waren fehlerhaft.** Die
+  Konformitätsprüfung stufte die häufigste Schreibweise einer Bridge-Adresse als öffentlich ein und
+  meldete grün für genau den Fehler, den sie finden soll; acht ihrer Prüfungen riefen ein
+  `docker`-Programm auf, das der neue Host nicht hat. Der Unit-Generator verlor Argumentgrenzen in
+  Health-Kommandos, setzte kein Startzeitlimit und reichte `%`-Platzhalter ungeschützt durch, wodurch
+  beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
+  gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
+
+- **Betrieb: der Deploy hätte auf dem Podman-Host jedes Mal abgebrochen.** Vor dem Anwenden lädt
+  `deploy.sh` die drei Anwendungs-Images vor; unter Podman bekam der Befehl statt der Image-Adresse
+  den Dienstnamen und scheiterte, was den ganzen Lauf beendete. Der Test dafür akzeptierte jede
+  Eingabe und meldete grün — er verlangt jetzt eine echte Image-Adresse.
 
 - **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
   langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf

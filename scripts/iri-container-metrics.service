@@ -1,0 +1,76 @@
+; systemd service for the cgroup v2 container metrics collector.
+;
+; WHAT IT IS. scripts/cgroup-container-metrics.py reads /sys/fs/cgroup and writes eleven
+; basetool_container_* series into node_exporter's textfile directory. Those eleven replace the
+; cAdvisor families the Podman migration deletes -- cAdvisor's rootless-Podman support is closed as
+; not planned upstream, and three of the signals (OOM kills, CPU throttling, the pids ceiling) have
+; no exporter equivalent at all. They were always kernel counters; cAdvisor only gave them Docker's
+; names.
+;
+; WHY THIS FILE EXISTS. The collector's own docstring said "the way the systemd timer runs it" and
+; there was no timer, anywhere in the repository. Six container alerts had been normalised onto the
+; new names (monitoring/prometheus/alerts/containers-runtime.yml) and nothing on the host was going
+; to produce them -- so the cutover would have silenced them without a single error.
+;
+; WHY A TIMER AND NOT A DAEMON. The script is a one-shot read of a handful of pseudo-files. A
+; resident process would add a supervision surface, a restart policy and a memory ceiling to
+; maintain, for work that takes well under a second. node_exporter serves the result on its next
+; scrape either way.
+;
+; Installation is by the Ansible role (tasks/27-observability.yml), not by hand.
+
+[Unit]
+Description=Profit Basetool — container metrics from cgroup v2 (replaces cAdvisor)
+Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cgroup-container-metrics.py
+
+[Service]
+Type=oneshot
+
+; Root, and it is worth saying why rather than leaving it to be noticed. Under rootless Podman a
+; container's cgroup lives under the SERVICE USER's slice
+; (/sys/fs/cgroup/user.slice/user-<uid>.slice/user@<uid>.service/...), and the directories are
+; traversable, but memory.events and pids.max are not uniformly readable by a third account. Root
+; reads them all without a special case per kernel version. Everything else about this unit is
+; locked down to compensate, and the process has no network, no devices and one writable path.
+User=root
+
+ExecStart=/var/iri/code/scripts/cgroup-container-metrics.py --output /var/iri/monitoring/textfile/containers.prom
+
+; Exit 1 means "nothing matched", which on a host whose stack is deliberately down is normal and
+; not a failure worth alerting on. The collector's own staleness is alerted on from Prometheus
+; instead (BasetoolContainerMetricsStale), which can tell "the host is quiet" from "the collector
+; stopped" -- something an exit code here cannot.
+SuccessExitStatus=0 1
+
+; --- Hardening -------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+; NOT ProtectControlGroups=true. That directive remounts /sys/fs/cgroup read-only, which would be
+; harmless -- but it also hides the unified hierarchy's delegated subtrees from a unit that has no
+; cgroup namespace of its own, and this collector's entire input is those subtrees.
+
+; The one writable path: the textfile directory node_exporter reads.
+ReadWritePaths=/var/iri/monitoring/textfile
+
+; It reads eleven files per container and writes one. A run that takes longer than this is wedged,
+; not slow, and a wedged collector must not overlap the next tick.
+TimeoutStartSec=30
+
+MemoryMax=128M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

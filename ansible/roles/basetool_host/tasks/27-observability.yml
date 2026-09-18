@@ -1,0 +1,277 @@
+---
+# The half of the monitoring plane that is NOT a container.
+#
+# WHY THIS FILE EXISTS. `scripts/generate-quadlet.py` refuses to translate two of the thirteen
+# monitoring compose services and deletes two more, with its reasons recorded beside each:
+#
+#   node-exporter  -> host-service. It mounts /run/systemd/private for its systemd collector,
+#                     which a rootless container cannot reach, and it owns the textfile directory
+#                     deploy.sh and the cgroup collector write into.
+#   alloy          -> host-service. It mounts /var/log and carries group_add 4/473 to read
+#                     root:adm files. A rootless container's supplementary groups are NAMESPACE
+#                     groups, not host groups, so that read stops working.
+#   cadvisor       -> deleted. Rootless-Podman support closed as not planned upstream.
+#   socket-proxy   -> deleted. It exists only to hand cAdvisor and Alloy a GET-only view of the
+#                     Docker socket, and there is no Docker socket.
+#
+# The generator says "host service". Nothing made one. Measured 2026-09-18 on the testing host:
+# no node_exporter, no alloy, no timer for scripts/cgroup-container-metrics.py -- whose own
+# docstring says "the way the systemd timer runs it" about a unit that did not exist anywhere in
+# the repository. A host cut over in that state has no host metrics, ships no logs or traces, and
+# produces none of the eleven basetool_container_* series the six container alerts were normalised
+# onto. This file is that missing half.
+#
+# WHAT WAS MEASURED, because the decision to use packages rather than pinned tarballs rests on it
+# (2026-09-18, Rocky Linux 10.2, testing host):
+#
+#   node-exporter                1.12.1  EPEL 10          == the version docker-compose.monitoring.yml pins
+#   alloy                        1.19.2  rpm.grafana.com  == the version docker-compose.monitoring.yml pins
+#   prometheus-podman-exporter   1.20.0  EPEL 10
+#
+# Neither is in Rocky's own repositories. cosign is NOT installed this way and that is not an
+# inconsistency: it was queried against the same EPEL metadata and is genuinely absent, which is
+# why 15-cosign.yml downloads it against a pinned checksum instead.
+
+# The service user's uid, looked up HERE and not taken from an earlier file's register. This file
+# is tagged [observability, monitoring], so `--tags observability` -- the natural way to add the
+# monitoring half to a host that is already serving -- skips 22-deploy-user.yml and leaves the
+# variable undefined. The run then dies with "'basetool_host_service_uid' is undefined", which says
+# nothing about tags. The same trap, and the same fix, as 22-deploy-user.yml's own lookup.
+- name: Read the service user's uid
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_service_user }}"
+  check_mode: false
+
+- name: Refuse if the service user does not exist yet
+  ansible.builtin.assert:
+    that: basetool_host_service_user in ansible_facts.getent_passwd
+    fail_msg: >-
+      {{ basetool_host_service_user }} does not exist on this host, so there is no rootless podman
+      for the exporter to read. Run the role without a tag limit -- 20-user.yml creates it.
+
+- name: Name the uid the user-scoped units need
+  ansible.builtin.set_fact:
+    basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
+# --- the repositories the three packages come from -------------------------------------------
+
+- name: Enable EPEL
+  # EPEL is a Fedora-maintained repository for RHEL-compatible distributions, and it is where
+  # node-exporter and prometheus-podman-exporter live. `epel-release` carries the GPG key and the
+  # repository definition together, so the key is not fetched over the wire by this role.
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Add Grafana's package repository
+  # alloy is published by Grafana and by nobody else. gpgcheck AND repo_gpgcheck are both on: the
+  # first verifies each package, the second verifies the repository metadata that lists them, and a
+  # repository trusted for only the first can still be lied to about which versions exist.
+  ansible.builtin.yum_repository:
+    name: grafana
+    description: Grafana OSS packages
+    baseurl: https://rpm.grafana.com
+    gpgcheck: true
+    repo_gpgcheck: true
+    gpgkey: https://rpm.grafana.com/gpg.key
+    sslverify: true
+    sslcacert: /etc/pki/tls/certs/ca-bundle.crt
+    enabled: true
+    # Grafana's repository also carries `grafana` itself, which this deployment runs as a
+    # CONTAINER pinned by digest. Without this the next `dnf update` could install a second,
+    # host-level Grafana beside it, listening on the same port.
+    #
+    # `exclude`, not `excludepkgs`: dnf's own configuration calls the directive excludepkgs and the
+    # module rejects that name outright -- it writes `exclude=`, which dnf honours as the synonym.
+    # The run failed here first, which is the useful kind of failure: it named the parameter.
+    exclude: grafana,grafana-enterprise
+
+- name: Install the host half of the monitoring plane
+  ansible.builtin.dnf:
+    name: "{{ basetool_host_observability_packages }}"
+    state: present
+  notify: Reload systemd for the observability units
+
+# --- node_exporter ----------------------------------------------------------------------------
+
+- name: Configure node_exporter
+  # The same collectors the compose service ran, minus `--path.rootfs=/host`: there is no /host
+  # here, this IS the host, and the flag would send every collector looking under a path that does
+  # not exist.
+  #
+  # `--collector.systemd` is the one worth reading twice. In production it produces NOTHING: the
+  # container runs as nobody and /run/systemd/private is mode 0600 root:root, so
+  # `node_systemd_unit_state` has zero series and the SystemdUnitFailed rule has never been able to
+  # fire (REQ-OBS-014 -- a dead alert reads as coverage, which is worse than no alert). The compose
+  # file carries a comment demanding this be verified rather than assumed. Verified here, on the
+  # host, 2026-09-18: 870 series and node_scrape_collector_success{collector="systemd"} = 1, still
+  # running as the unprivileged `prometheus` user. Moving the exporter onto the host fixes an alert
+  # that has been dead for months.
+  #
+  # AND ITS LIMIT, equally measured: the systemd collector reads the SYSTEM manager. iri-deploy,
+  # iri-backup and iri-restore-drill are system units and are covered (5 series each). The eight
+  # application units are `systemctl --user` units of the service user and are NOT (0 series). Their
+  # state comes from prometheus-podman-exporter below, which is one of the reasons it is installed.
+  ansible.builtin.copy:
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      ARGS="{{ basetool_host_node_exporter_flags | join(' ') }}"
+  notify: Restart node_exporter
+
+- name: Enable node_exporter
+  ansible.builtin.systemd_service:
+    name: prometheus-node-exporter.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+# --- alloy ------------------------------------------------------------------------------------
+
+# The restart handler must not start a service the role deliberately left stopped, so it asks
+# whether alloy is ALREADY running rather than assuming either way. Through service_facts, not
+# `systemctl is-active`: the same reason 65-firewall.yml gives -- a hand-read command needs a
+# hand-written changed_when, and a hand-written changed_when on a command is a guess.
+- name: Read the service state
+  ansible.builtin.service_facts:
+
+- name: Name it for the restart handler
+  ansible.builtin.set_fact:
+    basetool_host_alloy_active: >-
+      {{ ansible_facts.services['alloy.service'].state | default('') == 'running' }}
+
+- name: Point alloy at the configuration the release delivers
+  # The config arrives with the config bundle, like every other monitoring config, so it moves with
+  # the release instead of being provisioned separately. The package's own /etc/alloy/config.alloy
+  # is left on disk untouched and simply not used.
+  ansible.builtin.copy:
+    dest: /etc/sysconfig/alloy
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      CONFIG_FILE="{{ basetool_host_root_dir }}/code/monitoring/alloy/config.alloy"
+      CUSTOM_ARGS="--server.http.listen-addr={{ basetool_host_alloy_listen }}"
+  notify: Restart alloy
+
+- name: Confirm alloy can read what it is here to read
+  # The container needed `group_add: 4` and `473` to reach root:adm files such as auth.log, and a
+  # rootless container's supplementary groups are namespace groups, so that read was going to stop
+  # working -- the generator's stated reason for making this a host service. Measured 2026-09-18:
+  # the RPM already puts the alloy user in `adm` AND `systemd-journal`, so the host service reaches
+  # both the log files and the journal with no group hack at all. Asserted rather than assumed,
+  # because a future package revision could drop it and nothing else would notice.
+  ansible.builtin.command: id -nG alloy
+  register: basetool_host_alloy_groups
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Refuse an alloy that cannot read the journal or the logs
+  ansible.builtin.assert:
+    that:
+      - "'adm' in basetool_host_alloy_groups.stdout.split()"
+      - "'systemd-journal' in basetool_host_alloy_groups.stdout.split()"
+    fail_msg: >-
+      The alloy user is in [{{ basetool_host_alloy_groups.stdout | default('') }}] and needs adm
+      (for root:adm files under /var/log) and systemd-journal (for the container units' output,
+      which goes to the journal under the journald driver). Add them before enabling the service --
+      alloy starts perfectly well without them and simply ships nothing.
+  when: not ansible_check_mode
+
+# alloy is deliberately NOT started here. Its configuration comes from the config bundle, which
+# arrives with the first deploy; starting it now would fail on a file that is not there yet.
+- name: Enable alloy for the next boot, without starting it
+  ansible.builtin.systemd_service:
+    name: alloy.service
+    enabled: true
+    daemon_reload: true
+  when: not ansible_check_mode
+
+# --- prometheus-podman-exporter -----------------------------------------------------------------
+
+- name: Let the service user's systemd instance run the podman exporter
+  # A USER unit, not a system one, and the package ships both. The exporter talks to a podman
+  # socket, and the containers this deployment runs belong to the ROOTLESS service user -- a
+  # system-level exporter would talk to the root podman and report an empty host.
+  #
+  # Measured 2026-09-18 as a user unit of the service user: 423 series on :9882, covering exactly
+  # the families scripts/cgroup-container-metrics.py cannot produce --
+  # podman_container_started_seconds (for container_start_time_seconds) and the
+  # podman_container_net_* family (for container_network_*). container_memory_mapped_file has no
+  # equivalent here either and stays retired; saying "all three come back" would be wrong.
+  #
+  # It also covers what node_exporter's systemd collector cannot see: podman_container_health and
+  # podman_container_state for the eight application units.
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    scope: user
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  become_user: "{{ basetool_host_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ basetool_host_service_uid }}"
+  loop:
+    - podman.socket
+    - prometheus-podman-exporter.service
+  when: not ansible_check_mode
+
+# --- the cgroup container metrics, and the timer its docstring already described ----------------
+
+- name: Install the container metrics collector and its unit
+  ansible.builtin.copy:
+    src: "{{ basetool_host_scripts_src }}/{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - src: cgroup-container-metrics.py
+      dest: "{{ basetool_host_root_dir }}/code/scripts/cgroup-container-metrics.py"
+      mode: "0755"
+    - src: iri-container-metrics.service
+      dest: /etc/systemd/system/iri-container-metrics.service
+      mode: "0644"
+    - src: iri-container-metrics.timer
+      dest: /etc/systemd/system/iri-container-metrics.timer
+      mode: "0644"
+  notify: Reload systemd for the observability units
+
+- name: Let the new units be found before anything is enabled
+  ansible.builtin.meta: flush_handlers
+
+- name: Confirm systemd accepts the collector unit
+  ansible.builtin.command: systemd-analyze verify /etc/systemd/system/iri-container-metrics.service
+  register: basetool_host_metrics_verify
+  changed_when: false
+  failed_when: basetool_host_metrics_verify.rc != 0
+  when: not ansible_check_mode
+
+- name: Start the container metrics timer
+  # This one IS started, unlike the deploy and backup timers. It changes nothing and takes nothing
+  # down: it reads /sys/fs/cgroup and writes one file into the textfile directory. A host that is
+  # provisioned but not yet deployed should still report its own container state.
+  ansible.builtin.systemd_service:
+    name: iri-container-metrics.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not ansible_check_mode
+
+- name: Say what now runs on the host itself
+  ansible.builtin.debug:
+    msg: >-
+      Host-side monitoring: node_exporter on {{ basetool_host_node_exporter_listen }} (systemd +
+      textfile collectors), prometheus-podman-exporter on {{ basetool_host_podman_exporter_listen }}
+      as a user unit of {{ basetool_host_service_user }}, and iri-container-metrics.timer writing
+      {{ basetool_host_root_dir }}/monitoring/textfile. alloy is ENABLED but NOT started -- its
+      configuration arrives with the first config bundle. The containerised monitoring services
+      reach these over host.containers.internal, verified 2026-09-18; the host firewall keeps both
+      ports off the network, also verified.

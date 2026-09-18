@@ -1,0 +1,70 @@
+---
+# Reload rather than restart: haproxy's reload hands the listening sockets to the new process, so a
+# configuration change does not drop the connections currently going through it.
+#
+# Guarded on the unit ALREADY running, from an explicit check rather than from `ansible_facts`:
+# service facts are only present when `service_facts` has been gathered, and a handler that assumes
+# them fails on a host where it has not. This role provisions a host that is not serving yet, where
+# haproxy is enabled but deliberately not started -- reloading it there would start a front end in
+# front of an edge that does not exist.
+- name: Reload haproxy
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: reloaded
+  when: basetool_host_haproxy_active | default(false) | bool
+
+# restorecon is what actually writes the labels sefcontext only declared. It runs on a change and
+# nowhere else: relabelling the whole tree on every run is slow, and doing it when nothing moved
+# says nothing. 40-selinux.yml flushes this immediately rather than leaving it to the end of the
+# play, because the labels have to exist before the rest of the role uses the tree.
+#
+# `-F`, AND IT IS NOT OPTIONAL. `container_file_t` is listed in
+# /etc/selinux/targeted/contexts/customizable_types, and restorecon deliberately leaves a
+# customizable type alone unless forced -- it prints
+#
+#     /var/iri/code/scripts/deploy.sh not reset as customized by admin to ...container_file_t
+#
+# and exits 0. So this handler could not correct a single label under the tree it exists to
+# correct, on any run since it was written, and reported success every time. Measured on the
+# testing host 2026-09-18 with `restorecon -Rnv` against `restorecon -RFnv`: the first refuses
+# every file, the second relabels them.
+#
+# Forcing the policy default over an admin customisation is exactly right HERE and would not be
+# everywhere: this tree is owned end to end by this role, so the policy default IS the intent, and
+# a label someone set by hand on it is drift rather than a decision.
+- name: Apply the SELinux labels
+  ansible.builtin.command: "restorecon -RF {{ basetool_host_root_dir }}"
+  changed_when: true
+
+# The operational units land as files; systemd only sees them after a reload. 25-scripts.yml
+# flushes this before it enables anything, because `systemctl enable` on a unit the manager has
+# not read yet fails with "Unit file does not exist".
+- name: Reload systemd for the operational units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# The same reason as above, for the host half of the monitoring plane. The RPMs bring their own
+# units; the collector's are copied in. 27-observability.yml flushes this before enabling anything.
+- name: Reload systemd for the observability units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# Both read their whole configuration at start; neither has a reload path that picks up a changed
+# flag set. `state: restarted` unconditionally would bounce them on every run, so these are
+# handlers and fire only when the file above them actually changed.
+- name: Restart node_exporter
+  ansible.builtin.systemd_service:
+    name: prometheus-node-exporter.service
+    state: restarted
+  when: not ansible_check_mode
+
+# alloy is enabled but not started by the role -- its configuration arrives with the config bundle.
+# Restarting a service that was deliberately never started would fail the run on a fresh host, so
+# this restarts it only if it is ALREADY running.
+- name: Restart alloy
+  ansible.builtin.systemd_service:
+    name: alloy.service
+    state: restarted
+  when:
+    - not ansible_check_mode
+    - basetool_host_alloy_active | default(false) | bool

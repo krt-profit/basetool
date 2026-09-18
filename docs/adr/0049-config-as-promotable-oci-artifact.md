@@ -11,7 +11,9 @@ Production runs a deliberately one-directional deploy loop (`docs/deployment.md`
 Actions build + sign the app images and push them to GHCR; `promote.yml` re-tags a chosen
 version to `:stable`; the host's `iri-deploy.timer` polls `:stable`, and `deploy.sh` resolves
 it to immutable digests, pins them in a compose override, applies with a health gate, and
-rolls back on failure. The host holds **only** a read-only GHCR pull token — no inbound SSH,
+rolls back on failure. The host holds **only** a read-only GHCR pull token — no inbound SSH
+*for the deploy* (corrected 2026-09-16: the operator's administrative SSH exists and stays;
+this clause is about the delivery path, see REQ-OPS-001),
 no webhook, no git credential. That "pull, not push" posture is the security spine of the
 whole design.
 

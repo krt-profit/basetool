@@ -1,8 +1,8 @@
 # Grafana, admin-only (Keycloak realm role Admin). Reached over a dedicated
 # network that keeps the edge off the monitoring core.
 server {
-  listen 8443 ssl;
-  listen [::]:8443 ssl;
+  listen 8443 ssl ${EDGE_LISTEN_OPTS};
+  listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
   http2 on;
   server_name ${EDGE_HOST_GRAFANA};
 

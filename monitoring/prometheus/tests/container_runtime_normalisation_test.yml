@@ -1,0 +1,211 @@
+# promtool unit test for the container-runtime normalisation (REQ-OBS-014, ADR-0163, 2026-09-18).
+#
+# The Podman migration deletes cAdvisor and renames every container family the four alerts below
+# are written against. `alerts/containers-runtime.yml` normalises the two shapes into one set of
+# `basetool:container:*` recording rules, and this file is what makes that a measurement rather
+# than a claim:
+#
+#   - each alert FIRES from the cgroup-collector series alone   (the post-cutover host);
+#   - each alert FIRES from the cAdvisor series alone           (production today);
+#   - a host serving BOTH does not double-alert                 (the cutover window itself);
+#   - the collector's own liveness alerts fire when it stops or matches nothing,
+#     and stay SILENT on a host that never runs it.
+#
+# The last one is the whole reason the collector has alerts at all. Its docstring puts it plainly:
+# a parsing bug here is "an alert that never fires, which looks exactly like a healthy system".
+#
+# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
+#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
+#     prom/prometheus:v3.14.0 test rules tests/container_runtime_normalisation_test.yml
+
+rule_files:
+  - ../alerts/containers-runtime.yml
+  - ../alerts/infrastructure.yml
+
+evaluation_interval: 1m
+
+tests:
+  # =============================================================================================
+  # The post-cutover host: only basetool_container_* exists.
+  # =============================================================================================
+  - name: podman shape - anonymous memory over the line fires ContainerMemoryHigh
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_memory_anon_bytes{name="backend"}'
+        values: "966367641x30"   # 0.9375 of the limit below
+      - series: 'basetool_container_memory_limit_bytes{name="backend"}'
+        values: "1030792151x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: backend
+            exp_annotations:
+              summary: "Container anonymous memory >90% of limit: backend"
+              description: "Container backend holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
+
+  - name: podman shape - pids at the cap fires ContainerPidsHigh
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_pids{name="grafana"}'
+        values: "512x30"
+      - series: 'basetool_container_pids_max{name="grafana"}'
+        values: "512x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerPidsHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: grafana
+            exp_annotations:
+              summary: "Container pids >80% of the cgroup cap: grafana"
+              description: "Container grafana holds more than 80% of its pids cgroup cap (basetool:container:pids is the cgroup pids.current count, basetool:container:pids_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+
+  # memory.events -> oom_kill. This one has NO prometheus-podman-exporter equivalent at all, so the
+  # cgroup collector is the only source after the cutover -- and on 2026-09-18 nothing read it.
+  - name: podman shape - an OOM kill fires ContainerOomKilled
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_oom_kills_total{name="ingest"}'
+        values: "0+0x10 1+0x20"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerOomKilled
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: ingest
+            exp_annotations:
+              summary: "Container OOM-killed: ingest"
+              description: "Container ingest recorded an out-of-memory kill in the last 15 minutes. Check its memory limit and working set; on the memory-capped host this is the designed sacrifice order — confirm it was the intended victim."
+
+  # cpu.stat -> nr_periods / nr_throttled. Also cgroup-only after the cutover.
+  - name: podman shape - sustained throttling fires ContainerCpuThrottledHigh
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_cpu_periods_total{name="frontend"}'
+        values: "0+100x40"
+      - series: 'basetool_container_cpu_throttled_periods_total{name="frontend"}'
+        values: "0+50x40"     # 50% of periods throttled, over the 25% line
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: ContainerCpuThrottledHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: frontend
+            exp_annotations:
+              summary: "Container CPU throttled >25%: frontend"
+              description: "Container frontend had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
+
+  # =============================================================================================
+  # The cutover window: both families present for the same container. The `or` must take the LEFT
+  # side and produce exactly one series, or every alert doubles for as long as the migration runs.
+  # =============================================================================================
+  - name: both shapes - one container, one alert, not two
+    interval: 1m
+    input_series:
+      - series: 'container_memory_rss{name="backend",id="/docker/abc",image="ghcr.io/x"}'
+        values: "966367641x30"
+      - series: 'container_spec_memory_limit_bytes{name="backend",id="/docker/abc",image="ghcr.io/x"}'
+        values: "1030792151x30"
+      - series: 'basetool_container_memory_anon_bytes{name="backend"}'
+        values: "966367641x30"
+      - series: 'basetool_container_memory_limit_bytes{name="backend"}'
+        values: "1030792151x30"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerMemoryHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              name: backend
+            exp_annotations:
+              summary: "Container anonymous memory >90% of limit: backend"
+              description: "Container backend holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
+
+  # And the normalisation must strip cAdvisor's extra labels, or the alert identity changes at the
+  # cutover and every notification looks new.
+  - name: both shapes - the normalised series carries only the name label
+    interval: 1m
+    input_series:
+      - series: 'container_threads{name="ingest",id="/docker/def",image="ghcr.io/y"}'
+        values: "1700x30"
+      - series: 'container_threads_max{name="ingest",id="/docker/def",image="ghcr.io/y"}'
+        values: "2048x30"
+    promql_expr_test:
+      - expr: basetool:container:pids
+        eval_time: 10m
+        exp_samples:
+          - labels: 'basetool:container:pids{name="ingest"}'
+            value: 1700
+
+  # =============================================================================================
+  # The collector's own liveness.
+  # =============================================================================================
+  - name: collector - a stale textfile fires, and takes every container alert down with it
+    interval: 1m
+    input_series:
+      # A timestamp frozen 30 minutes in the past while `time()` advances.
+      - series: 'basetool_container_metrics_timestamp_seconds'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerCgroupCollectorStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The cgroup container-metrics collector has stopped writing"
+              description: "basetool_container_metrics_timestamp_seconds is more than 5 minutes old, so every basetool_container_* series is stale and the container memory, OOM, CPU-throttling and pids alerts have lost their input on this host. They will NOT fire while this is true. Check the iri-cgroup-metrics timer and the textfile directory."
+
+  - name: collector - a fresh textfile is silent
+    interval: 1m
+    input_series:
+      # Tracks `time()`: 0s at t=0, 60s at t=1m, ... so the age never exceeds one interval.
+      - series: 'basetool_container_metrics_timestamp_seconds'
+        values: "0+60x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ContainerCgroupCollectorStale
+        exp_alerts: []
+
+  # The nastier failure: the file is FRESH and lists nothing, because the cgroup layout stopped
+  # matching. Staleness stays green while every series has quietly disappeared.
+  - name: collector - a fresh file listing zero containers fires its own alert
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_metrics_timestamp_seconds'
+        values: "0+60x40"
+      - series: 'basetool_container_metrics_containers'
+        values: "0x40"
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: ContainerCgroupCollectorStale
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: ContainerCgroupCollectorFoundNothing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The cgroup container-metrics collector found no containers"
+              description: "The collector is running and writing, but matched zero container cgroups for 10 minutes. Either nothing is running on this host, or the cgroup layout stopped matching its pattern -- in which case the file is fresh, ContainerCgroupCollectorStale stays green, and every container-level alert has no data to fire on."
+
+  # A Docker host never runs the collector. Neither rule may fire there, or the migration hands
+  # production two permanent warnings for a thing it does not have.
+  - name: collector - silent on a host that does not run it
+    interval: 1m
+    input_series:
+      - series: 'container_last_seen{name="backend"}'
+        values: "1x40"
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ContainerCgroupCollectorStale
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: ContainerCgroupCollectorFoundNothing
+        exp_alerts: []

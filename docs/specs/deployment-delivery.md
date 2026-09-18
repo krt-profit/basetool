@@ -22,10 +22,19 @@ existed only as a runbook.
 
 ### REQ-OPS-001 — Pull-only delivery
 
-The production host **pulls**; nothing pushes to it. There is no inbound SSH, no webhook, and
-no GitHub-issued credential capable of running commands on the box. The host holds only a
-**read-only** GHCR pull token. A compromised Actions workflow or stolen `GITHUB_TOKEN` must
-not be able to drive code execution on prod — at most it can read images already published.
+The production host **pulls**; nothing pushes to it **for delivery**. There is no inbound SSH
+*for the deploy*, no webhook, and no GitHub-issued credential capable of running commands on the
+box. The host holds only a **read-only** GHCR pull token. A compromised Actions workflow or stolen
+`GITHUB_TOKEN` must not be able to drive code execution on prod — at most it can read images
+already published.
+
+> [!note] Corrected 2026-09-16 — this paragraph overstated its own scope
+> It read *"There is no inbound SSH"*, flatly, while the acceptance criteria below have always
+> scoped it to the **deploy path**. The operator's administrative SSH exists, is the host's sole
+> administrative entrance and the only route to the two loopback-bound admin interfaces, and it
+> **stays** — confirmed by @greluc on 2026-09-16. This requirement governs the delivery mechanism,
+> not human access. A requirement whose prose is false teaches its readers not to trust the ones
+> that are true, which is why this is a correction rather than a clarification.
 
 **Acceptance**
 
@@ -354,25 +363,59 @@ needs:
   (10001 for the JVM apps, 1000 for Keycloak/Quarkus) and bind only high ports, so they need **no**
   capabilities — `cap_drop: [ALL]` with an empty add-back.
 - **`postgres` (db-backend, db-keycloak) and `redis`** boot as root to chown their data dir and then
-  drop to their service user via gosu, so they keep exactly `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
+  drop to their service user via gosu, so under Docker they keep `CHOWN`/`DAC_OVERRIDE`/`FOWNER` +
   `SETGID`/`SETUID`. `no-new-privileges` still holds because gosu drops via the `CAP_SETUID` syscall,
-  not a setuid binary.
-- **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
-  capabilities at all — an empty add-back on the one service most exposed to the internet.
-- **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
-  to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
-  nothing and holds no inbound surface.
-- **`npm`** is retained only as the rollback path (`profiles: ["rollback"]`, ADR-0162) and keeps its
-  empirically-verified s6-overlay set (`NET_BIND_SERVICE`, `CHOWN`, `SETUID`, `SETGID`, `FOWNER`,
-  `DAC_OVERRIDE`, `KILL`) for as long as it exists.
+  not a setuid binary. **That set was measured on 2026-09-16 and is wrong in both directions**
+  (`PODMAN_MIGRATION_PLAN.md` §20): Postgres needs four of the five, `FOWNER` never among them, and
+  redis needs only `SETGID`/`SETUID`. Under Quadlet all three instead run **as their own uid** — 70,
+  70 and 999 — read-only and with no capabilities at all ([ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md)).
+
+> [!danger] For redis, a partial capability set is worse than the full one
+> Its entrypoint tests `has_cap setuid && has_cap setgid` before dropping privileges and, finding
+> neither, **skips the drop and runs as root** — healthy, answering `PING`, and green on every other
+> check here. It then writes its append-only files as `0:0`, which the correct configuration can no
+> longer open. Never remove `SETGID`/`SETUID` from redis without giving it a uid in the same edit,
+> and assert the **uid of pid 1** rather than the capability list: `check-conformance.py`'s
+> `containers-unprivileged` is what does that.
+> - **`edge`** runs as uid 101 on high ports (8080/8443, published as 80/443) and needs **no**
+> capabilities at all — an empty add-back on the one service most exposed to the internet.
+> - **`acme`** runs as root, because lego writes its state as root, and keeps exactly `CHOWN`: it has
+> to hand the issued certificates to uid 101 for the edge to read them. Nothing else — it listens on
+> nothing and holds no inbound surface.
 
 Because the add-back set is not upstream-documented for the third-party images, it **must be
-re-verified on every image bump** of that service before the bump is promoted (a clean boot, its
-healthcheck passing, and — for `npm` — a working `nginx -s reload`). The deploy health-gate is the
-safety net: a wrong cap set fails the container at start and is rolled back rather than shipped. A
-read-only root filesystem is **not** part of the shared baseline — the JVM and DB working dirs write
-across the filesystem — but it is required of `edge` specifically (`read_only: true` plus tmpfs for
-nginx's temp paths and its pid file), because that service exists to face the internet.
+re-verified on every image bump** of that service before the bump is promoted (a clean boot and its
+healthcheck passing). The deploy health-gate is the safety net: a wrong cap set fails the container
+at start and is rolled back rather than shipped.
+
+**A read-only root filesystem is part of the baseline under Quadlet** — all eighteen units
+([ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md)). Earlier revisions of this
+requirement said the opposite — *the JVM and DB working dirs write across the filesystem* — and that
+was never measured; when it was, on 2026-09-16, it was wrong in both halves. A healthy Spring Boot
+module writes Tomcat's work directory, its docbase and the JVM perf data, all three under `/tmp`,
+and nothing else; its own source contains no filesystem write API at all. Nine of the ten
+third-party images write nothing outside their mounts or write only under `/tmp`. **No `Tmpfs=`
+entry was needed for any of them**, because Podman mounts `/run`, `/tmp` and `/var/tmp` itself under
+`--read-only` and copies the image's content up into them — which **Docker does not do**, and is why
+this lives in the Quadlet units rather than in the compose file.
+
+**`keycloak` needs one `Tmpfs=` to get there, and it is the entry that has to be re-verified on
+every image bump.** `kc.sh start` without `--optimized` re-augments the Quarkus application at every
+boot, which plain read-only stops dead. A tmpfs over the 4.7M directory it rewrites — with
+`tmpcopyup`, so the image content is present — lets it start ready with the real SPI provider
+compiled in, at a measured 466M of its 2560M limit. That keeps [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)
+intact: the provider JAR stays its own promotable artifact, a provider-only change still
+auto-applies, and the rollback stays at JAR level. Baking the provider into a custom image and
+running `start --optimized` would buy the same property by making every provider change an
+operator-gated image rebuild.
+
+Under Docker, `read_only: true` remains required of `edge` specifically — `tmpfs` for nginx's temp
+paths and `/var/cache/nginx`, which Podman does **not** supply either — because that service exists
+to face the internet.
+
+`scripts/check-conformance.py`'s `containers-read-only` asserts the posture on a running host, in
+both directions: a container that should be read-only and is not, and `keycloak` becoming read-only
+without this record being updated.
 
 **Acceptance**
 

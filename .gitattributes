@@ -27,6 +27,32 @@
 *.css text eol=lf
 *.js text eol=lf
 *.svg text eol=lf
+
+# Quadlet units and their environment allow-lists (ADR-0163). These are read by systemd on
+# a Linux host, and a CRLF does not merely look untidy there: the carriage return becomes
+# part of the VALUE, so `Image=foo` silently becomes `Image=foo
+` and the pull fails on a
+# reference nobody can see is wrong. The config bundle can be built from a Windows checkout,
+# so this is not hypothetical.
+*.container text eol=lf
+*.network text eol=lf
+*.volume text eol=lf
+# The SYSTEM units and their log rotation, for the identical reason, and they were missed when the
+# block above was written: `ansible/roles/basetool_host/tasks/25-scripts.yml` copies iri-deploy,
+# iri-backup, iri-restore-drill, iri-docker-cleanup and iri-container-metrics onto the host
+# verbatim. A CRLF checkout puts a carriage return inside `ExecStart=`, so systemd looks for an
+# executable whose name ends in one and reports 203/EXEC for a path that is plainly right. The same
+# failure this migration has already spent a session on, for a different reason.
+*.service text eol=lf
+*.timer text eol=lf
+*.logrotate text eol=lf
+# The environment templates the generator emits beside the units. This line said `*.vars` until
+# 2026-09-18, an extension no file in the tree has ever used: the name list was replaced by
+# `.env.tmpl` templates on 2026-09-17 and the rule was never moved with it. So the block's stated
+# purpose did not cover the files it was written for, while reading as though it did -- and a CRLF
+# here is worse than in a unit, because these carry `KEY=${SECRET:?}` lines that the deployer
+# renders into an EnvironmentFile. A trailing carriage return lands inside the password.
+quadlet/env.d/*.env.tmpl text eol=lf
 *.json text eol=lf
 *.xml text eol=lf
 *.sql text eol=lf

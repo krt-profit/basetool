@@ -1,0 +1,64 @@
+---
+# SELinux is enforcing by default on the RHEL family. The Ubuntu host runs AppArmor, which never
+# had an opinion about bind mounts; SELinux does. A container process runs as container_t and may
+# only read files labelled container_file_t, so a bind mount from /var/iri hands it Permission
+# denied on a file whose mode bits say it should be readable -- which gets misdiagnosed as an
+# ownership problem every time.
+#
+# A permanent fcontext rule rather than :z / :Z on the mounts: it survives a relabel, it does not
+# rewrite labels on a host path at mount time, and a :Z on a path two services share is how they
+# end up unable to read each other's files.
+
+- name: Label the data tree for container access
+  community.general.sefcontext:
+    target: "{{ basetool_host_root_dir }}(/.*)?"
+    setype: container_file_t
+    state: present
+  notify: Apply the SELinux labels
+
+# The exception the rule above swallowed, and it made five systemd units unstartable.
+#
+# `/var/iri(/.*)?` is written for the CONTAINER STORE and it is right for almost everything under
+# that tree. It is wrong for one directory: `/var/iri/code/scripts` holds deploy.sh, backup.sh,
+# restore-drill.sh, docker-cleanup.sh and cgroup-container-metrics.py, and every one of them is the
+# ExecStart of a systemd unit. systemd will not execute a `container_file_t` file, so under
+# enforcing all five fail identically:
+#
+#     Unable to locate executable '/var/iri/code/scripts/cgroup-container-metrics.py': Permission denied
+#     Failed at step EXEC ... status=203/EXEC
+#
+# and the mode bits say 0755 root:root, so it reads as anything but a label. Measured on the
+# testing host 2026-09-18; relabelling one file to bin_t and starting the unit was the decisive
+# test -- it then ran, wrote its metrics and node_exporter served all eleven families.
+#
+# A MORE SPECIFIC regex wins in SELinux's file-context matching, so this rule beats the tree-wide
+# one without touching it. The scripts are root-owned and 0755: the deploy account runs them and
+# cannot rewrite them (tasks/25-scripts.yml), so bin_t grants nothing the directory did not already
+# imply.
+#
+# Nothing under this path is ever read by a container, which is what makes the exception safe.
+- name: Let systemd execute the operational scripts
+  community.general.sefcontext:
+    target: "{{ basetool_host_root_dir }}/code/scripts(/.*)?"
+    setype: bin_t
+    state: present
+  notify: Apply the SELinux labels
+
+# `notify` plus an immediate flush, not a plain task: ansible-lint reads `when: ... is changed` as
+# a handler written in the wrong place, and it is right. The flush is explicit because the labels
+# have to be on disk before anything else in this role touches the tree -- a handler left to run
+# at the end of the play would apply them after 50-podman has already used it.
+- name: Apply the labels
+  ansible.builtin.meta: flush_handlers
+
+- name: Note where the first failure will be
+  ansible.builtin.debug:
+    msg: >-
+      The certificate handover is where SELinux will bite first: acme writes fullchain.pem and
+      privkey.pem and hands them to container uid 101 so the edge can open them (REQ-OPS-026), and
+      that path now crosses a user-namespace uid translation AND a label transition at once. Both
+      failures present identically -- the edge exits three seconds after start, the health gate
+      fails, the deploy rolls back, and nothing says "label". Diagnose with
+      `ausearch -m AVC -ts recent`, never by guessing, and never by setting SELinux permissive.
+  changed_when: false
+  check_mode: false

@@ -55,39 +55,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Extract the acme command, verbatim -------------------------------------
-# The service's `command:` is a single YAML block scalar. Compose escapes shell
-# variables in it as `$$`, which it collapses to `$` when it loads the file, so
-# the same collapse happens here. The two `/lego` invocations become no-ops and
-# the 12-hour sleep becomes a clean exit, so one pass runs and returns.
-"${PY}" - "${COMPOSE_FILE}" "${WORK}/acme.sh" <<'PY'
+# --- Take the acme command from where it now lives --------------------------
+# It used to be a YAML block scalar inside the service's `command:`, and this
+# read it out of docker-compose.yml. It moved into a script file when the Quadlet
+# units were generated -- `Exec=` is one line and cannot hold a multi-line
+# command -- and this gate was not moved with it. It kept passing anyway, because
+# it searched for the FIRST `- |` anywhere after the `acme:` line and found the
+# npm service's, several hundred lines further down. Deleting npm is what made it
+# say so. A gate that reads the wrong block is worse than one that reads nothing:
+# it reports on something, and the something is not what runs.
+#
+# So: the script file is the subject, and compose is asked only whether it still
+# points at it. The two `/lego` invocations become no-ops and the 12-hour sleep
+# becomes a clean exit, so one pass runs and returns.
+ACME_SCRIPT="${REPO_ROOT}/docker/acme/publish-loop.sh"
+[[ -f "${ACME_SCRIPT}" ]] \
+  || { echo "FAIL: ${ACME_SCRIPT} does not exist"; exit 1; }
+grep -qF 'command: ["/etc/acme/publish-loop.sh"]' "${COMPOSE_FILE}" \
+  || { echo "FAIL: the acme service no longer runs /etc/acme/publish-loop.sh -- this gate would be reading a file nobody executes"; exit 1; }
+
+"${PY}" - "${ACME_SCRIPT}" "${WORK}/acme.sh" <<'PY'
 import sys
 
 src, dst = sys.argv[1], sys.argv[2]
-lines = open(src, encoding="utf-8").read().split("\n")
-
-try:
-    start = next(i for i, l in enumerate(lines) if l == "  acme:")
-except StopIteration:
-    sys.exit("FAIL: no `acme:` service in docker-compose.yml")
-
-# The block scalar opener, then every line indented under it.
-try:
-    opener = next(i for i in range(start, len(lines)) if lines[i].strip() == "- |")
-except StopIteration:
-    sys.exit("FAIL: no block scalar under the acme service's command:")
-
-body, indent = [], None
-for line in lines[opener + 1:]:
-    if not line.strip():
-        body.append("")
-        continue
-    pad = len(line) - len(line.lstrip())
-    if indent is None:
-        indent = pad
-    elif pad < indent:
-        break
-    body.append(line[indent:])
+body = open(src, encoding="utf-8").read().split(chr(10))
 
 out = []
 for line in body:
@@ -104,7 +95,9 @@ for line in body:
     else:
         out.append(line)
 
-script = "\n".join(out).replace("$$", "$")
+# No `$$` collapse here: that was compose escaping shell variables inside the
+# block scalar. A script file on disk carries real dollars already.
+script = chr(10).join(out)
 if "ACME_HOSTS" not in script:
     sys.exit("FAIL: the extracted script never mentions ACME_HOSTS")
 open(dst, "w", newline="\n", encoding="utf-8").write(script + "\n")

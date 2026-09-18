@@ -50,8 +50,18 @@ allprojects {
 // space and their `\uXXXX` escapes.
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   isEnforceCheck = true
+  // Trees Spotless must not touch: generated, vendored, or fetched. `ansible/collections/**` is
+  // the last of those — `ansible-galaxy install` drops a few thousand upstream files there
+  // (gitignored, ADR-0188), and formatting somebody else's collection is both slow and wrong.
   val vendored =
-    arrayOf("**/build/**", "**/.gradle/**", "**/node_modules/**", "**/.claude/**", "**/.git/**")
+    arrayOf(
+      "**/build/**",
+      "**/.gradle/**",
+      "**/node_modules/**",
+      "**/.claude/**",
+      "**/.git/**",
+      "ansible/collections/**",
+    )
 
   kotlinGradle {
     target("**/*.gradle.kts")

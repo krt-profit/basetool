@@ -171,7 +171,11 @@ Then the things only the host can show:
 ```bash
 docker inspect edge --format '{{.State.Health.Status}}'        # expect: healthy
 docker compose --profile prod logs --tail=20 acme
-docker exec edge sh -c 'wget -q -O - http://127.0.0.1:8080/healthz'   # expect: ok
+# :8081, not :8080. /healthz moved to a loopback-only listener when the public one began
+# speaking PROXY protocol (ADR-0187); on :8080 it now matches `location /` and answers 308,
+# which wget follows to an unresolvable host -- a failed verification step for a healthy edge,
+# in the middle of the one procedure where a false red is most expensive.
+docker exec edge sh -c 'wget -q -O - http://127.0.0.1:8081/healthz'   # expect: ok
 ```
 
 **The two probes that already existed are the real gate.** `blackbox-edge-deny` and the daily

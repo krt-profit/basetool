@@ -91,6 +91,13 @@ groups:
       # already uses changes()). A genuine 4+ crash loop still fires after for:5m; a lone restart no
       # longer pages (single-restart faults stay covered by ContainerOomKilled / ContainerPidsHigh /
       # TargetDown). Locked by tests/containerrestartloop_changes_test.yml.
+      #
+      # NOT normalised, and it cannot be: the cgroup collector publishes no start time and
+      # neither does prometheus-podman-exporter's subset until it lands with
+      # `podman_container_started_seconds`. This alert therefore goes SILENT at the Podman
+      # cutover rather than wrong, and the intent is covered meanwhile by SystemdUnitFailed
+      # plus the unit-level restart counters -- Quadlet containers ARE systemd units, which is
+      # a signal this migration gains. See the mapping table in docs/PODMAN_MIGRATION_PLAN.md.
       - alert: ContainerRestartLoop
         expr: changes(container_start_time_seconds{name=~".+"}[15m]) > 3
         for: 5m
@@ -107,6 +114,12 @@ groups:
       # cAdvisor lost its labels. `container_last_seen{name=~".+"}` metric verified against cadvisor
       # v0.60.3.
       # baseline-tune: the < 10 floor assumes the current ~20-container footprint.
+      #
+      # Also not normalised: `container_last_seen` is a cAdvisor liveness series with no cgroup
+      # analogue. Under Podman the same question -- "is anything reporting container metrics at
+      # all" -- is answered by ContainerCgroupCollectorStale and
+      # ContainerCgroupCollectorFoundNothing in containers-runtime.yml, which is why those two
+      # exist rather than being folded into this one.
       - alert: ContainerMetricsMissing
         expr: >-
           count(container_last_seen{name=~".+"}) < 10
@@ -306,20 +319,28 @@ groups:
       # (frontend 0.45 MiB, ingest 0.11 MiB), so the PR #1419 JVM budgets are unaffected by the change.
       # Kernel slab/stack is not counted here; ContainerPidsHigh covers the task-count angle
       # independently. Method + full table: monitoring/README.md -> "Go services" (REQ-OBS-014).
+      #
+      # Reads the NORMALISED series (containers-runtime.yml), not cAdvisor's directly: the Podman
+      # migration renames every container family, and this alert has to keep working on both shapes
+      # while the two run side by side. basetool:container:memory_anon_bytes is cgroup `anon` under
+      # either runtime, so the 0.90 threshold keeps its meaning and is not re-derived.
       - alert: ContainerMemoryHigh
-        expr: (container_memory_rss{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) > 0.90
+        expr: >-
+          (basetool:container:memory_anon_bytes / basetool:container:memory_limit_bytes) > 0.90
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Container anonymous memory >90% of limit: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check container_memory_working_set_bytes only to explain a gap, never to size."
+          description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
 
       # A single core app container dropping out of cAdvisor (#1041 item 7, REQ-OBS-014). Complements
       # the global ContainerMetricsMissing above: fires when fewer than the 7 core containers report a
       # cAdvisor series (or all are gone), catching a single core container whose container-level
       # metrics vanished while the plane keeps ~20 total series. Warning (not critical) because a truly
       # down app container also pages TargetDown on its app scrape.
+      # cAdvisor-only, for the same reason as ContainerMetricsMissing above. The per-container
+      # half of this question survives the cutover through TargetDown and the app health gates.
       - alert: CoreContainerMetricsMissing
         expr: >-
           count(container_last_seen{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7
@@ -335,7 +356,7 @@ groups:
       # one-off OOM kill slips under that threshold. `container_oom_events_total` verified present in
       # cadvisor v0.60.3.
       - alert: ContainerOomKilled
-        expr: increase(container_oom_events_total{name=~".+"}[15m]) > 0
+        expr: increase(basetool:container:oom_kills_total[15m]) > 0
         for: 0m
         labels:
           severity: warning
@@ -350,8 +371,8 @@ groups:
       # baseline-tune: the 25% throttled-period ratio is the issue's initial threshold.
       - alert: ContainerCpuThrottledHigh
         expr: >-
-          rate(container_cpu_cfs_throttled_periods_total{name=~".+"}[15m])
-          / rate(container_cpu_cfs_periods_total{name=~".+"}[15m]) > 0.25
+          rate(basetool:container:cpu_throttled_periods_total[15m])
+          / rate(basetool:container:cpu_periods_total[15m]) > 0.25
         for: 15m
         labels:
           severity: warning
@@ -387,17 +408,21 @@ groups:
       # Headroom is ample: measured on prod, grafana read 100% while the next-highest container
       # (tempo) sat at 12.5%, so 0.8 is nowhere near normal operation. Verified on cadvisor v0.60.5;
       # the `process` metric group that emits both series is enabled in docker-compose.monitoring.yml.
+      # Normalised via containers-runtime.yml, so it keeps working across the Podman cutover. The
+      # ceiling is the half prometheus-podman-exporter does not publish at all: under Podman it
+      # comes from the cgroup collector reading pids.max, which is the same file cAdvisor read to
+      # produce container_threads_max.
       - alert: ContainerPidsHigh
         expr: >-
-          container_threads{name=~".+"}
-          / (container_threads_max{name=~".+"} > 0)
+          basetool:container:pids
+          / (basetool:container:pids_max > 0)
           > 0.8
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Container pids >80% of the cgroup cap: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+          description: "Container {{ $labels.name }} holds more than 80% of its pids cgroup cap (basetool:container:pids is the cgroup pids.current count, basetool:container:pids_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
 
       - alert: RedisEvictions
         expr: increase(redis_evicted_keys_total[15m]) > 0

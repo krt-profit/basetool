@@ -1,0 +1,139 @@
+---
+# =================================================================================================
+# One name per container signal, whichever container runtime is serving it.
+#
+# The Podman migration deletes cAdvisor -- its rootless-Podman support is closed upstream as not
+# planned -- and replaces the families it published with two sources: `prometheus-podman-exporter`
+# for the lifecycle series, and `scripts/cgroup-container-metrics.py`, a node_exporter textfile
+# collector that reads the cgroup v2 tree directly, for everything the exporter does not publish.
+#
+# That is a rename of every series six alerts and a dashboard are written against, in the middle of
+# a migration where the two shapes must both work: production runs Docker + cAdvisor today, the
+# testing host runs rootless Podman + the collector, and for the length of the cutover they run
+# side by side. Repointing the consumers at the new names would blind production; leaving them on
+# the old ones ships a collector nothing reads. CLAUDE.md calls the second one out by name -- "a
+# renamed/removed metric that breaks a dashboard or alert rule ... is incomplete".
+#
+# So the two families are normalised HERE, once, and every consumer reads the normalised name. The
+# cutover then changes nothing downstream: the left side of each `or` simply stops producing
+# samples and the right side takes over, on a per-container basis, with no gap and no edit.
+#
+# `max by (name)` on both sides is not cosmetic. cAdvisor's series carry `id`, `image` and
+# `container_label_*`; the textfile collector's carry only `name`. Reducing both to a single
+# `name` label makes the two halves substitutable AND lets the ratio alerts divide without an
+# `on(...)` clause that would have to be written differently for each shape.
+#
+# REQ-OBS-011 (metric naming), REQ-OBS-014 (container signals), ADR-0163, ADR-0189.
+# The per-alert mapping table lives in docs/PODMAN_MIGRATION_PLAN.md -> "The seven alerts, one by
+# one"; docs/specs/observability.md registers the names.
+# =================================================================================================
+groups:
+  - name: container-runtime-normalisation
+    rules:
+      # --- memory ------------------------------------------------------------------------------
+      # ANONYMOUS memory, not usage. Page cache expands to fill whatever limit it is given, so a
+      # usage-over-limit ratio alerts on healthy behaviour -- alloy's 192->256->384->512M history
+      # is that mistake four times over. cAdvisor's `container_memory_rss` and the collector's
+      # `memory_anon_bytes` are both cgroup v2 `memory.stat` -> `anon`, so this is one signal under
+      # two names rather than two signals that resemble each other.
+      - record: basetool:container:memory_anon_bytes
+        expr: >-
+          max by (name) (container_memory_rss{name=~".+"})
+          or max by (name) (basetool_container_memory_anon_bytes)
+
+      - record: basetool:container:memory_limit_bytes
+        expr: >-
+          max by (name) (container_spec_memory_limit_bytes{name=~".+"})
+          or max by (name) (basetool_container_memory_limit_bytes)
+
+      # Kept for the dashboard, which explains a gap between anon and the working set. Never size
+      # a limit from it.
+      - record: basetool:container:memory_working_set_bytes
+        expr: >-
+          max by (name) (container_memory_working_set_bytes{name=~".+"})
+          or max by (name) (basetool_container_memory_working_set_bytes)
+
+      # --- cpu ---------------------------------------------------------------------------------
+      - record: basetool:container:cpu_usage_seconds_total
+        expr: >-
+          max by (name) (container_cpu_usage_seconds_total{name=~".+"})
+          or max by (name) (basetool_container_cpu_usage_seconds_total)
+
+      - record: basetool:container:cpu_periods_total
+        expr: >-
+          max by (name) (container_cpu_cfs_periods_total{name=~".+"})
+          or max by (name) (basetool_container_cpu_periods_total)
+
+      - record: basetool:container:cpu_throttled_periods_total
+        expr: >-
+          max by (name) (container_cpu_cfs_throttled_periods_total{name=~".+"})
+          or max by (name) (basetool_container_cpu_throttled_periods_total)
+
+      - record: basetool:container:cpu_throttled_seconds_total
+        expr: >-
+          max by (name) (container_cpu_cfs_throttled_seconds_total{name=~".+"})
+          or max by (name) (basetool_container_cpu_throttled_seconds_total)
+
+      # --- tasks -------------------------------------------------------------------------------
+      # pids.current and pids.max. At the cap the kernel refuses new tasks: a JVM throws "unable to
+      # create native thread" and child-process spawns fail -- the 2026-07-12 ingest native-thread
+      # OOM and the 2026-07-26 grafana zombie exhaustion.
+      - record: basetool:container:pids
+        expr: >-
+          max by (name) (container_threads{name=~".+"})
+          or max by (name) (basetool_container_pids)
+
+      - record: basetool:container:pids_max
+        expr: >-
+          max by (name) (container_threads_max{name=~".+"})
+          or max by (name) (basetool_container_pids_max)
+
+      # --- oom ---------------------------------------------------------------------------------
+      - record: basetool:container:oom_kills_total
+        expr: >-
+          max by (name) (container_oom_events_total{name=~".+"})
+          or max by (name) (basetool_container_oom_kills_total)
+
+  # ===============================================================================================
+  # The collector that produces the right-hand side of every `or` above.
+  #
+  # Its own docstring states the failure mode these two rules exist for: a parsing bug here is "an
+  # alert that never fires, which looks exactly like a healthy system". Normalisation makes that
+  # worse, not better -- a collector that stops writing leaves the left side of each `or` empty on
+  # a Podman host and every container alert silently loses its input. Nothing else would notice.
+  #
+  # Both rules are inert where the collector does not run: the series are absent on a Docker host,
+  # and an expression over an absent series produces no samples rather than a false alarm.
+  # ===============================================================================================
+  - name: container-metrics-collector
+    rules:
+      - alert: ContainerCgroupCollectorStale
+        # The timer runs every 30s. Five minutes is ten missed runs, which is a stopped timer or a
+        # collector that is failing every time, not a slow host.
+        expr: time() - basetool_container_metrics_timestamp_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The cgroup container-metrics collector has stopped writing"
+          description: >-
+            basetool_container_metrics_timestamp_seconds is more than 5 minutes old, so every
+            basetool_container_* series is stale and the container memory, OOM, CPU-throttling and
+            pids alerts have lost their input on this host. They will NOT fire while this is true.
+            Check the iri-cgroup-metrics timer and the textfile directory.
+
+      - alert: ContainerCgroupCollectorFoundNothing
+        # It writes a file listing zero containers when the cgroup paths stop matching -- a layout
+        # change, a renamed slice, a unit moved out of app.slice. The file is fresh, so the rule
+        # above stays green while every series has quietly disappeared.
+        expr: basetool_container_metrics_containers == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The cgroup container-metrics collector found no containers"
+          description: >-
+            The collector is running and writing, but matched zero container cgroups for 10
+            minutes. Either nothing is running on this host, or the cgroup layout stopped matching
+            its pattern -- in which case the file is fresh, ContainerCgroupCollectorStale stays
+            green, and every container-level alert has no data to fire on.

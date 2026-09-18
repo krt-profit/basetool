@@ -34,7 +34,18 @@ Description=Profit Basetool — pull and apply latest GHCR images
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Wants=network-online.target docker.service
 After=network-online.target docker.service
-Requires=docker.service
+# NOT `Requires=docker.service`. That line made all four of these units refuse to start on a
+# rootless-Podman host -- "Failed to create iri-deploy.service/start: Unit docker.service not
+# found" -- which is where the migration would have discovered it, on the new production host,
+# with the timers already enabled.
+#
+# Nothing replaces it, deliberately. The runtime is DETECTED by the script
+# (scripts/lib/container-runtime.sh), which refuses loudly when neither docker nor podman answers
+# -- a better failure than a unit that never ran, because it says which host is wrong and why. A
+# tick that fires while the runtime is still coming up costs one retry; the timer fires again.
+#
+# `Wants=`/`After=docker.service` are kept: an ordering or weak dependency on a unit that does not
+# exist is inert, and on the Docker host it still orders correctly.
 
 [Service]
 Type=oneshot
@@ -44,7 +55,20 @@ Type=oneshot
 # user has NO sudo grants and a `/sbin/nologin` shell — interactive use is
 # impossible.
 User=deploy
-Group=docker
+# NOT `Group=docker`. That group does not exist on a rootless-Podman host, and a unit naming a
+# group that does not exist refuses to start -- so all four of these were unstartable on the
+# platform the migration moves to.
+#
+# Removing it costs nothing on the Docker host: read from production 2026-09-18, the account is
+# `uid=999(deploy) gid=987(deploy) groups=987(deploy),988(docker)`, so it already CARRIES the
+# membership. With `User=` and no `Group=`, systemd takes the user's own primary group and
+# initialises its supplementary groups from the user database -- docker among them. The directive
+# was pinning what the account already had.
+#
+# On the Podman host the socket is not the path at all: the deploy account reaches the containers
+# through a sudoers rule naming two commands against the service user
+# (ansible/roles/basetool_host/tasks/22-deploy-user.yml), which is strictly narrower than docker
+# group membership, that being root-equivalent by design.
 
 ExecStart=/var/iri/code/scripts/deploy.sh
 

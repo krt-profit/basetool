@@ -103,6 +103,19 @@ services:
     # published port on a Linux runner.
     extra_hosts: !override []
     volumes: !override
+      # Restores the log tmpfs this `!override` drops. The header above says host-path log mounts
+      # are dropped because container logs go to stdout — true, but logback ALSO opens
+      # /app/logs/backend.log, and this stack runs the JVM as `user: "0:0"` with the base template's
+      # `cap_drop: [ALL]`. Root without DAC_OVERRIDE cannot create a file in a 0755 directory owned
+      # by another uid, and since #1932 the image ships /app/logs EMPTY and owned by 10001. Before
+      # that it shipped root-owned log files from the CDS training run, so root was appending to its
+      # own leftovers and this worked by accident. Without the tmpfs the container fails at
+      # "openFile(logs/backend.log) Permission denied" -> "Logback configuration error detected" ->
+      # exit 1, and every test in the suite reports initializationError.
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
       # The committed test certificate (ADR-0139), by a hardcoded path for the same reason
       # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
       # keystore. It must be this file and not a locally generated one, because test.yml pins
@@ -135,6 +148,12 @@ services:
       SERVER_HTTP2_ENABLED: "false"
     extra_hosts: !override []
     volumes: !override
+      # Same reason as backend-dev above: `user: "0:0"` plus `cap_drop: [ALL]` plus an /app/logs
+      # that #1932 made empty and owned by 10001.
+      - type: tmpfs
+        target: /app/logs
+        tmpfs:
+          mode: 0o777
       # The committed test certificate (ADR-0139), by a hardcoded path for the same reason
       # docker-compose.test.yml uses one: IRI_KEYSTORE_HOST_PATH still selects the PRODUCTION
       # keystore. It must be this file and not a locally generated one, because test.yml pins

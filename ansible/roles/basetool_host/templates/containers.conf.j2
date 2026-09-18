@@ -1,0 +1,26 @@
+#
+# Managed by Ansible -- ansible/roles/basetool_host (ADR-0188). Edits are overwritten.
+#
+# Rationale: docs/PODMAN_HOST_BOOTSTRAP.md section 6.
+#
+# THIS FILE CARRIES NO SETTINGS, ON PURPOSE, AND IS STILL WRITTEN. Podman's defaults are what this
+# host runs; the value of the file is the paragraph below, which answers the question a reader will
+# otherwise ask again in a year -- "shouldn't this set rootless_port_forwarder?" -- on the host,
+# where they are standing. An empty configuration file that explains its own emptiness is cheaper
+# than the experiment that re-discovers why.
+#
+# rootless_port_forwarder is DELIBERATELY NOT SET here, and the omission is the decision.
+#
+# Setting it to "pasta" was the entire reason this migration first moved to a platform with podman 6.
+# Measured on 2026-09-16, that forwarder preserves the client address on IPv4 and delivers NO IPv6 at
+# all: the socket binds, the connection is reset, nothing reaches the container. Traced to podman
+# overriding the rootless namespace's IPv6 address with a ULA, so the host's global v6 address is not
+# local there and netavark's `fib daddr type local` DNAT chain is never entered.
+#
+# ADR-0187 recovers the client address a different way -- a host-level haproxy hands it to the edge
+# in a PROXY protocol header -- which needs no forwarder setting at all. The default, rootlessport,
+# is what runs, and the edge no longer cares what address it presents.
+#
+# If a future podman fixes the IPv6 path, turning this on is still not a free win: the edge would
+# then trust two sources for one fact. The acceptance is the BEHAVIOUR either way, via
+# scripts/check-conformance.py's client-address-visible check.

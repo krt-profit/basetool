@@ -1,0 +1,346 @@
+---
+# Host hardening, from the platform's own versioned content rather than from anybody's idea of
+# what a hardened host looks like.
+#
+# EL 10 ships scap-security-guide with a datastream per distribution -- Rocky Linux 10, the
+# platform this role targets, carries `ssg-rl10-ds.xml` -- and seventeen profiles: CIS levels 1
+# and 2, DISA STIG, BSI SYS.1.1/SYS.1.3, ANSSI BP-028, PCI-DSS and more. The candidate list in
+# defaults/main.yml is what keeps this working across all four; see the note there.
+# That content is versioned, reviewed, and matched to this exact distribution, which is the whole
+# reason to use it instead of a hand-written list of sysctls.
+#
+# WHY cis_server_l1 -- measured on 2026-09-16 against scap-security-guide 0.1.82, not chosen by
+# reputation:
+#
+#   profile             tasks   fapolicyd   noexec targets
+#   bsi                   652      YES      /tmp only
+#   cis_server_l1        1022      no       /tmp /dev/shm /var/tmp /var/log /var/log/audit
+#   cis (level 2)        1669      no       same, plus more
+#   stig                 1657      YES      most aggressive
+#
+# Two findings decided it:
+#
+#  1. fapolicyd is application allowlisting by path and trust database. Rootless Podman executes
+#     every container binary out of the service user's own storage under
+#     ~/.local/share/containers/storage/overlay/..., which is not in any trust database and never
+#     will be. It appears in `bsi` and `stig` and NOT in cis_server_l1.
+#  2. /home gets nodev and nosuid under CIS L1 but NOT noexec -- checked rule by rule. So the
+#     rootless container storage survives. nosuid there is in any case consistent with what these
+#     containers already do: every one of them runs with no-new-privileges, which makes setuid
+#     inert regardless of the mount option.
+#
+# Scanning is the default. Remediation is NOT: applying a thousand rules to a host is a deliberate
+# act, and the scan report is what makes it an informed one.
+
+- name: Install the hardening content and scanner
+  ansible.builtin.dnf:
+    name:
+      - scap-security-guide
+      - openscap-scanner
+    state: present
+
+- name: Create a directory for the scan reports
+  ansible.builtin.file:
+    path: "{{ basetool_host_state_dir }}/hardening"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Look for every datastream this role knows about
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ basetool_host_hardening_datastream_candidates }}"
+  register: basetool_host_datastreams
+  changed_when: false
+  check_mode: false
+
+- name: Take the first one that exists
+  ansible.builtin.set_fact:
+    basetool_host_hardening_datastream: >-
+      {{ basetool_host_hardening_datastream
+         or (basetool_host_datastreams.results | selectattr('stat.exists') | map(attribute='item') | first | default('')) }}
+
+# The datastream ships in scap-security-guide, which the task above INSTALLS. Under
+# `--check` on a fresh host that install did not happen, so none of the candidates
+# exists and this assertion fails on a host that is perfectly fine -- the same
+# shape as the podman version gate in 10-packages.yml, one layer down.
+#
+# The distinction that matters: "the package is not installed yet" is expected in
+# a dry run, while "the package is installed and names its file differently" is
+# the real fault this assertion exists for. So it is skipped only in the first
+# case, and the skip says which case it is.
+- name: Note that the datastream cannot exist yet
+  ansible.builtin.debug:
+    msg: >-
+      scap-security-guide is not installed on this host, so no datastream can be found and the
+      hardening scan below is SKIPPED. Under --check that is expected -- the install task above
+      reported `changed`, meaning a real run installs it first. Outside --check it means the
+      install did not take effect.
+  when:
+    - ansible_check_mode
+    - basetool_host_hardening_datastream | length == 0
+
+- name: Assert a datastream was found
+  ansible.builtin.assert:
+    that: basetool_host_hardening_datastream | length > 0
+    fail_msg: >-
+      None of {{ basetool_host_hardening_datastream_candidates | join(', ') }} exists on this host.
+      scap-security-guide ships ONE datastream per distribution, and hardening against content
+      written for a different one proves nothing about this host. Either the package is missing, or
+      this distribution names its file differently -- set basetool_host_hardening_datastream explicitly
+      rather than letting the scan run against the wrong content.
+    success_msg: "{{ basetool_host_hardening_datastream }}"
+  when: not (ansible_check_mode and basetool_host_hardening_datastream | length == 0)
+
+# Always. A report that is only produced when somebody remembers to ask is a report nobody has.
+- name: Scan against the profile
+  ansible.builtin.command:
+    argv:
+      - oscap
+      - xccdf
+      - eval
+      - --profile
+      - "{{ basetool_host_hardening_profile }}"
+      - --results-arf
+      - "{{ basetool_host_state_dir }}/hardening/arf-{{ ansible_date_time.date }}.xml"
+      - --report
+      - "{{ basetool_host_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html"
+      - "{{ basetool_host_hardening_datastream }}"
+  register: basetool_host_scan
+  # oscap exits 0 when every rule passed, 2 when at least one failed, and 1 on an error. A failing
+  # rule is the normal state of an unhardened host and is the reason we are scanning, so only 1 is
+  # a failure of this task.
+  failed_when: basetool_host_scan.rc == 1
+  changed_when: false
+  # NOT check_mode: false. The scan changes no configuration, but it WRITES a report and an
+  # ARF file -- and a --check run that leaves files behind is not a dry run. It is skipped
+  # there, and the summary below is skipped with it rather than reading an undefined var.
+
+- name: Summarise the scan
+  when: not ansible_check_mode
+  ansible.builtin.debug:
+    msg: >-
+      {{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') }}:
+      {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }} passed,
+      {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'fail') | list | length }} failed.
+      Report: {{ basetool_host_state_dir }}/hardening/report-{{ ansible_date_time.date }}.html
+
+- name: Remediate
+  when: basetool_host_hardening_remediate | bool
+  block:
+    - name: Apply the profile's remediations
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --remediate
+          - --profile
+          - "{{ basetool_host_hardening_profile }}"
+          - --results-arf
+          - "{{ basetool_host_state_dir }}/hardening/arf-remediated-{{ ansible_date_time.date }}.xml"
+          - --report
+          - "{{ basetool_host_state_dir }}/hardening/report-remediated-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_host_hardening_datastream }}"
+      register: basetool_host_remediate
+      # oscap exits 2 when rules still fail, which is the normal state afterwards -- some rules have
+      # no automated fix. Only 1 is an error of the tool itself.
+      failed_when: basetool_host_remediate.rc == 1
+      # NOT changed_when: true. That reported a change on every run including one that had nothing
+      # left to do, which makes the idempotence of the whole role unreadable -- exactly the noise
+      # that hides a real change. The honest signal is below: did the number of passing rules move?
+      changed_when: false
+
+    # A SECOND scan, and it is not redundant. `oscap --remediate` prints the evaluation it made
+    # BEFORE applying anything, so comparing its stdout against the first scan compares one state
+    # with itself -- it reported "0 newly passing" on a run that had just rewritten 131 files under
+    # /etc. Measured on 2026-09-16, in the very task written to avoid a meaningless green.
+    #
+    # Only a fresh evaluation says what the host looks like now. It costs a couple of minutes and it
+    # is the only thing that distinguishes "remediation did nothing" from "remediation worked".
+    - name: Scan again, to find out what the remediation actually achieved
+      ansible.builtin.command:
+        argv:
+          - oscap
+          - xccdf
+          - eval
+          - --profile
+          - "{{ basetool_host_hardening_profile }}"
+          - --results-arf
+          - "{{ basetool_host_state_dir }}/hardening/arf-verify-{{ ansible_date_time.date }}.xml"
+          - --report
+          - "{{ basetool_host_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html"
+          - "{{ basetool_host_hardening_datastream }}"
+      register: basetool_host_rescan
+      failed_when: basetool_host_rescan.rc == 1
+      changed_when: false
+
+    - name: Count what actually moved
+      ansible.builtin.set_fact:
+        basetool_host_pass_before: >-
+          {{ basetool_host_scan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+        basetool_host_pass_after: >-
+          {{ basetool_host_rescan.stdout | regex_findall('Result\s+(\w+)') | select('equalto', 'pass') | list | length }}
+
+    - name: Report the remediation as changed only if it changed something
+      ansible.builtin.debug:
+        msg: >-
+          {{ basetool_host_pass_before }} rules passed before, {{ basetool_host_pass_after }} after
+          ({{ basetool_host_pass_after | int - basetool_host_pass_before | int }} newly passing).
+      changed_when: basetool_host_pass_after | int > basetool_host_pass_before | int
+
+    - name: Say so when remediation moved nothing at all
+      ansible.builtin.debug:
+        msg: >-
+          The remediation changed no rule's outcome. That is either a host already at this profile,
+          or a profile whose remaining failures have no automated fix -- and those are very different
+          situations. Read {{ basetool_host_state_dir }}/hardening/report-verify-{{ ansible_date_time.date }}.html
+          before concluding the first.
+      when: basetool_host_pass_after | int <= basetool_host_pass_before | int
+
+
+    # --- the three things that do not announce themselves ------------------------------------------
+    #
+    # A remediation report can show a perfect score on a host that is about to become unreachable.
+    # These read the specific settings whose effect is DELAYED -- to the next boot, or to the day a
+    # partition fills -- because a delayed effect is invisible in the run that caused it.
+
+    # Gathered AFTER the remediation, not before: arming tmp.mount is one of the things the
+    # remediation does, so facts taken earlier would report the state it was asked to change.
+    - name: Read the unit states the remediation may have moved
+      ansible.builtin.service_facts:
+
+    - name: Say so, loudly, because it only takes effect at the next boot
+      ansible.builtin.debug:
+        msg: >-
+          tmp.mount is now enabled. CIS wants /tmp as its own filesystem, and the usual
+          remediation enables this unit -- which does nothing until the host reboots and then
+          mounts /tmp as tmpfs with noexec,nosuid,nodev. Anything that executes from /tmp stops
+          working at that point, and the cause is a run that finished cleanly hours or weeks
+          earlier.
+      when: >-
+        ansible_facts.services['tmp.mount'] is defined
+        and ansible_facts.services['tmp.mount'].status == 'enabled'
+    - name: What will auditd do when its partition fills?
+      ansible.builtin.command: awk -F= '/^[[:space:]]*admin_space_left_action/ {gsub(/ /,"",$2); print tolower($2)}' /etc/audit/auditd.conf
+      register: basetool_host_audit_action
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Refuse to leave a self-shutdown armed without saying it out loud
+      ansible.builtin.debug:
+        msg: >-
+          auditd admin_space_left_action is '{{ basetool_host_audit_action.stdout | trim }}'. That is a
+          mechanism by which this host SWITCHES ITSELF OFF when the audit partition fills -- not
+          today, but in three weeks, and by then nobody is looking at the hardening run. Decide
+          whether that is wanted here; the alternative is a value that keeps the host serving.
+      when: basetool_host_audit_action.stdout | trim in ['halt', 'single']
+
+    # --- does sshd still accept the operator's key? ------------------------------------------------
+    #
+    # `sshd -t` checks syntax, and a syntactically perfect configuration can still lock everyone out:
+    # PubkeyAuthentication no, an AuthorizedKeysFile that moved, an AllowGroups that does not include
+    # this user, a crypto policy that drops the key's algorithm. The only honest answer comes from a
+    # real authentication against the new configuration.
+    #
+    # A SECOND instance on a spare port, against loopback, while the running one is untouched. If it
+    # refuses, that is learned with the working sshd still in place rather than after a restart.
+    - name: Check the new sshd configuration for syntax
+      ansible.builtin.command: /usr/sbin/sshd -t -f /etc/ssh/sshd_config
+      register: basetool_host_sshd_syntax
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Stop if sshd would not even parse its own configuration
+      ansible.builtin.assert:
+        that: basetool_host_sshd_syntax.rc == 0
+        fail_msg: >-
+          sshd will not parse /etc/ssh/sshd_config after remediation: {{ basetool_host_sshd_syntax.stderr }}
+          DO NOT restart sshd. The running instance still has the old configuration in memory and is
+          the only way into this host.
+
+    - name: State what still has to be proved by hand
+      ansible.builtin.debug:
+        msg: >-
+          sshd parses its new configuration. That is NOT the same as accepting your key. Before
+          restarting it, run a second instance on a spare port and authenticate against it for real:
+          `sudo /usr/sbin/sshd -D -p 2222 -f /etc/ssh/sshd_config &` and then, from the client you
+          actually use, `ssh -p 2222 -i <key> {{ ansible_user_id }}@<host> true`. Only restart sshd
+          once that succeeds -- if it fails, the old instance is still running and still yours.
+
+    # --- the two rules that will never pass, and must not be "fixed" ------------------------------
+    #
+    # CIS requires every file to have an owner and a group that exist in passwd/group. A host running
+    # ROOTLESS containers cannot satisfy that, and the reason is the design rather than an oversight:
+    # every uid inside a container maps to a SUBUID on the host, and subuids deliberately have no
+    # passwd entry. That covers both the image store and the data directories this role creates with
+    # namespace-translated ownership -- /var/iri/redis at 100998, /var/iri/db-backend at 100069, and
+    # so on. They are correct. They are also, to CIS, ownerless.
+    #
+    # The danger is not the failing rule. It is the remediation somebody reaches for later: a
+    # `chown -R` across those paths rewrites the image store AND hands every database its data
+    # directory under the wrong uid. The rule is therefore reported as a KNOWN EXCEPTION.
+    #
+    # The criterion is the SUBUID RANGE, not a path. A first version excluded paths under
+    # containers/storage and reported eleven orphans "outside" it -- which were the data directories,
+    # equally deliberate. Filtering by where a file sits describes today's layout; filtering by
+    # EVERY range in /etc/subuid, not just the service user's. Narrowing it to `iri` reported 14
+    # orphans -- which were containers run under another account's subuids. A uid inside ANY granted
+    # Two separate questions, because a file lands here for two separate reasons. `-nouser` is about
+    # the UID and is explained by /etc/subuid; `-nogroup` is about the GID and is explained by
+    # /etc/subgid. Checking the uid of a file that matched on its GROUP asks the wrong question of
+    # the right file -- it reported a container's /etc/shadow as unexplained because its owner was
+    # valid, while the thing that flagged it was a subgid.
+    #
+    # A LITERAL block (|), not folded: folding joins the lines with spaces and ate the final
+    # `| wc -l`, so the task reported an orphan's uid as though it were a count.
+    - name: Count owners outside every granted subuid range
+      ansible.builtin.shell: |
+        set -o pipefail
+        find / -xdev -nouser -printf '%U\n' 2>/dev/null | sort -u |
+        awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
+             { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subuid - |
+        wc -l
+      register: basetool_host_orphan_uids
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Count groups outside every granted subgid range
+      ansible.builtin.shell: |
+        set -o pipefail
+        find / -xdev -nogroup -printf '%G\n' 2>/dev/null | sort -u |
+        awk 'NR==FNR { split($0, r, ":"); lo[FNR]=r[2]; hi[FNR]=r[2]+r[3]; n=FNR; next }
+             { for (i=1; i<=n; i++) if ($1 >= lo[i] && $1 < hi[i]) next; print }' /etc/subgid - |
+        wc -l
+      register: basetool_host_orphan_gids
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+
+    - name: Report the exception, and only the exception
+      ansible.builtin.debug:
+        msg: >-
+          CIS's two file-ownership rules fail and always will on a rootless-container host: every
+          uid inside a container is a subuid on the host, and subuids have no passwd entry by
+          design. That covers the image store and the data directories this role creates. Do NOT
+          chown them -- it rewrites the image store and misplaces every database's data directory.
+          Unexplained owners: {{ basetool_host_orphan_uids.stdout | trim | default('?', true) }}
+          (uids outside every subuid range), unexplained groups:
+          {{ basetool_host_orphan_gids.stdout | trim | default('?', true) }} (gids outside every subgid
+          range). Those two numbers are the ones worth watching; above zero is a real finding rather
+          than this exception.
+
+
+    - name: Say what has to happen next, because the scan cannot
+      ansible.builtin.debug:
+        msg: >-
+          Remediation applied. It is NOT accepted until two things are true: the host reboots
+          cleanly (mount options and grub settings only take effect then), and
+          scripts/check-conformance.py is green against it. A hardened host that no longer serves
+          the application has failed, and the conformance suite is the only thing that will say so
+          -- an oscap report will happily show a perfect score on a host whose edge is down.

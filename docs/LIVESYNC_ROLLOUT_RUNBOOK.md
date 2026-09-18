@@ -62,8 +62,10 @@ cd /var/iri/code
 sudo grep -q '^REDIS_PASSWORD=..*' .env && echo "REDIS_PASSWORD present" || echo "!! REDIS_PASSWORD missing — set it before deploy"
 
 # 2. The Redis default user carries the &* channel grant (covers PUBLISH/SUBSCRIBE of the two
-#    fan-out channels). It is granted by --requirepass on the default user; the aclfile must NOT
-#    override the default user to a narrower grant. Inspect the running ACL:
+#    fan-out channels). It comes from the `user default ... &* ...` line in the aclfile -- NOT
+#    from --requirepass, which was removed on 2026-09-16 after being measured inert whenever
+#    --aclfile is in play. The aclfile is the source of truth for the default user, so that
+#    line must carry both the password and the `&*` channel grant. Inspect the running ACL:
 REDIS_PW="$(sudo grep -oP '(?<=^REDIS_PASSWORD=).*' /var/iri/code/.env)"
 docker exec redis redis-cli -a "$REDIS_PW" --no-auth-warning ACL LIST
 # Expect a `user default on ... ~* &* +@all` line (the &* is the channel grant), and the restricted

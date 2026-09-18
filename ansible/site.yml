@@ -1,0 +1,12 @@
+---
+# The Basetool host bootstrap. ADR-0188.
+#
+#   ansible-playbook site.yml --limit testing --check --diff     # see what would change
+#   ansible-playbook site.yml --limit testing                    # do it
+#
+# Run this against a host that is NOT serving traffic. It provisions; deploy.sh deploys.
+- name: Prepare a host to run the Basetool stack under rootless Podman
+  hosts: basetool_hosts
+  gather_facts: true
+  roles:
+    - role: basetool_host

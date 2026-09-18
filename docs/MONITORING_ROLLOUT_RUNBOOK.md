@@ -411,6 +411,17 @@ read arbitrary keys: the session store holds OAuth2 **refresh tokens**.
 > sudo grep -c '^user default ' /var/iri/redis/users.acl   # must be 1, not 0
 > ```
 >
+> **`--requirepass` was removed on 2026-09-16, so this file is now the only thing
+> protecting Redis.** It was kept until then as “redundant belt-and-braces”; measured
+> against `redis:8-alpine`, it is not redundant but inert. With a `default` line the ACL
+> password wins and a different `--requirepass` is simply rejected; without one there is no
+> authentication at all **whether or not** `--requirepass` is given. It protected nothing in
+> either direction while putting the password on redis-server's argv.
+>
+> The check above is therefore no longer belt-and-braces either, and it is now asserted
+> rather than remembered: `scripts/check-conformance.py --only redis-requires-auth` opens a
+> socket, sends an unauthenticated `PING`, and requires `-NOAUTH`. It needs no credential.
+>
 > **This file MUST exist before the deploy that adds `--aclfile`.** If Redis starts with `--aclfile`
 > pointing at a missing/invalid file, prod Redis fails to start, the deploy health-gate trips, and the
 > app deploy rolls back. Create the file now.
