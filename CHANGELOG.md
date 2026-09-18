@@ -81,6 +81,13 @@
 
 ### Fixed
 
+- **Betrieb: die Sicherung erfasst jetzt die Zertifikate und die Redis-Zugriffskontrolle.** Beides
+  fehlte, und beides braucht eine Wiederherstellung: ohne die TLS-Dateien kann ein
+  wiederhergestellter Host kein HTTPS ausliefern und muss neu ausstellen, wogegen ein
+  Wochenlimit steht; ohne die ACL-Datei startet Redis gar nicht. Die Sicherung hielt stattdessen
+  weiter den Stand des längst entfernten alten Proxys. Der wöchentliche Wiederherstellungstest
+  prüft die drei Dateien jetzt mit und schlägt Alarm, wenn eine fehlt (REQ-OPS-010, REQ-OPS-011).
+
 - **Betrieb: das Redis-Passwort liegt nicht mehr in der Umgebung des laufenden Containers.** Es war
   dort gelandet, um eine spätere Podman-Prüfung zu bedienen, wirkte aber sofort im heutigen
   Docker-Betrieb — lesbar aus `/proc/1/environ` und `docker inspect`, für ein Deployment, das den

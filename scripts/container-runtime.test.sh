@@ -59,6 +59,7 @@ make_stub docker 'case "$*" in
   *create*) echo "created-cid" ;;
 esac'
 make_stub podman 'case "$*" in
+  *"volume inspect"*) exit 0 ;;
   *"ps -aq"*) echo "cid-podman-1" ;;
   *"ps --format"*) echo "backend" ;;
   *"inspect --format"*) echo "false|running/healthy" ;;
@@ -359,6 +360,51 @@ if [[ "$got" == *"stop frontend.service stop keycloak.service stop db-backend.se
 else
   bad "stop order was '${got}', wanted frontend, keycloak, db-backend"
 fi
+
+say ""
+say "== reading state out for the backup =="
+# One primitive serves a host path and a named volume, because both CLIs accept
+# either in the same position. That is what let the edge's TLS material -- which
+# lives in volumes -- be captured by the same code that reads the keystore.
+expect_call "a named volume is read through the helper" podman \
+  'rt_read_mount edge-certs postgres:18-alpine tar -C /src -cz .' \
+  'run --rm -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
+expect_call "...and a host path identically" docker \
+  'rt_read_mount /var/iri/monitoring postgres:18-alpine cat /src/x' \
+  'run --rm -v /var/iri/monitoring:/src:ro'
+expect_call "the mount is read-only, so a backup cannot write to what it reads" podman \
+  'rt_read_mount edge-certs img tar -C /src -cz .' ':/src:ro'
+expect_out "a volume that does not exist is reported, not assumed present" podman \
+  'STUB_FAIL="volume inspect" rt_volume_exists edge-certs; echo "rc=$?"' 'rc=1'
+expect_out "...and one that does" podman 'rt_volume_exists edge-certs; echo "rc=$?"' 'rc=0'
+
+say ""
+say "== the quiesce: a pause, not a release =="
+expect_call "docker stops the writers with the configured timeout" docker \
+  'RT_STOP_TIMEOUT=30 rt_service_stop frontend backend ingest' 'stop -t 30 frontend backend ingest'
+expect_call "podman stops each writer unit" podman \
+  'rt_service_stop frontend backend' 'systemctl --user stop frontend.service'
+expect_call "and starts them again" podman \
+  'rt_service_start frontend' 'systemctl --user start frontend.service'
+# The quiesce must NOT apply the pin or wait for health -- that is a release
+# operation, and the backup is meant to put the stack back exactly as it was.
+expect_no_call "the quiesce does not re-apply the digest pin" docker \
+  'RT_PIN_FILE=/tmp/pin.yml rt_service_start frontend' '/tmp/pin.yml'
+
+say ""
+say "== the throwaway container the restore drill proves recoverability in =="
+expect_call "it is started detached, by name" podman \
+  'rt_run_detached iri-restore-drill postgres:18-alpine -e POSTGRES_USER=drill' \
+  'run -d --name iri-restore-drill -e POSTGRES_USER=drill postgres:18-alpine'
+# A drill container on the deployment's networks is a drill container that can be
+# mistaken for the real thing.
+expect_no_call "it joins none of the deployment's networks" podman \
+  'rt_run_detached iri-restore-drill img -e A=b' '--network'
+expect_call "a dump is copied into it" podman \
+  'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  'cp /work/krt_basetool.dump iri-restore-drill:/tmp/krt_basetool.dump'
+expect_call "and it is removed whatever state it is in" podman \
+  'rt_rm_force iri-restore-drill' 'rm -f iri-restore-drill'
 
 say ""
 say "== credentials never reach a command line =="

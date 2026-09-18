@@ -669,6 +669,127 @@ rt_stack_down() {
   esac
 }
 
+# =============================================================================
+# Reading state out, for the backup
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# rt_read_mount <source> <helper-image> <command>...
+#
+# Run a throwaway helper with <source> mounted read-only at /src and stream its
+# stdout. <source> may be a host path OR a named volume — both CLIs accept
+# either in the same position, which is what lets one primitive serve both.
+#
+# The helper exists because the backup runs as an unprivileged user and most of
+# what it must read is root-owned: the keystore is 0640 (REQ-OPS-016), and the
+# edge's TLS material lives in named volumes whose contents that user cannot open
+# directly. A plain `cp` EACCESes and, under `set -e`, takes the whole run with
+# it — the 2026-07-06 regression, where tightening the keystore mode silently
+# killed the off-site backup, database dumps included.
+#
+# Under rootless Podman a named volume belongs to the service user's own store,
+# which RT_CLI already carries the privilege prefix for.
+# -----------------------------------------------------------------------------
+rt_read_mount() {
+  local src="$1" image="$2"
+  shift 2
+  ${RT_CLI} run --rm -v "${src}:/src:ro" "${image}" "$@"
+}
+
+# -----------------------------------------------------------------------------
+# rt_volume_exists <name>
+#
+# Whether a named volume exists at all. The backup uses it to tell "this
+# deployment has no such volume" from "the volume is there and could not be
+# read" — the second is a failure, the first is a host that legitimately does
+# not run that service.
+# -----------------------------------------------------------------------------
+rt_volume_exists() {
+  ${RT_CLI} volume inspect "$1" >/dev/null 2>&1
+}
+
+rt_network_exists() {
+  ${RT_CLI} network inspect "$1" >/dev/null 2>&1
+}
+
+# -----------------------------------------------------------------------------
+# rt_run_on_network <network> <image> <command>...
+#
+# Run a throwaway container attached to one internal network. The weekly
+# Prometheus TSDB snapshot needs it: the admin API is reachable only from inside
+# the monitoring plane, because the host publishes no Prometheus port by design.
+# -----------------------------------------------------------------------------
+rt_run_on_network() {
+  local net="$1" image="$2"
+  shift 2
+  ${RT_CLI} run --rm --network "${net}" "${image}" "$@"
+}
+
+# =============================================================================
+# The throwaway container the restore drill proves recoverability in
+# =============================================================================
+
+# rt_rm_force <name> — remove a container whatever state it is in, quietly.
+rt_rm_force() {
+  ${RT_CLI} rm -f "$1" >/dev/null 2>&1 || true
+}
+
+# rt_run_detached <name> <image> [--env K=V]... — start a detached container.
+#
+# Deliberately NOT on any of the deployment's networks: the drill must prove the
+# dumps restore, and a throwaway Postgres that can reach the live stack is a
+# throwaway Postgres that can be mistaken for it.
+rt_run_detached() {
+  local name="$1" image="$2"
+  shift 2
+  ${RT_CLI} run -d --name "${name}" "$@" "${image}" >/dev/null
+}
+
+# rt_cp_to <source-on-host> <container> <destination-in-container>
+rt_cp_to() {
+  ${RT_CLI} cp "$1" "$2:$3"
+}
+
+# -----------------------------------------------------------------------------
+# rt_service_stop <service>...
+# rt_service_start <service>...
+#
+# The backup quiesce: stop the writers for the DUMP only, then start them again
+# before the slow upload, so the user-facing window is the dump and never the
+# transfer (REQ-OPS-009).
+#
+# Deliberately NOT rt_apply_stack: that waits for health and applies the pin,
+# which is a release operation. This is a pause, and it must come back exactly as
+# it was.
+# -----------------------------------------------------------------------------
+rt_service_stop() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        --profile "${RT_PROFILE:-prod}" stop -t "${RT_STOP_TIMEOUT:-30}" "$@"
+      ;;
+    podman)
+      local svc rc=0
+      for svc in "$@"; do ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1; done
+      return "${rc}"
+      ;;
+  esac
+}
+
+rt_service_start() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        --profile "${RT_PROFILE:-prod}" start "$@"
+      ;;
+    podman)
+      local svc rc=0
+      for svc in "$@"; do ${RT_SYSTEMCTL} start "${svc}.service" || rc=1; done
+      return "${rc}"
+      ;;
+  esac
+}
+
 # -----------------------------------------------------------------------------
 # rt_prune
 #
