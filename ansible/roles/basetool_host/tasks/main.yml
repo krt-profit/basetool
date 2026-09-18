@@ -33,6 +33,10 @@
   ansible.builtin.import_tasks: 30-directories.yml
   tags: [directories]
 
+- name: The operational scripts and their units
+  ansible.builtin.import_tasks: 25-scripts.yml
+  tags: [scripts]
+
 - name: SELinux file contexts
   ansible.builtin.import_tasks: 40-selinux.yml
   when: basetool_host_manage_selinux | bool

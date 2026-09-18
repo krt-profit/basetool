@@ -24,6 +24,29 @@
 # run` as root, no write access to the unit directory except through the
 # scripts' own paths.
 
+# The service user's uid, looked up HERE rather than taken from the register in
+# 20-user.yml. That file is tagged [user] and this one [user, deploy], so a
+# tag-limited run -- `--tags deploy,scripts`, which is exactly how tooling is
+# delivered to a host that is already serving -- skips it and leaves the variable
+# undefined. The run then dies with "'basetool_host_user' is undefined", which
+# says nothing about tags.
+- name: Read the service user's uid
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_service_user }}"
+  check_mode: false
+
+- name: Refuse if the service user does not exist yet
+  ansible.builtin.assert:
+    that: basetool_host_service_user in ansible_facts.getent_passwd
+    fail_msg: >-
+      {{ basetool_host_service_user }} does not exist on this host, so there is nothing for the
+      deploy account to reach. Run the role without a tag limit -- 20-user.yml creates it.
+
+- name: Name the uid the sudo bridge needs
+  ansible.builtin.set_fact:
+    basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
 - name: Create the deploy account
   ansible.builtin.user:
     name: "{{ basetool_host_deploy_user }}"
@@ -89,7 +112,7 @@
 - name: Prove deploy can drive the service user's systemd instance
   ansible.builtin.command: >-
     sudo -n -u {{ basetool_host_service_user }}
-    XDG_RUNTIME_DIR=/run/user/{{ basetool_host_user.uid }}
+    XDG_RUNTIME_DIR=/run/user/{{ basetool_host_service_uid }}
     systemctl --user is-system-running
   args:
     chdir: /tmp

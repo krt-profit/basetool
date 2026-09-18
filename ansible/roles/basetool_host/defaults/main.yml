@@ -20,6 +20,11 @@ basetool_host_service_group: iri
 # which is the gap 22-deploy-user.yml closes.
 basetool_host_deploy_user: deploy
 
+# Where the operational scripts are copied FROM. Relative to the playbook, so the role works from a
+# checkout without anything being installed into the role's own files/ directory -- and so a
+# reviewer can see that what lands on the host is exactly what is in the repository.
+basetool_host_scripts_src: "{{ playbook_dir }}/../scripts"
+
 # The subordinate id range. EVERY host-side uid in this role is derived from this number rather
 # than written down, so changing it here moves every ownership rule with it. That is the one thing
 # the prose bootstrap cannot do: a hand-computed 110000 is silently wrong the day this changes.
