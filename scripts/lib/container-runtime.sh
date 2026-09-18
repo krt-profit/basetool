@@ -548,11 +548,17 @@ rt_pin_rollback() {
 # Reclaim dangling images and unused networks. Deliberately NOT `system prune`:
 # that reaches volumes, and this stack's volumes hold the databases.
 # -----------------------------------------------------------------------------
+# rt_prune_images <age>   e.g. `rt_prune_images 720h`
+#
+# The age is REQUIRED rather than defaulted, so every call site states how much
+# history it is willing to lose. `until=` is what keeps the images this deploy
+# just pulled — the ones a rollback still needs — and a default would let a new
+# call site drop that protection without saying so.
+#
+# Best-effort: a stuck container reference can block a prune transiently, and
+# that must not fail a deploy.
 rt_prune_images() {
-  # `until=` keeps the images this deploy just pulled, which are the ones a
-  # rollback still needs. Best-effort: a stuck container reference can block a
-  # prune transiently, and that must not fail a deploy.
-  ${RT_CLI} image prune --force --filter "until=${1:-720h}" >/dev/null 2>&1 || true
+  ${RT_CLI} image prune --force --filter "until=$1" >/dev/null 2>&1 || true
 }
 
 rt_prune_networks() {
@@ -560,7 +566,7 @@ rt_prune_networks() {
 }
 
 rt_prune() {
-  rt_prune_images
+  rt_prune_images 720h
   rt_prune_networks
 }
 
