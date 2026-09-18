@@ -42,6 +42,16 @@
   when: basetool_host_manage_selinux | bool
   tags: [selinux]
 
+# AFTER the labels, deliberately. This file STARTS a timer whose unit executes a script out of
+# /var/iri/code/scripts, and until 40-selinux.yml has relabelled that directory to bin_t systemd
+# refuses to exec it (203/EXEC). Ordered before the labels the first tick of a fresh host always
+# fails; it recovers on the next one, but a provisioning run that leaves a failed unit behind
+# teaches an operator to ignore failed units.
+- name: The monitoring that is not a container
+  ansible.builtin.import_tasks: 27-observability.yml
+  when: basetool_host_manage_observability | default(true) | bool
+  tags: [observability, monitoring]
+
 - name: Podman configuration
   ansible.builtin.import_tasks: 50-podman.yml
   tags: [podman]

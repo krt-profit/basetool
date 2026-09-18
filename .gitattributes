@@ -37,6 +37,15 @@
 *.container text eol=lf
 *.network text eol=lf
 *.volume text eol=lf
+# The SYSTEM units and their log rotation, for the identical reason, and they were missed when the
+# block above was written: `ansible/roles/basetool_host/tasks/25-scripts.yml` copies iri-deploy,
+# iri-backup, iri-restore-drill, iri-docker-cleanup and iri-container-metrics onto the host
+# verbatim. A CRLF checkout puts a carriage return inside `ExecStart=`, so systemd looks for an
+# executable whose name ends in one and reports 203/EXEC for a path that is plainly right. The same
+# failure this migration has already spent a session on, for a different reason.
+*.service text eol=lf
+*.timer text eol=lf
+*.logrotate text eol=lf
 # The environment templates the generator emits beside the units. This line said `*.vars` until
 # 2026-09-18, an extension no file in the tree has ever used: the name list was replaced by
 # `.env.tmpl` templates on 2026-09-17 and the rule was never moved with it. So the block's stated

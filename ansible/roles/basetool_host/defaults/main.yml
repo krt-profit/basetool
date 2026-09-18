@@ -100,6 +100,26 @@ basetool_host_container_owners:
       - backend/log
       - frontend/log
       - ingest/log
+      # Loki and Tempo run as 10001 too -- read from the images themselves on 2026-09-18
+      # (`podman image inspect --format '{{.Config.User}}'`), not inferred from the Docker host.
+      - monitoring/data/loki
+      - monitoring/data/tempo
+  # --- the six that Docker created and Podman will not -------------------------------------
+  # Docker creates a missing bind-mount source directory. Podman refuses:
+  #     Error: statfs /var/iri/monitoring/data/prometheus: no such file or directory
+  # Measured on the testing host 2026-09-18, where six of the nine monitoring units would not
+  # start for exactly this reason. On the production Docker host these directories exist only
+  # because the daemon made them on 2026-07-04 and the containers then chowned them, so nothing
+  # in this repository ever had to name them -- and a fresh Podman host has no such helper.
+  - container_uid: 65534          # `nobody` in the prom/ images; confirmed numerically on prod
+    reason: "prometheus and alertmanager write their TSDB and notification state here"
+    paths:
+      - monitoring/data/prometheus
+      - monitoring/data/alertmanager
+  - container_uid: 472            # the grafana image's own user
+    reason: "grafana's sqlite database, dashboards and plugin state"
+    paths:
+      - monitoring/data/grafana
   - container_uid: 1000           # the Keycloak Quarkus image
     reason: "without it Keycloak logs OPEN_FAILURE and silently keeps console-only logging"
     paths:
@@ -129,6 +149,42 @@ basetool_host_service_user_dirs:
   - monitoring/textfile
   - monitoring/certs
   - monitoring/secrets
+
+# --- the host half of the monitoring plane -----------------------------------------------------
+# Set to false on a host that is not monitored. It is true by default because the alternative is a
+# host that looks fine and reports nothing.
+basetool_host_manage_observability: true
+
+# Three packages, from two repositories this role adds. Versions are NOT pinned here: both
+# node-exporter and alloy resolve to exactly the versions docker-compose.monitoring.yml already
+# pins (1.12.1 and 1.19.2, measured 2026-09-18), and a second pin that has to be kept in step with
+# the first is a drift source, not a safeguard. The compose file stays the single place a version
+# is chosen; `dnf` is asked for the package, and the assertion that the two agree belongs in a
+# check, not in a duplicated constant.
+basetool_host_observability_packages:
+  - node-exporter                # EPEL 10. Host metrics, the systemd collector, and the textfile
+                                 # collector that deploy.sh and the cgroup collector write into.
+  - alloy                        # rpm.grafana.com. Logs and traces.
+  - prometheus-podman-exporter   # EPEL 10. Per-container state for the rootless containers, which
+                                 # the systemd collector cannot see because they are USER units.
+
+# Both bind on all interfaces and are kept off the network by the host firewall instead, which is
+# default-deny in the public zone (tasks/65-firewall.yml). Verified 2026-09-18 from off-host: 9100
+# and 9882 refuse, SSH answers -- the control matters, because two closed ports and a broken probe
+# look identical. Binding to a single address is not an option: the containers reach the host over
+# `host.containers.internal`, which resolves to a per-network gateway, and there are eighteen
+# networks.
+basetool_host_node_exporter_listen: ":9100"
+# A LIST, joined into ARGS by the task. systemd's EnvironmentFile parser has no line continuation,
+# so the rendered line is one long one whatever happens -- but the flags are chosen here, one per
+# line, where a reviewer can see each of them and why.
+basetool_host_node_exporter_flags:
+  - "--collector.systemd"
+  - "--collector.textfile.directory={{ basetool_host_root_dir }}/monitoring/textfile"
+  - "--no-collector.wifi"
+  - "--web.listen-address={{ basetool_host_node_exporter_listen }}"
+basetool_host_podman_exporter_listen: ":9882"
+basetool_host_alloy_listen: "127.0.0.1:12345"
 
 # --- hardening -------------------------------------------------------------------------------------
 # The platform's own content: scap-security-guide ships a cs10 datastream with seventeen profiles.
