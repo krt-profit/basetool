@@ -542,6 +542,133 @@ rt_pin_rollback() {
   done < <(rt_pin_record_pairs "${RT_PIN_FILE}")
 }
 
+# =============================================================================
+# The monitoring plane
+#
+# Under Compose it is a SECOND project (`-p iri-monitoring`) with its own file,
+# deliberately separate so the app stack can be recreated without taking the
+# observability with it. Under Quadlet there are no projects: the nine
+# monitoring units sit in the same directory as the eight application ones and
+# are told apart by name, which RT_MONITORING_SERVICES holds.
+#
+# Every one of these is best-effort at the call site — the deploy is not gated on
+# the monitoring plane, because an observability failure must not stop a release
+# that is otherwise healthy.
+# =============================================================================
+
+rt_monitoring_configured() {
+  case "${RT_BACKEND}" in
+    docker)  [[ -f "${RT_MONITORING_FILE:-}" ]] ;;
+    podman)  [[ -n "${RT_MONITORING_SERVICES:-}" ]] ;;
+  esac
+}
+
+rt_monitoring_up() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
+        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" up -d "$@"
+      ;;
+    podman)
+      ${RT_SYSTEMCTL} daemon-reload || return 1
+      local svc rc=0
+      if [[ $# -eq 0 ]]; then
+        local -a msvcs=()
+        read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
+        set -- "${msvcs[@]}"
+      fi
+      for svc in "$@"; do
+        ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+      done
+      return "${rc}"
+      ;;
+  esac
+}
+
+# Take the monitoring plane down. Compose needs this before a network-topology
+# recreate because the monitoring project holds the shared data networks as
+# `external`, and a bridge with an endpoint still attached cannot be removed.
+rt_monitoring_down() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
+        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" down --remove-orphans
+      ;;
+    podman)
+      local svc rc=0
+      local -a msvcs=()
+      read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
+      for svc in "${msvcs[@]}"; do
+        ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1
+      done
+      return "${rc}"
+      ;;
+  esac
+}
+
+rt_monitoring_is_running() {
+  case "${RT_BACKEND}" in
+    docker)
+      # The project label is how compose itself identifies its containers.
+      [[ -n "$(docker ps --filter "label=com.docker.compose.project=iri-monitoring" \
+                 --format '{{.Names}}' 2>/dev/null)" ]]
+      ;;
+    podman)
+      local svc
+      local -a msvcs=()
+      read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
+      for svc in "${msvcs[@]}"; do
+        rt_is_running "${svc}" && return 0
+      done
+      return 1
+      ;;
+  esac
+}
+
+# Replace ONE monitoring container so it re-resolves its bind-mount inode and
+# re-reads a changed config file. Not health-gated and never gating: a failed
+# monitoring recreate re-drifts on the next tick rather than failing a release.
+rt_monitoring_recreate() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
+        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" \
+        up -d --force-recreate --no-deps "$1"
+      ;;
+    podman)
+      ${RT_SYSTEMCTL} restart "$1.service"
+      ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
+# rt_stack_down
+#
+# Take the APPLICATION stack down. Only used for a network-topology change, which
+# cannot be applied in place: the bridges have to be removed and recreated on the
+# new subnets.
+# -----------------------------------------------------------------------------
+rt_stack_down() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        --profile "${RT_PROFILE:-prod}" down --remove-orphans
+      ;;
+    podman)
+      local svc rc=0
+      local -a svcs=()
+      read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset}"
+      # Reverse order, so a dependent stops before what it depends on.
+      local i
+      for (( i=${#svcs[@]}-1; i>=0; i-- )); do
+        svc="${svcs[i]}"
+        ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1
+      done
+      return "${rc}"
+      ;;
+  esac
+}
+
 # -----------------------------------------------------------------------------
 # rt_prune
 #

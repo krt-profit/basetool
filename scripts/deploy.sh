@@ -427,19 +427,17 @@ network_block() {
 # addresses/gateways, so the NPM SSH-tunnel admin allow-list stays valid.
 clean_slate_recreate() {
   log "network topology changed -> clean recreate (brief full-stack downtime)"
-  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "  monitoring down (it holds the shared data nets as external)"
-    docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-      -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" down --remove-orphans >/dev/null 2>&1 \
+    rt_monitoring_down >/dev/null 2>&1 \
       || log "  WARN: monitoring 'down' reported an error (continuing)"
   fi
   log "  app down"
-  docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --profile "${PROFILE}" \
-    down --remove-orphans >/dev/null 2>&1 \
+  rt_stack_down >/dev/null 2>&1 \
     || log "  WARN: app 'down' reported an error (continuing to prune + up)"
   # Belt-and-braces: a stray endpoint can block `down` from removing a bridge; drop
   # any now-unused network so `up` cannot reuse a stale-subnet one (single-purpose host).
-  docker network prune -f >/dev/null 2>&1 || true
+  rt_prune_networks
 }
 
 # Snapshot the live config tree (the allowlisted paths) into a directory so the
@@ -536,8 +534,7 @@ reconcile_monitoring_reload() {
     return 0
   fi
   log "  monitoring: ${subpath} config differs from the last applied snapshot → recreating ${svc} (re-resolves the bind-mount inode)"
-  if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d --force-recreate --no-deps "${svc}" >/dev/null 2>&1; then
+  if rt_monitoring_recreate "${svc}" >/dev/null 2>&1; then
     # Refresh the baseline ONLY on a successful recreate, so a failed one re-drifts next tick.
     install -d -m 0755 "${MON_RELOAD_STATE_DIR}" 2>/dev/null || true
     rm -rf "${snap}"
@@ -698,13 +695,13 @@ reconcile_edge() {
 
 reconcile_monitoring_reloads() {
   if [[ "${IRI_MONITORING_ENABLED:-false}" != "true" ]]; then
-    if docker ps --filter "label=com.docker.compose.project=iri-monitoring" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+    if rt_monitoring_is_running; then
       log "  monitoring: WARN iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true' — on-disk monitoring config changes will NOT be reloaded into Prometheus/alloy/blackbox (set IRI_MONITORING_ENABLED=true in the iri-deploy service env)"
       write_monitoring_reconcile_state_metric 1
     fi
     return 0
   fi
-  [[ -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
+  rt_monitoring_configured || return 0
   write_monitoring_reconcile_state_metric 0
   # Apply monitoring COMPOSE-DEFINITION drift (a service's mem_limit / environment / volumes / image
   # pin) to the running containers. `up -d` recreates ONLY the services whose compose config-hash
@@ -718,9 +715,8 @@ reconcile_monitoring_reloads() {
   # container — 2026-07-17: alloy ran the stale 256M/230MiB definition for days while disk said
   # 384M/300MiB, and cadvisor a stale mount, because only the config subtree was reconciled. Best-
   # effort, non-gating (a failed apply logs and retries next tick; it never fails the deploy).
-  if ! docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1; then
-    log "  monitoring: WARN compose-definition reconcile (up -d) failed — non-gating, retries next tick"
+  if ! rt_monitoring_up >/dev/null 2>&1; then
+    log "  monitoring: WARN definition reconcile failed — non-gating, retries next tick"
   fi
   reconcile_monitoring_reload prometheus prometheus
   reconcile_monitoring_reload alloy alloy
@@ -855,6 +851,11 @@ export HOME="${IRI_HOME:-${STATE_DIR}}"
 # an installed-but-dead docker does not win over a working podman.
 rt_detect
 export RT_COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml"
+export RT_PROJECT_DIR="${COMPOSE_DIR}"
+export RT_MONITORING_FILE="${COMPOSE_DIR}/docker-compose.monitoring.yml"
+# The Quadlet half of the same plane. Compose identifies it by project; there are
+# no projects under Quadlet, so the nine units are named.
+export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"
 export RT_PROFILE="${PROFILE}"
 export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
 # Under Quadlet there is no project to ask what "the whole stack" is, so the list
@@ -1619,10 +1620,9 @@ if rt_apply_stack; then
   # path; crashed monitoring containers recover on their own restart policy. Any failure only logs —
   # the app deploy stays successful. Gated on IRI_MONITORING_ENABLED=true (unset on a host without
   # the stack). pipefail makes the `if` observe compose's real exit through the sed pipe.
-  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
-    if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-         -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d 2>&1 | sed 's/^/  monitoring: /'; then
+    if rt_monitoring_up 2>&1 | sed 's/^/  monitoring: /'; then
       log "monitoring stack reconciled"
       # `up -d` recreates a service only when its DEFINITION changes; a bind-mounted config-file edit
       # (inode-pinned single-file mount) needs a force-recreate. Reconcile the applied config against
@@ -1698,10 +1698,9 @@ fi
 # best-effort here rather than leaving it down until the next successful deploy.
 if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" \
       && "${IRI_MONITORING_ENABLED:-false}" == "true" \
-      && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
-  log "restoring the monitoring project after the rollback recreate (best-effort)"
-  docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-    -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1 \
+      ]] && rt_monitoring_configured; then
+  log "restoring the monitoring plane after the rollback recreate (best-effort)"
+  rt_monitoring_up >/dev/null 2>&1 \
     || log "WARN: monitoring restore failed — it returns on the next successful deploy"
 fi
 

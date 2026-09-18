@@ -322,6 +322,45 @@ expect_call    "the age filter that protects the rollback images" podman \
   'rt_prune_images 720h' 'image prune --force --filter until=720h'
 
 say ""
+say "== the monitoring plane, which is a project under one runtime and a name list under the other =="
+mon() { printf 'export RT_PROJECT_DIR=%q RT_MONITORING_FILE=%q RT_MONITORING_SERVICES=%q;' \
+  "$WORK" "${WORK}/docker-compose.monitoring.yml" "prometheus loki grafana"; }
+: > "${WORK}/docker-compose.monitoring.yml"
+
+expect_call "docker addresses it as its own project" docker \
+  "$(mon) rt_monitoring_up" '-p iri-monitoring'
+expect_call "podman starts each named unit" podman \
+  "$(mon) rt_monitoring_up" 'systemctl --user start prometheus.service'
+expect_call "...all of them, not just the first" podman \
+  "$(mon) rt_monitoring_up" 'systemctl --user start grafana.service'
+# `down` exists for exactly one reason: the monitoring project holds the shared
+# data networks as `external`, and a bridge with an endpoint attached cannot be
+# removed. Skipping it strands the topology change half-applied.
+expect_call "docker takes the project down with its orphans" docker \
+  "$(mon) rt_monitoring_down" 'down --remove-orphans'
+expect_call "podman stops each named unit" podman \
+  "$(mon) rt_monitoring_down" 'systemctl --user stop loki.service'
+expect_call "docker asks the project label whether anything runs" docker \
+  "$(mon) rt_monitoring_is_running" 'label=com.docker.compose.project=iri-monitoring'
+expect_call "a monitoring recreate touches one service only" podman \
+  "$(mon) rt_monitoring_recreate loki" 'systemctl --user restart loki.service'
+expect_no_call "...and never the whole plane" podman \
+  "$(mon) rt_monitoring_recreate loki" 'start prometheus.service'
+
+say ""
+say "== taking the app stack down, which only a topology change needs =="
+expect_call "docker uses the app project's own file" docker \
+  'rt_apply_stack >/dev/null; rt_stack_down' 'down --remove-orphans'
+# Reverse order: a dependent has to stop before the thing it depends on, or the
+# database is pulled out from under a service still talking to it.
+got="$(run_rt podman 'RT_STACK_SERVICES="db-backend keycloak frontend" rt_stack_down' 2>/dev/null; grep -o 'stop [a-z-]*\.service' "$LOG" | tr '\n' ' ')"
+if [[ "$got" == *"stop frontend.service stop keycloak.service stop db-backend.service"* ]]; then
+  ok "podman stops them in reverse dependency order"
+else
+  bad "stop order was '${got}', wanted frontend, keycloak, db-backend"
+fi
+
+say ""
 say "== credentials never reach a command line =="
 printf 'hunter2\n' > "${WORK}/token"
 expect_call "the password is piped, not passed" podman \
