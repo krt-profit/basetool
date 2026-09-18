@@ -274,32 +274,49 @@ rt_apply() {
 }
 
 # -----------------------------------------------------------------------------
-# rt_pull_refs <image-reference>...
+# rt_pull <service>=<reference>...
 #
-# Pre-pull specific images by reference. Deliberately by REFERENCE and not by
-# service: the point is to pull only what this deploy moves. The third-party
-# infra images are pinned by digest and change only on a deliberate config edit,
-# and pulling them here would make every deploy hostage to a transient outage of
-# a registry this project does not control — a quay.io 502 on the Keycloak
-# manifest aborting the run before `up` ever gets to reuse the image that is
-# already on disk.
+# Pre-pull the images this release moves, named as `service=reference` pairs.
 #
-# Compose can express that with a service list; podman takes the references
-# straight. A failed pull is NOT fatal here for the same reason: the apply below
-# pulls anything genuinely missing, so a transient failure costs a slower apply
-# rather than a failed deploy.
+# Only the images this deploy moves: the third-party infra images are pinned by
+# digest and change only on a deliberate config edit, and pulling them here would
+# make every deploy hostage to a transient outage of a registry this project does
+# not control — a quay.io 502 on the Keycloak manifest aborting the run before
+# the apply ever gets to reuse the image that is already on disk.
+#
+# WHY A PAIR, when each runtime only needs one half of it. Because the two halves
+# are not interchangeable and an earlier version of this function let them look
+# as if they were: it took REFERENCES, its single call site passed SERVICE NAMES,
+# and both were right for Docker. `docker compose pull backend` resolves the name
+# through the compose file to that service's pinned image. Podman has no compose
+# file and no project, so the same argument became `podman pull backend` — a bare
+# name resolved against the host's unqualified-search registries (on Rocky:
+# registry.access.redhat.com, registry.redhat.io, docker.io), which fails, or
+# succeeds against a stranger's image of the same name. Measured 2026-09-18 in
+# scripts/deploy.test.sh: the run aborted at "pulling images" and never reached
+# the apply, because the call site runs under `set -e`. Taking the pair makes
+# that mismatch unrepresentable — neither arm has to infer the other's half.
+#
+# A failed pull IS fatal, by way of that same `set -e` at the call site, and that
+# is deliberate: these three images ARE the release. What must not be fatal is a
+# third-party registry hiccup, and that is handled by not pulling infra here at
+# all rather than by swallowing errors.
 # -----------------------------------------------------------------------------
-rt_pull_refs() {
-  local ref rc=0
+rt_pull() {
+  local pair rc=0
   case "${RT_BACKEND}" in
     docker)
+      local -a svcs=()
+      for pair in "$@"; do svcs+=("${pair%%=*}"); done
       docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
         ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
-        --profile "${RT_PROFILE:-prod}" pull --quiet "$@" || rc=1
+        --profile "${RT_PROFILE:-prod}" pull --quiet "${svcs[@]}" || rc=1
       ;;
     podman)
-      for ref in "$@"; do
-        ${RT_CLI} pull --quiet "${ref}" >/dev/null 2>&1 || rc=1
+      # Every one is attempted even after the first failure, so the journal names
+      # each image that could not be fetched instead of only the earliest.
+      for pair in "$@"; do
+        ${RT_CLI} pull --quiet "${pair#*=}" >/dev/null 2>&1 || rc=1
       done
       ;;
   esac

@@ -107,6 +107,11 @@
   beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
   gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
 
+- **Betrieb: der Deploy hätte auf dem Podman-Host jedes Mal abgebrochen.** Vor dem Anwenden lädt
+  `deploy.sh` die drei Anwendungs-Images vor; unter Podman bekam der Befehl statt der Image-Adresse
+  den Dienstnamen und scheiterte, was den ganzen Lauf beendete. Der Test dafür akzeptierte jede
+  Eingabe und meldete grün — er verlangt jetzt eine echte Image-Adresse.
+
 - **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
   langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf
   Touch-Geräten schlicht wirkungslos. Jetzt nimmt ein kurzes Halten die Zeile auf und der Finger

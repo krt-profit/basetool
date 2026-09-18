@@ -203,6 +203,144 @@ FAKE
   printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/flock"
   chmod +x "${T_FAKE_BIN}/flock"
 
+  # --- the Podman shape ------------------------------------------------------
+  #
+  # Production serves on Docker until the cutover and the new host serves on
+  # rootless Podman, so the deployer has TWO live shapes and only one of them was
+  # ever exercised here. These stubs are the second.
+  #
+  # They record into the same log, so the existing assert helpers work unchanged
+  # for both: what an assertion is about is the DECISION the deployer took, not
+  # which binary carried it out.
+  cat > "${T_FAKE_BIN}/podman" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'podman %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+
+lookup() { local var="$1_$2"; printf '%s' "${!var:-}"; }
+
+case "${1:-}" in
+  login) cat > /dev/null; exit 0 ;;
+  ps)
+    # Quadlet stamps PODMAN_SYSTEMD_UNIT on every container it starts, and the
+    # deployer filters on that label rather than on the name.
+    svc=""
+    for a in "$@"; do
+      case "$a" in
+        label=PODMAN_SYSTEMD_UNIT=*) svc="${a#label=PODMAN_SYSTEMD_UNIT=}"; svc="${svc%.service}" ;;
+      esac
+    done
+    if [[ -n "${svc}" ]]; then
+      val="$(lookup FAKE_PS "${svc}")"
+      if [[ -n "${val}" ]]; then printf '%s\n' "${val}"; fi
+    elif [[ -n "${FAKE_EDGE_PS:-}" ]]; then
+      printf '%s\n' "${FAKE_EDGE_PS}"
+    fi
+    exit 0
+    ;;
+  inspect)
+    cid="${!#}"
+    case "$*" in
+      *RepoDigests*) printf '%s\n' "$(lookup FAKE_REPODIGESTS "${cid#img-cid-}")" ;;
+      *.Image*)      printf 'img-%s\n' "${cid}" ;;
+      *)             printf 'false|%s\n' "$(lookup FAKE_STATE "${cid#cid-}")" ;;
+    esac
+    exit 0
+    ;;
+  image)
+    img="${!#}"
+    printf '%s\n' "$(lookup FAKE_REPODIGESTS "${img#img-cid-}")"
+    exit 0
+    ;;
+  create) echo "created-cid"; exit 0 ;;
+  pull)
+    # What deploy.sh asks podman to pull has to be a REFERENCE. Under compose a
+    # SERVICE name is enough, because compose maps it to that service's pinned
+    # image; podman has no such mapping, so a bare `backend` is resolved against
+    # the host's unqualified-search registries -- on Rocky that is
+    # registry.access.redhat.com, registry.redhat.io and docker.io -- and either
+    # fails or, worse, succeeds against a stranger's image.
+    #
+    # A stub that exited 0 for anything would let that ship: the deployer would
+    # look tested and abort at "pulling images" on the real host.
+    ref=""
+    for a in "$@"; do
+      case "$a" in
+        pull | --quiet | -q) ;;
+        *) ref="$a" ;;
+      esac
+    done
+    case "${ref}" in
+      */*@sha256:*) ;;
+      *)
+        echo "Error: invalid reference \"${ref}\": a bare name is not a pullable image reference" >&2
+        exit 125
+        ;;
+    esac
+    exit "${FAKE_PULL_RC:-0}"
+    ;;
+  *)      exit 0 ;;
+esac
+FAKE
+  chmod +x "${T_FAKE_BIN}/podman"
+
+  # skopeo replaces `docker buildx imagetools inspect`: it resolves a tag to a
+  # digest WITHOUT pulling, which is the property the deployer depends on.
+  cat > "${T_FAKE_BIN}/skopeo" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'skopeo %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+case "$*" in
+  *basetool-backend:*)      d="${FAKE_REMOTE_BACKEND}" ;;
+  *basetool-frontend:*)     d="${FAKE_REMOTE_FRONTEND}" ;;
+  *basetool-ingest:*)       d="${FAKE_REMOTE_INGEST}" ;;
+  *basetool-config:*)       d="${FAKE_REMOTE_CONFIG}" ;;
+  *basetool-keycloak-spi:*) d="${FAKE_REMOTE_KCSPI}" ;;
+  *) exit 1 ;;
+esac
+printf '{"Digest":"%s"}\n' "$d"
+FAKE
+  chmod +x "${T_FAKE_BIN}/skopeo"
+
+  # `systemctl --user start <unit>` IS the health gate under Quadlet: Notify=healthy
+  # makes the unit Type=notify, so the call blocks until podman reports healthy and
+  # returns non-zero when it does not. FAKE_UP_RC models exactly that -- the same
+  # variable the compose `up --wait` arm uses, because it is the same decision.
+  cat > "${T_FAKE_BIN}/systemctl" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'systemctl %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+case "$*" in
+  *daemon-reload*) exit 0 ;;
+  *start*|*restart*)
+    # FAKE_UNHEALTHY_DIGEST models ONE broken release rather than a broken host:
+    # the unit whose digest-pin drop-in binds that digest never reports healthy,
+    # every other unit does. A flat FAKE_UP_RC=1 would fail the rollback's own
+    # start too, and "rolled back" and "rollback also failed" would stop being
+    # distinguishable -- which is exactly the pair a rollback test is about.
+    if [[ -n "${FAKE_UNHEALTHY_DIGEST:-}" && -n "${RT_UNIT_DIR:-}" ]]; then
+      unit=""
+      for a in "$@"; do
+        case "$a" in *.service) unit="${a%.service}" ;; esac
+      done
+      pin="${RT_UNIT_DIR}/${unit}.container.d/10-digest-pin.conf"
+      if [[ -n "${unit}" && -f "${pin}" ]] && grep -q "${FAKE_UNHEALTHY_DIGEST}" "${pin}"; then
+        echo "Job for ${unit}.service failed: start operation timed out" >&2
+        exit 1
+      fi
+    fi
+    exit "${FAKE_UP_RC:-0}"
+    ;;
+esac
+exit 0
+FAKE
+  chmod +x "${T_FAKE_BIN}/systemctl"
+
+  # The Quadlet generator. Its PRESENCE is what the pre-flight asserts: a host
+  # without it cannot turn .container files into services at all.
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/quadlet"
+  chmod +x "${T_FAKE_BIN}/quadlet"
+
   # Stub cosign for the host-side signature gate (REQ-OPS-015). Records the
   # invocation and exits FAKE_COSIGN_RC (default 0 = signature trusted); a
   # scenario sets FAKE_COSIGN_RC=1 to model a verification failure (a :stable
@@ -1379,6 +1517,225 @@ scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected
 scenario_check_only_noop_verifies
 scenario_check_only_verify_fail
+
+# ---------------------------------------------------------------------------
+# The Podman shape.
+#
+# Everything above exercises Docker. Both runtimes are live at once -- production
+# serves on Docker until the cutover, the new host serves on rootless Podman --
+# and a deployer path that has never run is a path nobody has tested, whatever it
+# looks like on the page.
+#
+# Digests here are real-shaped (64 hex characters) and not the readable
+# `sha256:backend-current` the Docker scenarios use, because they have to be: the
+# Podman resolver parses skopeo's JSON with a sed pattern that requires exactly
+# 64 hex characters and silently yields nothing for anything shorter. A test that
+# fed it the short form would exercise the failure path while reading like the
+# happy one.
+# ---------------------------------------------------------------------------
+
+# A readable 64-hex digest: the tag, then zero padding.
+hexdig() {
+  local tag="$1" pad=""
+  while (( ${#tag} + ${#pad} < 64 )); do pad="${pad}0"; done
+  printf 'sha256:%s%s' "${tag}" "${pad}"
+}
+
+PDIG_BACKEND="$(hexdig beef)"
+PDIG_FRONTEND="$(hexdig face)"
+PDIG_INGEST="$(hexdig 1ce)"
+PDIG_CONFIG="$(hexdig c0ffee)"
+PDIG_KCSPI="$(hexdig 5b1)"
+PDIG_BACKEND_NEW="$(hexdig dead)"
+PMARKER="${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDIG_KCSPI}"
+# The marker of a host still on the OLD backend: config and keycloak-spi match the
+# registry, so a deploy from here moves the app images only and never enters the
+# config-bundle extraction path.
+PMARKER_OLD="$(hexdig ba5e)|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDIG_KCSPI}"
+
+# Everything a scenario needs to drive the Podman arm: the backend forced, the
+# Quadlet generator pointed at the stub, and a unit directory that exists --
+# the pre-flight refuses a host where it does not.
+podman_env() {
+  printf '%s\n' \
+    "RT_BACKEND=podman" \
+    "IRI_QUADLET_BIN=${T_FAKE_BIN}/quadlet" \
+    "RT_UNIT_DIR=${T_UNIT_DIR}" \
+    "FAKE_REMOTE_BACKEND=${PDIG_BACKEND}" \
+    "FAKE_REMOTE_FRONTEND=${PDIG_FRONTEND}" \
+    "FAKE_REMOTE_INGEST=${PDIG_INGEST}" \
+    "FAKE_REMOTE_CONFIG=${PDIG_CONFIG}" \
+    "FAKE_REMOTE_KCSPI=${PDIG_KCSPI}"
+}
+
+# A converged Podman host: three running containers whose images carry the
+# digests the registry is serving.
+podman_converged_env() {
+  printf '%s\n' \
+    "FAKE_PS_backend=cid-backend" \
+    "FAKE_PS_frontend=cid-frontend" \
+    "FAKE_PS_ingest=cid-ingest" \
+    "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@${PDIG_BACKEND}" \
+    "FAKE_REPODIGESTS_frontend=ghcr.io/krt-profit/basetool-frontend@${PDIG_FRONTEND}" \
+    "FAKE_REPODIGESTS_ingest=ghcr.io/krt-profit/basetool-ingest@${PDIG_INGEST}"
+}
+
+# Creates the Quadlet unit directory the pre-flight insists on and exports its
+# path. Called after setup_host, before podman_env is expanded.
+podman_units() {
+  T_UNIT_DIR="${1}/units"
+  mkdir -p "${T_UNIT_DIR}"
+}
+
+scenario_podman_resolves_without_pulling() {
+  echo "Scenario: podman resolves a tag through skopeo, and never pulls to do it"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a converged stack exits 0"
+  assert_contains "container runtime: podman" "podman: the runtime is detected as podman"
+  assert_docker "skopeo inspect" "podman: the tag is resolved with skopeo"
+  assert_no_docker "buildx" "podman: buildx is never reached for a digest"
+  assert_no_docker "podman pull" "podman: resolving a tag does not PULL the image"
+  assert_no_docker "compose" "podman: compose is never invoked"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_applies_through_systemd() {
+  echo "Scenario: podman applies through systemd, and the unit start IS the health gate"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a deploy that moves the backend exits 0"
+  assert_contains "deploy successful" "podman: the deploy reports success"
+  # There is no --wait to pass: Notify=healthy makes each unit Type=notify, so
+  # `systemctl start` does not return until podman reports the container healthy.
+  assert_docker "systemctl --user daemon-reload" "podman: the units are re-read before anything starts"
+  assert_docker "systemctl --user start backend.service" "podman: the service is started through systemd"
+  assert_no_docker "compose" "podman: compose is never invoked on the apply path"
+  if grep -q "${PMARKER}" "${T_STATE_DIR}/last-deployed.digests"; then
+    record 1 "podman: the idempotence marker advances to the new target"
+  else
+    record 0 "podman: the idempotence marker advances to the new target"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_pin_is_a_dropin() {
+  echo "Scenario: the digest pin is a Quadlet drop-in, not just a record"
+  local tmp
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" >/dev/null 2>&1 || true
+  local pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
+  if [[ -f "${pin}" ]] \
+    && grep -q '^\[Container\]$' "${pin}" \
+    && grep -q "^Image=.*@${PDIG_BACKEND}\$" "${pin}"; then
+    record 1 "podman: the pin is a [Container] drop-in binding Image= by digest"
+  else
+    record 0 "podman: the pin is a [Container] drop-in binding Image= by digest"
+  fi
+  # The record is written too -- it is the only place the PREVIOUS digests
+  # survive once the drop-ins have been overwritten, so a rollback needs it.
+  if grep -rq "${PDIG_BACKEND}" "${T_STATE_DIR}"/*.yml 2>/dev/null; then
+    record 1 "podman: the pin record is written beside the drop-ins"
+  else
+    record 0 "podman: the pin record is written beside the drop-ins"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_health_gate_rolls_back() {
+  echo "Scenario: a unit that never reports healthy rolls the release BACK, not forward"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  # A first deploy that succeeds, so a previous pin exists to roll back TO.
+  run_deploy -- "${pod[@]}" "${conv[@]}" >/dev/null 2>&1 || true
+  local pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
+
+  # Now a new backend digest whose unit never reaches healthy. The stub refuses
+  # to start exactly the unit whose drop-in binds the broken digest -- which is
+  # what a failed `Notify=healthy` start is -- so the rollback's own start can
+  # succeed and the two outcomes stay distinguishable.
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_REMOTE_BACKEND=${PDIG_BACKEND_NEW}" \
+    "FAKE_UNHEALTHY_DIGEST=${PDIG_BACKEND_NEW}" || rc=$?
+  assert_exit 1 "$rc" "podman: a failed health gate exits non-zero"
+  assert_contains "rolling back" "podman: the failed release is rolled back"
+  assert_contains "rolled back to previous digest pin successfully" \
+    "podman: the rollback's own apply reaches health"
+  # The rollback is only real if the DROP-IN went back with the record. Under
+  # Quadlet the record binds nothing; restoring it alone would leave the failed
+  # digest bound and roll silently FORWARD into the release that just failed.
+  if grep -q "${PDIG_BACKEND_NEW}" "${pin}" 2>/dev/null; then
+    record 0 "podman: the drop-in is rebound away from the failed digest"
+  elif grep -q "${PDIG_BACKEND}" "${pin}" 2>/dev/null; then
+    record 1 "podman: the drop-in is rebound away from the failed digest"
+  else
+    record 0 "podman: the drop-in is rebound away from the failed digest"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_refuses_without_skopeo() {
+  echo "Scenario: a podman host without skopeo refuses instead of proceeding"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  rm -f "${T_FAKE_BIN}/skopeo"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a host without skopeo refuses"
+  assert_contains "skopeo not available" "podman: and names the missing tool"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_refuses_without_quadlet() {
+  echo "Scenario: a podman host whose Quadlet generator is missing refuses"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  # Point the override at a path that does not exist. Without the generator a
+  # .container file is an inert text file and nothing can ever start.
+  run_deploy -- "${pod[@]}" "${conv[@]}" "IRI_QUADLET_BIN=${tmp}/no-such-quadlet" || rc=$?
+  assert_exit 1 "$rc" "podman: a host without the Quadlet generator refuses"
+  assert_contains "Quadlet generator is missing" "podman: and says which piece is absent"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_resolves_without_pulling
+scenario_podman_applies_through_systemd
+scenario_podman_pin_is_a_dropin
+scenario_podman_health_gate_rolls_back
+scenario_podman_refuses_without_skopeo
+scenario_podman_refuses_without_quadlet
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

@@ -879,8 +879,18 @@ case "${RT_BACKEND}" in
     # saying so here beats discovering it halfway through an apply.
     command -v skopeo >/dev/null 2>&1 \
       || fail "skopeo not available; it is how a tag is resolved without pulling (ansible role: 10-packages.yml)"
-    [[ -x /usr/libexec/podman/quadlet ]] \
-      || fail "the Quadlet generator is missing; this host cannot turn .container files into services"
+    # A LIST, not one path: Fedora/RHEL/Rocky ship the generator at
+    # /usr/libexec/podman/quadlet and Debian at /usr/lib/podman/quadlet. Hardcoding
+    # either one is a latent failure on the other, and this project has already
+    # changed platform twice. IRI_QUADLET_BIN overrides it outright.
+    QUADLET_BIN="${IRI_QUADLET_BIN:-}"
+    if [[ -z "${QUADLET_BIN}" ]]; then
+      for candidate in /usr/libexec/podman/quadlet /usr/lib/podman/quadlet; do
+        [[ -x "${candidate}" ]] && { QUADLET_BIN="${candidate}"; break; }
+      done
+    fi
+    [[ -n "${QUADLET_BIN}" && -x "${QUADLET_BIN}" ]] \
+      || fail "the Quadlet generator is missing (looked in /usr/libexec/podman and /usr/lib/podman); this host cannot turn .container files into services"
     [[ -n "${RT_UNIT_DIR}" && -d "${RT_UNIT_DIR}" ]] \
       || fail "no Quadlet unit directory found (${RT_UNIT_DIR:-unset}) — has the stack been installed?"
     ;;
@@ -1545,7 +1555,10 @@ cd "${COMPOSE_DIR}"
 # digest bump is rolled forward — an already-present pinned image is simply
 # reused offline.
 log "pulling images"
-RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull_refs backend frontend ingest
+RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
+  "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # A network-topology change (detected above) cannot be applied in place — take the
 # whole stack down first so the `up` below recreates the bridges on the compose's

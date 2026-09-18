@@ -218,6 +218,35 @@ expect_out  "docker reports failure the same way" docker \
   'STUB_FAIL="up_-d" rt_apply backend; echo "rc=$?"' 'rc=1'
 
 say ""
+say "== pre-pulling the release, where a service name and a reference are NOT the same thing =="
+# The regression this section exists for. rt_pull used to take REFERENCES while
+# its only call site passed SERVICE NAMES, and both were correct under Docker:
+# `docker compose pull backend` resolves the name through the compose file.
+# Podman has no compose file, so the identical argument became `podman pull
+# backend` -- a bare name resolved against the host's unqualified-search
+# registries -- which fails and, at a call site running under `set -e`, aborted
+# every Podman deploy at "pulling images". It now takes the pair.
+PULL_PAIRS="'backend=ghcr.io/krt-profit/basetool-backend@sha256:3333333333333333333333333333333333333333333333333333333333333333' 'ingest=ghcr.io/krt-profit/basetool-ingest@sha256:4444444444444444444444444444444444444444444444444444444444444444'"
+expect_call "docker hands compose the SERVICE names it can resolve" docker \
+  "rt_pull ${PULL_PAIRS}" 'pull --quiet backend ingest'
+expect_no_call "...and never a reference, which compose has no argument for" docker \
+  "rt_pull ${PULL_PAIRS}" '@sha256:'
+expect_call "podman pulls the REFERENCE, the only form it can resolve" podman \
+  "rt_pull ${PULL_PAIRS}" \
+  'pull --quiet ghcr.io/krt-profit/basetool-backend@sha256:3333333333333333333333333333333333333333333333333333333333333333'
+expect_no_call "...and never the bare service name" podman \
+  "rt_pull ${PULL_PAIRS}" 'pull --quiet backend'
+expect_call "every image is attempted, so the journal names all of them" podman \
+  "rt_pull ${PULL_PAIRS}" \
+  'pull --quiet ghcr.io/krt-profit/basetool-ingest@sha256:4444444444444444444444444444444444444444444444444444444444444444'
+expect_out "a failed pull is reported, because these three images ARE the release" podman \
+  "STUB_FAIL='pull' rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=1'
+expect_out "docker reports it the same way" docker \
+  "STUB_FAIL='pull_--quiet' rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=1'
+expect_out "...and success stays success" podman \
+  "rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=0'
+
+say ""
 say "== finding the containers that belong to a service =="
 expect_call "docker asks compose, which knows the project" docker \
   'rt_service_container_ids backend' 'ps -aq backend'
