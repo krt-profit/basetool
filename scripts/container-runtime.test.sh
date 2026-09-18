@@ -53,7 +53,7 @@ STUB
 }
 
 make_stub docker 'case "$*" in
-  *"buildx imagetools"*) echo "{\"digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\"}" ;;
+  *"buildx imagetools"*) echo "sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
   *"ps -aq"*) echo "cid-docker-1" ;;
   *"inspect --format"*) echo "False|running/healthy" ;;
   *create*) echo "created-cid" ;;
@@ -253,6 +253,10 @@ say ""
 say "== lifting a file out of an image without running it =="
 expect_call "podman creates, copies, and removes" podman \
   'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a /b'
+# The bundle images declare no CMD and no ENTRYPOINT, so `create` refuses them
+# without an argument -- one that is never executed, but has to be there.
+expect_call "a command reaches create, for an image that declares none" podman \
+  'rt_extract_from_image img:tag /a /b /bundle' 'create img:tag /bundle'
 expect_call "the container is removed even when the copy FAILS" podman \
   'STUB_FAIL="cp_created-cid" rt_extract_from_image img:tag /a /b' 'rm -f created-cid'
 expect_out  "...and the failure is still reported" podman \

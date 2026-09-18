@@ -45,7 +45,13 @@ RT_SYSTEMCTL="${RT_SYSTEMCTL:-}"
 #: Where Quadlet reads unit files from, for the Podman backend.
 RT_UNIT_DIR="${RT_UNIT_DIR:-}"
 
+# Defers to the caller's own `fail` when it has one, so a sourcing script keeps
+# its logging and its exit path instead of dying differently depending on which
+# layer happened to notice.
 rt_die() {
+  if declare -F fail >/dev/null 2>&1; then
+    fail "$*"
+  fi
   printf 'container-runtime: %s\n' "$*" >&2
   exit 1
 }
@@ -132,9 +138,11 @@ rt_resolve_digest() {
   local ref="$1" out
   case "${RT_BACKEND}" in
     docker)
-      out="$(docker buildx imagetools inspect "${ref}" --format '{{json .Manifest}}' 2>/dev/null)" || return 1
-      # The digest is the manifest's own, which is what `@sha256:` addresses.
-      printf '%s' "${out}" | sed -n 's/.*"digest"[[:space:]]*:[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' | head -1
+      # The manifest's own digest, which is what `@sha256:` addresses. Works for
+      # a multi-arch list (returns the index digest) and a single manifest alike.
+      # This exact form is what deploy.sh has been using and what its 159 tests
+      # already pin, so the seam adopts it rather than introducing a second one.
+      docker buildx imagetools inspect "${ref}" --format '{{.Manifest.Digest}}' 2>/dev/null
       ;;
     podman)
       command -v skopeo >/dev/null 2>&1 || rt_die "skopeo is not installed; it is how a tag is resolved without pulling"
@@ -282,16 +290,25 @@ rt_exec() {
 }
 
 # -----------------------------------------------------------------------------
-# rt_extract_from_image <image-ref> <path-in-image> <destination-on-host>
+# rt_extract_from_image <image-ref> <path-in-image> <destination-on-host> [command]
 #
 # Lift one file out of an image without running it — how the Keycloak provider
 # JAR and the config bundle are staged. create/cp/rm is identical in both CLIs;
 # the container is removed even when the copy fails, so a failed deploy does not
 # leave a created-but-never-started container behind on every tick.
+#
+# The optional command matters even though it never runs: `create` refuses an
+# image declaring neither CMD nor ENTRYPOINT with "no command specified", and the
+# bundle images are exactly that — a filesystem with no process. Both CLIs accept
+# an argument they will never execute.
 # -----------------------------------------------------------------------------
 rt_extract_from_image() {
-  local ref="$1" src="$2" dst="$3" cid rc=0
-  cid="$(${RT_CLI} create "${ref}" 2>/dev/null)" || return 1
+  local ref="$1" src="$2" dst="$3" cmd="${4:-}" cid rc=0
+  if [[ -n "${cmd}" ]]; then
+    cid="$(${RT_CLI} create "${ref}" "${cmd}" 2>/dev/null)" || return 1
+  else
+    cid="$(${RT_CLI} create "${ref}" 2>/dev/null)" || return 1
+  fi
   ${RT_CLI} cp "${cid}:${src}" "${dst}" || rc=1
   ${RT_CLI} rm -f "${cid}" >/dev/null 2>&1 || true
   return "${rc}"
