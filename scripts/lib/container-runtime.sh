@@ -264,6 +264,118 @@ rt_apply() {
 }
 
 # -----------------------------------------------------------------------------
+# rt_pull_refs <image-reference>...
+#
+# Pre-pull specific images by reference. Deliberately by REFERENCE and not by
+# service: the point is to pull only what this deploy moves. The third-party
+# infra images are pinned by digest and change only on a deliberate config edit,
+# and pulling them here would make every deploy hostage to a transient outage of
+# a registry this project does not control — a quay.io 502 on the Keycloak
+# manifest aborting the run before `up` ever gets to reuse the image that is
+# already on disk.
+#
+# Compose can express that with a service list; podman takes the references
+# straight. A failed pull is NOT fatal here for the same reason: the apply below
+# pulls anything genuinely missing, so a transient failure costs a slower apply
+# rather than a failed deploy.
+# -----------------------------------------------------------------------------
+rt_pull_refs() {
+  local ref rc=0
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
+        --profile "${RT_PROFILE:-prod}" pull --quiet "$@" || rc=1
+      ;;
+    podman)
+      for ref in "$@"; do
+        ${RT_CLI} pull --quiet "${ref}" >/dev/null 2>&1 || rc=1
+      done
+      ;;
+  esac
+  return "${rc}"
+}
+
+# -----------------------------------------------------------------------------
+# rt_apply_stack [service]...
+#
+# The release apply: bring the stack to the pinned digests and WAIT, bounded by
+# RT_HEALTH_TIMEOUT. With no arguments it applies the whole stack.
+#
+# The two shapes differ in where the pin lives, not in what is guaranteed.
+# Compose gets the pin as a second `-f` override; under Quadlet the pin is
+# already a drop-in on disk (see rt_pin_write), so the unit files ARE the pinned
+# state and a daemon-reload is what picks them up.
+#
+# `--remove-orphans` has no Quadlet analogue and needs none: a retired service
+# leaves no container behind once its unit is gone, because Quadlet only starts
+# what has a unit file.
+#
+# The wait: compose blocks on `--wait --wait-timeout`; systemd blocks because
+# `Notify=healthy` makes each unit Type=notify, bounded by the generated
+# `TimeoutStartSec=`. Passing RT_HEALTH_TIMEOUT to systemd would fight that
+# value, which is derived per service from its own health numbers, so it is
+# deliberately not forwarded.
+# -----------------------------------------------------------------------------
+rt_apply_stack() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose \
+        -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
+        --profile "${RT_PROFILE:-prod}" \
+        up -d --no-build --remove-orphans \
+           --wait --wait-timeout "${RT_HEALTH_TIMEOUT:-180}" "$@"
+      ;;
+    podman)
+      ${RT_SYSTEMCTL} daemon-reload || return 1
+      local svc rc=0
+      if [[ $# -eq 0 ]]; then
+        # "the whole stack" has to be named under Quadlet: there is no project to
+        # ask, so the caller supplies the list. Split explicitly into an array
+        # rather than relying on an unquoted expansion to do it.
+        local -a svcs=()
+        read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
+        set -- "${svcs[@]}"
+      fi
+      for svc in "$@"; do
+        ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+      done
+      return "${rc}"
+      ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
+# rt_recreate <service>
+#
+# Replace one service's container and wait for it to be healthy, without
+# touching its dependencies. This is the Keycloak provider-JAR path: the JAR is
+# staged on the host and only `kc.sh start` re-running the provider build picks
+# it up, so the container has to be recreated rather than restarted in place.
+#
+# Under Quadlet a restart IS a recreate: the generated ExecStart carries
+# `--replace --rm`, so the old container is removed and a new one is created from
+# the current unit on every start.
+# -----------------------------------------------------------------------------
+rt_recreate() {
+  case "${RT_BACKEND}" in
+    docker)
+      docker compose \
+        -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
+        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
+        --profile "${RT_PROFILE:-prod}" \
+        up -d --no-deps --force-recreate \
+           --wait --wait-timeout "${RT_HEALTH_TIMEOUT:-180}" "$1"
+      ;;
+    podman)
+      ${RT_SYSTEMCTL} daemon-reload || return 1
+      ${RT_SYSTEMCTL} restart "$1.service"
+      ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
 # rt_restart <service>
 #
 # The targeted restart for runtime-health drift: the right release, a sick
@@ -351,12 +463,119 @@ rt_pin_clear() {
 }
 
 # -----------------------------------------------------------------------------
+# rt_pin_record_pairs <record-file>
+#
+# Read a pin RECORD back into `service=reference` lines.
+#
+# The record is the compose override this deployer has always written, and it
+# stays the single source of truth under both runtimes: a small YAML file under
+# the state directory naming three services and their digests. This function
+# round-trips OUR OWN generated output — a fixed, machine-written shape — and is
+# deliberately not a YAML parser.
+# -----------------------------------------------------------------------------
+rt_pin_record_pairs() {
+  awk '
+    /^  [a-z][a-z0-9-]*:[[:space:]]*$/ { svc = $1; sub(/:$/, "", svc); next }
+    /^    image:[[:space:]]/          { if (svc != "") print svc "=" $2 }
+  ' "$1" 2>/dev/null
+}
+
+# -----------------------------------------------------------------------------
+# rt_pin_apply <service>=<reference>...
+#
+# Write the pin: the record, and — under Quadlet — the drop-ins that actually
+# bind it.
+#
+# Both halves matter and for different reasons. Compose reads the record
+# directly as a second `-f` override, so under Docker the record IS the pin.
+# Quadlet reads unit files, so the record alone would pin nothing; the drop-ins
+# are the binding and the record is what makes a ROLLBACK possible, because it
+# is the only place the previous digests survive once the drop-ins have been
+# overwritten.
+# -----------------------------------------------------------------------------
+rt_pin_apply() {
+  local pair svc ref
+  {
+    printf '# Auto-generated by scripts/deploy.sh. Do not edit by hand -- it is rewritten\n'
+    printf '# on every deploy. Pinning to the exact image digests makes a subsequent\n'
+    printf '# tag flip in the registry a no-op until the next deploy.sh run.\n'
+    printf 'services:\n'
+    for pair in "$@"; do
+      printf '  %s:\n    image: %s\n' "${pair%%=*}" "${pair#*=}"
+    done
+  } > "${RT_PIN_FILE:?RT_PIN_FILE is unset}"
+
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+  for pair in "$@"; do
+    svc="${pair%%=*}"; ref="${pair#*=}"
+    rt_pin_write "${svc}" "${ref}"
+  done
+}
+
+# -----------------------------------------------------------------------------
+# rt_pin_save
+# rt_pin_rollback
+#
+# The rollback anchor. `rt_pin_save` snapshots the live record before it is
+# overwritten; `rt_pin_rollback` puts it back — and under Quadlet re-materialises
+# the drop-ins from it, which is the half that would otherwise be missed.
+#
+# Copying the record alone and calling it a rollback is the trap: under Podman
+# the running stack is bound by the DROP-INS, so restoring only the record would
+# leave the new digests in place and the "rollback" would silently roll forward
+# into the very release whose health check had just failed.
+# -----------------------------------------------------------------------------
+rt_pin_save() {
+  [[ -f "${RT_PIN_FILE:?RT_PIN_FILE is unset}" ]] || return 0
+  cp "${RT_PIN_FILE}" "${RT_PIN_FILE_PREVIOUS:?RT_PIN_FILE_PREVIOUS is unset}"
+}
+
+rt_pin_rollback() {
+  [[ -f "${RT_PIN_FILE_PREVIOUS:?RT_PIN_FILE_PREVIOUS is unset}" ]] || return 1
+  cp "${RT_PIN_FILE_PREVIOUS}" "${RT_PIN_FILE:?RT_PIN_FILE is unset}"
+
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+  local pair
+  while IFS= read -r pair; do
+    [[ -n "${pair}" ]] || continue
+    rt_pin_write "${pair%%=*}" "${pair#*=}"
+  done < <(rt_pin_record_pairs "${RT_PIN_FILE}")
+}
+
+# -----------------------------------------------------------------------------
 # rt_prune
 #
 # Reclaim dangling images and unused networks. Deliberately NOT `system prune`:
 # that reaches volumes, and this stack's volumes hold the databases.
 # -----------------------------------------------------------------------------
-rt_prune() {
-  ${RT_CLI} image prune -f >/dev/null 2>&1 || true
+rt_prune_images() {
+  # `until=` keeps the images this deploy just pulled, which are the ones a
+  # rollback still needs. Best-effort: a stuck container reference can block a
+  # prune transiently, and that must not fail a deploy.
+  ${RT_CLI} image prune --force --filter "until=${1:-720h}" >/dev/null 2>&1 || true
+}
+
+rt_prune_networks() {
   ${RT_CLI} network prune -f >/dev/null 2>&1 || true
+}
+
+rt_prune() {
+  rt_prune_images
+  rt_prune_networks
+}
+
+# -----------------------------------------------------------------------------
+# rt_is_running <container-name>
+#
+# Whether a container of that exact name is running. Exact, not a substring: the
+# session that wrote this had `keystore.p1` match inside `keystore.p12` once, and
+# a prefix match here would report a stopped `edge` as running because
+# `edge-acme` was up.
+# -----------------------------------------------------------------------------
+rt_is_running() {
+  # Single quotes on purpose: the braces are a Go template the CLI expands, not a
+  # shell expression. Double quotes would let the shell eat it and send an empty
+  # format string, which prints every container's id and makes the exact match
+  # below never fire.
+  ${RT_CLI} ps --format '{{.Names}}' 2>/dev/null | grep -qx -- "$1"
 }

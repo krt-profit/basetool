@@ -250,6 +250,54 @@ run_rt podman 'rt_pin_write backend ghcr.io/x/backend@sha256:abc; rt_pin_clear b
 if [[ ! -f "$PIN" ]]; then ok "clearing the pin removes the file"; else bad "the pin survived rt_pin_clear"; fi
 
 say ""
+say "== the pin's TWO halves, and the rollback that has to restore both =="
+# The trap this section exists for: under Quadlet the running stack is bound by
+# the DROP-INS, not by the record. Restoring only the record on rollback leaves
+# the new digests bound, so the "rollback" silently rolls FORWARD into the very
+# release whose health check just failed.
+PINDIR="${WORK}/pinstate"; mkdir -p "$PINDIR"
+pin_env() {
+  printf 'export RT_PIN_FILE=%q RT_PIN_FILE_PREVIOUS=%q;' \
+    "${PINDIR}/current.yml" "${PINDIR}/previous.yml"
+}
+DROPIN="${WORK}/units/backend.container.d/10-digest-pin.conf"
+
+rm -rf "${WORK}/units" "$PINDIR"; mkdir -p "$PINDIR"
+run_rt podman "$(pin_env) rt_pin_apply backend=img@sha256:OLD ingest=img2@sha256:OLDI" >/dev/null 2>&1
+if grep -q 'image: img@sha256:OLD' "${PINDIR}/current.yml" 2>/dev/null; then
+  ok "the record names the pinned reference"
+else bad "the record does not name the reference: $(cat "${PINDIR}/current.yml" 2>/dev/null)"; fi
+if grep -q '^Image=img@sha256:OLD$' "$DROPIN" 2>/dev/null; then
+  ok "...and the drop-in binds it"
+else bad "the drop-in does not bind it"; fi
+
+# Round-trip: the record must read back into exactly what was written, because
+# that is the only place the previous digests survive an overwrite.
+got="$(run_rt podman "$(pin_env) rt_pin_record_pairs \"${PINDIR}/current.yml\"" 2>/dev/null | tr '\n' ' ')"
+if [[ "$got" == *"backend=img@sha256:OLD"* && "$got" == *"ingest=img2@sha256:OLDI"* ]]; then
+  ok "the record round-trips into service=reference pairs"
+else bad "the record did not round-trip: '${got}'"; fi
+
+# Now the sequence a real deploy runs: save, apply a NEW pin, then roll back.
+run_rt podman "$(pin_env) rt_pin_save; rt_pin_apply backend=img@sha256:NEW" >/dev/null 2>&1
+if grep -q '^Image=img@sha256:NEW$' "$DROPIN" 2>/dev/null; then
+  ok "applying a new pin rebinds the drop-in"
+else bad "the drop-in was not rebound to the new digest"; fi
+run_rt podman "$(pin_env) rt_pin_rollback" >/dev/null 2>&1
+if grep -q 'image: img@sha256:OLD' "${PINDIR}/current.yml" 2>/dev/null; then
+  ok "rollback restores the record"
+else bad "rollback did not restore the record"; fi
+if grep -q '^Image=img@sha256:OLD$' "$DROPIN" 2>/dev/null; then
+  ok "rollback ALSO rebinds the drop-in -- it rolls back, not forward"
+else
+  bad "rollback left the drop-in on the failed release: $(grep '^Image=' "$DROPIN" 2>/dev/null)"
+fi
+# And a rollback with no anchor must refuse rather than pretend.
+if run_rt podman "$(pin_env) rm -f \"${PINDIR}/previous.yml\"; rt_pin_rollback" >/dev/null 2>&1; then
+  bad "rollback reported success with no previous pin to roll back to"
+else ok "rollback with no anchor fails instead of silently doing nothing"; fi
+
+say ""
 say "== lifting a file out of an image without running it =="
 expect_call "podman creates, copies, and removes" podman \
   'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a /b'
@@ -266,7 +314,12 @@ say ""
 say "== pruning must never reach a volume, because they hold the databases =="
 expect_no_call "no system prune" podman 'rt_prune' 'system prune'
 expect_no_call "no volume prune" podman 'rt_prune' 'volume prune'
-expect_call    "images and networks only" podman 'rt_prune' 'image prune -f'
+expect_call    "images and networks only" podman 'rt_prune' 'image prune --force'
+# `until=` is what keeps the images this deploy just pulled -- the ones a rollback
+# still needs. Pruning those would make the rollback re-pull from a registry that
+# may be exactly what is broken.
+expect_call    "the age filter that protects the rollback images" podman \
+  'rt_prune_images 720h' 'image prune --force --filter until=720h'
 
 say ""
 say "== credentials never reach a command line =="

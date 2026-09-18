@@ -1316,7 +1316,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
   assert_contains "certificates differs" "the certificate drift is named in the log"
-  assert_docker "--force-recreate --no-deps edge" "the edge is recreated to load them"
+  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "the edge is recreated to load them"
   if [[ -s "${T_STATE_DIR}/edge/certs.sha256" ]]; then
     record 1 "the fingerprint is persisted for the next tick"
   else
@@ -1329,14 +1329,14 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "an unchanged tick succeeds"
-  assert_no_docker "--force-recreate --no-deps edge" "an unchanged certificate recreates nothing"
+  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unchanged certificate recreates nothing"
 
   # 3. acme renewed it.
   : > "${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
   assert_exit 0 "$rc" "the renewal tick succeeds"
-  assert_docker "--force-recreate --no-deps edge" "a renewed certificate is loaded"
+  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "a renewed certificate is loaded"
 
   # 4. The exec failed. "Could not tell" must not read as "no certificates" —
   #    sha256sum of an empty input is a valid hash, and folding it in would
@@ -1345,7 +1345,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
   assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
-  assert_no_docker "--force-recreate --no-deps edge" "an unreadable certificate recreates nothing"
+  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unreadable certificate recreates nothing"
 
   rm -rf "${tmp}"
 }
