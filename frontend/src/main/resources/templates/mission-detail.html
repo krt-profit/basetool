@@ -643,7 +643,15 @@
                         <th:block th:each="p : ${unassignedParticipants}">
                             <div th:replace="~{:: personRow(${p}, null, null)}"></div>
                         </th:block>
-                        <div class="drop-hint" th:if="${mission.canEdit}" th:text="#{mission.crew.pool.drophint}">Hierher ziehen = Zuweisung entfernen</div>
+                        <!-- Two-state hint (#1936): .hint-idle names the TAP path before the drag one
+                             (native HTML5 drag is inert on touch), and .hint-armed replaces it with the
+                             short call to action once a participant is selected elsewhere on the board.
+                             The swap is pure CSS (:has(.person-row.is-selected)) — no JS state to keep in
+                             sync across the board's innerHTML swaps. -->
+                        <div class="drop-hint" th:if="${mission.canEdit}">
+                            <span class="hint-idle" th:text="#{mission.crew.pool.drophint}">Teilnehmer antippen, dann hierher tippen</span>
+                            <span class="hint-armed" th:text="#{mission.crew.pool.taphint}">Hier tippen, um die Zuweisung zu entfernen</span>
+                        </div>
                         <p th:if="${!mission.canEdit and unassignedParticipants.isEmpty()}" class="desc" th:text="#{mission.participants.empty}">Keine Teilnehmer.</p>
                     </div>
                 </div>
@@ -700,7 +708,11 @@
                                     <div th:replace="~{:: personRow(${cp}, ${c}, ${unit})}"></div>
                                 </th:block>
                             </th:block>
-                            <div class="drop-hint" th:if="${mission.canEdit}" th:text="#{mission.crew.unit.drophint}">Teilnehmer hierher ziehen</div>
+                            <!-- Same two-state hint as the pool zone (#1936) — see the comment there. -->
+                            <div class="drop-hint" th:if="${mission.canEdit}">
+                                <span class="hint-idle" th:text="#{mission.crew.unit.drophint}">Teilnehmer antippen, dann hierher tippen</span>
+                                <span class="hint-armed" th:text="#{mission.crew.unit.taphint}">Hier tippen, um zuzuweisen</span>
+                            </div>
                             <p th:if="${!mission.canEdit and (unit.crew == null or unit.crew.isEmpty())}" class="desc" th:text="#{mission.unit.no_crew}">Keine Crew.</p>
                         </div>
                     </div>

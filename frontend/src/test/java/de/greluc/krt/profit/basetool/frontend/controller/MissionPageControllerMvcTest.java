@@ -531,6 +531,105 @@ class MissionPageControllerMvcTest {
         .doesNotContain("data-crew-id=\"" + ghostCrewId + "\"");
   }
 
+  /**
+   * The crew board's drop zones must advertise the click path, not only the drag one (#1936).
+   * Native HTML5 drag never fires from touch input, so hints reading "Teilnehmer hierher ziehen"
+   * told a phone user to perform the one gesture that cannot work and said nothing about the click
+   * fallback that has always worked. Each zone now renders a two-state hint — the idle instruction
+   * plus the armed call to action that CSS reveals while a participant is selected — and a zone's
+   * {@code aria-label} carries the same sentence as its visible idle text. Asserted in both bundles
+   * (German is the {@code CookieLocaleResolver} default, English via {@code ?lang=en}) so a
+   * half-translated rewording fails here rather than in production.
+   *
+   * @throws Exception if the MockMvc exchange fails
+   */
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void missionDetail_CrewBoardZones_AdvertiseTheClickPathNotOnlyDrag() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto participant =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionParticipantDto(
+            participantId,
+            null,
+            "Pool Person",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            de.greluc.krt.profit.basetool.frontend.model.PayoutPreference.PAYOUT,
+            1L);
+    // No crew: the participant sits in the pool and the unit zone is empty, so both hints render.
+    de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto unit =
+        new de.greluc.krt.profit.basetool.frontend.model.dto.MissionUnitDto(
+            UUID.randomUUID(),
+            "Alpha Unit",
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null,
+            java.util.List.of());
+
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+        .thenReturn(
+            missionWithUnitsAndParticipants(
+                missionId, java.util.Set.of(participant), java.util.List.of(unit)));
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+    stubEmptyFinance(missionId);
+
+    String de =
+        mockMvc
+            .perform(get("/missions/" + missionId))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    // Both hint states are wired per zone; .hint-armed is what the :has(.is-selected) rule
+    // reveals, so it must be in the markup even though it starts hidden.
+    assertThat(de).as("idle hint rendered").contains("class=\"hint-idle\"");
+    assertThat(de).as("armed hint rendered").contains("class=\"hint-armed\"");
+    // The instruction names tapping, and each zone's armed text says what the tap will do.
+    assertThat(de)
+        .as("idle hint names the click path")
+        .contains("Teilnehmer antippen, dann hierher tippen");
+    assertThat(de).as("unit zone armed call to action").contains("Hier tippen, um zuzuweisen");
+    assertThat(de)
+        .as("pool zone armed call to action")
+        .contains("Hier tippen, um die Zuweisung zu entfernen");
+    // aria-label overrides the zone's visible content for a screen reader, so it has to carry the
+    // same instruction rather than the old drag-only sentence.
+    assertThat(de)
+        .as("zone aria-label carries the click path too")
+        .contains("aria-label=\"Teilnehmer antippen, dann hierher tippen");
+    // A key missing from a bundle renders as ??key_locale?? and would otherwise ship unnoticed.
+    assertThat(de).as("no unresolved crew-board message key").doesNotContain("??mission.crew.");
+
+    String en =
+        mockMvc
+            .perform(get("/missions/" + missionId + "?lang=en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(en)
+        .as("English idle hint names the click path")
+        .contains("Tap a participant, then tap here");
+    assertThat(en).as("English unit zone armed call to action").contains("Tap here to assign");
+    assertThat(en)
+        .as("English pool zone armed call to action")
+        .contains("Tap here to remove the assignment");
+    assertThat(en).as("no unresolved crew-board message key").doesNotContain("??mission.crew.");
+  }
+
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_AsAuthenticated_ShouldShowParticipationColumn() throws Exception {

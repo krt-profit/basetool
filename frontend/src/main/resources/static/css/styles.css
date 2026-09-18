@@ -6175,8 +6175,26 @@ textarea:focus-visible,
     background: var(--color-surface-input);
     border: var(--border-hairline);
     cursor: grab;
+    /* #1936: on touch the browser's own long-press behaviour WAS the bug — it raised the
+       selection menu instead of starting a drag. `user-select` removes the selection UI the
+       Android menu hangs off, `-webkit-touch-callout` removes iOS's callout, and `touch-action`
+       concedes vertical panning and pinch-zoom to the browser so a swipe still scrolls the board
+       and pinch still zooms; the JS hold is what claims the gesture, not this declaration. The
+       cost is that a participant's name is no longer selectable text — the row is a drag handle
+       first, and the same name is selectable wherever it is rendered as prose. */
+    touch-action: pan-y pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 .person-row.is-selected {
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+}
+/* Lifted while a touch drag carries it: the finger covers the row, so the dimming is mostly
+   read at its edges and in the gap it leaves behind in the list. */
+.person-row.is-touch-dragging {
+    opacity: 0.55;
     border-color: var(--color-primary);
     box-shadow: var(--glow-primary);
 }
@@ -6242,6 +6260,38 @@ textarea:focus-visible,
 .drop-zone.is-over .drop-hint {
     border-color: var(--color-primary);
     color: var(--color-primary);
+}
+/* Idle / armed hint text (#1936). The zones must advertise the click path, not only the
+   drag one: a mobile browser never turns touch input into HTML5 drag events, so a hint
+   reading "drag participants here" left a phone user with no visible way in at all. While
+   a participant is selected every OTHER zone trades its instruction for the short call to
+   action, in the same accent the drag-over state uses. The zone that HOLDS the selection
+   keeps its idle text — dropping a person where they already are is the one move
+   moveParticipant refuses, so offering it would be a lie.
+
+   Selector, not a JS state class, on purpose: the board replaces its own innerHTML on
+   every crew mutation, and a class parked on the wrapper is one more thing that can
+   survive a swap it no longer describes. :has() cannot desync. */
+.drop-hint .hint-armed {
+    display: none;
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint
+    .hint-idle {
+    display: none;
+}
+#crew-board-results:has(.person-row.is-selected)
+    .drop-zone:not(:has(.person-row.is-selected))
+    .drop-hint
+    .hint-armed {
+    display: block;
 }
 
 /* Chip-styled inline select — uppercase label + orange chevron; reads like a

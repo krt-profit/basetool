@@ -100,6 +100,16 @@
   beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
   gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
 
+- **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
+  langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf
+  Touch-Geräten schlicht wirkungslos. Jetzt nimmt ein kurzes Halten die Zeile auf und der Finger
+  zieht sie in die Einheit; ein Wischen scrollt weiterhin (REQ-MISSION-005).
+
+- **Einsätze: das Crew-Board sagt jetzt, dass man Teilnehmer auch antippen kann.** Die Hinweise in
+  den Einheiten forderten nur zum Ziehen auf. Der Weg über Antippen gab es schon, er stand nur
+  nirgends: Die Hinweise nennen ihn jetzt zuerst, und sobald ein Teilnehmer ausgewählt ist, zeigt
+  jede Einheit „Hier tippen, um zuzuweisen“ (REQ-MISSION-005).
+
 - **Betrieb: dokumentierte Schalter erreichten den Container nicht.** Die Umgebungsvariablen der
   drei Aufräumläufe und dreier weiterer Einstellungen waren nirgends an das Backend durchgereicht
   — der dokumentierte Not-Aus vor dem ersten, unwiderruflichen Lauf blieb wirkungslos. Alle sind
