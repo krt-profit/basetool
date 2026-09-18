@@ -11,6 +11,8 @@ collections:
     # the case this bound exists for.
     version: ">=10.0.0,<12.0.0"
   - name: ansible.posix
+    # ansible.posix.selinux, used by 00-preflight.yml to put the host in enforcing mode rather than
+    # merely remark on it, and
     # ansible.posix.firewalld, used by 65-firewall.yml and 70-frontend.yml. Those tasks used to
     # shell out to `firewall-cmd`, which meant every one of them needed a hand-written
     # `changed_when` and a separate `--reload` task afterwards -- and ansible-lint was right that a

@@ -28,11 +28,48 @@
       PidsLimit= are silently decoration without it, and REQ-OPS-020's measured limits would not
       be applied. Found '{{ basetool_host_cgroup_fs.stdout.strip() }}'.
 
-- name: Warn when SELinux is not enforcing
+# This task was named "Warn when SELinux is not enforcing" and tested
+# `status != 'enabled'`, which is a different question: `status` says whether
+# SELinux is COMPILED IN and loaded, `mode` says whether it is ENFORCING. A
+# permissive host reports status=enabled, so the warning was silent on exactly
+# the configuration it was written for -- measured on the new production host
+# (rocky-16gb-nbg1-1) on 2026-09-18, which shipped from Hetzner permissive.
+#
+# It also only warned. ADR-0163 counts SELinux as the second confinement layer of
+# its security case, and a security case that depends on an operator reading a
+# debug line is not a control. The role sets the mode now, and asserts it.
+- name: Assert SELinux is present and loaded
+  ansible.builtin.assert:
+    that: ansible_facts['selinux']['status'] | default('disabled') == 'enabled'
+    fail_msg: >-
+      SELinux reports status '{{ ansible_facts['selinux']['status'] | default('absent') }}'.
+      ADR-0163 counts SELinux as the second confinement layer of its security case, and a
+      disabled policy cannot be turned on without a relabel and a reboot -- which this role will
+      not do behind your back. Re-image the host with SELinux enabled.
+    success_msg: "SELinux policy loaded ({{ ansible_facts['selinux']['type'] | default('unknown') }})"
+
+- name: Put SELinux in enforcing mode, persistently
+  ansible.posix.selinux:
+    policy: "{{ ansible_facts['selinux']['type'] | default('targeted') }}"
+    state: enforcing
+  register: basetool_host_selinux_set
+
+# A host that has been running permissive may carry files labelled wrongly --
+# permissive suppresses the DENIAL, it does not correct the label. Switching to
+# enforcing without a relabel is how a host boots into a state where sshd is fine
+# and something else is not. The relabel is scheduled rather than forced, and the
+# reboot stays the operator's: this role provisions, it does not take hosts down.
+- name: Schedule a filesystem relabel when the mode had to be changed
+  ansible.builtin.file:
+    path: /.autorelabel
+    state: touch
+    mode: "0644"
+  when: basetool_host_selinux_set.changed | default(false)
+
+- name: Say plainly that a reboot is owed
   ansible.builtin.debug:
     msg: >-
-      SELinux reports '{{ ansible_facts['selinux']['status'] | default('absent') }}'. This role's
-      file contexts still apply, but the second confinement layer ADR-0163 counts as part of its
-      security case is not in force. Do NOT set it permissive to make something work -- diagnose
-      with `ausearch -m AVC -ts recent`.
-  when: ansible_facts['selinux']['status'] | default('disabled') != 'enabled'
+      SELinux mode was changed to enforcing and /.autorelabel was created. The running kernel is
+      NOT relabelled yet -- reboot this host before it serves anything. It reboots twice: once to
+      relabel, once to come up on the new labels.
+  when: basetool_host_selinux_set.changed | default(false)
