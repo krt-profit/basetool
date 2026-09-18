@@ -91,6 +91,13 @@ groups:
       # already uses changes()). A genuine 4+ crash loop still fires after for:5m; a lone restart no
       # longer pages (single-restart faults stay covered by ContainerOomKilled / ContainerPidsHigh /
       # TargetDown). Locked by tests/containerrestartloop_changes_test.yml.
+      #
+      # NOT normalised, and it cannot be: the cgroup collector publishes no start time and
+      # neither does prometheus-podman-exporter's subset until it lands with
+      # `podman_container_started_seconds`. This alert therefore goes SILENT at the Podman
+      # cutover rather than wrong, and the intent is covered meanwhile by SystemdUnitFailed
+      # plus the unit-level restart counters -- Quadlet containers ARE systemd units, which is
+      # a signal this migration gains. See the mapping table in docs/PODMAN_MIGRATION_PLAN.md.
       - alert: ContainerRestartLoop
         expr: changes(container_start_time_seconds{name=~".+"}[15m]) > 3
         for: 5m
@@ -107,6 +114,12 @@ groups:
       # cAdvisor lost its labels. `container_last_seen{name=~".+"}` metric verified against cadvisor
       # v0.60.3.
       # baseline-tune: the < 10 floor assumes the current ~20-container footprint.
+      #
+      # Also not normalised: `container_last_seen` is a cAdvisor liveness series with no cgroup
+      # analogue. Under Podman the same question -- "is anything reporting container metrics at
+      # all" -- is answered by ContainerCgroupCollectorStale and
+      # ContainerCgroupCollectorFoundNothing in containers-runtime.yml, which is why those two
+      # exist rather than being folded into this one.
       - alert: ContainerMetricsMissing
         expr: >-
           count(container_last_seen{name=~".+"}) < 10
@@ -319,13 +332,15 @@ groups:
           severity: warning
         annotations:
           summary: "Container anonymous memory >90% of limit: {{ $labels.name }}"
-          description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check container_memory_working_set_bytes only to explain a gap, never to size."
+          description: "Container {{ $labels.name }} holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
 
       # A single core app container dropping out of cAdvisor (#1041 item 7, REQ-OBS-014). Complements
       # the global ContainerMetricsMissing above: fires when fewer than the 7 core containers report a
       # cAdvisor series (or all are gone), catching a single core container whose container-level
       # metrics vanished while the plane keeps ~20 total series. Warning (not critical) because a truly
       # down app container also pages TargetDown on its app scrape.
+      # cAdvisor-only, for the same reason as ContainerMetricsMissing above. The per-container
+      # half of this question survives the cutover through TargetDown and the app health gates.
       - alert: CoreContainerMetricsMissing
         expr: >-
           count(container_last_seen{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7

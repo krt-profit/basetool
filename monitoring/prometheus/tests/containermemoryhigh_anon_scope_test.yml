@@ -47,7 +47,7 @@ tests:
               name: blackbox-exporter
             exp_annotations:
               summary: "Container anonymous memory >90% of limit: blackbox-exporter"
-              description: "Container blackbox-exporter holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check container_memory_working_set_bytes only to explain a gap, never to size."
+              description: "Container blackbox-exporter holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
 
   # THE false-positive class this rule exists to kill. Alloy's working set peaked at 485.6 MiB of its
   # 512 MiB limit (94.8%) — but 183.9 MiB of that was its memory-mapped binary, re-charged to its cgroup
