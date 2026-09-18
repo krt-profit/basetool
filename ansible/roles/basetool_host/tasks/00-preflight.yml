@@ -59,14 +59,22 @@
 # enforcing without a relabel is how a host boots into a state where sshd is fine
 # and something else is not. The relabel is scheduled rather than forced, and the
 # reboot stays the operator's: this role provisions, it does not take hosts down.
-- name: Schedule a filesystem relabel when the mode had to be changed
+# Deliberately NOT a handler, and the difference is the whole point. A handler
+# fires at the END of the play, so any later task that failed would leave this
+# host ENFORCING with files still carrying permissive-era labels and no
+# /.autorelabel to correct them: the one state this block exists to prevent.
+# The flag is set the moment the mode changes, or not at all.
+- name: Schedule a filesystem relabel when the mode had to be changed  # noqa: no-handler
   ansible.builtin.file:
     path: /.autorelabel
     state: touch
     mode: "0644"
   when: basetool_host_selinux_set.changed | default(false)
 
-- name: Say plainly that a reboot is owed
+# Reports on the task above and has to be read next to it. Deferred to the end
+# of the play it would be separated from the change it explains by every other
+# task in the role.
+- name: Say plainly that a reboot is owed  # noqa: no-handler
   ansible.builtin.debug:
     msg: >-
       SELinux mode was changed to enforcing and /.autorelabel was created. The running kernel is

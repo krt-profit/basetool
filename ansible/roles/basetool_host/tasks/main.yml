@@ -17,7 +17,7 @@
   ansible.builtin.import_tasks: 10-packages.yml
   tags: [packages]
 
-- name: cosign, the host half of the supply-chain gate
+- name: Cosign, the host half of the supply-chain gate
   ansible.builtin.import_tasks: 15-cosign.yml
   tags: [packages, cosign]
 

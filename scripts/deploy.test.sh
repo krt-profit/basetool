@@ -54,6 +54,49 @@ mktmp() {
   mktemp -d "${TMPDIR:-/tmp}/deploy-sh-test.XXXXXX"
 }
 
+# --- a PATH that genuinely cannot reach one command ------------------------
+#
+# Deleting the stub does NOT make a tool absent: a GitHub runner carries a real
+# /usr/bin/skopeo, so the "host without skopeo" scenario ran against a working
+# host and then died on a real registry call -- green on a workstation with no
+# skopeo, red in CI, in the test whose entire subject is the tool being missing.
+# The same mistake, in the same shape, as the detection cases in
+# scripts/container-runtime.test.sh.
+#
+# The fix is a MIRROR of this host's PATH with one name left out: every command
+# deploy.sh could reach, minus skopeo. Hand-picking a coreutils list instead was
+# the obvious move and it is wrong -- a tool nobody thought of makes the script
+# exit 127 with no output, which looks nothing like the refusal under test.
+#
+# It needs real symlinks. Under MSYS (Git Bash on Windows) `ln -s` COPIES, and a
+# copied binary cannot find its DLLs, so the mirror is skipped there and the
+# scenario falls back to the ambient PATH. That is safe because the assertion is
+# made against whichever PATH is actually used: a host that has skopeo AND cannot
+# mirror fails loudly rather than quietly testing nothing.
+T_MINIMAL="$(mktemp -d "${TMPDIR:-/tmp}/deploy-sh-minimal.XXXXXX")"
+T_MINIMAL_OK=false
+if ln -s /dev/null "${T_MINIMAL}/.symprobe" 2>/dev/null && [[ -L "${T_MINIMAL}/.symprobe" ]]; then
+  rm -f "${T_MINIMAL}/.symprobe"
+  IFS=':' read -ra t_path_dirs <<< "${PATH}"
+  for t_dir in "${t_path_dirs[@]}"; do
+    [[ -d "${t_dir}" ]] || continue
+    for t_cmd in "${t_dir}"/*; do
+      [[ -f "${t_cmd}" && -x "${t_cmd}" ]] || continue
+      t_name="${t_cmd##*/}"
+      # The one omission, and the entire point of the mirror.
+      [[ "${t_name}" == "skopeo" ]] && continue
+      [[ -e "${T_MINIMAL}/${t_name}" ]] && continue
+      ln -s "${t_cmd}" "${T_MINIMAL}/${t_name}" 2>/dev/null || true
+    done
+  done
+  # A mirror that cannot run a shell is not a mirror.
+  if PATH="${T_MINIMAL}" env bash -c 'exit 0' >/dev/null 2>&1; then
+    T_MINIMAL_OK=true
+  fi
+fi
+rm -f "${T_MINIMAL}/.symprobe"
+trap 'rm -rf "${T_MINIMAL}"' EXIT
+
 # Builds a complete fake host layout under $1: compose dir with a dummy
 # compose file and .env, state dir, GHCR token, keystore, the stub `docker`
 # and `flock` binaries, and an empty invocation log. Exports the per-scenario
@@ -424,9 +467,16 @@ run_deploy() {
       script_args+=("${arg}")
     fi
   done
+  # RUN_DEPLOY_MINIMAL_PATH=1 swaps the inherited PATH for the staged one, which
+  # is the only way a "this tool is not installed" scenario can mean anything on
+  # a runner that has the tool.
+  local run_path="${T_FAKE_BIN}:${PATH}"
+  if [[ "${RUN_DEPLOY_MINIMAL_PATH:-0}" == "1" ]]; then
+    run_path="${T_FAKE_BIN}:${T_MINIMAL}"
+  fi
   LAST_OUTPUT="$(
     env \
-      PATH="${T_FAKE_BIN}:${PATH}" \
+      PATH="${run_path}" \
       IRI_COMPOSE_DIR="${T_COMPOSE_DIR}" \
       IRI_STATE_DIR="${T_STATE_DIR}" \
       IRI_MONITORING_TEXTFILE_DIR="${T_STATE_DIR}/textfile" \
@@ -1705,9 +1755,22 @@ scenario_podman_refuses_without_skopeo() {
   podman_units "${tmp}"
   write_marker "${PMARKER}"
   rm -f "${T_FAKE_BIN}/skopeo"
+  # The isolation is asserted against the PATH this scenario ACTUALLY uses, not
+  # assumed. Without this it passed on a workstation and, on a runner carrying
+  # /usr/bin/skopeo, tested a host that had the tool all along.
+  local use_minimal=0 eff_path="${T_FAKE_BIN}:${PATH}"
+  if [[ "${T_MINIMAL_OK}" == "true" ]]; then
+    use_minimal=1
+    eff_path="${T_FAKE_BIN}:${T_MINIMAL}"
+  fi
+  if PATH="${eff_path}" command -v skopeo >/dev/null 2>&1; then
+    record 0 "podman: the scenario's PATH really cannot reach a skopeo"
+  else
+    record 1 "podman: the scenario's PATH really cannot reach a skopeo"
+  fi
   mapfile -t pod < <(podman_env)
   mapfile -t conv < <(podman_converged_env)
-  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  RUN_DEPLOY_MINIMAL_PATH="${use_minimal}" run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
   assert_exit 1 "$rc" "podman: a host without skopeo refuses"
   assert_contains "skopeo not available" "podman: and names the missing tool"
   rm -rf "${tmp}"
