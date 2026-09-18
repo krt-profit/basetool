@@ -61,6 +61,26 @@
       {{ basetool_host_hardening_datastream
          or (basetool_host_datastreams.results | selectattr('stat.exists') | map(attribute='item') | first | default('')) }}
 
+# The datastream ships in scap-security-guide, which the task above INSTALLS. Under
+# `--check` on a fresh host that install did not happen, so none of the candidates
+# exists and this assertion fails on a host that is perfectly fine -- the same
+# shape as the podman version gate in 10-packages.yml, one layer down.
+#
+# The distinction that matters: "the package is not installed yet" is expected in
+# a dry run, while "the package is installed and names its file differently" is
+# the real fault this assertion exists for. So it is skipped only in the first
+# case, and the skip says which case it is.
+- name: Note that the datastream cannot exist yet
+  ansible.builtin.debug:
+    msg: >-
+      scap-security-guide is not installed on this host, so no datastream can be found and the
+      hardening scan below is SKIPPED. Under --check that is expected -- the install task above
+      reported `changed`, meaning a real run installs it first. Outside --check it means the
+      install did not take effect.
+  when:
+    - ansible_check_mode
+    - basetool_host_hardening_datastream | length == 0
+
 - name: Assert a datastream was found
   ansible.builtin.assert:
     that: basetool_host_hardening_datastream | length > 0
@@ -71,6 +91,7 @@
       this distribution names its file differently -- set basetool_host_hardening_datastream explicitly
       rather than letting the scan run against the wrong content.
     success_msg: "{{ basetool_host_hardening_datastream }}"
+  when: not (ansible_check_mode and basetool_host_hardening_datastream | length == 0)
 
 # Always. A report that is only produced when somebody remembers to ask is a report nobody has.
 - name: Scan against the profile

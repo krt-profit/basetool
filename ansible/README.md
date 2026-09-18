@@ -82,7 +82,23 @@ ansible-playbook site.yml --limit testing --check --diff    # see what would cha
 ansible-playbook site.yml --limit testing                   # do it
 ```
 
-The controller cannot be Windows natively — use WSL or a container.
+The controller cannot be Windows natively — use WSL or a container. Note that Ansible **ignores an
+`ansible.cfg` in a world-writable directory**, which a Windows mount under `/mnt/` is: it prints a
+warning and then silently runs without `roles_path`, `collections_path` or `host_key_checking`.
+Copy the tree into the Linux filesystem before running it.
+
+> [!note] `--check` on a FRESH host stops partway, and that is not a defect
+> Many tasks read what earlier tasks install — the podman version floor, the SCAP datastream, the
+> firewalld service. In check mode nothing was installed, so those reads find nothing. The role
+> skips the ones it can skip and says so in words rather than failing (see `10-packages.yml` and
+> `60-hardening.yml`), but a dry run on an empty host will still stop at the first task that needs
+> a package to *exist* rather than merely to be readable.
+>
+> `--check` earns its keep on an **already-provisioned** host, where it is the idempotence proof —
+> and idempotence is the property Phases 1–4 lean on, because they run this role repeatedly against
+> a snapshotted host. On a fresh host that serves nobody, run it for real; the rollback is deleting
+> the host. Measured on the new production host, 2026-09-18: first run `changed=25`, second run
+> `changed=0`.
 
 ## What it asserts, and refuses to proceed without
 

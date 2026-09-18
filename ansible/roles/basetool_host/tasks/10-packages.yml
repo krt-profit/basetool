@@ -50,11 +50,40 @@
       - firewalld
     state: present
 
+# Everything from here to the Quadlet manual-page check reads the podman that the
+# task above installs. In a REAL run it is there by now; under `--check` on a
+# fresh host it is not, because nothing was installed -- and `check_mode: false`
+# made the version read run for real and fail with
+# "[Errno 2] No such file or directory: b'podman'", eight tasks in.
+#
+# That mattered: the role's README offers `--check --diff` as the way to see what
+# a run would do, and on the one host where that is most worth doing -- a new,
+# empty production host -- it could not complete. So the gate is skipped when the
+# binary is genuinely absent, and the skip is LOUD: a version floor that silently
+# does not run is worse than one that fails.
+- name: Look for an installed podman
+  ansible.builtin.command: command -v podman
+  register: basetool_host_podman_path
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Say that the version gate cannot run yet
+  ansible.builtin.debug:
+    msg: >-
+      podman is not installed on this host, so the version floor and the Quadlet
+      manual-page check below are SKIPPED. Under --check that is expected: the package task
+      above reported `changed`, meaning a real run installs it first. If you are seeing this
+      outside --check, the package install did not take effect and nothing below has been
+      verified.
+  when: basetool_host_podman_path.rc | default(1) != 0
+
 - name: Read the installed podman version
   ansible.builtin.command: podman --version
   register: basetool_host_podman_version_raw
   changed_when: false
   check_mode: false
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 - name: Split the version
   # `podman --version` prints "podman version 5.8.2". Taking the last field and splitting on dots
@@ -63,6 +92,7 @@
   # match -- an error that says nothing about which pattern or which input.
   ansible.builtin.set_fact:
     basetool_host_podman_parts: "{{ basetool_host_podman_version_raw.stdout.split()[-1].split('.') }}"
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 - name: Refuse a version string this role cannot read
   ansible.builtin.assert:
@@ -70,11 +100,13 @@
     fail_msg: >-
       Could not read a version out of '{{ basetool_host_podman_version_raw.stdout }}'. Everything below
       compares numbers, and comparing against a value that was never parsed would pass silently.
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 - name: Name the two numbers the assertions use
   ansible.builtin.set_fact:
     basetool_host_podman_major: "{{ basetool_host_podman_parts[0] | int }}"
     basetool_host_podman_minor: "{{ basetool_host_podman_parts[1] | int }}"
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 
 - name: Assert podman translates this stack's units completely
@@ -91,6 +123,7 @@
       key does not fail the unit -- it is simply not applied, so the container runs without the
       limit that was measured for it.
     success_msg: "{{ basetool_host_podman_version_raw.stdout }}"
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 # Belt and braces on the key that degrades silently rather than loudly. The version floor above is
 # the rule; this reads the shipped manual page and checks the rule still describes reality, which a
@@ -102,6 +135,7 @@
   changed_when: false
   check_mode: false
   failed_when: false
+  when: basetool_host_podman_path.rc | default(1) == 0
 
 - name: Assert it, when the manual page could be read at all
   ansible.builtin.assert:
@@ -111,4 +145,7 @@
       {{ basetool_host_podman_version_raw.stdout }}. Either the manual page is absent, or this build's
       Quadlet differs from the one measured -- and in the second case every Memory= line in the
       generated units would be ignored without a word. Check by hand before proceeding.
-  when: basetool_host_quadlet_memory.stdout | int >= 0 and basetool_host_quadlet_memory.rc | int == 0
+  when:
+    - basetool_host_podman_path.rc | default(1) == 0
+    - basetool_host_quadlet_memory.stdout | int >= 0
+    - basetool_host_quadlet_memory.rc | int == 0
