@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
+
 ### Added
 
 - **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
@@ -94,12 +96,12 @@
   Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
   bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
   sich neu anmelden (REQ-SEC-063).
-  
+
 - **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
   `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
   Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
   stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
-  
+
 - **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
   Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
   und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
