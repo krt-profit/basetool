@@ -1,0 +1,112 @@
+---
+# The account the operational scripts run as, and what it is allowed to reach.
+#
+# THE PROBLEM THIS SOLVES. `iri-deploy.service`, `iri-backup.service`,
+# `iri-restore-drill.service` and `iri-docker-cleanup.service` all declare
+# `User=deploy` and `Group=docker`. Measured 2026-09-18 on both Rocky hosts:
+# neither the user nor the group exists, because there is no Docker. As written,
+# all four units fail to start on the platform the migration is moving to — a
+# blocker nobody had hit, because the units had never been installed on a Rocky
+# host.
+#
+# WHY A SEPARATE USER AT ALL, rather than running them as `iri`. `iri` owns the
+# container store and runs the workload; the deploy account holds the registry
+# pull token, rewrites unit files and drives releases. Collapsing them would give
+# the account that runs the application the ability to change what the
+# application IS. The split is the same one the Docker deployment has today.
+#
+# WHY THIS IS TIGHTER THAN TODAY, not looser. On Docker, `deploy` is in the
+# `docker` group, and membership of that group is root-equivalent by design: it
+# can bind-mount `/` into a privileged container. Here `deploy` gets a sudoers
+# rule naming TWO commands against ONE target user, and nothing else.
+#
+# WHAT IT DOES NOT GET: no password sudo, no shell as another user, no `podman
+# run` as root, no write access to the unit directory except through the
+# scripts' own paths.
+
+- name: Create the deploy account
+  ansible.builtin.user:
+    name: "{{ basetool_host_deploy_user }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ basetool_host_state_dir }}"
+    create_home: false
+    comment: "Runs deploy.sh, backup.sh and restore-drill.sh (ADR-0188)"
+
+# The rootless service user's runtime directory is where its systemd --user
+# instance and its podman socket live. `deploy` needs to name it, not to own it.
+- name: Let deploy drive the service user's containers, and nothing else
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/basetool-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      #
+      # {{ basetool_host_deploy_user }} runs the operational scripts; {{ basetool_host_service_user }}
+      # owns the containers. These two commands are the whole of the bridge between them.
+      #
+      # NOPASSWD because the caller is a systemd timer with no terminal: a password prompt
+      # there does not ask anybody, it hangs the unit until its timeout.
+      #
+      # Deliberately NOT a blanket `ALL`, and deliberately not root: the target user is named,
+      # the commands are named, and the pair is what the container-runtime seam probes for.
+      #
+      # The two commands differ in ONE way, and it was measured on this host rather than assumed:
+      #
+      #   podman            finds its own runtime directory (/run/user/<uid>/containers) and needs
+      #                     NO environment passed -- so it gets none.
+      #   systemctl --user  cannot: without XDG_RUNTIME_DIR it reports "$DBUS_SESSION_BUS_ADDRESS
+      #                     and $XDG_RUNTIME_DIR not defined" and never reaches the user manager.
+      #
+      # sudo refuses a command-line variable unless the command is tagged SETENV, so exactly one
+      # command carries that tag. Granting it to both -- or setting `Defaults setenv` -- would hand
+      # the wider permission to the command that demonstrably does not need it.
+      Defaults:{{ basetool_host_deploy_user }} !requiretty
+      {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: /usr/bin/podman *
+      {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: /usr/bin/systemctl --user *
+
+# `visudo -cf` above proves the file is SYNTACTICALLY valid. These two prove it
+# GRANTS what it was written to grant -- different questions, and only the second
+# is what the deployer depends on every five minutes. The first version of this
+# passed XDG_RUNTIME_DIR to podman and failed with "you are not allowed to set
+# the following environment variables", which is how the split below was found.
+- name: Prove deploy can drive the containers
+  ansible.builtin.command: >-
+    sudo -n -u {{ basetool_host_service_user }}
+    podman info --format {% raw %}'{{.Host.Security.Rootless}}'{% endraw %}
+  args:
+    chdir: /tmp
+  become: true
+  become_user: "{{ basetool_host_deploy_user }}"
+  register: basetool_host_deploy_bridge
+  changed_when: false
+  failed_when: basetool_host_deploy_bridge.rc != 0
+  when: not ansible_check_mode
+
+- name: Prove deploy can drive the service user's systemd instance
+  ansible.builtin.command: >-
+    sudo -n -u {{ basetool_host_service_user }}
+    XDG_RUNTIME_DIR=/run/user/{{ basetool_host_user.uid }}
+    systemctl --user is-system-running
+  args:
+    chdir: /tmp
+  become: true
+  become_user: "{{ basetool_host_deploy_user }}"
+  register: basetool_host_deploy_systemd
+  changed_when: false
+  # `degraded` is a legitimate answer on a host with a failed unit, and this task
+  # is asking whether the BUS is reachable, not whether everything is healthy.
+  failed_when: basetool_host_deploy_systemd.stdout is not search('running|degraded|starting')
+  when: not ansible_check_mode
+
+- name: Report what the bridge answered
+  ansible.builtin.debug:
+    msg: >-
+      {{ basetool_host_deploy_user }} can drive {{ basetool_host_service_user }}'s podman
+      (rootless={{ basetool_host_deploy_bridge.stdout | default('?') }}) and reach its systemd
+      instance ({{ basetool_host_deploy_systemd.stdout | default('?') }}). That is the path
+      scripts/lib/container-runtime.sh detects, and the only privilege this account has.
+  when: not ansible_check_mode

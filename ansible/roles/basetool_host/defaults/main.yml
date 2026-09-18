@@ -12,6 +12,14 @@
 basetool_host_service_user: iri
 basetool_host_service_group: iri
 
+# The account the operational scripts run as. NOT the service user: `iri` owns the container store
+# and runs the workload, while this one holds the registry pull token, rewrites unit files and
+# drives releases. Collapsing them would let the account that runs the application change what the
+# application is. The Docker deployment has the same split today -- `User=deploy, Group=docker` in
+# the four iri-*.service units -- and neither that user nor that group exists on a Rocky host,
+# which is the gap 22-deploy-user.yml closes.
+basetool_host_deploy_user: deploy
+
 # The subordinate id range. EVERY host-side uid in this role is derived from this number rather
 # than written down, so changing it here moves every ownership rule with it. That is the one thing
 # the prose bootstrap cannot do: a hand-computed 110000 is silently wrong the day this changes.
@@ -41,6 +49,31 @@ basetool_host_token_dir: /etc/iri
 # `NoNewPrivileges=`, `AutoUpdate=` and `Notify=healthy`.
 basetool_host_min_podman_major: 5
 basetool_host_min_podman_minor: 8
+
+# --- cosign, and why it is a pinned download rather than a package -----------
+#
+# REQ-OPS-015 verifies every resolved digest against the release workflow's keyless signature
+# BEFORE it is pulled, extracted or applied, and the deployer is fail-closed on it. So a host
+# without cosign cannot deploy at all.
+#
+# Measured 2026-09-18 on Rocky 10.2: cosign is in no enabled repository, AND it is not in EPEL 10
+# either -- queried against the real EPEL metadata with `dnf --repofrompath` rather than assumed,
+# because "enable EPEL" was the obvious answer and it is not an answer.
+#
+# So it is the upstream binary. The interesting part is what it is verified AGAINST. Sigstore
+# publishes `cosign_checksums.txt` and a Sigstore bundle signing it -- and verifying that bundle
+# needs cosign, which is the thing being installed. Trusting the downloaded checksum file instead
+# just moves the question one file along: whoever could swap the binary could swap its checksum.
+#
+# The pin below breaks the circle. It is the checksum of the release artefact, reviewed in git like
+# every image digest and every SHA-pinned action in this repository, and the role compares against
+# THIS value rather than against anything it downloaded. Upgrading cosign is therefore a commit
+# that changes this line, which someone reads.
+basetool_host_cosign_version: "v3.1.3"
+basetool_host_cosign_sha256: "4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71"
+basetool_host_cosign_url: >-
+  https://github.com/sigstore/cosign/releases/download/{{ basetool_host_cosign_version }}/cosign-linux-amd64
+basetool_host_cosign_path: /usr/local/bin/cosign
 
 # --- SELinux ---------------------------------------------------------------------------------------
 # A permanent fcontext rule rather than :z/:Z on the mounts: it survives a relabel, it does not

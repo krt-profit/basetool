@@ -18,26 +18,11 @@
       # subcommand for it. Measured present in AppStream on Rocky 10 (1.22.2)
       # while mapping the Quadlet deploy path, plan Phase 3.
       - skopeo
-      # COSIGN IS DELIBERATELY NOT HERE, and its absence is a decision to take
-      # rather than an omission to fix by adding a line.
-      #
-      # REQ-OPS-015 verifies every resolved digest against the release workflow's
-      # keyless signature BEFORE it is pulled, extracted or applied, and the
-      # deployer is fail-closed on it -- so the Podman deployer cannot ship
-      # without cosign on the host. Measured 2026-09-17: cosign is in NO enabled
-      # repository on Rocky 10, and EPEL is not configured.
-      #
-      # The two ways out differ in what they cost, which is why this is the
-      # owner's call and not a package name:
-      #   * enable EPEL -- one line here, and a permanently wider supply-chain
-      #     surface on a host that was deliberately built from BaseOS, AppStream
-      #     and Extras alone;
-      #   * fetch the upstream static binary and verify it by published checksum
-      #     -- no new repository, but a bootstrap step this role has to own,
-      #     including how the checksum itself is trusted.
-      #
-      # Adding `- cosign` to the list above without choosing would fail the role
-      # outright on a fresh host, which is how this was found.
+      # COSIGN IS NOT A PACKAGE HERE, and that is now a decision taken rather than one
+      # pending: measured 2026-09-18, it is in no enabled repository on Rocky 10 AND not in
+      # EPEL 10 either -- queried against the real EPEL metadata, because "enable EPEL" was
+      # the obvious answer and turned out not to be one. It is installed from the upstream
+      # release against a checksum pinned in defaults/main.yml; see 15-cosign.yml.
       # Ansible needs setfacl to hand its temp files to an unprivileged become_user. Without it
       # the fallback is `chmod A+user:iri:rx:allow`, which is NFSv4 syntax that GNU chmod
       # rejects outright -- the run then dies with "Failed to set permissions on the temporary

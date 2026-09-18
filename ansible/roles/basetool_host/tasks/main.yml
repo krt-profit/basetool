@@ -17,9 +17,17 @@
   ansible.builtin.import_tasks: 10-packages.yml
   tags: [packages]
 
+- name: cosign, the host half of the supply-chain gate
+  ansible.builtin.import_tasks: 15-cosign.yml
+  tags: [packages, cosign]
+
 - name: The rootless service user
   ansible.builtin.import_tasks: 20-user.yml
   tags: [user]
+
+- name: The account the operational scripts run as
+  ansible.builtin.import_tasks: 22-deploy-user.yml
+  tags: [user, deploy]
 
 - name: Directory layout and its namespace-translated ownership
   ansible.builtin.import_tasks: 30-directories.yml

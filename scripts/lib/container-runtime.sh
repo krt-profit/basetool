@@ -106,9 +106,19 @@ rt_detect() {
       [[ -e "${lingerfile}" ]] || continue
       u="$(basename "${lingerfile}")"
       uid="$(id -u "${u}" 2>/dev/null)" || continue
-      if sudo -n -u "${u}" XDG_RUNTIME_DIR="/run/user/${uid}" \
-           podman ps --format '{{.Names}}' >/dev/null 2>&1; then
-        RT_CLI="sudo -n -u ${u} XDG_RUNTIME_DIR=/run/user/${uid} podman"
+      # podman is invoked with NO environment and systemctl WITH it, and the
+      # asymmetry is measured rather than stylistic (2026-09-18, Rocky 10.2):
+      # podman finds /run/user/<uid>/containers by itself, while systemctl --user
+      # without XDG_RUNTIME_DIR reports "$DBUS_SESSION_BUS_ADDRESS and
+      # $XDG_RUNTIME_DIR not defined" and never reaches the user manager.
+      #
+      # It matters because a correctly tightened sudoers refuses a command-line
+      # variable unless the command carries SETENV. Passing it to podman made the
+      # detection fail with "you are not allowed to set the following environment
+      # variables" on the one host whose sudo rule was written properly -- so the
+      # wider grant would have been needed for the command that does not need it.
+      if sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
+        RT_CLI="sudo -n -u ${u} podman"
         RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=/run/user/${uid} systemctl --user"
         RT_UNIT_DIR="$(getent passwd "${u}" | cut -d: -f6)/.config/containers/systemd"
         return 0
