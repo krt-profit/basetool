@@ -3335,6 +3335,28 @@ if (document.readyState === 'loading') {
         }
     }
 
+    // Aims the edge auto-scroll at a viewport y. Shared by the mouse drag's document `dragover`
+    // and the touch drag's `pointermove` (#1936): both want the same band, easing and rAF loop,
+    // and a second copy of the arithmetic is a second place for the two to drift apart.
+    function driveEdgeScroll(y) {
+        const h = window.innerHeight;
+        if (y <= EDGE_ZONE_PX) {
+            autoScrollDir = -1;
+            autoScrollStep = Math.ceil((MAX_SCROLL_STEP_PX * (EDGE_ZONE_PX - y)) / EDGE_ZONE_PX);
+        } else if (y >= h - EDGE_ZONE_PX) {
+            autoScrollDir = 1;
+            autoScrollStep = Math.ceil(
+                (MAX_SCROLL_STEP_PX * (y - (h - EDGE_ZONE_PX))) / EDGE_ZONE_PX,
+            );
+        } else {
+            autoScrollDir = 0;
+            autoScrollStep = 0;
+        }
+        if (autoScrollDir !== 0 && autoScrollRaf === null) {
+            autoScrollRaf = window.requestAnimationFrame(autoScrollTick);
+        }
+    }
+
     function setSelected(row) {
         if (selected) {
             selected.classList.remove('is-selected');
@@ -3423,6 +3445,11 @@ if (document.readyState === 'loading') {
 
     // Click: a row toggles its selection; a zone (empty space) receives the selected person.
     board.addEventListener('click', function (e) {
+        if (suppressClick) {
+            // The click a finished touch drag leaves behind (#1936) — consumed, not acted on.
+            suppressClick = false;
+            return;
+        }
         const row = e.target.closest('.person-row');
         if (row && board.contains(row)) {
             if (
@@ -3496,23 +3523,173 @@ if (document.readyState === 'loading') {
     // eligibility (the board-level dragover still governs that per zone).
     document.addEventListener('dragover', function (e) {
         if (!dragged) return;
-        const y = e.clientY;
-        const h = window.innerHeight;
-        if (y <= EDGE_ZONE_PX) {
-            autoScrollDir = -1;
-            autoScrollStep = Math.ceil((MAX_SCROLL_STEP_PX * (EDGE_ZONE_PX - y)) / EDGE_ZONE_PX);
-        } else if (y >= h - EDGE_ZONE_PX) {
-            autoScrollDir = 1;
-            autoScrollStep = Math.ceil(
-                (MAX_SCROLL_STEP_PX * (y - (h - EDGE_ZONE_PX))) / EDGE_ZONE_PX,
-            );
-        } else {
-            autoScrollDir = 0;
-            autoScrollStep = 0;
+        driveEdgeScroll(e.clientY);
+    });
+
+    // ---- Touch / pen drag (#1936). ----
+    // Native HTML5 drag is a mouse gesture: no mobile browser turns touch input into dragstart,
+    // so on a phone the board's entire drag half was dead — a long press produced the browser's
+    // own context menu and nothing moved. This is that gesture rebuilt on Pointer Events, and it
+    // drives the SAME moveParticipant, so every drop semantic (unit → unit, drop on the pool,
+    // release over no zone = unassign) is identical to the mouse path by construction. The mouse
+    // is excluded on purpose: it already has the native implementation, drag image and all.
+    //
+    // Why a hold rather than an immediate drag: on a phone the rows ARE the board, so a drag that
+    // began on first contact would leave no way to scroll it. A finger that travels before the
+    // hold elapses is therefore a scroll and cancels the press; only one that stays put takes the
+    // gesture over. That is also why `touch-action` on `.person-row` still concedes pan-y to the
+    // browser — the hold is what claims the gesture, not the CSS.
+    const LONG_PRESS_MS = 320;
+    const MOVE_CANCEL_PX = 12;
+
+    let touchRow = null; // the row under the finger once a press starts (not yet a drag)
+    let touchActive = false; // true once the hold elapsed and the drag owns the gesture
+    let touchZone = null; // the zone currently under the finger
+    let touchPointerId = null;
+    let pressTimer = null;
+    let pressX = 0;
+    let pressY = 0;
+    // A finished drag is followed by a synthetic click on the row. Without this it would also
+    // toggle that row's selection, leaving the board armed after every single drop.
+    let suppressClick = false;
+
+    function clearPressTimer() {
+        if (pressTimer !== null) {
+            window.clearTimeout(pressTimer);
+            pressTimer = null;
         }
-        if (autoScrollDir !== 0 && autoScrollRaf === null) {
-            autoScrollRaf = window.requestAnimationFrame(autoScrollTick);
+    }
+
+    // The board zone under a viewport point. elementFromPoint is the only hit-test available:
+    // the pointer is captured by the row, so the event's own target stays the row no matter
+    // where the finger actually is.
+    function zoneAt(x, y) {
+        const el = document.elementFromPoint(x, y);
+        if (!el || typeof el.closest !== 'function') return null;
+        const zone = el.closest('.drop-zone');
+        return zone && board.contains(zone) ? zone : null;
+    }
+
+    function setTouchZone(zone) {
+        if (touchZone === zone) return;
+        if (touchZone) touchZone.classList.remove('is-over');
+        touchZone = zone;
+        if (touchZone) touchZone.classList.add('is-over');
+    }
+
+    function endTouchDrag() {
+        clearPressTimer();
+        if (touchRow) {
+            touchRow.classList.remove('is-touch-dragging');
+            if (touchPointerId !== null) {
+                try {
+                    touchRow.releasePointerCapture(touchPointerId);
+                } catch (_e) {
+                    // Never captured (the pointer was already gone, or is synthetic in a test)
+                    // or released twice — either way there is nothing left to undo.
+                }
+            }
         }
+        setTouchZone(null);
+        stopAutoScroll();
+        touchRow = null;
+        touchActive = false;
+        touchPointerId = null;
+    }
+
+    board.addEventListener('pointerdown', function (e) {
+        suppressClick = false;
+        if (e.pointerType === 'mouse') return; // the mouse keeps the native HTML5 drag
+        const row = e.target.closest('.person-row');
+        if (!row || !board.contains(row)) return;
+        // Same carve-out as the click fallback: a row's own controls are not drag handles.
+        if (
+            e.target.closest('button') ||
+            e.target.closest('select') ||
+            e.target.closest('form') ||
+            e.target.closest('a')
+        )
+            return;
+        endTouchDrag(); // a press left over from an interrupted gesture never survives into this
+        touchRow = row;
+        touchPointerId = e.pointerId;
+        pressX = e.clientX;
+        pressY = e.clientY;
+        pressTimer = window.setTimeout(function () {
+            pressTimer = null;
+            if (!touchRow) return;
+            touchActive = true;
+            touchRow.classList.add('is-touch-dragging');
+            try {
+                touchRow.setPointerCapture(touchPointerId);
+            } catch (_e) {
+                // The pointer is no longer active, or is synthetic. The document-level listeners
+                // below see the rest of the gesture regardless, so capture is a nicety here and
+                // never a precondition.
+            }
+        }, LONG_PRESS_MS);
+    });
+
+    document.addEventListener('pointermove', function (e) {
+        if (!touchRow || e.pointerId !== touchPointerId) return;
+        if (!touchActive) {
+            // Still inside the hold: a finger that travels is scrolling the board, not dragging.
+            if (
+                Math.abs(e.clientX - pressX) > MOVE_CANCEL_PX ||
+                Math.abs(e.clientY - pressY) > MOVE_CANCEL_PX
+            ) {
+                endTouchDrag();
+            }
+            return;
+        }
+        setTouchZone(zoneAt(e.clientX, e.clientY));
+        driveEdgeScroll(e.clientY);
+    });
+
+    document.addEventListener('pointerup', function (e) {
+        if (!touchRow || e.pointerId !== touchPointerId) return;
+        if (!touchActive) {
+            endTouchDrag(); // a short tap — the click handler turns it into a selection
+            return;
+        }
+        const row = touchRow;
+        const zone = zoneAt(e.clientX, e.clientY);
+        endTouchDrag();
+        suppressClick = true;
+        if (zone) {
+            if (!zone.contains(row)) moveParticipant(row, zone);
+            return;
+        }
+        // Released over no zone at all — the unassign fallback the mouse path applies on
+        // `dragend`, so a row deep in a long board is freed without reaching for the pool.
+        const pool = document.getElementById('board-pool');
+        if (pool && row.getAttribute('data-crew-id') && row.getAttribute('data-unit-id')) {
+            moveParticipant(row, pool);
+        }
+    });
+
+    document.addEventListener('pointercancel', function (e) {
+        if (!touchRow || e.pointerId !== touchPointerId) return;
+        endTouchDrag();
+    });
+
+    // The page must not scroll out from under an active drag. Chrome treats a document-level
+    // touchmove listener as passive by default and ignores a passive listener's preventDefault,
+    // so {passive: false} is what makes this work at all. It is a no-op unless a drag is live.
+    document.addEventListener(
+        'touchmove',
+        function (e) {
+            if (touchActive) e.preventDefault();
+        },
+        { passive: false },
+    );
+
+    // Android raises its context menu on the very press this drag starts on — the symptom that
+    // made the board unusable on a phone (#1936). Suppressed for as long as a touch press on a
+    // row is live; the mouse returns above before touchRow is ever set, so right-click keeps its
+    // menu everywhere.
+    board.addEventListener('contextmenu', function (e) {
+        if (touchRow) e.preventDefault();
     });
 
     // On-board function chip-select (delegated): quick single-function change via the crew
@@ -3559,6 +3736,12 @@ if (document.readyState === 'loading') {
             selected = null;
             dragged = null;
             droppedOnZone = false;
+            // A touch drag ends in a swap, so its own state is stale by the time this runs: the
+            // row it held is detached and the zone it highlighted no longer exists (#1936).
+            // `suppressClick` is deliberately NOT cleared here — it is tied to the click the
+            // browser still owes for the finished drag, not to any node the swap replaced, and
+            // the next `pointerdown` clears it anyway.
+            endTouchDrag();
             stopAutoScroll();
         }
     });

@@ -130,8 +130,27 @@ deliberately **not** by a state class the board's JS parks on the wrapper: the b
 own `innerHTML` on every crew mutation, and a class that outlives the selection it described is a
 defect `:has()` cannot have. The section legend leads with the same click path, and each zone's
 `aria-label` is built from the idle hint, so the announced instruction and the visible one are the
-same sentence. Making the drag gesture itself work under touch is **not** covered here and stays
-open in #1936.
+same sentence.
+
+**Touch and pen drag the board through Pointer Events, behind a press-and-hold** (#1936,
+[ADR-0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md)). `pointerdown` with a
+`pointerType` other than `mouse` starts a press; **320 ms** of a stationary finger arms the drag
+(the row takes `.is-touch-dragging`), and travel beyond **12 px** before that cancels it, so a swipe
+still scrolls a board whose rows cover most of its surface. While armed, the zone under the finger
+is found by `elementFromPoint` — the pointer is captured by the row, so the event's own target is no
+guide — and takes `.is-over`; the same edge auto-scroll band applies. Release drives the **same**
+`moveParticipant` as the mouse path, so unit → unit, drop on the pool and release-over-no-zone all
+behave identically, and the click the browser emits after the drag is swallowed rather than acted
+on. The mouse keeps the native HTML5 implementation untouched.
+
+The platform's own long-press behaviour is suppressed in four places, none of which is sufficient
+alone: `user-select: none` and `-webkit-touch-callout: none` on `.person-row` remove the selection
+UI and the iOS callout, a `contextmenu` handler cancels the menu while a touch press on a row is
+live, and a **non-passive** `touchmove` handler cancels scrolling while a drag is live (a passive
+listener's `preventDefault` is ignored, and document-level `touchmove` is passive by default in
+Chrome). `touch-action` on the row is `pan-y pinch-zoom`, not `none`: panning and zoom stay with the
+browser and the hold is what claims the gesture. The cost, accepted in ADR-0191, is that a row's
+participant name is no longer selectable text.
 
 Each person row shows: check-in status dot, name (+ "Extern" chip), org-unit badges (incl. SK),
 desired job, planned job, comment as a tooltip mark, on-board function(s), check-in/check-out

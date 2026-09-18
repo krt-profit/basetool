@@ -67,9 +67,13 @@
 
 ### Fixed
 
+- **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
+  langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf
+  Touch-Geräten schlicht wirkungslos. Jetzt nimmt ein kurzes Halten die Zeile auf und der Finger
+  zieht sie in die Einheit; ein Wischen scrollt weiterhin (REQ-MISSION-005).
+
 - **Einsätze: das Crew-Board sagt jetzt, dass man Teilnehmer auch antippen kann.** Die Hinweise in
-  den Einheiten forderten nur zum Ziehen auf — das funktioniert auf dem Handy nicht, dort öffnet
-  langes Drücken das Kontextmenü des Browsers. Der Weg über Antippen gab es schon, er stand nur
+  den Einheiten forderten nur zum Ziehen auf. Der Weg über Antippen gab es schon, er stand nur
   nirgends: Die Hinweise nennen ihn jetzt zuerst, und sobald ein Teilnehmer ausgewählt ist, zeigt
   jede Einheit „Hier tippen, um zuzuweisen“ (REQ-MISSION-005).
 
