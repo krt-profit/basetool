@@ -204,7 +204,17 @@ basetool_host_node_exporter_flags:
   - "--no-collector.wifi"
   - "--web.listen-address={{ basetool_host_node_exporter_listen }}"
 basetool_host_podman_exporter_listen: ":9882"
-basetool_host_alloy_listen: "127.0.0.1:12345"
+# Every interface, not loopback -- and node-exporter above is why the asymmetry was a bug rather
+# than a choice. Prometheus runs in a CONTAINER and reaches host services through
+# `AddHost=alloy:host-gateway`, which resolves to 169.254.1.2; a listener bound to 127.0.0.1 refuses
+# that connection. Measured on the testing host 2026-09-20: alloy active, its unit aliased
+# correctly, and `wget http://alloy:12345/metrics` from inside prometheus answering
+# "Connection refused (169.254.1.2)" -- so the alloy scrape target was permanently down and
+# LogStreamSilent, LokiIngestSilent and TargetDown all fired off the back of it.
+#
+# The port stays off the network the same way node-exporter's does: firewalld is default-deny and
+# opens 80 and 443 only (65-firewall.yml), which the role asserts rather than assumes.
+basetool_host_alloy_listen: ":12345"
 
 # --- hardening -------------------------------------------------------------------------------------
 # The platform's own content: scap-security-guide ships a cs10 datastream with seventeen profiles.

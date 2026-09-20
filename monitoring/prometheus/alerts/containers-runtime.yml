@@ -36,6 +36,25 @@ groups:
       # is that mistake four times over. cAdvisor's `container_memory_rss` and the collector's
       # `memory_anon_bytes` are both cgroup v2 `memory.stat` -> `anon`, so this is one signal under
       # two names rather than two signals that resemble each other.
+      # PRESENCE, normalised like every value below it. Added 2026-09-20.
+      #
+      # `ContainerMetricsMissing` and `CoreContainerMetricsMissing` counted `container_last_seen`,
+      # which only cAdvisor emits -- so on a Podman host, where cAdvisor is gone by decision
+      # (ADR-0163), both fired permanently. Measured on the testing host: 200 basetool_container_*
+      # series present, 18 containers reported by the collector, and both alerts firing anyway, one
+      # of them CRITICAL. A critical that is always on is worse than no alert: it is the thing that
+      # teaches people to skip criticals.
+      #
+      # `memory_usage_bytes` is the presence proxy rather than a synthetic timestamp, because it is
+      # the one series BOTH families publish for every running container, unconditionally --
+      # cAdvisor as `container_memory_usage_bytes`, the collector from `memory.current`. A container
+      # that exists has it; a container that stopped loses it. Nothing reads its VALUE here, only
+      # whether it is there, which is why the differing units of the two sources do not matter.
+      - record: basetool:container:present
+        expr: >-
+          max by (name) (container_memory_usage_bytes{name=~".+"})
+          or max by (name) (basetool_container_memory_usage_bytes)
+
       - record: basetool:container:memory_anon_bytes
         expr: >-
           max by (name) (container_memory_rss{name=~".+"})
