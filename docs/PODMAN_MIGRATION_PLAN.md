@@ -2617,6 +2617,10 @@ Three things this cost, each worth keeping:
 
 ## 23. The production cutover — measured 2026-09-17, and what actually blocks it
 
+> [!tip] The executable steps are in [`PODMAN_CUTOVER_RUNBOOK.md`](PODMAN_CUTOVER_RUNBOOK.md)
+> This section carries the analysis, the measured state and the ordering. The runbook carries
+> the commands, the prerequisites that cannot be done inside the window, and the way back.
+
 Asked directly: how does production move without losing data, creating inconsistencies or
 introducing regressions, given that a long maintenance window is acceptable. The window turns out
 not to be the constraint.

@@ -200,6 +200,12 @@ sudo chown -R 65534:65534 /var/iri/monitoring/data/prometheus
 sudo chown -R 65534:65534 /var/iri/monitoring/textfile   # node_exporter reads it; deploy/backup write it
 ```
 
+> [!important] On a rootless-Podman host the owner uid is TRANSLATED
+> The `chown 65534:65534` below is right under Docker, where a container's uid is the host's.
+> Under rootless Podman it is `subuid_base + N - 1` — 165533 for 65534, with the base this
+> deployment uses. The `docker run httpd` in 3.4 is `podman run` there too. See
+> [`PODMAN_CUTOVER_RUNBOOK.md` §0.5](PODMAN_CUTOVER_RUNBOOK.md).
+
 ### 3.2 `scrape_password` — the Spring apps' `/actuator/prometheus` basic-auth password
 
 Same value goes into `.env` as `MONITORING_SCRAPE_PASSWORD` (Phase 5) and into the app secrets so the
