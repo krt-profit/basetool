@@ -261,9 +261,9 @@ basetool_host_manage_frontend: true
 # Empty means "write no drop-in and remove any this role wrote", so clearing the variable actually
 # clears the alias instead of leaving a stale one behind.
 basetool_host_public_name_alias: ""
-#: The services whose containers need it -- the three JVM modules, which are the ones that resolve
-#: the issuer. The generator emits `AddHost=` for exactly these three (their compose templates carry
-#: `extra_hosts`), so this list mirrors that rather than guessing.
+# The services whose containers need it -- the three JVM modules, which are the ones that resolve
+# the issuer. The generator emits `AddHost=` for exactly these three (their compose templates carry
+# `extra_hosts`), so this list mirrors that rather than guessing.
 basetool_host_public_name_alias_services:
   - backend
   - frontend
