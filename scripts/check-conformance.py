@@ -1436,6 +1436,17 @@ def check_env_reaches_the_units(ctx: Context) -> str:
     if not env_raw.strip():
         if not ctx.runner.run("test -f /var/iri/code/.env && echo yes || true").strip():
             raise Skip("no /var/iri/code/.env on this host")
+        # `test -r`, not `test -f`, and the distinction is the whole of this branch. The grep above
+        # ends in `|| true`, so it produces empty output both when the file HAS none of these keys
+        # and when the runner could not open it at all -- and .env is 0640 deploy:deploy, which an
+        # ordinary login account cannot read. Measured 2026-09-20: run as `sysadm` against the
+        # testing host, this check reported "sets none of the variables" about a file that sets
+        # IRI_KEYCLOAK_HOST_ALIAS. A check that draws a conclusion from a file it could not open is
+        # the exact failure this one exists to report about others.
+        if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
+            raise Skip("/var/iri/code/.env is not readable by this SSH account (it is 0640 "
+                       "deploy:deploy) -- rerun with an account that can read it, or this check "
+                       "says nothing")
         raise Skip("the .env on this host sets none of the variables the units bake in")
 
     env = {}
@@ -1455,9 +1466,19 @@ def check_env_reaches_the_units(ctx: Context) -> str:
     #
     # Both locations, no assumption about the user: /etc for a rootful install, every home for a
     # rootless one.
+    #
+    # THREE locations, and the third is the one that matters on this deployment. Added 2026-09-20:
+    # podman-systemd.unit(5) lists /etc/containers/systemd/users/$(UID) as a rootless search path,
+    # and it is where `deploy.sh` installs and where the role writes its drop-ins -- because it is
+    # the only one of the four an account other than the owner can write. Neither glob above
+    # matched it, so this check skipped with "no Quadlet units found" against a host carrying 39
+    # units and two drop-ins. The same shape as the `~` bug the comment above already records,
+    # one directory deeper.
     units = ctx.runner.run(
         "cat /etc/containers/systemd/*.container "
         "/etc/containers/systemd/*.container.d/*.conf "
+        "/etc/containers/systemd/users/*/*.container "
+        "/etc/containers/systemd/users/*/*.container.d/*.conf "
         "/home/*/.config/containers/systemd/*.container "
         "/home/*/.config/containers/systemd/*.container.d/*.conf 2>/dev/null || true"
     )

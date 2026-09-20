@@ -419,9 +419,46 @@ sudo -u iri podman container inspect backend --format '{{.ImageName}}'
 The whole point of the long window is that steps 1.2–1.8 happen without time pressure, with the old
 host still answering every user.
 
+Run the **host-side** half of the conformance suite against the new host. The five external checks
+are deliberately left out here: DNS still points at the OLD host, so they would describe that one
+and say nothing about this one. They run in §1.10, once the names have moved.
+
+```bash
+python scripts/check-conformance.py --ssh root@<new-host-ip> \
+  --only certificate-shared --only client-address-visible --only containers-running \
+  --only redis-requires-auth --only scrape-targets-up --only container-metrics \
+  --only log-streams --only edge-not-directly-reachable --only containers-unprivileged \
+  --only env-reaches-the-units --only containers-read-only
+```
+
+> [!important] `root@`, and not a login account — or eleven checks quietly say nothing
+> Every one of these reads something an ordinary account cannot. The rootless containers belong to
+> the service user, so `podman ps` as anyone else reports an empty host and the container checks
+> report *absent* for services that are running; and `.env` is `0640 deploy:deploy`, so
+> `env-reaches-the-units` cannot read it. Measured 2026-09-20 as `sysadm` against the testing host:
+> nine checks failed for want of privilege and one skipped, none of it about the host.
+
+> [!note] `env-reaches-the-units` can only run HERE, and it is the reason this step exists
+> Seven variables are baked into the units at generation time
+> (`check-conformance.py`'s `BAKED_INTO_UNITS`), and setting one of them in the host `.env` does
+> nothing unless a drop-in carries it. The `.env` arrives with the restore in §1.6 — so before this
+> step there is nothing to compare, and after the DNS switch it is too late to find a disagreement.
+> This is the one window in which that check is both possible and useful.
+
 ### 1.9 Only then, DNS
 
 ### 1.10 Conformance against the public names, then shut the old host down
+
+Now the names resolve to the new host, so the whole suite means what it says — the five external
+checks included:
+
+```bash
+python scripts/check-conformance.py --ssh root@<new-host-ip>
+```
+
+Expect every check to pass or to skip with a stated reason. A `rate-limit-active` skip is normal:
+it is opt-in because it puts load on the target, and `--include-load` is a decision to make
+deliberately rather than in a cutover window.
 
 ```bash
 # new host only

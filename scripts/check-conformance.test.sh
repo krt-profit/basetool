@@ -309,17 +309,36 @@ case "$cmd" in
   # --- env-reaches-the-units -----------------------------------------------------------------
   # The host .env. Only variables the generator BAKES matter here; anything else is carried into
   # the container by env.d and is not this check's business.
+  # `test -r` comes first: it is a longer match on the same path and must not fall into the grep
+  # branch below. env-unreadable answers empty, which is what an account that cannot open the file
+  # sees -- and the check has to tell that apart from a file that simply sets none of the keys.
+  *"test -r /var/iri/code/.env"*)
+    case "$scenario" in
+      env-unreadable) echo "" ;;
+      *)              echo "yes" ;;
+    esac
+    ;;
+  *"test -f /var/iri/code/.env"*)
+    case "$scenario" in
+      env-no-env) echo "" ;;
+      *)          echo "yes" ;;
+    esac
+    ;;
   *"/var/iri/code/.env"*)
     case "$scenario" in
-      env-no-env)  echo "" ;;
-      env-orphan)  printf 'IRI_TRUSTSTORE_HOST_PATH=/var/iri/secrets/truststore.p12\n' ;;
-      env-dropin)  printf 'IRI_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
-      *)           printf 'POSTGRES_DB=basetool\n' ;;
+      env-no-env)     echo "" ;;
+      env-unreadable) echo "" ;;
+      env-orphan)     printf 'IRI_TRUSTSTORE_HOST_PATH=/var/iri/secrets/truststore.p12\n' ;;
+      env-dropin)     printf 'IRI_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
+      *)              printf 'POSTGRES_DB=basetool\n' ;;
     esac
     ;;
   # The units AND their drop-ins, concatenated the way the check reads them -- the drop-in is the
   # supported way to give one host a different value, so it has to be part of the answer.
-  *".config/containers/systemd"*)
+  # The units AND their drop-ins. The check reads three locations in ONE `cat`, and
+  # /etc/containers/systemd/users/<uid> is the one a release actually delivers to -- match on that
+  # as well, or the stub answers nothing for the path that matters on a real host.
+  *".config/containers/systemd"*|*"/etc/containers/systemd/users/"*)
     case "$scenario" in
       env-no-units) echo "" ;;
       env-dropin)   printf '[Container]\nAddHost=basetool.example.test:10.0.0.9\n' ;;
@@ -753,6 +772,15 @@ STUB_SCENARIO=env-no-env assert_status \
 STUB_SCENARIO=env-no-units assert_status \
   "env-reaches-the-units skips when the host has no Quadlet units anywhere" \
   env-reaches-the-units skip "no Quadlet units found" -- "${STUB_ARGS[@]}"
+# An UNREADABLE .env is not an empty one, and that difference is the whole point of this check
+# existing. .env is 0640 deploy:deploy, so an ordinary login account gets empty output from the
+# grep -- indistinguishable, before this scenario, from a file that sets none of the seven keys.
+# Measured 2026-09-20: run as `sysadm` against the testing host, the check announced "sets none
+# of the variables" about a file that sets IRI_KEYCLOAK_HOST_ALIAS. A check that concludes from
+# a file it could not open is exactly what this one reports about other things.
+STUB_SCENARIO=env-unreadable assert_status \
+  "env-reaches-the-units says so when it cannot READ the .env, not that it is empty" \
+  env-reaches-the-units skip "not readable by this SSH account" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=healthy assert_status \
   "env-reaches-the-units passes when no per-host override is set at all" \
   env-reaches-the-units pass "uncontested" -- "${STUB_ARGS[@]}"
