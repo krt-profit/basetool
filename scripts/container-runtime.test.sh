@@ -407,6 +407,14 @@ expect_call "podman creates, streams a tar out, and removes" podman \
   'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a -'
 # The bundle images declare no CMD and no ENTRYPOINT, so `create` refuses them
 # without an argument -- one that is never executed, but has to be there.
+# The two shapes the one helper serves, and the reason it has to tell them apart. The config
+# bundle extracts a TREE into a directory; the Keycloak provider JAR is ONE FILE at a path. The
+# first version unpacked both with `tar -x -C`, which for the second means "extract into a
+# directory named keycloak-spi-stage.jar" -- and tar said so:
+#   tar: /var/lib/iri/keycloak-spi-stage.jar: Cannot open: No such file or directory
+expect_call "a trailing slash means a tree, unpacked in place" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'cp created-cid:/config/. -'
+expect_no_call "...and a tree is never streamed to a single file" podman   'rt_extract_from_image img:tag /config/. /tmp/rt-extract-dir/' 'xOf'
+
 expect_call "a command reaches create, for an image that declares none" podman \
   'rt_extract_from_image img:tag /a /b /bundle' 'create img:tag /bundle'
 expect_call "the container is removed even when the copy FAILS" podman \

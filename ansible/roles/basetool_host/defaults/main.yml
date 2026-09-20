@@ -137,11 +137,16 @@ basetool_host_container_owners:
       - db-keycloak
 
 # Directories owned by the service user itself (container root maps to it).
+#
+# `code` and `code/keycloak/providers` used to be here and are NOT any more. They hold the CONFIG
+# TREE, which the deployer writes on every release and the containers only read -- read from the
+# Docker production host 2026-09-18, where both are deploy-owned. With the service user owning them
+# the first deploy on a Podman host failed at
+#
+#     install: cannot create regular file '/var/iri/code/.docker-compose.yml.tmp': Permission denied
+#
+# They are in basetool_host_deploy_user_dirs below.
 basetool_host_service_user_dirs:
-  - code
-  # the deploy stages the promoted provider JAR here; if it is missing the deploy fails at the LAST
-  # step, after every container is already healthy, which reads like a glitch
-  - code/keycloak/providers
   - secrets
   - monitoring/data
   - monitoring/certs
@@ -159,6 +164,15 @@ basetool_host_manage_observability: true
 # as `prometheus`, which 0755 allows.
 basetool_host_deploy_user_dirs:
   - monitoring/textfile
+  # The config tree: compose file, monitoring config, edge config, Keycloak theme, and the units
+  # a release delivers. Written by the deployer, read by everything else -- 0755 and not 0750,
+  # because a container reads these through a bind mount as ITS OWN uid, which is a namespace uid
+  # and is in no host group. Group membership cannot help here; world-readable is the mechanism,
+  # and it is what the Docker host has always used.
+  - code
+  # The deploy stages the promoted provider JAR here. If it is missing the deploy fails at the LAST
+  # step, after every container is already healthy, which reads like a glitch.
+  - code/keycloak/providers
 
 
 # Three packages, from two repositories this role adds. Versions are NOT pinned here: both

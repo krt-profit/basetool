@@ -538,7 +538,21 @@ rt_extract_from_image() {
       # `cp <cid>:<src> -` writes a tar archive to stdout instead; the pipe crosses the account
       # boundary and the extraction happens as the caller, into its own directory. Same mechanism
       # rt_read_mount already uses to read a volume out for the backup.
-      ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst}" || rc=1
+      #
+      # The destination is a DIRECTORY for the config bundle (`/config/.` -> a tree) and a FILE for
+      # the Keycloak provider JAR (one member). A tar stream has to be unpacked differently for the
+      # two, and treating the second as the first is how the first version of this failed:
+      #
+      #     tar: /var/lib/iri/keycloak-spi-stage.jar: Cannot open: No such file or directory
+      #
+      # `-O` writes the member to stdout instead of to a path, which is exactly the single-file
+      # case. The trailing slash the caller already uses for a tree is what tells them apart, and
+      # an existing directory is honoured too so a caller that omits it still works.
+      if [[ "${dst}" == */ || -d "${dst}" ]]; then
+        ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst%/}" || rc=1
+      else
+        ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xOf - > "${dst}" || rc=1
+      fi
       ;;
   esac
   ${RT_CLI} rm -f "${cid}" >/dev/null 2>&1 || true

@@ -40,6 +40,13 @@
 # This file is tagged [directories], so `--tags directories` skips that one and leaves the
 # variable undefined -- the run then dies with "'basetool_host_service_uid' is undefined", which
 # says nothing about tags. The third file in this role to need the same self-contained lookup.
+# .env may legitimately not exist yet on a freshly provisioned host -- it is operator-provided and
+# arrives before the first deploy, not before this role.
+- name: Look for the host environment file
+  ansible.builtin.stat:
+    path: "{{ basetool_host_root_dir }}/code/.env"
+  register: basetool_host_env_file
+
 - name: Read the service user's uid
   ansible.builtin.getent:
     database: passwd
@@ -97,6 +104,64 @@
     # read is the same as no metric.
     mode: "0755"
   loop: "{{ basetool_host_deploy_user_dirs }}"
+
+# The subtrees a RELEASE owns end to end, reclaimed recursively.
+#
+# `apply_config_tree` mirrors each of these with rsync, which writes a temp file beside the target
+# and renames it -- so it needs write permission on every directory in the tree, not just the top.
+# A host that was brought up by hand before delivery existed has them owned by the service user,
+# and the mirror fails file by file:
+#
+#     rsync: [receiver] mkstemp "/var/iri/code/docker/maintenance/nginx/.http.conf.wOnPrQ" failed: Permission denied
+#
+# A fresh host never sees this, because the role creates them first. `recurse` is safe precisely
+# because these four carry NO operator content: every byte in them arrives with the config bundle
+# and is overwritten on the next release anyway. The operator's own files under code/ --
+# realm-export.json, .env, the keystore -- are deliberately not in this list.
+- name: Reclaim the subtrees a release owns end to end
+  ansible.builtin.file:
+    path: "{{ basetool_host_root_dir }}/code/{{ item }}"
+    state: directory
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    recurse: true
+  loop:
+    - docker
+    - keycloak-theme
+    - monitoring
+    - quadlet
+  when: not ansible_check_mode
+
+# The one directory both accounts need, and the only place a group actually helps.
+#
+# `render-env-d.py` runs as the DEPLOY account and writes one file per service; the units'
+# `EnvironmentFile=` lines are read by the SERVICE USER's systemd (18 of them, measured in the
+# generated units). So deploy writes and iri reads -- and unlike the rest of the config tree these
+# files carry secrets, so world-readable is not an option.
+#
+# SETGID (2750) is what makes it work: the renderer sets a mode and not a group, so without the
+# setgid bit every rendered file would land as deploy:deploy 0640 and the service user's systemd
+# would fail to start the unit on a file it cannot read. With it, new files inherit group iri.
+- name: Create the rendered environment directory, shared between the two accounts
+  ansible.builtin.file:
+    path: "{{ basetool_host_root_dir }}/code/env.d"
+    state: directory
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_service_group }}"
+    mode: "2750"
+
+# .env is operator-provided and this role never writes it -- but deploy.sh reads the keystore path
+# out of it, and render-env-d.py renders every env.d file FROM it, both as the deploy account. On
+# the Docker host it is deploy-owned 0640; here it arrived as iri-owned 0600, which the deployer
+# cannot read at all. Repaired rather than recreated: the CONTENT is a secret this role must not
+# touch, and changing the owner of a file does not read it.
+- name: Let the deploy account read the host environment file
+  ansible.builtin.file:
+    path: "{{ basetool_host_root_dir }}/code/.env"
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    mode: "0640"
+  when: basetool_host_env_file.stat.exists | default(false)
 
 - name: Create the directories a non-root container user writes to
   ansible.builtin.file:
