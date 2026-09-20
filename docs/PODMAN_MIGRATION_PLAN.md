@@ -213,12 +213,22 @@ option.)
 old host still serving the public names.
 **Rollback:** delete the host. Nothing has moved.
 
-### Phase 6 — Cutover and soak
+### Phase 6 — Cutover
 
-- DNS moved. The old host keeps running, untouched.
+> [!important] Superseded 2026-09-20 by @greluc: **there is no soak**
+> This phase originally ran both hosts side by side for a week. It does not. The old host is shut
+> DOWN at the cutover; a rollback is shutting the new one down and bringing the old one back up,
+> with its `iri-deploy.timer` stopped so it returns on the configuration it already has. The two
+> hosts never serve at the same time, in either direction.
+>
+> The consequence for this repository is that its configuration only ever has to be right for the
+> NEW host, which is why the `cadvisor` scrape job could simply be deleted rather than kept alive
+> for a Docker host that would otherwise still be watching.
+
+- DNS moved.
 - The Phase 0 suite green against the public names.
-- Soak with both hosts alive for at least a week. Going back is a DNS change, not a restore.
-- Decommission only after the soak, as a separate decision.
+- The old host shut down, its deploy timer left stopped.
+- Decommission as a separate, later decision.
 
 **Acceptance:** suite green, alerts quiet, a full deploy cycle observed on the new host.
 **Rollback:** DNS back to the old host — minutes, not hours.
@@ -644,7 +654,8 @@ has been quiet for a few days.
 
 ## 5. What this plan does not cover
 
-- **Decommissioning the old host.** A separate decision after the soak.
+- **Decommissioning the old host.** A separate decision, after the new host has run long enough
+  that bringing the old one back is no longer wanted. There is no soak with both alive (2026-09-20).
 - **Migrating the testing host to Podman permanently.** It is the rehearsal ground; whether it stays
   on Podman afterwards is decided once production has.
 - **Anything about the application.** No image, no schema and no endpoint changes here. If this
@@ -2695,16 +2706,18 @@ firing, and `backup.sh` plus `restore-drill.sh` working under Podman with one ru
    for this SAN set is five per week), plus `.env` and the redis ACL.
 7. Conformance suite green against the new host **by IP**, with the old host still serving.
 8. Only then DNS.
-9. Suite green against the public names; both hosts alive; soak.
+9. Suite green against the public names, then the old host shut down with its timer left stopped.
 
 The long window buys steps 2–7 without time pressure, which is exactly where the verification lives.
 
-> [!warning] "Going back is a DNS change" is true for reachability and false for data
-> Phase 6 says the rollback is a DNS change rather than a restore. That holds until the **first
-> write on the new host**. After that, going back either loses those writes or needs its own
-> migration in the opposite direction. The cheap rollback exists in the gap between the cutover and
-> the first user action, and it should be stated that way rather than as a property of the whole
-> soak.
+> [!warning] Going back is a host swap, and it is cheap only until the first write
+> Revised 2026-09-20: there is no soak and the hosts never serve together, so going back is "shut
+> the new one down, bring the old one up, revert DNS" rather than a DNS change alone. Either way the
+> **data** limit is unchanged: after the first write on the new host, going back loses those writes
+> or needs its own migration in the opposite direction. That is what bounds how long the cheap
+> rollback exists, not the reachability.
+
+The executable steps are in [`PODMAN_CUTOVER_RUNBOOK.md`](PODMAN_CUTOVER_RUNBOOK.md).
 
 ### Two decisions, both ruled by @greluc on 2026-09-17: neither is carried
 
@@ -2714,11 +2727,15 @@ gigabyte.
 
 It has one consequence worth writing down rather than discovering: **every alert whose expression
 looks back over a window is blind until that window has filled.** A rule reading `[7d]` says nothing
-for seven days, and a `predict_linear` on disk usage says nothing useful for longer. During the soak
-those alerts are not quiet because the system is healthy — they are quiet because they have no data.
-Phase 4's acceptance is that each one is shown *firing* when its condition is induced, so that is
-where this is caught rather than assumed; the soak's alert silence must not be read as a signal on
-its own until the windows have filled.
+for seven days, and a `predict_linear` on disk usage says nothing useful for longer. In the days
+after the cutover those alerts are not quiet because the system is healthy — they are quiet because
+they have no data. Phase 4's acceptance is that each one is shown *firing* when its condition is
+induced, so that is where this is caught rather than assumed; the early alert silence must not be
+read as a signal on its own until the windows have filled.
+
+That matters more now than it did when this was written, because there is no soak: the old host is
+shut down rather than kept alive as a second opinion, so the new host's own monitoring is the only
+signal from the cutover onwards — and for the first week part of it is structurally blind.
 
 **The 44 MB of redis sessions stay behind.** Everyone is logged out once, which the maintenance
 window absorbs.

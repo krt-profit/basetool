@@ -23,6 +23,7 @@ Memory=1024M
 PidsLimit=512
 AddHost=node-exporter:host-gateway
 AddHost=alloy:host-gateway
+AddHost=podman-exporter:host-gateway
 PodmanArgs=--oom-score-adj=500 --init
 
 [Service]

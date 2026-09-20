@@ -271,6 +271,14 @@ DISPOSITION: dict[str, tuple[str, str]] = {
         "its rootless-Podman support is closed as not planned upstream. Its series come back from "
         "prometheus-podman-exporter plus scripts/cgroup-container-metrics.py -- see the plan's §10.",
     ),
+    # Not a compose service at all: it exists only on the Podman side, installed as a host service
+    # by ansible/roles/basetool_host (tasks/27-observability.yml) and scraped through the alias
+    # below. Recorded here so PODMAN_HOST_ALIASES can be cross-checked against one table.
+    "podman-exporter": (
+        "host-service",
+        "a Podman-only exporter with no Compose counterpart; the role installs it as a user unit "
+        "of the service user, because a system-level one would talk to the root podman.",
+    ),
     "socket-proxy": (
         "deleted",
         "it exists only to hand cAdvisor and Alloy a GET-only view of the Docker socket. There is "
@@ -286,11 +294,11 @@ DISPOSITION: dict[str, tuple[str, str]] = {
 #: `alloy:12345` targets go permanently down. Measured on the testing host 2026-09-20: two of the
 #: five down targets were exactly those.
 #:
-#: The fix deliberately does NOT touch prometheus.yml. That file rides the configuration bundle and
-#: one bundle serves every environment, so a target rewritten for Podman would break the Docker host
-#: during the soak -- where node-exporter IS a container and the name must keep resolving to it.
-#: An alias in the UNIT is where a runtime difference belongs, and the units are now delivered per
-#: runtime.
+#: The alias goes in the UNIT rather than into prometheus.yml, and that survives the decision that
+#: there is no soak. It keeps the scrape configuration readable -- `node-exporter:9100` says what it
+#: scrapes, not where the host happens to be -- and it keeps the one runtime-specific fact in the
+#: one file that is generated per runtime. Writing `host.containers.internal` into prometheus.yml
+#: would work too and would put a Podman concept in a file that has never had one.
 #:
 #: `host-gateway` is podman's own token for "the host this container runs on"; verified on the
 #: testing host that an arbitrary name maps through it, including from the monitoring network.
@@ -298,7 +306,7 @@ DISPOSITION: dict[str, tuple[str, str]] = {
 #: NOT expressed as compose `extra_hosts:`, which the generator already translates: that would apply
 #: to Docker too, where it would override DNS for a container that is right there.
 PODMAN_HOST_ALIASES = {
-    "prometheus": ("node-exporter", "alloy"),
+    "prometheus": ("node-exporter", "alloy", "podman-exporter"),
 }
 
 #: Compose profiles whose services are translated. `dev` and `rollback` are local-stack and

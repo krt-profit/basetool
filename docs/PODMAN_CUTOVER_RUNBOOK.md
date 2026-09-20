@@ -9,9 +9,18 @@ Two properties shape every step below, and both were measured rather than assume
 1. **The data is small and the mechanism is weekly.** Under a gigabyte, moved by `backup.sh` and
    `restore-drill.sh` — the same pair that runs every night and every week in production. The
    cutover's central mechanism is not new code.
-2. **Going back is a DNS change only until the first write on the new host.** After that, going back
-   loses those writes or needs its own migration. The cheap rollback lives in the gap between the
-   cutover and the first user action; it is not a property of the whole soak.
+2. **There is no soak. The two hosts never serve at the same time.** The old host is shut DOWN at
+   the cutover. A rollback means shutting the new one down and bringing the old one back up — on the
+   configuration it already has on disk, with its deploy timer stopped so nothing promoted
+   afterwards can reach it.
+
+   That has one consequence worth stating plainly, because it is the real limit on going back:
+   **the rollback is cheap only until the first write on the new host.** After that, going back
+   either loses those writes or needs its own migration in the opposite direction. Decide before the
+   window how long that window is assumed to last.
+
+   It also means this repository's configuration only ever has to be right for the NEW host. Nothing
+   below keeps a Docker-shaped compromise alive for the benefit of a host that will be switched off.
 
 ---
 
@@ -150,7 +159,8 @@ grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
 sudo ls -1 ~iri/.config/containers/systemd/ 2>/dev/null | wc -l    # expect 0
 ```
 
-On a host that has them, move them aside (do not delete until the soak is over):
+On a host that has them, move them aside (keep them until the new host has been running long
+enough that you would not go back):
 
 ```bash
 sudo -u iri mkdir -p ~iri/.config/containers/systemd.pre-cutover
@@ -321,24 +331,37 @@ host still answering every user.
 
 ### 1.9 Only then, DNS
 
-### 1.10 Conformance against the public names · both hosts alive · soak
-
-Re-enable the deploy timer on the new host only:
+### 1.10 Conformance against the public names, then shut the old host down
 
 ```bash
+# new host only
 systemctl start iri-deploy.timer
 ```
+
+The old host is then shut down. **Leave its `iri-deploy.timer` stopped** — if it is ever brought
+back up, it must come back on the configuration it has on disk and not pull a bundle promoted after
+the cutover. That is what makes "bring the old one back" a complete answer rather than a race.
+
+> [!note] What the old host loses the moment this file ships
+> The `cadvisor` scrape job is gone from `prometheus.yml`, so a resurrected old host running a NEWER
+> bundle would have no container metrics — `basetool:container:*` records "cAdvisor-family or
+> cgroup-family" and it would have neither. With its deploy timer stopped it keeps its own older
+> bundle and is unaffected, which is exactly why the timer stays stopped.
 
 ---
 
 ## 2. The way back
 
-**Before the first write on the new host:** revert DNS. Both hosts are alive; the old one has never
-stopped serving.
+1. **Shut the new host down.**
+2. **Bring the old host up**, with `iri-deploy.timer` still stopped. It comes back on the
+   configuration and images it had at the cutover — nothing promoted since can reach it.
+3. **Revert DNS.**
 
-**After the first write:** the writes on the new host must be migrated back, or accepted as lost.
-Decide *before* the window which of those is acceptable, and for how long the cheap rollback is
-assumed to exist.
+The two hosts never serve at the same time, in either direction.
+
+**What this does not recover:** anything written on the new host after the cutover. Those writes are
+migrated back or accepted as lost, and that is the decision that bounds how long "just bring the old
+one back" remains a real option.
 
 ---
 
