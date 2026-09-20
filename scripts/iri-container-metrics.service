@@ -43,6 +43,11 @@ ExecStart=/var/iri/code/scripts/cgroup-container-metrics.py --output /var/iri/mo
 SuccessExitStatus=0 1
 
 ; --- Hardening -------------------------------------------------------------
+; NoNewPrivileges=true, unlike the other four operational units, and the difference is not an
+; oversight. Those run as `deploy` and reach the containers by sudo-ing to the service user, which
+; the flag forbids outright ("the no new privileges flag is set, which prevents sudo from running
+; as root"). This one runs as root already, invokes no sudo and needs no escalation at all, so the
+; flag costs it nothing and closes a door it never uses.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

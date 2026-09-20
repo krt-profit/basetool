@@ -393,8 +393,28 @@ infra_image_pins() {
   # said so within minutes; the testing host runs no monitoring plane, so nobody
   # was told. The gate was not wrong to exist, only wrong about what "changed"
   # means.
-  grep -Eo 'image:[[:space:]]*(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' "$1" \
-    | sed -E 's/image:[[:space:]]*//; s/@sha256:[0-9a-f]+$//' | sort -u || true
+  # $1 is a TREE, not a file. Under Compose the pins are in docker-compose.yml; under Quadlet
+  # there is no compose file at all and the same pins are `Image=` lines in db-backend.container,
+  # db-keycloak.container and keycloak.container. Reading only the compose file made this gate
+  # compare an empty "old" against a full "new" on every Quadlet tick, so it refused every deploy
+  # as a stateful-infra upgrade -- measured on the testing host 2026-09-18:
+  #
+  #     grep: /var/iri/code/docker-compose.yml: No such file or directory
+  #     CARVE-OUT: postgres/Keycloak image pin changed — refusing to auto-apply
+  #       old:
+  #       new: postgres:18-alpine quay.io/keycloak/keycloak:26.7
+  #
+  # A correct refusal from a wrong premise, which is the hardest kind to notice: the gate looked
+  # like it was working.
+  local tree="$1"
+  {
+    [[ -f "${tree}/docker-compose.yml" ]] \
+      && grep -Eho 'image:[[:space:]]*(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' \
+           "${tree}/docker-compose.yml" 2>/dev/null
+    [[ -d "${tree}/quadlet/systemd" ]] \
+      && grep -Eho '^Image=(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' \
+           "${tree}"/quadlet/systemd/*.container 2>/dev/null
+  } | sed -E 's/^(image:[[:space:]]*|Image=)//; s/@sha256:[0-9a-f]+$//' | sort -u || true
 }
 
 # Emit the compose top-level `networks:` block, comment- and blank-stripped, so a
@@ -460,6 +480,11 @@ snapshot_config_tree() {
     && cp -a "${COMPOSE_DIR}/docker-compose.monitoring.yml" "${dst}/docker-compose.monitoring.yml"
   [[ -d "${COMPOSE_DIR}/monitoring" ]] \
     && cp -a "${COMPOSE_DIR}/monitoring" "${dst}/monitoring"
+  # The Quadlet deployment. Without this a rollback would restore the previous compose file and
+  # the previous digest pin while leaving the NEW units in place -- and under Quadlet the units
+  # are what the pin binds to, so the rollback would put the old digests on the new definitions.
+  [[ -d "${COMPOSE_DIR}/quadlet" ]] \
+    && cp -a "${COMPOSE_DIR}/quadlet" "${dst}/quadlet"
   return 0
 }
 
@@ -501,6 +526,102 @@ apply_config_tree() {
   if [[ -d "${src}/keycloak-theme" ]]; then
     mirror_dir "${src}/keycloak-theme" "${dst}/keycloak-theme"
   fi
+  # The Quadlet units and their environment templates. Mirrored onto the host like any other
+  # bundle payload; install_quadlet_units() below is what moves them from here into the unit
+  # directory, because that step is Podman-only and this function is not.
+  if [[ -d "${src}/quadlet" ]]; then
+    mirror_dir "${src}/quadlet" "${dst}/quadlet"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# install_quadlet_units
+#
+# Put the release's unit files where Quadlet reads them, and render the
+# environment files they name. Podman only; a no-op under Compose, where
+# docker-compose.yml is the deployment and is already applied above.
+#
+# WHY THIS EXISTS AT ALL. Until 2026-09-18 nothing in this repository put a unit
+# file on a host. The bundle did not carry them, the Ansible role states that it
+# never ships them, and this script only checked that the directory was not empty
+# and failed with "has the stack been installed?" if it was. The 39 units on the
+# testing host had arrived by an operator action nobody wrote down. A release
+# could change an image, a health command, a memory limit or an environment
+# variable and have no path to production at all.
+#
+# THE THREE THINGS IT HAS TO GET RIGHT:
+#
+#   1. The drop-ins survive. `<unit>.container.d/10-digest-pin.conf` is written by
+#      THIS script and is what binds the release's digest; a host-specific drop-in
+#      may sit beside it at a higher number. A mirror with --delete over the unit
+#      directory would remove both, so the sync is file-by-file over the bundle's
+#      own names and the `.container.d` directories are never touched.
+#   2. A retired unit is STOPPED before it is removed. Quadlet only generates a
+#      service for a unit file that exists, so deleting the file makes systemd
+#      forget the unit -- while its container keeps running, unmanaged and
+#      invisible to every later reconcile.
+#   3. env.d is rendered from the HOST's .env. The templates carry `KEY=${VAR:?}`
+#      and no values; the secrets are on the host and never leave it. Rendering
+#      before daemon-reload matters: a unit whose EnvironmentFile= does not exist
+#      fails to start, and that failure reads as an application fault.
+# ---------------------------------------------------------------------------
+install_quadlet_units() {
+  local src="${1}/quadlet" installed=0 removed=0
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+
+  if [[ ! -d "${src}/systemd" ]]; then
+    # An older bundle, built before the units rode this channel. Not fatal: the
+    # host keeps the units it has, which is what it has always done.
+    log "config bundle carries no quadlet/systemd — units left as they are (pre-2026-09-18 bundle)"
+    return 0
+  fi
+
+  local unit_dir="${RT_UNIT_DIR:?RT_UNIT_DIR is unset}"
+  install -d "${unit_dir}"
+
+  # Render the environment files the units name, BEFORE anything reloads.
+  if [[ -d "${src}/env.d" ]]; then
+    if [[ -x "${ENV_RENDERER}" ]]; then
+      if ! "${ENV_RENDERER}" --env "${COMPOSE_DIR}/.env"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
+        fail "rendering ${ENV_D_DIR} from the bundle's templates failed — a unit whose EnvironmentFile is missing does not start"
+      fi
+      log "rendered env.d from the bundle's templates"
+    else
+      fail "the bundle carries env.d templates but ${ENV_RENDERER} is not on this host (ansible role: 25-scripts.yml)"
+    fi
+  fi
+
+  # Install every unit the bundle names.
+  local f base
+  for f in "${src}"/systemd/*; do
+    [[ -f "${f}" ]] || continue
+    base="$(basename "${f}")"
+    if [[ ! -f "${unit_dir}/${base}" ]] || ! cmp -s "${f}" "${unit_dir}/${base}"; then
+      install -m 0644 "${f}" "${unit_dir}/${base}"
+      installed=$(( installed + 1 ))
+    fi
+  done
+
+  # Retire what the bundle no longer names. Only files that LOOK like units are
+  # considered, so a `.container.d` directory and anything an operator left beside
+  # them are out of scope by construction rather than by a rule that can drift.
+  local existing name
+  for existing in "${unit_dir}"/*.container "${unit_dir}"/*.network "${unit_dir}"/*.volume; do
+    [[ -f "${existing}" ]] || continue
+    name="$(basename "${existing}")"
+    [[ -f "${src}/systemd/${name}" ]] && continue
+    if [[ "${name}" == *.container ]]; then
+      # Stop it while systemd still knows about it. Best effort: a unit that was
+      # never started is not an error, and a stop that fails must not block the
+      # release -- it is reported and the file still goes.
+      rt_service_stop "${name%.container}" >/dev/null 2>&1         || log "WARN: could not stop retired unit ${name%.container} before removing it"
+    fi
+    rm -f "${existing}"
+    removed=$(( removed + 1 ))
+  done
+
+  log "quadlet units: ${installed} installed/updated, ${removed} retired (${unit_dir})"
+  return 0
 }
 
 # Idempotently reconcile ONE monitoring service's LOADED config against the on-disk config tree.
@@ -805,7 +926,13 @@ check_only_verify_one() {
 }
 
 # --- Pre-flight -------------------------------------------------------------
-require_file "${COMPOSE_DIR}/docker-compose.yml"
+# NOT docker-compose.yml, and that is a correction rather than a relaxation. This line demanded a
+# compose file on EVERY host, and it ran before rt_detect -- so on a Quadlet host, where the unit
+# files are the deployment and there is no compose file at all, the deployer aborted with
+#   FATAL: required file missing: /var/iri/code/docker-compose.yml
+# before it could reach the runtime detection that would have told it so. Measured on the testing
+# host 2026-09-18. The compose file is still required under Docker; the check moved to where the
+# backend is known, beside the other runtime-specific pre-flight checks.
 require_file "${COMPOSE_DIR}/.env"
 require_file "${TOKEN_FILE}"
 
@@ -836,6 +963,12 @@ mkdir -p "${STATE_DIR}"
 # order is load-bearing.
 export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 install -d -m 0700 "${DOCKER_CONFIG}"
+# One credential file for three tools. cosign (go-containerregistry) reads
+# $DOCKER_CONFIG/config.json; skopeo and podman (containers/image) read $REGISTRY_AUTH_FILE
+# before anything else. Pointing the second at the first means a single `login` serves the
+# tag resolution, the signature check and the pull, instead of three tools each looking in a
+# different place and two of them finding nothing.
+export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-${DOCKER_CONFIG}/config.json}"
 
 # cosign writes its Sigstore/TUF cache under $HOME/.sigstore. The deploy user has
 # no usable $HOME (created with --no-create-home, and the systemd unit's
@@ -845,6 +978,13 @@ install -d -m 0700 "${DOCKER_CONFIG}"
 # the sandbox. docker resolves its credential via DOCKER_CONFIG (set above), NOT
 # $HOME, so this does not affect the registry login.
 export HOME="${IRI_HOME:-${STATE_DIR}}"
+
+# Where the units' EnvironmentFile= lines point, and the renderer that fills it. The templates
+# ride the config bundle and carry only `KEY=${VAR:?}` placeholders; the VALUES are in the host's
+# own .env and never leave it, which is the whole reason this is rendered here rather than baked
+# into the bundle at build time.
+ENV_D_DIR="${IRI_ENV_D_DIR:-${COMPOSE_DIR}/env.d}"
+ENV_RENDERER="${IRI_ENV_RENDERER:-${IRI_SCRIPT_DIR}/render-env-d.py}"
 
 # Decide which runtime is in front of us before anything else touches it, and
 # fail fast on a host that has neither. `rt_detect` TRIES rather than infers —
@@ -871,6 +1011,8 @@ case "${RT_BACKEND}" in
     if ! docker compose version --short >/dev/null 2>&1; then
       fail "docker compose v2 not available; install Docker Engine ≥ 23.x"
     fi
+    # The deployment itself, under this runtime.
+    require_file "${RT_COMPOSE_FILE}"
     ;;
   podman)
     # The Podman equivalents of compose's two guarantees. `skopeo` is how a tag
@@ -891,8 +1033,12 @@ case "${RT_BACKEND}" in
     fi
     [[ -n "${QUADLET_BIN}" && -x "${QUADLET_BIN}" ]] \
       || fail "the Quadlet generator is missing (looked in /usr/libexec/podman and /usr/lib/podman); this host cannot turn .container files into services"
+    # The DIRECTORY, not the units in it. An empty one is the normal state of a freshly
+    # provisioned host: ansible/roles/basetool_host creates it, and the first deploy fills it
+    # from the config bundle. Demanding units here would make that first deploy impossible,
+    # which is the shape this check had until the bundle began carrying them.
     [[ -n "${RT_UNIT_DIR}" && -d "${RT_UNIT_DIR}" ]] \
-      || fail "no Quadlet unit directory found (${RT_UNIT_DIR:-unset}) — has the stack been installed?"
+      || fail "no Quadlet unit directory (${RT_UNIT_DIR:-unset}) — run the basetool_host role first; it creates the directory this fills"
     ;;
 esac
 
@@ -1179,6 +1325,24 @@ if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_K
   KEYCLOAK_SPI_CHANGED=true
 fi
 
+# A Podman host with no unit files has not received this release's DEFINITION, whatever the
+# marker claims about its digests -- and that is the normal state of a freshly provisioned host,
+# because ansible/roles/basetool_host creates the unit directory and deliberately puts nothing in
+# it. Treated as a config change so the bundle is staged and install_quadlet_units fills it.
+#
+# Decided HERE, beside the other config divergences, and not further down: below this point sits
+# the idempotence fast exit, and a host whose marker happens to match would take it and report
+# "no change" for a stack that does not exist.
+if [[ "${RT_BACKEND}" == podman && "${CONFIG_CHANGED}" != "true" ]]; then
+  shopt -s nullglob
+  host_units=( "${RT_UNIT_DIR}"/*.container )
+  shopt -u nullglob
+  if (( ${#host_units[@]} == 0 )); then
+    CONFIG_CHANGED=true
+    log "no Quadlet units on this host — staging the config bundle to install them"
+  fi
+fi
+
 # --- Idempotence check ------------------------------------------------------
 # The marker only records what the last SUCCESSFUL deploy applied — trusting it
 # alone is not enough. A manual `docker compose up` without the digest-pin
@@ -1198,6 +1362,18 @@ fi
 # containers are judged by their state instead of being reported as absent.
 running_stack_drift() {
   local entry svc image digest cids cid probe state img_id repo_digests img_ok
+  # Under Quadlet the unit files ARE the stack. None of them means nothing can be
+  # running, and the per-service probe below would report three missing containers
+  # without ever saying why -- so the cause is named once, first.
+  if [[ "${RT_BACKEND}" == podman ]]; then
+    local -a units=()
+    shopt -s nullglob
+    units=( "${RT_UNIT_DIR}"/*.container )
+    shopt -u nullglob
+    if (( ${#units[@]} == 0 )); then
+      echo "structural quadlet: no unit files in ${RT_UNIT_DIR}"
+    fi
+  fi
   for entry in \
     "backend|${BACKEND_IMAGE}|${BACKEND_DIGEST}" \
     "frontend|${FRONTEND_IMAGE}|${FRONTEND_DIGEST}" \
@@ -1495,9 +1671,24 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # 5-minute loop. Refuse to auto-apply it; record the target so we alert ONCE
   # and then skip quietly until a new promotion or an operator --force. The
   # operator runs the documented manual upgrade, then re-runs with --force.
-  OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}/docker-compose.yml")"
-  NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}/docker-compose.yml")"
-  if [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]]; then
+  OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}")"
+  NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}")"
+  # A host that has never received a definition has nothing to compare, and "everything is new" is
+  # not an upgrade. On the Docker deployment this never arose, because the compose file was placed
+  # by hand at bootstrap and was always there by the first tick. A Quadlet host has no such step:
+  # the bundle IS the first definition, so the carve-out saw an empty `old` against a full `new`
+  # and refused the very first deploy as a stateful-infra upgrade -- measured on the testing host
+  # 2026-09-18, twice, with `old:` printing as an empty line.
+  #
+  # The test is whether a definition EXISTS, not whether the pins are empty: a compose file that
+  # genuinely names no postgres or Keycloak image is a different situation and must still compare.
+  HAS_OLD_DEFINITION=false
+  if [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] || [[ -d "${COMPOSE_DIR}/quadlet/systemd" ]]; then
+    HAS_OLD_DEFINITION=true
+  fi
+  if [[ "${HAS_OLD_DEFINITION}" != "true" ]]; then
+    log "first config bundle on this host — no previous definition to compare, so the stateful-infra gate does not apply"
+  elif [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]]; then
     if [[ "${FORCE}" != "true" ]]; then
       if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
         log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
@@ -1528,7 +1719,13 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # A change to the compose `networks:` block cannot be applied by an in-place
   # `up -d` (it strands container name resolution, #974). Detect it now, while the
   # LIVE compose is still on disk, so the apply below forces a clean down+up.
-  if [[ "$(network_block "${COMPOSE_DIR}/docker-compose.yml")" \
+  # Compose only. Under Quadlet the networks are .network units, and a changed subnet is applied
+  # by the unit install plus daemon-reload rather than by a full-stack down/up -- there is no
+  # compose project whose bridges have to be recreated together. Comparing a missing file against
+  # a present one would report a topology change on every single tick and pay a full-stack outage
+  # for it.
+  if [[ "${RT_BACKEND}" == docker ]] \
+     && [[ "$(network_block "${COMPOSE_DIR}/docker-compose.yml")" \
         != "$(network_block "${CONFIG_STAGE_DIR}/docker-compose.yml")" ]]; then
     NETWORK_TOPOLOGY_CHANGED=true
     log "network topology changed in the promoted compose -> clean recreate on apply (#974)"
@@ -1539,8 +1736,13 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
   [[ -f "${COMPOSE_DIR}/.env" ]] \
     || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
+  # The Quadlet half of the same swap. Under Compose this is a no-op; under Quadlet the unit
+  # files ARE the definition the apply below acts on, so they have to be in place before the pin
+  # is written and long before anything is started.
+  install_quadlet_units "${COMPOSE_DIR}"
   log "config applied"
 fi
+
 
 # --- Apply ------------------------------------------------------------------
 cd "${COMPOSE_DIR}"
@@ -1681,6 +1883,10 @@ log "recorded health-check failure #${FAIL_COUNT} for this target; next retry ba
 if [[ "${CONFIG_CHANGED}" == "true" ]] && [[ -d "${CONFIG_PREVIOUS_DIR}" ]]; then
   log "restoring previous host config"
   apply_config_tree "${CONFIG_PREVIOUS_DIR}" "${COMPOSE_DIR}"
+  # And the units with it. Restoring the compose file and the digest pin while leaving the NEW
+  # unit files in place would put the previous release's digests on the failed release's
+  # definitions -- a state neither release was ever tested in.
+  install_quadlet_units "${COMPOSE_DIR}"
 fi
 
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then

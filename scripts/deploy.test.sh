@@ -296,6 +296,17 @@ case "${1:-}" in
     exit 0
     ;;
   create) echo "created-cid"; exit 0 ;;
+  cp)
+    # podman cp <cid>:/config - -- a TAR ON STDOUT, which is what the seam asks for under podman
+    # so that the extraction happens as the CALLER and not as the service user. The stub has to
+    # produce a real archive: a stub that copied a directory instead would pass while the code it
+    # is standing in for streams, and the difference is the whole reason the podman arm exists.
+    if [[ -n "${FAKE_CONFIG_BUNDLE:-}" && "${3:-}" == "-" ]]; then
+      tar -cf - -C "${FAKE_CONFIG_BUNDLE}" . 2>/dev/null
+    fi
+    exit 0
+    ;;
+  rm) exit 0 ;;
   pull)
     # What deploy.sh asks podman to pull has to be a REFERENCE. Under compose a
     # SERVICE name is enough, because compose maps it to that service's pinned
@@ -1631,10 +1642,28 @@ podman_converged_env() {
 }
 
 # Creates the Quadlet unit directory the pre-flight insists on and exports its
-# path. Called after setup_host, before podman_env is expanded.
-podman_units() {
+# path, and seeds it with the units a host that has been deployed to actually
+# has. Called after setup_host, before podman_env is expanded.
+#
+# The seeding is not decoration. A Podman host with an EMPTY unit directory has
+# no stack at all, so the deployer treats it as a config divergence and stages
+# the bundle to fill it -- which means a scenario that left the directory empty
+# was modelling a host that cannot exist, and testing the wrong path.
+# podman_units_empty() is for the one scenario that wants that state on purpose.
+podman_units_empty() {
   T_UNIT_DIR="${1}/units"
   mkdir -p "${T_UNIT_DIR}"
+}
+
+podman_units() {
+  podman_units_empty "$1"
+  local svc
+  for svc in backend frontend ingest; do
+    printf '[Container]
+ContainerName=%s
+Image=placeholder
+' "${svc}"       > "${T_UNIT_DIR}/${svc}.container"
+  done
 }
 
 scenario_podman_resolves_without_pulling() {
@@ -1799,6 +1828,203 @@ scenario_podman_pin_is_a_dropin
 scenario_podman_health_gate_rolls_back
 scenario_podman_refuses_without_skopeo
 scenario_podman_refuses_without_quadlet
+
+# --- the Quadlet units as a release payload --------------------------------
+#
+# Until 2026-09-18 nothing put a unit file on a host: the config bundle did not
+# carry them, the Ansible role states it never ships them, and deploy.sh only
+# checked the directory was not empty. The units on the testing host had arrived
+# by an operator action nobody recorded, and a release could change an image, a
+# health command or a memory limit with no path to production at all.
+
+# A bundle fixture: a compose file (the docker arm still needs one), the units,
+# and an env.d template. $1 is the directory to build it in.
+write_bundle() {
+  local b="$1"
+  mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
+  echo "# promoted compose" > "${b}/docker-compose.yml"
+  printf '[Container]\nContainerName=backend\nImage=placeholder\n'  > "${b}/quadlet/systemd/backend.container"
+  printf '[Container]\nContainerName=frontend\nImage=placeholder\n' > "${b}/quadlet/systemd/frontend.container"
+  printf '[Network]\nNetworkName=net-app\n'                          > "${b}/quadlet/systemd/net-app.network"
+  # shellcheck disable=SC2016
+  # Literal on purpose: an env.d TEMPLATE carries the placeholder, and render-env-d.py is what
+  # substitutes it on the host. Expanding it here would bake this machine's value into the fixture.
+  printf 'BACKEND_TOKEN=${IRI_KEYSTORE_HOST_PATH:?}\n'                > "${b}/quadlet/env.d/backend.env.tmpl"
+}
+
+# A stub renderer, so the scenario tests what DEPLOY.SH does rather than
+# re-testing render-env-d.py, which has its own suite.
+write_env_renderer() {
+  cat > "${T_FAKE_BIN}/render-env-d.py" <<'REND'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'render-env-d %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+out=""
+prev=""
+for a in "$@"; do
+  [[ "${prev}" == "--out" ]] && out="$a"
+  prev="$a"
+done
+[[ -n "${out}" ]] || exit 2
+mkdir -p "${out}"
+echo "rendered" > "${out}/backend.env"
+REND
+  chmod +x "${T_FAKE_BIN}/render-env-d.py"
+}
+
+scenario_podman_bundle_installs_the_units() {
+  echo "Scenario: the config bundle delivers the Quadlet units, which is how a release reaches a Podman host"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+
+  # The host as it is before the release: one stale unit, one that this release
+  # retires, and a digest pin drop-in that must survive both.
+  printf '[Container]\nContainerName=backend\nImage=OLD\n' > "${T_UNIT_DIR}/backend.container"
+  printf '[Container]\nContainerName=retired\n'             > "${T_UNIT_DIR}/retired.container"
+  mkdir -p "${T_UNIT_DIR}/backend.container.d"
+  echo "# an operator drop-in" > "${T_UNIT_DIR}/backend.container.d/20-host-alias.conf"
+
+  # A marker whose CONFIG digest differs from the registry's, so the bundle is staged.
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+  assert_exit 0 "$rc" "podman: a deploy that ships new units exits 0"
+
+  if grep -q '^Image=placeholder$' "${T_UNIT_DIR}/backend.container" 2>/dev/null; then
+    record 1 "podman: the release's unit replaced the stale one on the host"
+  else
+    record 0 "podman: the release's unit replaced the stale one on the host"
+  fi
+  if [[ -f "${T_UNIT_DIR}/net-app.network" ]]; then
+    record 1 "podman: networks and volumes ride the same path as containers"
+  else
+    record 0 "podman: networks and volumes ride the same path as containers"
+  fi
+  # The drop-in is what BINDS the digest this release pinned. A mirror with
+  # --delete over the unit directory would take it with the retired unit, and the
+  # stack would silently fall back to whatever the base unit's Image= says.
+  if [[ -f "${T_UNIT_DIR}/backend.container.d/20-host-alias.conf" ]]; then
+    record 1 "podman: an operator drop-in survives a unit install"
+  else
+    record 0 "podman: an operator drop-in survives a unit install"
+  fi
+  if [[ -f "${T_COMPOSE_DIR}/env.d/backend.env" ]]; then
+    record 1 "podman: env.d is rendered on the host, from the host's own .env"
+  else
+    record 0 "podman: env.d is rendered on the host, from the host's own .env"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_retired_unit_is_stopped_then_removed() {
+  echo "Scenario: a unit the release retires is stopped BEFORE its file is removed"
+  local tmp
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+  printf '[Container]\nContainerName=retired\n' > "${T_UNIT_DIR}/retired.container"
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" >/dev/null 2>&1 || true
+
+  if [[ -f "${T_UNIT_DIR}/retired.container" ]]; then
+    record 0 "podman: the retired unit file is removed"
+  else
+    record 1 "podman: the retired unit file is removed"
+  fi
+  # Quadlet only generates a service for a unit file that EXISTS. Delete the file
+  # first and systemd forgets the unit while its container keeps running --
+  # unmanaged, and invisible to every later reconcile.
+  assert_docker "stop retired.service" "podman: ...and it was stopped first, so no container is orphaned"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_first_deploy_fills_an_empty_unit_dir() {
+  echo "Scenario: the first deploy on a freshly provisioned host installs the units it finds none of"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units_empty "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+  # The marker matches the registry exactly, so nothing is "changed" -- and the unit
+  # directory is empty, which is what the Ansible role leaves behind. Without the
+  # empty-directory path this deploy would resolve, verify, pin and start nothing,
+  # and report success.
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+  assert_exit 0 "$rc" "podman: a converged host with no units still exits 0"
+  if [[ -f "${T_UNIT_DIR}/backend.container" ]]; then
+    record 1 "podman: an empty unit directory is filled from the bundle"
+  else
+    record 0 "podman: an empty unit directory is filled from the bundle"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_runs_without_a_compose_file() {
+  echo "Scenario: a Quadlet host has no compose file, and the pre-flight must not demand one"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  # The state a real Quadlet host is in: the units are the deployment, and there is
+  # no docker-compose.yml anywhere. The pre-flight used to require one BEFORE
+  # rt_detect ran, so it aborted with "required file missing" before it could
+  # discover it was on a runtime that has no compose at all.
+  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
+  printf '[Container]\nContainerName=backend\nImage=x\n' > "${T_UNIT_DIR}/backend.container"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a host with no compose file deploys"
+  assert_excludes "required file missing" "podman: and the pre-flight does not ask for one"
+  rm -rf "${tmp}"
+}
+
+scenario_docker_still_requires_its_compose_file() {
+  echo "Scenario: ...and Docker still refuses without one, because there it IS the deployment"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 1 "$rc" "docker: a host without a compose file still refuses"
+  assert_contains "docker-compose.yml" "docker: and names the file it needs"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_bundle_installs_the_units
+scenario_podman_retired_unit_is_stopped_then_removed
+scenario_podman_first_deploy_fills_an_empty_unit_dir
+scenario_podman_runs_without_a_compose_file
+scenario_docker_still_requires_its_compose_file
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

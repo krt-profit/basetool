@@ -45,6 +45,11 @@ RT_SYSTEMCTL="${RT_SYSTEMCTL:-}"
 #: Where Quadlet reads unit files from, for the Podman backend.
 RT_UNIT_DIR="${RT_UNIT_DIR:-}"
 
+# Where systemd records which users may run services without a login session. A
+# variable, not a literal, only so the self-test can point detection at a fixture
+# -- on a host it is always this path.
+RT_LINGER_DIR="${RT_LINGER_DIR:-/var/lib/systemd/linger}"
+
 # Defers to the caller's own `fail` when it has one, so a sourcing script keeps
 # its logging and its exit path instead of dying differently depending on which
 # layer happened to notice.
@@ -89,7 +94,34 @@ rt_detect() {
   if command -v podman >/dev/null 2>&1; then
     RT_BACKEND=podman
     # Already the owning user?
-    if podman ps --format '{{.Names}}' >/dev/null 2>&1; then
+    #
+    # "Can I run podman" is NOT "do I own the containers", and the first version of
+    # this asked the wrong one. EVERY account with a podman binary can run
+    # `podman ps` against its own empty store, including the deploy account that
+    # runs this script. Measured on the testing host 2026-09-18: deploy passed the
+    # test, detection stopped here, RT_CLI became a bare `podman` pointed at
+    # deploy's own store, and RT_UNIT_DIR became
+    # /var/lib/iri/.config/containers/systemd -- the deploy account's HOME -- so
+    # the deployer went looking for the stack's units in a directory that has
+    # never held one and aborted with "no Quadlet unit directory".
+    #
+    # LINGERING is the qualifying signal, and it is the same one the bridge below
+    # already uses: "this user runs services without a login session" is exactly
+    # the declaration that it owns a rootless stack. An account that merely has
+    # podman does not make that claim. Checking it first also costs nothing on the
+    # host where this branch IS right -- an operator running the script as the
+    # service user, which lingers.
+    #
+    # The name is captured and CHECKED before it is used in a path. Inlining
+    # `$(id -un)` looked tidier and was wrong: when id fails the test becomes
+    # `[[ -e "${RT_LINGER_DIR}/" ]]`, which is TRUE for any directory that
+    # exists -- so the branch this guard was added to prevent would fire on
+    # every host where the name could not be read, which is precisely where
+    # least is known. Found by the self-test, whose staged PATH cannot run id.
+    local me
+    me="$(id -un 2>/dev/null || true)"
+    if [[ -n "${me}" && -e "${RT_LINGER_DIR}/${me}" ]] \
+       && podman ps --format '{{.Names}}' >/dev/null 2>&1; then
       RT_CLI=podman
       RT_SYSTEMCTL="systemctl --user"
       RT_UNIT_DIR="${RT_UNIT_DIR:-${HOME}/.config/containers/systemd}"
@@ -102,7 +134,7 @@ rt_detect() {
     # and the `-e` guard is what makes an EMPTY directory iterate zero times
     # instead of once over the literal pattern.
     local lingerfile u uid
-    for lingerfile in /var/lib/systemd/linger/*; do
+    for lingerfile in "${RT_LINGER_DIR}"/*; do
       [[ -e "${lingerfile}" ]] || continue
       u="$(basename "${lingerfile}")"
       uid="$(id -u "${u}" 2>/dev/null)" || continue
@@ -120,11 +152,35 @@ rt_detect() {
       if sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
         RT_CLI="sudo -n -u ${u} podman"
         RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=/run/user/${uid} systemctl --user"
-        RT_UNIT_DIR="$(getent passwd "${u}" | cut -d: -f6)/.config/containers/systemd"
+        # NOT the owning user's home. A deploy account cannot even TRAVERSE it:
+        # measured on the testing host 2026-09-18, /home/iri is 0750 iri:iri, so
+        # `[[ -d ~iri/.config/containers/systemd ]]` is false for the account that
+        # has to install units there, and the pre-flight aborted with "no Quadlet
+        # unit directory" pointing at a directory holding 39 units.
+        #
+        # podman-systemd.unit(5) as shipped by podman 5.8.2 lists four rootless
+        # search paths, and one of them is exactly this case -- a system location
+        # for one user's units:
+        #
+        #     $XDG_RUNTIME_DIR/containers/systemd/
+        #     $XDG_CONFIG_HOME/containers/systemd/  or  ~/.config/containers/systemd/
+        #     /etc/containers/systemd/users/$(UID)
+        #     /etc/containers/systemd/users/
+        #
+        # The third is owned by the deploy account (ansible role, 30-directories)
+        # and read by the service user's Quadlet generator on daemon-reload. It
+        # needs no privilege beyond the account's own, and it keeps the deployer
+        # out of the service user's home entirely.
+        #
+        # PRECEDENCE MATTERS AT CUTOVER: the home directory is searched FIRST, so a
+        # unit of the same name left in ~/.config/containers/systemd SHADOWS the
+        # delivered one, silently and permanently. A host that was brought up by
+        # hand has to have those removed once delivery is in place.
+        RT_UNIT_DIR="${RT_UNIT_DIR:-/etc/containers/systemd/users/${uid}}"
         return 0
       fi
     done
-    rt_die "podman is installed but no user could be found that owns the containers"
+    rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR})"
   fi
 
   rt_die "this host has neither a working docker nor a podman"
@@ -171,7 +227,24 @@ rt_resolve_digest() {
 # -----------------------------------------------------------------------------
 rt_login() {
   local registry="$1" user="$2" pwfile="$3"
-  ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}"
+  ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}" || return 1
+
+  # TWO identities, and that is not a duplicate call. Under Podman the images are pulled by the
+  # SERVICE USER (RT_CLI is `sudo -u <svc> podman`), while the tag is resolved by `skopeo` and the
+  # signature checked by `cosign` -- both of which run as the DEPLOY account, out of its own
+  # credential store. Logging in only through RT_CLI leaves that store empty, and the run dies at
+  #
+  #     FATAL: cannot resolve ghcr.io/krt-profit/basetool-backend:stable (tag missing or no GHCR access)
+  #
+  # which reads exactly like an expired token. Measured on the testing host 2026-09-18, where the
+  # same tag resolved perfectly as the service user and not at all as the deployer.
+  #
+  # REGISTRY_AUTH_FILE (honoured by the containers/image library that skopeo and podman share) is
+  # pointed at the Docker-style config.json that cosign reads, so one file serves all three tools.
+  # Under Docker RT_CLI is already `docker` and this second call is the same login again, which is
+  # idempotent and costs one request.
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+  podman login "${registry}" --username "${user}" --password-stdin < "${pwfile}"
 }
 
 # -----------------------------------------------------------------------------
@@ -448,7 +521,26 @@ rt_extract_from_image() {
   else
     cid="$(${RT_CLI} create "${ref}" 2>/dev/null)" || return 1
   fi
-  ${RT_CLI} cp "${cid}:${src}" "${dst}" || rc=1
+  case "${RT_BACKEND}" in
+    docker)
+      # The daemon runs as root and writes the destination itself, which is what the production
+      # deployment has always done.
+      ${RT_CLI} cp "${cid}:${src}" "${dst}" || rc=1
+      ;;
+    podman)
+      # A TAR STREAM, not a direct copy, and the difference is the account doing the writing.
+      # RT_CLI here is `sudo -u <service user> podman`, so a plain `cp` has the SERVICE USER write
+      # into the DEPLOY account's staging directory, and podman says so at length:
+      #
+      #     copier: put: error creating "/docker": mkdir /docker: permission denied
+      #
+      # Measured on the testing host 2026-09-18, immediately after the signatures verified.
+      # `cp <cid>:<src> -` writes a tar archive to stdout instead; the pipe crosses the account
+      # boundary and the extraction happens as the caller, into its own directory. Same mechanism
+      # rt_read_mount already uses to read a volume out for the backup.
+      ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst}" || rc=1
+      ;;
+  esac
   ${RT_CLI} rm -f "${cid}" >/dev/null 2>&1 || true
   return "${rc}"
 }

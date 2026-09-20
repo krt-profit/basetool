@@ -62,15 +62,48 @@ StandardOutput=append:/var/log/iri-backup.log
 StandardError=append:/var/log/iri-backup.log
 
 ; --- Hardening (mirrors iri-deploy.service) --------------------------------
-NoNewPrivileges=true
+; NOT NoNewPrivileges=true, and the reason is the whole point of this unit.
+;
+; This service's job is to act AS ANOTHER USER: under rootless Podman the containers belong to the
+; service account, and the deploy account reaches them through a sudoers rule naming two commands
+; against that one user (ansible/roles/basetool_host/tasks/22-deploy-user.yml). NoNewPrivileges
+; forbids exactly that, and sudo says so rather than failing quietly:
+;
+;     sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+;
+; Measured on the testing host 2026-09-18: without the flag the same call lists all eleven
+; containers; with it, the runtime detection finds no user that owns any and the unit dies with
+; "podman is installed but no lingering user could be found". All four operational units carried
+; the flag, so none of them could ever have run on the platform this migration moves to.
+;
+; What is NOT lost. The privilege boundary was never this flag -- it is the sudoers rule, which
+; names two commands and one target user and is strictly narrower than the `Group=docker` this
+; replaces (that group is root-equivalent by design: it can bind-mount / into a privileged
+; container). Everything else below stays: ProtectSystem=strict, ProtectHome, PrivateTmp,
+; PrivateDevices, the kernel protections, RestrictNamespaces, and a ReadWritePaths list of four
+; directories.
+;
+; On the Docker host the flag was compatible because group membership is not a privilege GAIN.
+; It is removed on both, so the two deployments stay one file.
 ProtectSystem=strict
-ProtectHome=true
+; ProtectHome=read-only, NOT true. `true` makes /home an inaccessible empty tmpfs, and rootless
+; podman has to resolve the SERVICE user's home to find its container store:
+;
+;     cannot resolve /home/iri: lstat /home/iri: permission denied
+;
+; read-only keeps the protection that matters here -- this unit has no business writing into
+; anybody's home -- and was measured working on the testing host 2026-09-18, against a baseline
+; taken seconds earlier so a transient rootless-podman state could not be mistaken for a verdict.
+ProtectHome=read-only
 PrivateTmp=true
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-RestrictNamespaces=true
+; NOT RestrictNamespaces=true. Rootless Podman IS a user namespace: the flag makes the container
+; runtime fail with "cannot set user namespace" before it reaches any container. There is no
+; narrower form that works -- `RestrictNamespaces=user` fails identically, because podman needs
+; mount, pid, ipc, net and uts as well.
 RestrictRealtime=true
 LockPersonality=true
 ; Writable paths the script needs:

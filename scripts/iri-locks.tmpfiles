@@ -1,0 +1,31 @@
+# systemd-tmpfiles rules for the Profit Basetool operational locks.
+#
+# WHY THIS FILE EXISTS. deploy.sh, backup.sh and docker-cleanup.sh coordinate through two flocks
+# under /var/lock, which is a symlink to /run/lock -- a tmpfs, emptied at every boot. Whether an
+# unprivileged account can create a file there is a DISTRIBUTION decision, not a project one, and
+# the two platforms disagree:
+#
+#   Ubuntu 24.04 (the Docker host)   /run/lock  drwxrwxrwt  root:root   -> deploy just creates it
+#   Rocky Linux 10 (the new host)    /run/lock  drwxr-xr-x  root:root   -> Permission denied
+#
+# Measured on both, 2026-09-18. On Rocky the deployer got as far as reporting its runtime and then
+# died on
+#
+#     /var/iri/code/scripts/deploy.sh: line 1207: /var/lock/iri-deploy.lock: Permission denied
+#
+# every five minutes, forever. Nothing about the scripts is wrong: they have used this path since
+# the Docker deployment and the backup depends on sharing the SAME lock as the deploy, so moving
+# it under the deploy account's own state directory would be a silent change to that coordination.
+#
+# Creating the files here instead is the mechanism the platform provides for a tmpfs path: they
+# are re-created on every boot, before any timer fires, owned by the account that has to write
+# them. `f` creates only when absent, so an existing lock is never truncated under a running
+# deploy.
+#
+# The mode is 0600 and the owner is the deploy account: nothing else takes these locks.
+#
+# Installed to /etc/tmpfiles.d/iri-locks.conf by ansible/roles/basetool_host/tasks/25-scripts.yml.
+
+#Type Path                            Mode User   Group  Age Argument
+f     /var/lock/iri-deploy.lock         0600 deploy deploy -   -
+f     /var/lock/iri-docker-cleanup.lock 0600 deploy deploy -   -

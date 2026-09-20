@@ -139,9 +139,37 @@ for util in bash sh env id basename getent cut ls sudo; do
   util_path="$(command -v "$util" 2>/dev/null)" || continue
   ln -sf "$util_path" "${MINIMAL}/${util}" 2>/dev/null     || cp "$util_path" "${MINIMAL}/${util}" 2>/dev/null || true
 done
+# STAGED IS NOT THE SAME AS RUNNABLE, and the difference is not cosmetic. Where
+# `ln -sf` copies instead of linking -- MSYS/Git Bash on Windows -- a copied
+# binary cannot find its runtime library and exits 127 with "error while loading
+# shared libraries". Detection calls `id -un`, so a broken `id` there made
+# rt_detect take a branch on an EMPTY username, which is the exact condition the
+# library now guards against. The stage is patched only when a utility genuinely
+# fails to run, so on Linux nothing below happens at all.
+if ! PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
+  minimal_srcdir="$(dirname "$(command -v id)")"
+  for runtime_lib in "${minimal_srcdir}"/msys-*.dll "${minimal_srcdir}"/cyg*.dll; do
+    [[ -e "${runtime_lib}" ]] || continue
+    cp "${runtime_lib}" "${MINIMAL}/" 2>/dev/null || true
+  done
+fi
 if [[ ! -x "${MINIMAL}/bash" ]]; then
   say "  FATAL: could not stage a minimal PATH (no bash found)"; exit 2
 fi
+# Asserted, not hoped for: every case below reads a username out of the staged
+# PATH, and one that cannot produce one tests nothing.
+if PATH="${MINIMAL}" id -un >/dev/null 2>&1; then
+  ok "the staged PATH can actually run its utilities"
+else
+  bad "the staged PATH cannot run \`id\` — every detection case below is meaningless"
+fi
+
+# A linger directory that does NOT name the current user, which is the state the
+# deploy account is in: it can run podman, and it owns nothing.
+NO_LINGER="${WORK}/linger-none"; mkdir -p "$NO_LINGER"
+# ...and one that does.
+SELF_LINGER="${WORK}/linger-self"; mkdir -p "$SELF_LINGER"
+: > "${SELF_LINGER}/$(id -un)"
 
 detect_in() { # $1 = directory holding the CLIs that exist; prints the backend
   # shellcheck disable=SC2030,SC2031
@@ -150,9 +178,32 @@ detect_in() { # $1 = directory holding the CLIs that exist; prints the backend
     set +e
     PATH="$1:${MINIMAL}"
     unset RT_BACKEND RT_CLI RT_SYSTEMCTL
+    # shellcheck disable=SC2034
+    # Read by the library sourced on the next line, which shellcheck does not follow.
+    RT_LINGER_DIR="${2:-${SELF_LINGER}}"
     # shellcheck disable=SC1090
     . "$LIB"
     rt_detect 2>/dev/null && printf '%s' "${RT_BACKEND}"
+  )
+}
+
+# Prints "<backend>|<cli>|<unit dir>" so a case can assert WHICH podman was
+# chosen, not merely that podman was.
+detect_detail() {
+  # shellcheck disable=SC2030,SC2031,SC2034
+  # The subshell IS the isolation, as in run_rt. RT_LINGER_DIR reads as unused because its only
+  # consumer is the library sourced two lines below, which shellcheck does not follow; the three
+  # RT_* names are read back out of that same subshell on purpose.
+  (
+    set +e
+    PATH="$1:${MINIMAL}"
+    unset RT_BACKEND RT_CLI RT_SYSTEMCTL RT_UNIT_DIR
+    RT_LINGER_DIR="${2:-${SELF_LINGER}}"
+    HOME="${WORK}/not-the-owner"
+    # shellcheck disable=SC1090
+    . "$LIB"
+    rt_detect 2>/dev/null
+    printf '%s|%s|%s' "${RT_BACKEND}" "${RT_CLI}" "${RT_UNIT_DIR}"
   )
 }
 # The isolation is itself asserted, because it is what silently failed: on a
@@ -188,6 +239,26 @@ printf '#!/usr/bin/env bash\nexit 1\n' > "${BROKEN}/docker"; chmod +x "${BROKEN}
 cp "${BIN}/podman" "${BROKEN}/"
 got="$(detect_in "$BROKEN")"
 if [[ "$got" == podman ]]; then ok "an installed-but-dead docker does not win over a working podman"; else bad "expected podman, got '${got}'"; fi
+
+# The case that shipped broken. `podman ps` succeeds for EVERY account with a
+# podman binary, against that account's own empty store -- so "can I run podman"
+# answered yes for the deploy account, which owns nothing, and detection stopped
+# there with a bare `podman` and a unit directory under deploy's HOME. Measured on
+# the testing host 2026-09-18: the deployer aborted with "no Quadlet unit
+# directory (/var/lib/iri/.config/containers/systemd)". Lingering is the signal
+# that distinguishes them, and it is the one the sudo bridge already used.
+got="$(detect_detail "$ONLY_PODMAN" "$NO_LINGER")"
+if [[ "${got}" == "podman|podman|"* ]]; then
+  bad "a user that merely HAS podman was taken for the owner (got '${got}')"
+else
+  ok "an account that can run podman but does not linger is not taken for the owner"
+fi
+got="$(detect_detail "$ONLY_PODMAN" "$SELF_LINGER")"
+if [[ "${got}" == "podman|podman|"*"/.config/containers/systemd" ]]; then
+  ok "...while a lingering user IS the owner, and its own unit directory is used"
+else
+  bad "expected the lingering user's own store, got '${got}'"
+fi
 
 say ""
 say "== resolving a tag to a digest without pulling =="
@@ -329,8 +400,11 @@ else ok "rollback with no anchor fails instead of silently doing nothing"; fi
 
 say ""
 say "== lifting a file out of an image without running it =="
-expect_call "podman creates, copies, and removes" podman \
-  'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a /b'
+# A TAR STREAM under podman, because RT_CLI is `sudo -u <svc> podman` there and a direct copy
+# would have the service user write into the deploy account's directory ("mkdir /docker:
+# permission denied"). The pipe is what crosses the account boundary.
+expect_call "podman creates, streams a tar out, and removes" podman \
+  'rt_extract_from_image img:tag /a /b' 'cp created-cid:/a -'
 # The bundle images declare no CMD and no ENTRYPOINT, so `create` refuses them
 # without an argument -- one that is never executed, but has to be there.
 expect_call "a command reaches create, for an image that declares none" podman \

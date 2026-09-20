@@ -144,9 +144,6 @@ basetool_host_service_user_dirs:
   - code/keycloak/providers
   - secrets
   - monitoring/data
-  # node_exporter's textfile collector, which the cgroup metrics collector and deploy.sh both
-  # write into
-  - monitoring/textfile
   - monitoring/certs
   - monitoring/secrets
 
@@ -154,6 +151,15 @@ basetool_host_service_user_dirs:
 # Set to false on a host that is not monitored. It is true by default because the alternative is a
 # host that looks fine and reports nothing.
 basetool_host_manage_observability: true
+
+# node_exporter's textfile collector. Owned by the DEPLOY account, not the service user: deploy.sh
+# writes a metric into it on every tick and could not -- measured 2026-09-18,
+# "/var/iri/monitoring/textfile/ghcr-token.prom.NNN: Permission denied" on a directory owned by
+# iri. The cgroup collector runs as root and is unaffected either way, and node_exporter reads it
+# as `prometheus`, which 0755 allows.
+basetool_host_deploy_user_dirs:
+  - monitoring/textfile
+
 
 # Three packages, from two repositories this role adds. Versions are NOT pinned here: both
 # node-exporter and alloy resolve to exactly the versions docker-compose.monitoring.yml already

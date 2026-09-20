@@ -46,6 +46,7 @@
 *.service text eol=lf
 *.timer text eol=lf
 *.logrotate text eol=lf
+*.tmpfiles text eol=lf
 # The environment templates the generator emits beside the units. This line said `*.vars` until
 # 2026-09-18, an extension no file in the tree has ever used: the name list was replaced by
 # `.env.tmpl` templates on 2026-09-17 and the rule was never moved with it. So the block's stated

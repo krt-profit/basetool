@@ -45,6 +45,14 @@
     - restore-drill.sh
     - docker-cleanup.sh
     - lib/container-runtime.sh
+    # The renderer deploy.sh calls when the config bundle carries env.d templates. It belongs
+    # here and not in the bundle for the same reason deploy.sh does: it is tooling the deployer
+    # invokes, and a release that could replace the tool running it is a self-update hazard.
+    #
+    # Its counterpart generate-quadlet.py is deliberately NOT here. That one runs in CI and writes
+    # the units into the repository, where they are drift-checked and committed; the host receives
+    # the RESULT through the config bundle and has no business generating anything.
+    - render-env-d.py
 
 - name: Install the systemd units and their timers
   # Copied verbatim. The units carry no Docker-specific directive any more: both
@@ -85,6 +93,27 @@
     - { src: iri-backup.logrotate, dest: iri-backup }
     - { src: iri-restore-drill.logrotate, dest: iri-restore-drill }
     - { src: iri-docker-cleanup.logrotate, dest: iri-docker-cleanup }
+
+# The two flocks the units coordinate through. /var/lock is a tmpfs whose mode differs between
+# distributions -- world-writable on the Ubuntu Docker host, root-only on Rocky -- so on the new
+# platform the deploy account cannot create its own lock and every tick dies with "Permission
+# denied" on a path the scripts have used since the Docker deployment. tmpfiles is the mechanism
+# for a directory that is re-created at boot.
+- name: Install the lock files the operational units coordinate through
+  ansible.builtin.copy:
+    src: "{{ basetool_host_scripts_src }}/iri-locks.tmpfiles"
+    dest: /etc/tmpfiles.d/iri-locks.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: basetool_host_lock_rules
+
+- name: Create them now, rather than at the next boot
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/iri-locks.conf
+  when:
+    - basetool_host_lock_rules.changed
+    - not ansible_check_mode
+  changed_when: true
 
 - name: Let the units be found before anything is enabled
   ansible.builtin.meta: flush_handlers
