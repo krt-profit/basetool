@@ -427,9 +427,20 @@ and say nothing about this one. They run in §1.10, once the names have moved.
 python scripts/check-conformance.py --ssh root@<new-host-ip> \
   --only certificate-shared --only client-address-visible --only containers-running \
   --only redis-requires-auth --only scrape-targets-up --only container-metrics \
-  --only log-streams --only edge-not-directly-reachable --only containers-unprivileged \
-  --only env-reaches-the-units --only containers-read-only
+  --only log-streams --only trace-pipeline --only edge-not-directly-reachable \
+  --only containers-unprivileged --only env-reaches-the-units --only containers-read-only
 ```
+
+> [!important] `log-streams` and `trace-pipeline` are the two that would have caught 2026-09-20
+> Alloy runs as a HOST service here and its configuration is written for a container, so every
+> path, name and port in it is a claim about an environment it is no longer in (REQ-OBS-019). On
+> the testing host that left the service `active`, its scrape target UP and 112 `alloy_*` series
+> being collected while it shipped **nothing** and had never carried a single span. `log-streams`
+> asserts Loki's ingest RATE rather than its presence and fails on exactly that; `trace-pipeline`
+> exists because nothing else in the monitoring plane looks at the trace path at all -- there is
+> no alert on either end of it. If `trace-pipeline` SKIPS here, read why:
+> `MONITORING_TRACING_ENABLED` must be `true` on production, and a skip means the `.env` restored
+> in §1.6 disagrees.
 
 > [!important] `root@`, and not a login account — or eleven checks quietly say nothing
 > Every one of these reads something an ordinary account cannot. The rootless containers belong to
@@ -469,11 +480,19 @@ The old host is then shut down. **Leave its `iri-deploy.timer` stopped** — if 
 back up, it must come back on the configuration it has on disk and not pull a bundle promoted after
 the cutover. That is what makes "bring the old one back" a complete answer rather than a race.
 
-> [!note] What the old host loses the moment this file ships
-> The `cadvisor` scrape job is gone from `prometheus.yml`, so a resurrected old host running a NEWER
-> bundle would have no container metrics — `basetool:container:*` records "cAdvisor-family or
-> cgroup-family" and it would have neither. With its deploy timer stopped it keeps its own older
-> bundle and is unaffected, which is exactly why the timer stays stopped.
+> [!note] What a NEWER bundle would take from the old host, and why the timer stays stopped
+> Two files in the bundle are now written for the Podman shape and would be wrong on the Docker
+> one. `prometheus.yml` has no `cadvisor` scrape job any more, so a resurrected old host running a
+> newer bundle would have no container metrics at all — `basetool:container:*` records
+> "cAdvisor-family or cgroup-family" and it would have neither. `config.alloy` reads container
+> stdout from the JOURNAL rather than the Docker API (REQ-OBS-019), so that host would lose its
+> `<svc>-stdout`, `mon-*`, `postgres-*` and `edge` streams; its FILE streams and both sinks are
+> unaffected, because the log paths are bind-mounted on the Podman side and the Loki and Tempo
+> endpoints default to the container-network names when the two `IRI_ALLOY_*` variables are unset.
+>
+> With its deploy timer stopped the old host keeps the bundle it already has and none of this
+> reaches it — which is exactly why the timer stays stopped, and why "bring the old one back" is a
+> complete answer. Bringing it back on a NEWER bundle is not a rollback path and never was.
 
 ---
 

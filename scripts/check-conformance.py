@@ -1312,6 +1312,69 @@ def check_log_streams(ctx: Context) -> str:
     return f"Loki ingesting {rate:.2f} lines/s"
 
 
+def check_trace_pipeline(ctx: Context) -> str:
+    """Spans reach Alloy's OTLP receiver, when the apps are configured to emit any.
+
+    The trace path has no alert of any kind -- not on `otelcol_receiver_accepted_spans_total`, not
+    on `tempo_distributor_spans_received_total` -- so a broken one reports nothing anywhere. It is
+    also the path most likely to break on a runtime change, because the apps address Alloy by a
+    NAME and a service that moves to the host stops answering to it. Measured on the testing host
+    on 2026-09-20: both counters ABSENT rather than zero, i.e. the pipeline had never carried a
+    single span, while every dashboard and every alert reported a healthy monitoring plane.
+
+    Absent is deliberately treated as the failure and not as "nothing yet". These are counters
+    Alloy creates on the first span it accepts; the apps emit on every request, so on a host that
+    serves at all, absence means the spans are being dropped before they arrive -- in each app's own
+    exporter, where nothing looks.
+
+    The check reads `MONITORING_TRACING_ENABLED` from the host `.env` first and skips when tracing
+    is off, because an app that is not emitting is not a fault. That is one grep for one name, in
+    the same narrow shape `check_env_reaches_the_units` uses so the rest of the credential set never
+    crosses the SSH boundary.
+
+    Args:
+        ctx: the run context.
+
+    Returns:
+        A summary naming the spans observed.
+
+    Raises:
+        Skip: when no host access is configured, or tracing is switched off on this host.
+        CheckFailed: when tracing is on and no span has reached the receiver.
+    """
+    raw = ctx.runner.run(
+        "grep -E '^MONITORING_TRACING_ENABLED=' /var/iri/code/.env 2>/dev/null || true")
+    if not raw.strip():
+        # Same distinction as check_env_reaches_the_units: an unreadable file and a file without
+        # the key both produce nothing, and only one of them is a reason to draw a conclusion.
+        if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
+            raise Skip("/var/iri/code/.env is not readable by this SSH account (0640 "
+                       "deploy:deploy) -- rerun with an account that can read it")
+        raise Skip("the .env does not set MONITORING_TRACING_ENABLED; it defaults to false "
+                   "(REQ-OBS, tracing is inert by default) so there are no spans to expect")
+    value = raw.split("=", 1)[1].strip().strip('"').strip("'").lower()
+    if value != "true":
+        raise Skip(f"MONITORING_TRACING_ENABLED={value} on this host -- the apps emit no spans, "
+                   "so the pipeline has nothing to carry")
+
+    payload = _promql(ctx, "sum(otelcol_receiver_accepted_spans_total)")
+    results = payload.get("data", {}).get("result", [])
+    if not results:
+        raise CheckFailed(
+            "otelcol_receiver_accepted_spans_total has no samples at all while tracing is ON - "
+            "no span has ever reached Alloy's OTLP receiver. The usual cause on a Podman host is "
+            "that the app containers cannot resolve `alloy`: it is a HOST service there, so the "
+            "name needs AddHost=alloy:host-gateway (generate-quadlet.py's PODMAN_HOST_ALIASES). "
+            "The spans are dropped in each app's own exporter, which logs nothing")
+    spans = float(results[0]["value"][1])
+    if spans <= 0:
+        raise CheckFailed(
+            "Alloy's OTLP receiver has accepted 0 spans while tracing is ON - the apps are "
+            "emitting nowhere and no alert covers this path")
+    return f"Alloy has accepted {spans:.0f} spans"
+
+
+
 # ============================================================================================
 # Checks - load (opt-in)
 # ============================================================================================
@@ -1600,6 +1663,7 @@ CHECKS: tuple[Check, ...] = (
     Check("scrape-targets-up", "REQ-OBS-005", True, check_scrape_targets_up),
     Check("container-metrics", "REQ-OBS-006", True, check_container_metrics),
     Check("log-streams", "REQ-OBS-005", True, check_log_streams),
+    Check("trace-pipeline", "REQ-OBS-009 / REQ-OBS-019", True, check_trace_pipeline),
     Check("rate-limit-active", "REQ-SEC-023", False, check_rate_limit_active),
     Check("edge-not-directly-reachable", "ADR-0187 / REQ-SEC-023", True,
           check_edge_not_directly_reachable),

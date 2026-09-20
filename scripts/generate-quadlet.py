@@ -305,8 +305,44 @@ DISPOSITION: dict[str, tuple[str, str]] = {
 #:
 #: NOT expressed as compose `extra_hosts:`, which the generator already translates: that would apply
 #: to Docker too, where it would override DNS for a container that is right there.
+#: The application containers need the SAME alias, for the opposite reason: they PUSH to Alloy.
+#: `MONITORING_OTLP_ENDPOINT=http://alloy:4318/v1/traces` (backend, frontend, ingest) and
+#: `KC_TRACING_ENDPOINT=http://alloy:4317` (keycloak) are container-network names, and on a Podman
+#: host nothing answers to them. Measured on the testing host 2026-09-20, before this entry:
+#: `alloy` did not resolve inside the backend container, and BOTH
+#: `otelcol_receiver_accepted_spans_total` and `tempo_distributor_spans_received_total` were absent
+#: -- not zero, absent. The trace pipeline had never carried a single span, and nothing said so:
+#: every span was dropped in the app's own exporter, where no alert looks.
+#:
+#: The scrape direction was translated when this table was written and the push direction was not,
+#: which is the same omission in both halves of one boundary. When a service moves to the host,
+#: BOTH directions need an answer -- and the one that cannot be solved with an alias at all (host
+#: reaching a container) is handled by publishing a loopback port, see PODMAN_LOOPBACK_PUBLISH.
 PODMAN_HOST_ALIASES = {
     "prometheus": ("node-exporter", "alloy", "podman-exporter"),
+    "backend": ("alloy",),
+    "frontend": ("alloy",),
+    "ingest": ("alloy",),
+    "keycloak": ("alloy",),
+}
+
+#: Ports published on LOOPBACK so a host service can reach a container. `AddHost=` solves the
+#: container-to-host direction; nothing solves the reverse, because rootless Podman keeps the
+#: container network inside a user namespace and the host has no route into it. A published port is
+#: the only way in, and 127.0.0.1 keeps it off every other interface.
+#:
+#: Both entries exist for the host-native Alloy: it WRITES logs to Loki and EXPORTS spans to Tempo,
+#: and on the testing host it could reach neither -- `loki` and `tempo` did not resolve, and neither
+#: container published anything. config.alloy reads the resulting addresses from
+#: IRI_ALLOY_LOKI_ENDPOINT / IRI_ALLOY_TEMPO_ENDPOINT, which default to the container-network names
+#: so the Docker shape is untouched.
+#:
+#: Tempo's OTLP port is published on 4327, NOT 4317: the host-native Alloy binds 0.0.0.0:4317 for
+#: its own OTLP receiver, which includes loopback, so 4317 is already taken on the host. Loki's 3100
+#: is free and keeps its own number.
+PODMAN_LOOPBACK_PUBLISH = {
+    "loki": ("127.0.0.1:3100:3100",),
+    "tempo": ("127.0.0.1:4327:4317",),
 }
 
 #: Compose profiles whose services are translated. `dev` and `rollback` are local-stack and
@@ -991,6 +1027,9 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     else:
         for port in spec.get("ports", []) or []:
             container.append(f"PublishPort={port}")
+    # ...and the loopback publishes a host service depends on. See PODMAN_LOOPBACK_PUBLISH.
+    for port in PODMAN_LOOPBACK_PUBLISH.get(service, ()):
+        container.append(f"PublishPort={port}")
 
     networks = spec.get("networks")
     names = list(networks.keys()) if isinstance(networks, dict) else list(networks or [])

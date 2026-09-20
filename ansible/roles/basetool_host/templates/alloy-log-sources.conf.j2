@@ -1,0 +1,50 @@
+{{ ansible_managed | comment }}
+#
+# The log sources, in the shape monitoring/alloy/config.alloy expects them.
+#
+# That file is written for an Alloy that runs as a CONTAINER, where the log directories arrive as
+# bind mounts at /logs/<service> and /hostlog (docker-compose.monitoring.yml). Here Alloy is a HOST
+# service, so none of those paths exist -- and the failure is silent. Measured on the testing host
+# on 2026-09-20, before this drop-in: alloy.service `active`, its scrape target UP, 112 alloy_*
+# series collected, `loki_source_file_read_lines_total` ABSENT, and all ten LogStreamSilent
+# instances firing. A shipper that is up and ships nothing looks exactly like a healthy one.
+#
+# The obvious fix -- rewrite the paths in config.alloy -- is the wrong one. Those paths are also
+# written into the alert rules (`absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})`
+# and nine more in meta.yml), so rewriting them would have retargeted all ten LogStreamSilent rules
+# at once, quietly. Recreating the container's view instead leaves config.alloy and the alert rules
+# alone and keeps ONE file true for both shapes.
+#
+# Each source is named on its own rather than binding /var/log wholesale: Alloy has no business
+# reading btmp, wtmp or the dnf logs, and a list of exactly what it reads is also the list to review
+# when someone asks what the shipper can see. A leading `-` marks a source that is allowed to be
+# absent; without it a missing file fails the unit at start.
+[Service]
+# --- application JSON / file logs, masked at source (REQ-OBS-007) ----------------------------------
+BindReadOnlyPaths={{ basetool_host_root_dir }}/backend/log:/logs/backend
+BindReadOnlyPaths={{ basetool_host_root_dir }}/frontend/log:/logs/frontend
+BindReadOnlyPaths={{ basetool_host_root_dir }}/ingest/log:/logs/ingest
+BindReadOnlyPaths={{ basetool_host_root_dir }}/keycloak/log:/logs/keycloak
+
+# NPM is retired (ADR-0162: the edge is native nginx with a separate ACME client) and the native
+# edge writes its access log to STDOUT, which now reaches Loki through the journal source instead.
+# The directory is bound optionally so a host that still carries NPM data keeps both streams, and a
+# host that never had them starts anyway.
+BindReadOnlyPaths=-{{ basetool_host_root_dir }}/npm/data/logs:/logs/npm
+
+# --- host security logs, ingested WITH usernames and IPs (the 31-day retention, REQ-OBS-010) -------
+# auth.log is Debian's name for it. On RHEL the same stream is /var/log/secure, and binding it onto
+# the expected name is what keeps `{app="host-auth"}` and the LogStreamSilent rule that watches
+# path="/hostlog/auth.log" correct on both families without a second code path anywhere.
+BindReadOnlyPaths=/var/log/secure:/hostlog/auth.log
+BindReadOnlyPaths=/var/log/audit:/hostlog/audit
+BindReadOnlyPaths=-/var/log/fail2ban.log:/hostlog/fail2ban.log
+
+# --- the ops automation logs ----------------------------------------------------------------------
+# Optional to a file: each is created by its timer's first run, and on a freshly provisioned host
+# that run has not happened yet. A required bind would make alloy.service fail to start on exactly
+# the host where it is needed first.
+BindReadOnlyPaths=-/var/log/iri-deploy.log:/hostlog/iri-deploy.log
+BindReadOnlyPaths=-/var/log/iri-backup.log:/hostlog/iri-backup.log
+BindReadOnlyPaths=-/var/log/iri-docker-cleanup.log:/hostlog/iri-docker-cleanup.log
+BindReadOnlyPaths=-/var/log/iri-restore-drill.log:/hostlog/iri-restore-drill.log

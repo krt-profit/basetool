@@ -330,6 +330,11 @@ case "$cmd" in
       env-unreadable) echo "" ;;
       env-orphan)     printf 'IRI_TRUSTSTORE_HOST_PATH=/var/iri/secrets/truststore.p12\n' ;;
       env-dropin)     printf 'IRI_KEYCLOAK_HOST_ALIAS=basetool.example.test:10.0.0.9\n' ;;
+      # Tracing ON. The apps emit, so an empty or zero span counter is a real fault rather than a
+      # switched-off feature -- which is the whole distinction trace-pipeline has to make.
+      traces-on|traces-absent|traces-zero)
+                      printf 'MONITORING_TRACING_ENABLED=true\n' ;;
+      traces-off)     printf 'MONITORING_TRACING_ENABLED=false\n' ;;
       *)              printf 'POSTGRES_DB=basetool\n' ;;
     esac
     ;;
@@ -425,6 +430,16 @@ case "$cmd" in
       logs-stopped) emit_prom "$(sample '' 0)" ;;
       logs-absent)  emit_prom "" ;;
       *)            emit_prom "$(sample '' 11.8)" ;;
+    esac
+    ;;
+  # ABSENT and ZERO are different faults here and both are faults. Absent means no span has ever
+  # arrived -- the shape measured on the testing host, where the app containers could not resolve
+  # `alloy` at all -- and zero means the receiver exists but is being fed nothing.
+  *"otelcol_receiver_accepted_spans_total"*)
+    case "$scenario" in
+      traces-absent) emit_prom "" ;;
+      traces-zero)   emit_prom "$(sample '' 0)" ;;
+      *)             emit_prom "$(sample '' 4127)" ;;
     esac
     ;;
   *)
@@ -627,6 +642,13 @@ assert_status "redis-requires-auth passes" redis-requires-auth pass "NOAUTH" -- 
 assert_status "scrape-targets-up passes"  scrape-targets-up  pass "targets up"     -- "${STUB_ARGS[@]}"
 assert_status "container-metrics passes"  container-metrics  pass "populated"      -- "${STUB_ARGS[@]}"
 assert_status "log-streams passes"        log-streams        pass "ingesting"      -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=traces-on assert_status \
+  "trace-pipeline passes when spans are arriving" trace-pipeline pass "accepted" -- "${STUB_ARGS[@]}"
+# Tracing off is a SKIP and not a pass. An app that emits nothing is not a healthy pipeline, and
+# reporting it as one is how a check starts agreeing with everything.
+STUB_SCENARIO=traces-off assert_status \
+  "trace-pipeline skips when tracing is switched off" trace-pipeline skip "emit no spans" \
+  -- "${STUB_ARGS[@]}"
 
 # =============================================================================================
 say ""
@@ -724,6 +746,17 @@ STUB_SCENARIO=logs-stopped assert_status \
   "log-streams fails when ingestion has stopped" log-streams fail "has stopped" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=logs-absent assert_status \
   "log-streams fails when the metric is absent" log-streams fail "no samples" -- "${STUB_ARGS[@]}"
+
+# The measured shape: tracing on, and the counter does not exist at all because no span has ever
+# reached the receiver. Nothing else in the monitoring plane reports this -- there is no alert on
+# either end of the trace path -- so this assertion is the only thing standing between a silent
+# trace outage and a cutover.
+STUB_SCENARIO=traces-absent assert_status \
+  "trace-pipeline fails when no span has ever arrived" \
+  trace-pipeline fail "no samples at all" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=traces-zero assert_status \
+  "trace-pipeline fails when the receiver has accepted zero" \
+  trace-pipeline fail "accepted 0 spans" -- "${STUB_ARGS[@]}"
 
 # ADR-0187 load-bearing invariant. The red case is the one that matters: a port answering on a
 # routable address means the PROXY header can be forged, and nothing about a healthy-looking

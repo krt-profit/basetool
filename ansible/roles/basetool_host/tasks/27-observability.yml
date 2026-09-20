@@ -158,7 +158,121 @@
       # Managed by the basetool_host Ansible role. Do not edit by hand.
       CONFIG_FILE="{{ basetool_host_root_dir }}/code/monitoring/alloy/config.alloy"
       CUSTOM_ARGS="--server.http.listen-addr={{ basetool_host_alloy_listen }}"
+      # Where the sink and the trace store are, for a process that is NOT on the container network.
+      # config.alloy falls back to the container names when these are unset, which is what keeps one
+      # file true for the Docker deployment as well. See the defaults for the port choice.
+      IRI_ALLOY_LOKI_ENDPOINT="{{ basetool_host_alloy_loki_endpoint }}"
+      IRI_ALLOY_TEMPO_ENDPOINT="{{ basetool_host_alloy_tempo_endpoint }}"
   notify: Restart alloy
+
+- name: Make room for the alloy drop-ins
+  ansible.builtin.file:
+    path: /etc/systemd/system/alloy.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Give the host service the log-source view config.alloy is written for
+  # config.alloy is written for an alloy that runs as a CONTAINER, where the log directories arrive
+  # as bind mounts at /logs/<service> and /hostlog. As a host service none of those paths exist, and
+  # nothing says so: measured here on 2026-09-20 the service was active, the scrape target up, 112
+  # alloy_* series collected -- and loki_source_file_read_lines_total absent, with all ten
+  # LogStreamSilent instances firing. Recreating the container's view is what keeps ONE config file
+  # and ONE set of alert rules (which pin path="/hostlog/auth.log" and nine more) true in both
+  # shapes. The template explains each source and why some are optional.
+  #
+  # Note the side effect, which is systemd's and not ours: a file bind whose destination does not
+  # exist creates that destination, so /var/log/auth.log appears on the host as an empty file. It is
+  # the mount point for /var/log/secure, never written to, and harmless -- but it is visible, so it
+  # is named here rather than discovered later.
+  ansible.builtin.template:
+    src: alloy-log-sources.conf.j2
+    dest: /etc/systemd/system/alloy.service.d/10-log-sources.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd for the observability units
+    - Restart alloy
+
+- name: Let the adm group read what RHEL writes root-only
+  # The whole log-shipping design rests on alloy's `adm` membership, and on Debian that is enough:
+  # rsyslog there writes auth.log as syslog:adm 0640. RHEL writes /var/log/secure as root:root 0640,
+  # so the group buys nothing and the SSH/sudo stream stays silently empty -- membership present,
+  # effect zero. This makes RHEL's rsyslog behave like Debian's instead of granting alloy a
+  # capability, which docker-compose.monitoring.yml's alloy comment explicitly argues against
+  # ("least privilege, no capability bypass").
+  #
+  # The include of /etc/rsyslog.d/*.conf sits at line 26 of rsyslog.conf, BEFORE the rules at 49-52,
+  # so these defaults are in force when the omfile actions are defined. Legacy directives on purpose:
+  # the modern `module(load="builtin:omfile" ...)` form would be a second load of a module the base
+  # config may already parameterise, and that is a fatal config error rather than an override.
+  ansible.builtin.copy:
+    dest: /etc/rsyslog.d/10-basetool-adm-readable.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      # Files rsyslog creates are group-adm readable, so the log shipper can read them through its
+      # supplementary group instead of through a capability. Mirrors Debian's syslog:adm 0640.
+      $FileGroup adm
+      $FileCreateMode 0640
+  notify: Reload rsyslog
+
+- name: Hand the existing auth log to adm as well
+  # The directive above only governs files rsyslog CREATES. The one already open keeps its old
+  # root:root until the next rotation, which is up to a week of a blind SSH stream on a host that
+  # was just provisioned. logrotate.conf uses a bare `create`, which reproduces the current owner,
+  # group and mode -- so setting it once here is also what makes it survive every later rotation.
+  ansible.builtin.file:
+    path: /var/log/secure
+    group: adm
+    mode: "0640"
+  when: not ansible_check_mode
+
+- name: Make the audit log readable by the shipper, as config.alloy requires
+  # Not an invention: config.alloy's host_auditd block states the precondition verbatim -- "set
+  # `log_group = adm` in /etc/audit/auditd.conf and make /var/log/audit traversable (0750 root:adm);
+  # the default root:root 0600 is unreadable and the stream would stay silently empty". This is that
+  # precondition, provisioned. Without it the sshd_config / authorized_keys tamper watches ship
+  # nowhere, which is a security regression that presents as a healthy monitoring plane.
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: '^\s*log_group\s*='
+    line: "log_group = adm"
+    owner: root
+    group: root
+    mode: "0640"
+  register: basetool_host_auditd_group
+  when: not ansible_check_mode
+
+- name: Apply it to the log that is already open
+  # auditd applies log_group when it opens the log, so the running instance keeps root:root until it
+  # is told otherwise. It cannot be restarted -- RefuseManualStop=yes on this unit, measured -- and
+  # it declares no ExecReload, so SIGHUP is the supported way to make it re-read its configuration.
+  # The explicit chgrp/chmod covers the window before the next rotation, the same way the auth log
+  # is handled above.
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    group: adm
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /var/log/audit, mode: "0750" }
+    - { path: /var/log/audit/audit.log, mode: "0640" }
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - not ansible_check_mode
+    - basetool_host_auditd_group is changed
+
+- name: Tell the running auditd to re-read its configuration
+  ansible.builtin.command: systemctl kill --signal=HUP auditd.service
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - basetool_host_auditd_group is changed
 
 - name: Confirm alloy can read what it is here to read
   # The container needed `group_add: 4` and `473` to reach root:adm files such as auth.log, and a
@@ -182,6 +296,38 @@
       (for root:adm files under /var/log) and systemd-journal (for the container units' output,
       which goes to the journal under the journald driver). Add them before enabling the service --
       alloy starts perfectly well without them and simply ships nothing.
+  when: not ansible_check_mode
+
+- name: Ask whether alloy can actually READ the security sources
+  # The assertion above was green on this host while alloy could read neither /var/log/secure nor
+  # audit.log: both are root:root, so membership in adm is necessary and not sufficient. A check
+  # that can only ever confirm the half that was already true is not a check. This one asks the
+  # question that matters -- can this user open this file -- and it is what proves the two tasks
+  # above had an effect rather than merely having run.
+  #
+  # Only the two host security logs are asserted. The application logs are created by the apps
+  # themselves and do not exist on a host that has not deployed yet, so requiring them here would
+  # fail provisioning for a reason that is not a fault.
+  ansible.builtin.command: runuser -u alloy -- test -r {{ item }}
+  loop:
+    - /var/log/secure
+    - /var/log/audit/audit.log
+  register: basetool_host_alloy_reads
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Refuse a shipper that is up and blind
+  ansible.builtin.assert:
+    that:
+      - basetool_host_alloy_reads.results | rejectattr('rc', 'equalto', 0) | list | length == 0
+    fail_msg: >-
+      alloy cannot read
+      {{ basetool_host_alloy_reads.results | rejectattr('rc', 'equalto', 0)
+         | map(attribute='item') | join(', ') }}.
+      The SSH/sudo and auditd tamper streams would stay empty while every other signal says the
+      monitoring plane is healthy. Check that rsyslog re-read $FileGroup and that auditd took the
+      SIGHUP; both are handled above and both are silent when they fail.
   when: not ansible_check_mode
 
 # alloy is deliberately NOT started here. Its configuration comes from the config bundle, which

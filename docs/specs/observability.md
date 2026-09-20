@@ -564,7 +564,7 @@ rule — no blanket "everything is masked" claim:
   masking. These carry the `level` label.
 - **backend / frontend / ingest container stdout/stderr** (`app="backend-stdout"` /
   `"frontend-stdout"` / `"ingest-stdout"`; ADR-0095) — the raw container console, shipped via
-  `loki.source.docker` **in addition to** the JSON file above and kept under a **distinct** `app`
+  the container-stdout source **in addition to** the JSON file above and kept under a **distinct** `app`
   label so a mixed masked-JSON / raw-stdout label never muddies the JSON stream's
   `{app="backend",level="error"}` queries. Motive: JVM/glibc native errors (`pthread_create failed` /
   `unable to create native thread`, the `hs_err` preamble) print to the container's stderr **outside
@@ -655,7 +655,7 @@ rule — no blanket "everything is masked" claim:
   `<svc>-stdout`, `mon-<service>`, `npm`, `postgres-*` streams above) flows through
   `loki.process.container_mask`, whose first stage drops any entry older than **167h**
   (`stage.drop older_than`, a 1 h guard below Loki's `reject_old_samples_max_age` of 168h). A near-idle
-  container keeps its last stdout line at the tail, and `loki.source.docker` re-delivers that same line
+  container keeps its last stdout line at the tail, and `loki.source.docker` re-delivered that same line
   on every tailer reconnect (`could not transfer logs: unexpected EOF`); while it is younger than the
   reject window Loki silently dedupes the repeat, but once it ages past 168h every re-delivery is
   400-rejected (`entry has timestamp too old`) and counted as a dropped entry, firing `LokiWriteFailing`
@@ -829,7 +829,8 @@ abuse detection:
 
 - **NPM edge access logs** — all public proxy hosts, client IPs (edge 4xx/5xx rates, scan/probe
   detection, per-host traffic).
-- **SSH / host-auth logs** — `/var/log/auth.log` (or the journal per distro): failed-auth spikes,
+- **SSH / host-auth logs** — `/hostlog/auth.log`, which is Debian's `/var/log/auth.log` and, on the
+  RHEL family, `/var/log/secure` bound onto that name (REQ-OBS-019): failed-auth spikes,
   invalid users, sudo failures, successful root logins, and a successful password/keyboard-interactive
   login on a key-only host.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
@@ -2185,8 +2186,9 @@ therefore alerts on:
   REQ-OBS-007) — read the exact rejected stream from Alloy's own `final error sending batch` log line
   before touching Loki limits. The **docker-sourced** container streams — the `<svc>-stdout` set
   (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `npm` and `postgres-*` — are deliberately given
-  **no** per-stream liveness alert, for two independent reasons: `loki.source.docker` exposes no
-  per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
+  **no** per-stream liveness alert, for two independent reasons: neither container-stdout source
+  (`loki.source.docker`, `loki.source.journal`) exposes a per-target
+  `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
   breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
   be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
 - **Dashboard provisioning.** The 13 dashboards under `monitoring/grafana/dashboards/` are
@@ -2564,6 +2566,57 @@ perfectly healthy while the file stays empty. All three modules therefore:
 
 **Enforced by:** `{backend,frontend,ingest}/src/main/resources/logback-spring.xml` ·
 **Related:** ADR-0095 (`<svc>-stdout` shipping), ADR-0072 (`stop_grace_period`), REQ-OBS-007
+
+### REQ-OBS-019 — The shipper runs in two shapes, and one configuration must be true in both
+
+Alloy is a **container** on the Docker deployment and a **host systemd service** on the Podman one
+(`generate-quadlet.py` translates it, because a rootless container's supplementary groups are
+namespace groups and would lose the `adm` and `systemd-journal` reads it exists for). Both read the
+same `monitoring/alloy/config.alloy`, which ships in the config bundle. Every path, name and port in
+that file is therefore a claim about **two** environments, and on 2026-09-20 none of them held in the
+second one.
+
+Measured on the testing host before the fix, with the service `active`, its scrape target UP and 112
+`alloy_*` series collected: `loki_source_file_read_lines_total` **absent**, all ten `LogStreamSilent`
+instances firing, `otelcol_receiver_accepted_spans_total` and `tempo_distributor_spans_received_total`
+**absent** rather than zero. A shipper that is up and ships nothing is indistinguishable from a
+healthy one at every level except the one nobody checks.
+
+**The rule: a difference between the two shapes is resolved in the host's provisioning, never by
+rewriting the shared configuration.** Those paths and names are also written into the alert rules —
+ten `LogStreamSilent` instances pin `path="/hostlog/auth.log"` and its nine siblings — so rewriting
+them would have retargeted every one of those rules silently. Three mechanisms, in order of
+preference:
+
+1. **A file or directory is elsewhere → bind it into the shape the config expects.**
+   `alloy.service.d/10-log-sources.conf` recreates `/logs/<service>` and `/hostlog` with
+   `BindReadOnlyPaths=`, one source per line rather than binding `/var/log` wholesale. This also
+   absorbs distro differences: `/var/log/secure` is bound onto `/hostlog/auth.log`, so one `app=
+   "host-auth"` stream and one alert rule serve both families. A `-` prefix marks a source allowed to
+   be absent, which a freshly provisioned host needs for the ops logs no timer has written yet.
+2. **A port cannot be bind-mounted → an environment variable with the container-shape default.**
+   `IRI_ALLOY_LOKI_ENDPOINT` and `IRI_ALLOY_TEMPO_ENDPOINT` default to `loki:3100` and `tempo:4317`,
+   so the Docker deployment reads the identical file and is untouched; the Podman host sets them to
+   the loopback ports `PODMAN_LOOPBACK_PUBLISH` publishes. Tempo's is **4327**, not 4317, because the
+   host-native Alloy binds `0.0.0.0:4317` for its own OTLP receiver and that includes loopback.
+3. **A source has no equivalent at all → replace it, and say so.** Container stdout came from the
+   Docker API through the socket-proxy; under Podman there is neither, so it comes from the journal
+   (`loki.source.journal`, keyed on `__journal_container_name`, which podman's journald driver sets to
+   the same value the compose-service label carried). Every mapping rule is otherwise unchanged, so
+   the `app=` scheme and every query over it survive.
+
+**Both directions of the boundary count.** When a service moves to the host, container-to-host and
+host-to-container are two separate problems with two separate answers, and it is the second that gets
+forgotten: `PODMAN_HOST_ALIASES` gave `prometheus` its `AddHost=alloy:host-gateway` when the table was
+written, and the four application containers — which *push* spans to `alloy:4318` — were left without
+one. That is why the trace pipeline had never carried a span. Production runs with
+`MONITORING_TRACING_ENABLED=true`, so the omission would have taken effect at cutover, in silence.
+
+**Preconditions the host must satisfy, asserted rather than assumed.** `adm` membership is necessary
+and not sufficient: RHEL writes `/var/log/secure` and `/var/log/audit/audit.log` as `root:root`, so
+the group buys nothing until rsyslog is given `$FileGroup adm` and auditd `log_group = adm`. The role
+therefore ends by asking whether the `alloy` user can actually **open** both files — the membership
+check that preceded it was green on a host where neither was readable.
 
 ### REQ-OBS-018 — The public API surface must be attributable, and probed before it exists
 

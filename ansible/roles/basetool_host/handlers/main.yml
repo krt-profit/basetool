@@ -58,6 +58,15 @@
     state: restarted
   when: not ansible_check_mode
 
+# A changed $FileGroup only governs files rsyslog creates AFTER it has re-read its configuration,
+# and rsyslog does have a reload path for that -- logrotate's own postrotate uses the same one. A
+# restart would drop the journal cursor imjournal holds and re-read from the start.
+- name: Reload rsyslog
+  ansible.builtin.systemd_service:
+    name: rsyslog.service
+    state: reloaded
+  when: not ansible_check_mode
+
 # alloy is enabled but not started by the role -- its configuration arrives with the config bundle.
 # Restarting a service that was deliberately never started would fail the run on a fresh host, so
 # this restarts it only if it is ALREADY running.

@@ -87,6 +87,22 @@
 
 ### Fixed
 
+- **Betrieb: auf der neuen Podman-Maschine wurde keine einzige Logzeile ausgeliefert.** Der Shipper
+  lief, wurde überwacht und meldete sich gesund — und schickte nichts: seine Pfade, Namen und Ports
+  stammen aus der Container-Welt und existieren für einen Host-Dienst nicht. Damit waren die
+  SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
+  und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
+
+- **Betrieb: auf der neuen Maschine wären sämtliche Traces verschwunden.** Die Anwendungen senden ihre
+  Spans an den Namen `alloy`, den auf einem Podman-Host nichts mehr auflöst; verworfen wurde im
+  Exporter der Anwendung, wo keine Warnung hinsieht. Die Container bekommen den Namen jetzt zugeteilt
+  (REQ-OBS-019).
+
+- **Betrieb: `/var/log/secure` und das auditd-Protokoll waren für den Shipper unlesbar.** Auf der
+  RHEL-Familie gehören beide `root:root`, die Gruppenmitgliedschaft allein reicht also nicht. Die
+  Provisionierung setzt die Rechte jetzt und prüft am Ende, ob die Dateien wirklich geöffnet werden
+  können — die bisherige Zusicherung prüfte nur die Gruppe und war auf einem blinden Host grün.
+
 - **Betrieb: die Sicherung erfasst jetzt die Zertifikate und die Redis-Zugriffskontrolle.** Beides
   fehlte, und beides braucht eine Wiederherstellung: ohne die TLS-Dateien kann ein
   wiederhergestellter Host kein HTTPS ausliefern und muss neu ausstellen, wogegen ein

@@ -216,6 +216,19 @@ basetool_host_podman_exporter_listen: ":9882"
 # opens 80 and 443 only (65-firewall.yml), which the role asserts rather than assumes.
 basetool_host_alloy_listen: ":12345"
 
+# Where the HOST-NATIVE alloy finds the log sink and the trace store. It cannot use the names in
+# config.alloy (`loki:3100`, `tempo:4317`): those live on the container network, and rootless Podman
+# keeps that network inside a user namespace with no route in from the host. generate-quadlet.py
+# publishes both on loopback (PODMAN_LOOPBACK_PUBLISH) and these two point at the published ports.
+#
+# config.alloy defaults to the container-network names when these are unset, so the Docker
+# deployment reads the very same file and is unaffected.
+#
+# Tempo is 4327 and not 4317 because alloy itself binds 0.0.0.0:4317 for its own OTLP receiver, and
+# 0.0.0.0 includes loopback -- the two would collide on the host.
+basetool_host_alloy_loki_endpoint: "127.0.0.1:3100"
+basetool_host_alloy_tempo_endpoint: "127.0.0.1:4327"
+
 # --- hardening -------------------------------------------------------------------------------------
 # The platform's own content: scap-security-guide ships a cs10 datastream with seventeen profiles.
 # Why cis_server_l1 and not bsi, cis level 2 or stig is measured in tasks/60-hardening.yml -- the

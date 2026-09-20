@@ -206,5 +206,37 @@ expect "every alias names a service the generator made a host service" \
   'print(all(g.DISPOSITION.get(a, ("",))[0] == "host-service" for v in g.PODMAN_HOST_ALIASES.values() for a in v))' \
   'True'
 
+# The push direction of the same boundary. The apps send spans TO alloy, and when it became a
+# host service `alloy` stopped resolving inside them: measured on the testing host, both
+# otelcol_receiver_accepted_spans_total and tempo_distributor_spans_received_total were ABSENT
+# -- the trace pipeline had never carried a span and nothing reported it, because the drop
+# happens in each app's own exporter, where no alert looks.
+for svc in backend frontend ingest keycloak; do
+  expect "${svc} can resolve alloy, which it pushes spans to" \
+    "print('alloy' in g.PODMAN_HOST_ALIASES.get('${svc}', ()))" \
+    'True'
+done
+
+echo "== the loopback publishes a host service depends on =="
+# AddHost= solves container->host. Nothing solves host->container, because rootless Podman keeps
+# the container network in a user namespace: a published port is the only way in.
+expect "loki publishes for the host-native shipper" \
+  'print(g.PODMAN_LOOPBACK_PUBLISH["loki"][0])' \
+  '127.0.0.1:3100:3100'
+# Every one of them must be bound to loopback, or a port meant for one local process is on the wire.
+expect "every loopback publish is actually on loopback" \
+  'print(all(p.startswith("127.0.0.1:") for v in g.PODMAN_LOOPBACK_PUBLISH.values() for p in v))' \
+  'True'
+# The collision that decided tempo's host port: the host-native alloy binds 0.0.0.0:4317 for its
+# own OTLP receiver, and 0.0.0.0 includes loopback. Publishing tempo there would fail to bind, and
+# the symptom would be a container that will not start rather than anything naming this choice.
+expect "no loopback publish collides with alloy's own OTLP ports" \
+  'print(all(p.split(":")[1] not in ("4317", "4318") for v in g.PODMAN_LOOPBACK_PUBLISH.values() for p in v))' \
+  'True'
+# A publish for a service the translation deleted would be silently inert.
+expect "every loopback publish names a service that is still a container" \
+  'print(all(g.DISPOSITION.get(s, ("",))[0] != "delete" for s in g.PODMAN_LOOPBACK_PUBLISH))' \
+  'True'
+
 printf '%d passed, %d failed\n' "$PASSED" "$FAILED"
 [[ $FAILED -eq 0 ]]
