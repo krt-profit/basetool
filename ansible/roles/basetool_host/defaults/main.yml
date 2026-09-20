@@ -269,6 +269,33 @@ basetool_host_public_name_alias_services:
   - frontend
   - ingest
 
+# --- a JVM truststore for a privately-signed edge --------------------------------------------------
+# A non-production host reaches its own public name through an edge holding a certificate from a
+# PRIVATE CA. The name resolving (basetool_host_public_name_alias, above) only gets the JVM as far
+# as the handshake; it then fails PKIX path building, because the public CA bundle inside the image
+# does not contain that CA. Measured on the testing host 2026-09-20 -- the frontend reached the
+# issuer and still would not start.
+#
+# Host path of a PKCS#12 truststore carrying that CA (and, normally, the public roots too, so the
+# JVM does not lose its ordinary trust). Empty means no drop-in, which is right for production: its
+# edge certificate is publicly signed.
+#
+# The container sees it at /run/secrets/jvm-truststore.p12 -- a SECOND destination, deliberately not
+# the existing /run/secrets/truststore.p12. Measured the same day: a drop-in Volume= APPENDS to the
+# unit's list, so re-using an existing destination gives podman two mounts on one path and it
+# refuses to start the container. Overriding would mean restating the unit's whole volume list in
+# the drop-in, which drifts on the next release.
+#
+# The JVM is pointed at it by IRI_EXTRA_JAVA_OPTS in the host .env, which is RENDERED into
+# JAVA_TOOL_OPTIONS on the host rather than baked into the unit -- so that half already works:
+#
+#   IRI_EXTRA_JAVA_OPTS=-Djavax.net.ssl.trustStore=/run/secrets/jvm-truststore.p12
+#                       -Djavax.net.ssl.trustStorePassword=... -Djavax.net.ssl.trustStoreType=PKCS12
+basetool_host_jvm_truststore_path: ""
+# Where the container sees it. A constant rather than a knob: the .env line above has to name the
+# same path, and two places to change is one too many.
+basetool_host_jvm_truststore_dest: /run/secrets/jvm-truststore.p12
+
 # --- the host firewall ----------------------------------------------------------------------------
 # Default-deny in front of a host that publishes two ports to the internet is straightforwardly
 # right, and the CIS profile installs firewalld regardless. Set this false only on a host whose

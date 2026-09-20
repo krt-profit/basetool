@@ -120,6 +120,66 @@
   when: basetool_host_public_name_alias | length == 0
   notify: Reload the service user's units
 
+# The truststore drop-in, and it is a SECOND mount rather than a replacement of the first.
+#
+# Two facts, both measured on the testing host 2026-09-20 and neither obvious:
+#
+#   * a drop-in whose mode is 0640 is IGNORED IN SILENCE. The file is read by the SERVICE user's
+#     Quadlet generator, which owns neither the file nor its group, so it simply does not see it --
+#     no warning, no error, the unit generates as if the drop-in were not there. Rocky's umask is
+#     027, so a hand-written one lands at 0640 by default. Hence the explicit 0644 below.
+#   * a drop-in `Volume=` APPENDS to the unit's list. Pointing it at a destination the unit already
+#     mounts (`/run/secrets/truststore.p12`) produced two mounts on one path and podman refused to
+#     start the container at all. Overriding would mean restating every Volume= the unit has, in a
+#     file that then drifts on the next release.
+#
+# So the JVM truststore gets its own destination and the .env points the JVM at that.
+- name: Write the JVM truststore drop-in
+  ansible.builtin.copy:
+    dest: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/20-jvm-truststore.conf
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      #
+      # A SECOND mount, not a replacement: a drop-in Volume= appends, and re-using a destination the
+      # unit already mounts makes podman refuse the container. The JVM is pointed here by
+      # IRI_EXTRA_JAVA_OPTS in {{ basetool_host_root_dir }}/code/.env, which is rendered on the host.
+      [Container]
+      Volume={{ basetool_host_jvm_truststore_path }}:{{ basetool_host_jvm_truststore_dest }}:ro
+  loop: "{{ basetool_host_public_name_alias_services }}"
+  when: basetool_host_jvm_truststore_path | length > 0
+  notify: Reload the service user's units
+
+- name: Refuse a truststore drop-in that points at nothing
+  # A bind-mount source that does not exist is not a warning under Podman -- the container does not
+  # start, with `statfs ...: no such file or directory`, which reads as a broken image. Cheaper to
+  # fail here, where the message names the variable.
+  ansible.builtin.stat:
+    path: "{{ basetool_host_jvm_truststore_path }}"
+  register: basetool_host_jvm_truststore_stat
+  when: basetool_host_jvm_truststore_path | length > 0
+
+- name: It has to exist before a container mounts it
+  ansible.builtin.assert:
+    that: basetool_host_jvm_truststore_stat.stat.exists | default(false)
+    fail_msg: >-
+      basetool_host_jvm_truststore_path is {{ basetool_host_jvm_truststore_path }}, which does not
+      exist on this host. Podman refuses a missing bind-mount source, so all three JVM services
+      would fail to start with an error naming the path and not the variable.
+  when: basetool_host_jvm_truststore_path | length > 0
+
+- name: Remove the truststore drop-in where none is configured
+  ansible.builtin.file:
+    path: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/20-jvm-truststore.conf
+    state: absent
+  loop: "{{ basetool_host_public_name_alias_services }}"
+  when: basetool_host_jvm_truststore_path | length == 0
+  notify: Reload the service user's units
+
 - name: Say whether the containers will see the public name
   ansible.builtin.debug:
     msg: >-
@@ -132,4 +192,9 @@
       No public-name alias is configured, which is right for production: its public name resolves to
       the host that serves it. A non-production host whose containers must reach their own public
       name sets basetool_host_public_name_alias.
+      {% endif %}
+      {% if basetool_host_jvm_truststore_path | length > 0 %}
+      A JVM truststore is mounted at {{ basetool_host_jvm_truststore_dest }} from
+      {{ basetool_host_jvm_truststore_path }}. IRI_EXTRA_JAVA_OPTS in the host .env must point
+      -Djavax.net.ssl.trustStore at that same path, or the mount is inert.
       {% endif %}
