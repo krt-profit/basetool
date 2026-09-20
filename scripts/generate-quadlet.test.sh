@@ -188,5 +188,23 @@ expect "a name the container is handed under no name at all is still refused" \
   "REFUSAL: db: the health command names \${NOWHERE}"
 
 echo
+echo "== the host aliases that exist only under Quadlet =="
+# node-exporter and alloy become HOST services here, so on a Podman host nothing answers to
+# those names on the container network and prometheus.yml's targets go permanently down --
+# measured on the testing host, two of its five down targets. The alias lives in the UNIT
+# rather than in prometheus.yml, because that file rides the bundle and one bundle serves the
+# Docker host too, where the same names must keep resolving to real containers.
+expect "prometheus gets a host alias for alloy" \
+  'print(" ".join(sorted(g.PODMAN_HOST_ALIASES["prometheus"])))' \
+  'alloy'
+expect "...and for node-exporter" \
+  'print(" ".join(sorted(g.PODMAN_HOST_ALIASES["prometheus"])))' \
+  'node-exporter'
+# Each alias must name a service the translation actually made a host service, or the alias
+# points at a host that is not serving and the target stays down with a new explanation.
+expect "every alias names a service the generator made a host service" \
+  'print(all(g.DISPOSITION.get(a, ("",))[0] == "host-service" for v in g.PODMAN_HOST_ALIASES.values() for a in v))' \
+  'True'
+
 printf '%d passed, %d failed\n' "$PASSED" "$FAILED"
 [[ $FAILED -eq 0 ]]

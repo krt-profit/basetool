@@ -278,6 +278,29 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     ),
 }
 
+#: Host aliases that exist ONLY under Quadlet, because the name they resolve belongs to a CONTAINER
+#: under Compose and to a HOST SERVICE here.
+#:
+#: node-exporter and alloy are translated to "host-service" above, so on a Podman host nothing
+#: answers to those names on the container network and `prometheus.yml`'s `node-exporter:9100` and
+#: `alloy:12345` targets go permanently down. Measured on the testing host 2026-09-20: two of the
+#: five down targets were exactly those.
+#:
+#: The fix deliberately does NOT touch prometheus.yml. That file rides the configuration bundle and
+#: one bundle serves every environment, so a target rewritten for Podman would break the Docker host
+#: during the soak -- where node-exporter IS a container and the name must keep resolving to it.
+#: An alias in the UNIT is where a runtime difference belongs, and the units are now delivered per
+#: runtime.
+#:
+#: `host-gateway` is podman's own token for "the host this container runs on"; verified on the
+#: testing host that an arbitrary name maps through it, including from the monitoring network.
+#:
+#: NOT expressed as compose `extra_hosts:`, which the generator already translates: that would apply
+#: to Docker too, where it would override DNS for a container that is right there.
+PODMAN_HOST_ALIASES = {
+    "prometheus": ("node-exporter", "alloy"),
+}
+
 #: Compose profiles whose services are translated. `dev` and `rollback` are local-stack and
 #: rollback-only and have no place in a host's unit directory.
 TRANSLATED_PROFILES = {"prod"}
@@ -1029,6 +1052,9 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     for entry in spec.get("extra_hosts") or []:
         resolved = _resolve_value(str(entry), f"{service}.extra_hosts")
         container.append(f"AddHost={resolved}")
+    # ...and the Quadlet-only ones, for names that are host services here. See PODMAN_HOST_ALIASES.
+    for alias in PODMAN_HOST_ALIASES.get(service, ()):
+        container.append(f"AddHost={alias}:host-gateway")
     nofile = (spec.get("ulimits") or {}).get("nofile")
     if isinstance(nofile, dict):
         podman_args.append(f"--ulimit nofile={nofile['soft']}:{nofile['hard']}")

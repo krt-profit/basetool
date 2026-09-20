@@ -321,8 +321,16 @@ openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext 
 
 ### 3.7 `certs/grafana.crt` + `grafana.key` — Grafana's OWN self-signed cert
 
-NPM terminates the public Let's Encrypt cert and re-encrypts upstream to Grafana over HTTPS; NPM does
-not verify the upstream cert, so a self-signed one with `SAN dns:grafana` is fine.
+> [!note] NPM is retired; the conclusion still holds
+> ADR-0162 replaced Nginx Proxy Manager with the native edge. The edge's grafana vhost is the
+> one that deliberately does **not** `include upstream-tls.conf`, and says why in the file:
+> Grafana presents its own leaf rather than the shared Basetool certificate, so verifying it
+> would mean pinning something regenerated whenever the container is. The hop stays encrypted
+> and `net-proxy-grafana` carries exactly two members. A self-signed cert is still correct.
+>
+> On a **rootless Podman** host, `chown 472:472` below becomes the translated uid, and the SAN
+> should come from that host's `EDGE_HOST_GRAFANA` rather than the domain hardcoded here —
+> see [`PODMAN_CUTOVER_RUNBOOK.md` §0.6](PODMAN_CUTOVER_RUNBOOK.md).
 
 ```bash
 cd /var/iri/monitoring/certs

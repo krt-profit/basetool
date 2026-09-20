@@ -109,9 +109,35 @@ BCRYPT="$(sudo -u iri podman run --rm docker.io/httpd:2.4-alpine htpasswd -nbBC 
 ### 0.6 Grafana's server certificate is on the host
 
 `grafana.container` mounts `/var/iri/monitoring/certs/grafana.{crt,key}` and will not start without
-them. The host needs the pair issued by the internal CA whose certificate is already at
-`/var/iri/monitoring/certs/basetool-ca.crt`. **Measured 2026-09-20: the testing host has the CA and
-not the pair, and Grafana is the one monitoring unit that stays down because of it.**
+them. It is **self-signed and not CA-issued**, deliberately: the edge's grafana vhost is the one
+that does not `include upstream-tls.conf`, and says why — Grafana presents its own leaf, so
+verifying would mean pinning something regenerated whenever the container is.
+
+The procedure is [`MONITORING_ROLLOUT_RUNBOOK.md` §3.7](MONITORING_ROLLOUT_RUNBOOK.md), with two
+changes on a rootless host — the owner uid is translated, and the SAN comes from this host's `.env`
+rather than the runbook's hardcoded production domain:
+
+```bash
+cd /var/iri/monitoring/certs
+GH="$(grep -m1 '^EDGE_HOST_GRAFANA=' /var/iri/code/.env | cut -d= -f2- | tr -d '"')"
+OWNER=$(( $(grep '^iri:' /etc/subuid | cut -d: -f2) + 472 - 1 ))     # container uid 472
+sudo openssl req -x509 -newkey rsa:2048 -nodes -keyout grafana.key -out grafana.crt   -subj "/CN=grafana" -addext "subjectAltName=DNS:grafana,DNS:${GH}" -days 825
+sudo chown ${OWNER}:${OWNER} grafana.crt grafana.key
+sudo chmod 640 grafana.key && sudo chmod 644 grafana.crt
+```
+
+Done on the testing host 2026-09-20; Grafana came up healthy and the monitoring plane reached 9/9.
+
+### 0.6b `.env` carries `KC_METRICS_ENABLED=true`
+
+The generated `env.d` template writes `KC_METRICS_ENABLED=${KC_METRICS_ENABLED:-false}` — it
+**defaults to off**. Production's `.env` sets it to `true`, so a restore carries it; a host whose
+`.env` lacks it silently loses Keycloak's metrics, and the management port answers `404` on
+`/metrics` while looking perfectly healthy otherwise.
+
+```bash
+grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
+```
 
 ### 0.7 The hand-placed units are gone from the service user's home
 
