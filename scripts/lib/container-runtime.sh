@@ -920,7 +920,30 @@ rt_run_detached() {
 
 # rt_cp_to <source-on-host> <container> <destination-in-container>
 rt_cp_to() {
-  ${RT_CLI} cp "$1" "$2:$3"
+  case "${RT_BACKEND}" in
+    docker)
+      docker cp "$1" "$2:$3"
+      ;;
+    podman)
+      # STREAMED IN, not copied, and for the mirror image of the reason rt_extract_from_image
+      # streams OUT. RT_CLI is `sudo -u <service user> podman`, so a plain `cp` has the service
+      # user READ a file that belongs to the deploy account -- and the restore drill's working tree
+      # is deploy-owned 0700 by design, because it holds restored database dumps:
+      #
+      #     Error: ".../krt_basetool.dump" could not be found on the host: ... permission denied
+      #
+      # Measured on the testing host 2026-09-20. `cp -` reads a tar from stdin, so the CALLER reads
+      # the file and the pipe crosses the account boundary. The archive is built here rather than
+      # by the caller so the member lands at the requested name inside the container.
+      local src="$1" ctr="$2" dst="$3"
+      tar -C "$(dirname "${src}")" -cf - "$(basename "${src}")"         | ${RT_CLI} cp - "${ctr}:$(dirname "${dst}")" || return 1
+      # tar preserves the SOURCE basename; rename inside the container when the caller asked for
+      # a different one, so the contract stays "this file, at this path".
+      if [[ "$(basename "${src}")" != "$(basename "${dst}")" ]]; then
+        ${RT_CLI} exec "${ctr}" mv "$(dirname "${dst}")/$(basename "${src}")" "${dst}" || return 1
+      fi
+      ;;
+  esac
 }
 
 # -----------------------------------------------------------------------------

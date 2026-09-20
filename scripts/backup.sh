@@ -396,9 +396,23 @@ if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
 fi
 
 # --- Restart writers BEFORE the slow upload -------------------------------
+#
+# LOUD BUT NOT FATAL, and on Podman that distinction is the difference between a nightly snapshot
+# and none. The two runtimes behave differently on this exact line: `docker compose start` returns
+# as soon as the containers are started, while `systemctl start` waits for `Notify=healthy` and
+# returns non-zero if it does not arrive. So a writer that is merely SLOW -- the frontend's unit
+# allows itself 4m15s -- made this bare command abort the whole run under `set -e`, with both
+# database dumps already on disk and never uploaded.
+#
+# Measured on the testing host 2026-09-20: the backup captured everything, failed here, and the
+# restore drill then reported `no snapshot found`. Losing the irreplaceable dumps because a service
+# was slow to come back is the same landmine the capture blocks above are all guarded against; this
+# line was simply missed, because under Docker it could not fire.
 if [[ "${QUIESCED}" == "true" ]]; then
   log "dumps captured — restarting writers (${WRITER_SERVICES[*]})"
-  rt_service_start "${WRITER_SERVICES[@]}"
+  if ! rt_service_start "${WRITER_SERVICES[@]}"; then
+    log "WARN: one or more writers did not return to health — continuing, so the dumps still reach the repository"
+  fi
   QUIESCED=false
 fi
 
