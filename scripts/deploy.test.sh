@@ -1700,7 +1700,11 @@ scenario_podman_applies_through_systemd() {
   # There is no --wait to pass: Notify=healthy makes each unit Type=notify, so
   # `systemctl start` does not return until podman reports the container healthy.
   assert_docker "systemctl --user daemon-reload" "podman: the units are re-read before anything starts"
-  assert_docker "systemctl --user start backend.service" "podman: the service is started through systemd"
+  # RESTART, not start. The scenario moves the backend's digest, so the deployer re-pins it -- and
+  # `systemctl start` on an already-active unit returns 0 without re-reading anything, which would
+  # leave the old container running the old image. Asserting `start` here is what let that ship.
+  assert_docker "systemctl --user restart backend.service" "podman: a re-pinned service is restarted, so the new image actually lands"
+  assert_docker "systemctl --user start db-backend.service" "podman: ...and an untouched one is only started, so the database stays up"
   assert_no_docker "compose" "podman: compose is never invoked on the apply path"
   if grep -q "${PMARKER}" "${T_STATE_DIR}/last-deployed.digests"; then
     record 1 "podman: the idempotence marker advances to the new target"

@@ -50,6 +50,21 @@ RT_UNIT_DIR="${RT_UNIT_DIR:-}"
 # -- on a host it is always this path.
 RT_LINGER_DIR="${RT_LINGER_DIR:-/var/lib/systemd/linger}"
 
+# The services whose DEFINITION this run changed -- a new digest pin, or a unit file the release
+# replaced. Space separated, appended to by rt_pin_write and install_quadlet_units, and read by
+# rt_apply_stack to decide `restart` instead of `start`.
+#
+# WHY IT HAS TO EXIST. `systemctl start` on a unit that is ALREADY ACTIVE is a no-op: it returns 0
+# immediately and does not re-read anything. Measured on the testing host 2026-09-18 -- the pin was
+# changed to a different image, daemon-reload run, `systemctl start backend.service` returned 0,
+# and the container went on running the PREVIOUS image while the drop-in on disk named the new one.
+# Every deploy after the first would have reported "deploy successful" and changed nothing: the
+# 2026-07-02 incident's exact shape, produced by the deployer rather than by a manual `up`.
+#
+# Compose has no equivalent because `up -d` recreates a container whose definition changed and
+# leaves the rest alone. Under Quadlet that comparison is ours to make.
+RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
+
 # Defers to the caller's own `fail` when it has one, so a sourcing script keeps
 # its logging and its exit path instead of dying differently depending on which
 # layer happened to notice.
@@ -439,7 +454,18 @@ rt_apply_stack() {
         set -- "${svcs[@]}"
       fi
       for svc in "$@"; do
-        ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+        # RESTART what this run re-defined, START what it did not. `start` on an already-active
+        # unit returns 0 without re-reading anything, so a changed pin would never reach the
+        # running container -- see RT_CHANGED_SERVICES at the top of this file for the measurement.
+        # A restart IS a recreate here: the generated ExecStart carries --replace, so the old
+        # container goes and a new one is created from the current unit.
+        #
+        # Everything else is left alone deliberately. Restarting the whole stack on every deploy
+        # would take the databases down for a change that never touched them.
+        case " ${RT_CHANGED_SERVICES} " in
+          *" ${svc} "*) ${RT_SYSTEMCTL} restart "${svc}.service" || rc=1 ;;
+          *)            ${RT_SYSTEMCTL} start   "${svc}.service" || rc=1 ;;
+        esac
       done
       return "${rc}"
       ;;
@@ -584,11 +610,25 @@ rt_pin_path() {
 }
 
 rt_pin_write() {
-  local svc="$1" ref="$2" path
+  local svc="$1" ref="$2" path body
   path="$(rt_pin_path "${svc}")"
   mkdir -p "$(dirname "${path}")"
-  printf '# Written by deploy.sh. The digest this release pinned; do not edit.\n[Container]\nImage=%s\n' \
-    "${ref}" > "${path}"
+  body="$(printf '# Written by deploy.sh. The digest this release pinned; do not edit.\n[Container]\nImage=%s\n' "${ref}")"
+  # Only a real change counts. Rewriting the identical file on every tick and then restarting the
+  # service for it would turn an idempotent deploy into a rolling restart of the whole stack.
+  if [[ ! -f "${path}" ]] || [[ "$(cat "${path}")" != "${body}" ]]; then
+    printf '%s\n' "${body}" > "${path}"
+    rt_note_changed "${svc}"
+  fi
+}
+
+# Record a service whose definition moved, once.
+rt_note_changed() {
+  local svc="$1"
+  case " ${RT_CHANGED_SERVICES} " in
+    *" ${svc} "*) return 0 ;;
+  esac
+  RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES}${RT_CHANGED_SERVICES:+ }${svc}"
 }
 
 rt_pin_clear() {

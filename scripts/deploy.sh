@@ -599,6 +599,10 @@ install_quadlet_units() {
     if [[ ! -f "${unit_dir}/${base}" ]] || ! cmp -s "${f}" "${unit_dir}/${base}"; then
       install -m 0644 "${f}" "${unit_dir}/${base}"
       installed=$(( installed + 1 ))
+      # A replaced .container is a changed DEFINITION, exactly like a changed digest pin, and the
+      # apply has to restart it rather than start it -- `systemctl start` on an active unit is a
+      # no-op and would leave the old container running the old definition.
+      [[ "${base}" == *.container ]] && rt_note_changed "${base%.container}"
     fi
   done
 

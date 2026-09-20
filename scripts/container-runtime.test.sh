@@ -439,6 +439,25 @@ mon() { printf 'export RT_PROJECT_DIR=%q RT_MONITORING_FILE=%q RT_MONITORING_SER
   "$WORK" "${WORK}/docker-compose.monitoring.yml" "prometheus loki grafana"; }
 : > "${WORK}/docker-compose.monitoring.yml"
 
+# shellcheck disable=SC2016
+# The snippets below are passed to `eval` inside run_rt, so `${WORK}` is expanded THERE, in the
+# subshell that has the library loaded. Expanding it here would be the bug, not the fix.
+#
+# The defect that would have shipped. `systemctl start` on an ALREADY ACTIVE unit returns 0 and
+# re-reads nothing, so a changed digest pin never reaches the running container: measured on the
+# testing host, the drop-in named a new image, `start` returned 0, and the container went on
+# running the old one while the deploy reported success.
+# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+expect_call "a service this run re-pinned is RESTARTED, not started" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart backend.service'
+# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+expect_call "...and one it did not is merely started, so the databases stay up" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:bbbb"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'start db-backend.service'
+# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+expect_no_call "...and the database is never restarted for somebody else's change" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart db-backend.service'
+# Idempotence: rewriting the identical pin must NOT count as a change, or every tick becomes a
+# rolling restart of the whole stack.
+# shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
+expect_no_call "an unchanged pin does not restart anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   'restart backend.service'
+
 expect_call "docker addresses it as its own project" docker \
   "$(mon) rt_monitoring_up" '-p iri-monitoring'
 expect_call "podman starts each named unit" podman \
