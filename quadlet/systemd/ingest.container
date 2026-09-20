@@ -28,6 +28,7 @@ Notify=healthy
 Memory=512M
 PidsLimit=2048
 AddHost=localhost:127.0.0.1
+AddHost=alloy:host-gateway
 PodmanArgs=--cpus=1.5 --init
 
 [Service]

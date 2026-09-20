@@ -33,6 +33,7 @@ HealthStartPeriod=30s
 Notify=healthy
 Memory=2560M
 PidsLimit=2048
+AddHost=alloy:host-gateway
 PodmanArgs=--cpus=3.0
 
 [Service]

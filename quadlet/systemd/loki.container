@@ -8,6 +8,7 @@ ContainerName=loki
 ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
+PublishPort=127.0.0.1:3100:3100
 Network=net-monitoring-core.network
 Volume=/var/iri/code/monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
 Volume=/var/iri/code/monitoring/loki/rules:/etc/loki/rules:ro

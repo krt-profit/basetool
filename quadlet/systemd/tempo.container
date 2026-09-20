@@ -8,6 +8,7 @@ ContainerName=tempo
 ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
+PublishPort=127.0.0.1:4327:4317
 Network=net-monitoring-core.network
 Volume=/var/iri/code/monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
 Volume=/var/iri/monitoring/data/tempo:/var/tempo
