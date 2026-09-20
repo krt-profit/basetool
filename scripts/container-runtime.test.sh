@@ -478,6 +478,24 @@ expect_call "a monitoring recreate touches one service only" podman \
 expect_no_call "...and never the whole plane" podman \
   "$(mon) rt_monitoring_recreate loki" 'start prometheus.service'
 
+# alloy is a HOST service under Podman -- generate-quadlet.py translates it to one, because it
+# carries group_add 4/473 to read root:adm files and a rootless container's namespace groups are
+# not host groups. Its CONFIGURATION still rides the config bundle, so a release can change it and
+# the reconcile has to restart something. Asking the SERVICE user's systemd about it fails with
+# "Unit alloy.service not found", which deploy.sh reported as "monitoring stack down?" about a unit
+# that was up -- on every tick, non-gating, while the new configuration never arrived.
+expect_call "a host service is restarted through the SYSTEM manager" podman \
+  "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate alloy" 'systemctl restart alloy.service'
+expect_no_call "...and never through the service user's, which has no such unit" podman \
+  "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate alloy" 'systemctl --user restart alloy.service'
+# The routing must stay narrow: everything that IS a container still goes the ordinary way, or one
+# host service turns the whole monitoring plane into system units nobody granted access to.
+expect_call "a containerised one still goes to the service user" podman \
+  "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate prometheus" 'systemctl --user restart prometheus.service'
+# Under Docker alloy IS a container, and the same name must not take the host route there.
+expect_call "under docker the same service is recreated as a container" docker \
+  "$(mon) rt_monitoring_recreate alloy" 'up -d --force-recreate --no-deps alloy'
+
 say ""
 say "== taking the app stack down, which only a topology change needs =="
 expect_call "docker uses the app project's own file" docker \

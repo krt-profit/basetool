@@ -90,6 +90,19 @@
       Defaults:{{ basetool_host_deploy_user }} !requiretty
       {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: /usr/bin/podman *
       {{ basetool_host_deploy_user }} ALL=({{ basetool_host_service_user }}) NOPASSWD: SETENV: /usr/bin/systemctl --user *
+      #
+      # And one SYSTEM unit, named in full, with no wildcard anywhere in the line.
+      #
+      # alloy is a host service here -- it reads /var/log and needs real supplementary groups, which
+      # a rootless container's namespace groups are not -- but its CONFIGURATION rides the config
+      # bundle, so a release can change it and something has to restart it. Without this the
+      # deployer asked the SERVICE user's systemd about a unit it has never had, logged
+      # "monitoring stack down?" about a service that was running, and the new configuration never
+      # reached it. Measured 2026-09-20, on every tick.
+      #
+      # `restart`, one named unit, target root and nothing else: not `systemctl *`, and not a unit
+      # the caller chooses. scripts/lib/container-runtime.sh's RT_HOST_SERVICES is the other half.
+      {{ basetool_host_deploy_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl restart alloy.service
 
 # `visudo -cf` above proves the file is SYNTACTICALLY valid. These two prove it
 # GRANTS what it was written to grant -- different questions, and only the second

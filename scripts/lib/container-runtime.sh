@@ -50,6 +50,28 @@ RT_UNIT_DIR="${RT_UNIT_DIR:-}"
 # -- on a host it is always this path.
 RT_LINGER_DIR="${RT_LINGER_DIR:-/var/lib/systemd/linger}"
 
+# Monitoring services that are HOST services under Podman rather than containers, so a reconcile has
+# to restart the system unit instead of asking the service user's systemd about a unit it has never
+# had.
+#
+# `generate-quadlet.py` translates node-exporter and alloy to "host-service": node-exporter mounts
+# /run/systemd/private, which a rootless container cannot reach, and alloy carries group_add 4/473
+# to read root:adm files, which a rootless container's NAMESPACE groups are not. Only alloy's
+# CONFIGURATION rides the config bundle, so only alloy is ever reconciled -- the other two are
+# configured by the Ansible role and never by a release.
+#
+# Measured on the testing host 2026-09-20: without this every deploy logged
+#   monitoring: WARN recreate of alloy failed (non-gating; monitoring stack down?)
+# and carried on. Non-gating, so nothing broke -- and an alloy config change therefore never
+# reached the running alloy, on every single tick, behind a line that guessed "monitoring stack
+# down?" about a host service that was running perfectly well.
+RT_HOST_SERVICES="${RT_HOST_SERVICES:-alloy}"
+
+# How to reach the SYSTEM manager for those. Set by rt_detect: a plain `systemctl` when this runs as
+# root or as the service user, and a narrowly granted sudo for the deploy account -- see
+# /etc/sudoers.d/basetool-deploy, which names that one unit with no wildcard.
+RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-}"
+
 # The services whose DEFINITION this run changed -- a new digest pin, or a unit file the release
 # replaced. Space separated, appended to by rt_pin_write and install_quadlet_units, and read by
 # rt_apply_stack to decide `restart` instead of `start`.
@@ -139,6 +161,7 @@ rt_detect() {
        && podman ps --format '{{.Names}}' >/dev/null 2>&1; then
       RT_CLI=podman
       RT_SYSTEMCTL="systemctl --user"
+      RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-systemctl}"
       RT_UNIT_DIR="${RT_UNIT_DIR:-${HOME}/.config/containers/systemd}"
       return 0
     fi
@@ -167,6 +190,9 @@ rt_detect() {
       if sudo -n -u "${u}" podman ps --format '{{.Names}}' >/dev/null 2>&1; then
         RT_CLI="sudo -n -u ${u} podman"
         RT_SYSTEMCTL="sudo -n -u ${u} XDG_RUNTIME_DIR=/run/user/${uid} systemctl --user"
+        # The SYSTEM manager, for RT_HOST_SERVICES. Running as root already has it; the deploy
+        # account reaches it through one named sudoers entry per unit, and through nothing wider.
+        RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-sudo -n systemctl}"
         # NOT the owning user's home. A deploy account cannot even TRAVERSE it:
         # measured on the testing host 2026-09-18, /home/iri is 0750 iri:iri, so
         # `[[ -d ~iri/.config/containers/systemd ]]` is false for the account that
@@ -809,7 +835,13 @@ rt_monitoring_recreate() {
         up -d --force-recreate --no-deps "$1"
       ;;
     podman)
-      ${RT_SYSTEMCTL} restart "$1.service"
+      # A host service is not in the service user's systemd at all, so asking it to restart
+      # one fails with "Unit alloy.service not found" -- which the caller reports as
+      # "monitoring stack down?" about a unit that is up. Route it to the system manager.
+      case " ${RT_HOST_SERVICES} " in
+        *" $1 "*) ${RT_HOST_SYSTEMCTL:-systemctl} restart "$1.service" ;;
+        *)        ${RT_SYSTEMCTL} restart "$1.service" ;;
+      esac
       ;;
   esac
 }
