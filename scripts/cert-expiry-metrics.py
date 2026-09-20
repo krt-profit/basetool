@@ -303,6 +303,13 @@ def write_atomically(target: str, content: str) -> None:
             os.fsync(handle.fileno())
         os.replace(tmp, target)
     except OSError as exc:
+        # Best-effort cleanup, and its failure is deliberately swallowed: this path is already
+        # handling a failed write, and the two ways the unlink can fail are both uninteresting --
+        # the sibling was never created (the `open` itself failed), or the directory is not
+        # writable, which is the same fact `exc` already carries. Raising from here would replace
+        # the diagnosis with a symptom, so the ORIGINAL error is re-raised on the next line and a
+        # stray `.tmp` is left for `ls` to show. node_exporter ignores it: the textfile collector
+        # reads `*.prom` only.
         try:
             os.unlink(tmp)
         except OSError:
