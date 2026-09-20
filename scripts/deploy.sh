@@ -201,6 +201,11 @@ COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubuserco
 # DELAY+2*DELAY seconds on a genuinely bad signature, which still aborts.
 COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
 COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
+# Where to look for cosign when it is not on PATH. The first entry is where the basetool_host role
+# installs it (`basetool_host_cosign_path`); the others are where an operator would put it by hand.
+# A variable rather than a literal only so the self-test can point the search at a fixture — on a
+# host it is always these three, the same reasoning as container-runtime.sh's RT_LINGER_DIR.
+COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 # stderr of the last failed `cosign verify`, so the abort can say *why* it failed
 # instead of only that it did. Declared here because `set -u` is in force.
 VERIFY_LAST_ERROR=""
@@ -1051,8 +1056,34 @@ esac
 # unverified :stable. Missing cosign with the gate ON is a bootstrap error, not a
 # reason to skip verification — install cosign (docs/deployment.md) or, only to
 # break glass during a Sigstore outage, run with IRI_COSIGN_VERIFY=false.
+#
+# "Not on PATH" and "not installed" are different facts, and on Rocky they come apart. The role
+# installs cosign to /usr/local/bin (`basetool_host_cosign_path`); sudo's `secure_path` on Rocky
+# 10.2 is `/sbin:/bin:/usr/sbin:/usr/bin` and does NOT contain it. So `sudo -u deploy deploy.sh` —
+# the manual invocation this script's own usage block documents — aborted with "install cosign"
+# against a host where cosign was sitting in /usr/local/bin, 141 MB of it, installed by the role two
+# days earlier. Measured on the testing host 2026-09-20.
+#
+# The TIMER is unaffected and always was: a systemd service gets systemd's own PATH, which includes
+# /usr/local/bin — so the cutover's `systemctl start iri-deploy.service` never saw this. That is
+# exactly what makes it worth fixing rather than documenting: the failure is invisible on the path
+# CI and the runbook exercise, and waiting for the operator who types the other one.
+#
+# Looking in the known locations is not a search of the filesystem: it is the one directory the
+# role is configured to install into, plus the two an operator would use by hand.
 if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
-  fail "cosign not found on PATH but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
+  IFS=':' read -r -a _cosign_dirs <<< "${COSIGN_SEARCH_PATH}"
+  for _cosign_dir in "${_cosign_dirs[@]}"; do
+    [[ -n "${_cosign_dir}" && -x "${_cosign_dir}/cosign" ]] || continue
+    PATH="${_cosign_dir}:${PATH}"
+    export PATH
+    log "cosign found at ${_cosign_dir}/cosign but not on PATH (sudo secure_path?) — using it"
+    break
+  done
+  unset _cosign_dir _cosign_dirs
+fi
+if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
+  fail "cosign not found on PATH or under ${COSIGN_SEARCH_PATH}, but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
 fi
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"

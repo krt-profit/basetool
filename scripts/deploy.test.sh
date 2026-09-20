@@ -1262,6 +1262,57 @@ scenario_break_glass_skips_verify() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 15b: cosign installed but not on PATH. "Not on PATH" and "not
+# installed" are different facts and on Rocky they come apart: the role installs
+# cosign to /usr/local/bin, and sudo's `secure_path` there is
+# `/sbin:/bin:/usr/sbin:/usr/bin`. So `sudo -u deploy deploy.sh` — the manual
+# invocation this script's own usage block documents — aborted with "install
+# cosign" on a host that had it. Measured on the testing host 2026-09-20.
+#
+# The TIMER never saw it: a systemd service gets systemd's PATH, which includes
+# /usr/local/bin. That asymmetry is exactly why it needs a test — the failure is
+# invisible on the path CI and the runbook exercise, and waits for the operator
+# who types the other one.
+# ---------------------------------------------------------------------------
+scenario_cosign_off_path() {
+  echo "Scenario: cosign is installed but not on PATH (sudo secure_path)"
+  local tmp rc=0 alt
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+
+  # Move the stub OUT of the staged PATH and into a directory that stands in for
+  # /usr/local/bin, then point the search there. Nothing else changes.
+  alt="${tmp}/not-on-path"
+  mkdir -p "${alt}"
+  mv "${T_FAKE_BIN}/cosign" "${alt}/cosign"
+
+  mapfile -t fake < <(converged_env)
+  RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
+    "IRI_COSIGN_SEARCH_PATH=${alt}" || rc=$?
+  assert_exit 0 "$rc" "the deploy succeeds with cosign off PATH but findable"
+  assert_contains "but not on PATH" "it says where it found cosign, rather than aborting"
+  assert_docker "cosign verify" "and it still verifies every signature"
+
+  # ...and with nothing to find, it must still fail closed and name where it looked.
+  #
+  # The stub log is truncated first: it ACCUMULATES across run_deploy calls, so without this the
+  # `assert_no_docker` below would read the first run's perfectly legitimate `cosign verify` and go
+  # red for the wrong reason. It did, on the first run of this scenario.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
+    "IRI_COSIGN_SEARCH_PATH=${tmp}/nowhere" || rc=$?
+  assert_exit 1 "$rc" "a genuinely missing cosign still fails closed"
+  assert_contains "cosign not found on PATH or under" "the abort names where it looked"
+  assert_no_docker "cosign verify" "nothing is verified when cosign is absent"
+
+  mv "${alt}/cosign" "${T_FAKE_BIN}/cosign"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 16: the GHCR token-expiry gauge is emitted on EVERY tick — including
 # the idempotence no-op — so the GhcrPullTokenExpiring alert never goes stale.
 # ---------------------------------------------------------------------------
@@ -1371,6 +1422,7 @@ scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_transient_verify_failure_retries
 scenario_break_glass_skips_verify
+scenario_cosign_off_path
 # ---------------------------------------------------------------------------
 # Scenario 19: --check-only over a CONVERGED stack still runs the signature
 # preflight (it does not take the plain no-op fast exit), reporting "no change"
