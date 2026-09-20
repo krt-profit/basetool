@@ -54,7 +54,25 @@ skopeo inspect --no-tags docker://ghcr.io/krt-profit/basetool-config:stable >/de
 cd ~/basetool-run/ansible && ansible-playbook site.yml --limit production
 ```
 
-Expect `failed=0`, and on a second run `changed=0`. The role is what puts the host in the state the
+Expect `failed=0`, and on a second run `changed=0`.
+
+> [!warning] A `--tags` run does not satisfy this gate, and it looks like it does
+> Audited on `rocky-16gb-nbg1-1` 2026-09-20, after an earlier `--tags scripts,selinux,observability`
+> run: the scripts were there, the SELinux labels were right, five timers were enabled — and
+> `/var/lib/iri`, `/etc/iri` and `/var/iri/code` were still owned by **`iri`** rather than `deploy`,
+> `/etc/iri` was `755` rather than `0700`, and `env.d`, `/var/iri/backup`,
+> `/etc/containers/systemd/users/994` and the lock tmpfiles did not exist at all. Everything a tag
+> selected was correct; everything it skipped was absent. The parts that make a host *look*
+> provisioned and the parts the deployer actually needs are selected by different tags.
+
+Read the gate back rather than inferring it from `changed=0` — these are the four that were wrong:
+
+```bash
+stat -c '%n %U:%G %a' /var/lib/iri /etc/iri /var/iri/code /var/iri/code/env.d /var/iri/backup
+ls -d /etc/containers/systemd/users/$(id -u iri)
+ls /etc/tmpfiles.d/iri-locks.conf
+rpm -q restic rclone
+``` The role is what puts the host in the state the
 deployer needs, and the following are all role-owned and were all wrong at some point in this
 migration — a partial run leaves one of them behind:
 
@@ -70,9 +88,14 @@ migration — a partial run leaves one of them behind:
 ### 0.3 The four operational units are startable
 
 ```bash
-systemd-analyze verify /etc/systemd/system/iri-{deploy,backup,restore-drill,docker-cleanup}.service
+systemd-analyze verify \
+  /etc/systemd/system/iri-{deploy,backup,restore-drill,docker-cleanup,container-metrics,cert-expiry}.service
 systemctl start iri-deploy.service && systemctl show iri-deploy.service -p Result --value   # success
 ```
+
+Six, not four: `iri-container-metrics` (the cAdvisor replacement) and `iri-cert-expiry` (§0.6c) are
+delivered by `27-observability.yml` rather than `25-scripts.yml`, so a run that skipped the
+`observability` tag leaves both behind while the other four verify cleanly.
 
 ### 0.4 The registry token is readable by the deploy account
 
@@ -126,9 +149,21 @@ The procedure is [`MONITORING_ROLLOUT_RUNBOOK.md` §3.7](MONITORING_ROLLOUT_RUNB
 changes on a rootless host — the owner uid is translated, and the SAN comes from this host's `.env`
 rather than the runbook's hardcoded production domain:
 
+> [!important] `.env` is not on the host yet, and this step reads it
+> `.env` arrives **in the window**, with the restore (§1.6) — so on a host that has not cut over,
+> the `grep` below returns nothing, `GH` is empty, and the certificate is minted with a SAN of
+> `DNS:grafana,DNS:` . Audited on `rocky-16gb-nbg1-1` 2026-09-20: no `.env`, and the certs directory
+> empty.
+>
+> The value is not a secret and does not have to come from `.env`: it is the public Grafana
+> hostname, and `.env.example` in this repository carries it. The command below falls back to it, so
+> the step works before the window and still prefers the host's own value once there is one.
+
 ```bash
 cd /var/iri/monitoring/certs
-GH="$(grep -m1 '^EDGE_HOST_GRAFANA=' /var/iri/code/.env | cut -d= -f2- | tr -d '"')"
+GH="$(grep -m1 '^EDGE_HOST_GRAFANA=' /var/iri/code/.env 2>/dev/null | cut -d= -f2- | tr -d '"')"
+GH="${GH:-grafana.profit-base.online}"                               # .env.example's value
+test -n "${GH}" || { echo "no grafana hostname; refusing to mint a certificate with an empty SAN"; exit 1; }
 OWNER=$(( $(grep '^iri:' /etc/subuid | cut -d: -f2) + 472 - 1 ))     # container uid 472
 sudo openssl req -x509 -newkey rsa:2048 -nodes -keyout grafana.key -out grafana.crt   -subj "/CN=grafana" -addext "subjectAltName=DNS:grafana,DNS:${GH}" -days 825
 sudo chown ${OWNER}:${OWNER} grafana.crt grafana.key
