@@ -874,15 +874,36 @@ steps to the keystore-rotation runbook in `docs/deployment.md`:
 2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.7), keeping
    `chown 472:472`.
 3. Restart the affected monitoring services so they reload the new files (`blackbox-exporter` mounts
-   the same CA for the `https_internal` probes):
+   the same CA for the `https_internal` probes).
+
+   On the **Podman** host, which is what production is since the cutover (ADR-0163) — the units are
+   `systemctl --user` units of the service user, so the restart runs as that user:
 
    ```bash
-   docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml \
-     up -d --force-recreate prometheus grafana blackbox-exporter
+   sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) \
+     systemctl --user restart prometheus.service grafana.service blackbox-exporter.service
    ```
+
+   > [!note] Updated 2026-09-20
+   > This step read `docker compose -p iri-monitoring ... up -d --force-recreate` until then. There
+   > is no Docker on the host that runs this procedure any more, and a rotation runbook whose
+   > command does not exist is worse than no runbook, because it is followed during an incident.
 
    Then re-run Phase 8.1 (all targets UP) to confirm the app scrapes handshake against the new CA, and
    check the `blackbox-internal-tls` job's `probe_success == 1` for the three app targets.
+
+4. **Re-read the certificate FILES**, so the file-based expiry metrics describe what is now on disk:
+
+   ```bash
+   sudo systemctl start iri-cert-expiry.service
+   grep '^basetool_certificate_expiry_timestamp_seconds' \
+     /var/iri/monitoring/textfile/certificates.prom
+   ```
+
+   `basetool-ca.crt` is watched by `SelfSignedCertificateExpiring` (90 days) and the collector reads
+   it once a day, so without this the alert keeps reporting the **old** CA's expiry until the next
+   03:40 — either a firing alert that a rotation has already resolved, or, worse, a silent one
+   whose reading belongs to a file that no longer exists. See REQ-OBS-008.
 
 ---
 

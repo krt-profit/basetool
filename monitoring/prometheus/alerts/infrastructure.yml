@@ -202,8 +202,87 @@ groups:
           summary: "TLS certificate for {{ $labels.instance }} expires in <14 days"
           description: "The certificate served at {{ $labels.instance }} expires in under 14 days."
 
+      # --- certificates that no listener SERVES --------------------------------------------------
+      # CertificateExpiringSoon above covers everything this deployment serves, and its blind spot is
+      # structural rather than an oversight: a probe can only see a certificate something is serving.
+      #
+      # The internal CA is the case that matters. `basetool-ca.crt` is the trust anchor for every
+      # `proxy_ssl_verify on` upstream at the edge and for the blackbox `https_internal` module
+      # itself. Nothing listens on it, so nothing probed it, so nothing watched it -- and the day it
+      # expires, every verified upstream fails at once AND the probes that would otherwise have
+      # warned about the leaves fail with it. Measured on the testing host 2026-09-20: the one
+      # certificate whose expiry is most expensive was the only one with no coverage at all.
+      #
+      # Filled from the host rather than by a probe: scripts/cert-expiry-metrics.py runs under
+      # iri-cert-expiry.timer and writes basetool_certificate_* into node_exporter's textfile
+      # directory. It reads public certificate FILES only -- never a key, and never the PKCS#12
+      # keystore, which would need a password and whose leaf backend/frontend/ingest/Keycloak all
+      # serve, so the probes already cover it. Label cardinality is the contents of one
+      # operator-provisioned directory (REQ-OBS-006/-011) -- two files on the testing host today,
+      # the internal CA and Grafana's leaf.
+      #
+      # REQ-OBS-008 (internal-cert expiry is monitored).
+      - alert: CertificateFileExpiringSoon
+        expr: (basetool_certificate_expiry_timestamp_seconds{self_signed="false"} - time()) < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate file {{ $labels.path }} expires in <14 days"
+          description: "The certificate at {{ $labels.path }} ({{ $labels.subject }}) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by {{ $labels.issuer }} -- re-issue it from that CA, put the new file in place and restart whatever reads it."
+
+      # 90 days rather than 14, and the difference is the whole point of the `self_signed` label.
+      # Replacing a CA-signed leaf is a file and a restart. Replacing a self-signed ROOT means
+      # re-issuing every certificate it signed and rolling the new anchor through the edge's
+      # `proxy_ssl_trusted_certificate` and the blackbox `https_internal` module *together* -- work
+      # that has to be staged, not done against a fortnight's deadline.
+      #
+      # A self-signed LEAF (Grafana's) is cheap and gets the same 90 days anyway: a rule that
+      # exempted it by name or by path would be one rename away from silently covering nothing, and
+      # alerting three months early on a cheap certificate costs an acknowledged alert.
+      - alert: SelfSignedCertificateExpiring
+        expr: (basetool_certificate_expiry_timestamp_seconds{self_signed="true"} - time()) < 90 * 24 * 3600
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Self-signed certificate {{ $labels.path }} expires in <90 days"
+          description: "{{ $labels.subject }} at {{ $labels.path }} is self-signed and expires in under 90 days. If it is the internal CA, replacing it means re-issuing every certificate it signed and rolling the trust anchor through the edge's proxy_ssl_trusted_certificate and the blackbox https_internal module together -- start now, not at 14 days."
+
   - name: infrastructure-warning
     rules:
+      # An expiry metric that stopped updating reads exactly like a certificate that is fine: the
+      # value is still there, still in the future, and increasingly a lie. Nothing else would catch
+      # it -- node_exporter keeps serving the .prom file after the collector dies, TargetDown covers
+      # only node_exporter itself, and SystemdUnitFailed covers a unit that EXITS non-zero, not a
+      # timer that stopped being scheduled or a run that never happened. So the collector reports its
+      # own liveness and this rule reads it (REQ-OBS-014).
+      #
+      # 36h because the timer fires daily: one missed run plus margin, not a hair trigger.
+      #
+      # The `or absent(...)` companion is the half that matters most: a collector that has never
+      # written emits no series at all, and `time() - <absent series>` produces no samples rather
+      # than an alert. Without it, the never-installed case -- the one a host rebuild actually
+      # produces -- would be the single state this rule cannot see, while reading as coverage.
+      #
+      # BARE, like `BackupStaleOrMissing` in ops-automation.yml and unlike the scheduled-job
+      # staleness rules in business.yml, and the difference is which kind of metric it reads. Those
+      # read gauges the BACKEND registers, which vanish on a restart -- there a bare absent() means
+      # "just deployed" and pages after every release, which is what their uptime gate exists to
+      # prevent. A textfile metric is the opposite: the .prom file is on disk and outlives every
+      # restart of Prometheus, of node_exporter and of the whole stack, so absent() here can only
+      # mean the collector has never written. The Ansible role takes the first reading at
+      # provisioning time, before the stack that runs Prometheus exists, so there is no window in
+      # which a healthy host looks like this one.
+      - alert: CertificateMetricsStale
+        expr: (time() - basetool_certificate_metrics_timestamp_seconds) > 36 * 3600 or absent(basetool_certificate_metrics_timestamp_seconds)
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate expiry metrics are stale"
+          description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
+
       - alert: HostDiskWarning
         expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.80
         for: 10m

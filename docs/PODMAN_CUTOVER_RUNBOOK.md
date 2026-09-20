@@ -148,6 +148,41 @@ The generated `env.d` template writes `KC_METRICS_ENABLED=${KC_METRICS_ENABLED:-
 grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
 ```
 
+### 0.6c The certificate files are being watched for expiry
+
+Every certificate the deployment **serves** is probed by blackbox and covered by
+`CertificateExpiringSoon`. A probe cannot see a certificate nothing serves, and
+`/var/iri/monitoring/certs/basetool-ca.crt` is served by nothing while being the trust anchor for
+every verified upstream at the edge *and* for the `https_internal` probe module. Measured on the
+testing host 2026-09-20: it was the only certificate in the monitoring plane with no coverage of any
+kind. `iri-cert-expiry.timer` closes that, and this step confirms it on the new host rather than
+assuming the role ran.
+
+```bash
+systemctl is-enabled iri-cert-expiry.timer                       # expect: enabled
+systemctl start iri-cert-expiry.service
+grep -c '^basetool_certificate_expiry_timestamp_seconds' /var/iri/monitoring/textfile/certificates.prom
+```
+
+The count must equal the number of `*.crt` / `*.pem` / `*.cer` files in
+`/var/iri/monitoring/certs` — at minimum `basetool-ca.crt` and `grafana.crt`, so **2**. A `0`, or a
+missing file, means the alerts have no input and `CertificateMetricsStale` is what will tell you,
+36 hours later.
+
+Then read what it actually says, because a metric that exists and a metric that is right are
+different claims:
+
+```bash
+awk -F'[{}]' '/^basetool_certificate_expiry_timestamp_seconds/ {print $3, $2}' \
+  /var/iri/monitoring/textfile/certificates.prom |
+  while read -r ts labels; do
+    printf '%6d days  %s\n' $(( (ts - $(date +%s)) / 86400 )) "${labels}"
+  done
+```
+
+Anything under 90 days with `self_signed="true"`, or under 14 with `self_signed="false"`, will page
+the moment Prometheus scrapes — rotate it **before** the window rather than during it.
+
 ### 0.7 The hand-placed units are gone from the service user's home
 
 > [!warning] The home directory shadows the delivered units — silently and permanently

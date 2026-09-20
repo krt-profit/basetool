@@ -1,0 +1,65 @@
+; systemd service for the certificate-expiry collector.
+;
+; WHAT IT IS FOR. Every certificate this deployment SERVES is already watched: the blackbox exporter
+; probes it and probe_ssl_earliest_cert_expiry feeds CertificateExpiringSoon. That has one
+; structural blind spot -- a probe can only see a certificate something is serving.
+;
+; The internal CA is the case that matters. /var/iri/monitoring/certs/basetool-ca.crt is the trust
+; anchor for every `proxy_ssl_verify on` upstream at the edge and for the https_internal probe
+; module itself. Nothing listens on it, so nothing probed it, so nothing would have noticed it
+; expiring -- and the day it does, every verified upstream fails at once AND the probes that would
+; otherwise have warned about the leaves fail with it. Measured 2026-09-20: it was the one
+; certificate in the monitoring plane with no coverage at all.
+;
+; Installation is by the Ansible role (tasks/27-observability.yml), not by hand.
+
+[Unit]
+Description=Profit Basetool — expiry metrics for certificates nothing serves
+Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cert-expiry-metrics.py
+
+[Service]
+Type=oneshot
+
+; Root, because the certificates are owned by the accounts that read them -- basetool-ca.crt by
+; root, grafana.crt by the namespace-translated uid 100471 -- and no single unprivileged account
+; can read all of them. The process opens no private key: the collector skips *.key by construction
+; and reads only the public half through `openssl x509`.
+User=root
+
+ExecStart=/var/iri/code/scripts/cert-expiry-metrics.py --output /var/iri/monitoring/textfile/certificates.prom
+
+; Exit 1 means "no certificate found", which on a host whose certs have not been provisioned yet is
+; a real finding but not one worth a failed unit every day. The staleness of the metric itself is
+; alerted on from Prometheus (CertificateMetricsStale), which can tell "not provisioned
+; yet" from "the collector stopped" -- something an exit code here cannot.
+SuccessExitStatus=0 1
+
+; --- Hardening -------------------------------------------------------------
+; The full set: this unit runs as root, invokes no sudo, starts no container and needs no
+; namespace of its own. Nothing here has to be relaxed for it the way the deploy units did.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+; Read the certificates, write the one metrics file. ProtectSystem=strict makes everything else
+; read-only, which is all this needs -- /var/iri/monitoring/certs is deliberately NOT writable.
+ReadWritePaths=/var/iri/monitoring/textfile
+
+TimeoutStartSec=60
+MemoryMax=128M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

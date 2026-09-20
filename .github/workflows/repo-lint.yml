@@ -226,6 +226,33 @@ jobs:
       - name: Self-test the cgroup metrics collector
         run: bash scripts/cgroup-container-metrics.test.sh
 
+  cert-expiry-selftest:
+    name: cert-expiry-selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `scripts/cert-expiry-metrics.py` reports the expiry of certificate FILES, because a
+      # blackbox probe can only see a certificate something is SERVING -- and the internal CA is
+      # served by nothing while being the trust anchor for every verified upstream at the edge AND
+      # for the https_internal probe module. Measured on the testing host 2026-09-20: it was the
+      # only certificate in the monitoring plane with no coverage of any kind.
+      #
+      # It is gated because the single label that decides between a 14-day and a 90-day deadline,
+      # `self_signed`, is a string comparison over openssl output, and neither way of getting it
+      # wrong looks like a failure: a CA marked CA-issued gets fourteen days for work that takes
+      # longer, and a leaf marked self-signed pages three months early until it is ignored.
+      #
+      # The self-test mints its own material, embeds one long-dead certificate so the
+      # already-expired case runs on THIS runner rather than only where openssl is 3.5+, and
+      # asserts the DN is RFC 2253 -- openssl's default form differs between 3.0 and 3.5 for the
+      # same file, which would retire every series on an upgrade. No host, no containers, no
+      # secrets.
+      - name: Self-test the certificate expiry collector
+        run: bash scripts/cert-expiry-metrics.test.sh
+
   container-runtime-selftest:
     name: container-runtime-selftest
     runs-on: ubuntu-latest

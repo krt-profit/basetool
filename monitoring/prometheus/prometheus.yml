@@ -426,6 +426,12 @@ scrape_configs:
           - https://backend:11261
           - https://frontend:18081
           - https://ingest:11262
+          # Keycloak serves HTTPS on 18443 from the same keystore, and the edge reaches it
+          # through upstream-tls.conf with `proxy_ssl_verify on` -- so its expiry breaks the
+          # login path, not just a scrape. It was the one TLS listener in the deployment with
+          # no probe at all (measured 2026-09-20); the exporter reaches it over
+          # net-monitoring-scrape, which the two already share.
+          - https://keycloak:18443
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

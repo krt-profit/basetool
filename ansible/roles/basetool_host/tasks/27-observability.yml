@@ -223,9 +223,23 @@
     - prometheus-podman-exporter.service
   when: not ansible_check_mode
 
-# --- the cgroup container metrics, and the timer its docstring already described ----------------
+# --- the host-side metric collectors, and the timers their docstrings already described ---------
+#
+# TWO collectors, for two things a container cannot see from inside one:
+#
+#   cgroup-container-metrics.py   the eleven basetool_container_* series the container alerts were
+#                                 normalised onto, replacing cAdvisor.
+#   cert-expiry-metrics.py        the expiry of certificate FILES. Everything this deployment
+#                                 SERVES is probed by blackbox and covered by
+#                                 CertificateExpiringSoon; a probe can only see a certificate
+#                                 something is serving, and the internal CA is served by nothing.
+#                                 Measured on the testing host 2026-09-20: basetool-ca.crt -- the
+#                                 trust anchor for every verified upstream at the edge AND for the
+#                                 blackbox https_internal module -- had no coverage of any kind, so
+#                                 the one certificate whose expiry takes the whole deployment down
+#                                 at once was the one nothing watched.
 
-- name: Install the container metrics collector and its unit
+- name: Install the metric collectors and their units
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -242,35 +256,122 @@
     - src: iri-container-metrics.timer
       dest: /etc/systemd/system/iri-container-metrics.timer
       mode: "0644"
+    - src: cert-expiry-metrics.py
+      dest: "{{ basetool_host_root_dir }}/code/scripts/cert-expiry-metrics.py"
+      mode: "0755"
+    - src: iri-cert-expiry.service
+      dest: /etc/systemd/system/iri-cert-expiry.service
+      mode: "0644"
+    - src: iri-cert-expiry.timer
+      dest: /etc/systemd/system/iri-cert-expiry.timer
+      mode: "0644"
   notify: Reload systemd for the observability units
+  register: basetool_host_collectors
 
 - name: Let the new units be found before anything is enabled
   ansible.builtin.meta: flush_handlers
 
-- name: Confirm systemd accepts the collector unit
-  ansible.builtin.command: systemd-analyze verify /etc/systemd/system/iri-container-metrics.service
+- name: Confirm systemd accepts the collector units
+  ansible.builtin.command: "systemd-analyze verify /etc/systemd/system/{{ item }}"
   register: basetool_host_metrics_verify
   changed_when: false
   failed_when: basetool_host_metrics_verify.rc != 0
+  loop:
+    - iri-container-metrics.service
+    - iri-cert-expiry.service
   when: not ansible_check_mode
 
-- name: Start the container metrics timer
-  # This one IS started, unlike the deploy and backup timers. It changes nothing and takes nothing
-  # down: it reads /sys/fs/cgroup and writes one file into the textfile directory. A host that is
-  # provisioned but not yet deployed should still report its own container state.
+- name: Start the metric timers
+  # These ARE started, unlike the deploy and backup timers. They change nothing and take nothing
+  # down: one reads /sys/fs/cgroup, the other reads public certificate files, and each writes a
+  # single file into the textfile directory. A host that is provisioned but not yet deployed should
+  # still report its own container state and its own certificates.
   ansible.builtin.systemd_service:
-    name: iri-container-metrics.timer
+    name: "{{ item }}"
     enabled: true
     state: started
     daemon_reload: true
+  loop:
+    - iri-container-metrics.timer
+    - iri-cert-expiry.timer
   when: not ansible_check_mode
+
+- name: Ask whether the certificate collector has ever written
+  ansible.builtin.stat:
+    path: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
+  register: basetool_host_cert_metrics_file
+
+# The certificate timer's earliest trigger is OnBootSec=5min, which on an already-running host means
+# "not today" -- its first reading would wait until 03:40. That gap is indistinguishable from a
+# collector that is broken, and CertificateMetricsStale's absent() branch would sit on it for 36
+# hours. So the run takes the first reading itself.
+#
+# Conditional, and that is not a detail: the unit is a oneshot without RemainAfterExit, so an
+# unconditional `state: started` would run it on every play and report `changed` forever --
+# 25-scripts.yml's own comment names a task that churns forever as the thing to avoid, because
+# idempotence is what this role is judged on. It runs when the collector was just installed or
+# changed, and when it has never written at all.
+- name: Take the first certificate reading now
+  ansible.builtin.systemd_service:
+    name: iri-cert-expiry.service
+    state: started
+  when:
+    - not ansible_check_mode
+    - basetool_host_collectors is changed or not basetool_host_cert_metrics_file.stat.exists
+
+- name: Read back what the collector wrote
+  # Proof rather than assumption. `systemd_service` reports success for a oneshot that exited 1,
+  # because the unit declares SuccessExitStatus=0 1 -- a host whose certificates are not provisioned
+  # yet must not fail the run. So the FILE is read, not the exit code: a unit that starts and writes
+  # nothing is exactly the failure this pair of files exists to make visible.
+  ansible.builtin.slurp:
+    src: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
+  register: basetool_host_cert_metrics
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Say which certificates are now watched
+  # Counted from the exposition lines rather than read out of `basetool_certificate_files`: that
+  # name also appears in the `# HELP` and `# TYPE` lines above the sample, so a naive split lands on
+  # the help text. `match` anchors at the start of the line, which the comment lines fail.
+  #
+  # `splitlines()` and NOT `split('\n')`, measured 2026-09-20 and not a style preference. A YAML
+  # folded scalar passes `\n` through as two characters, and in a `msg:` Jinja does not turn them
+  # back into a newline -- the split finds no separator, returns the whole file as one item, and
+  # the count comes out 0. The identical expression inside `assert.that:` DOES split, because
+  # Ansible evaluates a conditional through a different path, so a folded-scalar assert will
+  # happily certify an expression that is broken in the message beside it. splitlines() needs no
+  # escape and behaves the same in both.
+  ansible.builtin.debug:
+    msg: >-
+      {{ (basetool_host_cert_metrics.content | b64decode).splitlines() | select('match', 'basetool_certificate_expiry_timestamp_seconds') | list | length }}
+      certificate file(s) under {{ basetool_host_root_dir }}/monitoring/certs are now watched for
+      expiry -- CertificateFileExpiringSoon at 14 days, SelfSignedCertificateExpiring at 90.
+  when:
+    - not ansible_check_mode
+    - basetool_host_cert_metrics.content is defined
+
+- name: Say so loudly when there was nothing to read
+  # NOT a failure: the role provisions hosts that have no certificates yet, and refusing here would
+  # make the monitoring half un-runnable before the TLS half exists. But it must be SAID, because
+  # the same silence is what a mistyped directory produces.
+  ansible.builtin.debug:
+    msg: >-
+      No certificate metrics were written. {{ basetool_host_root_dir }}/monitoring/certs holds no
+      readable *.crt / *.pem / *.cer yet, so CertificateFileExpiringSoon and
+      SelfSignedCertificateExpiring have no input on this host. Put basetool-ca.crt and grafana.crt
+      there, then run systemctl start iri-cert-expiry.service.
+  when:
+    - not ansible_check_mode
+    - basetool_host_cert_metrics.content is not defined
 
 - name: Say what now runs on the host itself
   ansible.builtin.debug:
     msg: >-
       Host-side monitoring: node_exporter on {{ basetool_host_node_exporter_listen }} (systemd +
       textfile collectors), prometheus-podman-exporter on {{ basetool_host_podman_exporter_listen }}
-      as a user unit of {{ basetool_host_service_user }}, and iri-container-metrics.timer writing
+      as a user unit of {{ basetool_host_service_user }}, and iri-container-metrics.timer (every 30s)
+      plus iri-cert-expiry.timer (daily 03:40) writing
       {{ basetool_host_root_dir }}/monitoring/textfile. alloy is ENABLED but NOT started -- its
       configuration arrives with the first config bundle. The containerised monitoring services
       reach these over host.containers.internal, verified 2026-09-18; the host firewall keeps both

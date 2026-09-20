@@ -34,6 +34,12 @@
   antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
   Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
 
+- **Betrieb: die internen Zertifikate werden jetzt vollständig auf Ablauf überwacht.** Bisher
+  sah die Überwachung nur Zertifikate, die auch ausgeliefert werden — die interne CA, an der
+  jede interne TLS-Verbindung hängt, wurde von nichts geprüft und wäre unbemerkt abgelaufen.
+  Ein Sammler auf dem Host liest die Zertifikatsdateien jetzt täglich; selbstsignierte melden
+  sich 90 Tage vorher, alle anderen 14 (REQ-OBS-008, REQ-OBS-011).
+
 ### Removed
 
 - **Der alte Nginx Proxy Manager ist aus dem Stack entfernt.** Er lag seit der Umstellung auf den

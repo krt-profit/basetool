@@ -50,9 +50,20 @@ allprojects {
 // space and their `\uXXXX` escapes.
 configure<com.diffplug.gradle.spotless.SpotlessExtension> {
   isEnforceCheck = true
-  // Trees Spotless must not touch: generated, vendored, or fetched. `ansible/collections/**` is
-  // the last of those — `ansible-galaxy install` drops a few thousand upstream files there
-  // (gitignored, ADR-0188), and formatting somebody else's collection is both slow and wrong.
+  // Trees Spotless must not touch: generated, vendored, or fetched. The last two are both
+  // ansible's — `ansible-galaxy install` drops a few thousand upstream files into
+  // `ansible/collections/`, and ansible-lint caches a second copy under `ansible/.ansible/`. Both
+  // are gitignored (ADR-0188), and formatting somebody else's collection is slow and wrong.
+  //
+  // `ansible/.ansible/**` is not a tidiness entry: without it `:spotlessYaml` does not merely
+  // waste time, it FAILS the build outright on a file CI never sees —
+  //
+  //     Cannot access input property 'target' of task ':spotlessYaml' …
+  //     Unsupported file type for …/setup_snap/tasks/D-Fedora.yml
+  //
+  // — so the whole pre-push gate is unrunnable on any workstation that has ever run ansible-lint.
+  // Measured 2026-09-20. targetExclude is evaluated after Gradle snapshots the inputs, which is
+  // why the failure comes from the snapshot rather than from the formatter.
   val vendored =
     arrayOf(
       "**/build/**",
@@ -61,6 +72,7 @@ configure<com.diffplug.gradle.spotless.SpotlessExtension> {
       "**/.claude/**",
       "**/.git/**",
       "ansible/collections/**",
+      "ansible/.ansible/**",
     )
 
   kotlinGradle {

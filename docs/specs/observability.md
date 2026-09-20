@@ -689,18 +689,53 @@ rule — no blanket "everything is masked" claim:
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
 - The private key of the shared `keystore.p12` never leaves the four existing services;
   Grafana gets its own self-signed certificate.
-- **Internal-cert expiry is monitored.** The self-signed internal certs — the basetool-CA-signed
-  `keystore.p12` on the app modules and Grafana's own cert — are probed from inside the monitoring
-  plane by the blackbox `https_internal` / `https_internal_insecure` modules (the CA is mounted into
-  the blackbox exporter; Grafana uses the `insecure_skip_verify` variant since its cert is not
-  CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted). Their expiry gauge feeds the
-  unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry — which would otherwise break
-  all three app scrapes, the frontend→backend WebClient and the NPM→Grafana re-encryption at once —
-  is caught ~14 days ahead instead of only by a same-day `TargetDown`. These probe jobs stay outside
-  `BlackboxProbeFailed`'s liveness include-list (a down app is already paged by `TargetDown`), so they
-  add no double-paging. Enforced by `monitoring/blackbox/blackbox.yml`,
-  `monitoring/prometheus/prometheus.yml` (`blackbox-internal-tls*` jobs) and the blackbox CA mount in
-  `docker-compose.monitoring.yml`.
+- **Internal-cert expiry is monitored — what is served, by probe; what is not, by file.** Together
+  these two mechanisms cover **every** certificate in the deployment, and the split between them is
+  the point: a probe can only see a certificate something is *serving*.
+
+  **What is served.** The self-signed internal certs — the basetool-CA-signed `keystore.p12` on the
+  app modules, Keycloak's `https://keycloak:18443` listener, and Grafana's own cert — are probed
+  from inside the monitoring plane by the blackbox `https_internal` / `https_internal_insecure`
+  modules (the CA is mounted into the blackbox exporter; Grafana uses the `insecure_skip_verify`
+  variant since its cert is not CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted).
+  Their expiry gauge feeds the unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry
+  — which would otherwise break all three app scrapes, the frontend→backend WebClient and the
+  NPM→Grafana re-encryption at once — is caught ~14 days ahead instead of only by a same-day
+  `TargetDown`. These probe jobs stay outside `BlackboxProbeFailed`'s liveness include-list (a down
+  app is already paged by `TargetDown`), so they add no double-paging. Enforced by
+  `monitoring/blackbox/blackbox.yml`, `monitoring/prometheus/prometheus.yml`
+  (`blackbox-internal-tls*` jobs) and the blackbox CA mount in `docker-compose.monitoring.yml`.
+
+  **What is not served** — added 2026-09-20, and this paragraph **corrects** the sentence above it,
+  which read as full coverage and was not. The internal CA itself,
+  `/var/iri/monitoring/certs/basetool-ca.crt`, is the trust anchor for every verified upstream at
+  the edge **and** for the `https_internal` probe module. Nothing listens on it, so nothing probed
+  it, so nothing watched it — measured on the testing host 2026-09-20, it was the only certificate
+  in the monitoring plane with no coverage of any kind. The day it expires, every verified upstream
+  fails at once *and* the probes that would otherwise have warned about the leaves fail with it: the
+  most expensive expiry in the deployment was the one nothing could warn about. A file that is
+  present for a service that is currently down has the same shape.
+
+  The gap is closed from the host, not by another probe. `scripts/cert-expiry-metrics.py` runs under
+  `iri-cert-expiry.timer` (daily, `OnBootSec=5min`, `Persistent=true`) and writes
+  `basetool_certificate_expiry_timestamp_seconds{path,subject,issuer,self_signed}`,
+  `basetool_certificate_not_before_timestamp_seconds`, `basetool_certificate_files` and
+  `basetool_certificate_metrics_timestamp_seconds` into node_exporter's textfile directory. It reads
+  **public certificate files only** — never a `*.key`, and never the PKCS#12 keystore, which would
+  need a password the collector must not hold and whose leaf four services serve anyway.
+  Cardinality is the contents of one operator-provisioned directory, per REQ-OBS-006/-011.
+
+  Three alerts read it, in `alerts/infrastructure.yml` and pinned by
+  `tests/certificate_file_expiry_test.yml`:
+
+  | alert | threshold | why that number |
+  | --- | --- | --- |
+  | `CertificateFileExpiringSoon` | `self_signed="false"`, <14 days | matches the probe-based rule: replacing a CA-issued leaf is a file and a restart. |
+  | `SelfSignedCertificateExpiring` | `self_signed="true"`, <90 days | replacing a root means re-issuing everything it signed **and** rolling the anchor through the edge and the probe module together. That is staged work, not a fortnight's. |
+  | `CertificateMetricsStale` | >36h, **or** absent while node_exporter has been up 36h | a stopped collector leaves an expiry value that is still there, still in the future and increasingly a lie; a collector that was never installed emits nothing at all, and `time() - <nothing>` is not an alert. |
+
+  Delivered by `ansible/roles/basetool_host/tasks/27-observability.yml`, which also takes the first
+  reading immediately rather than leaving it to the next 03:40.
 
 ### REQ-OBS-009 — Distributed tracing (OTLP via the monitoring plane only)
 
@@ -849,7 +884,7 @@ shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.Busine
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
 
-#### The one family of `basetool_*` names no JVM module emits
+#### The `basetool_*` names no JVM module emits
 
 `basetool_container_*` and `basetool_container_metrics_*` are written by
 [`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) into
@@ -888,6 +923,36 @@ recreation, which is unbounded cardinality by definition.
 normalises them and the cAdvisor families into one `basetool:container:*` set of recording rules,
 and the alerts and `02-containers.json` read that — so the cutover changes nothing downstream and
 both shapes work while the two runtimes run side by side. See REQ-OBS-014.
+
+##### `basetool_certificate_*` — expiry for certificates no listener serves
+
+Written by [`scripts/cert-expiry-metrics.py`](../../scripts/cert-expiry-metrics.py) into the same
+textfile directory, under `iri-cert-expiry.timer`. Added 2026-09-20. The reason it exists is in
+REQ-OBS-008: blackbox probes cover every certificate this deployment **serves**, and the internal CA
+is served by nothing, so it was the one certificate with no coverage at all — while being the one
+whose expiry breaks every verified upstream *and* the probes that would have warned about the
+leaves, simultaneously.
+
+| series | type | source | why |
+|---|---|---|---|
+| `basetool_certificate_expiry_timestamp_seconds` | gauge | `openssl x509 -enddate` | `notAfter`, the value both expiry alerts subtract `time()` from |
+| `basetool_certificate_not_before_timestamp_seconds` | gauge | `openssl x509 -startdate` | `notBefore` — not alerted on; it makes "was this file just replaced?" answerable without shelling onto the host |
+| `basetool_certificate_files` | gauge | the collector itself | how many files it read |
+| `basetool_certificate_metrics_timestamp_seconds` | gauge | the collector itself | the collector's own liveness, read by `CertificateMetricsStale` |
+
+**Labels:** `path`, `subject`, `issuer`, `self_signed`. Bounded by the contents of one
+operator-provisioned directory — `/var/iri/monitoring/certs`, two files on the testing host today
+(the internal CA and Grafana's leaf) — which is what
+REQ-OBS-006 asks of a label set — `path` is not a request path or a user value, it is a fixed
+deployment artefact. `self_signed` is `issuer == subject`, and it is what splits the 14-day rule
+from the 90-day one.
+
+**Not collected, deliberately:** private keys (`*.key` is excluded by construction) and PKCS#12
+keystores, which would need a password the collector must never hold and whose leaf backend,
+frontend, ingest and Keycloak all serve — so the probes already cover it.
+
+**openssl rather than a Python X.509 library:** `cryptography` is not installed on the target host,
+and a collector must not add a dependency to a box whose point is a fixed, audited package set.
 
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
