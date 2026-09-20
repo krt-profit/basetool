@@ -587,6 +587,32 @@ rule — no blanket "everything is masked" claim:
   is the thing that would silently invalidate it.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
   `username=` / `ipAddress=` before ingestion).
+
+**Every shipper-side mask captures the secret and nothing else, and captures all of it.** Two
+rules, because the masks broke both ways:
+
+- Alloy's `stage.replace` does not substitute the whole match and does not expand back-references:
+  it walks *every capture group* of each match and overwrites each one with the literal `replace`
+  value. A keyword kept in its own group to survive the mask — `(username=)(\S+)` with `replace =
+  "${1}***"` — therefore loses the keyword too and prints the template text instead. Keep the
+  keyword **outside** the group (a literal prefix, or `(?:…)` where an alternation needs grouping)
+  and leave exactly one group around the value.
+- The group must span the **whole** value. Keycloak quotes its field values and `\S+` stops at the
+  first space, so a value containing one is masked only up to the space. Match the quoted run first
+  — `("[^"]*"|\S+)`.
+
+> [!warning] Corrected 2026-09-20
+> Seven of the thirteen replace stages were written the regexp-substitution way and had been since
+> they were added, so every masked line read `${1}***${1}***` in place of `username="…"`,
+> `ipAddress="…"`, `uname=…`, the bearer/token keyword and the GHCR account name — the field name
+> destroyed along with the value, and a template placeholder written into Loki. That half
+> **over**-masked and disclosed nothing.
+>
+> The `\S+` half did disclose. An attempted login as `Lucas Greuloch` reached Loki as
+> `${1}***${1}*** Greuloch"` — the tail after the space survived both stages. The attempted
+> username is whatever a person typed into the login form, so Keycloak's own username rules do not
+> constrain it. Both halves are fixed; the exposure is bounded to spaced values in the two Keycloak
+> streams, and no token, address or JWT pattern was ever affected (those carry no spaces).
 - **Keycloak container stdout** (`app="keycloak-stdout"`) — Keycloak runs `--log=console,file`, so
   its console carries the same lines as the masked file log plus the JVM/container-level output that
   never enters the file at all (the ADR-0095 motive, applied to the identity provider). The
@@ -1392,7 +1418,22 @@ consumer is `ActiveSessionsRunaway`, and it is **not** a presence signal — see
 `BackendApiClient` failure funnels. `reason` is a fixed **local** enumeration
 (`backend_4xx`/`backend_5xx`/`circuit_open`/`bulkhead_full`/`timeout`/`unknown`) derived from the
 failure branch — never the backend's response-body code, which could be arbitrary — and `method`
-is the HTTP verb. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
+is the HTTP verb. **The branch is chosen by what failed, not by the HTTP status on the exception.**
+A `WebClientResponseException` is not proof of a backend refusal: when an exchange fails while the
+response *body* is being read, Spring wraps the failure into one carrying the status that had
+already arrived, so a torn-down connection surfaces as a 200. Any such non-error status is a
+transport fault and is classified with the connection failures (`timeout`, HTTP 504,
+`BACKEND_TIMEOUT`) — the same bucket as the sibling failure that dies *before* the response, which
+Spring reports as `WebClientRequestException`. Both halves of one lost connection count alike.
+
+> [!warning] Corrected 2026-09-20
+> Until this date the classifier read the status line, so a connection lost mid-body was reported
+> as `Backend returned 200 [UNKNOWN]` and — because 200 is below 500 — counted under
+> `reason="backend_4xx"`, i.e. blamed on the caller. Production, 2026-09-20T19:30:31Z: fourteen
+> HTTP/2 streams on one connection died together and five inventory-page loads logged it at ERROR
+> with a stack trace whose top frame was the Problem+JSON parser, which reads as a decoding bug
+> rather than a lost connection. `backend_4xx` rates before that date over-count by whatever
+> transport failures they absorbed. The push-channel surfaces (#1041 item 17) add `basetool_notification_relay_connections`
 (open browser→backend notification SSE relays, `NotificationPageController`) and
 `basetool_presence_ws_sessions` (live live-sync WebSocket sessions summed across all topic rooms,
 `LiveSyncWebSocketHandler`) gauges, plus the `basetool_presence_relay_frames_total{type,topic_class}`

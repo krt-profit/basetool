@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
+  die Verbindung mitten in einer Antwort ab, meldete das Frontend intern einen Erfolg mit
+  unbekanntem Fehler und behandelte den Ausfall als Fehler des Aufrufers. Er wird jetzt als das
+  einsortiert, was er ist — eine Transportstörung — und landet in derselben Fehlerklasse und
+  Überwachung wie ein Verbindungsabbruch vor der Antwort (REQ-OBS-011).
+
+- **Das Frontend gibt Verbindungen zum Backend jetzt frei, bevor das Backend sie schließt.** Beide
+  Seiten warteten exakt 20 Sekunden, wodurch das Frontend gelegentlich eine bereits geschlossene
+  Verbindung weiterverwendete — unter HTTP/2 reißen dabei alle gleichzeitig darauf laufenden
+  Anfragen ab, nicht nur eine. Die Frontend-Seite wartet jetzt 10 Sekunden.
+
+- **Betrieb: die Maskierung im Log-Shipper schwärzt wieder genau das Richtige.** Sie überschrieb
+  auch den Feldnamen und schrieb `${1}***${1}***` statt `username=***`; zugleich endete sie beim
+  ersten Leerzeichen, sodass bei einem Anmeldeversuch mit Leerzeichen im Namen der Rest der Eingabe
+  unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
+  (REQ-OBS-007).
+
 ## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
 
 ### Added

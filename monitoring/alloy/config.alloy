@@ -119,17 +119,43 @@ loki.source.file "keycloak" {
 	forward_to = [loki.process.keycloak_mask.receiver]
 }
 
+// THE RULE FOR EVERY stage.replace IN THIS FILE — capture the secret and NOTHING else.
+//
+// `stage.replace` does not substitute the whole match and it does not expand back-references. It
+// walks EVERY CAPTURE GROUP of each match and overwrites each one with the literal `replace`
+// value. So a pattern written the regexp-substitution way — `(username=)(\S+)` with
+// `replace = "${1}***"`, keeping the field name via group 1 — replaces BOTH groups with the
+// literal string and emits `${1}***${1}***`, destroying the field name it meant to preserve and
+// printing a template placeholder into the log.
+//
+// That is exactly what every masked line here carried until 2026-09-20: a Keycloak LOGIN_ERROR
+// read `userId="…", ${1}***${1}*** error="invalid_user_credentials"` with no way to tell that the
+// scrubbed field had been `ipAddress`. Fixed by moving the keyword out of the group (a literal
+// prefix, or `(?:…)` where an alternation needs grouping) and leaving a single group around the
+// value alone.
+//
+// The value alternation `("[^"]*"|\S+)` is a SECOND defect found while fixing the first, and this
+// one did disclose. Keycloak quotes its field values while `\S+` stops at the first space, so a
+// value containing one was masked only as far as the space and the rest shipped verbatim: an
+// attempted login as `Lucas Greuloch` reached Loki as `${1}***${1}*** Greuloch"`. The attempted
+// username is whatever a person typed into the login form, so Keycloak's own username rules do not
+// constrain it and a full name is exactly what someone types by mistake. Preferring the quoted run
+// consumes the whole value, spaces included, and leaves the field separator intact. Both Keycloak
+// streams carry it, byte-identically, as REQ-OBS-007 requires of that pair.
+//
+// So the two halves failed in opposite directions: the group defect over-masked (the field NAME was
+// destroyed, never the point), the `\S+` defect under-masked (a spaced value's tail survived).
 loki.process "keycloak_mask" {
 	forward_to = [loki.write.default.receiver]
 
 	stage.replace {
-		expression = "(username=)(\\S+)"
-		replace    = "${1}***"
+		expression = "username=(\"[^\"]*\"|\\S+)"
+		replace    = "***"
 	}
 
 	stage.replace {
-		expression = "(ipAddress=)(\\S+)"
-		replace    = "${1}***"
+		expression = "ipAddress=(\"[^\"]*\"|\\S+)"
+		replace    = "***"
 	}
 }
 
@@ -274,8 +300,8 @@ loki.process "ops_automation_mask" {
 	}
 
 	stage.replace {
-		expression = "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
-		replace    = "${1}***"
+		expression = "(?i)(?:bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
+		replace    = "***"
 	}
 
 	// deploy.sh logs `logging in to <registry> as <GHCR_USERNAME>` (deploy.sh:881) on EVERY tick, so
@@ -284,8 +310,8 @@ loki.process "ops_automation_mask" {
 	// reference or a digest that merely contains " as " is left untouched; the registry host stays
 	// visible because it is the operationally useful half of the line.
 	stage.replace {
-		expression = "(logging in to \\S+ as )(\\S+)"
-		replace    = "${1}***"
+		expression = "logging in to \\S+ as (\\S+)"
+		replace    = "***"
 	}
 }
 
@@ -421,8 +447,8 @@ loki.process "container_mask" {
 		selector = "{app=\"mon-grafana\"}"
 
 		stage.replace {
-			expression = "(uname=)(\\S+)"
-			replace    = "${1}***"
+			expression = "uname=(\\S+)"
+			replace    = "***"
 		}
 
 		stage.replace {
@@ -462,8 +488,8 @@ loki.process "container_mask" {
 		}
 
 		stage.replace {
-			expression = "(?i)(bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
-			replace    = "${1}***"
+			expression = "(?i)(?:bearer\\s+|token\\s*[:=]?\\s*|session[-_]?id\\s*[:=]?\\s*|authorization\\s*[:=]?\\s*(?:bearer\\s+)?)([a-zA-Z0-9\\-_.+/=]+)"
+			replace    = "***"
 		}
 	}
 
@@ -476,13 +502,13 @@ loki.process "container_mask" {
 		selector = "{app=\"keycloak-stdout\"}"
 
 		stage.replace {
-			expression = "(username=)(\\S+)"
-			replace    = "${1}***"
+			expression = "username=(\"[^\"]*\"|\\S+)"
+			replace    = "***"
 		}
 
 		stage.replace {
-			expression = "(ipAddress=)(\\S+)"
-			replace    = "${1}***"
+			expression = "ipAddress=(\"[^\"]*\"|\\S+)"
+			replace    = "***"
 		}
 	}
 }
