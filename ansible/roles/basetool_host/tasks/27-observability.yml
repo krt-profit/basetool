@@ -301,6 +301,19 @@
     path: "{{ basetool_host_root_dir }}/monitoring/textfile/certificates.prom"
   register: basetool_host_cert_metrics_file
 
+- name: Ask whether there is anything for it to read
+  # The other half of the guard below, and the half that was missing. The collector refuses to write
+  # a file when it finds no certificate -- deliberately, because an empty metrics file and a
+  # mistyped directory look identical to Prometheus. So on a host whose certs directory is still
+  # empty, "the metrics file does not exist" stays true no matter how often the unit runs, and a
+  # task conditioned on it alone reports `changed` on every single play. Measured on
+  # rocky-16gb-nbg1-1 2026-09-20: second run `changed=1`, this task, forever.
+  ansible.builtin.find:
+    paths: "{{ basetool_host_root_dir }}/monitoring/certs"
+    patterns: "*.crt,*.pem,*.cer"
+    file_type: file
+  register: basetool_host_cert_files
+
 # The certificate timer's earliest trigger is OnBootSec=5min, which on an already-running host means
 # "not today" -- its first reading would wait until 03:40. That gap is indistinguishable from a
 # collector that is broken, and CertificateMetricsStale's absent() branch would sit on it for 36
@@ -317,6 +330,7 @@
     state: started
   when:
     - not ansible_check_mode
+    - basetool_host_cert_files.matched | default(0) | int > 0
     - basetool_host_collectors is changed or not basetool_host_cert_metrics_file.stat.exists
 
 - name: Read back what the collector wrote
@@ -357,10 +371,12 @@
   # the same silence is what a mistyped directory produces.
   ansible.builtin.debug:
     msg: >-
-      No certificate metrics were written. {{ basetool_host_root_dir }}/monitoring/certs holds no
-      readable *.crt / *.pem / *.cer yet, so CertificateFileExpiringSoon and
-      SelfSignedCertificateExpiring have no input on this host. Put basetool-ca.crt and grafana.crt
-      there, then run systemctl start iri-cert-expiry.service.
+      No certificate metrics were written: {{ basetool_host_root_dir }}/monitoring/certs holds
+      {{ basetool_host_cert_files.matched | default(0) }} readable *.crt / *.pem / *.cer, so
+      CertificateFileExpiringSoon and SelfSignedCertificateExpiring have no input on this host and
+      CertificateMetricsStale is what will say so. On a host that has not cut over yet this is the
+      expected state -- basetool-ca.crt is re-exported from the keystore, which arrives with the
+      restore. Cutover step 0.6c is where it stops being expected.
   when:
     - not ansible_check_mode
     - basetool_host_cert_metrics.content is not defined
