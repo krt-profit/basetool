@@ -264,6 +264,53 @@ def _stale(out_dir: str, produced: dict[str, str]) -> list[str]:
     )
 
 
+def _write_env_file(path: str, content: str, mode: int) -> None:
+    """Write one rendered ``<service>.env`` so the write cannot fail on the old file's owner.
+
+    A sibling plus ``os.replace`` rather than ``O_TRUNC`` on the target, and it is not a style
+    preference. Opening an existing file for writing needs permission on **that file**; replacing it
+    needs permission on the **directory**. The deploy account owns `env.d` (``deploy:iri 2750``)
+    and does not own files an earlier hand-run left behind — measured on the testing host
+    2026-09-20, where eighteen ``iri:iri 0640`` files from the manual bring-up made every deploy
+    abort with ``PermissionError: '/var/iri/code/env.d/acme.env'`` after the signatures had already
+    verified and the bundle had already been staged.
+
+    It also makes the write atomic, which matters for its own reason: these files are systemd
+    ``EnvironmentFile``s, and a unit that starts while one is half-written reads a truncated
+    environment rather than failing — the quietest possible way to run a service with a missing
+    secret.
+
+    The temporary file is created in the same directory, so the rename stays within one filesystem
+    and the setgid bit on ``env.d`` gives it group ``iri`` — which is what lets the service user
+    read the result.
+
+    Args:
+        path: the final ``<service>.env`` path.
+        content: the rendered text.
+        mode: the permission bits, already parsed from ``--mode``.
+
+    Raises:
+        OSError: if the sibling cannot be written or renamed; the partial file is removed first.
+    """
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    tmp = os.path.join(directory, f".{os.path.basename(path)}.{os.getpid()}.tmp")
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            # The sibling may never have been created -- the open itself is what usually fails
+            # here. Either way the original error is the one worth reporting, so it is re-raised
+            # below rather than replaced by this one.
+            pass
+        raise
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Render every template, or report drift under ``--check``.
 
@@ -338,10 +385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     mode = int(args.mode, 8)
     for service, content in produced.items():
         path = os.path.join(args.out, f"{service}.env")
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(content)
-        os.chmod(path, mode)
+        _write_env_file(path, content, mode)
 
     # And take the leftovers away. Retiring a service from compose used to leave its rendered
     # `<service>.env` -- a 0640 file holding that service's secrets -- on the host forever, while

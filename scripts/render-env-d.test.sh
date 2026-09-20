@@ -299,6 +299,69 @@ else
 fi
 
 # =============================================================================
+# An existing target the renderer cannot OPEN for writing must still be replaced.
+#
+# Opening a file for writing needs permission on that FILE; replacing it needs permission on the
+# DIRECTORY. The deploy account owns env.d and does not own files an earlier hand-run left there --
+# measured on the testing host 2026-09-20, where eighteen `iri:iri 0640` files from the manual
+# bring-up aborted every deploy with
+#
+#     PermissionError: [Errno 13] Permission denied: '/var/iri/code/env.d/acme.env'
+#
+# after the signatures had verified and the bundle had been staged. Ownership cannot be faked in a
+# test that runs as one user, but the permission axis is the same one: a 0400 target is exactly as
+# unopenable, and `os.replace` is exactly as indifferent to it.
+# =============================================================================
+say ""
+say "-- an unwritable existing target --"
+scenario "readonly" 'A=yes' 'K=${A}'
+render >/dev/null 2>&1
+chmod 0400 "${SC_DIR}/out/svc.env"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # Windows does not share the semantics under test. POSIX rename(2) over a read-only file
+    # succeeds because only the DIRECTORY's permissions bind; Win32 MoveFileEx refuses with
+    # ERROR_ACCESS_DENIED, so os.replace raises here for a platform reason and not a code one.
+    # The renderer only ever runs on the Linux host. Skipped rather than adapted: an assertion
+    # rewritten until it passed on both would no longer be testing rename semantics at all.
+    say "  skip  readonly target - os.replace over a read-only file is denied on Windows"
+    chmod 0640 "${SC_DIR}/out/svc.env"
+    ;;
+  *)
+if : > "${SC_DIR}/out/svc.env" 2>/dev/null; then
+  # Running as root, where mode bits do not bind: the scenario cannot mean anything, so say so
+  # rather than record a pass that proves nothing.
+  say "  skip  readonly target - running as a user that ignores mode bits (root?)"
+  chmod 0640 "${SC_DIR}/out/svc.env"
+else
+  if render >"${SC_DIR}/ro.out" 2>&1; then
+    ok "readonly: a 0400 svc.env is replaced rather than opened"
+  else
+    bad "readonly: render failed on a 0400 target: $(cat "${SC_DIR}/ro.out")"
+  fi
+  if grep -q 'K=yes' "${SC_DIR}/out/svc.env" 2>/dev/null; then
+    ok "readonly: and the new content is what landed"
+  else
+    bad "readonly: the file was not updated: $(cat "${SC_DIR}/out/svc.env" 2>/dev/null)"
+  fi
+  if [[ "$(stat -c '%a' "${SC_DIR}/out/svc.env")" == "640" ]]; then
+    ok "readonly: the replacement carries the requested mode, not the old one"
+  else
+    bad "readonly: mode is $(stat -c '%a' "${SC_DIR}/out/svc.env"), expected 640"
+  fi
+fi
+    ;;
+esac
+# No temporary sibling may survive a successful run -- node_exporter's textfile collector is not
+# the only reader that would be confused by one, and a `.acme.env.<pid>.tmp` holding secrets is
+# worse than untidy.
+if find "${SC_DIR}/out" -maxdepth 1 -name '.*.tmp' | grep -q .; then
+  bad "readonly: a temporary sibling was left behind"
+else
+  ok "readonly: no temporary sibling is left behind"
+fi
+
+# =============================================================================
 say ""
 say "=========================================="
 say "  passed: ${PASSED}   failed: ${FAILED}"
