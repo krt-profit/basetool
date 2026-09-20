@@ -70,6 +70,13 @@ Dockerfile text eol=lf
 # above describes, one file type over. The delivered copies were LF only because they were written
 # by hand in this session and git had not yet touched them.
 *.py text eol=lf
+# Jinja templates, for a reason one step removed from the others: nothing EXECUTES a `.j2`, but
+# Ansible renders it onto a Linux host and the line endings come through. XML and systemd both
+# tolerate CRLF, so this does not break anything loudly -- it makes the rendered file differ by the
+# platform the control node was checked out on, and the template task then reports `changed` on
+# every run against a host that was last touched from the other one. Exactly the churn the
+# tailoring file's own `<version time=>` was just fixed for.
+*.j2 text eol=lf
 .editorconfig text eol=lf
 
 # `.env.example` is copied verbatim onto a Linux host as the starting point for
