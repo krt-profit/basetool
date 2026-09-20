@@ -113,6 +113,33 @@
 
 set -euo pipefail
 
+# The applied config tree must be readable by the SERVICE user, so the mode it lands with cannot be
+# the caller's business. Rocky's hardened baseline sets `UMASK 027` in /etc/login.defs and
+# /etc/profile, while a systemd service gets 0022 — so the same deploy produces a different tree
+# depending on how it was started:
+#
+#   systemctl start iri-deploy.service   umask 0022 -> /var/iri/code/... 0755  works
+#   sudo -u deploy deploy.sh             umask 0027 -> /var/iri/code/... 0750  every container dies
+#
+# and the second is the invocation this script's own usage block documents. Under Docker it never
+# mattered: the root daemon resolved the bind mounts. Rootless Podman resolves them AS the service
+# user, which is not in group `deploy`, so it cannot traverse a 0750 directory — measured on the
+# testing host 2026-09-20, where keycloak and edge both exited 125 with
+#
+#   Error: statfs /var/iri/code/keycloak-theme/krt-theme: permission denied
+#
+# on a path that plainly exists. Worse than the cosign asymmetry, because it does not fail at apply
+# time: the deploy reports the config applied and the failure surfaces later, as a health-check
+# timeout and a rollback that fails the same way.
+#
+# 022 and not something tighter: this tree is the config BUNDLE, which carries no secret by
+# construction — the Dockerfile COPY is an allowlist, .dockerignore bars them from the context,
+# release-images.yml asserts the built bundle carries none, and assert_no_secrets below re-asserts
+# it on the host. The things that ARE secret set their own mode explicitly and are unaffected:
+# ${DOCKER_CONFIG} is `install -d -m 0700`, and render-env-d.py writes env.d at 0640 into a
+# setgid 2750 directory the role owns.
+umask 022
+
 # --- The container-runtime seam (ADR-0163, Phase 3) -------------------------
 # Every runtime operation below goes through `rt_*` rather than naming a CLI,
 # because BOTH shapes are live at once: production serves on Docker until the

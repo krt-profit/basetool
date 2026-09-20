@@ -1487,6 +1487,65 @@ scenario_config_mirrors_edge() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# The mode the mirrored tree lands with must not depend on WHO started the
+# deploy. Rocky's hardened baseline sets `UMASK 027` in /etc/login.defs and
+# /etc/profile; a systemd service gets 0022. So the same deploy produced
+# /var/iri/code/... at 0755 under the timer and 0750 under
+# `sudo -u deploy deploy.sh` — the invocation deploy.sh's own usage block
+# documents — and rootless Podman resolves bind mounts AS the service user,
+# which is not in group `deploy` and cannot traverse a 0750 directory.
+#
+# Measured on the testing host 2026-09-20: keycloak and edge both exited 125
+# with `statfs /var/iri/code/keycloak-theme/krt-theme: permission denied`, on a
+# path that plainly existed. It does not fail at apply time — the deploy reports
+# the config applied, and the failure arrives later as a health-check timeout
+# and a rollback that fails the same way.
+#
+# Asserted as an INVARIANT rather than against a literal 0755: the two runs must
+# agree. That is the property that matters and it holds on any platform, which
+# a hardcoded mode would not.
+# ---------------------------------------------------------------------------
+scenario_config_mirror_ignores_caller_umask() {
+  echo "Scenario: the mirrored config tree does not depend on the caller's umask"
+  local tmp rc=0 saved mode_lax mode_strict
+  for saved in 022 027; do
+    tmp="$(mktmp)"
+    setup_host "${tmp}"
+    local bundle="${tmp}/bundle"
+    mkdir -p "${bundle}/docker/edge/conf.d"
+    echo "# dummy compose file" > "${bundle}/docker-compose.yml"
+    echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
+    echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
+    write_marker "${MARKER}"
+    mapfile -t fake < <(converged_env)
+
+    local before
+    before="$(umask)"
+    umask "${saved}"
+    rc=0
+    run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" \
+      "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    umask "${before}"
+
+    assert_exit 0 "$rc" "a config-only change applies with the caller's umask ${saved}"
+    if [[ "${saved}" == "022" ]]; then
+      mode_lax="$(stat -c '%a' "${T_COMPOSE_DIR}/docker/edge" 2>/dev/null || echo unknown)"
+    else
+      mode_strict="$(stat -c '%a' "${T_COMPOSE_DIR}/docker/edge" 2>/dev/null || echo unknown)"
+    fi
+    rm -rf "${tmp}"
+  done
+
+  if [[ "${mode_lax}" == "unknown" || "${mode_strict}" == "unknown" ]]; then
+    record 0 "could not read the mirrored directory's mode"
+  elif [[ "${mode_lax}" == "${mode_strict}" ]]; then
+    record 1 "umask 022 and 027 both produce ${mode_strict} on docker/edge"
+  else
+    record 0 "the caller's umask leaked into the tree: 022 -> ${mode_lax}, 027 -> ${mode_strict}"
+  fi
+}
+
 # Writes a compose file carrying the stateful-infra image pins the carve-out
 # reads. $1 = destination file, $2 = keycloak tag, $3 = keycloak digest.
 write_infra_compose() {
@@ -1623,6 +1682,7 @@ scenario_check_only_verify_fail() {
 }
 
 scenario_config_mirrors_edge
+scenario_config_mirror_ignores_caller_umask
 scenario_edge_reloads_a_renewed_certificate
 scenario_infra_digest_refresh_is_not_gated
 scenario_token_expiry_metric
