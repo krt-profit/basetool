@@ -256,6 +256,26 @@ Not "the scripts exist" — one real run each. The plan is explicit that a week 
 a working backup outweighs any dump-and-restore cycle, which makes this a cutover gate rather than
 follow-up work.
 
+> [!danger] The DRILL belongs on the new host. The BACKUP does not — not before the cutover.
+> `restore-drill.sh` restores **`restic restore latest --tag basetool`**, and both hosts write to
+> the same repository. So a `backup.sh` run from the new host — which has no database, because its
+> data arrives with the restore in §1.4 — would push a snapshot of nothing and make it `latest`.
+> The next drill would then certify that empty snapshot, and **§1.4 itself would restore it**: the
+> cutover would carry no data and every check before the DNS switch would pass.
+>
+> What protects against this today is an accident, not a design: `backup.sh` aborts at
+> `missing /var/iri/code/.env`, because `.env` also arrives with the restore. Do not rely on it.
+>
+> - **On the new host, run the drill only.** It needs `/etc/iri/backup.env` (and `rclone.conf`),
+>   restic and rclone — not `.env` — so it runs before the cutover and proves exactly what the
+>   window depends on: that this host can read that repository and restore production's latest
+>   snapshot into a throwaway Postgres under rootless Podman.
+> - **Leave the backup to the host that has the data.** Its nightly timer already produces the
+>   snapshot §1.2 quiesces and §1.4 restores.
+> - **After the cutover** the new host is the host with the data, and its own `iri-backup.timer`
+>   takes over — which is when a backup from it becomes the right thing rather than the dangerous
+>   one.
+
 Check the log for the four captures that are easy to lose and easy not to notice, because each one
 is a best-effort WARN by design and the backup reports success without them:
 
