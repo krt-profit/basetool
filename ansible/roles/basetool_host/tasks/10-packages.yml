@@ -13,6 +13,13 @@
       - curl
       - jq
       - rsync
+      # The nightly backup and the weekly restore drill are both built on these two, and a host
+      # without them has no backup at all -- which the migration plan calls a larger data-loss risk
+      # than the migration night itself. They were never installed by this role: measured on the
+      # testing host 2026-09-20, neither package was present and `backup.sh` failed its pre-flight
+      # with a message naming `apt`, which does not exist on this platform either.
+      - restic
+      - rclone
       # Resolves a tag to an immutable digest without pulling the image -- what
       # `docker buildx imagetools inspect` does today, and there is no podman
       # subcommand for it. Measured present in AppStream on Rocky 10 (1.22.2)

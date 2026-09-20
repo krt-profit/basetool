@@ -105,6 +105,19 @@
     mode: "0755"
   loop: "{{ basetool_host_deploy_user_dirs }}"
 
+# The backup's own staging tree, and 0700 rather than 0755: it holds pg_dump output, the keystore
+# and the rendered secrets on their way into restic. The Docker host has it deploy:deploy 0700 and
+# this role never created it at all -- the nightly backup died on
+# `mkdir: cannot create directory '/var/iri/backup/staging': Permission denied`, measured on the
+# testing host 2026-09-20, after the runtime detection had already succeeded.
+- name: Create the backup staging tree, readable by nobody else
+  ansible.builtin.file:
+    path: "{{ basetool_host_root_dir }}/backup"
+    state: directory
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    mode: "0700"
+
 # The subtrees a RELEASE owns end to end, reclaimed recursively.
 #
 # `apply_config_tree` mirrors each of these with rsync, which writes a temp file beside the target

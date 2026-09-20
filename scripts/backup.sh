@@ -88,7 +88,16 @@ KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 # volumes (the deploy user cannot open them directly; a container running as root
 # can).
 # Defaults to the Postgres image, which is always present on the host.
-HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-postgres:18-alpine}"
+# FULLY QUALIFIED, and it has to be. Docker resolves a short name against Docker Hub silently;
+# podman on Rocky enforces short-name resolution and refuses without a TTY:
+#
+#     Error: short-name resolution enforced but cannot prompt without a TTY
+#
+# Measured on the testing host 2026-09-20. Every helper read failed that way -- the edge certificate
+# volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
+# the backup went on to report success over a snapshot that was missing all of them. Precisely the
+# class the certificate-capture work was about, arriving through the registry instead.
+HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-docker.io/library/postgres:18-alpine}"
 
 # Monitoring-plane backup (epic #936, ADR-0072). Best-effort and fully guarded so a host WITHOUT the
 # monitoring stack is unaffected. Loki data is deliberately EXCLUDED (its GFS retention would silently
@@ -175,7 +184,10 @@ write_backup_metrics() {
 }
 
 # --- Pre-flight -------------------------------------------------------------
-[[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] || fail "missing ${COMPOSE_DIR}/docker-compose.yml"
+# NOT docker-compose.yml here. This line ran BEFORE rt_detect and demanded a compose file on every
+# host, so on a Quadlet host -- where the unit files are the deployment and there is no compose file
+# at all -- the nightly backup aborted before it could discover which runtime it was on. The same
+# shape, and the same fix, as deploy.sh's pre-flight. The check moved below, into the docker arm.
 [[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
@@ -184,8 +196,14 @@ export RT_PROJECT_DIR="${COMPOSE_DIR}" RT_MONITORING_FILE="${MON_COMPOSE}"
 export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"
 export RT_STOP_TIMEOUT="${STOP_TIMEOUT}"
 log "container runtime: ${RT_BACKEND}"
-command -v restic >/dev/null 2>&1 || fail "restic not found (apt install restic)"
-command -v rclone >/dev/null 2>&1 || fail "rclone not found (apt install rclone)"
+# Under Compose the compose file IS the deployment and the capture reads it; under Quadlet the unit
+# files are, and there is nothing to read.
+[[ "${RT_BACKEND}" != docker ]] || [[ -f "${RT_COMPOSE_FILE}" ]]   || fail "missing ${RT_COMPOSE_FILE}"
+# The package manager differs with the platform this migration moves to, and naming the wrong one
+# sends an operator down a path that cannot work: `apt install restic` on Rocky Linux reports
+# "command not found" for apt, which reads as a broken host rather than a missing package.
+command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
+command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
 
 # The deploy user has no usable $HOME; pin the tool config/cache dirs into
 # STATE_DIR (already in the systemd unit's ReadWritePaths) so docker/restic do
@@ -360,7 +378,17 @@ else
   log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
 fi
 if [[ -f "${COMPOSE_DIR}/realm-export.json" ]]; then
-  cp -p "${COMPOSE_DIR}/realm-export.json" "${STAGING}/config/realm-export.json"
+  # Through the helper, like the keystore, and for the same reason: this is an operator-provided
+  # file whose ownership the deployer does not control. On the Podman host it arrived iri-owned
+  # 0640 and the plain `cp` that used to be here failed with "Permission denied" -- as a hard
+  # error, because unlike the keystore it had no fallback, so it aborted the host-config capture
+  # and took the providers archive with it.
+  if rt_read_mount "${COMPOSE_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json        > "${STAGING}/config/realm-export.json" 2>/dev/null      && [[ -s "${STAGING}/config/realm-export.json" ]]; then
+    :
+  else
+    rm -f "${STAGING}/config/realm-export.json"
+    log "WARN: could not read ${COMPOSE_DIR}/realm-export.json — skipped"
+  fi
 fi
 if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
   tar -C "${COMPOSE_DIR}/keycloak" -czf "${STAGING}/config/providers.tar.gz" providers 2>/dev/null \

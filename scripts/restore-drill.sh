@@ -33,7 +33,16 @@ STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
 BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-DRILL_IMAGE="${IRI_DRILL_IMAGE:-postgres:18-alpine}"
+# FULLY QUALIFIED, and it has to be. Docker resolves a short name against Docker Hub silently;
+# podman on Rocky enforces short-name resolution and refuses without a TTY:
+#
+#     Error: short-name resolution enforced but cannot prompt without a TTY
+#
+# Measured on the testing host 2026-09-20. Every helper read failed that way -- the edge certificate
+# volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
+# the backup went on to report success over a snapshot that was missing all of them. Precisely the
+# class the certificate-capture work was about, arriving through the registry instead.
+DRILL_IMAGE="${IRI_DRILL_IMAGE:-docker.io/library/postgres:18-alpine}"
 CONTAINER="iri-restore-drill"
 READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
 MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
@@ -108,8 +117,8 @@ write_drill_metrics() {
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV}"
 rt_detect
 log "container runtime: ${RT_BACKEND}"
-command -v restic >/dev/null 2>&1 || fail "restic not found"
-command -v rclone >/dev/null 2>&1 || fail "rclone not found"
+command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
+command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
 
 export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"

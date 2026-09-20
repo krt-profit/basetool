@@ -132,10 +132,46 @@ sudo -u iri sh -c 'mv ~/.config/containers/systemd/* ~/.config/containers/system
 sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user daemon-reload
 ```
 
-### 0.8 Rehearsed on testing, against real data
+### 0.8 `restic` and `rclone` are installed, and `/etc/iri/backup.env` exists
 
-`backup.sh` and `restore-drill.sh` under Podman, with one run against a real dump; and a deploy that
-moves a digest, showing the **re-pinned service restarted and the databases untouched**.
+Both come from the role (`10-packages.yml`) since 2026-09-20; before that neither was on the host
+and `backup.sh` failed its pre-flight with a message naming `apt`, which does not exist on Rocky
+either. `backup.env` is operator-provided: the restic repository, its password, and the rclone
+remote — see [`backup.md` §4](backup.md).
+
+```bash
+rpm -q restic rclone
+sudo -u deploy test -r /etc/iri/backup.env && echo readable
+```
+
+### 0.9 One backup and one restore drill have run on the Podman host
+
+Not "the scripts exist" — one real run each. The plan is explicit that a week of production without
+a working backup outweighs any dump-and-restore cycle, which makes this a cutover gate rather than
+follow-up work.
+
+Check the log for the four captures that are easy to lose and easy not to notice, because each one
+is a best-effort WARN by design and the backup reports success without them:
+
+```
+  edge-certs: captured
+  edge-acme-webroot: captured
+  capturing the redis ACL (/var/iri/redis/users.acl)
+  capturing host config (.env, keystore, realm-export, providers)
+```
+
+> [!warning] A short image name silently empties the snapshot on Podman
+> The helper image that streams those four out was `postgres:18-alpine`. Docker resolves a short
+> name against Docker Hub; podman enforces short-name resolution and refuses without a TTY —
+> `Error: short-name resolution enforced but cannot prompt without a TTY`. Every helper read failed,
+> every failure was a WARN, and the backup went on to report success over a snapshot missing the
+> certificates, the ACME state, the redis ACL and the keystore. Fixed by qualifying the image;
+> **if you ever override `IRI_BACKUP_HELPER_IMAGE` or `IRI_DRILL_IMAGE`, qualify it fully.**
+
+### 0.10 Rehearsed on testing, against real data
+
+A deploy that moves a digest, showing the **re-pinned service restarted and the databases
+untouched**; and a rollback from a release that cannot become healthy.
 
 ---
 
