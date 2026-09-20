@@ -53,3 +53,83 @@
         internet at once; with the second red, the header it trusts can be forged.
   changed_when: false
   check_mode: false
+
+# --- the public-name alias, which the units deliberately cannot carry ------------------------------
+#
+# `docker-compose.yml` has `extra_hosts: - "${IRI_KEYCLOAK_HOST_ALIAS:-localhost:127.0.0.1}"`, and
+# compose interpolates that at `up` time against the host's own `.env`. Quadlet interpolates
+# nothing, so `scripts/generate-quadlet.py` resolves it once, at generation time, to the no-op
+# default -- ON PURPOSE: the units are one promotable artifact for every environment, and a
+# host-specific alias cannot live in them. The generator says so in its VALUE_VARS comment, names
+# this exact drop-in as the mechanism, and says it "belongs to Ansible".
+#
+# Nothing implemented it. Measured on the testing host 2026-09-20: `.env` carried
+# `IRI_KEYCLOAK_HOST_ALIAS=basetool.greluc.me:10.98.0.13`, all three units carried
+# `AddHost=localhost:127.0.0.1`, the running containers reported `[localhost:127.0.0.1]`, and inside
+# the container the name resolved to the PUBLIC address with no route to it. The frontend then
+# crash-looped on "Unable to resolve Configuration with the provided Issuer ... Connect timed out",
+# which reads as a Keycloak outage and is a missing file.
+#
+# `check-conformance.py` already fails when the `.env` and the units disagree and no drop-in
+# explains it (BAKED_INTO_UNITS), and `deploy.sh` already leaves host-specific drop-ins alone --
+# "the `.container.d` directories are never touched". This is the one part that was missing.
+# The uid, looked up HERE and not taken from 22-deploy-user.yml's register. This file is tagged
+# [podman], so `--tags podman` skips that file and leaves the variable undefined -- and the run then
+# dies with "'basetool_host_service_uid' is undefined", which says nothing about tags. The same trap
+# and the same fix as 27-observability.yml's own lookup.
+- name: Read the service user's uid for the unit path
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ basetool_host_service_user }}"
+  check_mode: false
+
+- name: Name it
+  ansible.builtin.set_fact:
+    basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
+
+- name: Write the public-name alias drop-in
+  ansible.builtin.copy:
+    dest: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/10-host-alias.conf
+    owner: "{{ basetool_host_deploy_user }}"
+    group: "{{ basetool_host_deploy_user }}"
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      #
+      # Host configuration, not release configuration: the delivered unit carries the no-op default
+      # because it is the same artifact on every host. See generate-quadlet.py's VALUE_VARS.
+      #
+      # This value must match IRI_KEYCLOAK_HOST_ALIAS in {{ basetool_host_root_dir }}/code/.env;
+      # scripts/check-conformance.py fails the host when the two disagree.
+      [Container]
+      AddHost={{ basetool_host_public_name_alias }}
+  loop: "{{ basetool_host_public_name_alias_services }}"
+  when: basetool_host_public_name_alias | length > 0
+  notify: Reload the service user's units
+
+# Clearing the variable has to clear the alias. Without this the drop-in outlives the decision that
+# put it there, and the next reader finds a unit whose effective configuration is not in the unit,
+# not in the .env and not in this role.
+- name: Remove the alias drop-in where no alias is configured
+  ansible.builtin.file:
+    path: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/10-host-alias.conf
+    state: absent
+  loop: "{{ basetool_host_public_name_alias_services }}"
+  when: basetool_host_public_name_alias | length == 0
+  notify: Reload the service user's units
+
+- name: Say whether the containers will see the public name
+  ansible.builtin.debug:
+    msg: >-
+      {% if basetool_host_public_name_alias | length > 0 %}
+      {{ basetool_host_public_name_alias_services | join(', ') }} carry
+      AddHost={{ basetool_host_public_name_alias }} via a drop-in. It MUST match
+      IRI_KEYCLOAK_HOST_ALIAS in the host .env -- check-conformance.py fails on a silent
+      disagreement.
+      {% else %}
+      No public-name alias is configured, which is right for production: its public name resolves to
+      the host that serves it. A non-production host whose containers must reach their own public
+      name sets basetool_host_public_name_alias.
+      {% endif %}

@@ -248,6 +248,27 @@ basetool_host_frontend_timeout_client: 15m
 basetool_host_frontend_timeout_server: 15m
 basetool_host_manage_frontend: true
 
+# --- the public-name alias for the application containers ------------------------------------------
+# A non-production host has to reach its OWN public name from inside a container -- the frontend
+# discovers the OIDC issuer over it (`https://<public>/auth/realms/iri`) and will not start if the
+# name resolves to an address the container cannot reach. Production needs nothing here: its public
+# name resolves to the host that serves it.
+#
+# `hostname:ip`, exactly the form the host `.env` uses for IRI_KEYCLOAK_HOST_ALIAS, and it must
+# MATCH that line -- `scripts/check-conformance.py` compares the two and fails when they disagree
+# silently, which is the whole reason that check exists.
+#
+# Empty means "write no drop-in and remove any this role wrote", so clearing the variable actually
+# clears the alias instead of leaving a stale one behind.
+basetool_host_public_name_alias: ""
+#: The services whose containers need it -- the three JVM modules, which are the ones that resolve
+#: the issuer. The generator emits `AddHost=` for exactly these three (their compose templates carry
+#: `extra_hosts`), so this list mirrors that rather than guessing.
+basetool_host_public_name_alias_services:
+  - backend
+  - frontend
+  - ingest
+
 # --- the host firewall ----------------------------------------------------------------------------
 # Default-deny in front of a host that publishes two ports to the internet is straightforwardly
 # right, and the CIS profile installs firewalld regardless. Set this false only on a host whose
