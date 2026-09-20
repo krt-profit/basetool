@@ -60,6 +60,16 @@ quadlet/env.d/*.env.tmpl text eol=lf
 *.md text eol=lf
 Dockerfile text eol=lf
 *.sh text eol=lf
+# `*.py` for the same reason as `*.sh`, and it was missing until 2026-09-20 while three of these
+# files were already being copied onto a Linux host and executed by their shebang:
+# `cgroup-container-metrics.py` and `cert-expiry-metrics.py` are the ExecStart of
+# iri-container-metrics.service and iri-cert-expiry.service, and `render-env-d.py` is invoked by
+# deploy.sh. `core.autocrlf=true` on a Windows clone writes CRLF into the working tree, the Ansible
+# role copies the file verbatim, and the kernel then reads the shebang as `python3\r` and reports
+# 203/EXEC for an interpreter that is plainly installed -- the identical failure the unit block
+# above describes, one file type over. The delivered copies were LF only because they were written
+# by hand in this session and git had not yet touched them.
+*.py text eol=lf
 .editorconfig text eol=lf
 
 # `.env.example` is copied verbatim onto a Linux host as the starting point for
