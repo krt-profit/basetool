@@ -226,6 +226,32 @@ basetool_host_alloy_listen: ":12345"
 #
 # Tempo is 4327 and not 4317 because alloy itself binds 0.0.0.0:4317 for its own OTLP receiver, and
 # 0.0.0.0 includes loopback -- the two would collide on the host.
+# --- fail2ban --------------------------------------------------------------------------------
+# Intrusion prevention for SSH, banning through firewalld. Only the sshd jail is enabled; see the
+# jail.local template for why a jail on the edge would be a liability rather than a defence.
+basetool_host_fail2ban_enabled: true
+
+# Never banned. Loopback only by default -- a host administered from a management network adds it
+# in the inventory, because this file has no business knowing any site's addressing. Get this wrong
+# and the jail locks out the only way in.
+basetool_host_fail2ban_ignoreip:
+  - 127.0.0.1/8
+  - ::1
+
+# Ten failures in ten minutes, banned for an hour, doubling on every repeat up to a week. The
+# escalation is the part that matters: one ban is a typo, the second is a scanner coming back.
+#
+# TEN and not five, and the reason is a self-lockout rather than leniency: `ssh-agent` offers every
+# key it holds, and sshd logs a `Failed publickey` for each one it refuses BEFORE the right key is
+# tried. An administrator with six keys in their agent therefore produces six failures in a single
+# successful login, and at maxretry 5 the second login bans the person holding the correct key. A
+# scanner is not deterred by the difference between five and ten; an administrator locked out of the
+# only way in at 03:40 very much is.
+basetool_host_fail2ban_maxretry: 10
+basetool_host_fail2ban_findtime: 10m
+basetool_host_fail2ban_bantime: 1h
+basetool_host_fail2ban_maxtime: 1w
+
 basetool_host_alloy_loki_endpoint: "127.0.0.1:3100"
 basetool_host_alloy_tempo_endpoint: "127.0.0.1:4327"
 

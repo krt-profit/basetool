@@ -155,33 +155,36 @@ loki.process "keycloak_mask" {
 	}
 }
 
-// --- NPM access + error logs (client IPs retained 31d — owner-approved, REQ-OBS-007/-010) -----
-// The glob is per-FILE, not per-host: NPM writes proxy-host-<n>_access.log for every proxy host,
-// so the API vhost of ADR-0135 is tailed the moment it is created — no Alloy change, and no
-// LogStreamSilent gap on the day it goes live. Its lines carry the same fields and the same
-// 31-day client-IP retention as every other vhost (REQ-OBS-010), which is why the privacy policy
-// needed no new category for it either. Verify after D3 with {app="npm-access"} |= "api.profit-base.online".
-local.file_match "npm_access" {
-	path_targets = [{__path__ = "/logs/npm/*_access.log", app = "npm-access"}]
-}
+// --- The edge access + error logs are NOT here, and that is the point ------------------------
+// Until 2026-09-20 two `loki.source.file` blocks tailed /logs/npm/*_access.log and *_error.log
+// under app="npm-access" / "npm-error". NPM was replaced by native nginx in ADR-0162 and the native
+// edge writes both to STDOUT (`access_log /dev/stdout`, `error_log /dev/stderr`), so those two
+// streams have had no producer since; on a host that never ran NPM the files do not exist at all
+// and their two LogStreamSilent rules fired forever.
+//
+// The edge's lines arrive through the container-stdout source below, under app="edge", and they are
+// deliberately NOT masked there (the stage.match selectors in loki.process.container_mask name
+// grafana, alertmanager and the <svc>-stdout apps only) -- which is what preserves the client IPs
+// the 31-day retention of REQ-OBS-007/-010 is about. The retention itself moved with the label:
+// see loki-config.yml.
+//
+// What was lost with the files, and it is worth naming rather than discovering: the per-vhost split.
+// NPM wrote proxy-host-<n>_access.log per proxy host, so a new vhost was tailed the moment it was
+// created. The native edge writes one stream for all of them, so a per-vhost question is now a
+// query over the line's own Host field rather than over a stream label.
 
-loki.source.file "npm_access" {
-	targets    = local.file_match.npm_access.targets
-	forward_to = [loki.write.default.receiver]
-}
-
-local.file_match "npm_error" {
-	path_targets = [{__path__ = "/logs/npm/*_error.log", app = "npm-error"}]
-}
-
-loki.source.file "npm_error" {
-	targets    = local.file_match.npm_error.targets
-	forward_to = [loki.write.default.receiver]
-}
-
-// --- Host auth log (SSH/sudo; usernames+IPs retained 31d). Journal variant: see the runbook. --
+// --- Host auth log (SSH/sudo; usernames+IPs retained 31d) ------------------------------------
+// TWO paths, one stream. Debian's rsyslog writes /var/log/auth.log; the RHEL family writes
+// /var/log/secure. Both arrive under /hostlog because the whole directory is mounted, and both are
+// named here so one `app="host-auth"` stream and one set of detectors serve either family with no
+// second code path and no symlink invented on the host to paper over the difference. On a given
+// host exactly one of them exists, so the other contributes no target and no series -- which is why
+// LogStreamSilent watches the two with a regex rather than asserting a single path.
 local.file_match "host_auth" {
-	path_targets = [{__path__ = "/hostlog/auth.log", app = "host-auth"}]
+	path_targets = [
+		{__path__ = "/hostlog/auth.log", app = "host-auth"},
+		{__path__ = "/hostlog/secure", app = "host-auth"},
+	]
 }
 
 loki.source.file "host_auth" {
@@ -399,14 +402,18 @@ discovery.relabel "containers" {
 		replacement   = "postgres-keycloak"
 	}
 
-	// `edge` and `acme` joined this list with ADR-0162. The edge logs to the
-	// CONTAINER stream rather than to files, unlike NPM, which wrote
-	// /data/logs/proxy-host-<n>_{access,error}.log and was the one component whose
-	// logs needed a bind mount to reach Loki at all. Access and error lines now
-	// share one stream, which is what ADR-0095 already does for every other
-	// service. The npm_access / npm_error FILE streams above are deliberately kept:
-	// they are empty while the edge serves and light up again if the `rollback`
-	// profile is ever used.
+	// `edge` and `acme` joined this list with ADR-0162. The edge logs to the CONTAINER stream
+	// rather than to files, unlike NPM, which wrote /data/logs/proxy-host-<n>_{access,error}.log and
+	// was the one component whose logs needed a bind mount to reach Loki at all. Access and error
+	// lines now share one stream, which is what ADR-0095 already does for every other service.
+	//
+	// This is where the 31-day client-IP retention of REQ-OBS-007/-010 now lives. `edge` is
+	// deliberately absent from loki.process.container_mask's stage.match selectors, so these lines
+	// pass through unmasked -- that is the point, not an oversight.
+	//
+	// `npm` stays in the alternation although nothing answers to that name any more. It costs an
+	// alternative that never matches, and removing it would be the only thing standing between a
+	// resurrected rollback stack and an unlabelled stream.
 	rule {
 		source_labels = ["__journal_container_name"]
 		regex         = "(npm|edge|acme|redis)"

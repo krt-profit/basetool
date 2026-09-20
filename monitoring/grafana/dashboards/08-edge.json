@@ -1,6 +1,6 @@
 {
   "schemaVersion": 39,
-  "title": "Edge / NPM",
+  "title": "Edge",
   "uid": "basetool-edge-npm",
   "tags": [
     "basetool"
@@ -222,7 +222,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=~\"edge|npm-access\"} |~ \" 5[0-9][0-9] \" [5m]))",
+          "expr": "sum(rate({app=\"edge\"} |~ \" 5[0-9][0-9] \" [5m]))",
           "refId": "A",
           "legendFormat": "5xx",
           "datasource": {
@@ -267,7 +267,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=~\"edge|npm-access\"} |~ \" 4[0-9][0-9] \" [5m]))",
+          "expr": "sum(rate({app=\"edge\"} |~ \" 4[0-9][0-9] \" [5m]))",
           "refId": "A",
           "legendFormat": "4xx",
           "datasource": {
@@ -312,7 +312,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=~\"edge|npm-access\"}[5m]))",
+          "expr": "sum(rate({app=\"edge\"}[5m]))",
           "refId": "A",
           "legendFormat": "requests",
           "datasource": {
@@ -331,7 +331,7 @@
         "y": 16
       },
       "type": "timeseries",
-      "title": "NPM error log rate",
+      "title": "Edge error-line rate",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -370,7 +370,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate({app=~\"edge|npm-error\"}[5m]))",
+          "expr": "sum(rate({app=\"edge\"}[5m]))",
           "refId": "A",
           "legendFormat": "errors",
           "datasource": {
@@ -389,7 +389,7 @@
         "y": 16
       },
       "type": "logs",
-      "title": "Recent npm-access lines",
+      "title": "Recent edge access lines",
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -407,7 +407,7 @@
       },
       "targets": [
         {
-          "expr": "{app=~\"edge|npm-access\"}",
+          "expr": "{app=\"edge\"}",
           "refId": "A",
           "datasource": {
             "type": "loki",

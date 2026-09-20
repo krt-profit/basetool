@@ -11,14 +11,22 @@
 #
 # The obvious fix -- rewrite the paths in config.alloy -- is the wrong one. Those paths are also
 # written into the alert rules (`absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})`
-# and nine more in meta.yml), so rewriting them would have retargeted all ten LogStreamSilent rules
-# at once, quietly. Recreating the container's view instead leaves config.alloy and the alert rules
-# alone and keeps ONE file true for both shapes.
+# and its siblings in meta.yml), so rewriting them would have retargeted those rules at once, and
+# quietly. Recreating the container's view instead leaves config.alloy and the alert rules alone and
+# keeps ONE file true for both shapes.
 #
-# Each source is named on its own rather than binding /var/log wholesale: Alloy has no business
-# reading btmp, wtmp or the dnf logs, and a list of exactly what it reads is also the list to review
-# when someone asks what the shipper can see. A leading `-` marks a source that is allowed to be
-# absent; without it a missing file fails the unit at start.
+# EVERY BIND HERE IS A DIRECTORY, and that is a correction rather than a preference. The first
+# version of this file named each log file individually, on the reasoning that Alloy has no business
+# reading btmp or the dnf logs. That reasoning is sound and the implementation is not: a systemd
+# file bind resolves to an INODE at unit start, and every one of these files is rotated. logrotate's
+# `create` and auditd's own ROTATE both make a NEW file, so after the first rotation the mount would
+# still point at the rotated-away inode -- Alloy tailing a file nothing writes to, reporting healthy,
+# shipping nothing. The same failure this drop-in exists to fix, reintroduced by the refinement.
+#
+# A directory bind has no such problem: Alloy re-opens by path inside the mounted tree and follows
+# the rotation exactly as it does in the container. /var/log:/hostlog is also precisely what
+# docker-compose.monitoring.yml mounts, so this is parity with the deployment that works rather than
+# a new exposure.
 [Service]
 # --- application JSON / file logs, masked at source (REQ-OBS-007) ----------------------------------
 BindReadOnlyPaths={{ basetool_host_root_dir }}/backend/log:/logs/backend
@@ -26,25 +34,14 @@ BindReadOnlyPaths={{ basetool_host_root_dir }}/frontend/log:/logs/frontend
 BindReadOnlyPaths={{ basetool_host_root_dir }}/ingest/log:/logs/ingest
 BindReadOnlyPaths={{ basetool_host_root_dir }}/keycloak/log:/logs/keycloak
 
-# NPM is retired (ADR-0162: the edge is native nginx with a separate ACME client) and the native
-# edge writes its access log to STDOUT, which now reaches Loki through the journal source instead.
-# The directory is bound optionally so a host that still carries NPM data keeps both streams, and a
-# host that never had them starts anyway.
-BindReadOnlyPaths=-{{ basetool_host_root_dir }}/npm/data/logs:/logs/npm
-
-# --- host security logs, ingested WITH usernames and IPs (the 31-day retention, REQ-OBS-010) -------
-# auth.log is Debian's name for it. On RHEL the same stream is /var/log/secure, and binding it onto
-# the expected name is what keeps `{app="host-auth"}` and the LogStreamSilent rule that watches
-# path="/hostlog/auth.log" correct on both families without a second code path anywhere.
-BindReadOnlyPaths=/var/log/secure:/hostlog/auth.log
-BindReadOnlyPaths=/var/log/audit:/hostlog/audit
-BindReadOnlyPaths=-/var/log/fail2ban.log:/hostlog/fail2ban.log
-
-# --- the ops automation logs ----------------------------------------------------------------------
-# Optional to a file: each is created by its timer's first run, and on a freshly provisioned host
-# that run has not happened yet. A required bind would make alloy.service fail to start on exactly
-# the host where it is needed first.
-BindReadOnlyPaths=-/var/log/iri-deploy.log:/hostlog/iri-deploy.log
-BindReadOnlyPaths=-/var/log/iri-backup.log:/hostlog/iri-backup.log
-BindReadOnlyPaths=-/var/log/iri-docker-cleanup.log:/hostlog/iri-docker-cleanup.log
-BindReadOnlyPaths=-/var/log/iri-restore-drill.log:/hostlog/iri-restore-drill.log
+# --- the host's own logs --------------------------------------------------------------------------
+# One directory, as the container has it. It carries the SSH/sudo stream (auth.log on Debian,
+# secure on RHEL -- config.alloy names both), the auditd tamper watches under audit/, the fail2ban
+# ban log, and the four ops-automation logs the systemd timers append to.
+#
+# Two host preconditions this bind does NOT provide, both handled in the role and both silent when
+# they are missed: the files have to be group-adm readable (RHEL writes secure and audit.log as
+# root:root), and /var/log/audit has to be traversable -- /usr/lib/tmpfiles.d/audit.conf pins it to
+# 0700 root:root, which is why there is a tmpfiles drop-in overriding it rather than a chmod that
+# gets undone the next time systemd-tmpfiles runs.
+BindReadOnlyPaths=/var/log:/hostlog

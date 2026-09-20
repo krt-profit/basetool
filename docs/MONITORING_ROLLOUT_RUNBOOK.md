@@ -167,7 +167,7 @@ sudo sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin|cha
 
 > **NPM failed-login log-line format:** confirm on the isolated **test stack** (never prod) what an
 > NPM 2.15.1 admin-UI failed-login line looks like in `/var/iri/npm/data/logs`, so the Loki query on
-> dashboard 08 (`08-edge-npm.json`) matches real lines. Spin the test stack per the README's
+> dashboard 08 (`08-edge.json`) matches real lines. Spin the test stack per the README's
 > *Running the Local Test Stack* section, generate a failed login, and record the exact line shape.
 
 ---

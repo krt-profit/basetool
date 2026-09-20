@@ -291,9 +291,12 @@ groups:
   # silence still covers them via LokiIngestSilent.
   - name: meta-log-pipeline
     rules:
-      # Whole-pipeline silence: the 30s blackbox probes guarantee npm-access baseline traffic, so a
-      # 30-minute zero means the shipper or Loki ingest is dead. `or absent(...)` also catches the
-      # case where the counter never registered (Loki restarted, nothing pushing).
+      # Whole-pipeline silence: the 30s blackbox probes guarantee baseline traffic through the edge,
+      # whose access log reaches Loki as app="edge", so a 30-minute zero means the shipper or Loki
+      # ingest is dead. `or absent(...)` also catches the case where the counter never registered
+      # (Loki restarted, nothing pushing). Until 2026-09-20 this comment named the npm-access FILE
+      # stream as the baseline; NPM was replaced by native nginx in ADR-0162 and the native edge
+      # writes to stdout, so that stream had already stopped being the thing keeping this quiet.
       - alert: LokiIngestSilent
         expr: >-
           sum(rate(loki_distributor_lines_received_total[30m])) == 0
@@ -303,7 +306,7 @@ groups:
           severity: warning
         annotations:
           summary: "Loki received no log lines in 30m"
-          description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the npm-access stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
+          description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the app=\"edge\" stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
 
       # Per-critical-path stream death. A tailed file keeps its loki_source_file_read_lines_total
       # series present (flat when quiet — verified against alloy v1.17.1), so ABSENCE of the series
@@ -312,14 +315,14 @@ groups:
       # stream is legitimately quiet for days when healthy, so rate==0 would false-positive; total-flow
       # silence is already covered by LokiIngestSilent above.
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})
+        expr: absent(loki_source_file_read_lines_total{path=~"/hostlog/(auth\\.log|secure)"})
         for: 1h
         labels:
           severity: warning
           stream: host-auth
         annotations:
           summary: "Log stream not being tailed: host auth.log"
-          description: "Alloy is not tailing /hostlog/auth.log — the SSH failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and file permissions (adm group readable)."
+          description: "Alloy is not tailing the host SSH log — /hostlog/auth.log on Debian, /hostlog/secure on the RHEL family, and neither is being read. The failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and that the file is group-adm readable; on RHEL, rsyslog writes it root:root unless $FileGroup says otherwise."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/audit/audit.log"})
@@ -331,15 +334,17 @@ groups:
           summary: "Log stream not being tailed: host audit.log"
           description: "Alloy is not tailing /hostlog/audit/audit.log — the sshd_config/authorized_keys tamper detector is blind. Confirm /var/log/audit is traversable (0750 root:adm) and log_group=adm in auditd.conf."
 
-      - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_access\\.log"})
-        for: 1h
-        labels:
-          severity: warning
-          stream: npm-access
-        annotations:
-          summary: "Log stream not being tailed: NPM access logs"
-          description: "Alloy is not tailing any /logs/npm/*_access.log — the edge 5xx/rate-limit/scan detectors and the npm-access baseline for LokiIngestSilent are blind. Check the NPM log mount."
+      # There was a LogStreamSilent for /logs/npm/*_access.log here until 2026-09-20, and one for
+      # *_error.log below. Both watched files that NPM wrote; ADR-0162 replaced NPM with native
+      # nginx, which writes access to stdout and errors to stderr, so both streams arrive as
+      # app="edge" through the container-stdout source instead. On a host that never ran NPM the
+      # files do not exist and the two rules fired forever, which is the shape of a rule that
+      # outlives the thing it watched.
+      #
+      # They are NOT replaced by an app="edge" equivalent, for the reason stated at the top of this
+      # group: a container-stdout stream exposes no per-target loki_source_file_read_lines_total
+      # series to take absent() of. Edge silence is covered by LokiIngestSilent (the edge IS the
+      # baseline) and by the blackbox probes, which fail outright if the edge stops answering.
 
       # Highest-value guard in this group. KeycloakErrorRateHigh ({app="keycloak"}) is the ONLY
       # detector for the fail-open Discord SPI precheck: when that precheck errors persistently the
@@ -389,16 +394,6 @@ groups:
         annotations:
           summary: "Log stream not being tailed: ingest JSON"
           description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors / IngestBackendUnavailable page needs the gateway's own log. Check the /var/iri/ingest/log mount and that the app's JSON file appender is still writing."
-
-      - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_error\\.log"})
-        for: 1h
-        labels:
-          severity: warning
-          stream: npm-error
-        annotations:
-          summary: "Log stream not being tailed: NPM error logs"
-          description: "Alloy is not tailing any /logs/npm/*_error.log — the edge's own fault record ([emerg]/[error], upstream-connect failures, cert-renewal errors) is missing, which is the first thing an EdgeServerErrorSpike triage needs after the access log. Check the NPM log mount."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/fail2ban.log"})

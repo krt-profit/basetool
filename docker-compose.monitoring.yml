@@ -537,7 +537,6 @@ services:
       - /var/iri/frontend/log:/logs/frontend:ro
       - /var/iri/ingest/log:/logs/ingest:ro
       - /var/iri/keycloak/log:/logs/keycloak:ro
-      - /var/iri/npm/data/logs:/logs/npm:ro
       - /var/log:/hostlog:ro
     deploy:
       resources:

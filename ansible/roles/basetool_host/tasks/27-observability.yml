@@ -231,6 +231,7 @@
     group: adm
     mode: "0640"
   when: not ansible_check_mode
+  failed_when: false
 
 - name: Make the audit log readable by the shipper, as config.alloy requires
   # Not an invention: config.alloy's host_auditd block states the precondition verbatim -- "set
@@ -248,26 +249,53 @@
   register: basetool_host_auditd_group
   when: not ansible_check_mode
 
-- name: Apply it to the log that is already open
-  # auditd applies log_group when it opens the log, so the running instance keeps root:root until it
-  # is told otherwise. It cannot be restarted -- RefuseManualStop=yes on this unit, measured -- and
-  # it declares no ExecReload, so SIGHUP is the supported way to make it re-read its configuration.
-  # The explicit chgrp/chmod covers the window before the next rotation, the same way the auth log
-  # is handled above.
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    group: adm
-    mode: "{{ item.mode }}"
-  loop:
-    - { path: /var/log/audit, mode: "0750" }
-    - { path: /var/log/audit/audit.log, mode: "0640" }
-  loop_control:
-    label: "{{ item.path }}"
+- name: Stop systemd from putting the audit directory back
+  # /usr/lib/tmpfiles.d/audit.conf carries `d /var/log/audit 0700 root root`, and systemd-tmpfiles
+  # re-applies it every time it runs -- at boot, and whenever anything triggers --create. So a chmod
+  # here is undone on a schedule nobody is watching. Measured on the testing host on 2026-09-20: the
+  # directory was set to 0750 root:adm at 18:45 and was back to 0700 root:root by 20:01, with auditd
+  # not having restarted since the 16th. The shipper had stopped being able to traverse into it, and
+  # the only thing that said so was the readability assertion below.
+  #
+  # A file of the same name in /etc/tmpfiles.d REPLACES the one in /usr/lib entirely, which is the
+  # supported override and the only durable answer. auditd itself sets the LOG's group from
+  # log_group; it is the DIRECTORY that tmpfiles owns.
+  ansible.builtin.copy:
+    dest: /etc/tmpfiles.d/audit.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      # Overrides /usr/lib/tmpfiles.d/audit.conf, which pins this directory to 0700 root:root.
+      # The log shipper reads the auditd tamper watches through its supplementary `adm` group and
+      # needs to traverse the directory to reach the file (REQ-OBS-019). 0750 keeps it closed to
+      # everyone else.
+      d /var/log/audit 0750 root adm - -
+  register: basetool_host_auditd_tmpfiles
+
+- name: Apply it now rather than at the next boot
+  ansible.builtin.command: systemd-tmpfiles --create /etc/tmpfiles.d/audit.conf
+  changed_when: true
   when:
     - not ansible_check_mode
-    - basetool_host_auditd_group is changed
+    - basetool_host_auditd_tmpfiles is changed
+
+- name: Hand the audit log itself to adm
+  # Unconditional, and that is the point. auditd applies log_group when it opens or rotates the log,
+  # so a file that predates the setting keeps its old group -- and gating this on "the config line
+  # changed" means it runs exactly once, on the host where it happened to be introduced. A `file:`
+  # task is idempotent and costs nothing on a host that is already right.
+  ansible.builtin.file:
+    path: /var/log/audit/audit.log
+    group: adm
+    mode: "0640"
+  when: not ansible_check_mode
+  failed_when: false
 
 - name: Tell the running auditd to re-read its configuration
+  # It cannot be restarted -- RefuseManualStop=yes on this unit, measured -- and it declares no
+  # ExecReload, so SIGHUP is the supported way.
   ansible.builtin.command: systemctl kill --signal=HUP auditd.service
   changed_when: true
   when:

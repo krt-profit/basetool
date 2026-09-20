@@ -2172,7 +2172,7 @@ therefore alerts on:
   quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
   it. **`LogStreamSilent` guards ten tails, each its own rule with a distinct `stream` label:**
-  `host-auth`, `host-auditd`, `host-fail2ban`, `npm-access`, `npm-error`, `keycloak`, `backend`,
+  `host-auth`, `host-auditd`, `host-fail2ban`, `keycloak`, `backend`,
   `frontend`, `ingest` and `ops-deploy`. It is deliberately **one rule per path, never an
   alternation** — `absent()` returns 1 only when the selector matches *nothing*, so a combined
   `path=~"…(backend|frontend|ingest)…"` rule would stay perfectly silent while two of the three tails

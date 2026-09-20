@@ -61,6 +61,14 @@
 # A changed $FileGroup only governs files rsyslog creates AFTER it has re-read its configuration,
 # and rsyslog does have a reload path for that -- logrotate's own postrotate uses the same one. A
 # restart would drop the journal cursor imjournal holds and re-read from the start.
+# fail2ban re-reads jail.local on a reload, but a changed backend or banaction only takes effect on
+# a restart -- and a jail that did not take effect is indistinguishable from one that did.
+- name: Restart fail2ban
+  ansible.builtin.systemd_service:
+    name: fail2ban.service
+    state: restarted
+  when: not ansible_check_mode
+
 - name: Reload rsyslog
   ansible.builtin.systemd_service:
     name: rsyslog.service
