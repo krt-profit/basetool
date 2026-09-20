@@ -121,7 +121,11 @@
 # which is worse than either choice made consistently.
 - name: Name the profile and tailoring every oscap run uses
   ansible.builtin.set_fact:
-    basetool_host_oscap_profile_args: "{{ ['--tailoring-file', basetool_host_hardening_tailoring_file, '--profile', basetool_host_hardening_tailored_profile] if basetool_host_hardening_exclusions | length > 0 else ['--profile', basetool_host_hardening_profile] }}"
+    basetool_host_oscap_profile_args: >-
+      {{ ['--tailoring-file', basetool_host_hardening_tailoring_file,
+          '--profile', basetool_host_hardening_tailored_profile]
+         if basetool_host_hardening_exclusions | length > 0
+         else ['--profile', basetool_host_hardening_profile] }}
 
 - name: Say which profile the scan will use
   ansible.builtin.debug:
@@ -140,7 +144,14 @@
 # Always. A report that is only produced when somebody remembers to ask is a report nobody has.
 - name: Scan against the profile
   ansible.builtin.command:
-    argv: "{{ ['oscap', 'xccdf', 'eval'] + basetool_host_oscap_profile_args + ['--results-arf', basetool_host_state_dir ~ '/hardening/arf-' ~ ansible_date_time.date ~ '.xml', '--report', basetool_host_state_dir ~ '/hardening/report-' ~ ansible_date_time.date ~ '.html', basetool_host_hardening_datastream] }}"
+    argv: >-
+      {{ ['oscap', 'xccdf', 'eval']
+         + basetool_host_oscap_profile_args
+         + ['--results-arf',
+            basetool_host_state_dir ~ '/hardening/arf-' ~ ansible_date_time.date ~ '.xml',
+            '--report',
+            basetool_host_state_dir ~ '/hardening/report-' ~ ansible_date_time.date ~ '.html',
+            basetool_host_hardening_datastream] }}
   register: basetool_host_scan
   # oscap exits 0 when every rule passed, 2 when at least one failed, and 1 on an error. A failing
   # rule is the normal state of an unhardened host and is the reason we are scanning, so only 1 is
@@ -165,7 +176,14 @@
   block:
     - name: Apply the profile's remediations
       ansible.builtin.command:
-        argv: "{{ ['oscap', 'xccdf', 'eval', '--remediate'] + basetool_host_oscap_profile_args + ['--results-arf', basetool_host_state_dir ~ '/hardening/arf-remediated-' ~ ansible_date_time.date ~ '.xml', '--report', basetool_host_state_dir ~ '/hardening/report-remediated-' ~ ansible_date_time.date ~ '.html', basetool_host_hardening_datastream] }}"
+        argv: >-
+          {{ ['oscap', 'xccdf', 'eval', '--remediate']
+             + basetool_host_oscap_profile_args
+             + ['--results-arf',
+                basetool_host_state_dir ~ '/hardening/arf-remediated-' ~ ansible_date_time.date ~ '.xml',
+                '--report',
+                basetool_host_state_dir ~ '/hardening/report-remediated-' ~ ansible_date_time.date ~ '.html',
+                basetool_host_hardening_datastream] }}
       register: basetool_host_remediate
       # oscap exits 2 when rules still fail, which is the normal state afterwards -- some rules have
       # no automated fix. Only 1 is an error of the tool itself.
@@ -184,7 +202,14 @@
     # is the only thing that distinguishes "remediation did nothing" from "remediation worked".
     - name: Scan again, to find out what the remediation actually achieved
       ansible.builtin.command:
-        argv: "{{ ['oscap', 'xccdf', 'eval'] + basetool_host_oscap_profile_args + ['--results-arf', basetool_host_state_dir ~ '/hardening/arf-verify-' ~ ansible_date_time.date ~ '.xml', '--report', basetool_host_state_dir ~ '/hardening/report-verify-' ~ ansible_date_time.date ~ '.html', basetool_host_hardening_datastream] }}"
+        argv: >-
+          {{ ['oscap', 'xccdf', 'eval']
+             + basetool_host_oscap_profile_args
+             + ['--results-arf',
+                basetool_host_state_dir ~ '/hardening/arf-verify-' ~ ansible_date_time.date ~ '.xml',
+                '--report',
+                basetool_host_state_dir ~ '/hardening/report-verify-' ~ ansible_date_time.date ~ '.html',
+                basetool_host_hardening_datastream] }}
       register: basetool_host_rescan
       failed_when: basetool_host_rescan.rc == 1
       changed_when: false
@@ -379,7 +404,12 @@
 # result until something resets it, and node_exporter's systemd collector goes on reporting it -- so
 # SystemdUnitFailed would stay critical about a unit nobody is running any more.
 - name: Ask whether it is still in a failed state
-  ansible.builtin.command: systemctl is-failed systemd-journal-upload.service
+  # The module with no state/enabled asks and changes nothing, returning the unit's own
+  # ActiveState. `systemctl is-failed` would have said the same thing and ansible-lint is right to
+  # refuse it: a bare command needs a hand-written changed_when, and a hand-written changed_when on
+  # a command is a guess -- the same reasoning 65-firewall.yml already gives for service_facts.
+  ansible.builtin.systemd_service:
+    name: systemd-journal-upload.service
   register: basetool_host_journal_upload_state
   changed_when: false
   failed_when: false
@@ -397,4 +427,4 @@
   changed_when: true
   when:
     - not ansible_check_mode
-    - basetool_host_journal_upload_state.stdout | default('') == 'failed'
+    - basetool_host_journal_upload_state.status.ActiveState | default('') == 'failed'
