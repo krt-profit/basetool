@@ -1,0 +1,64 @@
+{#-
+  An XCCDF tailoring file: the profile this host is actually judged against.
+
+  WHY THIS EXISTS. A benchmark rule tests a MEANS, and occasionally the deployment reaches the same
+  END by another one. Leaving such a rule selected produces a permanently failing check, and a
+  permanently failing check is read exactly once -- after that it is scenery, and the next genuine
+  failure beside it is scenery too. Deselecting it without writing down why is the opposite problem:
+  the score looks better and nobody can reconstruct the argument.
+
+  So every exclusion carries its reason into the profile DESCRIPTION.
+
+  Not into an XML comment, and that is not a style choice: XML forbids `--` inside a comment, and
+  these reasons are prose written by people who use dashes. oscap rejected the whole file with
+  "Double hyphen within comment" on the first attempt (2026-09-20) -- the same trap this repository
+  already records for the OWASP suppressions file, in a different XML dialect.
+
+  Where it ends up, measured rather than assumed (2026-09-20) -- the first version of this comment
+  claimed the HTML report carries it, and it does not:
+
+      the ARF (arf-<date>.xml)   carries the reason verbatim. That is the archived, machine-readable
+                                 result, so the argument travels with the evidence.
+      the HTML report            does NOT carry it, but does name the tailored profile id, which is
+                                 the thread back to this file.
+
+  So the description is the right place for a different reason than the one first written down: not
+  because a reader meets it in the report, but because it cannot be separated from the results.
+
+  The profile EXTENDS the upstream one rather than restating it, so an scap-security-guide upgrade
+  brings every new and changed rule with it -- only the named exclusions stay excluded.
+-#}
+<?xml version="1.0" encoding="UTF-8"?>
+<xccdf:Tailoring xmlns:xccdf="http://checklists.nist.gov/xccdf/1.2"
+                 id="xccdf_{{ basetool_host_hardening_tailoring_ns }}_tailoring_basetool">
+  <xccdf:benchmark href="{{ basetool_host_hardening_datastream }}"/>
+  {#-
+    A STABLE time, from basetool_host_hardening_tailoring_time, not `ansible_date_time`.
+
+    The attribute is required -- oscap rejects the file without it ("The attribute 'time' is
+    required but missing") -- but rendering "now" into it rewrote this file on every play, which is
+    churn in the one file whose purpose is to record a decision that does not change. Measured
+    2026-09-20, both ways.
+
+    It also happens to be what the attribute means: when this VERSION of the tailoring was made,
+    which is when somebody changed an exclusion, not when a play ran.
+  -#}
+  <xccdf:version time="{{ basetool_host_hardening_tailoring_time }}">1</xccdf:version>
+
+  <xccdf:Profile id="{{ basetool_host_hardening_tailored_profile }}"
+                 extends="{{ basetool_host_hardening_profile }}">
+    <xccdf:title xml:lang="en">{{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') | e }}, as this deployment is judged</xccdf:title>
+    <xccdf:description xml:lang="en">Managed by the basetool_host Ansible role; do not edit by hand.
+Extends the upstream profile, so an scap-security-guide upgrade brings every new and changed rule
+with it. Each deselection below is a decision with a reason, not a convenience.
+{% for e in basetool_host_hardening_exclusions %}
+
+DESELECTED: {{ e.rule | e }}
+{{ e.reason | trim | e }}
+{% endfor %}
+</xccdf:description>
+{% for e in basetool_host_hardening_exclusions %}
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_{{ e.rule }}" selected="false"/>
+{% endfor %}
+  </xccdf:Profile>
+</xccdf:Tailoring>

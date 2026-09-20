@@ -238,6 +238,45 @@ basetool_host_hardening_datastream: ""
 # have a snapshot of, and re-run the conformance suite afterwards.
 basetool_host_hardening_remediate: false
 
+# --- what this deployment is actually judged against ----------------------------------------------
+# A benchmark rule tests a MEANS. Occasionally the deployment reaches the same END another way, and
+# then the rule fails forever -- which is read once and is scenery afterwards, along with whatever
+# genuine failure sits beside it. Each entry below deselects one rule AND carries the argument into
+# the tailoring file itself, where oscap cannot lose it and the next reader meets it at the same
+# moment as the rule.
+#
+# Empty means no tailoring file is written and oscap evaluates the upstream profile unchanged.
+#
+# `rule` is the bare rule name; the template prefixes `xccdf_org.ssgproject.content_rule_`.
+basetool_host_hardening_exclusions:
+  - rule: service_systemd-journal-upload_enabled
+    reason: >-
+      Journal shipping is done by alloy, not by systemd-journal-upload. alloy runs on this host in
+      the `adm` and `systemd-journal` groups, reads the journal directly and ships it to Loki with
+      the retention and querying REQ-OBS-007 and REQ-OBS-010 describe, so the END this rule tests
+      for -- journal records leaving the host into a queryable store -- is met. Satisfying it
+      literally would mean standing up a second systemd-journal-remote receiver, securing it with
+      its own TLS material and monitoring it, purely to ship the same records a second time.
+      Measured on the testing host 2026-09-20: the unit had been enabled by hand with no URL=
+      configured at all, so it failed on every boot since 2026-09-16 and drove SystemdUnitFailed
+      critical while shipping nothing. Decided 2026-09-20; revisit if journal shipping ever leaves
+      alloy.
+
+# A namespace of our own, so a tailored profile id can never collide with an upstream one, and a
+# name that says it is DERIVED from the profile rather than an alternative to it.
+basetool_host_hardening_tailoring_ns: krt.basetool
+basetool_host_hardening_tailored_profile: "xccdf_krt.basetool_profile_{{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') }}_basetool"
+basetool_host_hardening_tailoring_file: /etc/iri/ssg-tailoring.xml
+# When this set of exclusions was last CHANGED. XCCDF requires a `time` on <version> and oscap
+# enforces it, so it cannot simply be left out -- but rendering "now" into it rewrote the file on
+# every play, which is churn in the one file whose purpose is to record a decision that does not
+# change (measured 2026-09-20: changed=1 forever, with a diff consisting of nothing but the clock).
+#
+# Bump it when you add, remove or reword an exclusion above. Leaving it alone is the correct
+# behaviour for a run that changes nothing, and that is exactly what the attribute is supposed to
+# mean.
+basetool_host_hardening_tailoring_time: "2026-09-20T00:00:00Z"
+
 # --- the L4 front end (ADR-0187) ------------------------------------------------------------------
 # haproxy binds the public ports and hands the edge the client address with PROXY protocol, because
 # rootless port forwarding replaces it. The edge itself publishes on loopback only.
