@@ -413,16 +413,35 @@ untouched**; and a rollback from a release that cannot become healthy.
 
 ## 1. In the window
 
-### 1.1 Stop the deploy timer on BOTH hosts
+### 1.1 Stop the deploy timer on BOTH hosts — and DISABLE the old one
 
 It fires every five minutes and will pull an image mid-migration.
 
 ```bash
-# old host
-systemctl stop iri-deploy.timer && systemctl is-active iri-deploy.timer   # inactive
-# new host
+# old host -- disable, not just stop. See the box below.
+systemctl disable --now iri-deploy.timer
+systemctl is-active iri-deploy.timer && echo UNEXPECTED   # expect: inactive
+systemctl is-enabled iri-deploy.timer                     # expect: disabled
+# new host -- stop is enough; it is about to be deployed to deliberately
 systemctl stop iri-deploy.timer && systemctl is-active iri-deploy.timer   # inactive
 ```
+
+> [!warning] `stop` does not survive a reboot, and bringing the old host back IS a reboot
+> This step said `stop` on both hosts until 2026-09-21, which leaves the unit `enabled`: the timer
+> is re-armed by the next boot. Measured on the old host that same day — `enabled=enabled
+> active=inactive`.
+>
+> §1.10 rests its whole rollback argument on that timer never firing again: *"if it is ever brought
+> back up, it must come back on the configuration it has on disk and not pull a bundle promoted
+> after the cutover — that is what makes 'bring the old one back' a complete answer rather than a
+> race."* But bringing a host back up is a boot, the boot re-arms the timer, and five minutes later
+> it pulls the `:stable` that was promoted after the cutover. The rollback target would then
+> silently become a host running the new bundle on the old runtime — which, among other things,
+> loses its container-stdout log streams (`config.alloy` reads the journal now) and its cAdvisor
+> container metrics (that scrape job is gone).
+>
+> `disable --now` is what the argument actually requires. The new host keeps `stop`, because there
+> the timer is meant to come back — §1.10 starts it deliberately once the names have moved.
 
 ### 1.2 Quiesced backup on the old host
 
@@ -795,9 +814,11 @@ deliberately rather than in a cutover window.
 systemctl start iri-deploy.timer
 ```
 
-The old host is then shut down. **Leave its `iri-deploy.timer` stopped** — if it is ever brought
-back up, it must come back on the configuration it has on disk and not pull a bundle promoted after
-the cutover. That is what makes "bring the old one back" a complete answer rather than a race.
+The old host is then shut down. **Its `iri-deploy.timer` must be DISABLED, not merely stopped**
+(§1.1) — if it is ever brought back up, it must come back on the configuration it has on disk and
+not pull a bundle promoted after the cutover. That is what makes "bring the old one back" a complete
+answer rather than a race, and a stopped-but-enabled timer does not deliver it: the act of bringing
+the host back is a boot, and the boot re-arms it.
 
 > [!note] What a NEWER bundle would take from the old host, and why the timer stays stopped
 > Two files in the bundle are now written for the Podman shape and would be wrong on the Docker
