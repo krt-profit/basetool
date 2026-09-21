@@ -1,0 +1,160 @@
+# promtool unit test for the two trace-pipeline silence alerts after they stopped using a proxy for
+# "tracing is switched on" (REQ-OBS-009/-019).
+#
+# WHAT THIS PINS. `TempoReceiverSilent` used to gate on `sum(tempo_receiver_accepted_spans) > 0`,
+# reasoning that the counter stays 0 while tracing is off so the rule cannot false-alarm on a host
+# that never meant to trace. That proxy is true for a pipeline that is OFF and equally true for one
+# that has NEVER WORKED, and the second is not a quiet state -- it is an outage that never started.
+#
+# Measured on the testing host 2026-09-20: the app containers could not resolve `alloy` (a HOST
+# service under rootless Podman, so the container-network name answered to nothing), every span was
+# dropped inside each app's own OTLP exporter, which logs nothing, and BOTH span counters were
+# absent rather than zero. The rule was structurally incapable of firing and it was the only one
+# watching the trace path. Production runs MONITORING_TRACING_ENABLED=true, so this would have gone
+# live in exactly that state.
+#
+# The gate is now `basetool_tracing_enabled == 1`, a gauge each app module publishes from
+# `management.opentelemetry.enabled`. The cases below assert both directions, because a rule that
+# cannot fire and a rule that always fires fail the same way in the end: SILENT while tracing is
+# off, LOUD when it is on and nothing arrives -- including when nothing has EVER arrived, which is
+# the case the old expression could not express.
+
+rule_files:
+  - ../alerts/meta.yml
+
+evaluation_interval: 1m
+
+tests:
+  # --- the case the old rule could not express --------------------------------------------------
+  # Tracing on, and neither counter exists at all. This is the measured shape of a pipeline that has
+  # never carried a span.
+  - name: loud - tracing is on and no span has ever arrived at either end
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "1+0x45"
+      - series: 'basetool_tracing_enabled{application="basetool-frontend"}'
+        values: "1+0x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: TempoReceiverSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Tempo received no spans in 1h while tracing is enabled"
+              description: "The apps report tracing ON (basetool_tracing_enabled=1) and Tempo has stored no span for an hour — or has never stored one. The OTLP path from the apps/Keycloak through Alloy to Tempo is dead. Check AlloyOtlpReceiverSilent first: if that is firing too, the spans never reached Alloy and the usual cause on a Podman host is that the app containers cannot resolve `alloy` (it is a HOST service there and needs AddHost=alloy:host-gateway). If it is NOT firing, Alloy is accepting spans and failing to forward them to Tempo — check its otelcol exporter endpoint."
+      - eval_time: 40m
+        alertname: AlloyOtlpReceiverSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Alloy's OTLP receiver accepted no spans in 1h while tracing is enabled"
+              description: "The apps report tracing ON (basetool_tracing_enabled=1) and no span has reached Alloy's OTLP receiver for an hour — or ever. The spans are being dropped in each app's own exporter, which logs nothing about it. Check that the app containers can resolve the collector's name (`alloy:4318` for the three JVM apps, `alloy:4317` for Keycloak) and that its receiver is listening."
+
+  # --- the negative control, which is the whole reason the gauge exists --------------------------
+  # Tracing OFF and no spans anywhere. Identical span metrics to the case above; only the gauge
+  # differs. Both rules must stay silent, or every dev, test and monitoring-less host pages forever.
+  - name: silent - tracing is switched off and no span exists
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "0+0x45"
+      - series: 'basetool_tracing_enabled{application="basetool-frontend"}'
+        values: "0+0x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: TempoReceiverSilent
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: AlloyOtlpReceiverSilent
+        exp_alerts: []
+
+  # --- one module on, one off ---------------------------------------------------------------------
+  # `max()` over the gauge means a single module with tracing on is enough to expect spans, which is
+  # the right reading: that module IS emitting and its spans are going nowhere.
+  - name: loud - one module has tracing on while another does not
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "1+0x45"
+      - series: 'basetool_tracing_enabled{application="basetool-ingest"}'
+        values: "0+0x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: AlloyOtlpReceiverSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Alloy's OTLP receiver accepted no spans in 1h while tracing is enabled"
+              description: "The apps report tracing ON (basetool_tracing_enabled=1) and no span has reached Alloy's OTLP receiver for an hour — or ever. The spans are being dropped in each app's own exporter, which logs nothing about it. Check that the app containers can resolve the collector's name (`alloy:4318` for the three JVM apps, `alloy:4317` for Keycloak) and that its receiver is listening."
+
+  # --- a healthy pipeline -------------------------------------------------------------------------
+  # Tracing on and spans flowing at both ends. Silence here is what makes the loud cases mean
+  # something.
+  - name: silent - tracing is on and spans are arriving at both ends
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "1+0x45"
+      - series: 'otelcol_receiver_accepted_spans_total{receiver="otlp"}'
+        values: "0+60x45"
+      - series: 'tempo_receiver_accepted_spans{instance="tempo:3200"}'
+        values: "0+60x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: TempoReceiverSilent
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: AlloyOtlpReceiverSilent
+        exp_alerts: []
+
+  # --- the half-broken path, which is why there are two rules -------------------------------------
+  # Alloy is accepting spans and Tempo is storing none: the forward from collector to trace store is
+  # the broken half. Exactly one rule must fire, or the split buys nothing.
+  - name: loud on Tempo only - Alloy accepts spans but nothing reaches the store
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "1+0x45"
+      - series: 'otelcol_receiver_accepted_spans_total{receiver="otlp"}'
+        values: "0+60x45"
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: AlloyOtlpReceiverSilent
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: TempoReceiverSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Tempo received no spans in 1h while tracing is enabled"
+              description: "The apps report tracing ON (basetool_tracing_enabled=1) and Tempo has stored no span for an hour — or has never stored one. The OTLP path from the apps/Keycloak through Alloy to Tempo is dead. Check AlloyOtlpReceiverSilent first: if that is firing too, the spans never reached Alloy and the usual cause on a Podman host is that the app containers cannot resolve `alloy` (it is a HOST service there and needs AddHost=alloy:host-gateway). If it is NOT firing, Alloy is accepting spans and failing to forward them to Tempo — check its otelcol exporter endpoint."
+
+  # --- a pipeline that WAS working and stopped ----------------------------------------------------
+  # The case the original rule was written for. It has to keep working: the counters exist and are
+  # flat, which `rate() == 0` catches without needing the absent() leg.
+  - name: loud - spans were arriving and stopped
+    interval: 1m
+    input_series:
+      - series: 'basetool_tracing_enabled{application="basetool-backend"}'
+        values: "1+0x160"
+      - series: 'otelcol_receiver_accepted_spans_total{receiver="otlp"}'
+        values: "0+60x30 1800+0x130"
+      - series: 'tempo_receiver_accepted_spans{instance="tempo:3200"}'
+        values: "0+60x30 1800+0x130"
+    # The counters go flat at t=30m, so the 1h rate only reaches zero around t=91m and the 30m `for`
+    # holds it pending until ~t=121m. Evaluating at 115m read a rule that was still pending, which is
+    # correct behaviour and a wrong assertion.
+    alert_rule_test:
+      - eval_time: 130m
+        alertname: TempoReceiverSilent
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Tempo received no spans in 1h while tracing is enabled"
+              description: "The apps report tracing ON (basetool_tracing_enabled=1) and Tempo has stored no span for an hour — or has never stored one. The OTLP path from the apps/Keycloak through Alloy to Tempo is dead. Check AlloyOtlpReceiverSilent first: if that is firing too, the spans never reached Alloy and the usual cause on a Podman host is that the app containers cannot resolve `alloy` (it is a HOST service there and needs AddHost=alloy:host-gateway). If it is NOT firing, Alloy is accepting spans and failing to forward them to Tempo — check its otelcol exporter endpoint."

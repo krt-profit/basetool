@@ -804,11 +804,35 @@ Tracing on the OTel SDK) behind a hard master gate:
   which is not enabled — only `service-graphs` is). Trace data itself is queried by the TraceQL search
   tables (`{ duration > 1s }`, `{ status = error }`) **directly against the Tempo datasource**. Tempo
   pipeline health is alerted in `meta.yml`:
-  `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent`
-  (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
-  when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
+  `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent` and
+  `AlloyOtlpReceiverSilent` (both: rate 0 for 1h **or the counter absent**, gated on
+  `max(basetool_tracing_enabled) == 1`) and `TempoWritePathFailing` (live-store completion/flush
+  failures) —
   metric names verified against a live Tempo 3.0.2 scrape, since the app's own throttled
-  export-failure log (<= 1/min, see REQ-OBS-013) is not a usable outage detector. An ungraceful container stop is a distinct trigger of this write-path failure
+  export-failure log (<= 1/min, see REQ-OBS-013) is not a usable outage detector.
+
+  > [!important] The two silence rules are gated on a metric, not on a proxy — corrected 2026-09-20
+  > `TempoReceiverSilent` used to require `sum(tempo_receiver_accepted_spans) > 0`, reading a
+  > non-zero counter as "tracing is switched on" so the rule could not false-alarm on a host that
+  > never meant to trace. That proxy is equally true of a pipeline that has **never worked**, and it
+  > made the rule structurally incapable of firing on one — while being the only rule watching the
+  > trace path at all. Measured on the Podman testing host: the app containers could not resolve
+  > `alloy`, every span was dropped inside each app's own OTLP exporter (which logs nothing), and
+  > both span counters were **absent** rather than zero. Production runs
+  > `MONITORING_TRACING_ENABLED=true`, so it would have shipped in that state.
+  >
+  > The gate is now `basetool_tracing_enabled`, published by each app module from
+  > `management.opentelemetry.enabled` — the flag Boot's OTel auto-configuration actually honours.
+  > It reports **0 rather than disappearing** when tracing is off, which is the one way it differs
+  > from `basetool_scheduled_job_enabled`: absence then means "this module is not being scraped",
+  > and a rule that has to read "tracing is on" positively needs that difference.
+  >
+  > There are two rules because the two ends fail differently and the split is the triage:
+  > `AlloyOtlpReceiverSilent` firing means the spans never reached the collector (the app-side
+  > name-resolution failure); `TempoReceiverSilent` alone means the collector has them and the
+  > forward to the trace store is broken.
+
+  An ungraceful container stop is a distinct trigger of this write-path failure
   mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
   `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
   `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment

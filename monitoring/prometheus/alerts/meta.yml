@@ -213,17 +213,51 @@ groups:
           summary: "Tempo refused spans"
           description: "Tempo's OTLP receiver could not push spans into the pipeline in the last 15 minutes (backpressure or an overloaded live-store) — traces are being dropped at ingest. Check the Tempo log and its memory limit."
 
-      # Silent-pipeline detector, robust to tracing being DISABLED: the accepted-spans counter stays 0
-      # (so `sum(...) > 0` is false) when MONITORING_TRACING_ENABLED is off, so this only fires when
-      # tracing WAS working (counter > 0 since Tempo start) but stopped for an hour.
+      # Silent-pipeline detector. The gate is `basetool_tracing_enabled == 1`, published by each app
+      # module from `management.opentelemetry.enabled` (REQ-OBS-019) -- and that is a correction.
+      #
+      # This rule used to gate on `sum(tempo_receiver_accepted_spans) > 0` as a PROXY for "tracing is
+      # switched on", reasoning that the counter stays 0 while it is off. The proxy is true for a
+      # pipeline that is off and equally true for one that has NEVER WORKED, and those need opposite
+      # responses. Measured on the Podman host on 2026-09-20: the app containers could not resolve
+      # `alloy` (a host service there, so the container-network name answered to nothing), every span
+      # was dropped in each app's own exporter, and BOTH span counters were absent rather than zero.
+      # This rule was structurally incapable of firing, and it was the only one watching.
+      #
+      # `or absent(...)` is what covers the never-worked case: the counter is created on the first
+      # span, so on a pipeline that has never carried one there is no series to take a rate of.
       - alert: TempoReceiverSilent
-        expr: sum(rate(tempo_receiver_accepted_spans[1h])) == 0 and sum(tempo_receiver_accepted_spans) > 0
+        expr: >-
+          max(basetool_tracing_enabled) == 1
+          and (
+            sum(rate(tempo_receiver_accepted_spans[1h])) == 0
+            or absent(tempo_receiver_accepted_spans)
+          )
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "Tempo received no spans in 1h while tracing is enabled"
-          description: "Tempo accepted spans before but none in the last hour, while the accepted-spans counter is non-zero (tracing is enabled) — the OTLP export path from the apps/Keycloak or Alloy's OTLP forward is dead. Traces are not being stored."
+          description: "The apps report tracing ON (basetool_tracing_enabled=1) and Tempo has stored no span for an hour — or has never stored one. The OTLP path from the apps/Keycloak through Alloy to Tempo is dead. Check AlloyOtlpReceiverSilent first: if that is firing too, the spans never reached Alloy and the usual cause on a Podman host is that the app containers cannot resolve `alloy` (it is a HOST service there and needs AddHost=alloy:host-gateway). If it is NOT firing, Alloy is accepting spans and failing to forward them to Tempo — check its otelcol exporter endpoint."
+
+      # The collector end of the same path, and the one that names the fault. Alloy's OTLP receiver
+      # counts what the apps actually managed to send it; Tempo's counts what survived the forward.
+      # Split like this, one glance says which half is broken -- and the half that broke on the
+      # migration is this one, where the failure is entirely invisible from the app side: an OTLP
+      # exporter that cannot resolve its endpoint drops spans without logging anything.
+      - alert: AlloyOtlpReceiverSilent
+        expr: >-
+          max(basetool_tracing_enabled) == 1
+          and (
+            sum(rate(otelcol_receiver_accepted_spans_total[1h])) == 0
+            or absent(otelcol_receiver_accepted_spans_total)
+          )
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy's OTLP receiver accepted no spans in 1h while tracing is enabled"
+          description: "The apps report tracing ON (basetool_tracing_enabled=1) and no span has reached Alloy's OTLP receiver for an hour — or ever. The spans are being dropped in each app's own exporter, which logs nothing about it. Check that the app containers can resolve the collector's name (`alloy:4318` for the three JVM apps, `alloy:4317` for Keycloak) and that its receiver is listening."
 
       # 3.x write-path health (replaces the removed 2.x ingester metrics): live-store blocks failing to
       # complete or flush locally means accepted traces are lost before they reach a backend block.

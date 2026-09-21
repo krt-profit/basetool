@@ -93,6 +93,12 @@
   SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
   und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
 
+- **Betrieb: ein toter Trace-Pfad fällt jetzt auf.** Die einzige Regel, die ihn beobachtete,
+  benutzte „es kamen schon einmal Spans an" als Ersatz für „Tracing ist eingeschaltet" — und konnte
+  deshalb einen Pfad, der noch nie funktioniert hat, gar nicht melden. Die Anwendungen melden ihren
+  Tracing-Zustand jetzt selbst, und zwei Regeln unterscheiden, ob die Spans schon den Kollektor nicht
+  erreichen oder erst danach verloren gehen (REQ-OBS-019).
+
 - **Betrieb: auf der neuen Maschine wären sämtliche Traces verschwunden.** Die Anwendungen senden ihre
   Spans an den Namen `alloy`, den auf einem Podman-Host nichts mehr auflöst; verworfen wurde im
   Exporter der Anwendung, wo keine Warnung hinsieht. Die Container bekommen den Namen jetzt zugeteilt
