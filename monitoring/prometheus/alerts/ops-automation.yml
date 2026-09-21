@@ -1,5 +1,5 @@
 # Ops-automation alerts driven by node_exporter textfile metrics written by deploy.sh, backup.sh,
-# restore-drill.sh and docker-cleanup.sh (ADR-0072). The textfiles carry richer per-outcome detail
+# restore-drill.sh and container-cleanup.sh (ADR-0072, renamed from docker-cleanup.sh by ADR-0194). The textfiles carry richer per-outcome detail
 # (per-outcome timestamps, durations, reclaimed bytes, per-artifact restore results) than the
 # systemd collector's unit-level success, and let alerts distinguish "failed" / "stale" / "never
 # ran" via absent()-guards. Textfile names are defined by the scripts.
@@ -132,11 +132,29 @@ groups:
           summary: "GHCR pull token expiring <14d"
           description: "The production GHCR pull token's recorded expiry is under 14 days away — rotate it and update its .expiry file (docs/deployment.md → Token rotation). A lapsed token silently stops all deploys. If the expiry itself looks wrong, deploy.sh logs an unparseable sidecar as a WARN: `{app=\"ops-deploy\"} |~ \"expiry\"` in Grafana -> Explore -> Loki."
 
-      - alert: DockerCleanupStaleOrMissing
-        expr: (time() - basetool_docker_cleanup_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_docker_cleanup_last_success_timestamp)
+      # Renamed from DockerCleanupStaleOrMissing / basetool_docker_cleanup_* with ADR-0194. The job
+      # is runtime-agnostic now: scripts/container-cleanup.sh goes through lib/container-runtime.sh
+      # instead of calling `docker` directly, because the rootless Podman host has no docker binary
+      # at all — the weekly run failed at its first command while the timer stayed enabled, and this
+      # alert fired on `absent()` with no way to satisfy it.
+      #
+      # BOTH metric names are accepted, and that is not belt-and-braces. **The alert rules ride the
+      # CONFIG BUNDLE; the scripts are installed by the ANSIBLE ROLE.** The two halves of this
+      # rename therefore reach a host independently and in either order. Accepting only the new name
+      # would false-fire on every host that has the new bundle and the old script; accepting only
+      # the old one would go silent on the reverse. `container_cleanup_rename_test.yml` locks all
+      # four combinations.
+      #
+      # Drop the `basetool_docker_cleanup_*` half once every host has run the role — after that it
+      # is dead weight, not a safety net, and a rule that accepts a name nothing writes is how a
+      # rename quietly never finishes.
+      - alert: ContainerCleanupStaleOrMissing
+        expr: |
+          (time() - max(basetool_container_cleanup_last_success_timestamp or basetool_docker_cleanup_last_success_timestamp)) > 8 * 24 * 3600
+            or (absent(basetool_container_cleanup_last_success_timestamp) and absent(basetool_docker_cleanup_last_success_timestamp))
         for: 1h
         labels:
           severity: warning
         annotations:
-          summary: "docker-cleanup stale >8d or metric absent"
-          description: "The weekly docker-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-docker-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-docker-cleanup.service` (stdout/stderr are appended to /var/log/iri-docker-cleanup.log)."
+          summary: "container-cleanup stale >8d or metric absent"
+          description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-container-cleanup.service` (stdout/stderr are appended to /var/log/iri-container-cleanup.log). On Podman the volume step is skipped on purpose (ADR-0194), so a smaller reclaimed figure there is correct rather than a partial run."

@@ -21,11 +21,28 @@
 
 set -euo pipefail
 
+# The container-runtime seam (ADR-0163, Phase 3): both shapes are live at once.
+IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/container-runtime.sh
+# shellcheck disable=SC1091
+# repo-lint.yml runs shellcheck without -x, so it cannot follow a sourced file.
+. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+
 STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
 BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-DRILL_IMAGE="${IRI_DRILL_IMAGE:-postgres:18-alpine}"
+# FULLY QUALIFIED, and it has to be. Docker resolves a short name against Docker Hub silently;
+# podman on Rocky enforces short-name resolution and refuses without a TTY:
+#
+#     Error: short-name resolution enforced but cannot prompt without a TTY
+#
+# Measured on the testing host 2026-09-20. Every helper read failed that way -- the edge certificate
+# volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
+# the backup went on to report success over a snapshot that was missing all of them. Precisely the
+# class the certificate-capture work was about, arriving through the registry instead.
+DRILL_IMAGE="${IRI_DRILL_IMAGE:-docker.io/library/postgres:18-alpine}"
 CONTAINER="iri-restore-drill"
 READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
 MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
@@ -42,6 +59,11 @@ OK_DB_BACKEND=0
 OK_DB_KEYCLOAK=0
 OK_GRAFANA_SQLITE=0
 OK_MONITORING_SECRETS=0
+# The non-database restore surface. A host whose databases restore perfectly still
+# does not come up without these -- see the checks further down.
+OK_EDGE_CERTS=0
+OK_ACME_STATE=0
+OK_REDIS_ACL=0
 
 KEEP=false
 [[ "${1:-}" == "--keep" ]] && KEEP=true
@@ -80,6 +102,9 @@ write_drill_metrics() {
     echo "basetool_restore_drill_artifact_ok{artifact=\"db_keycloak\"} ${OK_DB_KEYCLOAK}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"grafana_sqlite\"} ${OK_GRAFANA_SQLITE}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"monitoring_secrets\"} ${OK_MONITORING_SECRETS}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"edge_certs\"} ${OK_EDGE_CERTS}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"acme_state\"} ${OK_ACME_STATE}"
+    echo "basetool_restore_drill_artifact_ok{artifact=\"redis_acl\"} ${OK_REDIS_ACL}"
   } > "${tmp}" 2>/dev/null; then
     mv -f "${tmp}" "${TEXTFILE_DIR}/restore_drill.prom" 2>/dev/null || true
   else
@@ -90,9 +115,10 @@ write_drill_metrics() {
 
 # --- Pre-flight -------------------------------------------------------------
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV}"
-command -v docker >/dev/null 2>&1 || fail "docker not found"
-command -v restic >/dev/null 2>&1 || fail "restic not found"
-command -v rclone >/dev/null 2>&1 || fail "rclone not found"
+rt_detect
+log "container runtime: ${RT_BACKEND}"
+command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
+command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
 
 export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
@@ -112,7 +138,7 @@ chmod 700 "${WORK}"
 # shellcheck disable=SC2317  # cleanup runs indirectly via the EXIT trap set below
 cleanup() {
   local rc=$?
-  docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
+  rt_rm_force "${CONTAINER}"
   # Always emit the outcome metric — on success AND on any failure path — so absent() means "never
   # ran", not "failed once".
   write_drill_metrics
@@ -130,8 +156,41 @@ log "restoring latest snapshot dumps from ${RESTIC_REPOSITORY}"
 restic restore latest --tag basetool \
   --include '*/krt_basetool.dump' --include '*/keycloak.dump' \
   --include '*/monitoring/grafana.db' --include '*/monitoring/secrets.tar.gz' \
+  --include '*/edge-certs.tar.gz' --include '*/edge-acme-state.tar.gz' \
+  --include '*/config/users.acl' \
   --target "${WORK}" \
   || fail "restic restore failed"
+
+# --- The artifacts a restore needs and no query can miss --------------------
+#
+# The drill used to restore two dumps into a throwaway Postgres and call that
+# recoverability. It is not the whole claim: a host whose databases restore
+# perfectly still does not come up if the certificates are gone (re-issuing runs
+# into Let's Encrypt's five-duplicates-per-week limit for this SAN set) or if the
+# redis ACL is gone (redis refuses to start without the file its --aclfile names,
+# ADR-0088, and a hand-written replacement missing a `default` line leaves it
+# wide open).
+#
+# Neither was in the backup until 2026-09-18, and the drill was green throughout,
+# because it never looked. It looks now — presence only, never content, so
+# nothing here can print a key.
+check_artifact() { # <glob> <flag-variable> <what it is> <what its absence costs>
+  local found
+  found="$(find "${WORK}" -name "$1" -size +0c -print -quit 2>/dev/null)"
+  if [[ -n "${found}" ]]; then
+    printf -v "$2" '%s' 1
+    log "  present: $3"
+  else
+    log "  MISSING: $3 — $4"
+  fi
+}
+log "checking the non-database restore surface (REQ-OPS-010)"
+check_artifact 'edge-certs.tar.gz' OK_EDGE_CERTS 'the edge TLS material' \
+  'a restored host cannot serve HTTPS, and re-issuing hits the Let'"'"'s Encrypt duplicate limit'
+check_artifact 'edge-acme-state.tar.gz' OK_ACME_STATE 'the ACME account state' \
+  'renewal starts from a new account and the issuance history is lost'
+check_artifact 'users.acl' OK_REDIS_ACL 'the redis ACL' \
+  'redis refuses to start, and a hand-written replacement can leave it open'
 
 BACKEND_DUMP="$(find "${WORK}" -name krt_basetool.dump -print -quit)"
 KEYCLOAK_DUMP="$(find "${WORK}" -name keycloak.dump -print -quit)"
@@ -140,30 +199,29 @@ KEYCLOAK_DUMP="$(find "${WORK}" -name keycloak.dump -print -quit)"
 log "restored: $(du -h "${BACKEND_DUMP}" | cut -f1) backend, $(du -h "${KEYCLOAK_DUMP}" | cut -f1) keycloak"
 
 # --- Spin a throwaway Postgres + restore into it ----------------------------
-docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
+rt_rm_force "${CONTAINER}"
 log "starting throwaway Postgres (${DRILL_IMAGE})"
-docker run -d --name "${CONTAINER}" \
-  -e POSTGRES_USER=drill -e POSTGRES_PASSWORD=drill -e POSTGRES_DB=postgres \
-  "${DRILL_IMAGE}" >/dev/null
+rt_run_detached "${CONTAINER}" "${DRILL_IMAGE}" \
+  -e POSTGRES_USER=drill -e POSTGRES_PASSWORD=drill -e POSTGRES_DB=postgres
 
 log "waiting for it to become ready (timeout ${READY_TIMEOUT}s)"
 deadline=$(( $(date +%s) + READY_TIMEOUT ))
-until docker exec "${CONTAINER}" pg_isready -U drill -d postgres >/dev/null 2>&1; do
+until rt_exec "${CONTAINER}" pg_isready -U drill -d postgres >/dev/null 2>&1; do
   (( $(date +%s) < deadline )) || fail "throwaway Postgres did not become ready"
   sleep 2
 done
 
-dexec() { docker exec -i "${CONTAINER}" "$@"; }
+dexec() { rt_exec "${CONTAINER}" "$@"; }
 
 log "restoring backend dump → krt_basetool"
 dexec createdb -U drill krt_basetool
-docker cp "${BACKEND_DUMP}" "${CONTAINER}:/tmp/krt_basetool.dump"
+rt_cp_to "${BACKEND_DUMP}" "${CONTAINER}" /tmp/krt_basetool.dump
 dexec pg_restore -U drill -d krt_basetool --no-owner --no-privileges /tmp/krt_basetool.dump \
   || log "WARN: pg_restore (backend) reported non-fatal errors — verifying anyway"
 
 log "restoring keycloak dump → keycloak"
 dexec createdb -U drill keycloak
-docker cp "${KEYCLOAK_DUMP}" "${CONTAINER}:/tmp/keycloak.dump"
+rt_cp_to "${KEYCLOAK_DUMP}" "${CONTAINER}" /tmp/keycloak.dump
 dexec pg_restore -U drill -d keycloak --no-owner --no-privileges /tmp/keycloak.dump \
   || log "WARN: pg_restore (keycloak) reported non-fatal errors — verifying anyway"
 

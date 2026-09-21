@@ -163,6 +163,60 @@ reports **zero** remaining derivable cases: what the analyser can prove, the bra
   on a field it now also generates a runtime null-check. It is left as follow-up rather than
   guessed at in bulk.
 
+## Amendment 1 (2026-09-21) — the sweep covers every source set, and what it leaves is classified
+
+**Status:** accepted · **Directed by:** @greluc (explicit, in-chat)
+
+Point 4 above swept **`main`**. Point 1 had just made both toolkits available in `test` and `e2e`
+as well, so the sweep and the wiring ended one step apart, and the ADR's sentence *"`main` contains
+no hand-rolled logger and no trivial accessor"* said nothing about the 951 test sources. Three files
+added to `main` after the sweep — the `TracingEnabledMetric` in `backend`, `frontend` and `ingest`
+— then put six accessors back, which is the more useful half of this note: a one-off sweep is
+true on the day it runs.
+
+**Eight** accessors are now expressed by lombok: `@Getter` + `@Setter(AccessLevel.PACKAGE)` on the
+three metric beans' `tracingEnabled` field, and `@Getter`/`@Setter` on `RedisSessionConfigTest`'s
+one-property `SampleForm`.
+
+> [!warning] It was twelve for about an hour, and CodeQL was right to object
+> The first version of this amendment also converted the four `WebSocketSession` members of
+> `LiveSyncWebSocketHandlerTest`'s `FakeSession`. CodeQL flagged **all four**: the generated
+> `getId()`, `getUri()`, `getAttributes()` and `getPrincipal()` implement an interface and carry no
+> `@Override`, which lombok cannot emit.
+>
+> They were reverted to hand-written methods. **The standard this ADR actually applies was never
+> "lombok can express it" on its own** — it is *"and the result is not worse"*, which is why
+> `@ToString` on the `Material*` entities and `@AllArgsConstructor` on `UserApprovalEvent` are
+> refused under *Alternatives considered*. Sixteen lines saved in a private test double, against a
+> static-analysis finding that returns on every scan, is that same trade and it goes the same way.
+> A finding that recurs forever teaches its reader to ignore the tool — the same disease as an
+> alert that can never be satisfied.
+
+**What remains is not boilerplate, and it is now counted rather than asserted.** Every one-line
+field accessor in the repository, across all source sets, classified by two independent scans — one
+matching method headers, one starting from the bodies and reassembling headers that wrap, so a
+long return type cannot hide a case:
+
+| remaining | count | why lombok cannot express it |
+| --- | --- | --- |
+| fluent getters (`status()`) | 74 | `lombok.config` sets no `accessors.fluent`; lombok generates `getX`/`isX` only |
+| record components | 33 | lombok cannot annotate a record component |
+| accessors in anonymous classes | 12 | they return an enclosing local, not a field |
+| fluent setters | 4 | same as the getters |
+| interface implementations kept by hand | 4 | lombok **can** generate these — they are the `FakeSession` four above, kept hand-written so they can carry `@Override` |
+
+Only those last four are cases lombok could express, and they are a recorded decision rather than
+an oversight. Everything else the two scans find — 123 accessors — lombok cannot write at all.
+
+**`lombok.accessors.fluent = true` was reconsidered here and rejected again**, now with the numbers.
+It would let the 78 fluent accessors be generated — and, because `lombok.config` is deliberately one
+shared file at the repository root, it would simultaneously rewrite every accessor lombok already
+generates across the 146 files carrying `@Getter`/`@Setter`/`@Data`, turning `getName()` into
+`name()`. 2,944 Thymeleaf property expressions resolve through JavaBeans naming, as do Spring's form
+binding, Jackson and the property paths in validation messages. The per-class `@Accessors(fluent =
+true)` escape is `lombok.experimental`, which is the exact ground on which this ADR already rejected
+`@UtilityClass`.
+
 ## Alternatives considered
 
 - **`lombok.copyableAnnotations += org.jetbrains.annotations.NotNull`** — rejected as a no-op:

@@ -465,6 +465,10 @@ services:
     # (removed), no `prometheus.operator.servicemonitors` (its file-access default flipped) and no
     # memory-limiter processor (its metrics were renamed), and `alloy validate` passes on 1.19.2. Re-run
     # that check on the next minor rather than assuming this one still holds.
+    # READ ITS OUTPUT, NOT ITS EXIT CODE: `alloy validate` exits 0 even when validation fails
+    # (measured on 1.19.2, 2026-09-20 -- a config naming a component that does not exist prints
+    # "Error: validation failed" on stderr and still returns 0). Anything that gates on `$?` here is
+    # a check that cannot fail. Gate on the output being empty instead.
     # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
     # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
     # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
@@ -533,7 +537,6 @@ services:
       - /var/iri/frontend/log:/logs/frontend:ro
       - /var/iri/ingest/log:/logs/ingest:ro
       - /var/iri/keycloak/log:/logs/keycloak:ro
-      - /var/iri/npm/data/logs:/logs/npm:ro
       - /var/log:/hostlog:ro
     deploy:
       resources:

@@ -1,0 +1,103 @@
+# promtool unit test for ContainerCleanupStaleOrMissing across its own rename (ADR-0194).
+#
+# WHY THIS TEST EXISTS
+# --------------------
+# The weekly cleanup job was renamed from docker-cleanup to container-cleanup, and its metric with
+# it. The rename crosses a delivery boundary that makes it non-atomic: **the alert rules ride the
+# config bundle, the scripts are installed by the Ansible role.** A host can therefore hold the new
+# bundle with the old script, or the old bundle with the new script, for as long as it takes the
+# other half to land — in either order.
+#
+# That is exactly the shape of failure this alert exists to catch and is the easiest one to
+# reintroduce while fixing it: an expression that names only one metric is silently wrong for half
+# the transition. All four combinations are locked here.
+#
+# The absent() half matters more than it looks. It is what turned the original defect into an alert
+# nobody could satisfy: on the Podman host the script could not run at all, so the metric was never
+# written, so the rule fired forever — in the same group as the backup and restore-drill staleness
+# alerts, teaching its reader that the group is noise.
+#
+# Run it the way the other tests in this directory are run — see monitoring/README.md.
+
+rule_files:
+  - ../alerts/ops-automation.yml
+
+evaluation_interval: 1m
+
+tests:
+  # --- the transition, both ways --------------------------------------------------------------
+  - name: silent - only the OLD metric exists and is fresh (new bundle, old script)
+    interval: 1m
+    input_series:
+      - series: 'basetool_docker_cleanup_last_success_timestamp'
+        values: "0+60x180"          # tracks time(): always "just succeeded"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ContainerCleanupStaleOrMissing
+        exp_alerts: []
+
+  - name: silent - only the NEW metric exists and is fresh (role has run)
+    interval: 1m
+    input_series:
+      - series: 'basetool_container_cleanup_last_success_timestamp'
+        values: "0+60x180"
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ContainerCleanupStaleOrMissing
+        exp_alerts: []
+
+  # --- the two states that must alert -----------------------------------------------------------
+  - name: fires - neither metric exists at all
+    interval: 1m
+    input_series:
+      - series: 'basetool_deploy_last_success_timestamp'
+        values: "0+60x180"          # an unrelated series, so the group still evaluates
+    alert_rule_test:
+      - eval_time: 3h
+        alertname: ContainerCleanupStaleOrMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "container-cleanup stale >8d or metric absent"
+              description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-container-cleanup.service` (stdout/stderr are appended to /var/log/iri-container-cleanup.log). On Podman the volume step is skipped on purpose (ADR-0194), so a smaller reclaimed figure there is correct rather than a partial run."
+
+  - name: fires - the newest of the two is older than eight days
+    # 30-minute steps, 500 of them: 10.4 days of series, so both are still PRESENT at the 9-day
+    # evaluation. At 1-minute steps the series would have gone stale after 20 hours and the
+    # absent() branch would have produced the same verdict for an entirely different reason --
+    # which is what the first draft of this test did.
+    interval: 30m
+    input_series:
+      # Both held flat at t=0 while time() advances past the 8-day threshold. The older one must not
+      # be able to drag the verdict either way: max() takes the freshest, and the freshest is stale.
+      - series: 'basetool_container_cleanup_last_success_timestamp'
+        values: "0+0x500"
+      - series: 'basetool_docker_cleanup_last_success_timestamp'
+        values: "0+0x500"
+    alert_rule_test:
+      - eval_time: 9d
+        alertname: ContainerCleanupStaleOrMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "container-cleanup stale >8d or metric absent"
+              description: "The weekly container-cleanup last succeeded more than 8 days ago, or its metric is absent — an early disk-fill indicator. `{app=\"ops-cleanup\"}` in Grafana -> Explore -> Loki over the last 10d shows the last run and what it reclaimed; an empty stream means the timer never fired (`systemctl list-timers iri-container-cleanup.timer`) or the optional job was never installed on this host. Not visible via `journalctl -u iri-container-cleanup.service` (stdout/stderr are appended to /var/log/iri-container-cleanup.log). On Podman the volume step is skipped on purpose (ADR-0194), so a smaller reclaimed figure there is correct rather than a partial run."
+
+  # --- the case max() exists for --------------------------------------------------------------
+  # The old metric is frozen at t=0 (the script stopped writing it when the role landed) while the
+  # new one is fresh. A rule that summed, or that preferred the old name, would alert here — and it
+  # would be alerting about a job that is running perfectly.
+  - name: silent - the OLD metric is stale but the NEW one is fresh
+    interval: 30m
+    input_series:
+      - series: 'basetool_docker_cleanup_last_success_timestamp'
+        values: "0+0x500"
+      # tracks time(): one step is 30m = 1800s, so the value always equals the evaluation time
+      - series: 'basetool_container_cleanup_last_success_timestamp'
+        values: "0+1800x500"
+    alert_rule_test:
+      - eval_time: 9d
+        alertname: ContainerCleanupStaleOrMissing
+        exp_alerts: []

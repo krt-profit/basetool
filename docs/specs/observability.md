@@ -564,7 +564,7 @@ rule — no blanket "everything is masked" claim:
   masking. These carry the `level` label.
 - **backend / frontend / ingest container stdout/stderr** (`app="backend-stdout"` /
   `"frontend-stdout"` / `"ingest-stdout"`; ADR-0095) — the raw container console, shipped via
-  `loki.source.docker` **in addition to** the JSON file above and kept under a **distinct** `app`
+  the container-stdout source **in addition to** the JSON file above and kept under a **distinct** `app`
   label so a mixed masked-JSON / raw-stdout label never muddies the JSON stream's
   `{app="backend",level="error"}` queries. Motive: JVM/glibc native errors (`pthread_create failed` /
   `unable to create native thread`, the `hs_err` preamble) print to the container's stderr **outside
@@ -639,7 +639,7 @@ not silent — so the only detector was a human reading a log export.
   amendment) records it.
 - **Ops-automation host logs** (`app="ops-deploy"` / `"ops-backup"` / `"ops-cleanup"` /
   `"ops-restore-drill"`) — the four systemd units' own log files under the existing
-  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-docker-cleanup.log`,
+  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-container-cleanup.log`,
   `iri-restore-drill.log`). Motive: the units write with `StandardOutput=append:`, which **replaces**
   journald rather than teeing to it, so `journalctl -u iri-deploy.service` carries only systemd's own
   unit records — the script output that explains *why* a deploy rolled back was reachable over SSH
@@ -695,7 +695,7 @@ not silent — so the only detector was a human reading a log export.
   `<svc>-stdout`, `mon-<service>`, `npm`, `postgres-*` streams above) flows through
   `loki.process.container_mask`, whose first stage drops any entry older than **167h**
   (`stage.drop older_than`, a 1 h guard below Loki's `reject_old_samples_max_age` of 168h). A near-idle
-  container keeps its last stdout line at the tail, and `loki.source.docker` re-delivers that same line
+  container keeps its last stdout line at the tail, and `loki.source.docker` re-delivered that same line
   on every tailer reconnect (`could not transfer logs: unexpected EOF`); while it is younger than the
   reject window Loki silently dedupes the repeat, but once it ages past 168h every re-delivery is
   400-rejected (`entry has timestamp too old`) and counted as a dropped entry, firing `LokiWriteFailing`
@@ -729,18 +729,53 @@ not silent — so the only detector was a human reading a log export.
   that actually creates those networks. Rationale and residual risk live in ADR-0072.
 - The private key of the shared `keystore.p12` never leaves the four existing services;
   Grafana gets its own self-signed certificate.
-- **Internal-cert expiry is monitored.** The self-signed internal certs — the basetool-CA-signed
-  `keystore.p12` on the app modules and Grafana's own cert — are probed from inside the monitoring
-  plane by the blackbox `https_internal` / `https_internal_insecure` modules (the CA is mounted into
-  the blackbox exporter; Grafana uses the `insecure_skip_verify` variant since its cert is not
-  CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted). Their expiry gauge feeds the
-  unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry — which would otherwise break
-  all three app scrapes, the frontend→backend WebClient and the NPM→Grafana re-encryption at once —
-  is caught ~14 days ahead instead of only by a same-day `TargetDown`. These probe jobs stay outside
-  `BlackboxProbeFailed`'s liveness include-list (a down app is already paged by `TargetDown`), so they
-  add no double-paging. Enforced by `monitoring/blackbox/blackbox.yml`,
-  `monitoring/prometheus/prometheus.yml` (`blackbox-internal-tls*` jobs) and the blackbox CA mount in
-  `docker-compose.monitoring.yml`.
+- **Internal-cert expiry is monitored — what is served, by probe; what is not, by file.** Together
+  these two mechanisms cover **every** certificate in the deployment, and the split between them is
+  the point: a probe can only see a certificate something is *serving*.
+
+  **What is served.** The self-signed internal certs — the basetool-CA-signed `keystore.p12` on the
+  app modules, Keycloak's `https://keycloak:18443` listener, and Grafana's own cert — are probed
+  from inside the monitoring plane by the blackbox `https_internal` / `https_internal_insecure`
+  modules (the CA is mounted into the blackbox exporter; Grafana uses the `insecure_skip_verify`
+  variant since its cert is not CA-signed, and `probe_ssl_earliest_cert_expiry` is still emitted).
+  Their expiry gauge feeds the unfiltered `CertificateExpiringSoon` alert so an internal-cert expiry
+  — which would otherwise break all three app scrapes, the frontend→backend WebClient and the
+  NPM→Grafana re-encryption at once — is caught ~14 days ahead instead of only by a same-day
+  `TargetDown`. These probe jobs stay outside `BlackboxProbeFailed`'s liveness include-list (a down
+  app is already paged by `TargetDown`), so they add no double-paging. Enforced by
+  `monitoring/blackbox/blackbox.yml`, `monitoring/prometheus/prometheus.yml`
+  (`blackbox-internal-tls*` jobs) and the blackbox CA mount in `docker-compose.monitoring.yml`.
+
+  **What is not served** — added 2026-09-20, and this paragraph **corrects** the sentence above it,
+  which read as full coverage and was not. The internal CA itself,
+  `/var/iri/monitoring/certs/basetool-ca.crt`, is the trust anchor for every verified upstream at
+  the edge **and** for the `https_internal` probe module. Nothing listens on it, so nothing probed
+  it, so nothing watched it — measured on the testing host 2026-09-20, it was the only certificate
+  in the monitoring plane with no coverage of any kind. The day it expires, every verified upstream
+  fails at once *and* the probes that would otherwise have warned about the leaves fail with it: the
+  most expensive expiry in the deployment was the one nothing could warn about. A file that is
+  present for a service that is currently down has the same shape.
+
+  The gap is closed from the host, not by another probe. `scripts/cert-expiry-metrics.py` runs under
+  `iri-cert-expiry.timer` (daily, `OnBootSec=5min`, `Persistent=true`) and writes
+  `basetool_certificate_expiry_timestamp_seconds{path,subject,issuer,self_signed}`,
+  `basetool_certificate_not_before_timestamp_seconds`, `basetool_certificate_files` and
+  `basetool_certificate_metrics_timestamp_seconds` into node_exporter's textfile directory. It reads
+  **public certificate files only** — never a `*.key`, and never the PKCS#12 keystore, which would
+  need a password the collector must not hold and whose leaf four services serve anyway.
+  Cardinality is the contents of one operator-provisioned directory, per REQ-OBS-006/-011.
+
+  Three alerts read it, in `alerts/infrastructure.yml` and pinned by
+  `tests/certificate_file_expiry_test.yml`:
+
+  | alert | threshold | why that number |
+  | --- | --- | --- |
+  | `CertificateFileExpiringSoon` | `self_signed="false"`, <14 days | matches the probe-based rule: replacing a CA-issued leaf is a file and a restart. |
+  | `SelfSignedCertificateExpiring` | `self_signed="true"`, <90 days | replacing a root means re-issuing everything it signed **and** rolling the anchor through the edge and the probe module together. That is staged work, not a fortnight's. |
+  | `CertificateMetricsStale` | >36h, **or** absent while node_exporter has been up 36h | a stopped collector leaves an expiry value that is still there, still in the future and increasingly a lie; a collector that was never installed emits nothing at all, and `time() - <nothing>` is not an alert. |
+
+  Delivered by `ansible/roles/basetool_host/tasks/27-observability.yml`, which also takes the first
+  reading immediately rather than leaving it to the next 03:40.
 
 ### REQ-OBS-009 — Distributed tracing (OTLP via the monitoring plane only)
 
@@ -809,11 +844,35 @@ Tracing on the OTel SDK) behind a hard master gate:
   which is not enabled — only `service-graphs` is). Trace data itself is queried by the TraceQL search
   tables (`{ duration > 1s }`, `{ status = error }`) **directly against the Tempo datasource**. Tempo
   pipeline health is alerted in `meta.yml`:
-  `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent`
-  (`tempo_receiver_accepted_spans` rate 0 for 1h while the counter is non-zero, so it stays quiet
-  when tracing is disabled) and `TempoWritePathFailing` (live-store completion/flush failures) —
+  `TempoSpansRefused` (`tempo_receiver_refused_spans`), `TempoReceiverSilent` and
+  `AlloyOtlpReceiverSilent` (both: rate 0 for 1h **or the counter absent**, gated on
+  `max(basetool_tracing_enabled) == 1`) and `TempoWritePathFailing` (live-store completion/flush
+  failures) —
   metric names verified against a live Tempo 3.0.2 scrape, since the app's own throttled
-  export-failure log (<= 1/min, see REQ-OBS-013) is not a usable outage detector. An ungraceful container stop is a distinct trigger of this write-path failure
+  export-failure log (<= 1/min, see REQ-OBS-013) is not a usable outage detector.
+
+  > [!important] The two silence rules are gated on a metric, not on a proxy — corrected 2026-09-20
+  > `TempoReceiverSilent` used to require `sum(tempo_receiver_accepted_spans) > 0`, reading a
+  > non-zero counter as "tracing is switched on" so the rule could not false-alarm on a host that
+  > never meant to trace. That proxy is equally true of a pipeline that has **never worked**, and it
+  > made the rule structurally incapable of firing on one — while being the only rule watching the
+  > trace path at all. Measured on the Podman testing host: the app containers could not resolve
+  > `alloy`, every span was dropped inside each app's own OTLP exporter (which logs nothing), and
+  > both span counters were **absent** rather than zero. Production runs
+  > `MONITORING_TRACING_ENABLED=true`, so it would have shipped in that state.
+  >
+  > The gate is now `basetool_tracing_enabled`, published by each app module from
+  > `management.opentelemetry.enabled` — the flag Boot's OTel auto-configuration actually honours.
+  > It reports **0 rather than disappearing** when tracing is off, which is the one way it differs
+  > from `basetool_scheduled_job_enabled`: absence then means "this module is not being scraped",
+  > and a rule that has to read "tracing is on" positively needs that difference.
+  >
+  > There are two rules because the two ends fail differently and the split is the triage:
+  > `AlloyOtlpReceiverSilent` firing means the spans never reached the collector (the app-side
+  > name-resolution failure); `TempoReceiverSilent` alone means the collector has them and the
+  > forward to the trace store is broken.
+
+  An ungraceful container stop is a distinct trigger of this write-path failure
   mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` so a routine
   `deploy.sh --force-recreate` cannot `SIGKILL` them mid-drain (dskit
   `server.graceful_shutdown_timeout` 30s) and truncate the write-ahead log (ADR-0072 amendment
@@ -834,7 +893,8 @@ abuse detection:
 
 - **NPM edge access logs** — all public proxy hosts, client IPs (edge 4xx/5xx rates, scan/probe
   detection, per-host traffic).
-- **SSH / host-auth logs** — `/var/log/auth.log` (or the journal per distro): failed-auth spikes,
+- **SSH / host-auth logs** — `/hostlog/auth.log`, which is Debian's `/var/log/auth.log` and, on the
+  RHEL family, `/var/log/secure` bound onto that name (REQ-OBS-019): failed-auth spikes,
   invalid users, sudo failures, successful root logins, and a successful password/keyboard-interactive
   login on a key-only host.
 - **Host auditd log** — `/var/log/audit/audit.log`: file-integrity watch events on `sshd_config`(.d)
@@ -888,6 +948,76 @@ single source of truth for names, tag keys and the non-enum label values). The b
 shared `metrics.TaskMetrics` wrapper; queue depth is sampled by the `task.BusinessMetricsCollector`
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
 transaction per pass) rather than per-scrape.
+
+#### The `basetool_*` names no JVM module emits
+
+`basetool_container_*` and `basetool_container_metrics_*` are written by
+[`scripts/cgroup-container-metrics.py`](../../scripts/cgroup-container-metrics.py) into
+node_exporter's textfile directory. They are registered here because the naming rule is
+repository-wide, not module-wide: anything called `basetool_*` obeys REQ-OBS-006, whoever produces
+it. Added 2026-09-18; the collector shipped without them being written down, which made the
+vocabulary look complete while eleven series sat outside it.
+
+They exist because the Podman migration deletes cAdvisor — its rootless-Podman support is closed
+upstream as *not planned* — and `prometheus-podman-exporter` is a **subset** of what cAdvisor
+published (ADR-0163). The collector supplies the remainder by reading the cgroup v2 tree, which
+needs no daemon, no socket and no privilege beyond reading `/sys/fs/cgroup`.
+
+| series | type | source file | replaces |
+|---|---|---|---|
+| `basetool_container_cpu_usage_seconds_total` | counter | `cpu.stat` `usage_usec` | `container_cpu_usage_seconds_total` |
+| `basetool_container_cpu_periods_total` | counter | `cpu.stat` `nr_periods` | `container_cpu_cfs_periods_total` |
+| `basetool_container_cpu_throttled_periods_total` | counter | `cpu.stat` `nr_throttled` | `container_cpu_cfs_throttled_periods_total` |
+| `basetool_container_cpu_throttled_seconds_total` | counter | `cpu.stat` `throttled_usec` | `container_cpu_cfs_throttled_seconds_total` |
+| `basetool_container_oom_kills_total` | counter | `memory.events` `oom_kill` | `container_oom_events_total` |
+| `basetool_container_memory_anon_bytes` | gauge | `memory.stat` `anon` | `container_memory_rss` |
+| `basetool_container_memory_usage_bytes` | gauge | `memory.current` | — |
+| `basetool_container_memory_working_set_bytes` | gauge | `memory.current` − reclaimable | `container_memory_working_set_bytes` |
+| `basetool_container_memory_limit_bytes` | gauge | `memory.max` | `container_spec_memory_limit_bytes` |
+| `basetool_container_pids` | gauge | `pids.current` | `container_threads` |
+| `basetool_container_pids_max` | gauge | `pids.max` | `container_threads_max` |
+| `basetool_container_metrics_containers` | gauge | the collector itself | — |
+| `basetool_container_metrics_timestamp_seconds` | gauge | the collector itself | — |
+
+**Labels.** Exactly one, `name`, holding the container name — bounded by the deployment's own
+container set, which is a fixed list in the compose files and the Quadlet units. cAdvisor's `id`,
+`image` and `container_label_*` are deliberately **not** reproduced: `id` changes on every
+recreation, which is unbounded cardinality by definition.
+
+**Consumers.** Nothing reads these names directly. `monitoring/prometheus/alerts/containers-runtime.yml`
+normalises them and the cAdvisor families into one `basetool:container:*` set of recording rules,
+and the alerts and `02-containers.json` read that — so the cutover changes nothing downstream and
+both shapes work while the two runtimes run side by side. See REQ-OBS-014.
+
+##### `basetool_certificate_*` — expiry for certificates no listener serves
+
+Written by [`scripts/cert-expiry-metrics.py`](../../scripts/cert-expiry-metrics.py) into the same
+textfile directory, under `iri-cert-expiry.timer`. Added 2026-09-20. The reason it exists is in
+REQ-OBS-008: blackbox probes cover every certificate this deployment **serves**, and the internal CA
+is served by nothing, so it was the one certificate with no coverage at all — while being the one
+whose expiry breaks every verified upstream *and* the probes that would have warned about the
+leaves, simultaneously.
+
+| series | type | source | why |
+|---|---|---|---|
+| `basetool_certificate_expiry_timestamp_seconds` | gauge | `openssl x509 -enddate` | `notAfter`, the value both expiry alerts subtract `time()` from |
+| `basetool_certificate_not_before_timestamp_seconds` | gauge | `openssl x509 -startdate` | `notBefore` — not alerted on; it makes "was this file just replaced?" answerable without shelling onto the host |
+| `basetool_certificate_files` | gauge | the collector itself | how many files it read |
+| `basetool_certificate_metrics_timestamp_seconds` | gauge | the collector itself | the collector's own liveness, read by `CertificateMetricsStale` |
+
+**Labels:** `path`, `subject`, `issuer`, `self_signed`. Bounded by the contents of one
+operator-provisioned directory — `/var/iri/monitoring/certs`, two files on the testing host today
+(the internal CA and Grafana's leaf) — which is what
+REQ-OBS-006 asks of a label set — `path` is not a request path or a user value, it is a fixed
+deployment artefact. `self_signed` is `issuer == subject`, and it is what splits the 14-day rule
+from the 90-day one.
+
+**Not collected, deliberately:** private keys (`*.key` is excluded by construction) and PKCS#12
+keystores, which would need a password the collector must never hold and whose leaf backend,
+frontend, ingest and Keycloak all serve — so the probes already cover it.
+
+**openssl rather than a Python X.509 library:** `cryptography` is not installed on the target host,
+and a collector must not add a dependency to a box whose point is a fixed, audited package set.
 
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
@@ -2121,22 +2251,23 @@ therefore alerts on:
   quiet, so absence means the file is not being tailed at all, the permission-drift failure
   `config.alloy` warns about) and `LokiWriteFailing` (shipper-side entry drops) — all warning — cover
   it. **`LogStreamSilent` guards ten tails, each its own rule with a distinct `stream` label:**
-  `host-auth`, `host-auditd`, `host-fail2ban`, `npm-access`, `npm-error`, `keycloak`, `backend`,
+  `host-auth`, `host-auditd`, `host-fail2ban`, `keycloak`, `backend`,
   `frontend`, `ingest` and `ops-deploy`. It is deliberately **one rule per path, never an
   alternation** — `absent()` returns 1 only when the selector matches *nothing*, so a combined
   `path=~"…(backend|frontend|ingest)…"` rule would stay perfectly silent while two of the three tails
   were dead. Three ops-automation tails are **not** guarded (`ops-backup`, `ops-cleanup`,
   `ops-restore-drill`): those units are separate or optional installs, and with no file there is no
   series, so a guard would fire forever on a correctly-configured host — their liveness is covered
-  metric-side by `BackupStaleOrMissing` / `DockerCleanupStaleOrMissing` / `RestoreDrill*` instead.
+  metric-side by `BackupStaleOrMissing` / `ContainerCleanupStaleOrMissing` / `RestoreDrill*` instead.
   `LokiWriteFailing` fires on `rate(loki_write_dropped_entries_total[15m]) > 0`; a **persistent**
   firing with `reason="ingester_error"` and no other symptom is most often the idle-container stale-line
   re-delivery guarded by the `stage.drop older_than = "167h"` in `loki.process.container_mask` (see
   REQ-OBS-007) — read the exact rejected stream from Alloy's own `final error sending batch` log line
   before touching Loki limits. The **docker-sourced** container streams — the `<svc>-stdout` set
   (ADR-0095), `keycloak-stdout`, the `mon-*` streams, `npm` and `postgres-*` — are deliberately given
-  **no** per-stream liveness alert, for two independent reasons: `loki.source.docker` exposes no
-  per-target `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
+  **no** per-stream liveness alert, for two independent reasons: neither container-stdout source
+  (`loki.source.docker`, `loki.source.journal`) exposes a per-target
+  `loki_source_file_read_lines_total` series to take `absent()` of, and a native-error
   breadcrumb is rare by design, so a `rate()`/`absent()` liveness check on such a quiet stream would
   be a permanent false alarm. Whole-pipeline silence is still caught by `LokiIngestSilent`.
 - **Dashboard provisioning.** The 13 dashboards under `monitoring/grafana/dashboards/` are
@@ -2235,6 +2366,30 @@ therefore alerts on:
   `node_filesystem_*`). The 2048 cap is
   hardcoded to stay in lockstep with `JvmThreadsHigh` and the compose `pids` limit; do **not** raise
   the cap to silence the alert.
+- **One name per container signal, whichever runtime is serving it** (added 2026-09-18, ADR-0163).
+  The four alerts above read **normalised recording rules** —
+  `basetool:container:{memory_anon_bytes,memory_limit_bytes,pids,pids_max,oom_kills_total,cpu_periods_total,cpu_throttled_periods_total}`
+  — defined in `monitoring/prometheus/alerts/containers-runtime.yml`, not cAdvisor's series
+  directly. Each is `cAdvisor-family or cgroup-collector-family`, both reduced with `max by (name)`
+  so the two halves are substitutable and the ratio alerts divide without a runtime-specific
+  `on(...)` clause. The Podman migration renames every one of these families at once, and
+  production (Docker + cAdvisor) and the testing host (rootless Podman + the textfile collector)
+  run side by side for the length of the cutover: repointing the consumers at the new names would
+  blind production, and leaving them on the old ones ships a collector nothing reads. The `or`
+  makes the cutover invisible downstream — the left side simply stops producing samples, per
+  container, with no gap and no edit. Normalisation also **strips** cAdvisor's `id` / `image`
+  labels, so an alert keeps its identity across the cutover instead of every notification looking
+  new. Three cAdvisor panels have no cgroup equivalent and stay on the old names until
+  `prometheus-podman-exporter` lands with them (`container_memory_mapped_file`,
+  `container_start_time_seconds`, `container_network_*`); the per-alert mapping is
+  `docs/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
+  `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
+  the collector itself, because a collector that stops writing — or writes a **fresh** file
+  matching zero cgroups — takes the four alerts above down with it silently, which is the failure
+  mode the collector's own docstring names: *"an alert that never fires, which looks exactly like a
+  healthy system"*. Both are inert on a host that never runs it. All nine behaviours, including
+  the no-double-alert property during the cutover window, are locked by
+  `monitoring/prometheus/tests/container_runtime_normalisation_test.yml`.
 - **Alertmanager routing & root-cause suppression.** One real fault fans out into many true-positive
   downstream symptoms; the notification plane collapses them so an operator sees the cause, not the
   storm. The route groups by `alertname` only (`group_by: ['alertname']`) — grouping *also* by `job`
@@ -2490,6 +2645,71 @@ perfectly healthy while the file stays empty. All three modules therefore:
 
 **Enforced by:** `{backend,frontend,ingest}/src/main/resources/logback-spring.xml` ·
 **Related:** ADR-0095 (`<svc>-stdout` shipping), ADR-0072 (`stop_grace_period`), REQ-OBS-007
+
+### REQ-OBS-019 — The shipper runs in two shapes, and one configuration must be true in both
+
+Alloy is a **container** on the Docker deployment and a **host systemd service** on the Podman one
+(`generate-quadlet.py` translates it, because a rootless container's supplementary groups are
+namespace groups and would lose the `adm` and `systemd-journal` reads it exists for). Both read the
+same `monitoring/alloy/config.alloy`, which ships in the config bundle. Every path, name and port in
+that file is therefore a claim about **two** environments, and on 2026-09-20 none of them held in the
+second one.
+
+Measured on the testing host before the fix, with the service `active`, its scrape target UP and 112
+`alloy_*` series collected: `loki_source_file_read_lines_total` **absent**, all ten `LogStreamSilent`
+instances firing, `otelcol_receiver_accepted_spans_total` and `tempo_distributor_spans_received_total`
+**absent** rather than zero. A shipper that is up and ships nothing is indistinguishable from a
+healthy one at every level except the one nobody checks.
+
+**The rule: a difference between the two shapes is resolved in the host's provisioning, never by
+rewriting the shared configuration.** Those paths and names are also written into the alert rules —
+ten `LogStreamSilent` instances pin `path="/hostlog/auth.log"` and its nine siblings — so rewriting
+them would have retargeted every one of those rules silently. Three mechanisms, in order of
+preference:
+
+1. **A file or directory is elsewhere → bind it into the shape the config expects.**
+   `alloy.service.d/10-log-sources.conf` recreates `/logs/<service>` and `/hostlog` with
+   `BindReadOnlyPaths=`, one source per line rather than binding `/var/log` wholesale. This also
+   absorbs distro differences: `/var/log/secure` is bound onto `/hostlog/auth.log`, so one `app=
+   "host-auth"` stream and one alert rule serve both families. A `-` prefix marks a source allowed to
+   be absent, which a freshly provisioned host needs for the ops logs no timer has written yet.
+2. **A port cannot be bind-mounted → an environment variable with the container-shape default.**
+   `IRI_ALLOY_LOKI_ENDPOINT` and `IRI_ALLOY_TEMPO_ENDPOINT` default to `loki:3100` and `tempo:4317`,
+   so the Docker deployment reads the identical file and is untouched; the Podman host sets them to
+   the loopback ports `PODMAN_LOOPBACK_PUBLISH` publishes. Tempo's is **4327**, not 4317, because the
+   host-native Alloy binds `0.0.0.0:4317` for its own OTLP receiver and that includes loopback.
+3. **A source has no equivalent at all → replace it, and say so.** Container stdout came from the
+   Docker API through the socket-proxy; under Podman there is neither, so it comes from the journal
+   (`loki.source.journal`, keyed on `__journal_container_name`, which podman's journald driver sets to
+   the same value the compose-service label carried). Every mapping rule is otherwise unchanged, so
+   the `app=` scheme and every query over it survive.
+
+**Both directions of the boundary count.** When a service moves to the host, container-to-host and
+host-to-container are two separate problems with two separate answers, and it is the second that gets
+forgotten: `PODMAN_HOST_ALIASES` gave `prometheus` its `AddHost=alloy:host-gateway` when the table was
+written, and the four application containers — which *push* spans to `alloy:4318` — were left without
+one. That is why the trace pipeline had never carried a span. Production runs with
+`MONITORING_TRACING_ENABLED=true`, so the omission would have taken effect at cutover, in silence.
+
+**The conformance suite reads Prometheus from INSIDE the container, for the same reason.** It used
+to take the container's IP out of `inspect` and query it from the host, which works on Docker
+because its bridge is host-visible. Under rootless Podman the container network is in a user
+namespace and the host has no route into it: measured 2026-09-21, `inspect` returned `10.89.0.22`
+and a query to it timed out. Three checks read Prometheus — `scrape-targets-up`, `container-metrics`,
+`log-streams` — so all three failed at the two cutover steps that exist to catch exactly this class
+of problem. The same boundary, in the same direction, as Alloy's push to Loki.
+
+**`container-metrics` accepts either container family.** It asked for the cAdvisor names alone and
+reported all six series missing on a host collecting every one of them as `basetool_container_*` —
+"every alert reading them is silently disarmed", about alerts that were armed. The alert rules had
+already been taught that normalisation (`basetool:container:present`); this check was the half left
+behind, which is the shape a runtime migration leaves when a signal is renamed in one place.
+
+**Preconditions the host must satisfy, asserted rather than assumed.** `adm` membership is necessary
+and not sufficient: RHEL writes `/var/log/secure` and `/var/log/audit/audit.log` as `root:root`, so
+the group buys nothing until rsyslog is given `$FileGroup adm` and auditd `log_group = adm`. The role
+therefore ends by asking whether the `alloy` user can actually **open** both files — the membership
+check that preceded it was green on a host where neither was readable.
 
 ### REQ-OBS-018 — The public API surface must be attributable, and probed before it exists
 

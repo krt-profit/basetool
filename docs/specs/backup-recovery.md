@@ -73,12 +73,34 @@ serves the existing maintenance page. An operator may opt into a zero-downtime o
 
 The backup set is exactly what a full restore needs, and exclusions are deliberate, not
 accidental. **Captured:** `pg_dump -Fc` of `krt_basetool`; `pg_dump -Fc` of `keycloak` (the live
-source of truth — **not** the sanitized `realm-export.json`); the nginx-proxy-manager state
-(`/var/iri/npm` = SQLite config + Let's Encrypt); and the host secrets/config needed to stand the
-stack up (`.env`, `keystore.p12`, `realm-export.json`, `keycloak/providers`). **Excluded by
-design:** Redis (sessions transparently re-login), logs, and the WireGuard `wg0.conf` key — the
-operator backs that key up **out-of-band** (it is irreplaceable but must not ride the same
-channel as the application data, by owner decision).
+source of truth — **not** the sanitized `realm-export.json`); the **edge's TLS material and ACME
+account state** (the `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes); and the host
+secrets/config needed to stand the stack up (`.env`, `keystore.p12`, `realm-export.json`,
+`keycloak/providers`, and the **redis `users.acl`**). **Excluded by design:** Redis *session* data —
+`appendonlydir` and `dump.rdb`, which transparently re-login — logs, and the WireGuard `wg0.conf`
+key, which the operator backs up **out-of-band** (irreplaceable, but must not ride the same channel
+as the application data, by owner decision).
+
+> [!warning] Two of those were added on 2026-09-18, and their absence was a live gap
+> This paragraph named *"the nginx-proxy-manager state (`/var/iri/npm` = SQLite config + Let's
+> Encrypt)"* — and NPM had been removed from the stack. Its successor keeps the same material in
+> three **named volumes**, and the backup captured none of them while still capturing the retired
+> proxy's directory. So production's certificates and ACME account key were not in any snapshot: a
+> rebuilt host would have had to **re-issue**, against Let's Encrypt's limit of five duplicate
+> certificates per week for this SAN set — and the Podman migration's cutover explicitly *seeds*
+> the certificates from the old host rather than re-issuing.
+>
+> `users.acl` was the second. It is **access control, not session data** (ADR-0088): redis-server is
+> started with `--aclfile` and refuses to start without the file that names, and an ACL file missing
+> a `default` entry makes redis reset that user to `nopass ~* &* +@all` at load. Nothing generates
+> it — it is host-provisioned — so a restore without it produces a redis that does not come up, and
+> a hand-written replacement that omits one line produces one that is wide open.
+>
+> Neither gap was visible, because REQ-OPS-011's drill restored the two database dumps and nothing
+> else. The drill now asserts the presence of all three artifacts and reports each through
+> `basetool_restore_drill_artifact_ok{artifact=…}`, which `RestoreDrillArtifactNotRestorable`
+> already alerts on without a label matcher — so a future omission is a **critical** alert rather
+> than a paragraph nobody re-reads.
 
 Because `keystore.p12` is delivered root-owned and **not** world-readable (mode `0640` + a uid-1000
 POSIX ACL — REQ-OPS-016, #1018), the backup — which runs as the unprivileged `deploy` user — reads it
@@ -115,6 +137,13 @@ verifies them with sanity queries (backend: `flyway_schema_history` present and 
 public-table-count floor; Keycloak: a public-table-count floor). The drill touches **no**
 production state, and a failure makes the unit report `failed` so it is caught.
 
+**The databases are not the whole claim** (added 2026-09-18). A host whose dumps restore perfectly
+still does not come up without the edge's TLS material or the redis ACL, and for as long as the
+drill looked only at the dumps it reported green over a snapshot that held neither. It therefore
+also asserts the **presence** of the non-database artifacts REQ-OPS-010 names — presence only, never
+content, so nothing it logs can carry a key — and reports each through
+`basetool_restore_drill_artifact_ok{artifact=…}`.
+
 **Acceptance**
 
 - [ ] `iri-restore-drill.timer` runs `restore-drill.sh` weekly.
@@ -122,6 +151,8 @@ production state, and a failure makes the unit report `failed` so it is caught.
   production database, volume, or the live stack.
 - [ ] An empty/garbage restore (no `flyway_schema_history` rows, or table counts below the floor)
   exits non-zero (`failed`).
+- [ ] A snapshot missing the edge certificates, the ACME state or the redis ACL reports
+  `artifact_ok=0` for that artifact, which `RestoreDrillArtifactNotRestorable` pages on.
 
 **Enforced by:** `scripts/restore-drill.sh` · `scripts/iri-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 

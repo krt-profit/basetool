@@ -1,0 +1,72 @@
+---
+# basetool_host -- prepare a Rocky Linux 10 host to run the Basetool stack under rootless Podman.
+#
+# ADR-0188. This role PROVISIONS; it does not deploy. It installs packages, creates the service
+# user and its subuid range, lays out and owns the directories, sets SELinux contexts and writes
+# containers.conf. It never ships unit files, never pulls an image, and must never be run against a
+# host that is serving traffic -- REQ-OPS-001's pull-only delivery is untouched by it.
+#
+# The reasoning behind every step is in docs/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
+# document is the why, and it is not duplicated here on purpose.
+
+- name: Preflight -- the host is what this role assumes
+  ansible.builtin.import_tasks: 00-preflight.yml
+  tags: [preflight]
+
+- name: Packages, and the two versions the migration depends on
+  ansible.builtin.import_tasks: 10-packages.yml
+  tags: [packages]
+
+- name: Cosign, the host half of the supply-chain gate
+  ansible.builtin.import_tasks: 15-cosign.yml
+  tags: [packages, cosign]
+
+- name: The rootless service user
+  ansible.builtin.import_tasks: 20-user.yml
+  tags: [user]
+
+- name: The account the operational scripts run as
+  ansible.builtin.import_tasks: 22-deploy-user.yml
+  tags: [user, deploy]
+
+- name: Directory layout and its namespace-translated ownership
+  ansible.builtin.import_tasks: 30-directories.yml
+  tags: [directories]
+
+- name: The operational scripts and their units
+  ansible.builtin.import_tasks: 25-scripts.yml
+  tags: [scripts]
+
+- name: SELinux file contexts
+  ansible.builtin.import_tasks: 40-selinux.yml
+  when: basetool_host_manage_selinux | bool
+  tags: [selinux]
+
+# AFTER the labels, deliberately. This file STARTS a timer whose unit executes a script out of
+# /var/iri/code/scripts, and until 40-selinux.yml has relabelled that directory to bin_t systemd
+# refuses to exec it (203/EXEC). Ordered before the labels the first tick of a fresh host always
+# fails; it recovers on the next one, but a provisioning run that leaves a failed unit behind
+# teaches an operator to ignore failed units.
+- name: The monitoring that is not a container
+  ansible.builtin.import_tasks: 27-observability.yml
+  when: basetool_host_manage_observability | default(true) | bool
+  tags: [observability, monitoring]
+
+- name: Podman configuration
+  ansible.builtin.import_tasks: 50-podman.yml
+  tags: [podman]
+
+- name: Host hardening, from the platform's own SCAP content
+  ansible.builtin.import_tasks: 60-hardening.yml
+  when: basetool_host_manage_hardening | default(true) | bool
+  tags: [hardening]
+
+- name: The host firewall, and what it deliberately does not allow
+  ansible.builtin.import_tasks: 65-firewall.yml
+  when: basetool_host_manage_firewall | default(true) | bool
+  tags: [firewall]
+
+- name: The L4 front end that gives the edge back the client address
+  ansible.builtin.import_tasks: 70-frontend.yml
+  when: basetool_host_manage_frontend | default(true) | bool
+  tags: [frontend]

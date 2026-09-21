@@ -1,0 +1,20 @@
+---
+# Copy to hosts.yml and fill in. hosts.yml itself is gitignored: an inventory names real machines,
+# and this repository is public.
+#
+# The testing host is built FIRST and production is built from the same role afterwards -- that
+# sequence is the safety argument of the whole migration (PODMAN_MIGRATION_PLAN.md section 11), and
+# it only means anything if both entries below use the same role with the same variables.
+basetool_hosts:
+  hosts:
+    testing:
+      ansible_host: 10.0.0.0          # the Rocky Linux 10 testing guest (ADR-0163)
+      ansible_user: sysadm
+    production:
+      ansible_host: 203.0.113.0       # the new Hetzner CPX42
+      ansible_user: root
+  vars:
+    # Everything else comes from roles/basetool_host/defaults/main.yml. Override here only what
+    # genuinely differs between the two hosts -- every override is a way for the rehearsal to stop
+    # rehearsing the real thing.
+    basetool_host_report_uid_map: true

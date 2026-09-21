@@ -15,12 +15,24 @@
 # new credential.
 #
 # The COPY list is an explicit ALLOWLIST: host secrets (.env, keystore.p12,
-# realm-export.json, keycloak/providers, the systemd units and deploy.sh itself)
-# are never named here. .dockerignore additionally bars secrets from the build
-# context, release-images.yml asserts the built bundle carries none, and
-# deploy.sh re-asserts their absence before applying. deploy.sh and the systemd
-# units are deliberately left OUT so a promoted bundle can never overwrite the
-# running deployer (self-update hazard) — they stay a manual bootstrap concern.
+# realm-export.json, keycloak/providers and deploy.sh itself) are never named
+# here. .dockerignore additionally bars secrets from the build context,
+# release-images.yml asserts the built bundle carries none, and deploy.sh
+# re-asserts their absence before applying. deploy.sh and the four OPERATIONAL
+# units (iri-deploy, iri-backup, iri-restore-drill, iri-container-cleanup) are
+# deliberately left OUT so a promoted bundle can never overwrite the running
+# deployer — a deployer that updates itself mid-run is a self-update hazard.
+# Those are provisioning, and ansible/roles/basetool_host delivers them.
+#
+# The QUADLET units are the opposite case and the distinction is the whole point:
+# they are the deployment. Under Compose the deployment is docker-compose.yml,
+# which has ridden this bundle since ADR-0049; under Quadlet the same definition
+# IS the unit files, so leaving them out would mean a release could change an
+# image, a health command, a memory limit or an environment variable and have no
+# way to reach the host. ADR-0188 puts unit files in the delivery column for
+# exactly this reason. Until 2026-09-18 nothing implemented it: the units were
+# generated, drift-checked in CI, committed -- and went nowhere, while
+# docs/PODMAN_HOST_BOOTSTRAP.md already described this bundle as carrying them.
 #
 # The monitoring compose + config tree (epic #936, ADR-0072) ride the same channel so a promoted
 # release ships updated dashboards/alert rules to the host. They carry NO secrets (every credential
@@ -38,3 +50,7 @@ COPY docker/maintenance /config/docker/maintenance
 COPY docker/edge /config/docker/edge
 COPY keycloak-theme /config/keycloak-theme
 COPY monitoring /config/monitoring
+# The Quadlet deployment: 18 .container units, 18 .network units, 3 .volume units, and the
+# env.d templates beside them. The templates carry `KEY=${VAR:?}` PLACEHOLDERS and no values --
+# deploy.sh renders them on the host against the host's own .env, which never leaves it.
+COPY quadlet /config/quadlet

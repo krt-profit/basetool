@@ -1064,10 +1064,19 @@ jobs:
             test -f "/tmp/config-bundle/${f}" \
               || { echo "::error::config bundle is missing file: ${f}" >&2; missing=1; }
           done
-          for d in docker/maintenance keycloak-theme monitoring; do
+          for d in docker/maintenance keycloak-theme monitoring quadlet/systemd quadlet/env.d; do
             test -d "/tmp/config-bundle/${d}" \
               || { echo "::error::config bundle is missing directory: ${d}" >&2; missing=1; }
           done
+          # The Quadlet units ARE the deployment on a Podman host, the way docker-compose.yml is
+          # on a Docker one, so a bundle without them ships a release that cannot change anything
+          # about how the stack runs. A COUNT guard as well as a presence guard: an empty
+          # quadlet/systemd directory satisfies `test -d` and delivers nothing.
+          units="$(find /tmp/config-bundle/quadlet/systemd -name '*.container' 2>/dev/null | wc -l)"
+          if [ "${units}" -lt 1 ]; then
+            echo "::error::config bundle carries no .container units (found ${units})" >&2
+            missing=1
+          fi
           test "${missing}" -eq 0 || exit 1
           echo "config bundle OK: no secrets present, all required payloads present"
 

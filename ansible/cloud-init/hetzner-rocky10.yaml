@@ -1,0 +1,107 @@
+#cloud-config
+# =====================================================================================
+# The ONLY thing cloud-init does for this deployment: make the machine reachable by
+# Ansible. Everything else is the role's (ADR-0188), and that boundary is the point.
+#
+# The migration's safety argument is that the testing host and the production host come
+# out of the SAME procedure -- testing first, production afterwards, same role, same
+# variables. Anything cloud-init sets up here that the role also sets up exists in two
+# places, and two places drift. A host built by "cloud-init plus the role" is not the
+# host that was rehearsed; it is a near neighbour of it, and the resemblance is exactly
+# what the sequence was supposed to guarantee.
+#
+# So: one user, two keys, sudo. Nothing else.
+#
+# NO HOSTNAME IS SET HERE, and that is a decision rather than an omission. Hetzner's datasource
+# supplies `local-hostname` from the server name, so the machine comes up named after the thing the
+# console calls it and the two cannot drift. Setting `hostname:` here would pin a second copy of
+# that name and they would diverge the first time the server is renamed.
+#
+# The trap, for anyone reusing this template on another platform (reported by the PVE operator
+# 2026-09-16, after it bit them): **RHEL-family images default to `prefer_fqdn_over_hostname: true`
+# and Debian does not.** On a datasource that provides no `local-hostname` -- Proxmox with
+# `cicustom` is one -- cloud-init can derive no FQDN, prefers it anyway, and the host comes up
+# called `localhost`. It boots, it serves, and nothing says so. A template that carries `hostname:`
+# alone is correct on Debian and wrong on Rocky for the same reason this one is silent: it depends
+# on what the datasource hands over. If this is ever used somewhere that hands over nothing, set
+# `fqdn:` AND `prefer_fqdn_over_hostname: false`, not `hostname:` on its own.
+#
+# Nothing in the role reads the hostname -- verified, not assumed: `ansible_hostname`,
+# `inventory_hostname`, `ansible_fqdn` and `ansible_nodename` have no hits across the role, the
+# playbook or ansible.cfg, and every host is addressed by IP. So a wrong name here is a cosmetic
+# defect and a confusing one, not a broken provisioning run.
+#
+# Paste into Hetzner's "Cloud config" field when creating the server. Check the two keys
+# against their fingerprints below before it is the only way in.
+#
+# Validated against cloud-init 24.4 on the target platform itself -- `cloud-init schema
+# --config-file` reports "Valid schema". Parsing as YAML would not have been the same check:
+# a misspelled top-level key is valid YAML and silently does nothing.
+# =====================================================================================
+
+# Why a user at all, when Hetzner already injects the selected SSH key for root: the
+# testing host is reached as `sysadm`, and the inventory's production entry said `root`.
+# That difference is a difference in the procedure. Creating sysadm here makes the two
+# inventory entries identical apart from the address, which is what "the same role with
+# the same variables" is supposed to mean.
+users:
+  - name: sysadm
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true          # key authentication only; there is no password to guess
+    ssh_authorized_keys:
+      # TWO keys, and the distinction between them matters more than it looks.
+      #
+      # The operator's, so a human can get in when the automation cannot -- which is the
+      # case that counts, because on this host `root` and `sysadm` are password-locked and
+      # the console accepts no login. Without this line the Ansible key is the only way in,
+      # and a single key is a single point of failure that fails on the day it is needed.
+      #   SHA256:NHM3Xvz9cL5Q2g/RrPOP3Ei/HOoNtPg7tV2fog6qsX0
+      - ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBGaLCBXB4sF+5Qu2lpVh7K7clqvNQiS6QuKpdzIr6l6NmNuc9892vPhwFKdy0vuoh/kFtch4WNIh3fjzG+RGZ0I= lucas@LUCAS-DESKTOP
+
+      # The Ansible control node's. Restrict it in authorized_keys AFTER the first run,
+      # from a MEASURED source address -- a `from=` guessed before the machine exists locks
+      # you out of a machine you cannot yet reach any other way. On the testing host the
+      # measured source was the workstation's VPN address, and the restriction was written
+      # as the /24 rather than that one address, so a DHCP change does not look like a key
+      # problem at three in the morning.
+      #   SHA256:3pu2j7ZgkxgDos/5IjooLUPlq3Exgpd9k0Kjq59kTJo
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMQ9ZZFW/dkY6kMitzDdUqCDD5F0dBQLuq8IX5IaaAVX basetool-ansible-wsl@LUCAS-DESKTOP
+
+      # A third key exists on the testing host and is DELIBERATELY NOT HERE: the notebook's
+      # (SHA256:gKMikwNbh9G1lp5+cnT5J6cmYwOhB4u4zFTPIsJtJBI). Adding a machine's access to a
+      # production host is the operator's decision, not a copy-paste from the rehearsal --
+      # uncomment it if that machine should reach production, and leave it out if it should
+      # not. Stated rather than silently omitted, because "we forgot" and "we decided" look
+      # identical in a file that does not mention it.
+      # - ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBB2kTen7JhzE8+Lg3sJUqtgxL8FxCpCgWvvQe85n3gpHq1PHJcfgWHldZNetdb7XiN7ZKrhTyrN2FtOxGYA0eGw= lucas@LUCAS-NOTEBOOK
+      #
+      # The PVE audit key from the testing host is not here either, and that one is not even
+      # a choice: it belongs to the hypervisor's own tooling and has no business on a machine
+      # at a different provider.
+
+# Root stays reachable by key until the role has run and `sysadm` is PROVEN to work.
+# The hardening profile then sets `PermitRootLogin no` itself, which is the right moment:
+# closing it here would mean that a cloud-init failure to create sysadm leaves a machine
+# nobody can log into at all, on a provider where the way back is the rescue system.
+#
+# Stated rather than omitted, because "we forgot" and "we decided" look identical in a
+# file that simply does not mention it.
+disable_root: false
+
+package_update: true
+package_upgrade: true
+
+# NOT installed here: podman, firewalld, the SCAP content, anything under /var/iri.
+# The role installs all of it, asserts the versions it needs, and is re-runnable. A
+# package list in two files is a version skew waiting to happen.
+
+# Rebooting once here gets the kernel from package_upgrade into use before Ansible runs,
+# so the role never measures one kernel and leaves another running -- which is exactly
+# what happened on the testing host, where an update from the build step only took effect
+# at a reboot hours later and briefly looked like the hardening's doing.
+power_state:
+  mode: reboot
+  condition: true
+  message: "Rebooting into the updated kernel before provisioning"

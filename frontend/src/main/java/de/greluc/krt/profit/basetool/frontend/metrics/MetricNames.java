@@ -534,6 +534,30 @@ public final class MetricNames {
    */
   public static final String CLIENT_ERROR_RESOURCE_ERROR = "resource_error";
 
+  /**
+   * Gauge {@code basetool_tracing_enabled} — {@code 1} while this module is configured to emit
+   * spans, {@code 0} while it is not.
+   *
+   * <p><b>What it is for.</b> The trace pipeline had no alert at either end until 2026-09-20, and
+   * that is why a dead one went unnoticed: on the Podman host the application containers could not
+   * resolve {@code alloy}, every span was dropped in this module's own exporter, and both {@code
+   * otelcol_receiver_accepted_spans_total} and {@code tempo_distributor_spans_received_total} were
+   * <em>absent</em> rather than zero. An alert on that absence alone cannot be written, because
+   * absence is also what a deliberately switched-off tracing stack looks like — the same problem
+   * the backend's {@code basetool_scheduled_job_enabled} solves for a switched-off job, and the
+   * same solution.
+   *
+   * <p><b>Reported as 0 rather than omitted</b>, which is the one way this differs from the
+   * scheduled-job gauge. That one is absent when off because the bean does not exist; here the
+   * series is registered unconditionally, so {@code basetool_tracing_enabled == 0} says "off on
+   * purpose" while <em>absence</em> says "this module is not being scraped at all". An alert that
+   * has to read "tracing is on" positively needs the difference.
+   *
+   * <p>Untagged: the deployment-wide {@code application} tag already separates the three modules,
+   * and a second identity for the same fact would only invite them to disagree (REQ-OBS-011).
+   */
+  public static final String TRACING_ENABLED = "basetool.tracing.enabled";
+
   private MetricNames() {
     // Constants holder — not instantiable.
   }

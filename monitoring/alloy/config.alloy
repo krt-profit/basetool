@@ -4,8 +4,16 @@
 // Two responsibilities:
 //   1. Receive app/Keycloak OTLP spans on the scrape net and forward them to Tempo on the core net
 //      (apps never reach the trace store directly — the span push is funnelled through Alloy).
-//   2. Ship logs to Loki with the per-stream masking rules. Container logs are read via the GET-only
-//      docker-socket-proxy (tcp://socket-proxy:2375), never the raw docker socket.
+//   2. Ship logs to Loki with the per-stream masking rules. Container stdout is read from the
+//      systemd JOURNAL (podman's journald driver, 2026-09-20). It came from the GET-only
+//      docker-socket-proxy before that; under rootless Podman there is no docker API to proxy.
+//
+// This file is read by Alloy in TWO shapes and the paths below must be true in both: as a container
+// on the Docker host, where the log directories are bind-mounted at /logs and /hostlog, and as a
+// systemd HOST service on the Podman host, where alloy.service.d/10-log-sources.conf recreates
+// exactly those two trees with BindReadOnlyPaths=. Fixing this by rewriting the paths was the
+// obvious move and the wrong one: the path= labels in meta.yml's LogStreamSilent rules are part of
+// the contract too, and a rewrite would have silently retargeted all ten of them.
 //
 // Per-stream privacy (REQ-OBS-007): app JSON is PII-masked AT SOURCE (no shipper masking) under
 // app=backend/frontend/ingest; ADDITIONALLY the same three apps' raw container stdout/stderr is now
@@ -50,9 +58,19 @@ otelcol.receiver.otlp "default" {
 	}
 }
 
+// WHERE THE TRACE STORE IS, from this process's point of view. `tempo:4317` is a name on the
+// container network, which is correct while Alloy runs as a container and unreachable while it runs
+// as a host service -- rootless Podman keeps the container network inside a user namespace, so the
+// host can only reach a PUBLISHED port. The default keeps the container shape working untouched;
+// generate-quadlet.py publishes tempo's OTLP port on loopback and 27-observability.yml sets this
+// variable to it. A bind mount fixed the same problem for the log FILES, but a port cannot be bind
+// mounted, so this one is an environment variable with a default instead.
+//
+// The published host port is deliberately NOT 4317: this very process binds 0.0.0.0:4317 for its own
+// OTLP receiver below, which includes loopback, so publishing tempo there would collide.
 otelcol.exporter.otlp "tempo" {
 	client {
-		endpoint = "tempo:4317"
+		endpoint = coalesce(sys.env("IRI_ALLOY_TEMPO_ENDPOINT"), "tempo:4317")
 
 		tls {
 			insecure = true
@@ -63,9 +81,13 @@ otelcol.exporter.otlp "tempo" {
 // =============================================================================================
 // 2) Log shipping to Loki
 // =============================================================================================
+// The same reasoning as the Tempo endpoint above, for the log sink. Measured on the testing host
+// on 2026-09-20: with the file sources repaired and nine streams tailing, `loki_write_sent_entries_total`
+// was still exactly 0 -- the host cannot resolve `loki`, and Loki published no port at all. A shipper
+// that reads everything and sends nothing is the same silent failure as one that reads nothing.
 loki.write "default" {
 	endpoint {
-		url = "http://loki:3100/loki/api/v1/push"
+		url = "http://" + coalesce(sys.env("IRI_ALLOY_LOKI_ENDPOINT"), "loki:3100") + "/loki/api/v1/push"
 	}
 }
 
@@ -166,33 +188,36 @@ loki.process "keycloak_mask" {
 	}
 }
 
-// --- NPM access + error logs (client IPs retained 31d — owner-approved, REQ-OBS-007/-010) -----
-// The glob is per-FILE, not per-host: NPM writes proxy-host-<n>_access.log for every proxy host,
-// so the API vhost of ADR-0135 is tailed the moment it is created — no Alloy change, and no
-// LogStreamSilent gap on the day it goes live. Its lines carry the same fields and the same
-// 31-day client-IP retention as every other vhost (REQ-OBS-010), which is why the privacy policy
-// needed no new category for it either. Verify after D3 with {app="npm-access"} |= "api.profit-base.online".
-local.file_match "npm_access" {
-	path_targets = [{__path__ = "/logs/npm/*_access.log", app = "npm-access"}]
-}
+// --- The edge access + error logs are NOT here, and that is the point ------------------------
+// Until 2026-09-20 two `loki.source.file` blocks tailed /logs/npm/*_access.log and *_error.log
+// under app="npm-access" / "npm-error". NPM was replaced by native nginx in ADR-0162 and the native
+// edge writes both to STDOUT (`access_log /dev/stdout`, `error_log /dev/stderr`), so those two
+// streams have had no producer since; on a host that never ran NPM the files do not exist at all
+// and their two LogStreamSilent rules fired forever.
+//
+// The edge's lines arrive through the container-stdout source below, under app="edge", and they are
+// deliberately NOT masked there (the stage.match selectors in loki.process.container_mask name
+// grafana, alertmanager and the <svc>-stdout apps only) -- which is what preserves the client IPs
+// the 31-day retention of REQ-OBS-007/-010 is about. The retention itself moved with the label:
+// see loki-config.yml.
+//
+// What was lost with the files, and it is worth naming rather than discovering: the per-vhost split.
+// NPM wrote proxy-host-<n>_access.log per proxy host, so a new vhost was tailed the moment it was
+// created. The native edge writes one stream for all of them, so a per-vhost question is now a
+// query over the line's own Host field rather than over a stream label.
 
-loki.source.file "npm_access" {
-	targets    = local.file_match.npm_access.targets
-	forward_to = [loki.write.default.receiver]
-}
-
-local.file_match "npm_error" {
-	path_targets = [{__path__ = "/logs/npm/*_error.log", app = "npm-error"}]
-}
-
-loki.source.file "npm_error" {
-	targets    = local.file_match.npm_error.targets
-	forward_to = [loki.write.default.receiver]
-}
-
-// --- Host auth log (SSH/sudo; usernames+IPs retained 31d). Journal variant: see the runbook. --
+// --- Host auth log (SSH/sudo; usernames+IPs retained 31d) ------------------------------------
+// TWO paths, one stream. Debian's rsyslog writes /var/log/auth.log; the RHEL family writes
+// /var/log/secure. Both arrive under /hostlog because the whole directory is mounted, and both are
+// named here so one `app="host-auth"` stream and one set of detectors serve either family with no
+// second code path and no symlink invented on the host to paper over the difference. On a given
+// host exactly one of them exists, so the other contributes no target and no series -- which is why
+// LogStreamSilent watches the two with a regex rather than asserting a single path.
 local.file_match "host_auth" {
-	path_targets = [{__path__ = "/hostlog/auth.log", app = "host-auth"}]
+	path_targets = [
+		{__path__ = "/hostlog/auth.log", app = "host-auth"},
+		{__path__ = "/hostlog/secure", app = "host-auth"},
+	]
 }
 
 loki.source.file "host_auth" {
@@ -264,10 +289,21 @@ loki.source.file "ops_backup" {
 	forward_to = [loki.process.ops_automation_mask.receiver]
 }
 
-// The unit and its log file are named iri-docker-cleanup; the stream label is shortened to
-// ops-cleanup to keep the app label set short and symmetric with its three siblings.
+// The unit and its log file are named iri-container-cleanup; the stream label stays ops-cleanup to
+// keep the app label set short and symmetric with its three siblings -- and because the alert and
+// the dashboard both point a reader at `{app="ops-cleanup"}`, which a label rename would break for
+// every historical query.
+//
+// BOTH file names are watched. The unit was renamed from iri-docker-cleanup with ADR-0194, and the
+// scripts reach a host through the Ansible role while this file rides the config bundle, so the two
+// halves land independently. Watching only the new name would leave a gap in the very stream the
+// alert tells the operator to read over the last 10 days. Drop the old path once every host has run
+// the role.
 local.file_match "ops_cleanup" {
-	path_targets = [{__path__ = "/hostlog/iri-docker-cleanup.log", app = "ops-cleanup"}]
+	path_targets = [
+		{__path__ = "/hostlog/iri-container-cleanup.log", app = "ops-cleanup"},
+		{__path__ = "/hostlog/iri-docker-cleanup.log", app = "ops-cleanup"},
+	]
 }
 
 loki.source.file "ops_cleanup" {
@@ -322,18 +358,54 @@ loki.process "ops_automation_mask" {
 	}
 }
 
-// --- Container logs via the GET-only docker-socket-proxy -------------------------------------
-// Selected by the compose service label so it is independent of the project-prefixed container name.
-discovery.docker "containers" {
-	host = "tcp://socket-proxy:2375"
-}
-
+// --- Container logs, from the JOURNAL --------------------------------------------------------
+//
+// This read the Docker API through the GET-only socket-proxy until 2026-09-20. Under rootless Podman
+// there is no Docker API and no socket-proxy: generate-quadlet.py deletes that service, because it
+// exists only to hand cAdvisor and Alloy a view of a socket that no longer exists.
+//
+// What that cost, measured on the testing host before the change: Alloy was `active`, its scrape
+// target was UP and 112 alloy_* series were being collected -- and it shipped nothing. Every sixty
+// seconds it logged
+//
+//     component_id=discovery.docker.containers
+//     err="error while listing containers: failed to connect to the docker API at tcp://socket-proxy:2375"
+//
+// and carried on. An up-and-silent shipper is the failure mode this file's own comments warn about
+// twice, and it took the `<svc>-stdout` streams with it -- the streams ADR-0095 exists for, and which
+// the comment below calls "the only place Loki can see" the JVM and kernel failures that are printed
+// outside logback: the OOM-kill preamble, `pthread_create failed (EAGAIN)`. It also took the EDGE
+// access log, which since ADR-0162 is written to stdout (`access_log /dev/stdout`) rather than to the
+// NPM files below -- so the 31-day client-IP stream of REQ-OBS-007/-010 arrived here too, and stopped.
+//
+// The replacement is the journal, and it is a relabel rather than a redesign because podman's journald
+// driver already carries what the docker labels used to. Measured on the same host: the log driver IS
+// journald, and 297 of the last 400 journal entries carried
+//
+//     CONTAINER_NAME=frontend    _SYSTEMD_USER_UNIT=frontend.service
+//
+// so `__journal_container_name` says exactly what the compose-service label used to. Every mapping
+// rule below is unchanged but for that source label -- the app= scheme, the -stdout split, the masking
+// sink -- so every existing Loki query, dashboard and alert keeps matching.
+//
+// REPLACED rather than run alongside: a component cannot be declared conditionally, so keeping the
+// docker source would mean one host logging a connection error forever, which is precisely the noise
+// that hid this for as long as it hid. Same decision, same reasoning, as deleting the cadvisor scrape
+// job from prometheus.yml. The Docker host keeps working from the bundle already on it; a redeploy
+// THERE would need the previous bundle, which is not part of any rollback path (see the runbook).
 discovery.relabel "containers" {
-	targets = discovery.docker.containers.targets
+	// Required, and empty on purpose: this block exists for its `.rules` export, which
+	// loki.source.journal applies to each entry. There is nothing to discover -- the journal is one
+	// stream, and the keep rule at the END of this block is what selects container lines out of it.
+	targets = []
 
-	// Keep only the container streams we ingest via the docker API (NPM stdout = operational logs
-	// — nginx reloads, cert renewals, [emerg]/[error]; NOT admin-UI logins, which NPM never writes
-	// to stdout; postgres runs with log_error_verbosity=terse).
+	// Which container streams we ingest (NPM stdout = operational logs — nginx reloads, cert
+	// renewals, [emerg]/[error]; NOT admin-UI logins, which NPM never writes to stdout; postgres runs
+	// with log_error_verbosity=terse). The selection is made by these mapping rules and enforced by
+	// the single `keep` at the END of the block: an entry no rule below names never gets an `app`
+	// label and is dropped there. That ordering is required now that the source is the whole journal
+	// rather than a docker listing -- a keep placed first would have to re-state the service list,
+	// and a list stated twice is a list that drifts.
 	// (ADR-0095) backend/frontend/ingest ARE now kept — reversing the original REQ-OBS-007 decision to
 	// ship these three via the masked JSON file ONLY. Their container stdout/stderr is shipped here IN
 	// ADDITION to that file path, under the DISTINCT app=<svc>-stdout label (see the mapping rule below)
@@ -352,43 +424,42 @@ discovery.relabel "containers" {
 	// existed only in the host json-file driver (5x10MB, SSH-only) and were unreachable from Loki. Note
 	// that the alternative is exactly `keycloak`: anchored, it matches neither `keycloak-dev` nor
 	// `db-keycloak` / `postgres-exporter-keycloak`, which keep their existing streams.
-	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "backend|frontend|ingest|keycloak|npm|edge|acme|redis|db-backend|db-keycloak|prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter"
-		action        = "keep"
-	}
 	// (#1041 item 24) Map every monitoring-plane service to a bounded `mon-<service>` app label.
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-		regex         = "(prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|cadvisor|socket-proxy|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter)"
+		source_labels = ["__journal_container_name"]
+		regex         = "(prometheus|grafana|loki|tempo|alloy|alertmanager|node-exporter|postgres-exporter-backend|postgres-exporter-keycloak|redis-exporter|blackbox-exporter)"
 		target_label  = "app"
 		replacement   = "mon-$1"
 	}
 	// Map the compose service to a stable, low-cardinality app label.
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		source_labels = ["__journal_container_name"]
 		regex         = "db-backend"
 		target_label  = "app"
 		replacement   = "postgres-backend"
 	}
 
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		source_labels = ["__journal_container_name"]
 		regex         = "db-keycloak"
 		target_label  = "app"
 		replacement   = "postgres-keycloak"
 	}
 
-	// `edge` and `acme` joined this list with ADR-0162. The edge logs to the
-	// CONTAINER stream rather than to files, unlike NPM, which wrote
-	// /data/logs/proxy-host-<n>_{access,error}.log and was the one component whose
-	// logs needed a bind mount to reach Loki at all. Access and error lines now
-	// share one stream, which is what ADR-0095 already does for every other
-	// service. The npm_access / npm_error FILE streams above are deliberately kept:
-	// they are empty while the edge serves and light up again if the `rollback`
-	// profile is ever used.
+	// `edge` and `acme` joined this list with ADR-0162. The edge logs to the CONTAINER stream
+	// rather than to files, unlike NPM, which wrote /data/logs/proxy-host-<n>_{access,error}.log and
+	// was the one component whose logs needed a bind mount to reach Loki at all. Access and error
+	// lines now share one stream, which is what ADR-0095 already does for every other service.
+	//
+	// This is where the 31-day client-IP retention of REQ-OBS-007/-010 now lives. `edge` is
+	// deliberately absent from loki.process.container_mask's stage.match selectors, so these lines
+	// pass through unmasked -- that is the point, not an oversight.
+	//
+	// `npm` stays in the alternation although nothing answers to that name any more. It costs an
+	// alternative that never matches, and removing it would be the only thing standing between a
+	// resurrected rollback stack and an unlabelled stream.
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		source_labels = ["__journal_container_name"]
 		regex         = "(npm|edge|acme|redis)"
 		target_label  = "app"
 		replacement   = "$1"
@@ -397,7 +468,7 @@ discovery.relabel "containers" {
 	// masked-JSON `app=backend|frontend|ingest` file streams so a mixed masked-JSON / raw-stdout label
 	// never confuses the {app="backend",level="error"} JSON queries. Anchored, so `db-backend` is unaffected.
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		source_labels = ["__journal_container_name"]
 		regex         = "(backend|frontend|ingest)"
 		target_label  = "app"
 		replacement   = "$1-stdout"
@@ -410,17 +481,41 @@ discovery.relabel "containers" {
 	// rather than folded into the (backend|frontend|ingest) alternation because Keycloak needs the
 	// username= / ipAddress= masking that the three app streams do not (see container_mask below).
 	rule {
-		source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+		source_labels = ["__journal_container_name"]
 		regex         = "keycloak"
 		target_label  = "app"
 		replacement   = "keycloak-stdout"
 	}
+
+	// The selection, in one place and at the end. Anything the rules above did not name -- every
+	// non-container journal entry, and any container we do not ingest -- has no `app` and stops here.
+	rule {
+		source_labels = ["app"]
+		regex         = ".+"
+		action        = "keep"
+	}
 }
 
-loki.source.docker "containers" {
-	host       = "tcp://socket-proxy:2375"
-	targets    = discovery.relabel.containers.output
-	forward_to = [loki.process.container_mask.receiver]
+loki.source.journal "containers" {
+	forward_to    = [loki.process.container_mask.receiver]
+	relabel_rules = discovery.relabel.containers.rules
+
+	// The persistent journal, which is where podman's journald driver writes and where the USER
+	// units' output lands too -- the containers belong to the rootless service user, so their lines
+	// carry _SYSTEMD_USER_UNIT=<svc>.service and _SYSTEMD_OWNER_UID=<that user>. Alloy reads them by
+	// being in the `systemd-journal` group, which 27-observability.yml asserts rather than assumes:
+	// the service starts perfectly well without it and simply ships nothing.
+	path = "/var/log/journal"
+
+	// A bounded backlog on (re)start. Without it Alloy re-offers the whole retained journal after
+	// every restart and the older half is 400-rejected by Loki as "entry has timestamp too old" --
+	// the same failure the stage.drop below was added for in July, reached by a different route.
+	// Twelve hours is comfortably inside that window and still covers an overnight outage.
+	max_age = "12h"
+
+	// No static labels: everything that reaches Loki comes from the relabel rules above, so the label
+	// set is exactly the one the docker path produced and every existing query still matches.
+	labels = {}
 }
 
 // (#1041 item 24 / ADR-0095) Shipper-side masking for the kept container streams that can carry PII
@@ -432,8 +527,8 @@ loki.process "container_mask" {
 
 	// (2026-07-19) Drop stale re-delivered container lines BEFORE they reach loki.write. A near-idle
 	// container (redis-exporter, the two postgres exporters and alertmanager log almost nothing after
-	// startup) keeps its last stdout line at the tail; loki.source.docker re-opens the docker tail on
-	// every reconnect ("could not transfer logs: unexpected EOF") and re-delivers that SAME last line.
+	// startup) keeps its last stdout line at the tail; loki.source.docker re-opened the docker tail on
+	// every reconnect ("could not transfer logs: unexpected EOF") and re-delivered that SAME last line.
 	// While it is younger than Loki's reject_old_samples_max_age (168h, loki-config.yml) Loki silently
 	// dedupes the repeat, but once it ages past that window every re-delivery is 400-rejected ("entry
 	// has timestamp too old") and counted as a dropped entry -> loki_write_dropped_entries_total climbs
@@ -444,6 +539,11 @@ loki.process "container_mask" {
 	// stdout carries no signal and Loki would reject it regardless. The file streams (npm/host-auth, the
 	// deliberate 31-day IP-retention paths) never pass through this processor and stamp their timestamp
 	// at read time = now, so their long retention is untouched.
+	// (2026-09-20) That source is loki.source.journal now and the reconnect-tail mechanism above is
+	// history -- but the guard is not. The journal is a replayed backlog rather than a live tail, so
+	// on every Alloy restart it re-offers whatever max_age allows. This stage is what keeps that
+	// backlog from becoming the same doomed push, which is why max_age (12h) and this drop (167h) are
+	// two independent bounds and not one: the first limits what is read, the second what is sent.
 	stage.drop {
 		older_than          = "167h"
 		drop_counter_reason = "reject_old_samples_guard"

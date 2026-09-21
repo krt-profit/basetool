@@ -2,7 +2,7 @@
 # Epic #936, REQ-OBS-007 (per-stream log-privacy rules), ADR-0072.
 #
 # Retention is 31 days, enforced by the compactor (table_manager is deprecated in 3.x and is NOT
-# used). This bounds the deliberate, owner-approved 31-day IP retention for the NPM-access /
+# used). This bounds the deliberate, owner-approved 31-day IP retention for the edge-access /
 # SSH-host-auth / Keycloak streams; Loki data is deliberately excluded from backups so restic's GFS
 # retention cannot silently extend those 31 days (ADR-0072). Rate caps guard against log storms.
 auth_enabled: false

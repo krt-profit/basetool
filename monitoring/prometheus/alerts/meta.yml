@@ -213,17 +213,51 @@ groups:
           summary: "Tempo refused spans"
           description: "Tempo's OTLP receiver could not push spans into the pipeline in the last 15 minutes (backpressure or an overloaded live-store) — traces are being dropped at ingest. Check the Tempo log and its memory limit."
 
-      # Silent-pipeline detector, robust to tracing being DISABLED: the accepted-spans counter stays 0
-      # (so `sum(...) > 0` is false) when MONITORING_TRACING_ENABLED is off, so this only fires when
-      # tracing WAS working (counter > 0 since Tempo start) but stopped for an hour.
+      # Silent-pipeline detector. The gate is `basetool_tracing_enabled == 1`, published by each app
+      # module from `management.opentelemetry.enabled` (REQ-OBS-019) -- and that is a correction.
+      #
+      # This rule used to gate on `sum(tempo_receiver_accepted_spans) > 0` as a PROXY for "tracing is
+      # switched on", reasoning that the counter stays 0 while it is off. The proxy is true for a
+      # pipeline that is off and equally true for one that has NEVER WORKED, and those need opposite
+      # responses. Measured on the Podman host on 2026-09-20: the app containers could not resolve
+      # `alloy` (a host service there, so the container-network name answered to nothing), every span
+      # was dropped in each app's own exporter, and BOTH span counters were absent rather than zero.
+      # This rule was structurally incapable of firing, and it was the only one watching.
+      #
+      # `or absent(...)` is what covers the never-worked case: the counter is created on the first
+      # span, so on a pipeline that has never carried one there is no series to take a rate of.
       - alert: TempoReceiverSilent
-        expr: sum(rate(tempo_receiver_accepted_spans[1h])) == 0 and sum(tempo_receiver_accepted_spans) > 0
+        expr: >-
+          max(basetool_tracing_enabled) == 1
+          and (
+            sum(rate(tempo_receiver_accepted_spans[1h])) == 0
+            or absent(tempo_receiver_accepted_spans)
+          )
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "Tempo received no spans in 1h while tracing is enabled"
-          description: "Tempo accepted spans before but none in the last hour, while the accepted-spans counter is non-zero (tracing is enabled) — the OTLP export path from the apps/Keycloak or Alloy's OTLP forward is dead. Traces are not being stored."
+          description: "The apps report tracing ON (basetool_tracing_enabled=1) and Tempo has stored no span for an hour — or has never stored one. The OTLP path from the apps/Keycloak through Alloy to Tempo is dead. Check AlloyOtlpReceiverSilent first: if that is firing too, the spans never reached Alloy and the usual cause on a Podman host is that the app containers cannot resolve `alloy` (it is a HOST service there and needs AddHost=alloy:host-gateway). If it is NOT firing, Alloy is accepting spans and failing to forward them to Tempo — check its otelcol exporter endpoint."
+
+      # The collector end of the same path, and the one that names the fault. Alloy's OTLP receiver
+      # counts what the apps actually managed to send it; Tempo's counts what survived the forward.
+      # Split like this, one glance says which half is broken -- and the half that broke on the
+      # migration is this one, where the failure is entirely invisible from the app side: an OTLP
+      # exporter that cannot resolve its endpoint drops spans without logging anything.
+      - alert: AlloyOtlpReceiverSilent
+        expr: >-
+          max(basetool_tracing_enabled) == 1
+          and (
+            sum(rate(otelcol_receiver_accepted_spans_total[1h])) == 0
+            or absent(otelcol_receiver_accepted_spans_total)
+          )
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alloy's OTLP receiver accepted no spans in 1h while tracing is enabled"
+          description: "The apps report tracing ON (basetool_tracing_enabled=1) and no span has reached Alloy's OTLP receiver for an hour — or ever. The spans are being dropped in each app's own exporter, which logs nothing about it. Check that the app containers can resolve the collector's name (`alloy:4318` for the three JVM apps, `alloy:4317` for Keycloak) and that its receiver is listening."
 
       # 3.x write-path health (replaces the removed 2.x ingester metrics): live-store blocks failing to
       # complete or flush locally means accepted traces are lost before they reach a backend block.
@@ -291,9 +325,12 @@ groups:
   # silence still covers them via LokiIngestSilent.
   - name: meta-log-pipeline
     rules:
-      # Whole-pipeline silence: the 30s blackbox probes guarantee npm-access baseline traffic, so a
-      # 30-minute zero means the shipper or Loki ingest is dead. `or absent(...)` also catches the
-      # case where the counter never registered (Loki restarted, nothing pushing).
+      # Whole-pipeline silence: the 30s blackbox probes guarantee baseline traffic through the edge,
+      # whose access log reaches Loki as app="edge", so a 30-minute zero means the shipper or Loki
+      # ingest is dead. `or absent(...)` also catches the case where the counter never registered
+      # (Loki restarted, nothing pushing). Until 2026-09-20 this comment named the npm-access FILE
+      # stream as the baseline; NPM was replaced by native nginx in ADR-0162 and the native edge
+      # writes to stdout, so that stream had already stopped being the thing keeping this quiet.
       - alert: LokiIngestSilent
         expr: >-
           sum(rate(loki_distributor_lines_received_total[30m])) == 0
@@ -303,7 +340,7 @@ groups:
           severity: warning
         annotations:
           summary: "Loki received no log lines in 30m"
-          description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the npm-access stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
+          description: "Loki ingested zero log lines for 30 minutes while baseline edge traffic should keep the app=\"edge\" stream flowing — the Alloy shipper or Loki ingest path is likely dead. All log-derived alerts are blind until it recovers."
 
       # Per-critical-path stream death. A tailed file keeps its loki_source_file_read_lines_total
       # series present (flat when quiet — verified against alloy v1.17.1), so ABSENCE of the series
@@ -312,14 +349,14 @@ groups:
       # stream is legitimately quiet for days when healthy, so rate==0 would false-positive; total-flow
       # silence is already covered by LokiIngestSilent above.
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})
+        expr: absent(loki_source_file_read_lines_total{path=~"/hostlog/(auth\\.log|secure)"})
         for: 1h
         labels:
           severity: warning
           stream: host-auth
         annotations:
           summary: "Log stream not being tailed: host auth.log"
-          description: "Alloy is not tailing /hostlog/auth.log — the SSH failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and file permissions (adm group readable)."
+          description: "Alloy is not tailing the host SSH log — /hostlog/auth.log on Debian, /hostlog/secure on the RHEL family, and neither is being read. The failed-auth / root-login / password-on-key-only-host detectors are blind. Check the /var/log mount and that the file is group-adm readable; on RHEL, rsyslog writes it root:root unless $FileGroup says otherwise."
 
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/audit/audit.log"})
@@ -331,15 +368,17 @@ groups:
           summary: "Log stream not being tailed: host audit.log"
           description: "Alloy is not tailing /hostlog/audit/audit.log — the sshd_config/authorized_keys tamper detector is blind. Confirm /var/log/audit is traversable (0750 root:adm) and log_group=adm in auditd.conf."
 
-      - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_access\\.log"})
-        for: 1h
-        labels:
-          severity: warning
-          stream: npm-access
-        annotations:
-          summary: "Log stream not being tailed: NPM access logs"
-          description: "Alloy is not tailing any /logs/npm/*_access.log — the edge 5xx/rate-limit/scan detectors and the npm-access baseline for LokiIngestSilent are blind. Check the NPM log mount."
+      # There was a LogStreamSilent for /logs/npm/*_access.log here until 2026-09-20, and one for
+      # *_error.log below. Both watched files that NPM wrote; ADR-0162 replaced NPM with native
+      # nginx, which writes access to stdout and errors to stderr, so both streams arrive as
+      # app="edge" through the container-stdout source instead. On a host that never ran NPM the
+      # files do not exist and the two rules fired forever, which is the shape of a rule that
+      # outlives the thing it watched.
+      #
+      # They are NOT replaced by an app="edge" equivalent, for the reason stated at the top of this
+      # group: a container-stdout stream exposes no per-target loki_source_file_read_lines_total
+      # series to take absent() of. Edge silence is covered by LokiIngestSilent (the edge IS the
+      # baseline) and by the blackbox probes, which fail outright if the edge stops answering.
 
       # Highest-value guard in this group. KeycloakErrorRateHigh ({app="keycloak"}) is the ONLY
       # detector for the fail-open Discord SPI precheck: when that precheck errors persistently the
@@ -391,16 +430,6 @@ groups:
           description: "Alloy is not tailing /logs/ingest/ingest.json — no Loki ruler alert reads this stream today, so nothing else will notice; the loss is forensic, and it lands exactly when an IngestHandoffErrors / IngestBackendUnavailable page needs the gateway's own log. Check the /var/iri/ingest/log mount and that the app's JSON file appender is still writing."
 
       - alert: LogStreamSilent
-        expr: absent(loki_source_file_read_lines_total{path=~"/logs/npm/.+_error\\.log"})
-        for: 1h
-        labels:
-          severity: warning
-          stream: npm-error
-        annotations:
-          summary: "Log stream not being tailed: NPM error logs"
-          description: "Alloy is not tailing any /logs/npm/*_error.log — the edge's own fault record ([emerg]/[error], upstream-connect failures, cert-renewal errors) is missing, which is the first thing an EdgeServerErrorSpike triage needs after the access log. Check the NPM log mount."
-
-      - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/fail2ban.log"})
         for: 1h
         labels:
@@ -416,7 +445,7 @@ groups:
       # docker-housekeeping timer is documented as optional outright); with no file, local.file_match
       # yields no target and no series, so an absent()-guard on them would fire forever on a correct
       # configuration — a dead alert, exactly what REQ-OBS-014 forbids. Their liveness is already
-      # covered from the metric side by BackupStaleOrMissing / DockerCleanupStaleOrMissing /
+      # covered from the metric side by BackupStaleOrMissing / ContainerCleanupStaleOrMissing /
       # RestoreDrillStaleOrMissing.
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/iri-deploy.log"})

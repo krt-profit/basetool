@@ -229,19 +229,19 @@ groups:
           description: "auth.log shows a sudo failure. The only non-root account has no sudo, so a failure implies an unexpected actor — investigate."
 
       - alert: EdgeServerErrorSpike
-        expr: sum(rate({app=~"edge|npm-access"} |~ " 5[0-9][0-9] " [5m])) > 1
+        expr: sum(rate({app="edge"} |~ " 5[0-9][0-9] " [5m])) > 1
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Edge (NPM) 5xx spike"
-          description: "The NPM access logs show an elevated 5xx rate at the edge — catches upstream failures app metrics cannot see."
+          summary: "Edge 5xx spike"
+          description: "The edge access log shows an elevated 5xx rate — catches upstream failures app metrics cannot see."
 
       # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in the custom
       # server_proxy.conf snippet) or the backend Bucket4j limiter passing through the edge —
       # either way a sustained rate means someone is flooding or brute-forcing.
       - alert: EdgeRateLimitSpike
-        expr: sum(rate({app=~"edge|npm-access"} |~ " 429 " [5m])) > 1
+        expr: sum(rate({app="edge"} |~ " 429 " [5m])) > 1
         for: 10m
         labels:
           severity: warning

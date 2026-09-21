@@ -167,7 +167,7 @@ sudo sshd -T 2>/dev/null | grep -E '^(passwordauthentication|permitrootlogin|cha
 
 > **NPM failed-login log-line format:** confirm on the isolated **test stack** (never prod) what an
 > NPM 2.15.1 admin-UI failed-login line looks like in `/var/iri/npm/data/logs`, so the Loki query on
-> dashboard 08 (`08-edge-npm.json`) matches real lines. Spin the test stack per the README's
+> dashboard 08 (`08-edge.json`) matches real lines. Spin the test stack per the README's
 > *Running the Local Test Stack* section, generate a failed login, and record the exact line shape.
 
 ---
@@ -199,6 +199,12 @@ sudo chown -R 65534:65534 /var/iri/monitoring/data/prometheus
 # the uid printed in `docker inspect --format '{{.Config.User}}' <image>` and restart it.
 sudo chown -R 65534:65534 /var/iri/monitoring/textfile   # node_exporter reads it; deploy/backup write it
 ```
+
+> [!important] On a rootless-Podman host the owner uid is TRANSLATED
+> The `chown 65534:65534` below is right under Docker, where a container's uid is the host's.
+> Under rootless Podman it is `subuid_base + N - 1` — 165533 for 65534, with the base this
+> deployment uses. The `docker run httpd` in 3.4 is `podman run` there too. See
+> [`PODMAN_CUTOVER_RUNBOOK.md` §0.5](PODMAN_CUTOVER_RUNBOOK.md).
 
 ### 3.2 `scrape_password` — the Spring apps' `/actuator/prometheus` basic-auth password
 
@@ -315,8 +321,16 @@ openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext 
 
 ### 3.7 `certs/grafana.crt` + `grafana.key` — Grafana's OWN self-signed cert
 
-NPM terminates the public Let's Encrypt cert and re-encrypts upstream to Grafana over HTTPS; NPM does
-not verify the upstream cert, so a self-signed one with `SAN dns:grafana` is fine.
+> [!note] NPM is retired; the conclusion still holds
+> ADR-0162 replaced Nginx Proxy Manager with the native edge. The edge's grafana vhost is the
+> one that deliberately does **not** `include upstream-tls.conf`, and says why in the file:
+> Grafana presents its own leaf rather than the shared Basetool certificate, so verifying it
+> would mean pinning something regenerated whenever the container is. The hop stays encrypted
+> and `net-proxy-grafana` carries exactly two members. A self-signed cert is still correct.
+>
+> On a **rootless Podman** host, `chown 472:472` below becomes the translated uid, and the SAN
+> should come from that host's `EDGE_HOST_GRAFANA` rather than the domain hardcoded here —
+> see [`PODMAN_CUTOVER_RUNBOOK.md` §0.6](PODMAN_CUTOVER_RUNBOOK.md).
 
 ```bash
 cd /var/iri/monitoring/certs
@@ -410,6 +424,17 @@ read arbitrary keys: the session store holds OAuth2 **refresh tokens**.
 > ```bash
 > sudo grep -c '^user default ' /var/iri/redis/users.acl   # must be 1, not 0
 > ```
+>
+> **`--requirepass` was removed on 2026-09-16, so this file is now the only thing
+> protecting Redis.** It was kept until then as “redundant belt-and-braces”; measured
+> against `redis:8-alpine`, it is not redundant but inert. With a `default` line the ACL
+> password wins and a different `--requirepass` is simply rejected; without one there is no
+> authentication at all **whether or not** `--requirepass` is given. It protected nothing in
+> either direction while putting the password on redis-server's argv.
+>
+> The check above is therefore no longer belt-and-braces either, and it is now asserted
+> rather than remembered: `scripts/check-conformance.py --only redis-requires-auth` opens a
+> socket, sends an unauthenticated `PING`, and requires `-NOAUTH`. It needs no credential.
 >
 > **This file MUST exist before the deploy that adds `--aclfile`.** If Redis starts with `--aclfile`
 > pointing at a missing/invalid file, prod Redis fails to start, the deploy health-gate trips, and the
@@ -849,15 +874,36 @@ steps to the keystore-rotation runbook in `docs/deployment.md`:
 2. **Re-issue the Grafana self-signed cert** if its SANs/validity changed (Phase 3.7), keeping
    `chown 472:472`.
 3. Restart the affected monitoring services so they reload the new files (`blackbox-exporter` mounts
-   the same CA for the `https_internal` probes):
+   the same CA for the `https_internal` probes).
+
+   On the **Podman** host, which is what production is since the cutover (ADR-0163) — the units are
+   `systemctl --user` units of the service user, so the restart runs as that user:
 
    ```bash
-   docker compose -p iri-monitoring -f /var/iri/code/docker-compose.monitoring.yml \
-     up -d --force-recreate prometheus grafana blackbox-exporter
+   sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) \
+     systemctl --user restart prometheus.service grafana.service blackbox-exporter.service
    ```
+
+   > [!note] Updated 2026-09-20
+   > This step read `docker compose -p iri-monitoring ... up -d --force-recreate` until then. There
+   > is no Docker on the host that runs this procedure any more, and a rotation runbook whose
+   > command does not exist is worse than no runbook, because it is followed during an incident.
 
    Then re-run Phase 8.1 (all targets UP) to confirm the app scrapes handshake against the new CA, and
    check the `blackbox-internal-tls` job's `probe_success == 1` for the three app targets.
+
+4. **Re-read the certificate FILES**, so the file-based expiry metrics describe what is now on disk:
+
+   ```bash
+   sudo systemctl start iri-cert-expiry.service
+   grep '^basetool_certificate_expiry_timestamp_seconds' \
+     /var/iri/monitoring/textfile/certificates.prom
+   ```
+
+   `basetool-ca.crt` is watched by `SelfSignedCertificateExpiring` (90 days) and the collector reads
+   it once a day, so without this the alert keeps reporting the **old** CA's expiry until the next
+   03:40 — either a firing alert that a rotation has already resolved, or, worse, a silent one
+   whose reading belongs to a file that no longer exists. See REQ-OBS-008.
 
 ---
 

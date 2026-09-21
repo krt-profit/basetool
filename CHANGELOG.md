@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Entwicklung: die Architektur ist jetzt vollständig nach arc42 dokumentiert.** Zwölf Kapitel unter `docs/arc42/` — Kontext, Bausteine, Laufzeit, Verteilung, Querschnitt, Qualität, Risiken und Glossar — mit dem Stand **nach** dem Podman-Umzug. Sie verweisen auf Specs und ADRs, statt sie zu wiederholen. Rein entwicklungsseitig.
+
 ### Changed
 
 - **Entwicklung: das Logging ist jetzt erzwungen einheitlich.** Produktionscode holt seinen Logger
@@ -17,12 +21,26 @@
   eigenen Code abgeleitete Nullbarkeits-Angabe bekommen. Rein entwicklungsseitig; das Verhalten der
   Anwendung ändert sich nicht (ADR-0192).
 
+- **Entwicklung: die letzten handgeschriebenen Accessoren sind jetzt Lombok.** Der Sweep aus
+  ADR-0192 hatte nur den Produktionsbereich erfasst; acht Getter und Setter in den Metrik-Beans und
+  in einer Testklasse sind jetzt Annotationen. Was stehen bleibt, ist gezählt statt behauptet: 123
+  Accessoren, die Lombok nicht schreiben kann, plus vier Interface-Implementierungen, die von Hand
+  bleiben, damit sie „@Override“ tragen können. Rein entwicklungsseitig.
+
 - **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
   als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
   die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge
   und der Frontend-Formatierer Prettier. Betrifft nur den Betrieb, nicht die Nutzung.
 
 ### Fixed
+
+- **Betrieb: die wöchentliche Aufräum-Aufgabe läuft wieder — und hätte beinahe Zertifikate
+  gelöscht.** Sie rief `docker` direkt auf; auf dem neuen Host gibt es kein `docker`, der Timer war
+  trotzdem aktiv und ihr Alarm feuerte dauerhaft. Sie erkennt die Laufzeit jetzt selbst. Zwei
+  Schritte entfallen auf Podman: `podman volume prune` kennt kein „nur anonyme" und hätte
+  `edge-certs` und `edge-acme-state` mitgenommen, und `builder prune` ist dort nur ein zweiter
+  Image-Prune. Der Grund für den Volume-Schritt wurde dafür an der Quelle beseitigt: die
+  Restore-Probe ließ bei jedem Lauf ein 156-MB-Volume zurück (ADR-0194).
 
 - **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
   die Verbindung mitten in einer Antwort ab, meldete das Frontend intern einen Erfolg mit
@@ -86,6 +104,20 @@
   antworten. Beides prüfen zwei neue Blackbox-Proben am Edge; die bisherigen Tests laufen nur im
   Prozess und blieben grün, während eine Edge-Regel die Route bricht (REQ-SEC-038, REQ-OBS-012).
 
+- **Betrieb: die internen Zertifikate werden jetzt vollständig auf Ablauf überwacht.** Bisher
+  sah die Überwachung nur Zertifikate, die auch ausgeliefert werden — die interne CA, an der
+  jede interne TLS-Verbindung hängt, wurde von nichts geprüft und wäre unbemerkt abgelaufen.
+  Ein Sammler auf dem Host liest die Zertifikatsdateien jetzt täglich; selbstsignierte melden
+  sich 90 Tage vorher, alle anderen 14 (REQ-OBS-008, REQ-OBS-011).
+
+### Removed
+
+- **Der alte Nginx Proxy Manager ist aus dem Stack entfernt.** Er lag seit der Umstellung auf den
+  neuen Edge-Proxy nur noch als Rückweg im `rollback`-Profil und startete im Normalbetrieb nicht.
+  Der Edge hat sich bewährt, also fällt die Rückfallebene weg (ADR-0162). Für Betreiber ändert sich
+  nichts am laufenden Betrieb; die Daten unter `/var/iri/npm` bleiben auf dem Host liegen und werden
+  nicht automatisch gelöscht.
+
 ### Changed
 
 - **Die Nutzungsbedingungen nennen jetzt ein Mindestalter von 18 Jahren.** Ein Zugang wird ohnehin
@@ -111,6 +143,12 @@
   **Deploy-Hinweis:** Anders als bisher dokumentiert ist das kein `deploy.sh --force`-Fall — der
   Deploy wendet eine Digest-Auffrischung innerhalb desselben `26.7`-Tags seit 2026-09-12 selbst an;
   der Keycloak-Container startet dabei neu.
+- **Betrieb: der Edge kann die echte Client-Adresse von einem vorgeschalteten Dienst übernehmen.**
+  Neue optionale Variable `EDGE_TRUSTED_PROXY`: ist sie leer, ändert sich nichts. Trägt sie die
+  Adresse eines Vorschalters, sprechen die öffentlichen Listener PROXY-Protocol und der Edge stellt
+  die Client-Adresse daraus wieder her — nötig für den Umzug auf rootless Podman, weil dessen
+  Port-Weiterleitung die Adresse sonst ersetzt (ADR-0187). Der Health-Check des Containers läuft
+  jetzt über einen eigenen Loopback-Listener auf Port 8081.
 
 - **Betrieb: die drei Java-Dienste brauchen weniger Arbeitsspeicher für dieselbe Arbeit.** Sie legen
   Objekte jetzt mit kompakten Kopfdaten ab (64 statt 96 Bit pro Objekt) — ab Java 27 ist das die
@@ -118,6 +156,78 @@
   bewusst unverändert, bis der Gewinn auf Produktion nachgemessen ist (REQ-OPS-030).
 
 ### Fixed
+
+- **Betrieb: auf der neuen Podman-Maschine wurde keine einzige Logzeile ausgeliefert.** Der Shipper
+  lief, wurde überwacht und meldete sich gesund — und schickte nichts: seine Pfade, Namen und Ports
+  stammen aus der Container-Welt und existieren für einen Host-Dienst nicht. Damit waren die
+  SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
+  und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
+
+- **Betrieb: die Cockpit-Weboberfläche wird entfernt.** Rockys Server-Installation bringt sie mit,
+  und ihr Socket lauscht auf allen Netzwerkschnittstellen. Die Hosts werden über SSH verwaltet, also
+  ist das ein zweiter Verwaltungszugang, den niemand nutzt und den trotzdem jemand aktuell halten
+  müsste. Die Provisionierung entfernt ihn und prüft, dass der Port wirklich frei ist.
+
+- **Betrieb: die Prüfung, ob der Sitzungsspeicher ein Passwort verlangt, lief auf dem neuen Host gar nicht.** Sie sprach ihn über eine Adresse an, die es dort vom Host aus nicht gibt, und lief in eine Zeitüberschreitung — ausgerechnet die Prüfung, die unauthentifizierten Zugriff finden soll. Sie fragt jetzt von innen und bringt ihre eigene Absicherung mit, damit sie sich nicht versehentlich selbst anmeldet.
+
+- **Betrieb: die Konformitätsprüfung konnte die Überwachung des neuen Hosts nicht abfragen.** Sie
+  sprach den Metrik-Dienst über eine Adresse an, die es auf dem neuen Container-Unterbau vom Host
+  aus nicht gibt, und meldete daraufhin „kein Überwachungssystem vorhanden" — über eines, das lief.
+  Drei Prüfungen hängen daran, alle drei sind beim Umzug vorgesehen.
+
+- **Betrieb: die Konformitätsprüfung sah auf dem neuen Host keine Container.** Sie meldete neun
+  laufende Dienste als abwesend — aus dem Verzeichnis, in dem eine Root-Anmeldung startet, kann der
+  Dienstnutzer nicht lesen, und der Fehler wurde verschluckt. Genau diese Prüfung soll den Umzug
+  absichern; sie hätte im entscheidenden Moment eine gesunde Maschine als kaputt gemeldet.
+
+- **Betrieb: das Löschen des Token-Ablaufdatums wirkt jetzt auch.** Ein Zugangstoken ohne Ablauf soll keine Ablaufdatei haben — genau das hatte der Deploy bisher nicht umgesetzt: die alte Kennzahl blieb liegen und der kritische Alarm feuerte dauerhaft dafür, dass man seiner eigenen Anweisung gefolgt war. Die Kennzahl wird jetzt entfernt, auch bei leerer oder unlesbarer Datei.
+
+- **Betrieb: ein toter Trace-Pfad fällt jetzt auf.** Die einzige Regel, die ihn beobachtete,
+  benutzte „es kamen schon einmal Spans an" als Ersatz für „Tracing ist eingeschaltet" — und konnte
+  deshalb einen Pfad, der noch nie funktioniert hat, gar nicht melden. Die Anwendungen melden ihren
+  Tracing-Zustand jetzt selbst, und zwei Regeln unterscheiden, ob die Spans schon den Kollektor nicht
+  erreichen oder erst danach verloren gehen (REQ-OBS-019).
+
+- **Betrieb: auf der neuen Maschine wären sämtliche Traces verschwunden.** Die Anwendungen senden ihre
+  Spans an den Namen `alloy`, den auf einem Podman-Host nichts mehr auflöst; verworfen wurde im
+  Exporter der Anwendung, wo keine Warnung hinsieht. Die Container bekommen den Namen jetzt zugeteilt
+  (REQ-OBS-019).
+
+- **Betrieb: `/var/log/secure` und das auditd-Protokoll waren für den Shipper unlesbar.** Auf der
+  RHEL-Familie gehören beide `root:root`, die Gruppenmitgliedschaft allein reicht also nicht. Die
+  Provisionierung setzt die Rechte jetzt und prüft am Ende, ob die Dateien wirklich geöffnet werden
+  können — die bisherige Zusicherung prüfte nur die Gruppe und war auf einem blinden Host grün.
+
+- **Betrieb: die Sicherung erfasst jetzt die Zertifikate und die Redis-Zugriffskontrolle.** Beides
+  fehlte, und beides braucht eine Wiederherstellung: ohne die TLS-Dateien kann ein
+  wiederhergestellter Host kein HTTPS ausliefern und muss neu ausstellen, wogegen ein
+  Wochenlimit steht; ohne die ACL-Datei startet Redis gar nicht. Die Sicherung hielt stattdessen
+  weiter den Stand des längst entfernten alten Proxys. Der wöchentliche Wiederherstellungstest
+  prüft die drei Dateien jetzt mit und schlägt Alarm, wenn eine fehlt (REQ-OPS-010, REQ-OPS-011).
+
+- **Betrieb: das Redis-Passwort liegt nicht mehr in der Umgebung des laufenden Containers.** Es war
+  dort gelandet, um eine spätere Podman-Prüfung zu bedienen, wirkte aber sofort im heutigen
+  Docker-Betrieb — lesbar aus `/proc/1/environ` und `docker inspect`, für ein Deployment, das den
+  Wert gar nicht braucht.
+
+- **Betrieb: die Container-Kennzahlen haben jetzt Alarme und ein Dashboard.** Die Serien, die
+  cAdvisor bei der Podman-Umstellung ersetzen, wurden zwar erhoben, aber von nichts gelesen. Speicher,
+  OOM-Kills, CPU-Drosselung und Prozesszahl lösen jetzt dieselben Alarme wie bisher aus — unter
+  beiden Container-Laufzeiten, ohne Lücke während der Umstellung — und zwei neue Alarme melden,
+  wenn der Sammler selbst stehenbleibt oder nichts mehr findet (REQ-OBS-011, REQ-OBS-014).
+
+- **Betrieb: mehrere Prüfungen und Vorlagen der Podman-Umstellung waren fehlerhaft.** Die
+  Konformitätsprüfung stufte die häufigste Schreibweise einer Bridge-Adresse als öffentlich ein und
+  meldete grün für genau den Fehler, den sie finden soll; acht ihrer Prüfungen riefen ein
+  `docker`-Programm auf, das der neue Host nicht hat. Der Unit-Generator verlor Argumentgrenzen in
+  Health-Kommandos, setzte kein Startzeitlimit und reichte `%`-Platzhalter ungeschützt durch, wodurch
+  beide Datenbanken mit zerstörtem Log-Präfix liefen. Ein zurückgezogener Dienst ließ seine
+  gerenderte Secret-Datei unbegrenzt auf dem Host zurück.
+
+- **Betrieb: der Deploy hätte auf dem Podman-Host jedes Mal abgebrochen.** Vor dem Anwenden lädt
+  `deploy.sh` die drei Anwendungs-Images vor; unter Podman bekam der Befehl statt der Image-Adresse
+  den Dienstnamen und scheiterte, was den ganzen Lauf beendete. Der Test dafür akzeptierte jede
+  Eingabe und meldete grün — er verlangt jetzt eine echte Image-Adresse.
 
 - **Einsätze: Teilnehmer lassen sich auf dem Handy wieder in eine Einheit ziehen.** Bisher öffnete
   langes Drücken das Kontextmenü des Browsers statt den Teilnehmer aufzunehmen — Ziehen war auf

@@ -1,0 +1,133 @@
+; systemd service for the weekly Profit Basetool container housekeeping.
+;
+; Installation (on the production host, one-time — see docs/deployment.md):
+;   sudo cp /var/iri/code/scripts/iri-container-cleanup.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-container-cleanup.timer   /etc/systemd/system/
+;   sudo systemctl daemon-reload
+;   sudo systemctl enable --now iri-container-cleanup.timer
+;
+; Run an immediate cleanup (bypassing the next scheduled tick):
+;   sudo systemctl start iri-container-cleanup.service
+;
+; Inspect:
+;   systemctl status iri-container-cleanup.timer
+;   journalctl -u iri-container-cleanup.service -f
+;
+; Runs as the same unprivileged `deploy` user as iri-backup / iri-deploy (member
+; of the `docker` group, no shell, no sudo): it needs the Docker socket to prune
+; unused resources, nothing more. DOCKER_CONFIG is pinned to a real path because
+; `deploy` is created with `--no-create-home` (no usable $HOME) and, under
+; ProtectHome=true, the Docker CLI would otherwise fail reading its config from
+; the unreachable $HOME/.docker — the same reason deploy.sh pins it.
+
+[Unit]
+Description=Profit Basetool — weekly container housekeeping (prune unused containers/images/networks)
+Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+# NOT `Requires=docker.service`. That line made all four of these units refuse to start on a
+# rootless-Podman host -- "Failed to create iri-deploy.service/start: Unit docker.service not
+# found" -- which is where the migration would have discovered it, on the new production host,
+# with the timers already enabled.
+#
+# Nothing replaces it, deliberately. The runtime is DETECTED by the script
+# (scripts/lib/container-runtime.sh), which refuses loudly when neither docker nor podman answers
+# -- a better failure than a unit that never ran, because it says which host is wrong and why. A
+# tick that fires while the runtime is still coming up costs one retry; the timer fires again.
+#
+# `Wants=`/`After=docker.service` are kept: an ordering or weak dependency on a unit that does not
+# exist is inert, and on the Docker host it still orders correctly.
+
+[Service]
+Type=oneshot
+
+User=deploy
+# NOT `Group=docker`. That group does not exist on a rootless-Podman host, and a unit naming a
+# group that does not exist refuses to start -- so all four of these were unstartable on the
+# platform the migration moves to.
+#
+# Removing it costs nothing on the Docker host: read from production 2026-09-18, the account is
+# `uid=999(deploy) gid=987(deploy) groups=987(deploy),988(docker)`, so it already CARRIES the
+# membership. With `User=` and no `Group=`, systemd takes the user's own primary group and
+# initialises its supplementary groups from the user database -- docker among them. The directive
+# was pinning what the account already had.
+#
+# On the Podman host the socket is not the path at all: the deploy account reaches the containers
+# through a sudoers rule naming two commands against the service user
+# (ansible/roles/basetool_host/tasks/22-deploy-user.yml), which is strictly narrower than docker
+# group membership, that being root-equivalent by design.
+
+; `deploy` has no usable $HOME, so point the Docker CLI at a real, writable path
+; (already in ReadWritePaths below). Mirrors the DOCKER_CONFIG the retired
+; docker-cleanup.cron drop-in used to export.
+Environment=DOCKER_CONFIG=/var/lib/iri/.docker
+
+ExecStart=/var/iri/code/scripts/container-cleanup.sh
+
+; stdout/stderr to journald AND to /var/log/iri-container-cleanup.log for
+; logrotate-kept history.
+StandardOutput=append:/var/log/iri-container-cleanup.log
+StandardError=append:/var/log/iri-container-cleanup.log
+
+; --- Hardening (mirrors iri-backup.service) --------------------------------
+; NOT NoNewPrivileges=true, and the reason is the whole point of this unit.
+;
+; This service's job is to act AS ANOTHER USER: under rootless Podman the containers belong to the
+; service account, and the deploy account reaches them through a sudoers rule naming two commands
+; against that one user (ansible/roles/basetool_host/tasks/22-deploy-user.yml). NoNewPrivileges
+; forbids exactly that, and sudo says so rather than failing quietly:
+;
+;     sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
+;
+; Measured on the testing host 2026-09-18: without the flag the same call lists all eleven
+; containers; with it, the runtime detection finds no user that owns any and the unit dies with
+; "podman is installed but no lingering user could be found". All four operational units carried
+; the flag, so none of them could ever have run on the platform this migration moves to.
+;
+; What is NOT lost. The privilege boundary was never this flag -- it is the sudoers rule, which
+; names two commands and one target user and is strictly narrower than the `Group=docker` this
+; replaces (that group is root-equivalent by design: it can bind-mount / into a privileged
+; container). Everything else below stays: ProtectSystem=strict, ProtectHome, PrivateTmp,
+; PrivateDevices, the kernel protections, RestrictNamespaces, and a ReadWritePaths list of four
+; directories.
+;
+; On the Docker host the flag was compatible because group membership is not a privilege GAIN.
+; It is removed on both, so the two deployments stay one file.
+ProtectSystem=strict
+; ProtectHome=read-only, NOT true. `true` makes /home an inaccessible empty tmpfs, and rootless
+; podman has to resolve the SERVICE user's home to find its container store:
+;
+;     cannot resolve /home/iri: lstat /home/iri: permission denied
+;
+; read-only keeps the protection that matters here -- this unit has no business writing into
+; anybody's home -- and was measured working on the testing host 2026-09-18, against a baseline
+; taken seconds earlier so a transient rootless-podman state could not be mistaken for a verdict.
+ProtectHome=read-only
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+; NOT RestrictNamespaces=true. Rootless Podman IS a user namespace: the flag makes the container
+; runtime fail with "cannot set user namespace" before it reaches any container. There is no
+; narrower form that works -- `RestrictNamespaces=user` fails identically, because podman needs
+; mount, pid, ipc, net and uts as well.
+RestrictRealtime=true
+LockPersonality=true
+; Writable paths the script needs:
+;   /var/lib/iri        — DOCKER_CONFIG (deploy has no usable $HOME)
+;   /var/iri/monitoring — the node_exporter textfile dir the script writes the
+;                         basetool_container_cleanup_* metrics into
+;   /var/log            — append to iri-container-cleanup.log
+;   /var/lock           — the container-cleanup flock
+ReadWritePaths=/var/lib/iri /var/iri/monitoring /var/log /var/lock
+
+; Pruning is light on this host; cap generously. The heavy lifting happens inside the container
+; runtime, out-of-band from this sandbox.
+MemoryMax=1G
+CPUQuota=200%
+
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target

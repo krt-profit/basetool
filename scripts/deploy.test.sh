@@ -54,6 +54,49 @@ mktmp() {
   mktemp -d "${TMPDIR:-/tmp}/deploy-sh-test.XXXXXX"
 }
 
+# --- a PATH that genuinely cannot reach one command ------------------------
+#
+# Deleting the stub does NOT make a tool absent: a GitHub runner carries a real
+# /usr/bin/skopeo, so the "host without skopeo" scenario ran against a working
+# host and then died on a real registry call -- green on a workstation with no
+# skopeo, red in CI, in the test whose entire subject is the tool being missing.
+# The same mistake, in the same shape, as the detection cases in
+# scripts/container-runtime.test.sh.
+#
+# The fix is a MIRROR of this host's PATH with one name left out: every command
+# deploy.sh could reach, minus skopeo. Hand-picking a coreutils list instead was
+# the obvious move and it is wrong -- a tool nobody thought of makes the script
+# exit 127 with no output, which looks nothing like the refusal under test.
+#
+# It needs real symlinks. Under MSYS (Git Bash on Windows) `ln -s` COPIES, and a
+# copied binary cannot find its DLLs, so the mirror is skipped there and the
+# scenario falls back to the ambient PATH. That is safe because the assertion is
+# made against whichever PATH is actually used: a host that has skopeo AND cannot
+# mirror fails loudly rather than quietly testing nothing.
+T_MINIMAL="$(mktemp -d "${TMPDIR:-/tmp}/deploy-sh-minimal.XXXXXX")"
+T_MINIMAL_OK=false
+if ln -s /dev/null "${T_MINIMAL}/.symprobe" 2>/dev/null && [[ -L "${T_MINIMAL}/.symprobe" ]]; then
+  rm -f "${T_MINIMAL}/.symprobe"
+  IFS=':' read -ra t_path_dirs <<< "${PATH}"
+  for t_dir in "${t_path_dirs[@]}"; do
+    [[ -d "${t_dir}" ]] || continue
+    for t_cmd in "${t_dir}"/*; do
+      [[ -f "${t_cmd}" && -x "${t_cmd}" ]] || continue
+      t_name="${t_cmd##*/}"
+      # The one omission, and the entire point of the mirror.
+      [[ "${t_name}" == "skopeo" ]] && continue
+      [[ -e "${T_MINIMAL}/${t_name}" ]] && continue
+      ln -s "${t_cmd}" "${T_MINIMAL}/${t_name}" 2>/dev/null || true
+    done
+  done
+  # A mirror that cannot run a shell is not a mirror.
+  if PATH="${T_MINIMAL}" env bash -c 'exit 0' >/dev/null 2>&1; then
+    T_MINIMAL_OK=true
+  fi
+fi
+rm -f "${T_MINIMAL}/.symprobe"
+trap 'rm -rf "${T_MINIMAL}"' EXIT
+
 # Builds a complete fake host layout under $1: compose dir with a dummy
 # compose file and .env, state dir, GHCR token, keystore, the stub `docker`
 # and `flock` binaries, and an empty invocation log. Exports the per-scenario
@@ -203,6 +246,155 @@ FAKE
   printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/flock"
   chmod +x "${T_FAKE_BIN}/flock"
 
+  # --- the Podman shape ------------------------------------------------------
+  #
+  # Production serves on Docker until the cutover and the new host serves on
+  # rootless Podman, so the deployer has TWO live shapes and only one of them was
+  # ever exercised here. These stubs are the second.
+  #
+  # They record into the same log, so the existing assert helpers work unchanged
+  # for both: what an assertion is about is the DECISION the deployer took, not
+  # which binary carried it out.
+  cat > "${T_FAKE_BIN}/podman" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'podman %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+
+lookup() { local var="$1_$2"; printf '%s' "${!var:-}"; }
+
+case "${1:-}" in
+  login) cat > /dev/null; exit 0 ;;
+  ps)
+    # Quadlet stamps PODMAN_SYSTEMD_UNIT on every container it starts, and the
+    # deployer filters on that label rather than on the name.
+    svc=""
+    for a in "$@"; do
+      case "$a" in
+        label=PODMAN_SYSTEMD_UNIT=*) svc="${a#label=PODMAN_SYSTEMD_UNIT=}"; svc="${svc%.service}" ;;
+      esac
+    done
+    if [[ -n "${svc}" ]]; then
+      val="$(lookup FAKE_PS "${svc}")"
+      if [[ -n "${val}" ]]; then printf '%s\n' "${val}"; fi
+    elif [[ -n "${FAKE_EDGE_PS:-}" ]]; then
+      printf '%s\n' "${FAKE_EDGE_PS}"
+    fi
+    exit 0
+    ;;
+  inspect)
+    cid="${!#}"
+    case "$*" in
+      *RepoDigests*) printf '%s\n' "$(lookup FAKE_REPODIGESTS "${cid#img-cid-}")" ;;
+      *.Image*)      printf 'img-%s\n' "${cid}" ;;
+      *)             printf 'false|%s\n' "$(lookup FAKE_STATE "${cid#cid-}")" ;;
+    esac
+    exit 0
+    ;;
+  image)
+    img="${!#}"
+    printf '%s\n' "$(lookup FAKE_REPODIGESTS "${img#img-cid-}")"
+    exit 0
+    ;;
+  create) echo "created-cid"; exit 0 ;;
+  cp)
+    # podman cp <cid>:/config - -- a TAR ON STDOUT, which is what the seam asks for under podman
+    # so that the extraction happens as the CALLER and not as the service user. The stub has to
+    # produce a real archive: a stub that copied a directory instead would pass while the code it
+    # is standing in for streams, and the difference is the whole reason the podman arm exists.
+    if [[ -n "${FAKE_CONFIG_BUNDLE:-}" && "${3:-}" == "-" ]]; then
+      tar -cf - -C "${FAKE_CONFIG_BUNDLE}" . 2>/dev/null
+    fi
+    exit 0
+    ;;
+  rm) exit 0 ;;
+  pull)
+    # What deploy.sh asks podman to pull has to be a REFERENCE. Under compose a
+    # SERVICE name is enough, because compose maps it to that service's pinned
+    # image; podman has no such mapping, so a bare `backend` is resolved against
+    # the host's unqualified-search registries -- on Rocky that is
+    # registry.access.redhat.com, registry.redhat.io and docker.io -- and either
+    # fails or, worse, succeeds against a stranger's image.
+    #
+    # A stub that exited 0 for anything would let that ship: the deployer would
+    # look tested and abort at "pulling images" on the real host.
+    ref=""
+    for a in "$@"; do
+      case "$a" in
+        pull | --quiet | -q) ;;
+        *) ref="$a" ;;
+      esac
+    done
+    case "${ref}" in
+      */*@sha256:*) ;;
+      *)
+        echo "Error: invalid reference \"${ref}\": a bare name is not a pullable image reference" >&2
+        exit 125
+        ;;
+    esac
+    exit "${FAKE_PULL_RC:-0}"
+    ;;
+  *)      exit 0 ;;
+esac
+FAKE
+  chmod +x "${T_FAKE_BIN}/podman"
+
+  # skopeo replaces `docker buildx imagetools inspect`: it resolves a tag to a
+  # digest WITHOUT pulling, which is the property the deployer depends on.
+  cat > "${T_FAKE_BIN}/skopeo" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'skopeo %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+case "$*" in
+  *basetool-backend:*)      d="${FAKE_REMOTE_BACKEND}" ;;
+  *basetool-frontend:*)     d="${FAKE_REMOTE_FRONTEND}" ;;
+  *basetool-ingest:*)       d="${FAKE_REMOTE_INGEST}" ;;
+  *basetool-config:*)       d="${FAKE_REMOTE_CONFIG}" ;;
+  *basetool-keycloak-spi:*) d="${FAKE_REMOTE_KCSPI}" ;;
+  *) exit 1 ;;
+esac
+printf '{"Digest":"%s"}\n' "$d"
+FAKE
+  chmod +x "${T_FAKE_BIN}/skopeo"
+
+  # `systemctl --user start <unit>` IS the health gate under Quadlet: Notify=healthy
+  # makes the unit Type=notify, so the call blocks until podman reports healthy and
+  # returns non-zero when it does not. FAKE_UP_RC models exactly that -- the same
+  # variable the compose `up --wait` arm uses, because it is the same decision.
+  cat > "${T_FAKE_BIN}/systemctl" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'systemctl %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+case "$*" in
+  *daemon-reload*) exit 0 ;;
+  *start*|*restart*)
+    # FAKE_UNHEALTHY_DIGEST models ONE broken release rather than a broken host:
+    # the unit whose digest-pin drop-in binds that digest never reports healthy,
+    # every other unit does. A flat FAKE_UP_RC=1 would fail the rollback's own
+    # start too, and "rolled back" and "rollback also failed" would stop being
+    # distinguishable -- which is exactly the pair a rollback test is about.
+    if [[ -n "${FAKE_UNHEALTHY_DIGEST:-}" && -n "${RT_UNIT_DIR:-}" ]]; then
+      unit=""
+      for a in "$@"; do
+        case "$a" in *.service) unit="${a%.service}" ;; esac
+      done
+      pin="${RT_UNIT_DIR}/${unit}.container.d/10-digest-pin.conf"
+      if [[ -n "${unit}" && -f "${pin}" ]] && grep -q "${FAKE_UNHEALTHY_DIGEST}" "${pin}"; then
+        echo "Job for ${unit}.service failed: start operation timed out" >&2
+        exit 1
+      fi
+    fi
+    exit "${FAKE_UP_RC:-0}"
+    ;;
+esac
+exit 0
+FAKE
+  chmod +x "${T_FAKE_BIN}/systemctl"
+
+  # The Quadlet generator. Its PRESENCE is what the pre-flight asserts: a host
+  # without it cannot turn .container files into services at all.
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/quadlet"
+  chmod +x "${T_FAKE_BIN}/quadlet"
+
   # Stub cosign for the host-side signature gate (REQ-OPS-015). Records the
   # invocation and exits FAKE_COSIGN_RC (default 0 = signature trusted); a
   # scenario sets FAKE_COSIGN_RC=1 to model a verification failure (a :stable
@@ -286,9 +478,16 @@ run_deploy() {
       script_args+=("${arg}")
     fi
   done
+  # RUN_DEPLOY_MINIMAL_PATH=1 swaps the inherited PATH for the staged one, which
+  # is the only way a "this tool is not installed" scenario can mean anything on
+  # a runner that has the tool.
+  local run_path="${T_FAKE_BIN}:${PATH}"
+  if [[ "${RUN_DEPLOY_MINIMAL_PATH:-0}" == "1" ]]; then
+    run_path="${T_FAKE_BIN}:${T_MINIMAL}"
+  fi
   LAST_OUTPUT="$(
     env \
-      PATH="${T_FAKE_BIN}:${PATH}" \
+      PATH="${run_path}" \
       IRI_COMPOSE_DIR="${T_COMPOSE_DIR}" \
       IRI_STATE_DIR="${T_STATE_DIR}" \
       IRI_MONITORING_TEXTFILE_DIR="${T_STATE_DIR}/textfile" \
@@ -1063,6 +1262,57 @@ scenario_break_glass_skips_verify() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 15b: cosign installed but not on PATH. "Not on PATH" and "not
+# installed" are different facts and on Rocky they come apart: the role installs
+# cosign to /usr/local/bin, and sudo's `secure_path` there is
+# `/sbin:/bin:/usr/sbin:/usr/bin`. So `sudo -u deploy deploy.sh` — the manual
+# invocation this script's own usage block documents — aborted with "install
+# cosign" on a host that had it. Measured on the testing host 2026-09-20.
+#
+# The TIMER never saw it: a systemd service gets systemd's PATH, which includes
+# /usr/local/bin. That asymmetry is exactly why it needs a test — the failure is
+# invisible on the path CI and the runbook exercise, and waits for the operator
+# who types the other one.
+# ---------------------------------------------------------------------------
+scenario_cosign_off_path() {
+  echo "Scenario: cosign is installed but not on PATH (sudo secure_path)"
+  local tmp rc=0 alt
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+
+  # Move the stub OUT of the staged PATH and into a directory that stands in for
+  # /usr/local/bin, then point the search there. Nothing else changes.
+  alt="${tmp}/not-on-path"
+  mkdir -p "${alt}"
+  mv "${T_FAKE_BIN}/cosign" "${alt}/cosign"
+
+  mapfile -t fake < <(converged_env)
+  RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
+    "IRI_COSIGN_SEARCH_PATH=${alt}" || rc=$?
+  assert_exit 0 "$rc" "the deploy succeeds with cosign off PATH but findable"
+  assert_contains "but not on PATH" "it says where it found cosign, rather than aborting"
+  assert_docker "cosign verify" "and it still verifies every signature"
+
+  # ...and with nothing to find, it must still fail closed and name where it looked.
+  #
+  # The stub log is truncated first: it ACCUMULATES across run_deploy calls, so without this the
+  # `assert_no_docker` below would read the first run's perfectly legitimate `cosign verify` and go
+  # red for the wrong reason. It did, on the first run of this scenario.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  write_marker "sha256:backend-old|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+  RUN_DEPLOY_MINIMAL_PATH=1 run_deploy -- "${fake[@]}" \
+    "IRI_COSIGN_SEARCH_PATH=${tmp}/nowhere" || rc=$?
+  assert_exit 1 "$rc" "a genuinely missing cosign still fails closed"
+  assert_contains "cosign not found on PATH or under" "the abort names where it looked"
+  assert_no_docker "cosign verify" "nothing is verified when cosign is absent"
+
+  mv "${alt}/cosign" "${T_FAKE_BIN}/cosign"
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 16: the GHCR token-expiry gauge is emitted on EVERY tick — including
 # the idempotence no-op — so the GhcrPullTokenExpiring alert never goes stale.
 # ---------------------------------------------------------------------------
@@ -1083,6 +1333,59 @@ scenario_token_expiry_metric() {
   else
     record 0 "the token-expiry gauge is written on the no-op tick"
   fi
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 16b: deleting the expiry file is the DOCUMENTED action when the PAT
+# turns out not to expire, and it has to actually silence the gauge. Until
+# 2026-09-20 write_token_expiry_metric returned early on an absent file without
+# removing ghcr-token.prom, so node_exporter kept serving the last recorded
+# timestamp and GhcrPullTokenExpired fired critical forever -- for following the
+# alert's own instructions. Both no-expiry shapes are covered: the file removed,
+# and the file emptied.
+# ---------------------------------------------------------------------------
+scenario_token_expiry_removed_clears_the_gauge() {
+  echo "Scenario: removing the expiry file removes the gauge"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+
+  # First a tick WITH an expiry, so there is something to clear.
+  printf '2026-10-01\n' > "${T_TOKEN}.expiry"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick that records an expiry exits 0"
+  if grep -q '^basetool_ghcr_token_expiry_timestamp [1-9]' \
+       "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
+    record 1 "the gauge exists before the expiry file is removed"
+  else
+    record 0 "the gauge exists before the expiry file is removed"
+  fi
+
+  # Now the operator learns the PAT does not expire and deletes the sidecar.
+  rm -f "${T_TOKEN}.expiry"
+  rc=0
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick after removing the expiry file exits 0"
+  if [[ -e "${T_STATE_DIR}/textfile/ghcr-token.prom" ]]; then
+    record 0 "the gauge file is gone once no expiry is recorded"
+  else
+    record 1 "the gauge file is gone once no expiry is recorded"
+  fi
+
+  # An EMPTY file is the same statement and must behave the same way.
+  : > "${T_TOKEN}.expiry"
+  rc=0
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick with an empty expiry file exits 0"
+  if [[ -e "${T_STATE_DIR}/textfile/ghcr-token.prom" ]]; then
+    record 0 "an empty expiry file leaves no gauge behind either"
+  else
+    record 1 "an empty expiry file leaves no gauge behind either"
+  fi
+
   rm -rf "${tmp}"
 }
 
@@ -1172,6 +1475,7 @@ scenario_signature_verified_on_apply
 scenario_signature_failure_aborts
 scenario_transient_verify_failure_retries
 scenario_break_glass_skips_verify
+scenario_cosign_off_path
 # ---------------------------------------------------------------------------
 # Scenario 19: --check-only over a CONVERGED stack still runs the signature
 # preflight (it does not take the plain no-op fast exit), reporting "no change"
@@ -1233,6 +1537,65 @@ scenario_config_mirrors_edge() {
     record 1 "the conf.d and include trees came with it"
   else
     record 0 "conf.d / include were not mirrored"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# The mode the mirrored tree lands with must not depend on WHO started the
+# deploy. Rocky's hardened baseline sets `UMASK 027` in /etc/login.defs and
+# /etc/profile; a systemd service gets 0022. So the same deploy produced
+# /var/iri/code/... at 0755 under the timer and 0750 under
+# `sudo -u deploy deploy.sh` — the invocation deploy.sh's own usage block
+# documents — and rootless Podman resolves bind mounts AS the service user,
+# which is not in group `deploy` and cannot traverse a 0750 directory.
+#
+# Measured on the testing host 2026-09-20: keycloak and edge both exited 125
+# with `statfs /var/iri/code/keycloak-theme/krt-theme: permission denied`, on a
+# path that plainly existed. It does not fail at apply time — the deploy reports
+# the config applied, and the failure arrives later as a health-check timeout
+# and a rollback that fails the same way.
+#
+# Asserted as an INVARIANT rather than against a literal 0755: the two runs must
+# agree. That is the property that matters and it holds on any platform, which
+# a hardcoded mode would not.
+# ---------------------------------------------------------------------------
+scenario_config_mirror_ignores_caller_umask() {
+  echo "Scenario: the mirrored config tree does not depend on the caller's umask"
+  local tmp rc=0 saved mode_lax mode_strict
+  for saved in 022 027; do
+    tmp="$(mktmp)"
+    setup_host "${tmp}"
+    local bundle="${tmp}/bundle"
+    mkdir -p "${bundle}/docker/edge/conf.d"
+    echo "# dummy compose file" > "${bundle}/docker-compose.yml"
+    echo "worker_processes auto;" > "${bundle}/docker/edge/nginx.conf"
+    echo "# vhost" > "${bundle}/docker/edge/conf.d/10-frontend.conf"
+    write_marker "${MARKER}"
+    mapfile -t fake < <(converged_env)
+
+    local before
+    before="$(umask)"
+    umask "${saved}"
+    rc=0
+    run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" \
+      "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    umask "${before}"
+
+    assert_exit 0 "$rc" "a config-only change applies with the caller's umask ${saved}"
+    if [[ "${saved}" == "022" ]]; then
+      mode_lax="$(stat -c '%a' "${T_COMPOSE_DIR}/docker/edge" 2>/dev/null || echo unknown)"
+    else
+      mode_strict="$(stat -c '%a' "${T_COMPOSE_DIR}/docker/edge" 2>/dev/null || echo unknown)"
+    fi
+    rm -rf "${tmp}"
+  done
+
+  if [[ "${mode_lax}" == "unknown" || "${mode_strict}" == "unknown" ]]; then
+    record 0 "could not read the mirrored directory's mode"
+  elif [[ "${mode_lax}" == "${mode_strict}" ]]; then
+    record 1 "umask 022 and 027 both produce ${mode_strict} on docker/edge"
+  else
+    record 0 "the caller's umask leaked into the tree: 022 -> ${mode_lax}, 027 -> ${mode_strict}"
   fi
 }
 
@@ -1316,7 +1679,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
   assert_contains "certificates differs" "the certificate drift is named in the log"
-  assert_docker "--force-recreate --no-deps edge" "the edge is recreated to load them"
+  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "the edge is recreated to load them"
   if [[ -s "${T_STATE_DIR}/edge/certs.sha256" ]]; then
     record 1 "the fingerprint is persisted for the next tick"
   else
@@ -1329,14 +1692,14 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "an unchanged tick succeeds"
-  assert_no_docker "--force-recreate --no-deps edge" "an unchanged certificate recreates nothing"
+  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unchanged certificate recreates nothing"
 
   # 3. acme renewed it.
   : > "${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
   assert_exit 0 "$rc" "the renewal tick succeeds"
-  assert_docker "--force-recreate --no-deps edge" "a renewed certificate is loaded"
+  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "a renewed certificate is loaded"
 
   # 4. The exec failed. "Could not tell" must not read as "no certificates" —
   #    sha256sum of an empty input is a valid hash, and folding it in would
@@ -1345,7 +1708,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
   assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
-  assert_no_docker "--force-recreate --no-deps edge" "an unreadable certificate recreates nothing"
+  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unreadable certificate recreates nothing"
 
   rm -rf "${tmp}"
 }
@@ -1372,13 +1735,466 @@ scenario_check_only_verify_fail() {
 }
 
 scenario_config_mirrors_edge
+scenario_config_mirror_ignores_caller_umask
 scenario_edge_reloads_a_renewed_certificate
 scenario_infra_digest_refresh_is_not_gated
 scenario_token_expiry_metric
+scenario_token_expiry_removed_clears_the_gauge
 scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected
 scenario_check_only_noop_verifies
 scenario_check_only_verify_fail
+
+# ---------------------------------------------------------------------------
+# The Podman shape.
+#
+# Everything above exercises Docker. Both runtimes are live at once -- production
+# serves on Docker until the cutover, the new host serves on rootless Podman --
+# and a deployer path that has never run is a path nobody has tested, whatever it
+# looks like on the page.
+#
+# Digests here are real-shaped (64 hex characters) and not the readable
+# `sha256:backend-current` the Docker scenarios use, because they have to be: the
+# Podman resolver parses skopeo's JSON with a sed pattern that requires exactly
+# 64 hex characters and silently yields nothing for anything shorter. A test that
+# fed it the short form would exercise the failure path while reading like the
+# happy one.
+# ---------------------------------------------------------------------------
+
+# A readable 64-hex digest: the tag, then zero padding.
+hexdig() {
+  local tag="$1" pad=""
+  while (( ${#tag} + ${#pad} < 64 )); do pad="${pad}0"; done
+  printf 'sha256:%s%s' "${tag}" "${pad}"
+}
+
+PDIG_BACKEND="$(hexdig beef)"
+PDIG_FRONTEND="$(hexdig face)"
+PDIG_INGEST="$(hexdig 1ce)"
+PDIG_CONFIG="$(hexdig c0ffee)"
+PDIG_KCSPI="$(hexdig 5b1)"
+PDIG_BACKEND_NEW="$(hexdig dead)"
+PMARKER="${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDIG_KCSPI}"
+# The marker of a host still on the OLD backend: config and keycloak-spi match the
+# registry, so a deploy from here moves the app images only and never enters the
+# config-bundle extraction path.
+PMARKER_OLD="$(hexdig ba5e)|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDIG_KCSPI}"
+
+# Everything a scenario needs to drive the Podman arm: the backend forced, the
+# Quadlet generator pointed at the stub, and a unit directory that exists --
+# the pre-flight refuses a host where it does not.
+podman_env() {
+  printf '%s\n' \
+    "RT_BACKEND=podman" \
+    "IRI_QUADLET_BIN=${T_FAKE_BIN}/quadlet" \
+    "RT_UNIT_DIR=${T_UNIT_DIR}" \
+    "FAKE_REMOTE_BACKEND=${PDIG_BACKEND}" \
+    "FAKE_REMOTE_FRONTEND=${PDIG_FRONTEND}" \
+    "FAKE_REMOTE_INGEST=${PDIG_INGEST}" \
+    "FAKE_REMOTE_CONFIG=${PDIG_CONFIG}" \
+    "FAKE_REMOTE_KCSPI=${PDIG_KCSPI}"
+}
+
+# A converged Podman host: three running containers whose images carry the
+# digests the registry is serving.
+podman_converged_env() {
+  printf '%s\n' \
+    "FAKE_PS_backend=cid-backend" \
+    "FAKE_PS_frontend=cid-frontend" \
+    "FAKE_PS_ingest=cid-ingest" \
+    "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@${PDIG_BACKEND}" \
+    "FAKE_REPODIGESTS_frontend=ghcr.io/krt-profit/basetool-frontend@${PDIG_FRONTEND}" \
+    "FAKE_REPODIGESTS_ingest=ghcr.io/krt-profit/basetool-ingest@${PDIG_INGEST}"
+}
+
+# Creates the Quadlet unit directory the pre-flight insists on and exports its
+# path, and seeds it with the units a host that has been deployed to actually
+# has. Called after setup_host, before podman_env is expanded.
+#
+# The seeding is not decoration. A Podman host with an EMPTY unit directory has
+# no stack at all, so the deployer treats it as a config divergence and stages
+# the bundle to fill it -- which means a scenario that left the directory empty
+# was modelling a host that cannot exist, and testing the wrong path.
+# podman_units_empty() is for the one scenario that wants that state on purpose.
+podman_units_empty() {
+  T_UNIT_DIR="${1}/units"
+  mkdir -p "${T_UNIT_DIR}"
+}
+
+podman_units() {
+  podman_units_empty "$1"
+  local svc
+  for svc in backend frontend ingest; do
+    printf '[Container]
+ContainerName=%s
+Image=placeholder
+' "${svc}"       > "${T_UNIT_DIR}/${svc}.container"
+  done
+}
+
+scenario_podman_resolves_without_pulling() {
+  echo "Scenario: podman resolves a tag through skopeo, and never pulls to do it"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a converged stack exits 0"
+  assert_contains "container runtime: podman" "podman: the runtime is detected as podman"
+  assert_docker "skopeo inspect" "podman: the tag is resolved with skopeo"
+  assert_no_docker "buildx" "podman: buildx is never reached for a digest"
+  assert_no_docker "podman pull" "podman: resolving a tag does not PULL the image"
+  assert_no_docker "compose" "podman: compose is never invoked"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_applies_through_systemd() {
+  echo "Scenario: podman applies through systemd, and the unit start IS the health gate"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a deploy that moves the backend exits 0"
+  assert_contains "deploy successful" "podman: the deploy reports success"
+  # There is no --wait to pass: Notify=healthy makes each unit Type=notify, so
+  # `systemctl start` does not return until podman reports the container healthy.
+  assert_docker "systemctl --user daemon-reload" "podman: the units are re-read before anything starts"
+  # RESTART, not start. The scenario moves the backend's digest, so the deployer re-pins it -- and
+  # `systemctl start` on an already-active unit returns 0 without re-reading anything, which would
+  # leave the old container running the old image. Asserting `start` here is what let that ship.
+  assert_docker "systemctl --user restart backend.service" "podman: a re-pinned service is restarted, so the new image actually lands"
+  assert_docker "systemctl --user start db-backend.service" "podman: ...and an untouched one is only started, so the database stays up"
+  assert_no_docker "compose" "podman: compose is never invoked on the apply path"
+  if grep -q "${PMARKER}" "${T_STATE_DIR}/last-deployed.digests"; then
+    record 1 "podman: the idempotence marker advances to the new target"
+  else
+    record 0 "podman: the idempotence marker advances to the new target"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_pin_is_a_dropin() {
+  echo "Scenario: the digest pin is a Quadlet drop-in, not just a record"
+  local tmp
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" >/dev/null 2>&1 || true
+  local pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
+  if [[ -f "${pin}" ]] \
+    && grep -q '^\[Container\]$' "${pin}" \
+    && grep -q "^Image=.*@${PDIG_BACKEND}\$" "${pin}"; then
+    record 1 "podman: the pin is a [Container] drop-in binding Image= by digest"
+  else
+    record 0 "podman: the pin is a [Container] drop-in binding Image= by digest"
+  fi
+  # The record is written too -- it is the only place the PREVIOUS digests
+  # survive once the drop-ins have been overwritten, so a rollback needs it.
+  if grep -rq "${PDIG_BACKEND}" "${T_STATE_DIR}"/*.yml 2>/dev/null; then
+    record 1 "podman: the pin record is written beside the drop-ins"
+  else
+    record 0 "podman: the pin record is written beside the drop-ins"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_health_gate_rolls_back() {
+  echo "Scenario: a unit that never reports healthy rolls the release BACK, not forward"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  # A first deploy that succeeds, so a previous pin exists to roll back TO.
+  run_deploy -- "${pod[@]}" "${conv[@]}" >/dev/null 2>&1 || true
+  local pin="${T_UNIT_DIR}/backend.container.d/10-digest-pin.conf"
+
+  # Now a new backend digest whose unit never reaches healthy. The stub refuses
+  # to start exactly the unit whose drop-in binds the broken digest -- which is
+  # what a failed `Notify=healthy` start is -- so the rollback's own start can
+  # succeed and the two outcomes stay distinguishable.
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_REMOTE_BACKEND=${PDIG_BACKEND_NEW}" \
+    "FAKE_UNHEALTHY_DIGEST=${PDIG_BACKEND_NEW}" || rc=$?
+  assert_exit 1 "$rc" "podman: a failed health gate exits non-zero"
+  assert_contains "rolling back" "podman: the failed release is rolled back"
+  assert_contains "rolled back to previous digest pin successfully" \
+    "podman: the rollback's own apply reaches health"
+  # The rollback is only real if the DROP-IN went back with the record. Under
+  # Quadlet the record binds nothing; restoring it alone would leave the failed
+  # digest bound and roll silently FORWARD into the release that just failed.
+  if grep -q "${PDIG_BACKEND_NEW}" "${pin}" 2>/dev/null; then
+    record 0 "podman: the drop-in is rebound away from the failed digest"
+  elif grep -q "${PDIG_BACKEND}" "${pin}" 2>/dev/null; then
+    record 1 "podman: the drop-in is rebound away from the failed digest"
+  else
+    record 0 "podman: the drop-in is rebound away from the failed digest"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_refuses_without_skopeo() {
+  echo "Scenario: a podman host without skopeo refuses instead of proceeding"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  rm -f "${T_FAKE_BIN}/skopeo"
+  # The isolation is asserted against the PATH this scenario ACTUALLY uses, not
+  # assumed. Without this it passed on a workstation and, on a runner carrying
+  # /usr/bin/skopeo, tested a host that had the tool all along.
+  local use_minimal=0 eff_path="${T_FAKE_BIN}:${PATH}"
+  if [[ "${T_MINIMAL_OK}" == "true" ]]; then
+    use_minimal=1
+    eff_path="${T_FAKE_BIN}:${T_MINIMAL}"
+  fi
+  if PATH="${eff_path}" command -v skopeo >/dev/null 2>&1; then
+    record 0 "podman: the scenario's PATH really cannot reach a skopeo"
+  else
+    record 1 "podman: the scenario's PATH really cannot reach a skopeo"
+  fi
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  RUN_DEPLOY_MINIMAL_PATH="${use_minimal}" run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a host without skopeo refuses"
+  assert_contains "skopeo not available" "podman: and names the missing tool"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_refuses_without_quadlet() {
+  echo "Scenario: a podman host whose Quadlet generator is missing refuses"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  # Point the override at a path that does not exist. Without the generator a
+  # .container file is an inert text file and nothing can ever start.
+  run_deploy -- "${pod[@]}" "${conv[@]}" "IRI_QUADLET_BIN=${tmp}/no-such-quadlet" || rc=$?
+  assert_exit 1 "$rc" "podman: a host without the Quadlet generator refuses"
+  assert_contains "Quadlet generator is missing" "podman: and says which piece is absent"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_resolves_without_pulling
+scenario_podman_applies_through_systemd
+scenario_podman_pin_is_a_dropin
+scenario_podman_health_gate_rolls_back
+scenario_podman_refuses_without_skopeo
+scenario_podman_refuses_without_quadlet
+
+# --- the Quadlet units as a release payload --------------------------------
+#
+# Until 2026-09-18 nothing put a unit file on a host: the config bundle did not
+# carry them, the Ansible role states it never ships them, and deploy.sh only
+# checked the directory was not empty. The units on the testing host had arrived
+# by an operator action nobody recorded, and a release could change an image, a
+# health command or a memory limit with no path to production at all.
+
+# A bundle fixture: a compose file (the docker arm still needs one), the units,
+# and an env.d template. $1 is the directory to build it in.
+write_bundle() {
+  local b="$1"
+  mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
+  echo "# promoted compose" > "${b}/docker-compose.yml"
+  printf '[Container]\nContainerName=backend\nImage=placeholder\n'  > "${b}/quadlet/systemd/backend.container"
+  printf '[Container]\nContainerName=frontend\nImage=placeholder\n' > "${b}/quadlet/systemd/frontend.container"
+  printf '[Network]\nNetworkName=net-app\n'                          > "${b}/quadlet/systemd/net-app.network"
+  # shellcheck disable=SC2016
+  # Literal on purpose: an env.d TEMPLATE carries the placeholder, and render-env-d.py is what
+  # substitutes it on the host. Expanding it here would bake this machine's value into the fixture.
+  printf 'BACKEND_TOKEN=${IRI_KEYSTORE_HOST_PATH:?}\n'                > "${b}/quadlet/env.d/backend.env.tmpl"
+}
+
+# A stub renderer, so the scenario tests what DEPLOY.SH does rather than
+# re-testing render-env-d.py, which has its own suite.
+write_env_renderer() {
+  cat > "${T_FAKE_BIN}/render-env-d.py" <<'REND'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'render-env-d %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+out=""
+prev=""
+for a in "$@"; do
+  [[ "${prev}" == "--out" ]] && out="$a"
+  prev="$a"
+done
+[[ -n "${out}" ]] || exit 2
+mkdir -p "${out}"
+echo "rendered" > "${out}/backend.env"
+REND
+  chmod +x "${T_FAKE_BIN}/render-env-d.py"
+}
+
+scenario_podman_bundle_installs_the_units() {
+  echo "Scenario: the config bundle delivers the Quadlet units, which is how a release reaches a Podman host"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+
+  # The host as it is before the release: one stale unit, one that this release
+  # retires, and a digest pin drop-in that must survive both.
+  printf '[Container]\nContainerName=backend\nImage=OLD\n' > "${T_UNIT_DIR}/backend.container"
+  printf '[Container]\nContainerName=retired\n'             > "${T_UNIT_DIR}/retired.container"
+  mkdir -p "${T_UNIT_DIR}/backend.container.d"
+  echo "# an operator drop-in" > "${T_UNIT_DIR}/backend.container.d/20-host-alias.conf"
+
+  # A marker whose CONFIG digest differs from the registry's, so the bundle is staged.
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+  assert_exit 0 "$rc" "podman: a deploy that ships new units exits 0"
+
+  if grep -q '^Image=placeholder$' "${T_UNIT_DIR}/backend.container" 2>/dev/null; then
+    record 1 "podman: the release's unit replaced the stale one on the host"
+  else
+    record 0 "podman: the release's unit replaced the stale one on the host"
+  fi
+  if [[ -f "${T_UNIT_DIR}/net-app.network" ]]; then
+    record 1 "podman: networks and volumes ride the same path as containers"
+  else
+    record 0 "podman: networks and volumes ride the same path as containers"
+  fi
+  # The drop-in is what BINDS the digest this release pinned. A mirror with
+  # --delete over the unit directory would take it with the retired unit, and the
+  # stack would silently fall back to whatever the base unit's Image= says.
+  if [[ -f "${T_UNIT_DIR}/backend.container.d/20-host-alias.conf" ]]; then
+    record 1 "podman: an operator drop-in survives a unit install"
+  else
+    record 0 "podman: an operator drop-in survives a unit install"
+  fi
+  if [[ -f "${T_COMPOSE_DIR}/env.d/backend.env" ]]; then
+    record 1 "podman: env.d is rendered on the host, from the host's own .env"
+  else
+    record 0 "podman: env.d is rendered on the host, from the host's own .env"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_retired_unit_is_stopped_then_removed() {
+  echo "Scenario: a unit the release retires is stopped BEFORE its file is removed"
+  local tmp
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+  printf '[Container]\nContainerName=retired\n' > "${T_UNIT_DIR}/retired.container"
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" >/dev/null 2>&1 || true
+
+  if [[ -f "${T_UNIT_DIR}/retired.container" ]]; then
+    record 0 "podman: the retired unit file is removed"
+  else
+    record 1 "podman: the retired unit file is removed"
+  fi
+  # Quadlet only generates a service for a unit file that EXISTS. Delete the file
+  # first and systemd forgets the unit while its container keeps running --
+  # unmanaged, and invisible to every later reconcile.
+  assert_docker "stop retired.service" "podman: ...and it was stopped first, so no container is orphaned"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_first_deploy_fills_an_empty_unit_dir() {
+  echo "Scenario: the first deploy on a freshly provisioned host installs the units it finds none of"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units_empty "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+  # The marker matches the registry exactly, so nothing is "changed" -- and the unit
+  # directory is empty, which is what the Ansible role leaves behind. Without the
+  # empty-directory path this deploy would resolve, verify, pin and start nothing,
+  # and report success.
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+  assert_exit 0 "$rc" "podman: a converged host with no units still exits 0"
+  if [[ -f "${T_UNIT_DIR}/backend.container" ]]; then
+    record 1 "podman: an empty unit directory is filled from the bundle"
+  else
+    record 0 "podman: an empty unit directory is filled from the bundle"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_podman_runs_without_a_compose_file() {
+  echo "Scenario: a Quadlet host has no compose file, and the pre-flight must not demand one"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  # The state a real Quadlet host is in: the units are the deployment, and there is
+  # no docker-compose.yml anywhere. The pre-flight used to require one BEFORE
+  # rt_detect ran, so it aborted with "required file missing" before it could
+  # discover it was on a runtime that has no compose at all.
+  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
+  printf '[Container]\nContainerName=backend\nImage=x\n' > "${T_UNIT_DIR}/backend.container"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a host with no compose file deploys"
+  assert_excludes "required file missing" "podman: and the pre-flight does not ask for one"
+  rm -rf "${tmp}"
+}
+
+scenario_docker_still_requires_its_compose_file() {
+  echo "Scenario: ...and Docker still refuses without one, because there it IS the deployment"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 1 "$rc" "docker: a host without a compose file still refuses"
+  assert_contains "docker-compose.yml" "docker: and names the file it needs"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_bundle_installs_the_units
+scenario_podman_retired_unit_is_stopped_then_removed
+scenario_podman_first_deploy_fills_an_empty_unit_dir
+scenario_podman_runs_without_a_compose_file
+scenario_docker_still_requires_its_compose_file
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

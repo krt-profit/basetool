@@ -283,7 +283,7 @@
         "y": 16
       },
       "type": "stat",
-      "title": "Days since last docker cleanup",
+      "title": "Days since last container cleanup",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -311,7 +311,7 @@
       "options": {},
       "targets": [
         {
-          "expr": "(time()-basetool_docker_cleanup_last_success_timestamp)/86400",
+          "expr": "(time()-basetool_container_cleanup_last_success_timestamp)/86400",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -329,7 +329,7 @@
         "y": 16
       },
       "type": "timeseries",
-      "title": "Docker cleanup reclaimed bytes",
+      "title": "Container cleanup reclaimed bytes",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -343,7 +343,7 @@
       "options": {},
       "targets": [
         {
-          "expr": "basetool_docker_cleanup_reclaimed_bytes",
+          "expr": "basetool_container_cleanup_reclaimed_bytes",
           "refId": "A",
           "datasource": {
             "type": "prometheus",

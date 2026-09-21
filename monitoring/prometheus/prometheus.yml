@@ -99,9 +99,29 @@ scrape_configs:
     static_configs:
       - targets: ["node-exporter:9100"]
 
-  - job_name: cadvisor
+  # cAdvisor is gone. Its rootless-Podman support is closed as not planned upstream and the Quadlet
+  # translation deletes the service, so a job for it would be permanently down on the host this
+  # configuration is now written for.
+  #
+  # There is no soak: the old host is shut DOWN at the cutover, and a rollback means shutting the
+  # new one down and bringing the old one back up with its deploy timer stopped -- on the
+  # configuration it already has on disk, not on a bundle promoted afterwards. So this file only
+  # ever has to be right for the Podman host, and removing the job costs nothing anywhere.
+  # Ruled by @greluc 2026-09-20.
+  #
+  # The replacement is scripts/cgroup-container-metrics.py, whose eleven basetool_container_*
+  # series the `basetool:container:*` recording rules already read, plus the exporter below.
+
+  # prometheus-podman-exporter. It restores container_start_time_seconds and the container_network_*
+  # family that the cgroup collector cannot produce; container_memory_mapped_file has no equivalent
+  # in either and stays retired.
+  #
+  # The name resolves through `AddHost=podman-exporter:host-gateway` on the prometheus unit, the
+  # same mechanism node-exporter and alloy use: all three are HOST services here, and the alias is
+  # what lets a service name in this file mean "the host" without the file having to say so.
+  - job_name: podman-exporter
     static_configs:
-      - targets: ["cadvisor:8080"]
+      - targets: ["podman-exporter:9882"]
 
   - job_name: postgres-backend
     static_configs:
@@ -406,6 +426,12 @@ scrape_configs:
           - https://backend:11261
           - https://frontend:18081
           - https://ingest:11262
+          # Keycloak serves HTTPS on 18443 from the same keystore, and the edge reaches it
+          # through upstream-tls.conf with `proxy_ssl_verify on` -- so its expiry breaks the
+          # login path, not just a scrape. It was the one TLS listener in the deployment with
+          # no probe at all (measured 2026-09-20); the exporter reaches it over
+          # net-monitoring-scrape, which the two already share.
+          - https://keycloak:18443
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

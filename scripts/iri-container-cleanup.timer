@@ -1,4 +1,4 @@
-; systemd timer that fires the Docker housekeeping weekly (Saturday 02:00 UTC).
+; systemd timer that fires the container housekeeping weekly (Saturday 02:00 UTC).
 ;
 ; The `UTC` suffix on OnCalendar pins the schedule to UTC regardless of the
 ; host's local timezone — preserving the behaviour of the retired
@@ -12,9 +12,9 @@
 ; mounts are untouched), so the exact time is not load-bearing.
 
 [Unit]
-Description=Profit Basetool — weekly Docker housekeeping (Sat 02:00 UTC)
+Description=Profit Basetool — weekly container housekeeping (Sat 02:00 UTC)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
-Requires=iri-docker-cleanup.service
+Requires=iri-container-cleanup.service
 
 [Timer]
 OnCalendar=Sat *-*-* 02:00:00 UTC
@@ -26,7 +26,7 @@ Persistent=true
 ; Small jitter — the prune is not time-critical and sits in no window.
 RandomizedDelaySec=5min
 
-Unit=iri-docker-cleanup.service
+Unit=iri-container-cleanup.service
 
 [Install]
 WantedBy=timers.target

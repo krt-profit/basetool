@@ -113,6 +113,51 @@
 
 set -euo pipefail
 
+# The applied config tree must be readable by the SERVICE user, so the mode it lands with cannot be
+# the caller's business. Rocky's hardened baseline sets `UMASK 027` in /etc/login.defs and
+# /etc/profile, while a systemd service gets 0022 — so the same deploy produces a different tree
+# depending on how it was started:
+#
+#   systemctl start iri-deploy.service   umask 0022 -> /var/iri/code/... 0755  works
+#   sudo -u deploy deploy.sh             umask 0027 -> /var/iri/code/... 0750  every container dies
+#
+# and the second is the invocation this script's own usage block documents. Under Docker it never
+# mattered: the root daemon resolved the bind mounts. Rootless Podman resolves them AS the service
+# user, which is not in group `deploy`, so it cannot traverse a 0750 directory — measured on the
+# testing host 2026-09-20, where keycloak and edge both exited 125 with
+#
+#   Error: statfs /var/iri/code/keycloak-theme/krt-theme: permission denied
+#
+# on a path that plainly exists. Worse than the cosign asymmetry, because it does not fail at apply
+# time: the deploy reports the config applied and the failure surfaces later, as a health-check
+# timeout and a rollback that fails the same way.
+#
+# 022 and not something tighter: this tree is the config BUNDLE, which carries no secret by
+# construction — the Dockerfile COPY is an allowlist, .dockerignore bars them from the context,
+# release-images.yml asserts the built bundle carries none, and assert_no_secrets below re-asserts
+# it on the host. The things that ARE secret set their own mode explicitly and are unaffected:
+# ${DOCKER_CONFIG} is `install -d -m 0700`, and render-env-d.py writes env.d at 0640 into a
+# setgid 2750 directory the role owns.
+umask 022
+
+# --- The container-runtime seam (ADR-0163, Phase 3) -------------------------
+# Every runtime operation below goes through `rt_*` rather than naming a CLI,
+# because BOTH shapes are live at once: production serves on Docker until the
+# cutover and the testing host serves on rootless Podman now. See
+# lib/container-runtime.sh for why this is a seam and not a rewrite.
+#
+# Sourced by path relative to THIS script, so a host that has scripts/ has the
+# library too. `rt_detect` runs in the pre-flight below, not here, so a usage
+# error still reports before anything touches a registry.
+IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/container-runtime.sh
+# shellcheck disable=SC1091
+# repo-lint.yml runs `shellcheck <files>` without -x, so it cannot follow a
+# sourced file and reports SC1091 at info level, which fails the job. The
+# library is linted on its own by the same sweep, so nothing goes unchecked.
+. "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
+
 # --- Defaults / paths -------------------------------------------------------
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
 STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
@@ -183,6 +228,11 @@ COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubuserco
 # DELAY+2*DELAY seconds on a genuinely bad signature, which still aborts.
 COSIGN_VERIFY_ATTEMPTS="${IRI_COSIGN_VERIFY_ATTEMPTS:-3}"
 COSIGN_VERIFY_DELAY="${IRI_COSIGN_VERIFY_DELAY:-5}"
+# Where to look for cosign when it is not on PATH. The first entry is where the basetool_host role
+# installs it (`basetool_host_cosign_path`); the others are where an operator would put it by hand.
+# A variable rather than a literal only so the self-test can point the search at a fixture — on a
+# host it is always these three, the same reasoning as container-runtime.sh's RT_LINGER_DIR.
+COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosign/bin}"
 # stderr of the last failed `cosign verify`, so the abort can say *why* it failed
 # instead of only that it did. Declared here because `set -u` is in force.
 VERIFY_LAST_ERROR=""
@@ -317,16 +367,11 @@ mirror_dir() {
 # create` needs a placeholder argument; the container is never started —
 # `docker cp` reads straight from its filesystem layer.
 extract_config_bundle() {
-  local ref="$1" dest="$2" cid
+  local ref="$1" dest="$2"
   rm -rf "${dest}"
   install -d -m 0755 "${dest}"
-  cid="$(docker create "${ref}" /bundle 2>/dev/null)" \
-    || fail "cannot create container from config image ${ref}"
-  if ! docker cp "${cid}:/config/." "${dest}/" >/dev/null 2>&1; then
-    docker rm -f "${cid}" >/dev/null 2>&1 || true
-    fail "cannot extract /config from config image ${ref}"
-  fi
-  docker rm -f "${cid}" >/dev/null 2>&1 || true
+  rt_extract_from_image "${ref}" "/config/." "${dest}/" /bundle \
+    || fail "cannot extract /config from config image ${ref}"
 }
 
 # Fail loudly if a staged config bundle smuggled in a host secret. The bundle is
@@ -380,8 +425,28 @@ infra_image_pins() {
   # said so within minutes; the testing host runs no monitoring plane, so nobody
   # was told. The gate was not wrong to exist, only wrong about what "changed"
   # means.
-  grep -Eo 'image:[[:space:]]*(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' "$1" \
-    | sed -E 's/image:[[:space:]]*//; s/@sha256:[0-9a-f]+$//' | sort -u || true
+  # $1 is a TREE, not a file. Under Compose the pins are in docker-compose.yml; under Quadlet
+  # there is no compose file at all and the same pins are `Image=` lines in db-backend.container,
+  # db-keycloak.container and keycloak.container. Reading only the compose file made this gate
+  # compare an empty "old" against a full "new" on every Quadlet tick, so it refused every deploy
+  # as a stateful-infra upgrade -- measured on the testing host 2026-09-18:
+  #
+  #     grep: /var/iri/code/docker-compose.yml: No such file or directory
+  #     CARVE-OUT: postgres/Keycloak image pin changed — refusing to auto-apply
+  #       old:
+  #       new: postgres:18-alpine quay.io/keycloak/keycloak:26.7
+  #
+  # A correct refusal from a wrong premise, which is the hardest kind to notice: the gate looked
+  # like it was working.
+  local tree="$1"
+  {
+    [[ -f "${tree}/docker-compose.yml" ]] \
+      && grep -Eho 'image:[[:space:]]*(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' \
+           "${tree}/docker-compose.yml" 2>/dev/null
+    [[ -d "${tree}/quadlet/systemd" ]] \
+      && grep -Eho '^Image=(postgres:[^[:space:]]+|quay\.io/keycloak/keycloak:[^[:space:]]+)' \
+           "${tree}"/quadlet/systemd/*.container 2>/dev/null
+  } | sed -E 's/^(image:[[:space:]]*|Image=)//; s/@sha256:[0-9a-f]+$//' | sort -u || true
 }
 
 # Emit the compose top-level `networks:` block, comment- and blank-stripped, so a
@@ -414,19 +479,17 @@ network_block() {
 # addresses/gateways, so the NPM SSH-tunnel admin allow-list stays valid.
 clean_slate_recreate() {
   log "network topology changed -> clean recreate (brief full-stack downtime)"
-  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "  monitoring down (it holds the shared data nets as external)"
-    docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-      -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" down --remove-orphans >/dev/null 2>&1 \
+    rt_monitoring_down >/dev/null 2>&1 \
       || log "  WARN: monitoring 'down' reported an error (continuing)"
   fi
   log "  app down"
-  docker compose -f "${COMPOSE_DIR}/docker-compose.yml" --profile "${PROFILE}" \
-    down --remove-orphans >/dev/null 2>&1 \
+  rt_stack_down >/dev/null 2>&1 \
     || log "  WARN: app 'down' reported an error (continuing to prune + up)"
   # Belt-and-braces: a stray endpoint can block `down` from removing a bridge; drop
   # any now-unused network so `up` cannot reuse a stale-subnet one (single-purpose host).
-  docker network prune -f >/dev/null 2>&1 || true
+  rt_prune_networks
 }
 
 # Snapshot the live config tree (the allowlisted paths) into a directory so the
@@ -449,6 +512,11 @@ snapshot_config_tree() {
     && cp -a "${COMPOSE_DIR}/docker-compose.monitoring.yml" "${dst}/docker-compose.monitoring.yml"
   [[ -d "${COMPOSE_DIR}/monitoring" ]] \
     && cp -a "${COMPOSE_DIR}/monitoring" "${dst}/monitoring"
+  # The Quadlet deployment. Without this a rollback would restore the previous compose file and
+  # the previous digest pin while leaving the NEW units in place -- and under Quadlet the units
+  # are what the pin binds to, so the rollback would put the old digests on the new definitions.
+  [[ -d "${COMPOSE_DIR}/quadlet" ]] \
+    && cp -a "${COMPOSE_DIR}/quadlet" "${dst}/quadlet"
   return 0
 }
 
@@ -490,6 +558,106 @@ apply_config_tree() {
   if [[ -d "${src}/keycloak-theme" ]]; then
     mirror_dir "${src}/keycloak-theme" "${dst}/keycloak-theme"
   fi
+  # The Quadlet units and their environment templates. Mirrored onto the host like any other
+  # bundle payload; install_quadlet_units() below is what moves them from here into the unit
+  # directory, because that step is Podman-only and this function is not.
+  if [[ -d "${src}/quadlet" ]]; then
+    mirror_dir "${src}/quadlet" "${dst}/quadlet"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# install_quadlet_units
+#
+# Put the release's unit files where Quadlet reads them, and render the
+# environment files they name. Podman only; a no-op under Compose, where
+# docker-compose.yml is the deployment and is already applied above.
+#
+# WHY THIS EXISTS AT ALL. Until 2026-09-18 nothing in this repository put a unit
+# file on a host. The bundle did not carry them, the Ansible role states that it
+# never ships them, and this script only checked that the directory was not empty
+# and failed with "has the stack been installed?" if it was. The 39 units on the
+# testing host had arrived by an operator action nobody wrote down. A release
+# could change an image, a health command, a memory limit or an environment
+# variable and have no path to production at all.
+#
+# THE THREE THINGS IT HAS TO GET RIGHT:
+#
+#   1. The drop-ins survive. `<unit>.container.d/10-digest-pin.conf` is written by
+#      THIS script and is what binds the release's digest; a host-specific drop-in
+#      may sit beside it at a higher number. A mirror with --delete over the unit
+#      directory would remove both, so the sync is file-by-file over the bundle's
+#      own names and the `.container.d` directories are never touched.
+#   2. A retired unit is STOPPED before it is removed. Quadlet only generates a
+#      service for a unit file that exists, so deleting the file makes systemd
+#      forget the unit -- while its container keeps running, unmanaged and
+#      invisible to every later reconcile.
+#   3. env.d is rendered from the HOST's .env. The templates carry `KEY=${VAR:?}`
+#      and no values; the secrets are on the host and never leave it. Rendering
+#      before daemon-reload matters: a unit whose EnvironmentFile= does not exist
+#      fails to start, and that failure reads as an application fault.
+# ---------------------------------------------------------------------------
+install_quadlet_units() {
+  local src="${1}/quadlet" installed=0 removed=0
+  [[ "${RT_BACKEND}" == podman ]] || return 0
+
+  if [[ ! -d "${src}/systemd" ]]; then
+    # An older bundle, built before the units rode this channel. Not fatal: the
+    # host keeps the units it has, which is what it has always done.
+    log "config bundle carries no quadlet/systemd — units left as they are (pre-2026-09-18 bundle)"
+    return 0
+  fi
+
+  local unit_dir="${RT_UNIT_DIR:?RT_UNIT_DIR is unset}"
+  install -d "${unit_dir}"
+
+  # Render the environment files the units name, BEFORE anything reloads.
+  if [[ -d "${src}/env.d" ]]; then
+    if [[ -x "${ENV_RENDERER}" ]]; then
+      if ! "${ENV_RENDERER}" --env "${COMPOSE_DIR}/.env"              --templates "${src}/env.d" --out "${ENV_D_DIR}" >/dev/null; then
+        fail "rendering ${ENV_D_DIR} from the bundle's templates failed — a unit whose EnvironmentFile is missing does not start"
+      fi
+      log "rendered env.d from the bundle's templates"
+    else
+      fail "the bundle carries env.d templates but ${ENV_RENDERER} is not on this host (ansible role: 25-scripts.yml)"
+    fi
+  fi
+
+  # Install every unit the bundle names.
+  local f base
+  for f in "${src}"/systemd/*; do
+    [[ -f "${f}" ]] || continue
+    base="$(basename "${f}")"
+    if [[ ! -f "${unit_dir}/${base}" ]] || ! cmp -s "${f}" "${unit_dir}/${base}"; then
+      install -m 0644 "${f}" "${unit_dir}/${base}"
+      installed=$(( installed + 1 ))
+      # A replaced .container is a changed DEFINITION, exactly like a changed digest pin, and the
+      # apply has to restart it rather than start it -- `systemctl start` on an active unit is a
+      # no-op and would leave the old container running the old definition.
+      [[ "${base}" == *.container ]] && rt_note_changed "${base%.container}"
+    fi
+  done
+
+  # Retire what the bundle no longer names. Only files that LOOK like units are
+  # considered, so a `.container.d` directory and anything an operator left beside
+  # them are out of scope by construction rather than by a rule that can drift.
+  local existing name
+  for existing in "${unit_dir}"/*.container "${unit_dir}"/*.network "${unit_dir}"/*.volume; do
+    [[ -f "${existing}" ]] || continue
+    name="$(basename "${existing}")"
+    [[ -f "${src}/systemd/${name}" ]] && continue
+    if [[ "${name}" == *.container ]]; then
+      # Stop it while systemd still knows about it. Best effort: a unit that was
+      # never started is not an error, and a stop that fails must not block the
+      # release -- it is reported and the file still goes.
+      rt_service_stop "${name%.container}" >/dev/null 2>&1         || log "WARN: could not stop retired unit ${name%.container} before removing it"
+    fi
+    rm -f "${existing}"
+    removed=$(( removed + 1 ))
+  done
+
+  log "quadlet units: ${installed} installed/updated, ${removed} retired (${unit_dir})"
+  return 0
 }
 
 # Idempotently reconcile ONE monitoring service's LOADED config against the on-disk config tree.
@@ -523,8 +691,7 @@ reconcile_monitoring_reload() {
     return 0
   fi
   log "  monitoring: ${subpath} config differs from the last applied snapshot → recreating ${svc} (re-resolves the bind-mount inode)"
-  if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d --force-recreate --no-deps "${svc}" >/dev/null 2>&1; then
+  if rt_monitoring_recreate "${svc}" >/dev/null 2>&1; then
     # Refresh the baseline ONLY on a successful recreate, so a failed one re-drifts next tick.
     install -d -m 0755 "${MON_RELOAD_STATE_DIR}" 2>/dev/null || true
     rm -rf "${snap}"
@@ -645,8 +812,8 @@ reconcile_edge() {
   # itself was fixed and the edge went on serving the material seeded from NPM.
   # The edge already mounts the volume read-only, so `exec` needs neither a new
   # container nor root.
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'edge'; then
-    fp_lines="$(docker exec edge sh -c \
+  if rt_is_running edge; then
+    fp_lines="$(rt_exec edge sh -c \
                   'find /etc/nginx/certs -name fullchain.pem -type f -exec sha256sum {} +' \
                   2>/dev/null || true)"
   fi
@@ -664,8 +831,7 @@ reconcile_edge() {
   [[ -n "${drift}" ]] || return 0
 
   log "  edge: ${drift} differs from the last applied state -> recreating edge (re-resolves the bind-mount inode and re-reads the certificates)"
-  if docker compose --profile prod --project-directory "${COMPOSE_DIR}" \
-       -f "${COMPOSE_DIR}/docker-compose.yml" up -d --force-recreate --no-deps edge >/dev/null 2>&1; then
+  if rt_recreate edge >/dev/null 2>&1; then
     install -d -m 0755 "${EDGE_STATE_DIR}" 2>/dev/null || true
     rm -rf "${snap}"
     if cp -R "${src}" "${snap}" 2>/dev/null; then
@@ -686,13 +852,13 @@ reconcile_edge() {
 
 reconcile_monitoring_reloads() {
   if [[ "${IRI_MONITORING_ENABLED:-false}" != "true" ]]; then
-    if docker ps --filter "label=com.docker.compose.project=iri-monitoring" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+    if rt_monitoring_is_running; then
       log "  monitoring: WARN iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true' — on-disk monitoring config changes will NOT be reloaded into Prometheus/alloy/blackbox (set IRI_MONITORING_ENABLED=true in the iri-deploy service env)"
       write_monitoring_reconcile_state_metric 1
     fi
     return 0
   fi
-  [[ -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]] || return 0
+  rt_monitoring_configured || return 0
   write_monitoring_reconcile_state_metric 0
   # Apply monitoring COMPOSE-DEFINITION drift (a service's mem_limit / environment / volumes / image
   # pin) to the running containers. `up -d` recreates ONLY the services whose compose config-hash
@@ -706,9 +872,8 @@ reconcile_monitoring_reloads() {
   # container — 2026-07-17: alloy ran the stale 256M/230MiB definition for days while disk said
   # 384M/300MiB, and cadvisor a stale mount, because only the config subtree was reconciled. Best-
   # effort, non-gating (a failed apply logs and retries next tick; it never fails the deploy).
-  if ! docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-       -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1; then
-    log "  monitoring: WARN compose-definition reconcile (up -d) failed — non-gating, retries next tick"
+  if ! rt_monitoring_up >/dev/null 2>&1; then
+    log "  monitoring: WARN definition reconcile failed — non-gating, retries next tick"
   fi
   reconcile_monitoring_reload prometheus prometheus
   reconcile_monitoring_reload alloy alloy
@@ -723,16 +888,11 @@ reconcile_monitoring_reloads() {
 # installed 0644 (and its parent dir created) so the uid-1000 Keycloak runtime can
 # read it through the providers bind mount.
 extract_keycloak_spi_jar() {
-  local ref="$1" dest_jar="$2" cid stage
+  local ref="$1" dest_jar="$2" stage
   stage="${STATE_DIR}/keycloak-spi-stage.jar"
   rm -f "${stage}"
-  cid="$(docker create "${ref}" /bundle 2>/dev/null)" \
-    || fail "cannot create container from keycloak-spi image ${ref}"
-  if ! docker cp "${cid}:/providers/keycloak-spi.jar" "${stage}" >/dev/null 2>&1; then
-    docker rm -f "${cid}" >/dev/null 2>&1 || true
-    fail "cannot extract /providers/keycloak-spi.jar from ${ref}"
-  fi
-  docker rm -f "${cid}" >/dev/null 2>&1 || true
+  rt_extract_from_image "${ref}" /providers/keycloak-spi.jar "${stage}" /bundle \
+    || fail "cannot extract /providers/keycloak-spi.jar from ${ref}"
   install -D -m 0644 "${stage}" "${dest_jar}"
   rm -f "${stage}"
 }
@@ -802,7 +962,13 @@ check_only_verify_one() {
 }
 
 # --- Pre-flight -------------------------------------------------------------
-require_file "${COMPOSE_DIR}/docker-compose.yml"
+# NOT docker-compose.yml, and that is a correction rather than a relaxation. This line demanded a
+# compose file on EVERY host, and it ran before rt_detect -- so on a Quadlet host, where the unit
+# files are the deployment and there is no compose file at all, the deployer aborted with
+#   FATAL: required file missing: /var/iri/code/docker-compose.yml
+# before it could reach the runtime detection that would have told it so. Measured on the testing
+# host 2026-09-18. The compose file is still required under Docker; the check moved to where the
+# backend is known, beside the other runtime-specific pre-flight checks.
 require_file "${COMPOSE_DIR}/.env"
 require_file "${TOKEN_FILE}"
 
@@ -833,6 +999,12 @@ mkdir -p "${STATE_DIR}"
 # order is load-bearing.
 export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 install -d -m 0700 "${DOCKER_CONFIG}"
+# One credential file for three tools. cosign (go-containerregistry) reads
+# $DOCKER_CONFIG/config.json; skopeo and podman (containers/image) read $REGISTRY_AUTH_FILE
+# before anything else. Pointing the second at the first means a single `login` serves the
+# tag resolution, the signature check and the pull, instead of three tools each looking in a
+# different place and two of them finding nothing.
+export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-${DOCKER_CONFIG}/config.json}"
 
 # cosign writes its Sigstore/TUF cache under $HOME/.sigstore. The deploy user has
 # no usable $HOME (created with --no-create-home, and the systemd unit's
@@ -843,20 +1015,102 @@ install -d -m 0700 "${DOCKER_CONFIG}"
 # $HOME, so this does not affect the registry login.
 export HOME="${IRI_HOME:-${STATE_DIR}}"
 
-# Compose v2 ships with Docker Engine ≥ 20.10.13 as `docker compose`; the
-# `--wait` flag landed in 2.1.0. Fail fast on older installs rather than
-# discovering it during `up`.
-if ! docker compose version --short >/dev/null 2>&1; then
-  fail "docker compose v2 not available; install Docker Engine ≥ 23.x"
-fi
+# Where the units' EnvironmentFile= lines point, and the renderer that fills it. The templates
+# ride the config bundle and carry only `KEY=${VAR:?}` placeholders; the VALUES are in the host's
+# own .env and never leave it, which is the whole reason this is rendered here rather than baked
+# into the bundle at build time.
+ENV_D_DIR="${IRI_ENV_D_DIR:-${COMPOSE_DIR}/env.d}"
+ENV_RENDERER="${IRI_ENV_RENDERER:-${IRI_SCRIPT_DIR}/render-env-d.py}"
+
+# Decide which runtime is in front of us before anything else touches it, and
+# fail fast on a host that has neither. `rt_detect` TRIES rather than infers —
+# an installed-but-dead docker does not win over a working podman.
+rt_detect
+export RT_COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml"
+export RT_PROJECT_DIR="${COMPOSE_DIR}"
+export RT_MONITORING_FILE="${COMPOSE_DIR}/docker-compose.monitoring.yml"
+# The Quadlet half of the same plane. Compose identifies it by project; there are
+# no projects under Quadlet, so the nine units are named.
+export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"
+export RT_PROFILE="${PROFILE}"
+export RT_HEALTH_TIMEOUT="${HEALTH_TIMEOUT}"
+# Under Quadlet there is no project to ask what "the whole stack" is, so the list
+# is named here. It is the compose prod profile's services, in dependency order.
+export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge"
+log "container runtime: ${RT_BACKEND}"
+
+case "${RT_BACKEND}" in
+  docker)
+    # Compose v2 ships with Docker Engine ≥ 20.10.13 as `docker compose`; the
+    # `--wait` flag landed in 2.1.0. Fail fast on older installs rather than
+    # discovering it during `up`.
+    if ! docker compose version --short >/dev/null 2>&1; then
+      fail "docker compose v2 not available; install Docker Engine ≥ 23.x"
+    fi
+    # The deployment itself, under this runtime.
+    require_file "${RT_COMPOSE_FILE}"
+    ;;
+  podman)
+    # The Podman equivalents of compose's two guarantees. `skopeo` is how a tag
+    # is resolved to a digest without pulling; Quadlet is what turns the unit
+    # files into services at all. A host missing either cannot deploy, and
+    # saying so here beats discovering it halfway through an apply.
+    command -v skopeo >/dev/null 2>&1 \
+      || fail "skopeo not available; it is how a tag is resolved without pulling (ansible role: 10-packages.yml)"
+    # A LIST, not one path: Fedora/RHEL/Rocky ship the generator at
+    # /usr/libexec/podman/quadlet and Debian at /usr/lib/podman/quadlet. Hardcoding
+    # either one is a latent failure on the other, and this project has already
+    # changed platform twice. IRI_QUADLET_BIN overrides it outright.
+    QUADLET_BIN="${IRI_QUADLET_BIN:-}"
+    if [[ -z "${QUADLET_BIN}" ]]; then
+      for candidate in /usr/libexec/podman/quadlet /usr/lib/podman/quadlet; do
+        [[ -x "${candidate}" ]] && { QUADLET_BIN="${candidate}"; break; }
+      done
+    fi
+    [[ -n "${QUADLET_BIN}" && -x "${QUADLET_BIN}" ]] \
+      || fail "the Quadlet generator is missing (looked in /usr/libexec/podman and /usr/lib/podman); this host cannot turn .container files into services"
+    # The DIRECTORY, not the units in it. An empty one is the normal state of a freshly
+    # provisioned host: ansible/roles/basetool_host creates it, and the first deploy fills it
+    # from the config bundle. Demanding units here would make that first deploy impossible,
+    # which is the shape this check had until the bundle began carrying them.
+    [[ -n "${RT_UNIT_DIR}" && -d "${RT_UNIT_DIR}" ]] \
+      || fail "no Quadlet unit directory (${RT_UNIT_DIR:-unset}) — run the basetool_host role first; it creates the directory this fills"
+    ;;
+esac
 
 # cosign is required for the host-side signature gate (REQ-OPS-015). Fail closed:
 # a host that cannot verify signatures must not silently fall back to trusting an
 # unverified :stable. Missing cosign with the gate ON is a bootstrap error, not a
 # reason to skip verification — install cosign (docs/deployment.md) or, only to
 # break glass during a Sigstore outage, run with IRI_COSIGN_VERIFY=false.
+#
+# "Not on PATH" and "not installed" are different facts, and on Rocky they come apart. The role
+# installs cosign to /usr/local/bin (`basetool_host_cosign_path`); sudo's `secure_path` on Rocky
+# 10.2 is `/sbin:/bin:/usr/sbin:/usr/bin` and does NOT contain it. So `sudo -u deploy deploy.sh` —
+# the manual invocation this script's own usage block documents — aborted with "install cosign"
+# against a host where cosign was sitting in /usr/local/bin, 141 MB of it, installed by the role two
+# days earlier. Measured on the testing host 2026-09-20.
+#
+# The TIMER is unaffected and always was: a systemd service gets systemd's own PATH, which includes
+# /usr/local/bin — so the cutover's `systemctl start iri-deploy.service` never saw this. That is
+# exactly what makes it worth fixing rather than documenting: the failure is invisible on the path
+# CI and the runbook exercise, and waiting for the operator who types the other one.
+#
+# Looking in the known locations is not a search of the filesystem: it is the one directory the
+# role is configured to install into, plus the two an operator would use by hand.
 if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
-  fail "cosign not found on PATH but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
+  IFS=':' read -r -a _cosign_dirs <<< "${COSIGN_SEARCH_PATH}"
+  for _cosign_dir in "${_cosign_dirs[@]}"; do
+    [[ -n "${_cosign_dir}" && -x "${_cosign_dir}/cosign" ]] || continue
+    PATH="${_cosign_dir}:${PATH}"
+    export PATH
+    log "cosign found at ${_cosign_dir}/cosign but not on PATH (sudo secure_path?) — using it"
+    break
+  done
+  unset _cosign_dir _cosign_dirs
+fi
+if [[ "${COSIGN_VERIFY}" == "true" ]] && ! command -v cosign >/dev/null 2>&1; then
+  fail "cosign not found on PATH or under ${COSIGN_SEARCH_PATH}, but signature verification is enabled — install cosign (see docs/deployment.md → 'Signature verification (cosign)') or set IRI_COSIGN_VERIFY=false ONLY to break glass during a Sigstore outage"
 fi
 
 PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
@@ -917,18 +1171,37 @@ TOKEN_EXPIRY_FILE="${IRI_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
 TOKEN_METRIC_FILE="${TEXTFILE_DIR}/ghcr-token.prom"
 
 # Emit basetool_ghcr_token_expiry_timestamp from the operator-recorded expiry
-# date. Best-effort and opt-in: absent file → no metric, and the alert does NOT
-# fire on absence (a non-expiring token is a valid, un-alerted state);
-# unparseable → a WARN; never fails the deploy. Called on EVERY tick, including
-# the idempotence no-op, so the gauge does not go stale.
+# date. Best-effort and opt-in: no expiry recorded → NO METRIC, and the alert does
+# not fire on absence (a non-expiring token is a valid, un-alerted state);
+# never fails the deploy. Called on EVERY tick, including the idempotence no-op,
+# so the gauge does not go stale.
+#
+# "No metric" has to mean REMOVING one that is already there, and that is a fix
+# rather than a nicety (2026-09-20). This used to `return 0` on an absent file,
+# which is correct only on a host that never recorded an expiry. On a host where
+# one WAS recorded and was then correctly deleted -- the documented action when
+# the PAT turns out to be non-expiring -- the old ghcr-token.prom stayed on disk,
+# node_exporter kept serving the stale timestamp, and GhcrPullTokenExpired fired
+# CRITICAL forever for doing exactly what the alert's own description asks.
+#
+# An UNPARSEABLE date removes it too. A typo'd date is not a reason to keep
+# asserting the previous one: "no claim" is recoverable, a stale claim is a
+# permanent critical that looks like a real one. The WARN is what says so.
 write_token_expiry_metric() {
   local raw epoch tmp
-  [[ -f "${TOKEN_EXPIRY_FILE}" ]] || return 0
+  if [[ ! -f "${TOKEN_EXPIRY_FILE}" ]]; then
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
+    return 0
+  fi
   raw="$(tr -d '[:space:]' < "${TOKEN_EXPIRY_FILE}" 2>/dev/null || true)"
-  [[ -n "${raw}" ]] || return 0
+  if [[ -z "${raw}" ]]; then
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
+    return 0
+  fi
   epoch="$(date -u -d "${raw}" +%s 2>/dev/null || true)"
   if ! [[ "${epoch}" =~ ^[0-9]+$ ]]; then
-    log "WARN: could not parse GHCR token expiry '${raw}' from ${TOKEN_EXPIRY_FILE}"
+    log "WARN: could not parse GHCR token expiry '${raw}' from ${TOKEN_EXPIRY_FILE}; removing the metric rather than leaving the previous value asserted"
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
     return 0
   fi
   install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
@@ -1046,10 +1319,8 @@ fi
 
 # --- Authenticate to GHCR ---------------------------------------------------
 log "logging in to ${REGISTRY} as ${GHCR_USERNAME}"
-if ! docker login "${REGISTRY}" \
-       --username "${GHCR_USERNAME}" \
-       --password-stdin < "${TOKEN_FILE}" >/dev/null 2>&1; then
-  fail "docker login to ${REGISTRY} failed — check ${TOKEN_FILE} (scope: read:packages)"
+if ! rt_login "${REGISTRY}" "${GHCR_USERNAME}" "${TOKEN_FILE}" >/dev/null 2>&1; then
+  fail "${RT_BACKEND} login to ${REGISTRY} failed — check ${TOKEN_FILE} (scope: read:packages)"
 fi
 
 # Refresh the token-expiry gauge on every tick (incl. the no-op below), so the
@@ -1064,11 +1335,11 @@ CONFIG_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-config"
 KEYCLOAK_SPI_IMAGE="${REGISTRY}/${NAMESPACE}/basetool-keycloak-spi"
 
 resolve_digest() {
-  # buildx imagetools resolves a tag to its manifest digest without pulling
-  # the image. Works for multi-arch lists (returns the index digest) and for
-  # single-platform manifests alike.
-  local ref="$1"
-  docker buildx imagetools inspect "${ref}" --format '{{.Manifest.Digest}}' 2>/dev/null
+  # Resolves a tag to its manifest digest WITHOUT pulling the image: buildx
+  # imagetools under Docker, `skopeo inspect` under Podman — which is why the
+  # Ansible role installs skopeo. Works for multi-arch lists (returns the index
+  # digest) and for single-platform manifests alike.
+  rt_resolve_digest "$1"
 }
 
 log "resolving ${TARGET_TAG} → digest"
@@ -1135,6 +1406,24 @@ if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_K
   KEYCLOAK_SPI_CHANGED=true
 fi
 
+# A Podman host with no unit files has not received this release's DEFINITION, whatever the
+# marker claims about its digests -- and that is the normal state of a freshly provisioned host,
+# because ansible/roles/basetool_host creates the unit directory and deliberately puts nothing in
+# it. Treated as a config change so the bundle is staged and install_quadlet_units fills it.
+#
+# Decided HERE, beside the other config divergences, and not further down: below this point sits
+# the idempotence fast exit, and a host whose marker happens to match would take it and report
+# "no change" for a stack that does not exist.
+if [[ "${RT_BACKEND}" == podman && "${CONFIG_CHANGED}" != "true" ]]; then
+  shopt -s nullglob
+  host_units=( "${RT_UNIT_DIR}"/*.container )
+  shopt -u nullglob
+  if (( ${#host_units[@]} == 0 )); then
+    CONFIG_CHANGED=true
+    log "no Quadlet units on this host — staging the config bundle to install them"
+  fi
+fi
+
 # --- Idempotence check ------------------------------------------------------
 # The marker only records what the last SUCCESSFUL deploy applied — trusting it
 # alone is not enough. A manual `docker compose up` without the digest-pin
@@ -1154,13 +1443,24 @@ fi
 # containers are judged by their state instead of being reported as absent.
 running_stack_drift() {
   local entry svc image digest cids cid probe state img_id repo_digests img_ok
+  # Under Quadlet the unit files ARE the stack. None of them means nothing can be
+  # running, and the per-service probe below would report three missing containers
+  # without ever saying why -- so the cause is named once, first.
+  if [[ "${RT_BACKEND}" == podman ]]; then
+    local -a units=()
+    shopt -s nullglob
+    units=( "${RT_UNIT_DIR}"/*.container )
+    shopt -u nullglob
+    if (( ${#units[@]} == 0 )); then
+      echo "structural quadlet: no unit files in ${RT_UNIT_DIR}"
+    fi
+  fi
   for entry in \
     "backend|${BACKEND_IMAGE}|${BACKEND_DIGEST}" \
     "frontend|${FRONTEND_IMAGE}|${FRONTEND_DIGEST}" \
     "ingest|${INGEST_IMAGE}|${INGEST_DIGEST}"; do
     IFS='|' read -r svc image digest <<< "${entry}"
-    cids="$(docker compose -f "${COMPOSE_DIR}/docker-compose.yml" \
-              --profile "${PROFILE}" ps -aq "${svc}" 2>/dev/null)" || cids=""
+    cids="$(rt_service_container_ids "${svc}")" || cids=""
     if [[ -z "${cids}" ]]; then
       # A wholly missing service is a STRUCTURAL divergence (half-down stack),
       # never a runtime-health blip: an `up` must (re)create the container.
@@ -1169,9 +1469,7 @@ running_stack_drift() {
     fi
     while IFS= read -r cid; do
       [[ -n "${cid}" ]] || continue
-      probe="$(docker inspect --format \
-        '{{index .Config.Labels "com.docker.compose.oneoff"}}|{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' \
-        "${cid}" 2>/dev/null)" || probe="|gone"
+      probe="$(rt_container_probe "${cid}")" || probe="|gone"
       # One-off `docker compose run` containers (debug shells, ad-hoc jobs) are
       # listed by `ps -aq` alongside the service replica but are not part of
       # the deployed stack — judging them would flag drift on every tick for
@@ -1185,11 +1483,10 @@ running_stack_drift() {
       # the target image can be told apart from one on a wrong image. The former
       # is a runtime-health fault (targeted restart); the latter, like a missing
       # container, is a structural mismatch the apply/rollback path must correct.
-      img_id="$(docker inspect --format '{{.Image}}' "${cid}" 2>/dev/null)" || img_id=""
+      img_id="$(rt_container_image_id "${cid}")" || img_id=""
       repo_digests=""
       if [[ -n "${img_id}" ]]; then
-        repo_digests="$(docker image inspect \
-          --format '{{join .RepoDigests " "}}' "${img_id}" 2>/dev/null)" || repo_digests=""
+        repo_digests="$(rt_image_repo_digests "${img_id}")" || repo_digests=""
       fi
       img_ok=false
       case " ${repo_digests} " in
@@ -1347,14 +1644,13 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
 
   cd "${COMPOSE_DIR}"
   log "health drift: restarting unhealthy service(s) [${UNHEALTHY_SVCS}] (targeted; no pull, no signature re-verify, no release rollback)"
-  HR_COMPOSE_ARGS=(-f docker-compose.yml)
-  if [[ -f "${PIN_FILE_CURRENT}" ]]; then
-    HR_COMPOSE_ARGS+=(-f "${PIN_FILE_CURRENT}")
-  fi
-  # shellcheck disable=SC2086 # UNHEALTHY_SVCS is a deliberate space-split service list
-  if docker compose "${HR_COMPOSE_ARGS[@]}" --profile "${PROFILE}" \
-       up -d --no-deps --force-recreate --no-build \
-          --wait --wait-timeout "${HEALTH_TIMEOUT}" ${UNHEALTHY_SVCS}; then
+  # The targeted restart recreates ONLY the sick services, at the release they
+  # are already on — no pull, no signature re-verify, no rollback (ADR-0083).
+  HR_RC=0
+  for hr_svc in ${UNHEALTHY_SVCS}; do
+    rt_recreate "${hr_svc}" || HR_RC=1
+  done
+  if [[ "${HR_RC}" -eq 0 ]]; then
     rm -f "${HEALTH_RESTART_FILE}"
     log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart"
     write_stack_health_metric healthy
@@ -1426,20 +1722,18 @@ verify_digest_or_die "ingest"   "${INGEST_IMAGE}@${INGEST_DIGEST}"
 [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && verify_digest_or_die "keycloak-spi" "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
 
 # --- Save rollback anchor + write new pin -----------------------------------
-[[ -f "${PIN_FILE_CURRENT}" ]] && cp "${PIN_FILE_CURRENT}" "${PIN_FILE_PREVIOUS}"
-
-cat > "${PIN_FILE_CURRENT}" <<EOF
-# Auto-generated by scripts/deploy.sh. Do not edit by hand — it is rewritten
-# on every deploy. Pinning to the exact image digests makes a subsequent
-# \`:stable\` tag flip in GHCR a no-op until the next deploy.sh run.
-services:
-  backend:
-    image: ${BACKEND_IMAGE}@${BACKEND_DIGEST}
-  frontend:
-    image: ${FRONTEND_IMAGE}@${FRONTEND_DIGEST}
-  ingest:
-    image: ${INGEST_IMAGE}@${INGEST_DIGEST}
-EOF
+# The pin has two halves under Quadlet and one under Compose, and the seam owns
+# both: the RECORD (this file, which compose reads directly as an override) and,
+# on a Podman host, the `.container.d/` drop-ins that actually bind the digest.
+# Restoring only the record on rollback would leave the new digests bound and
+# roll silently FORWARD into the release whose health check just failed.
+export RT_PIN_FILE="${PIN_FILE_CURRENT}"
+export RT_PIN_FILE_PREVIOUS="${PIN_FILE_PREVIOUS}"
+rt_pin_save
+rt_pin_apply \
+  "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # --- Deliver promoted host config -------------------------------------------
 # The compose file and its sibling host config (NPM maintenance page, Keycloak
@@ -1458,9 +1752,24 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # 5-minute loop. Refuse to auto-apply it; record the target so we alert ONCE
   # and then skip quietly until a new promotion or an operator --force. The
   # operator runs the documented manual upgrade, then re-runs with --force.
-  OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}/docker-compose.yml")"
-  NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}/docker-compose.yml")"
-  if [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]]; then
+  OLD_INFRA="$(infra_image_pins "${COMPOSE_DIR}")"
+  NEW_INFRA="$(infra_image_pins "${CONFIG_STAGE_DIR}")"
+  # A host that has never received a definition has nothing to compare, and "everything is new" is
+  # not an upgrade. On the Docker deployment this never arose, because the compose file was placed
+  # by hand at bootstrap and was always there by the first tick. A Quadlet host has no such step:
+  # the bundle IS the first definition, so the carve-out saw an empty `old` against a full `new`
+  # and refused the very first deploy as a stateful-infra upgrade -- measured on the testing host
+  # 2026-09-18, twice, with `old:` printing as an empty line.
+  #
+  # The test is whether a definition EXISTS, not whether the pins are empty: a compose file that
+  # genuinely names no postgres or Keycloak image is a different situation and must still compare.
+  HAS_OLD_DEFINITION=false
+  if [[ -f "${COMPOSE_DIR}/docker-compose.yml" ]] || [[ -d "${COMPOSE_DIR}/quadlet/systemd" ]]; then
+    HAS_OLD_DEFINITION=true
+  fi
+  if [[ "${HAS_OLD_DEFINITION}" != "true" ]]; then
+    log "first config bundle on this host — no previous definition to compare, so the stateful-infra gate does not apply"
+  elif [[ "${OLD_INFRA}" != "${NEW_INFRA}" ]]; then
     if [[ "${FORCE}" != "true" ]]; then
       if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
         log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
@@ -1491,7 +1800,13 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   # A change to the compose `networks:` block cannot be applied by an in-place
   # `up -d` (it strands container name resolution, #974). Detect it now, while the
   # LIVE compose is still on disk, so the apply below forces a clean down+up.
-  if [[ "$(network_block "${COMPOSE_DIR}/docker-compose.yml")" \
+  # Compose only. Under Quadlet the networks are .network units, and a changed subnet is applied
+  # by the unit install plus daemon-reload rather than by a full-stack down/up -- there is no
+  # compose project whose bridges have to be recreated together. Comparing a missing file against
+  # a present one would report a topology change on every single tick and pay a full-stack outage
+  # for it.
+  if [[ "${RT_BACKEND}" == docker ]] \
+     && [[ "$(network_block "${COMPOSE_DIR}/docker-compose.yml")" \
         != "$(network_block "${CONFIG_STAGE_DIR}/docker-compose.yml")" ]]; then
     NETWORK_TOPOLOGY_CHANGED=true
     log "network topology changed in the promoted compose -> clean recreate on apply (#974)"
@@ -1502,8 +1817,13 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
   [[ -f "${COMPOSE_DIR}/.env" ]] \
     || fail "POST-APPLY: ${COMPOSE_DIR}/.env vanished after config swap — aborting before up"
+  # The Quadlet half of the same swap. Under Compose this is a no-op; under Quadlet the unit
+  # files ARE the definition the apply below acts on, so they have to be in place before the pin
+  # is written and long before anything is started.
+  install_quadlet_units "${COMPOSE_DIR}"
   log "config applied"
 fi
+
 
 # --- Apply ------------------------------------------------------------------
 cd "${COMPOSE_DIR}"
@@ -1518,11 +1838,10 @@ cd "${COMPOSE_DIR}"
 # digest bump is rolled forward — an already-present pinned image is simply
 # reused offline.
 log "pulling images"
-docker compose \
-  -f docker-compose.yml \
-  -f "${PIN_FILE_CURRENT}" \
-  --profile "${PROFILE}" \
-  pull --quiet backend frontend ingest
+RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
+  "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+  "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+  "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
 # A network-topology change (detected above) cannot be applied in place — take the
 # whole stack down first so the `up` below recreates the bridges on the compose's
@@ -1533,15 +1852,7 @@ if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" ]]; then
 fi
 
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
-if docker compose \
-     -f docker-compose.yml \
-     -f "${PIN_FILE_CURRENT}" \
-     --profile "${PROFILE}" \
-     up -d \
-        --no-build \
-        --remove-orphans \
-        --wait \
-        --wait-timeout "${HEALTH_TIMEOUT}"; then
+if rt_apply_stack; then
 
   # The app stack is healthy. If the promoted provider JAR moved, swap it in and
   # recreate ONLY keycloak so its `start` re-runs the provider build and loads the
@@ -1560,24 +1871,14 @@ if docker compose \
     fi
     extract_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" "${KEYCLOAK_SPI_JAR}"
 
-    if ! docker compose \
-           -f docker-compose.yml \
-           -f "${PIN_FILE_CURRENT}" \
-           --profile "${PROFILE}" \
-           up -d --no-deps --force-recreate \
-              --wait --wait-timeout "${HEALTH_TIMEOUT}" keycloak; then
+    if ! rt_recreate keycloak; then
       log "keycloak did not become healthy with the new provider JAR — rolling back the JAR"
       if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
         install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}"
       else
         rm -f "${KEYCLOAK_SPI_JAR}"
       fi
-      docker compose \
-        -f docker-compose.yml \
-        -f "${PIN_FILE_CURRENT}" \
-        --profile "${PROFILE}" \
-        up -d --no-deps --force-recreate \
-           --wait --wait-timeout "${HEALTH_TIMEOUT}" keycloak >/dev/null 2>&1 \
+      rt_recreate keycloak >/dev/null 2>&1 \
         || log "WARNING: keycloak did not return to health on the previous JAR — manual check needed"
 
       # Record the failure so the backoff throttles re-attempts of this exact
@@ -1615,10 +1916,9 @@ if docker compose \
   # path; crashed monitoring containers recover on their own restart policy. Any failure only logs —
   # the app deploy stays successful. Gated on IRI_MONITORING_ENABLED=true (unset on a host without
   # the stack). pipefail makes the `if` observe compose's real exit through the sed pipe.
-  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
+  if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
-    if docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-         -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d 2>&1 | sed 's/^/  monitoring: /'; then
+    if rt_monitoring_up 2>&1 | sed 's/^/  monitoring: /'; then
       log "monitoring stack reconciled"
       # `up -d` recreates a service only when its DEFINITION changes; a bind-mounted config-file edit
       # (inode-pinned single-file mount) needs a force-recreate. Reconcile the applied config against
@@ -1639,7 +1939,7 @@ if docker compose \
   # `until=720h` to avoid wiping the just-pulled images we may still need to
   # roll back to. `|| true` because a stuck container ref can transiently
   # block a prune and we should not fail the deploy over it.
-  docker image prune --force --filter "until=720h" >/dev/null 2>&1 || true
+  rt_prune_images 720h
   exit 0
 fi
 
@@ -1664,6 +1964,10 @@ log "recorded health-check failure #${FAIL_COUNT} for this target; next retry ba
 if [[ "${CONFIG_CHANGED}" == "true" ]] && [[ -d "${CONFIG_PREVIOUS_DIR}" ]]; then
   log "restoring previous host config"
   apply_config_tree "${CONFIG_PREVIOUS_DIR}" "${COMPOSE_DIR}"
+  # And the units with it. Restoring the compose file and the digest pin while leaving the NEW
+  # unit files in place would put the previous release's digests on the failed release's
+  # definitions -- a state neither release was ever tested in.
+  install_quadlet_units "${COMPOSE_DIR}"
 fi
 
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then
@@ -1672,7 +1976,8 @@ if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then
   exit 2
 fi
 
-cp "${PIN_FILE_PREVIOUS}" "${PIN_FILE_CURRENT}"
+# Restores the record AND, under Quadlet, the drop-ins it names — see rt_pin_rollback.
+rt_pin_rollback
 
 # If this deploy crossed a network-topology change, the previous compose's subnets
 # differ from the just-recreated ones, so the rollback `up` is itself a topology
@@ -1682,15 +1987,7 @@ if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" ]]; then
   clean_slate_recreate
 fi
 
-if docker compose \
-     -f docker-compose.yml \
-     -f "${PIN_FILE_CURRENT}" \
-     --profile "${PROFILE}" \
-     up -d \
-        --no-build \
-        --remove-orphans \
-        --wait \
-        --wait-timeout "${HEALTH_TIMEOUT}"; then
+if rt_apply_stack; then
   log "rolled back to previous digest pin successfully"
 else
   log "rollback ALSO failed — one or more target digests broken or environment problem"
@@ -1701,10 +1998,9 @@ fi
 # best-effort here rather than leaving it down until the next successful deploy.
 if [[ "${NETWORK_TOPOLOGY_CHANGED}" == "true" \
       && "${IRI_MONITORING_ENABLED:-false}" == "true" \
-      && -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" ]]; then
-  log "restoring the monitoring project after the rollback recreate (best-effort)"
-  docker compose -p iri-monitoring --project-directory "${COMPOSE_DIR}" \
-    -f "${COMPOSE_DIR}/docker-compose.monitoring.yml" up -d >/dev/null 2>&1 \
+      ]] && rt_monitoring_configured; then
+  log "restoring the monitoring plane after the rollback recreate (best-effort)"
+  rt_monitoring_up >/dev/null 2>&1 \
     || log "WARN: monitoring restore failed — it returns on the next successful deploy"
 fi
 

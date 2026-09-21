@@ -1,0 +1,32 @@
+; systemd timer for the certificate-expiry collector.
+;
+; DAILY, unlike the container-metrics timer's 30 seconds. A certificate's notAfter does not move,
+; so the only thing a shorter period would buy is noticing a REPLACED file sooner -- and the alert
+; thresholds are measured in days and weeks. Once a day is two orders of magnitude finer than the
+; decision it feeds.
+;
+; 03:40, inside the 04:00 maintenance window's approach but before the backup at 04:15, so a day's
+; metrics are fresh before the nightly work starts. RandomizedDelaySec spreads it because nothing
+; downstream cares about the exact minute.
+
+[Unit]
+Description=Profit Basetool — certificate expiry metrics, daily
+Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cert-expiry-metrics.py
+Requires=iri-cert-expiry.service
+
+[Timer]
+; Once shortly after boot as well: a freshly provisioned or rebooted host should not wait until the
+; next 03:40 to report what its certificates say.
+OnBootSec=5min
+OnCalendar=*-*-* 03:40:00
+RandomizedDelaySec=300
+
+; Catch up a missed run. Unlike the container metrics -- where a late write describes a moment that
+; has passed -- an expiry date is equally true whenever it is read, so a catch-up is strictly better
+; than a gap.
+Persistent=true
+
+Unit=iri-cert-expiry.service
+
+[Install]
+WantedBy=timers.target

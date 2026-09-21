@@ -140,80 +140,191 @@ NOFILE="$(awk '
 ENV_ARGS=()
 for v in "${EDGE_VARS[@]}"; do ENV_ARGS+=(-e "${v}=${RENDER[${v}]}"); done
 
-docker run --rm --user 0:0 --network none \
-  "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 --ulimit "nofile=${NOFILE}:${NOFILE}" \
+# The edge has TWO shapes since ADR-0187, and a gate that only proves one of them
+# is the gate this project already had when the render step was wired up wrongly.
+#   plain     - no front end. Listeners are bare and no header is trusted. This is
+#               what the Docker deployment runs today.
+#   frontend  - EDGE_TRUSTED_PROXY set. Every public listener speaks proxy_protocol
+#               and the client address is restored from it.
+# They are not variations of one configuration: a proxy_protocol listener REJECTS a
+# header-less connection, so a mistake in either direction takes the site down.
+check_mode() {
+  local mode="$1" trusted="$2"
+  local out="${CERT_DIR}/${mode}-nginx-t.out"
+  echo "==> validating the '${mode}' shape"
+
+  docker run --rm --user 0:0 --network none \
+  "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 -e EDGE_TRUSTED_PROXY="${trusted}" --ulimit "nofile=${NOFILE}:${NOFILE}" \
   -v "$(to_native "${EDGE_DIR}"):/edge:ro" \
   -v "$(to_native "${CERT_DIR}"):/certs:ro" \
   --entrypoint sh \
   "${IMAGE}" -c '
-set -eu
-# Mirrors the runtime layout exactly: ONE directory at /etc/nginx/edge, and the
-# main config selected with -c. Anything else would validate a shape the
-# container never runs.
-cp -r /edge /etc/nginx/edge
-cp -r /certs /etc/nginx/certs
-mv /etc/nginx/certs/upstream-ca.crt /etc/nginx/upstream-ca.crt
-mkdir -p /var/www/acme /usr/share/nginx/html/maintenance /tmp/nginx
-# nginx does not open these at parse time, but the roots must exist.
-: > /usr/share/nginx/html/maintenance/maintenance.html
-: > /usr/share/nginx/html/maintenance/maintenance.json
-# Render through the runtime script rather than a copy of its logic: a check
-# that renders differently validates a configuration nobody runs.
-sh /etc/nginx/edge/render-and-run.sh
-# -T, not -t. An `include` whose glob matches NOTHING is not an error in nginx,
-# so a plain -t passes a configuration with zero vhosts in it -- which is exactly
-# what this gate did the first time the render step was wired up wrongly.
-# -t and -T, separately, and the sentinel matters. `nginx -T` dumps the whole
-# configuration INCLUDING COMMENTS, and the comments in nginx.conf quote the very
-# warnings this gate looks for -- so a single combined stream makes the check find
-# its own documentation and fail. Warnings are read from the -t part, the vhost
-# presence from the -T part.
-nginx -t -c /etc/nginx/edge/nginx.conf
-echo "@@@CONFIG-DUMP@@@"
-nginx -T -c /etc/nginx/edge/nginx.conf
-echo "@@@RUNTIME@@@"
-# `nginx -t` PARSES. It does not start workers, and several of the things that
-# have taken this edge down only happen when they start: the pid path on a
-# read-only root, the temp directories nginx creates but does not parent, and the
-# worker_connections-versus-file-descriptor warning production logged on every
-# start while this gate stayed green. So start it for real, briefly, and read
-# what it says.
-nginx -g "daemon off;" -c /etc/nginx/edge/nginx.conf > /tmp/runtime.log 2>&1 &
-npid=$!
-sleep 2
-kill "$npid" 2>/dev/null || true
-wait "$npid" 2>/dev/null || true
-cat /tmp/runtime.log
-' 2>&1 | tee "${CERT_DIR}/nginx-t.out"
+  set -eu
+  # Mirrors the runtime layout exactly: ONE directory at /etc/nginx/edge, and the
+  # main config selected with -c. Anything else would validate a shape the
+  # container never runs.
+  cp -r /edge /etc/nginx/edge
+  cp -r /certs /etc/nginx/certs
+  mv /etc/nginx/certs/upstream-ca.crt /etc/nginx/upstream-ca.crt
+  mkdir -p /var/www/acme /usr/share/nginx/html/maintenance /tmp/nginx
+  # nginx does not open these at parse time, but the roots must exist.
+  : > /usr/share/nginx/html/maintenance/maintenance.html
+  : > /usr/share/nginx/html/maintenance/maintenance.json
+  # Render through the runtime script rather than a copy of its logic: a check
+  # that renders differently validates a configuration nobody runs.
+  sh /etc/nginx/edge/render-and-run.sh
+  # -T, not -t. An `include` whose glob matches NOTHING is not an error in nginx,
+  # so a plain -t passes a configuration with zero vhosts in it -- which is exactly
+  # what this gate did the first time the render step was wired up wrongly.
+  # -t and -T, separately, and the sentinel matters. `nginx -T` dumps the whole
+  # configuration INCLUDING COMMENTS, and the comments in nginx.conf quote the very
+  # warnings this gate looks for -- so a single combined stream makes the check find
+  # its own documentation and fail. Warnings are read from the -t part, the vhost
+  # presence from the -T part.
+  nginx -t -c /etc/nginx/edge/nginx.conf
+  echo "@@@CONFIG-DUMP@@@"
+  nginx -T -c /etc/nginx/edge/nginx.conf
+  echo "@@@RUNTIME@@@"
+  # `nginx -t` PARSES. It does not start workers, and several of the things that
+  # have taken this edge down only happen when they start: the pid path on a
+  # read-only root, the temp directories nginx creates but does not parent, and the
+  # worker_connections-versus-file-descriptor warning production logged on every
+  # start while this gate stayed green. So start it for real, briefly, and read
+  # what it says.
+  nginx -g "daemon off;" -c /etc/nginx/edge/nginx.conf > /tmp/runtime.log 2>&1 &
+  npid=$!
+  sleep 2
+  kill "$npid" 2>/dev/null || true
+  wait "$npid" 2>/dev/null || true
+  cat /tmp/runtime.log
+' 2>&1 | tee "${out}"
 
-# `nginx -t` exits 0 on a warning, and a configuration that always warns is one
-# where the next — real — warning is not read. Treat any [warn] as a failure.
-# Only the part BEFORE the dump sentinel: everything after it is the configuration
-# itself, whose comments quote warnings verbatim.
-sed -n '1,/@@@CONFIG-DUMP@@@/p' "${CERT_DIR}/nginx-t.out" > "${CERT_DIR}/nginx-t.warnings"
-if grep -q '\[warn\]' "${CERT_DIR}/nginx-t.warnings"; then
+  # `nginx -t` exits 0 on a warning, and a configuration that always warns is one
+  # where the next — real — warning is not read. Treat any [warn] as a failure.
+  # Only the part BEFORE the dump sentinel: everything after it is the configuration
+  # itself, whose comments quote warnings verbatim.
+  sed -n '1,/@@@CONFIG-DUMP@@@/p' "${out}" > "${CERT_DIR}/${mode}-warnings"
+  if grep -q '\[warn\]' "${CERT_DIR}/${mode}-warnings"; then
   echo "FAIL: nginx -t emitted a warning (shown above). Fix it or state why it is acceptable."
   exit 1
-fi
+  fi
 
-# The assertion that makes the dump worth taking: every synthetic host must appear
-# in the ASSEMBLED configuration. If the include path, the template suffix or the
-# render step breaks, nginx still reports "syntax is ok" -- and this does not.
-for h in "${HOSTS[@]}"; do
-  grep -qF "server_name ${h};" "${CERT_DIR}/nginx-t.out" \
+  # The assertion that makes the dump worth taking: every synthetic host must appear
+  # in the ASSEMBLED configuration. If the include path, the template suffix or the
+  # render step breaks, nginx still reports "syntax is ok" -- and this does not.
+  for h in "${HOSTS[@]}"; do
+  grep -qF "server_name ${h};" "${out}" \
     || { echo "FAIL: ${h} is missing from the assembled configuration"; exit 1; }
-done
+  done
 
-# The runtime section, read on its own. `nginx -t` never prints these: a warning
-# about worker_connections versus the descriptor limit, an alert about a failed
-# setrlimit, an emerg about a path it cannot create. Production logged the first
-# of those on every start for two days while this gate reported the configuration
-# valid, because parsing and starting are not the same thing.
-sed -n '/@@@RUNTIME@@@/,$p' "${CERT_DIR}/nginx-t.out" > "${CERT_DIR}/nginx-runtime.out"
-if grep -qE '\[(warn|alert|emerg)\]' "${CERT_DIR}/nginx-runtime.out"; then
+  # The runtime section, read on its own. `nginx -t` never prints these: a warning
+  # about worker_connections versus the descriptor limit, an alert about a failed
+  # setrlimit, an emerg about a path it cannot create. Production logged the first
+  # of those on every start for two days while this gate reported the configuration
+  # valid, because parsing and starting are not the same thing.
+  sed -n '/@@@RUNTIME@@@/,$p' "${out}" > "${CERT_DIR}/${mode}-runtime.out"
+  if grep -qE '\[(warn|alert|emerg)\]' "${CERT_DIR}/${mode}-runtime.out"; then
   echo "FAIL: the edge logged a warning or worse when it actually started:"
-  grep -E '\[(warn|alert|emerg)\]' "${CERT_DIR}/nginx-runtime.out" | sed 's/^/  /'
+  grep -E '\[(warn|alert|emerg)\]' "${CERT_DIR}/${mode}-runtime.out" | sed 's/^/  /'
   exit 1
-fi
+  fi
 
-echo "==> edge configuration is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
+  # DIRECTIVES ONLY. `nginx -T` dumps the configuration including comments, and
+  # nginx.conf's own comment explains at length why there is NO set_real_ip_from
+  # here -- so an unfiltered grep finds the documentation and reports the opposite
+  # of the truth. This gate already warns about that for [warn]; the same trap
+  # applies to every assertion below.
+  local dump="${CERT_DIR}/${mode}-directives"
+  grep -vE '^[[:space:]]*#' "${out}" > "${dump}"
+
+  # The two shapes have to differ in the assembled configuration, or the gate is
+  # green because the switch did nothing rather than because it worked.
+  if [[ -n "${trusted}" ]]; then
+    grep -qE 'listen .*proxy_protocol' "${dump}" \
+      || { echo "FAIL: ${mode}: no listener speaks proxy_protocol"; exit 1; }
+    grep -qF "set_real_ip_from ${trusted};" "${dump}" \
+      || { echo "FAIL: ${mode}: the client address is not restored from the header"; exit 1; }
+    grep -qF 'real_ip_header proxy_protocol;' "${dump}" \
+      || { echo "FAIL: ${mode}: real_ip_header is not set to proxy_protocol"; exit 1; }
+  else
+    grep -qE 'listen .*proxy_protocol' "${dump}" \
+      && { echo "FAIL: ${mode}: a listener speaks proxy_protocol with no front end configured"; exit 1; }
+    grep -qF 'set_real_ip_from' "${dump}" \
+      && { echo "FAIL: ${mode}: a header is trusted with nothing in front of the edge"; exit 1; }
+  fi
+
+  # The health listener must NEVER speak proxy_protocol, in either shape: the
+  # container's own HEALTHCHECK is a plain wget, and a rejected check would hold
+  # the whole stack down behind an edge that is working.
+  awk '/listen 127.0.0.1:8081/,/^}/' "${dump}" | grep -q 'proxy_protocol' \
+    && { echo "FAIL: ${mode}: the health listener speaks proxy_protocol"; exit 1; }
+  grep -qE 'listen (127\.0\.0\.1|\[::1\]):8081;' "${dump}" \
+    || { echo "FAIL: ${mode}: the loopback health listener is missing"; exit 1; }
+
+  # The /auth/admin allow-list has to move WITH the listener. Its six entries are
+  # container-bridge gateways, which is what $remote_addr is on a plain listener; under
+  # proxy_protocol $remote_addr is what haproxy asserts, and the operator's `ssh -L` tunnel then
+  # arrives as the host loopback instead. Neither half may leak into the other mode: a missing
+  # loopback grant is a lockout at cutover, and a loopback grant on a PLAIN listener would be a
+  # standing allow for anything inside the container's own netns.
+  local admin
+  admin="$(awk '/location \^~ \/auth\/admin/,/^[[:space:]]*}/' "${dump}")"
+  grep -q 'allow 172.28.15.1;' <<<"${admin}" \
+    || { echo "FAIL: ${mode}: the ingress-gateway grant is missing from /auth/admin"; exit 1; }
+  if [[ "${mode}" == "frontend" ]]; then
+    grep -q 'allow 127.0.0.1;' <<<"${admin}" \
+      || { echo "FAIL: frontend: /auth/admin does not admit the tunnel's loopback address - this is the #1885 lockout, reintroduced"; exit 1; }
+    grep -q 'allow ::1;' <<<"${admin}" \
+      || { echo "FAIL: frontend: /auth/admin admits 127.0.0.1 but not ::1 - one word of the ssh command would decide whether the console opens"; exit 1; }
+  else
+    grep -q 'allow 127.0.0.1;' <<<"${admin}" \
+      && { echo "FAIL: plain: /auth/admin grants loopback on a listener where it is not the tunnel"; exit 1; }
+  fi
+  grep -q 'deny all;' <<<"${admin}" \
+    || { echo "FAIL: ${mode}: /auth/admin lost its load-bearing 'deny all'"; exit 1; }
+
+  echo "==> '${mode}' is valid, ${#HOSTS[@]} vhosts rendered and present, and starts clean"
+}
+
+# A value that trusts too much is the one way this feature turns into its
+# opposite: a source-address forgery tool aimed at the rate limiter and the admin
+# allow-list it exists to preserve. `render-and-run.sh` refuses those values, and
+# a refusal nobody tests is a refusal that gets removed as dead code.
+refuses() {
+  local label="$1" value="$2"
+  if docker run --rm --user 0:0 --network none        "${ENV_ARGS[@]}" -e EDGE_RENDER_ONLY=1 -e EDGE_TRUSTED_PROXY="${value}"        -v "$(to_native "${EDGE_DIR}"):/edge:ro" --entrypoint sh "${IMAGE}" -c '
+         set -eu; cp -r /edge /etc/nginx/edge; sh /etc/nginx/edge/render-and-run.sh
+       ' >/dev/null 2>&1; then
+    echo "FAIL: EDGE_TRUSTED_PROXY='${value}' (${label}) was ACCEPTED - it must be refused"
+    exit 1
+  fi
+  echo "==> refused ${label}: ${value}"
+}
+
+check_mode plain ''
+check_mode frontend '172.28.15.10'
+
+refuses 'an IPv4 wildcard' '0.0.0.0/0'
+refuses 'an IPv6 wildcard' '::/0'
+refuses 'a prefix'         '172.28.15.0/24'
+
+# EDGE_ADMIN_ALLOW widens the Keycloak admin console, so it is held to the same rule as the trust
+# above: literal addresses, never a range. A prefix there would hand the console to a whole subnet.
+refuses_admin() {
+  local label="$1" value="$2"
+  if docker run --rm --user 0:0 --network none "${ENV_ARGS[@]}" \
+       -e EDGE_RENDER_ONLY=1 -e EDGE_TRUSTED_PROXY='172.28.15.10' -e EDGE_ADMIN_ALLOW="${value}" \
+       -v "$(to_native "${EDGE_DIR}"):/edge:ro" --entrypoint sh "${IMAGE}" -c '
+         set -eu; cp -r /edge /etc/nginx/edge; sh /etc/nginx/edge/render-and-run.sh
+       ' >/dev/null 2>&1; then
+    echo "FAIL: EDGE_ADMIN_ALLOW='${value}' (${label}) was ACCEPTED - it must be refused"
+    exit 1
+  fi
+  echo "==> refused admin ${label}: ${value}"
+}
+
+refuses_admin 'a prefix'        '10.0.0.0/8'
+refuses_admin 'an IPv4 wildcard' '0.0.0.0'
+refuses_admin 'one good and one bad address' '10.9.0.7 192.168.0.0/16'
+
+echo "==> edge configuration is valid in BOTH shapes"

@@ -86,3 +86,14 @@ ssh Befehle.txt
 # way to keep it is to make `git add -A` unable to pick them up.
 *.tmp
 .ui.xml
+
+# Ansible (ADR-0188): an inventory names real machines and this repository is public.
+ansible/inventory/hosts.yml
+ansible/collections/
+# ansible-galaxy builds a throwaway GPG home here while verifying a collection's signatures.
+# It is a byproduct of installing, not part of the tree, and on a case-sensitive filesystem
+# with ordinary permissions it shows up as untracked on every machine that has run the
+# install once.
+ansible/gpg/
+# ansible-lint drops a cache here the first time it runs. Fetched state, like collections/.
+ansible/.ansible/

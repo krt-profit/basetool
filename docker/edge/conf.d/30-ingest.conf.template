@@ -1,7 +1,7 @@
 # The desktop one-click ingest gateway.
 server {
-  listen 8443 ssl;
-  listen [::]:8443 ssl;
+  listen 8443 ssl ${EDGE_LISTEN_OPTS};
+  listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
   http2 on;
   server_name ${EDGE_HOST_INGEST};
 

@@ -16,6 +16,10 @@
 #     prom/prometheus:v3.14.0 test rules tests/containerpidshigh_cap_relative_test.yml
 
 rule_files:
+  # The alert reads the NORMALISED series since the Podman migration, so the recording
+  # rules that produce them have to be loaded too -- without this file the alert has no
+  # input and the test proves only that promtool can evaluate an empty vector.
+  - ../alerts/containers-runtime.yml
   - ../alerts/infrastructure.yml
 
 evaluation_interval: 1m
@@ -39,7 +43,7 @@ tests:
               name: grafana
             exp_annotations:
               summary: "Container pids >80% of the cgroup cap: grafana"
-              description: "Container grafana holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+              description: "Container grafana holds more than 80% of its pids cgroup cap (basetool:container:pids is the cgroup pids.current count, basetool:container:pids_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
 
   # The original 2026-07-12 case must keep firing: a 2048-capped JVM container past 80% (1700/2048).
   - name: fires - 2048-capped JVM container above 80 percent
@@ -58,7 +62,7 @@ tests:
               name: ingest
             exp_annotations:
               summary: "Container pids >80% of the cgroup cap: ingest"
-              description: "Container ingest holds more than 80% of its pids cgroup cap (container_threads is the cgroup pids.current count, container_threads_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
+              description: "Container ingest holds more than 80% of its pids cgroup cap (basetool:container:pids is the cgroup pids.current count, basetool:container:pids_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
 
   # Normal operation on both cap sizes — prod measured grafana's healthy peers at <=12.5%.
   - name: silent - normal load on 512-capped and 2048-capped containers

@@ -31,7 +31,7 @@
       },
       "targets": [
         {
-          "expr": "container_memory_rss{name=~\".+\"}/container_spec_memory_limit_bytes{name=~\".+\"}*100",
+          "expr": "basetool:container:memory_anon_bytes/basetool:container:memory_limit_bytes*100",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
@@ -65,7 +65,7 @@
       },
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{name=~\".+\"}",
+          "expr": "basetool:container:memory_working_set_bytes",
           "legendFormat": "{{name}} working set",
           "refId": "A",
           "datasource": {
@@ -74,7 +74,7 @@
           }
         },
         {
-          "expr": "container_memory_rss{name=~\".+\"}",
+          "expr": "basetool:container:memory_anon_bytes",
           "legendFormat": "{{name}} anon",
           "refId": "B",
           "datasource": {
@@ -117,7 +117,7 @@
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{name=~\".+\"}[5m])",
+          "expr": "rate(basetool:container:cpu_usage_seconds_total[5m])",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
@@ -183,7 +183,7 @@
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_cfs_throttled_seconds_total{name=~\".+\"}[5m])",
+          "expr": "rate(basetool:container:cpu_throttled_seconds_total[5m])",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {
@@ -217,7 +217,7 @@
       },
       "targets": [
         {
-          "expr": "rate(container_cpu_cfs_throttled_periods_total{name=~\".+\"}[5m]) / rate(container_cpu_cfs_periods_total{name=~\".+\"}[5m]) * 100",
+          "expr": "rate(basetool:container:cpu_throttled_periods_total[5m]) / rate(basetool:container:cpu_periods_total[5m]) * 100",
           "legendFormat": "{{name}}",
           "refId": "A",
           "datasource": {

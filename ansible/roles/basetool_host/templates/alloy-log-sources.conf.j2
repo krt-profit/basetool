@@ -1,0 +1,47 @@
+{{ ansible_managed | comment }}
+#
+# The log sources, in the shape monitoring/alloy/config.alloy expects them.
+#
+# That file is written for an Alloy that runs as a CONTAINER, where the log directories arrive as
+# bind mounts at /logs/<service> and /hostlog (docker-compose.monitoring.yml). Here Alloy is a HOST
+# service, so none of those paths exist -- and the failure is silent. Measured on the testing host
+# on 2026-09-20, before this drop-in: alloy.service `active`, its scrape target UP, 112 alloy_*
+# series collected, `loki_source_file_read_lines_total` ABSENT, and all ten LogStreamSilent
+# instances firing. A shipper that is up and ships nothing looks exactly like a healthy one.
+#
+# The obvious fix -- rewrite the paths in config.alloy -- is the wrong one. Those paths are also
+# written into the alert rules (`absent(loki_source_file_read_lines_total{path="/hostlog/auth.log"})`
+# and its siblings in meta.yml), so rewriting them would have retargeted those rules at once, and
+# quietly. Recreating the container's view instead leaves config.alloy and the alert rules alone and
+# keeps ONE file true for both shapes.
+#
+# EVERY BIND HERE IS A DIRECTORY, and that is a correction rather than a preference. The first
+# version of this file named each log file individually, on the reasoning that Alloy has no business
+# reading btmp or the dnf logs. That reasoning is sound and the implementation is not: a systemd
+# file bind resolves to an INODE at unit start, and every one of these files is rotated. logrotate's
+# `create` and auditd's own ROTATE both make a NEW file, so after the first rotation the mount would
+# still point at the rotated-away inode -- Alloy tailing a file nothing writes to, reporting healthy,
+# shipping nothing. The same failure this drop-in exists to fix, reintroduced by the refinement.
+#
+# A directory bind has no such problem: Alloy re-opens by path inside the mounted tree and follows
+# the rotation exactly as it does in the container. /var/log:/hostlog is also precisely what
+# docker-compose.monitoring.yml mounts, so this is parity with the deployment that works rather than
+# a new exposure.
+[Service]
+# --- application JSON / file logs, masked at source (REQ-OBS-007) ----------------------------------
+BindReadOnlyPaths={{ basetool_host_root_dir }}/backend/log:/logs/backend
+BindReadOnlyPaths={{ basetool_host_root_dir }}/frontend/log:/logs/frontend
+BindReadOnlyPaths={{ basetool_host_root_dir }}/ingest/log:/logs/ingest
+BindReadOnlyPaths={{ basetool_host_root_dir }}/keycloak/log:/logs/keycloak
+
+# --- the host's own logs --------------------------------------------------------------------------
+# One directory, as the container has it. It carries the SSH/sudo stream (auth.log on Debian,
+# secure on RHEL -- config.alloy names both), the auditd tamper watches under audit/, the fail2ban
+# ban log, and the four ops-automation logs the systemd timers append to.
+#
+# Two host preconditions this bind does NOT provide, both handled in the role and both silent when
+# they are missed: the files have to be group-adm readable (RHEL writes secure and audit.log as
+# root:root), and /var/log/audit has to be traversable -- /usr/lib/tmpfiles.d/audit.conf pins it to
+# 0700 root:root, which is why there is a tmpfiles drop-in overriding it rather than a chmod that
+# gets undone the next time systemd-tmpfiles runs.
+BindReadOnlyPaths=/var/log:/hostlog
