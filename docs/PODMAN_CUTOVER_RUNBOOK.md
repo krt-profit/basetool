@@ -28,6 +28,29 @@ Two properties shape every step below, and both were measured rather than assume
 
 Each line is a gate. If one is not true, stop: the window is not the place to discover it.
 
+> [!note] Where phase 0 stands on `rocky-16gb-nbg1-1` — re-measured in one read-only pass, 2026-09-21
+> | gate | state |
+> | --- | --- |
+> | 0.2 role has run | **met** — all five paths at the documented owner and mode, `env.d` `deploy:iri 2750`, quadlet dir for uid 994, `iri-locks.conf` present |
+> | 0.3 operational units | **met** — all five timers `enabled`, services `disabled` as designed (they are timer-driven) |
+> | 0.4 registry token | **met** — `deploy:deploy 600`, readable by `deploy` |
+> | 0.5 monitoring secrets | **met** — three files, all `165533:165533 600` |
+> | 0.6 grafana certificate | **met** — `100471:100471`, `644`/`640`, SAN `grafana` + `grafana.profit-base.online`, valid to 2028-12-24 |
+> | 0.6a `basetool-ca.crt` | **deferred to §1.5a** — absent, and so is the `keystore.p12` it derives from; §1.4 restores both |
+> | 0.6b `KC_METRICS_ENABLED` | **deferred to §1.5a** — `.env` is not on the host until §1.4 |
+> | 0.6c expiry watch | **met** — timer `enabled`, `certificates.prom` written, 1 series today and 2 once 0.6a lands |
+> | 0.7 no hand-placed units | **met** — `~iri/.config/containers/systemd/` is empty |
+> | 0.8 backup tooling | **met** — `restic` and `rclone` installed, `backup.env` and `rclone.conf` readable by `deploy` |
+> | 0.9 backup + drill | **met** — see the gate, run on this host against a real production snapshot |
+> | §1.6 carries | **done early** — see the box there |
+>
+> Host posture at the same moment: SELinux `Enforcing`, lingering enabled for `iri`,
+> `/etc/containers/systemd/users/994` holding **0** unit files — which is the correct pre-deploy
+> state, because the units ride the config bundle and are written by the first deploy (§1.7).
+>
+> The only gates not met are the two that **cannot** be met yet; nothing here is waiting on a
+> decision or a fix.
+
 ### 0.1 A config bundle built from THIS branch is promoted to `:stable`
 
 **This is the hardest prerequisite and the easiest to overlook.** Since the units ride the config
@@ -213,7 +236,19 @@ Done on the testing host 2026-09-20; Grafana came up healthy and the monitoring 
 ### 0.6a `certs/basetool-ca.crt` — the one Prometheus scrapes THROUGH
 
 Done on `rocky-16gb-nbg1-1` 2026-09-21 for the Grafana half above; **this half is still open**, and
-it was not listed anywhere in these prerequisites until now. `prometheus.yml` scrapes the three JVM
+it was not listed anywhere in these prerequisites until now.
+
+> [!important] Measured 2026-09-21: this gate cannot be met in phase 0 — and that is not a gap
+> On the target, `/var/iri/secrets/keystore.p12`, `/var/iri/code/.env` and
+> `/var/iri/monitoring/certs/basetool-ca.crt` are **all three absent**, and §1.4 restores all three
+> from the cutover snapshot. So neither this gate nor §0.6b can be ticked before the window: their
+> inputs do not exist until the restore has run. **Both are verified at §1.5a**, which is where the
+> commands now live.
+>
+> Said out loud because the alternative is worse than the ordering mistake. A reader working phase 0
+> the evening before meets two gates that cannot pass, and the natural resolution — "that one comes
+> later" — is exactly how a real gap gets normalised. Phase 0's promise is that none of it has to
+> happen inside the window; these two are checks *of* the window's own work. `prometheus.yml` scrapes the three JVM
 apps and Keycloak over **https** with
 
 ```yaml
@@ -262,6 +297,9 @@ The generated `env.d` template writes `KC_METRICS_ENABLED=${KC_METRICS_ENABLED:-
 ```bash
 grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env    # expect 1
 ```
+
+`.env` is restored by §1.4 step 2 and does not exist on the host before that, so this is checked at
+§1.5a — see the box in §0.6a.
 
 ### 0.6c The certificate files are being watched for expiry
 
@@ -567,6 +605,26 @@ sudo -u iri podman exec -i db-backend sh -c \
 
 Table-by-table row counts · Flyway count and latest version · realm users, clients, credentials.
 Any difference stops the cutover; the old host is still serving.
+
+### 1.5a The two phase-0 gates whose inputs only exist now
+
+§0.6a and §0.6b are prerequisites in substance and post-restore in practice: `keystore.p12`, `.env`
+and `certs/basetool-ca.crt` all arrive with §1.4. Check them **here**, before the first deploy, so
+the apps and Prometheus start against a host that already has them.
+
+```bash
+# 0.6a -- the CA that prometheus.yml pins for all four application scrapes
+stat -c '%n %U:%G %a' /var/iri/monitoring/certs/basetool-ca.crt
+openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -enddate
+
+# 0.6b -- Keycloak's metrics lever, which the generated template defaults to OFF
+grep -c '^KC_METRICS_ENABLED=true' /var/iri/code/.env      # expect 1
+```
+
+The two failures are not equally loud, which is the reason both are listed. A missing CA takes out
+all four application scrape targets and `scrape-targets-up` reports it at §1.8 — late, but caught.
+A missing `KC_METRICS_ENABLED` is the quiet one: Keycloak stays healthy, every probe passes, and
+its management port simply answers `404` on `/metrics` with nothing else looking wrong.
 
 ### 1.6 Carry what a restore does not
 
