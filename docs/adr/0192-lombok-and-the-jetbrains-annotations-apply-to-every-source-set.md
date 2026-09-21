@@ -183,6 +183,12 @@ reports **zero** remaining derivable cases: what the analyser can prove, the bra
   `HibernateProxy` before comparing, which lombok cannot express at all, and the id classes are
   JPA-identity-critical code with their own tests. This is the "optimistic-locking landmine" class
   of change `CLAUDE.md` warns about, for no boilerplate worth removing.
+- **`@ToString` on the five `Material*` entities that hand-write one** — rejected. Those
+  implementations print the *foreign-key id* of each `LAZY` association (`jobOrder.getId()`)
+  precisely so a log line does not initialise the proxy or surface a member's name; `@ToString`
+  would either include the whole association and trigger the lazy load, or exclude it and lose the
+  id. Lombok has no third option. `LiveSyncStreamService.Subscription` likewise keeps identity
+  `equals`/`hashCode` on a record, which is the opposite of what any generated form would do.
 - **`@AllArgsConstructor` on `UserApprovalEvent`** — rejected. Its hand-written constructor takes
   four of the entity's five fields, `id` being database-generated and deliberately excluded;
   `@AllArgsConstructor` would silently widen it to five arguments. Lombok has no "all fields but
