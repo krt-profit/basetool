@@ -338,6 +338,15 @@ case "$cmd" in
       *)              echo "yes" ;;
     esac
     ;;
+  # `test -e` is asked BEFORE `test -r` by the trace check, to tell a file that is not there yet
+  # from one that cannot be opened. Run against the migration target before its first deploy, the
+  # old order reported "not readable" about a file that did not exist.
+  *"test -e /var/iri/code/.env"*)
+    case "$scenario" in
+      env-no-env) echo "" ;;
+      *)          echo "yes" ;;
+    esac
+    ;;
   *"test -f /var/iri/code/.env"*)
     case "$scenario" in
       env-no-env) echo "" ;;

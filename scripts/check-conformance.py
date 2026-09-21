@@ -1426,8 +1426,14 @@ def check_trace_pipeline(ctx: Context) -> str:
     raw = ctx.runner.run(
         "grep -E '^MONITORING_TRACING_ENABLED=' /var/iri/code/.env 2>/dev/null || true")
     if not raw.strip():
-        # Same distinction as check_env_reaches_the_units: an unreadable file and a file without
-        # the key both produce nothing, and only one of them is a reason to draw a conclusion.
+        # Same distinction as check_env_reaches_the_units, and one more: an ABSENT file, an
+        # UNREADABLE one and one without the key all produce nothing here. Run against the
+        # migration target before its first deploy, this reported ".env is not readable by this
+        # SSH account" about a file that simply did not exist yet -- a true statement that points
+        # at the wrong problem, and the kind that sends someone checking sudo rules for an hour.
+        if not ctx.runner.run("test -e /var/iri/code/.env && echo yes || true").strip():
+            raise Skip("no /var/iri/code/.env on this host yet -- it arrives with the restore, so "
+                       "before that there is nothing to read and nothing to conclude")
         if not ctx.runner.run("test -r /var/iri/code/.env && echo yes || true").strip():
             raise Skip("/var/iri/code/.env is not readable by this SSH account (0640 "
                        "deploy:deploy) -- rerun with an account that can read it")
