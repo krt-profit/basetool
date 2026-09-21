@@ -174,13 +174,23 @@ added to `main` after the sweep — the `TracingEnabledMetric` in `backend`, `fr
 — then put six accessors back, which is the more useful half of this note: a one-off sweep is
 true on the day it runs.
 
-Twelve accessors are now expressed by lombok: `@Getter` + `@Setter(AccessLevel.PACKAGE)` on the
-three metric beans' `tracingEnabled` field, `@Getter`/`@Setter` on `RedisSessionConfigTest`'s
-one-property `SampleForm`, and field-level `@Getter` on the four `WebSocketSession` members of
-`LiveSyncWebSocketHandlerTest`'s `FakeSession`. The last is field-level deliberately: `@Getter` on
-that class would also generate `getSent()`, `isFailSend()` and `getCloseStatus()` — new public
-surface on a private test double — and would sit beside the hand-written `isOpen()`, whose
-`flipOpenAfter` logic lombok cannot express.
+**Eight** accessors are now expressed by lombok: `@Getter` + `@Setter(AccessLevel.PACKAGE)` on the
+three metric beans' `tracingEnabled` field, and `@Getter`/`@Setter` on `RedisSessionConfigTest`'s
+one-property `SampleForm`.
+
+> [!warning] It was twelve for about an hour, and CodeQL was right to object
+> The first version of this amendment also converted the four `WebSocketSession` members of
+> `LiveSyncWebSocketHandlerTest`'s `FakeSession`. CodeQL flagged **all four**: the generated
+> `getId()`, `getUri()`, `getAttributes()` and `getPrincipal()` implement an interface and carry no
+> `@Override`, which lombok cannot emit.
+>
+> They were reverted to hand-written methods. **The standard this ADR actually applies was never
+> "lombok can express it" on its own** — it is *"and the result is not worse"*, which is why
+> `@ToString` on the `Material*` entities and `@AllArgsConstructor` on `UserApprovalEvent` are
+> refused under *Alternatives considered*. Sixteen lines saved in a private test double, against a
+> static-analysis finding that returns on every scan, is that same trade and it goes the same way.
+> A finding that recurs forever teaches its reader to ignore the tool — the same disease as an
+> alert that can never be satisfied.
 
 **What remains is not boilerplate, and it is now counted rather than asserted.** Every one-line
 field accessor in the repository, across all source sets, classified by two independent scans — one
@@ -193,8 +203,10 @@ long return type cannot hide a case:
 | record components | 33 | lombok cannot annotate a record component |
 | accessors in anonymous classes | 12 | they return an enclosing local, not a field |
 | fluent setters | 4 | same as the getters |
+| interface implementations kept by hand | 4 | lombok **can** generate these — they are the `FakeSession` four above, kept hand-written so they can carry `@Override` |
 
-Neither scan finds a single remaining case lombok could express, in any source set.
+Only those last four are cases lombok could express, and they are a recorded decision rather than
+an oversight. Everything else the two scans find — 123 accessors — lombok cannot write at all.
 
 **`lombok.accessors.fluent = true` was reconsidered here and rejected again**, now with the numbers.
 It would let the 78 fluent accessors be generated — and, because `lombok.config` is deliberately one
