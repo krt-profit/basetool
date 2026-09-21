@@ -44,6 +44,7 @@ import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
@@ -119,6 +120,8 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
    * @return the compiled patterns, unmodifiable because the field is shared across request threads
    * @throws IllegalStateException when an entry is blank or cannot be parsed
    */
+  @NotNull
+  @UnmodifiableView
   private static List<PathPattern> compilePaths(@Nullable List<String> paths) {
     if (paths == null || paths.isEmpty()) {
       return List.of();
@@ -296,6 +299,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
       this.body = body.clone();
     }
 
+    @NotNull
     @Override
     public ServletInputStream getInputStream() {
       ByteArrayInputStream delegate = new ByteArrayInputStream(body);
@@ -322,6 +326,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
       };
     }
 
+    @NotNull
     @Override
     public BufferedReader getReader() {
       return new BufferedReader(

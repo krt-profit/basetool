@@ -31,6 +31,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -78,6 +79,7 @@ public class MeController {
    *
    * @return current effective org-unit context for the calling request; never {@code null}.
    */
+  @NotNull
   @GetMapping("/active-org-unit")
   public ActiveOrgUnitResponse getActiveOrgUnit() {
     return new ActiveOrgUnitResponse(ownerScopeService.currentOrgUnitId().orElse(null));
@@ -112,6 +114,7 @@ public class MeController {
    *
    * @return the caller's UI capability flags; never {@code null}.
    */
+  @NotNull
   @GetMapping("/capabilities")
   @Operation(
       summary = "Per-principal UI capability flags (blueprint overview, job orders, bank staff).")

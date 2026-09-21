@@ -94,12 +94,13 @@ public class OrgHierarchyController {
    * @param dto create payload; {@code id}/{@code version} are ignored (server-stamped).
    * @return the persisted Bereich DTO.
    */
+  @NotNull
   @PostMapping("/bereiche")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Create a Bereich",
       description = "Creates an area (Bereich); name/shorthand unique across all org units.")
-  public BereichDto createBereich(@RequestBody @Valid BereichDto dto) {
+  public BereichDto createBereich(@NotNull @RequestBody @Valid BereichDto dto) {
     return toDto(
         orgHierarchyService.createBereich(
             dto.name(),
@@ -133,13 +134,14 @@ public class OrgHierarchyController {
    * @param dto create payload; {@code id}/{@code version} are ignored (server-stamped).
    * @return the persisted OL DTO.
    */
+  @NotNull
   @PostMapping("/organisationsleitung")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Create the Organisationsleitung",
       description = "Creates the single top-of-hierarchy org unit; a second one is rejected (409).")
   public OrganisationsleitungDto createOrganisationsleitung(
-      @RequestBody @Valid OrganisationsleitungDto dto) {
+      @NotNull @RequestBody @Valid OrganisationsleitungDto dto) {
     return toDto(
         orgHierarchyService.createOrganisationsleitung(
             dto.name(), dto.shorthand(), dto.description()));
@@ -171,6 +173,7 @@ public class OrgHierarchyController {
    * @param request the new parent id (or {@code null} to detach) plus the child's version.
    * @return the child's id, kind, new parent id and bumped version.
    */
+  @NotNull
   @PatchMapping("/org-units/{id}/parent")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
@@ -179,7 +182,8 @@ public class OrgHierarchyController {
           "Assigns a Staffel/SK to a Bereich, or a Bereich to the Organisationsleitung. Validates"
               + " the kind pairing and the child's optimistic-lock version.")
   public OrgUnitParentResponse setParent(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid OrgUnitParentUpdateRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid OrgUnitParentUpdateRequest request) {
     OrgUnit updated =
         orgHierarchyService.setParent(id, request.parentOrgUnitId(), request.version());
     return new OrgUnitParentResponse(
@@ -197,6 +201,7 @@ public class OrgHierarchyController {
    * @param request the user and the role to grant.
    * @return the member's resulting role flags + version.
    */
+  @NotNull
   @PostMapping("/bereiche/{id}/members")
   @PreAuthorize(
       "hasRole('"
@@ -210,7 +215,8 @@ public class OrgHierarchyController {
               + " (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's"
               + " Bereichsleiter for the Koordinator/Operator rungs.")
   public BereichMemberResponse addBereichLeader(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid AddBereichLeaderRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid AddBereichLeaderRequest request) {
     return toBereichMember(
         orgUnitMembershipService.addBereichLeader(id, request.userId(), request.role()));
   }
@@ -245,13 +251,14 @@ public class OrgHierarchyController {
    * @param request the user to add.
    * @return the member's resulting OL-flag + version.
    */
+  @NotNull
   @PostMapping("/organisationsleitung/{id}/members")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(
       summary = "Add an Organisationsleitung member",
       description = "Adds a user to the Organisationsleitung (is_ol_member). ADMIN-only.")
   public OlMemberResponse addOlMember(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid AddOlMemberRequest request) {
+      @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid AddOlMemberRequest request) {
     return toOlMember(orgUnitMembershipService.addOlMember(id, request.userId()));
   }
 
@@ -318,6 +325,7 @@ public class OrgHierarchyController {
    * @param m the membership; never {@code null}.
    * @return the response DTO.
    */
+  @NotNull
   private BereichMemberResponse toBereichMember(@NotNull OrgUnitMembership m) {
     // The three Bereich booleans are derived from the unified rank (epic #800, REQ-ROLE-001) — the
     // is_bereichs* columns were dropped in the Phase 5 cleanup (V187).
@@ -337,6 +345,7 @@ public class OrgHierarchyController {
    * @param m the membership; never {@code null}.
    * @return the response DTO.
    */
+  @NotNull
   private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
     // The OL-member boolean is derived from the unified rank (epic #800, REQ-ROLE-001) —
     // is_ol_member
@@ -356,6 +365,7 @@ public class OrgHierarchyController {
    * @param u the entity; never {@code null}.
    * @return the node DTO.
    */
+  @NotNull
   private OrgUnitNodeDto toNodeDto(@NotNull OrgUnit u) {
     return new OrgUnitNodeDto(
         u.getId(),
@@ -374,6 +384,7 @@ public class OrgHierarchyController {
    * @param b the entity; never {@code null}.
    * @return the DTO.
    */
+  @NotNull
   private BereichDto toDto(@NotNull Bereich b) {
     return new BereichDto(
         b.getId(),
@@ -392,6 +403,7 @@ public class OrgHierarchyController {
    * @param o the entity; never {@code null}.
    * @return the DTO.
    */
+  @NotNull
   private OrganisationsleitungDto toDto(@NotNull Organisationsleitung o) {
     return new OrganisationsleitungDto(
         o.getId(), o.getName(), o.getShorthand(), o.getDescription(), o.isActive(), o.getVersion());

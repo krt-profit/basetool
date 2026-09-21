@@ -110,6 +110,7 @@ public class AsyncConfig {
    *
    * @return configured UEX async executor
    */
+  @NotNull
   @Bean(name = UEX_EXECUTOR)
   public Executor uexExecutor() {
     return buildExecutor(2, 4, 100, "uex-async-", 20);
@@ -134,6 +135,7 @@ public class AsyncConfig {
    *
    * @return configured SC Wiki async executor
    */
+  @NotNull
   @Bean(name = SCWIKI_EXECUTOR)
   public Executor scWikiExecutor() {
     return buildExecutor(2, 2, 0, "scwiki-async-", 20);
@@ -159,6 +161,7 @@ public class AsyncConfig {
    *
    * @return configured P4K import async executor
    */
+  @NotNull
   @Bean(name = IMPORT_EXECUTOR)
   public Executor importExecutor() {
     return buildExecutor(1, 1, 20, "p4k-import-", 60);
@@ -181,6 +184,7 @@ public class AsyncConfig {
    *
    * @return configured notification async executor
    */
+  @NotNull
   @Bean(name = NOTIFICATION_EXECUTOR)
   public Executor notificationExecutor() {
     return buildExecutor(2, 4, 200, "notification-async-", 20);
@@ -203,6 +207,7 @@ public class AsyncConfig {
    *
    * @return configured mail async executor
    */
+  @NotNull
   @Bean(name = MAIL_EXECUTOR)
   public Executor mailExecutor() {
     return buildExecutor(2, 4, 200, "mail-async-", 20);
@@ -222,6 +227,7 @@ public class AsyncConfig {
    * @param awaitTerminationSeconds the graceful-shutdown window granted to in-flight tasks
    * @return an initialised executor ready to accept work
    */
+  @NotNull
   private Executor buildExecutor(
       int corePoolSize,
       int maxPoolSize,

@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -108,7 +109,8 @@ public final class MaterialNameCanonicalizer {
    * @param name a non-blank commodity name
    * @return the folded words in original order (possibly empty)
    */
-  private static Iterable<String> foldedWords(String name) {
+  @NotNull
+  private static Iterable<String> foldedWords(@NotNull String name) {
     String stripped = PARENTHETICAL.matcher(name.toLowerCase(Locale.ROOT)).replaceAll(" ");
     List<String> words = new ArrayList<>();
     for (String word : stripped.split("\\s+")) {

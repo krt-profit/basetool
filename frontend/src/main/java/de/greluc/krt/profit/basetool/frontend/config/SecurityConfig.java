@@ -32,6 +32,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -406,6 +407,7 @@ public class SecurityConfig {
    *
    * @return the publisher bean
    */
+  @NotNull
   @Bean
   public org.springframework.security.web.session.HttpSessionEventPublisher
       httpSessionEventPublisher() {
@@ -437,6 +439,7 @@ public class SecurityConfig {
    *
    * @return the shared request cache; never {@code null}
    */
+  @NotNull
   @Bean
   public RequestCache navigationRequestCache() {
     HttpSessionRequestCache cache = new HttpSessionRequestCache();
@@ -535,6 +538,7 @@ public class SecurityConfig {
    *     login promotes its short anonymous session to this window
    * @return the success handler wired into {@code .oauth2Login().successHandler(...)}
    */
+  @NotNull
   @Bean
   public AuthenticationSuccessHandler oauth2LoginSuccessHandler(
       @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout,
@@ -554,6 +558,7 @@ public class SecurityConfig {
             new AssetAwareAuthenticationSuccessHandler(navigationRequestCache)));
   }
 
+  @NotNull
   private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
       ClientRegistrationRepository clientRegistrationRepository) {
     DefaultOAuth2AuthorizationRequestResolver defaultResolver =
@@ -574,6 +579,7 @@ public class SecurityConfig {
         return customizeAuthorizationRequest(req, request);
       }
 
+      @Nullable
       private OAuth2AuthorizationRequest customizeAuthorizationRequest(
           OAuth2AuthorizationRequest req, HttpServletRequest request) {
         if (req == null) {

@@ -124,6 +124,7 @@ public class MemberManagementController {
    * @param model Thymeleaf model populated with users, page metadata and the echoed search query
    * @return the {@code members} view name, or its {@code membersTableFragment} selector
    */
+  @NotNull
   @GetMapping
   public String listMembers(
       @RequestParam(required = false) String search,
@@ -207,6 +208,7 @@ public class MemberManagementController {
    * @param query free-text query forwarded to the backend
    * @return matching users or {@code null} when the backend returns no page
    */
+  @Nullable
   @GetMapping("/api/search")
   @ResponseBody
   public List<UserDto> searchMembers(@RequestParam String query) {
@@ -240,6 +242,7 @@ public class MemberManagementController {
    * @param redirectAttributes flash attributes carrier for the error redirect
    * @return inline {@code member-edit} view, or redirect to {@code /members} on backend failure
    */
+  @NotNull
   @GetMapping("/{id}/edit")
   public String editMember(
       @PathVariable @NotNull UUID id,
@@ -356,6 +359,7 @@ public class MemberManagementController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect target depending on source and outcome
    */
+  @NotNull
   @PostMapping("/{id}/edit")
   public String updateMember(
       @PathVariable @NotNull UUID id,
@@ -466,7 +470,7 @@ public class MemberManagementController {
    * @param id user id
    * @param form the validated member edit form
    */
-  private void applyMemberUpdate(@NotNull UUID id, MemberEditForm form) {
+  private void applyMemberUpdate(@NotNull UUID id, @NotNull MemberEditForm form) {
     UserAttributesUpdateDto body =
         new UserAttributesUpdateDto(
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
@@ -552,7 +556,8 @@ public class MemberManagementController {
    * @param e the backend service exception carrying the relayed status, problem code and detail
    * @return the relayed error as a {@code problem+json} response mirroring the backend status
    */
-  private ResponseEntity<Object> relayBackendError(String logMessage, BackendServiceException e) {
+  private ResponseEntity<Object> relayBackendError(
+      String logMessage, @NotNull BackendServiceException e) {
     log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
     return propagateBackendError(e);
   }
@@ -565,6 +570,7 @@ public class MemberManagementController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /members}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMember(@PathVariable UUID id, RedirectAttributes redirectAttributes) {

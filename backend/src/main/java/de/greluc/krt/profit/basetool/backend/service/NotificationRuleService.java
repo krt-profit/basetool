@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -224,6 +225,8 @@ public class NotificationRuleService {
         .orElseThrow(() -> new NotFoundException("Notification rule not found: " + id));
   }
 
+  @Contract("null -> null")
+  @Nullable
   private static String trimToNull(String value) {
     if (value == null) {
       return null;

@@ -85,6 +85,7 @@ public class JobOrderMaterialDemandPageController {
    * @param model Thymeleaf model populated with {@code demand}
    * @return the {@code orders-material-demand} view name, or its {@code demandResults} fragment
    */
+  @NotNull
   @GetMapping("/material-demand")
   @PreAuthorize("isAuthenticated()")
   public String viewMaterialDemand(

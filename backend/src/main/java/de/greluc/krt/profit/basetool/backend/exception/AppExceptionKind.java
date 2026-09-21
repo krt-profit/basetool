@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -203,6 +204,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed code for this kind
    */
+  @NotNull
   public String code() {
     return code;
   }
@@ -212,6 +214,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed title bundle key for this kind
    */
+  @NotNull
   public String titleKey() {
     return titleKey;
   }
@@ -222,6 +225,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed detail bundle key for this kind
    */
+  @NotNull
   public String detailKey() {
     return detailKey;
   }
@@ -232,6 +236,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed problem-type suffix for this kind
    */
+  @NotNull
   public String typeSuffix() {
     return typeSuffix;
   }
@@ -241,6 +246,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed log label for this kind
    */
+  @NotNull
   public String logLabel() {
     return logLabel;
   }
@@ -251,6 +257,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed disclosure policy for this kind
    */
+  @NotNull
   public ErrorDisclosurePolicy disclosurePolicy() {
     return disclosurePolicy;
   }

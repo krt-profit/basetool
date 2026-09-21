@@ -213,6 +213,7 @@ public class MaterialsPageController {
    * @param model Thymeleaf model populated with {@code materials} and {@code materialsByKind}
    * @return the {@code materials} view name
    */
+  @NotNull
   @GetMapping
   public String listMaterials(Model model) {
     try {
@@ -274,6 +275,7 @@ public class MaterialsPageController {
    *     filter source lists
    * @return the {@code materials-overview} view name
    */
+  @NotNull
   @GetMapping("/overview")
   public String getMatrixOverview(Model model) {
     try {
@@ -592,6 +594,7 @@ public class MaterialsPageController {
    * @param model Thymeleaf model populated with {@code material} and {@code prices}
    * @return the {@code material-detail} view name
    */
+  @NotNull
   @GetMapping("/{id}")
   public String getMaterialDetail(@PathVariable @NotNull UUID id, Model model) {
     try {

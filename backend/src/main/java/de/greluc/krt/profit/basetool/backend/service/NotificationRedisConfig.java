@@ -27,6 +27,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -75,6 +76,7 @@ public class NotificationRedisConfig {
    * @param properties the fan-out settings supplying the channel name
    * @return the Redis notification fan-out bean
    */
+  @NotNull
   @Bean
   public RedisNotificationFanout redisNotificationFanout(
       NotificationStreamService notificationStreamService,
@@ -107,6 +109,7 @@ public class NotificationRedisConfig {
    *
    * @return the bounded listener dispatch executor (shut down with the context)
    */
+  @NotNull
   @Bean(destroyMethod = "shutdown")
   public ThreadPoolTaskExecutor notificationRedisListenerExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -136,6 +139,7 @@ public class NotificationRedisConfig {
    * @param meterRegistry registry the subscription gauge binds to
    * @return the message-listener container
    */
+  @NotNull
   @Bean
   public RedisMessageListenerContainer notificationRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,

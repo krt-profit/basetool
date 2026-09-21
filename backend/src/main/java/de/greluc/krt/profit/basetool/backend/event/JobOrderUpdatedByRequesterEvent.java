@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Domain event published right after a requesting owner (Auftraggeber) commits an edit to one of
@@ -62,11 +63,13 @@ public record JobOrderUpdatedByRequesterEvent(
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */
   public static final String ENTITY_TYPE = "JOB_ORDER";
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.JOB_ORDER_UPDATED_BY_REQUESTER;
   }
 
+  @NotNull
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     Map<NotificationContextRole, OrgUnitRef> map =
@@ -77,6 +80,7 @@ public record JobOrderUpdatedByRequesterEvent(
     return map;
   }
 
+  @NotNull
   @Override
   public String entityType() {
     return ENTITY_TYPE;
@@ -87,6 +91,7 @@ public record JobOrderUpdatedByRequesterEvent(
     return jobOrderId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();

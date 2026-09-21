@@ -47,6 +47,8 @@ import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.OptimisticLock;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * Mission JPA entity.
@@ -361,6 +363,8 @@ public class Mission extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the mission's procedure-timeline steps
    */
+  @NotNull
+  @UnmodifiableView
   public Set<MissionStep> getSteps() {
     return Collections.unmodifiableSet(steps);
   }
@@ -371,7 +375,7 @@ public class Mission extends AbstractEntity<UUID> {
    *
    * @param step the step to attach to this mission
    */
-  public void addStep(MissionStep step) {
+  public void addStep(@NotNull MissionStep step) {
     step.setMission(this);
     steps.add(step);
   }
@@ -395,6 +399,8 @@ public class Mission extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the mission's goals
    */
+  @NotNull
+  @UnmodifiableView
   public Set<MissionObjective> getObjectives() {
     return Collections.unmodifiableSet(objectives);
   }
@@ -405,7 +411,7 @@ public class Mission extends AbstractEntity<UUID> {
    *
    * @param objective the goal to attach to this mission
    */
-  public void addObjective(MissionObjective objective) {
+  public void addObjective(@NotNull MissionObjective objective) {
     objective.setMission(this);
     objectives.add(objective);
   }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.support;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -52,6 +53,7 @@ public final class MapPayloadValues {
    * @param value the raw payload value, or {@code null}
    * @return the parsed UUID, or {@code null} for an absent / malformed value
    */
+  @Contract("null -> null")
   public static @Nullable UUID uuidOrNull(@Nullable Object value) {
     if (value == null) {
       return null;

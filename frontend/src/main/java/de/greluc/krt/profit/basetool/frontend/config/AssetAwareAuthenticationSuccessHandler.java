@@ -118,6 +118,7 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
    * @param requestCache the shared cache; never {@code null}
    * @return the delegate whose default target URL is {@code /}
    */
+  @NotNull
   private static SavedRequestAwareAuthenticationSuccessHandler defaultDelegate(
       @NotNull RequestCache requestCache) {
     SavedRequestAwareAuthenticationSuccessHandler handler =

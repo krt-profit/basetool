@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -256,6 +257,7 @@ public class BackendApiClient {
   // A PAGE_WALK catalogue is always consumed as PageResponse<E> via the type-ref overload
   // (FrontendCacheSplitTest pins the modes; the Class overload rejects walked constants), so the
   // T <-> PageResponse casts below are the unavoidable Object->generic case.
+  @NotNull
   @SuppressWarnings("unchecked")
   private <T> T fetchCompleteCatalog(
       CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {

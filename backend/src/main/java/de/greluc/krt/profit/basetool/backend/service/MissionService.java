@@ -312,7 +312,7 @@ public class MissionService {
    * @param scope the caller's effective org-unit scope (never admin-all / never empty here)
    * @return the next-mission head (id-only matters; caller re-fetches through the graphed findById)
    */
-  private Optional<Mission> findNextScopedMissionHead(Instant now, ScopePredicate scope) {
+  private Optional<Mission> findNextScopedMissionHead(Instant now, @NotNull ScopePredicate scope) {
     return missionRepository
         .findNextScopedMission(
             now,
@@ -337,7 +337,7 @@ public class MissionService {
    *     operationId} does not resolve
    */
   @Transactional
-  public Mission createMission(@NotNull CreateMissionRequest request) {
+  public Mission createMission(CreateMissionRequest request) {
     Mission mission = new Mission();
     applyCreatePayload(mission, request);
 
@@ -416,7 +416,7 @@ public class MissionService {
    * @param mission target entity (caller owns its identity and version)
    * @param request validated create payload
    */
-  private void applyCreatePayload(Mission mission, CreateMissionRequest request) {
+  private void applyCreatePayload(@NotNull Mission mission, @NotNull CreateMissionRequest request) {
     mission.setName(request.name());
     mission.setDescription(request.description());
     mission.setMeetingPoint(request.meetingPoint());
@@ -457,7 +457,7 @@ public class MissionService {
    *     version is stale
    */
   @Transactional
-  public Mission updateMission(@NotNull UUID missionId, @NotNull UpdateMissionRequest request) {
+  public Mission updateMission(@NotNull UUID missionId, UpdateMissionRequest request) {
     // Since #1114 every mutable mission scalar is @OptimisticLock(excluded = true), so a full
     // overwrite no longer bumps the row @Version by itself. Load under OPTIMISTIC_FORCE_INCREMENT
     // so the flush still increments+checks @Version (WHERE version = loaded) — that keeps this
@@ -1250,8 +1250,7 @@ public class MissionService {
    * @throws NotFoundException when {@code parentMissionId} or {@code operationId} does not resolve
    */
   @Transactional
-  public Mission addSubMission(
-      @NotNull UUID parentMissionId, @NotNull CreateMissionRequest request) {
+  public Mission addSubMission(@NotNull UUID parentMissionId, CreateMissionRequest request) {
     Mission parent =
         missionRepository
             .findById(parentMissionId)
@@ -1514,7 +1513,8 @@ public class MissionService {
         .orElse(0L);
   }
 
-  private void upsertMissionOwnership(Mission mission, User newOwner, Long expectedVersion) {
+  private void upsertMissionOwnership(
+      @NotNull Mission mission, User newOwner, Long expectedVersion) {
     MissionOwnership ownership =
         missionOwnershipRepository
             .findByMissionId(mission.getId())
@@ -1602,6 +1602,7 @@ public class MissionService {
    * @return a stable {@code kind:id} reference, or {@code "none"} when {@code orgUnit} is {@code
    *     null}.
    */
+  @NotNull
   private static String formatOrgUnitRef(OrgUnit orgUnit) {
     return orgUnit == null ? "none" : orgUnit.getKind() + ":" + orgUnit.getId();
   }

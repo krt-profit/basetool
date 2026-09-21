@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -186,7 +187,7 @@ public class ScWikiVehicleSyncService {
    * @param dto the Wiki vehicle payload
    * @param now timestamp for {@code scwiki_synced_at}
    */
-  private void applyWikiFields(ShipType st, ScWikiVehicleDto dto, Instant now) {
+  private void applyWikiFields(@NotNull ShipType st, @NotNull ScWikiVehicleDto dto, Instant now) {
     st.setScwikiSlug(dto.slug());
     st.setGameName(dto.gameName());
     if (!StringUtils.hasText(st.getClassName())) {

@@ -25,6 +25,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published when an admin refuses a member's erasure request (REQ-SEC-061). The seeded
@@ -49,11 +52,13 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
   /** Loose entity-type tag stored on the produced notifications for deep-linking. */
   public static final String ENTITY_TYPE = "DELETION_REQUEST";
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.ACCOUNT_DELETION_REQUEST_DECLINED;
   }
 
+  @Nullable
   @Override
   public UUID actorSub() {
     // The acting admin is not carried: excluding them would be meaningless here (the sole recipient
@@ -62,11 +67,14 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
     return null;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
   }
 
+  @NotNull
   @Override
   public String entityType() {
     return ENTITY_TYPE;
@@ -77,6 +85,8 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
     return userId;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
     // The message names no one and quotes nothing: "your deletion request was declined; the reason
@@ -104,6 +114,8 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
    *
    * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
    */
+  @NotNull
+  @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
     return Set.of(NotificationType.ACCOUNT_DELETION_REQUESTED);

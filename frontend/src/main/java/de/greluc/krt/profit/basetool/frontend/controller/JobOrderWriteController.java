@@ -62,6 +62,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -154,6 +157,7 @@ public class JobOrderWriteController {
    * @param principal the caller, or {@code null} for anonymous
    * @return redirect target
    */
+  @NotNull
   @PostMapping("/items")
   public String createItemOrder(
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
@@ -216,7 +220,7 @@ public class JobOrderWriteController {
    * @param form the bound item-order form
    * @return the filtered item-line DTOs (preserving the persistent, client line + parent ids)
    */
-  private static List<CreateJobOrderItemLineDto> buildItemLineDtos(JobOrderItemForm form) {
+  private static List<CreateJobOrderItemLineDto> buildItemLineDtos(@NotNull JobOrderItemForm form) {
     return form.getItems().stream()
         .filter(
             l ->
@@ -293,6 +297,7 @@ public class JobOrderWriteController {
    * @param redirectAttributes flash carrier
    * @return redirect to the detail page
    */
+  @NotNull
   @PostMapping("/{id}/items/update")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String updateItemOrder(
@@ -367,6 +372,7 @@ public class JobOrderWriteController {
    *
    * @return inline form view on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/create")
   public String createOrder(
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -439,6 +445,7 @@ public class JobOrderWriteController {
    * @param source the create-page source param to carry on the stay-on-create target
    * @return the URL the AJAX caller should navigate to on success
    */
+  @NotNull
   private static String postCreateTarget(
       OidcUser principal, boolean canViewJobOrders, String source) {
     if (principal == null || !canViewJobOrders) {
@@ -454,7 +461,7 @@ public class JobOrderWriteController {
    * @param form the bound material-order form
    * @return the filtered material requirement DTOs
    */
-  private static List<CreateJobOrderMaterialDto> buildMaterialDtos(JobOrderForm form) {
+  private static List<CreateJobOrderMaterialDto> buildMaterialDtos(@NotNull JobOrderForm form) {
     return form.getMaterials().stream()
         .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
         .map(
@@ -679,6 +686,7 @@ public class JobOrderWriteController {
    *
    * @return redirect to the order detail page
    */
+  @NotNull
   @PostMapping("/{id}/update")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String updateOrder(
@@ -737,7 +745,7 @@ public class JobOrderWriteController {
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateOrderAjax(
-      @PathVariable UUID id, @RequestBody JobOrderForm form) {
+      @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
             .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
@@ -779,6 +787,7 @@ public class JobOrderWriteController {
    * @param redirectAttributes flash carrier for the result toast
    * @return redirect back to the order detail
    */
+  @NotNull
   @PostMapping("/{id}/requested-update")
   public String updateOrderAsRequester(
       @PathVariable UUID id,
@@ -828,7 +837,7 @@ public class JobOrderWriteController {
       consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> updateOrderAsRequesterAjax(
-      @PathVariable UUID id, @RequestBody JobOrderForm form) {
+      @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
     List<CreateJobOrderMaterialDto> materials =
         form.getMaterials().stream()
             .filter(m -> m.getMaterialId() != null && m.getAmount() != null && m.getAmount() > 0)
@@ -901,6 +910,7 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
+  @NotNull
   @PostMapping("/{id}/assignees")
   public String addAssignee(
       @PathVariable UUID id,
@@ -928,6 +938,7 @@ public class JobOrderWriteController {
    *
    * @return redirect to the order detail page
    */
+  @NotNull
   @PostMapping("/{id}/handovers")
   @PreAuthorize(
       "hasRole('"
@@ -1022,6 +1033,7 @@ public class JobOrderWriteController {
    * @param redirectAttributes flash channel for the success/error toast
    * @return redirect to the order detail page
    */
+  @NotNull
   @PostMapping("/{id}/item-handovers")
   @PreAuthorize(
       "hasRole('"
@@ -1147,7 +1159,7 @@ public class JobOrderWriteController {
           + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> createHandoverAjax(
-      @PathVariable UUID id, @RequestBody JobOrderHandoverForm form) {
+      @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
     List<JobOrderHandoverItemCreateDto> items =
         form.getItems().stream()
             .filter(
@@ -1209,7 +1221,7 @@ public class JobOrderWriteController {
           + "')")
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> createItemHandoverAjax(
-      @PathVariable UUID id, @RequestBody JobOrderItemHandoverForm form) {
+      @PathVariable UUID id, @NotNull @RequestBody JobOrderItemHandoverForm form) {
     List<JobOrderItemHandoverEntryCreateDto> entries =
         form.getEntries().stream()
             .filter(
@@ -1294,6 +1306,7 @@ public class JobOrderWriteController {
    *
    * @return redirect to the order detail page
    */
+  @NotNull
   @PostMapping("/{id}/materials/unlink")
   @PreAuthorize(
       "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
@@ -1319,6 +1332,7 @@ public class JobOrderWriteController {
    *
    * @return redirect to the order detail page
    */
+  @NotNull
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
   @PreAuthorize(
       "hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")
@@ -1380,6 +1394,7 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
+  @NotNull
   @DeleteMapping("/{id}/assignees/{userId}")
   public String removeAssignee(
       @PathVariable UUID id,
@@ -1409,6 +1424,7 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
+  @NotNull
   @PutMapping("/{id}/assignees/{userId}/note")
   public String setAssigneeNote(
       @PathVariable UUID id,
@@ -1439,6 +1455,7 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller
    * @return the {@code orders-detail :: assigneesSection} fragment view name
    */
+  @NotNull
   @DeleteMapping("/{id}/assignees/{userId}/note")
   public String deleteAssigneeNote(
       @PathVariable UUID id,
@@ -1493,7 +1510,8 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller
    * @param order the freshly mutated order
    */
-  private void populateAssigneeSectionModel(Model model, OidcUser principal, JobOrderDto order) {
+  private void populateAssigneeSectionModel(
+      @NotNull Model model, OidcUser principal, JobOrderDto order) {
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", getCurrentUserId(principal));
     boolean canAssign = isLogistician(principal);
@@ -1517,6 +1535,7 @@ public class JobOrderWriteController {
    *
    * @return the users, or an empty list on failure; never {@code null}
    */
+  @NotNull
   private List<UserDto> fetchUsers() {
     try {
       PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", PAGE_OF_USER);
@@ -1537,6 +1556,8 @@ public class JobOrderWriteController {
    * @param principal the authenticated caller, or {@code null} for a guest
    * @return the caller's user id, or {@code null} when unresolvable
    */
+  @Contract("null -> null")
+  @Nullable
   private UUID getCurrentUserId(OidcUser principal) {
     if (principal == null) {
       return null;

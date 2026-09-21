@@ -27,6 +27,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
@@ -146,7 +147,7 @@ public class SessionMetricsConfig {
    * @param event the Spring Session create event carrying the new session id.
    */
   @EventListener
-  void onSessionCreated(SessionCreatedEvent event) {
+  void onSessionCreated(@NotNull SessionCreatedEvent event) {
     tracker.onSessionStarted(event.getSessionId());
   }
 
@@ -157,7 +158,7 @@ public class SessionMetricsConfig {
    * @param event the Spring Session delete event carrying the ended session id.
    */
   @EventListener
-  void onSessionDeleted(SessionDeletedEvent event) {
+  void onSessionDeleted(@NotNull SessionDeletedEvent event) {
     tracker.onSessionEnded(event.getSessionId());
   }
 
@@ -167,7 +168,7 @@ public class SessionMetricsConfig {
    * @param event the Spring Session expire event carrying the ended session id.
    */
   @EventListener
-  void onSessionExpired(SessionExpiredEvent event) {
+  void onSessionExpired(@NotNull SessionExpiredEvent event) {
     tracker.onSessionEnded(event.getSessionId());
   }
 }

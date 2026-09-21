@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
@@ -64,6 +65,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
    * SecurityContextHolder#getContext()} returns null/anonymous at that point. Reading directly from
    * the session attribute gives the correct persisted authentication state.
    */
+  @Contract("null -> null")
   @Nullable
   private Authentication getAuthFromSession(@Nullable HttpSession session) {
     if (session == null) {

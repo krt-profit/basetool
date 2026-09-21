@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.backend.support.MissionViewerAccess;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -212,6 +213,7 @@ public abstract class MissionMapper {
    * @param mission the mission being projected; {@code null} yields {@code null}.
    * @return the description for a member-or-above caller, otherwise {@code null}.
    */
+  @Nullable
   public String resolveDescription(Mission mission) {
     if (mission == null || mission.getDescription() == null) {
       return null;
@@ -298,6 +300,7 @@ public abstract class MissionMapper {
    * Resolves a participant's display name: the linked user's effective name if known, otherwise the
    * guest name captured at sign-up.
    */
+  @Nullable
   public String resolveParticipantName(MissionCrew crew) {
     if (crew.getParticipant() == null) {
       return null;

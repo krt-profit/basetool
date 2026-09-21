@@ -24,7 +24,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published right after a brand-new Discord registration is persisted in the {@code
@@ -45,22 +47,27 @@ public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String user
   /** Loose entity-type tag stored on the produced notifications for deep-linking. */
   public static final String ENTITY_TYPE = "DISCORD_REGISTRATION";
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.DISCORD_REGISTRATION_PENDING;
   }
 
+  @Nullable
   @Override
   public UUID actorSub() {
     // The new (unapproved) user is not an "actor" to exclude; recipients are admins only.
     return null;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
   }
 
+  @NotNull
   @Override
   public String entityType() {
     return ENTITY_TYPE;
@@ -71,6 +78,7 @@ public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String user
     return userId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();

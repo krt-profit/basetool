@@ -48,7 +48,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -216,6 +218,8 @@ public class MissionStructureService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the id is
    *     unknown
    */
+  @Contract("null -> null")
+  @Nullable
   private User resolveResponsibleUser(UUID responsibleUserId) {
     if (responsibleUserId == null) {
       return null;
@@ -375,6 +379,7 @@ public class MissionStructureService {
    * @return the candidate ships for this mission's unit ship pickers
    * @throws NotFoundException when the mission id does not resolve
    */
+  @NotNull
   @Transactional(readOnly = true)
   public List<Ship> getSelectableUnitShips(@NotNull UUID missionId) {
     Mission mission =
@@ -587,6 +592,7 @@ public class MissionStructureService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when an id is unknown
    * @throws IllegalArgumentException when a resolved job type is not of archetype {@code CREW}
    */
+  @NotNull
   private Set<JobType> validateAndFetchJobTypes(Set<UUID> jobTypeIds) {
     Set<JobType> jobTypes = new HashSet<>();
     if (jobTypeIds != null && !jobTypeIds.isEmpty()) {

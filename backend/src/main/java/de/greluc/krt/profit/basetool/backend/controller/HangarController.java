@@ -350,6 +350,7 @@ public class HangarController {
    * @param request the curated home location id
    * @return the number of ships updated
    */
+  @NotNull
   @Operation(
       summary = "Set home location for all own ships",
       description =

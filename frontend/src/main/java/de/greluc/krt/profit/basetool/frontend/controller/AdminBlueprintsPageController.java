@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -83,6 +84,7 @@ public class AdminBlueprintsPageController {
    * @return the {@code admin/blueprints} view name, or its {@code results} fragment for an AJAX
    *     swap request
    */
+  @NotNull
   @GetMapping
   public String listBlueprints(
       @RequestParam(required = false) String search,
@@ -147,7 +149,7 @@ public class AdminBlueprintsPageController {
    *
    * @param model Thymeleaf model to fill
    */
-  private void populateEmpty(Model model) {
+  private void populateEmpty(@NotNull Model model) {
     model.addAttribute("blueprints", List.of());
     model.addAttribute("currentPage", 0);
     model.addAttribute("totalPages", 0);

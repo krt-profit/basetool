@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.model.dto.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemHandoverEntryDto;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -63,6 +64,7 @@ public interface JobOrderItemHandoverMapper {
    * @param gameItem the catalogue entity, or {@code null}
    * @return the slim reference, or {@code null} when the input is {@code null}
    */
+  @Nullable
   default GameItemReferenceDto toGameItemReference(GameItem gameItem) {
     if (gameItem == null) {
       return null;

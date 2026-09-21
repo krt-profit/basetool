@@ -25,7 +25,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published right after a requester withdraws (cancels) their own still-pending bank
@@ -43,11 +45,14 @@ import org.jetbrains.annotations.Nullable;
 public record BankBookingRequestCancelledEvent(
     UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.BANK_BOOKING_REQUEST_CANCELLED;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
@@ -63,6 +68,8 @@ public record BankBookingRequestCancelledEvent(
     return requestId;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
     return Map.of();
@@ -74,6 +81,8 @@ public record BankBookingRequestCancelledEvent(
    *
    * @return the singleton {@link NotificationType#BANK_BOOKING_REQUEST_CREATED}
    */
+  @NotNull
+  @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
     return Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);

@@ -40,7 +40,9 @@ import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -804,6 +806,7 @@ public class OrgChartService {
    *     if neither is supplied for a rank other than {@code COMMAND_LEAD}.
    * @throws NotFoundException if {@code userId} does not match an existing user.
    */
+  @Nullable
   private User resolveHolderForCreate(OrgChartPositionType type, UUID userId, String displayName) {
     if (userId != null && displayName != null) {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
@@ -828,6 +831,7 @@ public class OrgChartService {
     return normalized;
   }
 
+  @Nullable
   private OrgUnit resolveScopeOrgUnit(OrgChartScope scope, UUID orgUnitId) {
     if (scope == OrgChartScope.AREA) {
       if (orgUnitId != null) {
@@ -864,6 +868,7 @@ public class OrgChartService {
     return unit;
   }
 
+  @Nullable
   private OrgChartPosition resolveAndValidateParent(
       OrgChartPositionType type, OrgUnit orgUnit, UUID parentId) {
     if (type != OrgChartPositionType.DEPUTY_COMMAND_LEAD && type != OrgChartPositionType.ENSIGN) {
@@ -965,6 +970,8 @@ public class OrgChartService {
     }
   }
 
+  @Contract("null -> null")
+  @Nullable
   private static String trimToNull(String value) {
     if (value == null) {
       return null;

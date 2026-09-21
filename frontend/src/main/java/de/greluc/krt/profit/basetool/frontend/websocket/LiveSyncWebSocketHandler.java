@@ -1211,6 +1211,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * @param session the session
    * @return the subscription set, or {@code null}
    */
+  @Nullable
   @SuppressWarnings("unchecked")
   private static Set<String> subscriptions(@NotNull WebSocketSession session) {
     // Object -> generic cast is unavoidable reading the WebSocket attribute map
@@ -2012,6 +2013,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         : session;
   }
 
+  @Nullable
   private static String resolveUserId(@NotNull Principal principal) {
     if (principal instanceof AbstractAuthenticationToken token) {
       Object p = token.getPrincipal();
@@ -2042,6 +2044,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     return name == null ? "" : name;
   }
 
+  @Nullable
   private static String textValue(@NotNull JsonNode node, @NotNull String field) {
     JsonNode value = node.get(field);
     if (value == null || !value.isString()) {

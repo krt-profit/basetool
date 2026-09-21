@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -44,7 +45,7 @@ public class GlobalBindingAdvice {
    * @param binder Spring's data binder for the current request
    */
   @InitBinder
-  public void initBinder(WebDataBinder binder) {
+  public void initBinder(@NotNull WebDataBinder binder) {
     binder.registerCustomEditor(
         String.class, new NormalizedStringEditor(StringNormalization.MAX_FREE_TEXT_LENGTH, true));
   }

@@ -92,6 +92,7 @@ public class AdminDiscordRegistrationsPageController {
    * @param model Thymeleaf model populated with the pending registrations
    * @return the {@code admin/discord-registrations} view name
    */
+  @NotNull
   @GetMapping
   public String list(Model model) {
     try {

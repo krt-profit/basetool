@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -364,6 +366,7 @@ public class AdminAuditLogPageController {
    * @param model Thymeleaf model
    * @return the {@code admin/audit-log} view name, or its {@code auditResults} fragment selector
    */
+  @NotNull
   @GetMapping("/admin/audit-log")
   public String auditLog(
       @RequestParam(required = false) String domain,
@@ -440,6 +443,7 @@ public class AdminAuditLogPageController {
    * @param prefix the bank event-label key prefix
    * @return the adapted page, or {@code null} when the source was {@code null}
    */
+  @Nullable
   private static PageResponse<AuditRowView> adaptBank(
       PageResponse<BankAuditEventDto> page, String prefix) {
     if (page == null) {
@@ -468,6 +472,7 @@ public class AdminAuditLogPageController {
    * @param prefix the generic event-label key prefix
    * @return the adapted page, or {@code null} when the source was {@code null}
    */
+  @Nullable
   private static PageResponse<AuditRowView> adaptGeneric(
       PageResponse<AuditEventDto> page, String prefix) {
     if (page == null) {

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import org.jetbrains.annotations.NotNull;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -93,6 +94,7 @@ public interface MaterialMapper {
   }
 
   /** MapStruct default - converts a {@code Boolean} back to a UEX-style 0/1 {@code Integer}. */
+  @NotNull
   default Integer mapIsIllegal(Boolean value) {
     return value != null && value ? 1 : 0;
   }

@@ -112,6 +112,7 @@ public class AdminMissionDataPageController {
    * @return the {@code admin/mission-data} view name, or one section's {@code results} fragment for
    *     an AJAX swap
    */
+  @NotNull
   @GetMapping
   public String listData(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactiveJobTypes,
@@ -219,6 +220,7 @@ public class AdminMissionDataPageController {
    * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
    * warning banner (REQ-ADMIN-002).
    */
+  @NotNull
   private CompleteCatalog<JobTypeDto> fetchJobTypes(boolean includeInactive) {
     CompleteCatalog<Map<String, Object>> catalog =
         CatalogPages.fetchAll(
@@ -256,6 +258,7 @@ public class AdminMissionDataPageController {
    * yields an empty item list; the returned wrapper carries the truncation flag for the page-level
    * warning banner (REQ-ADMIN-002).
    */
+  @NotNull
   private CompleteCatalog<SquadronDto> fetchSquadrons(boolean includeInactive) {
     CompleteCatalog<Map<String, Object>> catalog =
         CatalogPages.fetchAll(
@@ -313,6 +316,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/job-types")
   public String createJobType(
       @Valid @ModelAttribute("jobTypeForm") JobTypeForm form,
@@ -367,6 +371,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/job-types/{id}/update")
   public String updateJobType(
       @PathVariable @NotNull UUID id,
@@ -421,6 +426,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data} (optionally with error param)
    */
+  @NotNull
   @PostMapping("/job-types/{id}/delete")
   public String deleteJobType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -450,6 +456,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/job-types/{id}/activate")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String activateJobType(
@@ -477,6 +484,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/squadrons")
   public String createSquadron(
       @Valid @ModelAttribute("squadronForm") SquadronForm form,
@@ -520,6 +528,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/squadrons/{id}/update")
   public String updateSquadron(
       @PathVariable @NotNull UUID id,
@@ -571,6 +580,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/squadrons/{id}/delete")
   public String deleteSquadron(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -599,6 +609,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/squadrons/{id}/activate")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String activateSquadron(
@@ -624,6 +635,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/frequency-types")
   public String createFrequencyType(
       @Valid @ModelAttribute("frequencyTypeForm") FrequencyTypeForm form,
@@ -663,6 +675,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline list page on failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/frequency-types/{id}/update")
   public String updateFrequencyType(
       @PathVariable @NotNull UUID id,
@@ -707,6 +720,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/frequency-types/{id}/delete")
   public String deleteFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -737,6 +751,7 @@ public class AdminMissionDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/mission-data}
    */
+  @NotNull
   @PostMapping("/frequency-types/{id}/activate")
   public String activateFrequencyType(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {

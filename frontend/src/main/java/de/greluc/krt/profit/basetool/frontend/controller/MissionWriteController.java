@@ -48,6 +48,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
@@ -181,7 +182,7 @@ public class MissionWriteController {
    * @param binder Spring data binder for the current request
    */
   @InitBinder
-  public void initBinder(WebDataBinder binder) {
+  public void initBinder(@NotNull WebDataBinder binder) {
     binder.registerCustomEditor(String.class, new StringTrimmerEditor(true));
   }
 
@@ -258,6 +259,7 @@ public class MissionWriteController {
    * @param redirectAttributes flash-scoped toast carrier
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/party-lead")
   public String setPartyLead(
       @PathVariable @NotNull UUID id,
@@ -339,6 +341,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/participants/{participantId}/check-in")
   public String checkInParticipant(
       @PathVariable @NotNull UUID id,
@@ -366,6 +369,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/participants/{participantId}/check-out")
   public String checkOutParticipant(
       @PathVariable @NotNull UUID id,
@@ -496,6 +500,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/participants/{participantId}/delete")
   public String deleteParticipant(
       @PathVariable @NotNull UUID id,
@@ -582,6 +587,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/units")
   public String addUnit(
       @PathVariable @NotNull UUID id,
@@ -619,6 +625,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/units/{unitId}/update")
   public String updateUnit(
       @PathVariable @NotNull UUID id,
@@ -658,6 +665,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/units/{unitId}/delete")
   public String deleteUnit(
       @PathVariable @NotNull UUID id,
@@ -754,6 +762,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/units/{unitId}/crew/{crewId}/delete")
   public String deleteCrew(
       @PathVariable @NotNull UUID id,
@@ -872,6 +881,7 @@ public class MissionWriteController {
    * @return the parsed list, or {@code null} when the carrier is blank or the array is empty
    * @throws JsonProcessingException when the carrier holds malformed JSON
    */
+  @Nullable
   private <T> List<T> parseCreateList(String json, TypeReference<List<T>> typeRef)
       throws JsonProcessingException {
     if (json == null || json.isBlank()) {
@@ -941,7 +951,7 @@ public class MissionWriteController {
    * @param id the mission id
    * @param form the validated submitted form
    */
-  private void applyMissionUpdate(@NotNull UUID id, MissionForm form) {
+  private void applyMissionUpdate(@NotNull UUID id, @NotNull MissionForm form) {
     boolean saveSchedule = form.dirtySchedule() == null || form.dirtySchedule();
     boolean saveCore = form.dirtyCore() == null || form.dirtyCore();
     boolean saveFlags = form.dirtyFlags() == null || form.dirtyFlags();
@@ -1071,6 +1081,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteMission(
@@ -1316,6 +1327,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/frequencies")
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String addOrUpdateFrequency(
@@ -1342,6 +1354,7 @@ public class MissionWriteController {
    *
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{id}/frequencies/{frequencyId}/delete")
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String deleteFrequency(
@@ -2144,6 +2157,7 @@ public class MissionWriteController {
    * @param dateTimeStr the hidden input value; {@code null}/blank yields {@code null}
    * @return the parsed instant, or {@code null} if the value is blank or unparseable
    */
+  @Nullable
   private java.time.Instant parseToInstant(String dateTimeStr) {
     if (dateTimeStr == null || dateTimeStr.isBlank()) {
       return null;

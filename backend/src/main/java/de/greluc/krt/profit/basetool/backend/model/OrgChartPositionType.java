@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The fixed catalogue of functional ranks ("Funktionsränge") a user can hold in the Profit-Bereich
@@ -103,6 +104,7 @@ public enum OrgChartPositionType {
    *
    * @return the owning scope; never {@code null}.
    */
+  @NotNull
   public OrgChartScope scope() {
     return scope;
   }

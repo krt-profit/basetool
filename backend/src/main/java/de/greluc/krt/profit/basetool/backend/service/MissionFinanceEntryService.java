@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -100,6 +101,7 @@ public class MissionFinanceEntryService {
    * @param missionId mission id
    * @return the finance totals (sums coalesced to zero; expense bucket folds in refinery expenses)
    */
+  @NotNull
   public MissionFinanceTotalsDto calculateTotals(UUID missionId) {
     FinanceEntryAggregate agg = financeEntryRepository.aggregateFinanceByMission(missionId);
     BigDecimal incomeSum = agg.incomeSum() != null ? agg.incomeSum() : BigDecimal.ZERO;
@@ -162,7 +164,7 @@ public class MissionFinanceEntryService {
    * @throws BadRequestException when the participant belongs to a different mission
    */
   @Transactional
-  public MissionFinanceEntryDto createEntry(MissionFinanceEntryCreateDto dto) {
+  public MissionFinanceEntryDto createEntry(@NotNull MissionFinanceEntryCreateDto dto) {
     Mission mission =
         missionRepository
             .findById(dto.missionId())

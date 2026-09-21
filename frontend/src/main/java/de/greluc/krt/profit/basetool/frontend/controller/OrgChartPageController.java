@@ -83,6 +83,7 @@ public class OrgChartPageController {
    * @return the {@code org-chart} view name, or its {@code chartBody} selector for the fragment
    *     path.
    */
+  @NotNull
   @GetMapping
   public String orgChart(@RequestParam(required = false) String fragment, Model model) {
     try {
@@ -186,7 +187,7 @@ public class OrgChartPageController {
     }
   }
 
-  private ResponseEntity<Object> relayError(String logMessage, BackendServiceException e) {
+  private ResponseEntity<Object> relayError(String logMessage, @NotNull BackendServiceException e) {
     log.warn("{}: status={}, code={}", logMessage, e.getStatusCode(), e.getProblemCode());
     Map<String, Object> payload = new HashMap<>();
     payload.put("code", e.getProblemCode());

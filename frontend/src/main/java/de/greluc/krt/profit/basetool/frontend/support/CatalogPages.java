@@ -78,6 +78,7 @@ public final class CatalogPages {
      * @param <T> the page item type
      * @return a catalogue with no items, a total of zero and {@code truncated=false}
      */
+    @NotNull
     public static <T> CompleteCatalog<T> empty() {
       return new CompleteCatalog<>(List.of(), 0L, false);
     }

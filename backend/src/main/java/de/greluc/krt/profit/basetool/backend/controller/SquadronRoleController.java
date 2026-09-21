@@ -78,7 +78,7 @@ public class SquadronRoleController {
   public OrgUnitMembershipDto assignRank(
       @PathVariable @NotNull UUID squadronId,
       @PathVariable @NotNull UUID userId,
-      @RequestBody @Valid AssignSquadronRankRequest request) {
+      @NotNull @RequestBody @Valid AssignSquadronRankRequest request) {
     return membershipService.assignSquadronRankDto(
         squadronId, userId, request.role(), request.kommandoGroupId(), request.version());
   }

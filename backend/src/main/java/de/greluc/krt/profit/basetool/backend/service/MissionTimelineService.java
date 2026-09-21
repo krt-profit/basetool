@@ -42,6 +42,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -320,6 +321,7 @@ public class MissionTimelineService {
    * Normalises a step's optional time/place hint: trims surrounding whitespace and collapses blank
    * input to {@code null}.
    */
+  @Nullable
   private static String normalizeStepMeta(String meta) {
     return meta == null || meta.isBlank() ? null : meta.trim();
   }

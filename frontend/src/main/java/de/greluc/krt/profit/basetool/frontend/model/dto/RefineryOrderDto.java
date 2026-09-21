@@ -23,6 +23,7 @@ import jakarta.validation.constraints.Positive;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend {@code RefineryOrderDto} wire shape (per the {@code
@@ -52,6 +53,7 @@ public record RefineryOrderDto(
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */
+  @Nullable
   public Instant getEndsAt() {
     if (startedAt != null && durationMinutes != null) {
       return startedAt.plus(durationMinutes, java.time.temporal.ChronoUnit.MINUTES);

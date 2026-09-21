@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -36,6 +37,7 @@ public class PrivacyController {
    *
    * @return the {@code privacy} view name
    */
+  @NotNull
   @GetMapping("/privacy")
   public String showPrivacy() {
     return "privacy";

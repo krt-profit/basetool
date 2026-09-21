@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Bereich (area / division) tenant — one level <em>above</em> Staffeln and Spezialkommandos in the
@@ -66,6 +67,7 @@ public class Bereich extends OrgUnit {
    *
    * @return always {@link OrgUnitKind#BEREICH}, never {@code null}.
    */
+  @NotNull
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.BEREICH;

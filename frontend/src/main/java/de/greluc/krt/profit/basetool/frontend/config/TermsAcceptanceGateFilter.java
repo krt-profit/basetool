@@ -283,7 +283,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    * @param request the current request
    * @return {@code true} for an AJAX call
    */
-  private static boolean isAjax(HttpServletRequest request) {
+  private static boolean isAjax(@NotNull HttpServletRequest request) {
     return "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
   }
 
@@ -415,7 +415,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    * @param request the current request, whose session carries the cached verdict
    * @return {@code true} when the user may proceed
    */
-  private boolean hasAccepted(HttpServletRequest request) {
+  private boolean hasAccepted(@NotNull HttpServletRequest request) {
     HttpSession session = request.getSession(false);
     long now = System.currentTimeMillis();
     if (session != null && Boolean.TRUE.equals(session.getAttribute(SESSION_ACCEPTED))) {

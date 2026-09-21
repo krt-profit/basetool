@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -163,6 +164,7 @@ public class UexItemPriceSyncService {
    * @param now timestamp to stamp on the row
    * @return the saved {@link GameItemPrice} id, or {@code null} if skipped
    */
+  @Nullable
   private UUID upsert(UexItemPriceDto dto, Instant now) {
     if (dto.idItem() == null || dto.idTerminal() == null) {
       return null;

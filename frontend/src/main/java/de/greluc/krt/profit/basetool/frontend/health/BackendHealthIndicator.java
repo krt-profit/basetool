@@ -168,7 +168,10 @@ public class BackendHealthIndicator implements HealthIndicator {
    * @param sslContext the resolved TLS context whose trust managers gate the probe's handshake
    */
   private BackendHealthIndicator(
-      String backendUrl, Duration connectTimeout, Duration readTimeout, SSLContext sslContext) {
+      @NotNull String backendUrl,
+      Duration connectTimeout,
+      Duration readTimeout,
+      SSLContext sslContext) {
     String trimmedBaseUrl =
         backendUrl.endsWith("/") ? backendUrl.substring(0, backendUrl.length() - 1) : backendUrl;
     this.readinessUrl = trimmedBaseUrl + READINESS_PATH;
@@ -264,7 +267,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    * @param environment the active environment, for profile detection
    * @return the resolved {@link SSLContext} for the probe's HTTP client
    */
-  private static SSLContext backendTls(SslBundles sslBundles, Environment environment) {
+  private static SSLContext backendTls(SslBundles sslBundles, @NotNull Environment environment) {
     List<String> profiles = Arrays.asList(environment.getActiveProfiles());
     if (profiles.contains("dev") || profiles.contains("test")) {
       return trustAllSslContext();
@@ -304,7 +307,7 @@ public class BackendHealthIndicator implements HealthIndicator {
    * @param delegates the PKIX trust managers produced from the {@code backend-trust} truststore
    * @return trust managers that pin the chain but do not enforce hostname verification
    */
-  private static TrustManager[] pinnedTrustSkippingHostname(TrustManager[] delegates) {
+  private static TrustManager[] pinnedTrustSkippingHostname(@NotNull TrustManager[] delegates) {
     TrustManager[] wrapped = delegates.clone();
     for (int i = 0; i < wrapped.length; i++) {
       if (wrapped[i] instanceof X509TrustManager x509) {

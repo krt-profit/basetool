@@ -170,6 +170,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
    * @param name OIDC principal name (typically the JWT {@code sub}); may be {@code null} or empty.
    * @return a short tag like {@code "u-1a2b3c4d"}, or {@code "<anon>"} for null/empty input.
    */
+  @NotNull
   private static String maskPrincipal(String name) {
     if (name == null || name.isEmpty()) {
       return "<anon>";
@@ -617,6 +618,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
      * @param user the backend's view of the caller; never {@code null}
      * @return the asserted authorities plus their authoritativeness flags
      */
+    @NotNull
     private static BackendAuthorities of(@NotNull UserDto user) {
       Set<String> asserted = new LinkedHashSet<>();
       if (user.roles() != null) {

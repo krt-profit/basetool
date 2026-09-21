@@ -90,6 +90,7 @@ public class OrgUnitMembershipQueryService {
    * @return active Squadron + SpecialCommand options; never {@code null}, possibly empty when the
    *     system has zero active org units.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listAllActiveOptions() {
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>();
     for (Squadron s : squadronRepository.findAllByActiveTrue()) {
@@ -132,6 +133,7 @@ public class OrgUnitMembershipQueryService {
    *
    * @return active org-unit options across all four kinds; never {@code null}, possibly empty.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listAllActiveOrgUnitOptionsAllKinds() {
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(listAllActiveOptions());
     orgUnitRepository.findActiveBereiche().stream()
@@ -174,6 +176,7 @@ public class OrgUnitMembershipQueryService {
    *
    * @return every active org unit as a pinnable option; never {@code null}, possibly empty.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listAllPinnableOptions() {
     List<OrgUnitMembershipOptionDto> options =
         new ArrayList<>(listAllActiveOrgUnitOptionsAllKinds());
@@ -204,6 +207,7 @@ public class OrgUnitMembershipQueryService {
    * @param userId the user whose memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs for each membership; never {@code null}, possibly empty.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listOptionsForUser(@NotNull UUID userId) {
     List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
     if (rows.isEmpty()) {
@@ -274,6 +278,7 @@ public class OrgUnitMembershipQueryService {
    * @param userId the user whose direct memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs across all four kinds; never {@code null}, possibly empty.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listDirectMembershipOptions(@NotNull UUID userId) {
     Set<UUID> ids = findDirectMembershipOrgUnitIds(userId);
     if (ids.isEmpty()) {
@@ -328,6 +333,7 @@ public class OrgUnitMembershipQueryService {
    * @return picker-friendly DTOs across all reachable kinds; never {@code null}, possibly empty
    *     when the caller has no membership at all.
    */
+  @NotNull
   public List<OrgUnitMembershipOptionDto> listPickerOptionsWithDescendants(@NotNull UUID userId) {
     List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
     if (rows.isEmpty()) {
@@ -503,6 +509,7 @@ public class OrgUnitMembershipQueryService {
    * @param userId the user whose memberships to enumerate; never {@code null}.
    * @return the membership rows; never {@code null}, possibly empty.
    */
+  @NotNull
   public List<OrgUnitMembership> findAllMembershipsForUser(@NotNull UUID userId) {
     List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
     if (rows.isEmpty()) {

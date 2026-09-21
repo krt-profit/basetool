@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -171,6 +172,7 @@ public class AuditAdminController {
    * @param before the exclusive cutoff (ISO instant); entries older than this are removed
    * @return the number of audit rows deleted
    */
+  @NotNull
   @Operation(summary = "Purge an activity audit log's entries older than a cutoff (admin)")
   @DeleteMapping("/{domain}")
   public AuditPurgeResultDto purgeAuditLog(

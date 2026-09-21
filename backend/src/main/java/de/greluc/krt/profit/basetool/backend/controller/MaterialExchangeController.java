@@ -37,6 +37,8 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -220,6 +222,8 @@ public class MaterialExchangeController {
    * @param ids the Lager rows to check (repeated {@code ids} query params).
    * @return the subset that have an active offer.
    */
+  @NotNull
+  @Unmodifiable
   @GetMapping("/released-item-ids")
   @Operation(summary = "Which of the given Lager rows currently carry an active offer.")
   public List<UUID> releasedItemIds(@RequestParam(name = "ids", required = false) List<UUID> ids) {

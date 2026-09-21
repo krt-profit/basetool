@@ -128,6 +128,7 @@ public class AdminOrgStructurePageController {
    * @param model the view model.
    * @return the view name, or the requested fragment selector.
    */
+  @NotNull
   @GetMapping
   public String page(@RequestParam(required = false) String fragment, Model model) {
     List<OrgUnitNodeDto> nodes = List.of();
@@ -166,7 +167,7 @@ public class AdminOrgStructurePageController {
    * @param nodes the unsorted nodes; never {@code null}.
    * @return a new list ordered by tier then name.
    */
-  private static List<OrgUnitNodeDto> sortForDisplay(List<OrgUnitNodeDto> nodes) {
+  private static List<OrgUnitNodeDto> sortForDisplay(@NotNull List<OrgUnitNodeDto> nodes) {
     return nodes.stream()
         .sorted(
             Comparator.comparingInt((OrgUnitNodeDto n) -> KIND_DISPLAY_ORDER.indexOf(n.kind()))

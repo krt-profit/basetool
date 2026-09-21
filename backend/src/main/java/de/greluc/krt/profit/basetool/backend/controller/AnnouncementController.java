@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.AnnouncementDto;
 import de.greluc.krt.profit.basetool.backend.service.AnnouncementService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,7 +90,7 @@ public class AnnouncementController {
   @PutMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public AnnouncementDto updateAnnouncement(
-      @RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
+      @NotNull @RequestBody @jakarta.validation.Valid AnnouncementRequest request) {
     return announcementMapper.toDto(
         announcementService.updateAnnouncement(request.getContent(), request.getVersion()));
   }

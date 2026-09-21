@@ -26,6 +26,7 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Organisationsleitung (OL) tenant — the top of the Kartell hierarchy, above every {@link Bereich}
@@ -93,6 +94,7 @@ public class Organisationsleitung extends OrgUnit {
    *
    * @return always {@link OrgUnitKind#ORGANISATIONSLEITUNG}, never {@code null}.
    */
+  @NotNull
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.ORGANISATIONSLEITUNG;

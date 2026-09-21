@@ -179,6 +179,7 @@ public class MissionFinancePageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /missions/{id}}
    */
+  @NotNull
   @PostMapping("/{entryId}/delete")
   public String deleteFinanceEntry(
       @PathVariable @NotNull UUID id,

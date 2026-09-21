@@ -29,6 +29,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -109,6 +110,7 @@ public class DeletionRequestController {
    *     admin decides deliberately
    * @return the caller's open request
    */
+  @NotNull
   @PostMapping
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -119,7 +121,8 @@ public class DeletionRequestController {
               + "triggered by the member's own click. Idempotent - a second submission returns the "
               + "existing request.")
   public DeletionRequestDto request(
-      @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateDeletionRequestRequest request) {
+      @AuthenticationPrincipal Jwt jwt,
+      @NotNull @Valid @RequestBody CreateDeletionRequestRequest request) {
     DeletionRequest raised =
         deletionRequestService.raise(userService.getUserIdFromJwt(jwt), request.eraseHistory());
     return toDto(raised, null);
@@ -152,7 +155,8 @@ public class DeletionRequestController {
    *     projection does not need to be told who they are)
    * @return the DTO
    */
-  static DeletionRequestDto toDto(DeletionRequest request, @Nullable String handle) {
+  @NotNull
+  static DeletionRequestDto toDto(@NotNull DeletionRequest request, @Nullable String handle) {
     return new DeletionRequestDto(
         request.getId(),
         request.getVersion(),

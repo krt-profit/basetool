@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The Variante-C "deduct from" plan resolver (REQ-INV-027): given a quantity {@code totalX} leaving
@@ -77,8 +78,9 @@ public final class AllocationReductions {
    * @throws OverAllocationException when the plan under-assigns so much that the not-yet-assigned
    *     rest cannot absorb the remainder (the R5 422)
    */
+  @NotNull
   public static Map<UUID, Double> resolveReductionPlan(
-      InventoryItem item,
+      @NotNull InventoryItem item,
       List<AllocationReductionDto> reductions,
       double totalX,
       boolean jobOrderDimension) {
@@ -129,7 +131,7 @@ public final class AllocationReductions {
    * @param jobOrderDimension {@code true} to shrink job-order slices, {@code false} for mission
    */
   public static void applyPlan(
-      InventoryItem item, Map<UUID, Double> plan, boolean jobOrderDimension) {
+      InventoryItem item, @NotNull Map<UUID, Double> plan, boolean jobOrderDimension) {
     plan.forEach(
         (targetId, scu) -> {
           if (jobOrderDimension) {
@@ -153,6 +155,7 @@ public final class AllocationReductions {
    * @return the derived {@code targetId → amount} plan (empty when the rest already covers {@code
    *     totalX})
    */
+  @NotNull
   private static Map<UUID, Double> defaultReductionPlan(
       InventoryItem item, double totalX, double rest, boolean jobOrderDimension) {
     Map<UUID, Double> plan = new LinkedHashMap<>();

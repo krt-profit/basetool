@@ -36,6 +36,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -161,7 +162,8 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    * @param request the current request
    * @return the blocked user's id, or {@code null} when the request may proceed
    */
-  private UUID blockedUserId(HttpServletRequest request) {
+  @Nullable
+  private UUID blockedUserId(@NotNull HttpServletRequest request) {
     PathContainer path =
         PathContainer.parsePath(
             request.getRequestURI().substring(request.getContextPath().length()));

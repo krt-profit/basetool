@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -197,6 +198,7 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @param jwt the access token.
    * @return the cache key, or {@code null} to bypass caching for this token.
    */
+  @Nullable
   private static String authoritiesCacheKey(@NonNull Jwt jwt) {
     String sub = jwt.getSubject();
     Instant issuedAt = jwt.getIssuedAt();

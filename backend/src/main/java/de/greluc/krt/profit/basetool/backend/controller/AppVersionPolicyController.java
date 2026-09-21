@@ -26,6 +26,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -68,6 +69,7 @@ public class AppVersionPolicyController {
    *
    * @return the policy in force, never {@code null}
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("permitAll()")
   // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the

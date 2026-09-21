@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /** Data transfer record carrying Refinery Order List payload. */
 public record RefineryOrderListDto(
@@ -43,6 +44,7 @@ public record RefineryOrderListDto(
   /**
    * Derived end timestamp ({@code startedAt + durationMinutes}); {@code null} if either is unset.
    */
+  @Nullable
   public Instant getEndsAt() {
     if (startedAt != null && durationMinutes != null) {
       return startedAt.plus(durationMinutes, java.time.temporal.ChronoUnit.MINUTES);

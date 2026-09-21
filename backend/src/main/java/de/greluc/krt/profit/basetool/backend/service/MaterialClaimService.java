@@ -144,6 +144,7 @@ public class MaterialClaimService {
    * @return the per-bucket claim view, never {@code null}.
    * @throws NotFoundException when the order does not exist.
    */
+  @NotNull
   public List<ClaimBucketDto> getClaimBuckets(@NotNull UUID jobOrderId) {
     return getClaimBucketsForOrder(loadOrder(jobOrderId));
   }
@@ -156,6 +157,7 @@ public class MaterialClaimService {
    * @param order the managed order whose buckets + claims to project.
    * @return the per-bucket claim view, never {@code null}.
    */
+  @NotNull
   public List<ClaimBucketDto> getClaimBucketsForOrder(@NotNull JobOrder order) {
     return getClaimBucketsForOrder(
         order, materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId()));
@@ -173,8 +175,9 @@ public class MaterialClaimService {
    * @param orderClaims this order's claims, newest-first; may be empty.
    * @return the per-bucket claim view, never {@code null}.
    */
+  @NotNull
   public List<ClaimBucketDto> getClaimBucketsForOrder(
-      @NotNull JobOrder order, @NotNull List<MaterialClaim> orderClaims) {
+      JobOrder order, @NotNull List<MaterialClaim> orderClaims) {
     Map<Bucket, Double> required = requiredByBucket(order);
     Map<UUID, Material> materials = materialsByBucket(order);
 
@@ -217,6 +220,7 @@ public class MaterialClaimService {
    * @return order id → its per-bucket claim view; orders with no claims still get their required
    *     buckets with empty claim lists.
    */
+  @NotNull
   public Map<UUID, List<ClaimBucketDto>> getClaimBucketsForOrders(
       @NotNull Collection<JobOrder> orders) {
     if (orders.isEmpty()) {
@@ -328,6 +332,7 @@ public class MaterialClaimService {
    * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
    *     row.
    */
+  @NotNull
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public ClaimDto upsertClaimWithinTransaction(
       @NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
@@ -508,7 +513,7 @@ public class MaterialClaimService {
    *     audit event by the caller.
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public int withdrawOrphanedClaimsWithinTransaction(@NotNull JobOrder order) {
+  public int withdrawOrphanedClaimsWithinTransaction(JobOrder order) {
     Map<Bucket, Double> required = requiredByBucket(order);
     List<MaterialClaim> orphaned =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(order.getId()).stream()
@@ -536,6 +541,7 @@ public class MaterialClaimService {
    * @param order the order.
    * @return required amount keyed by bucket, insertion-ordered for stable rendering.
    */
+  @NotNull
   private Map<Bucket, Double> requiredByBucket(JobOrder order) {
     Map<Bucket, Double> required = new LinkedHashMap<>();
     if (order.getType() == JobOrderType.ITEM) {
@@ -568,6 +574,7 @@ public class MaterialClaimService {
    * @param order the order.
    * @return material id → material, for every material referenced by a bucket.
    */
+  @NotNull
   private Map<UUID, Material> materialsByBucket(JobOrder order) {
     Map<UUID, Material> materials = new LinkedHashMap<>();
     if (order.getType() == JobOrderType.ITEM) {
@@ -592,7 +599,7 @@ public class MaterialClaimService {
    * @param order the order.
    * @throws BadRequestException when the order is not a claimable SK order.
    */
-  private void assertClaimable(JobOrder order) {
+  private void assertClaimable(@NotNull JobOrder order) {
     OrgUnit responsible = order.getResponsibleOrgUnit();
     if (responsible == null || responsible.getKind() != OrgUnitKind.SPECIAL_COMMAND) {
       throw new BadRequestException(
@@ -717,7 +724,8 @@ public class MaterialClaimService {
    * @param claim the persisted claim.
    * @return the DTO.
    */
-  private ClaimDto toClaimDto(MaterialClaim claim) {
+  @NotNull
+  private ClaimDto toClaimDto(@NotNull MaterialClaim claim) {
     return new ClaimDto(
         claim.getId(),
         squadronMapper.orgUnitToReferenceDto(claim.getClaimingOrgUnit()),
@@ -745,7 +753,7 @@ public class MaterialClaimService {
    * @param order the parent order
    * @return the {@code #<displayId> '<handle>'} label
    */
-  private static String orderLabel(JobOrder order) {
+  private static String orderLabel(@NotNull JobOrder order) {
     return JobOrderAuditLabel.of(order.getDisplayId());
   }
 }

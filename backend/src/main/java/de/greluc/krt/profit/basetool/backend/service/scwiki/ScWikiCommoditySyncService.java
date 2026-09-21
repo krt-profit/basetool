@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -258,7 +259,7 @@ public class ScWikiCommoditySyncService {
    * @return resolution outcome
    */
   private ResolveResult resolve(
-      ScWikiCommodityDto dto, Map<String, List<Material>> canonicalIndex, UUID runId) {
+      @NotNull ScWikiCommodityDto dto, Map<String, List<Material>> canonicalIndex, UUID runId) {
     // 1. by Wiki UUID (set on a previous sync).
     Optional<Material> byUuid = materialRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
@@ -318,6 +319,7 @@ public class ScWikiCommoditySyncService {
    *
    * @return canonical-name index of unmatched materials
    */
+  @NotNull
   private Map<String, List<Material>> buildCanonicalIndex() {
     Map<String, List<Material>> index = new HashMap<>();
     for (Material material : materialRepository.findAll()) {
@@ -343,6 +345,7 @@ public class ScWikiCommoditySyncService {
    * @param runId current run id for event logging
    * @return a new, unsaved {@link Material}
    */
+  @NotNull
   private Material createWikiOnlyMaterial(ScWikiCommodityDto dto, UUID runId) {
     Material material = new Material();
     material.setName(dto.name());
@@ -371,7 +374,8 @@ public class ScWikiCommoditySyncService {
    * @param dto the Wiki commodity row
    * @param now timestamp to stamp on {@code scwiki_synced_at}
    */
-  private void applyWikiFields(Material material, ScWikiCommodityDto dto, Instant now) {
+  private void applyWikiFields(
+      @NotNull Material material, @NotNull ScWikiCommodityDto dto, Instant now) {
     material.setScwikiUuid(dto.uuid());
     material.setScwikiKey(dto.key());
     material.setScwikiSlug(dto.slug());
@@ -444,6 +448,7 @@ public class ScWikiCommoditySyncService {
      * @param material the matched material
      * @return a matched result
      */
+    @NotNull
     static ResolveResult matched(Material material) {
       return new ResolveResult(material, false);
     }
@@ -453,6 +458,7 @@ public class ScWikiCommoditySyncService {
      *
      * @return a create-new result
      */
+    @NotNull
     static ResolveResult createNew() {
       return new ResolveResult(null, false);
     }
@@ -462,6 +468,7 @@ public class ScWikiCommoditySyncService {
      *
      * @return a skip result
      */
+    @NotNull
     static ResolveResult skipped() {
       return new ResolveResult(null, true);
     }

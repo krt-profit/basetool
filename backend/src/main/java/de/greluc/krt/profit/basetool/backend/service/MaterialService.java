@@ -230,6 +230,7 @@ public class MaterialService {
    * @param <T> the element type
    * @return {@code null} when {@code values} is {@code null} or empty, otherwise {@code values}
    */
+  @Nullable
   private static <T> Collection<T> emptyToNull(Collection<T> values) {
     return values == null || values.isEmpty() ? null : values;
   }

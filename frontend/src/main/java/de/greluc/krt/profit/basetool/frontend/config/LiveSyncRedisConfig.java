@@ -25,6 +25,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -66,6 +67,7 @@ public class LiveSyncRedisConfig {
    * @param liveSyncProperties the live-sync settings supplying the channel name
    * @return the Redis fan-out bean
    */
+  @NotNull
   @Bean
   public RedisLiveSyncFanout redisLiveSyncFanout(
       StringRedisTemplate redisTemplate,
@@ -100,6 +102,7 @@ public class LiveSyncRedisConfig {
    *
    * @return the bounded listener dispatch executor (shut down with the context)
    */
+  @NotNull
   @Bean(destroyMethod = "shutdown")
   public ThreadPoolTaskExecutor liveSyncRedisListenerExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -129,6 +132,7 @@ public class LiveSyncRedisConfig {
    *     mode that took the backend's equivalent container down once the fan-out was enabled)
    * @return the message-listener container
    */
+  @NotNull
   @Bean
   public RedisMessageListenerContainer liveSyncRedisMessageListenerContainer(
       RedisConnectionFactory connectionFactory,

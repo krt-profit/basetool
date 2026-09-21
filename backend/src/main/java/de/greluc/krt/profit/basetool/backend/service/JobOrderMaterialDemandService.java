@@ -351,6 +351,7 @@ public class JobOrderMaterialDemandService {
      *
      * @return the group DTO.
      */
+    @NotNull
     private MaterialDemandGroupDto toDto() {
       List<MaterialDemandRowDto> rows =
           buckets.values().stream().map(BucketAccumulator::toDto).sorted(ROW_ORDER).toList();
@@ -396,6 +397,7 @@ public class JobOrderMaterialDemandService {
      *
      * @return the row DTO.
      */
+    @NotNull
     private MaterialDemandRowDto toDto() {
       double required = round(requiredAmount, material);
       double booked = round(bookedAmount, material);
