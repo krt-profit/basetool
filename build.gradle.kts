@@ -384,9 +384,24 @@ subprojects {
   }
 
   // Checkstyle (Gradle core plugin). Uses the Google Java Style config
-  // (`config/checkstyle/google_checks.xml`, downloaded from the Checkstyle
-  // 13.6.0 release tag) which enforces 2-space indents, 100-char lines,
-  // Google-style imports, naming conventions, Javadoc on public API, etc.
+  // (`config/checkstyle/google_checks.xml`, a byte-for-byte copy of the file
+  // shipped in the Checkstyle 14.1.0 release tag) which enforces 2-space
+  // indents, 100-char lines, Google-style imports, naming conventions,
+  // Javadoc on public API, etc. The copy is deliberately unmodified: no
+  // Spotless format targets `.xml`, so it stays diffable against upstream and
+  // a refresh is a straight overwrite rather than a merge.
+  //
+  // That copy does NOT follow `toolVersion`, and nothing fails when the two
+  // drift: an older config on a newer tool simply runs, silently skipping
+  // every rule added since it was copied. It was 13.6.0 against a 14.1.0 tool
+  // from `712f22d75` (2026-09-13) until this refresh, which cost six rules the
+  // 14.1.0 config adds plus `GoogleMethodName`, the replacement upstream made
+  // for the hand-rolled `MethodName` regex -- four of them check classes that
+  // do not exist in 13.6.0 at all. So re-copy it from the
+  // matching release tag in the same commit that bumps `checkstyle` in
+  // `gradle/libs.versions.toml`:
+  //
+  // https://github.com/checkstyle/checkstyle/blob/checkstyle-<version>/src/main/resources/google_checks.xml
   //
   // Phase 4 (this configuration): the gate is now STRICT.
   // `ignoreFailures = false` + `maxWarnings = 0` mean any new Checkstyle
