@@ -49,6 +49,7 @@ import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import lombok.Getter;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -1885,13 +1886,13 @@ class LiveSyncWebSocketHandlerTest {
    * them.
    */
   private static final class FakeSession implements WebSocketSession {
-    private final String id = UUID.randomUUID().toString();
-    final Map<String, Object> attributes = new HashMap<>();
+    @Getter private final String id = UUID.randomUUID().toString();
+    @Getter final Map<String, Object> attributes = new HashMap<>();
     final List<WebSocketMessage<?>> sent = new ArrayList<>();
     boolean open;
     boolean failSend;
-    URI uri;
-    Principal principal;
+    @Getter URI uri;
+    @Getter Principal principal;
     CloseStatus closeStatus;
 
     /**
@@ -1905,28 +1906,8 @@ class LiveSyncWebSocketHandlerTest {
     private int openChecks;
 
     @Override
-    public String getId() {
-      return id;
-    }
-
-    @Override
-    public URI getUri() {
-      return uri;
-    }
-
-    @Override
     public HttpHeaders getHandshakeHeaders() {
       return new HttpHeaders();
-    }
-
-    @Override
-    public Map<String, Object> getAttributes() {
-      return attributes;
-    }
-
-    @Override
-    public Principal getPrincipal() {
-      return principal;
     }
 
     @Override

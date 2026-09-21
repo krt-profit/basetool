@@ -28,6 +28,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.Getter;
+import lombok.Setter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -193,15 +195,9 @@ class RedisSessionConfigTest {
    * this test reproduces lives in Spring's {@code BeanPropertyBindingResult}, not in our forms.
    */
   @SuppressWarnings("unused")
+  @Getter
+  @Setter
   public static class SampleForm {
     private String name;
-
-    public String getName() {
-      return name;
-    }
-
-    public void setName(String name) {
-      this.name = name;
-    }
   }
 }

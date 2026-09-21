@@ -17,6 +17,11 @@
   eigenen Code abgeleitete Nullbarkeits-Angabe bekommen. Rein entwicklungsseitig; das Verhalten der
   Anwendung ändert sich nicht (ADR-0192).
 
+- **Entwicklung: die letzten handgeschriebenen Accessoren sind jetzt Lombok.** Der Sweep aus
+  ADR-0192 hatte nur den Produktionsbereich erfasst; zwölf Getter und Setter in den Metrik-Beans
+  und in zwei Testklassen sind jetzt Annotationen. Was stehen bleibt, ist gezählt statt behauptet:
+  123 Accessoren, die Lombok nicht schreiben kann. Rein entwicklungsseitig.
+
 - **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
   als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
   die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge

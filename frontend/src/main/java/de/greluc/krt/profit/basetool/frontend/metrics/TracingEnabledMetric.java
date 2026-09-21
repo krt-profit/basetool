@@ -22,7 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.metrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,7 +66,14 @@ public class TracingEnabledMetric {
    *
    * <p>Defaults to {@code false} to match the property's own default, so a deployment that never
    * sets it reports {@code 0} rather than failing to start.
+   *
+   * <p>{@code @Getter} publishes this as {@code isTracingEnabled()} — the same value the gauge
+   * reports, for a caller that wants it without reading the registry. The package-private
+   * {@code @Setter} exists for the tests, which construct this bean directly rather than through
+   * Spring and therefore never have the {@code @Value} injected.
    */
+  @Getter
+  @Setter(AccessLevel.PACKAGE)
   @Value("${management.opentelemetry.enabled:false}")
   private boolean tracingEnabled;
 
@@ -85,24 +95,6 @@ public class TracingEnabledMetric {
         "Tracing is {}; basetool_tracing_enabled reports {}.",
         tracingEnabled ? "ENABLED" : "disabled",
         tracingEnabled ? 1 : 0);
-  }
-
-  /**
-   * Whether this module is configured to emit spans, as the gauge reports it.
-   *
-   * @return {@code true} when {@code management.opentelemetry.enabled} is set
-   */
-  public boolean isTracingEnabled() {
-    return tracingEnabled;
-  }
-
-  /**
-   * Sets the configured flag, for tests that construct this bean directly.
-   *
-   * @param enabled the value the gauge should report
-   */
-  void setTracingEnabled(boolean enabled) {
-    this.tracingEnabled = enabled;
   }
 
   /**

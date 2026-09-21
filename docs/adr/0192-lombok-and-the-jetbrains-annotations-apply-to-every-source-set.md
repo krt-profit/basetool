@@ -163,6 +163,48 @@ reports **zero** remaining derivable cases: what the analyser can prove, the bra
   on a field it now also generates a runtime null-check. It is left as follow-up rather than
   guessed at in bulk.
 
+## Amendment 1 (2026-09-21) — the sweep covers every source set, and what it leaves is classified
+
+**Status:** accepted · **Directed by:** @greluc (explicit, in-chat)
+
+Point 4 above swept **`main`**. Point 1 had just made both toolkits available in `test` and `e2e`
+as well, so the sweep and the wiring ended one step apart, and the ADR's sentence *"`main` contains
+no hand-rolled logger and no trivial accessor"* said nothing about the 951 test sources. Three files
+added to `main` after the sweep — the `TracingEnabledMetric` in `backend`, `frontend` and `ingest`
+— then put six accessors back, which is the more useful half of this note: a one-off sweep is
+true on the day it runs.
+
+Twelve accessors are now expressed by lombok: `@Getter` + `@Setter(AccessLevel.PACKAGE)` on the
+three metric beans' `tracingEnabled` field, `@Getter`/`@Setter` on `RedisSessionConfigTest`'s
+one-property `SampleForm`, and field-level `@Getter` on the four `WebSocketSession` members of
+`LiveSyncWebSocketHandlerTest`'s `FakeSession`. The last is field-level deliberately: `@Getter` on
+that class would also generate `getSent()`, `isFailSend()` and `getCloseStatus()` — new public
+surface on a private test double — and would sit beside the hand-written `isOpen()`, whose
+`flipOpenAfter` logic lombok cannot express.
+
+**What remains is not boilerplate, and it is now counted rather than asserted.** Every one-line
+field accessor in the repository, across all source sets, classified by two independent scans — one
+matching method headers, one starting from the bodies and reassembling headers that wrap, so a
+long return type cannot hide a case:
+
+| remaining | count | why lombok cannot express it |
+| --- | --- | --- |
+| fluent getters (`status()`) | 74 | `lombok.config` sets no `accessors.fluent`; lombok generates `getX`/`isX` only |
+| record components | 33 | lombok cannot annotate a record component |
+| accessors in anonymous classes | 12 | they return an enclosing local, not a field |
+| fluent setters | 4 | same as the getters |
+
+Neither scan finds a single remaining case lombok could express, in any source set.
+
+**`lombok.accessors.fluent = true` was reconsidered here and rejected again**, now with the numbers.
+It would let the 78 fluent accessors be generated — and, because `lombok.config` is deliberately one
+shared file at the repository root, it would simultaneously rewrite every accessor lombok already
+generates across the 146 files carrying `@Getter`/`@Setter`/`@Data`, turning `getName()` into
+`name()`. 2,944 Thymeleaf property expressions resolve through JavaBeans naming, as do Spring's form
+binding, Jackson and the property paths in validation messages. The per-class `@Accessors(fluent =
+true)` escape is `lombok.experimental`, which is the exact ground on which this ADR already rejected
+`@UtilityClass`.
+
 ## Alternatives considered
 
 - **`lombok.copyableAnnotations += org.jetbrains.annotations.NotNull`** — rejected as a no-op:
