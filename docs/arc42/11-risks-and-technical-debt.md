@@ -21,6 +21,13 @@ metric names and Alloy watches **both** log paths:
 `container_cleanup_rename_test.yml` locks all four combinations, including the one that matters
 most: old metric stale, new metric fresh, alert silent.
 
+The Ansible role **retires** the old unit rather than leaving it beside the new one — it stops and
+disables `iri-docker-cleanup.timer`, removes its units, its logrotate entry and the old script, and
+deliberately keeps the old **log file** so Alloy's `{app="ops-cleanup"}` stream has no gap. That
+had to be added: the role installs and has no general removal pass, so before it a renamed unit
+simply gained a sibling, and the old broken timer would have gone on failing every Saturday next to
+the new one that works.
+
 **Remove both halves once every host has run the role.** A rule that accepts a name nothing writes
 is how a rename quietly never finishes — and while it stands, a host that somehow kept writing only
 the old name would look healthy forever, which is precisely the state the alert exists to report.

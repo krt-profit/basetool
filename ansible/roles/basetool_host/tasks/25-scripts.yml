@@ -54,6 +54,52 @@
     # the RESULT through the config bundle and has no business generating anything.
     - render-env-d.py
 
+# --- Retire the units this role used to install -------------------------------------------------
+#
+# This role INSTALLS; it has no general removal pass, so a renamed unit would simply gain a sibling.
+# iri-docker-cleanup was renamed to iri-container-cleanup (ADR-0194) because the script called
+# `docker` directly and this host has no docker binary. Without the four tasks below, a host that
+# has run this role before keeps the OLD timer enabled and failing every Saturday, next to the new
+# one that works -- which is the half-finished rename the ADR itself warns about.
+#
+# The log file is deliberately NOT removed: Alloy still watches /hostlog/iri-docker-cleanup.log for
+# the length of the transition so the `{app="ops-cleanup"}` stream has no gap, and deleting an
+# operator's logs is not this role's business in any case. Logrotate will age it out.
+- name: Find out whether the retired cleanup units are present
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/{{ item }}"
+  register: basetool_host_retired_cleanup
+  loop:
+    - iri-docker-cleanup.timer
+    - iri-docker-cleanup.service
+
+- name: Stop and disable the retired cleanup timer
+  # Guarded on the unit FILE rather than on systemd's opinion: `systemctl disable` on a unit that
+  # does not exist fails, and a fresh host must not be a failed run.
+  ansible.builtin.systemd_service:
+    name: "{{ item.item }}"
+    state: stopped
+    enabled: false
+  loop: "{{ basetool_host_retired_cleanup.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.stat.exists | default(false)
+
+- name: Remove the retired cleanup units and their logrotate entry
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/iri-docker-cleanup.timer
+    - /etc/systemd/system/iri-docker-cleanup.service
+    - /etc/logrotate.d/iri-docker-cleanup
+  notify: Reload systemd for the operational units
+
+- name: Remove the retired cleanup script
+  ansible.builtin.file:
+    path: "{{ basetool_host_root_dir }}/code/scripts/docker-cleanup.sh"
+    state: absent
+
 - name: Install the systemd units and their timers
   # Copied verbatim. The units carry no Docker-specific directive any more: both
   # `Group=docker` and `Requires=docker.service` were removed AT THE SOURCE, with
