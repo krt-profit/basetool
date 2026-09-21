@@ -124,6 +124,31 @@ jobs:
       - name: Run hadolint
         run: hadolint backend/Dockerfile frontend/Dockerfile ingest/Dockerfile
 
+  logging-facade:
+    name: logging-facade
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `CLAUDE.md` says "@Slf4j - never instantiate loggers manually", and production code has
+      # always honoured it, but nothing checked. `lombok.config` enforces the neighbouring half
+      # (which Lombok logging annotation is allowed, per module) at compile time; a hand-written
+      # `LoggerFactory.getLogger(...)` sails past that, because it is not a Lombok annotation at
+      # all. A hand-rolled field is where the logger NAME drifts from its declaring class - a
+      # copy-pasted `.class` literal - which silently misroutes the line against the per-logger
+      # levels in logback-spring.xml.
+      #
+      # The self-test runs first so the check can never pass vacuously. Its load-bearing cases are
+      # the false-positive guards: the 33 log-CAPTURE tests and the Playwright suite's deliberate
+      # console output must stay green, or the gate would be red on a clean tree.
+      - name: Self-test the logging-facade checker
+        run: scripts/check-logging-facade.test.sh
+
+      - name: Check the logging facade
+        run: scripts/check-logging-facade.sh
+
   pid1-reaping:
     name: pid1-reaping
     runs-on: ubuntu-latest

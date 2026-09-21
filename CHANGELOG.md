@@ -4,6 +4,12 @@
 
 ### Changed
 
+- **Entwicklung: das Logging ist jetzt erzwungen einheitlich.** Produktionscode holt seinen Logger
+  ausschließlich über Lombok — `@Slf4j`, im Keycloak-Provider `@JBossLog`; jede andere
+  Logging-Annotation ist ein Compile-Fehler, und ein neuer CI-Check (`logging-facade`) weist
+  handgeschriebene Logger und Konsolenausgaben im Produktionscode zurück. Rein entwicklungsseitig
+  (ADR-0193).
+
 - **Entwicklung: Lombok und die JetBrains-Annotationen stehen jetzt in jedem Modul und jedem
   Quellbereich zur Verfügung** — auch in Tests, im E2E-Bereich, im Keycloak-Provider und im
   Test-Hilfsmodul, wo bisher schlicht keins von beiden eingebunden war. Lombok versieht zusätzlich
