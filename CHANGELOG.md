@@ -137,6 +137,8 @@
   ist das ein zweiter Verwaltungszugang, den niemand nutzt und den trotzdem jemand aktuell halten
   müsste. Die Provisionierung entfernt ihn und prüft, dass der Port wirklich frei ist.
 
+- **Betrieb: die Prüfung, ob der Sitzungsspeicher ein Passwort verlangt, lief auf dem neuen Host gar nicht.** Sie sprach ihn über eine Adresse an, die es dort vom Host aus nicht gibt, und lief in eine Zeitüberschreitung — ausgerechnet die Prüfung, die unauthentifizierten Zugriff finden soll. Sie fragt jetzt von innen und bringt ihre eigene Absicherung mit, damit sie sich nicht versehentlich selbst anmeldet.
+
 - **Betrieb: die Konformitätsprüfung konnte die Überwachung des neuen Hosts nicht abfragen.** Sie
   sprach den Metrik-Dienst über eine Adresse an, die es auf dem neuen Container-Unterbau vom Host
   aus nicht gibt, und meldete daraufhin „kein Überwachungssystem vorhanden" — über eines, das lief.

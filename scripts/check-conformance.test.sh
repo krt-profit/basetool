@@ -308,7 +308,10 @@ case "$cmd" in
         *)             echo "7" ;;
       esac
       ;;
-  *"/dev/tcp/"*)
+  # The redis ping comes from INSIDE the container now: the host has no route to a rootless
+  # container's IP, so the /dev/tcp probe did not fail, it hung until the runner's timeout killed
+  # it. The scenarios are unchanged -- only the command that carries them.
+  *"exec redis"*)
     case "$scenario" in
       redis-open)     echo "+PONG" ;;
       redis-absent)   echo "ABSENT" ;;

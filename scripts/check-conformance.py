@@ -1012,13 +1012,28 @@ def check_redis_requires_auth(ctx: Context) -> str:
     #
     # `head -n 1`, not `head -c N`: Redis keeps the connection open, so a byte count blocks until
     # it is reached and -NOAUTH is shorter than any sensible count. That cost one confusing run.
+    #
+    # **The ping is sent from inside the container now**, and that is a fix. It used to read the
+    # container's IP out of `inspect` and open /dev/tcp to it FROM THE HOST -- fine on Docker, whose
+    # bridge is host-visible. Under rootless Podman the container network is in a user namespace and
+    # the host has no route into it: measured on the testing host 2026-09-21, this check did not
+    # fail, it HUNG, and was killed by the runner's 45-second timeout. The one check whose purpose
+    # is catching unauthenticated access to the session store could not run at all.
+    #
+    # `redis-cli` is an unauthenticated client here and -NOAUTH is a protocol-level answer, so the
+    # assertion is unchanged in substance: it is still "an anonymous client is refused". What is
+    # lost is the proof that the PORT is closed to the network, and nothing here proved that anyway
+    # -- the network segmentation is `edge-not-directly-reachable`'s and the firewall's job.
+    #
+    # `env -u REDISCLI_AUTH` is not decoration. redis-cli reads that variable and would authenticate
+    # itself, turning the answer into +PONG and this check into a PASS on exactly the state it
+    # exists to catch. Measured: the container carries REDIS_PASSWORD but not REDISCLI_AUTH, so it
+    # does not happen today -- and a check that is only correct until someone adds an environment
+    # variable is not correct.
     cmd = (
-        f'addr=$({ctx.runner.container_cli} inspect redis '
-        '--format "{{range .NetworkSettings.Networks}}{{.IPAddress}} '
-        '{{end}}" | cut -d" " -f1); '
-        'if [ -z "$addr" ]; then echo ABSENT; exit 0; fi; '
-        "exec 3<>/dev/tcp/$addr/6379 || { echo UNREACHABLE; exit 0; }; "
-        "printf 'PING\\r\\n' >&3; timeout 5 head -n 1 <&3 || echo NO_REPLY"
+        f"{ctx.runner.container_cli} exec redis sh -c "
+        "'env -u REDISCLI_AUTH redis-cli --no-auth-warning ping 2>&1 | head -n 1' "
+        "|| echo ABSENT"
     )
     reply = ctx.runner.run(cmd).strip()
 

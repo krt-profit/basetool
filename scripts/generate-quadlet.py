@@ -576,7 +576,7 @@ def _qualify(image: str) -> str:
         return "docker.io/" + image
     first = image.split("/")[0]
     # With a slash, the first segment is a registry only if it looks like a host: a dot, a port,
-    # or the literal localhost. Otherwise it is a Docker Hub namespace -- `grafana/loki:3.7.7`.
+    # or the literal localhost. Otherwise it is a Docker Hub namespace -- `grafana/loki:3.7.8`.
     if "." in first or ":" in first or first == "localhost":
         return image
     return "docker.io/" + image
