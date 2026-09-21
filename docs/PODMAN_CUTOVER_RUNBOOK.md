@@ -578,6 +578,18 @@ Any difference stops the cutover; the old host is still serving.
 
   Skipping it is fine and needs no command — but say so out loud beforehand, because the first
   report will be "everyone got logged out".
+
+  > [!warning] The DESTINATION has to be inside the service user's subuid range, or every file fails
+  > `podman unshare tar -x` runs as the namespace's root, which is the service user outside it. A
+  > directory owned by host root is outside that range — it reads as `nobody` in there — and the
+  > extraction fails with `Permission denied` on every entry. Measured on the testing host
+  > 2026-09-21: into a hand-made `root:root` directory, all five files refused; into one owned as
+  > the real `/var/iri/redis` is, contents and modes came out identical (`100998`, 600/700/755).
+  >
+  > The role creates `/var/iri/redis` correctly — `100998` on both hosts, checked — so this only
+  > bites if somebody `mkdir`s it by hand first. The same applies to the certificate volumes above,
+  > which is why they are created with `podman volume create` as the service user rather than by
+  > hand. It fails loudly, which is the one merciful thing about it.
 - **`.env`**, and afterwards `chown deploy:deploy` + `chmod 640` — the deployer reads it and
   `render-env-d.py` renders every `env.d` file from it.
 - **The redis ACL** (`users.acl`).
