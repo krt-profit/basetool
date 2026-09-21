@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.client.ClientAuthorizationRequiredException;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 /**
@@ -180,6 +181,41 @@ class BackendApiClientResilienceTest {
 
       assertEquals(504, ex.getStatusCode());
       assertEquals(BackendServiceException.CODE_BACKEND_TIMEOUT, ex.getProblemCode());
+    }
+
+    /**
+     * A {@code WebClientResponseException} is not automatically a backend refusal. When the
+     * exchange fails while the response BODY is being read, Spring wraps the failure into one of
+     * these carrying the status that had already arrived — so a torn-down connection arrives here
+     * as a 200. The classifier must read the cause, not the status line, or it reports {@code
+     * Backend returned 200 [UNKNOWN]} and counts a dead connection as {@code reason=backend_4xx}.
+     */
+    @Test
+    void successStatusWrappingABodySideTransportFailure_yields504_backendTimeout() {
+      WebClientResponseException wrapped =
+          WebClientResponseException.create(
+              200,
+              "OK",
+              org.springframework.http.HttpHeaders.EMPTY,
+              new byte[0],
+              java.nio.charset.StandardCharsets.UTF_8);
+      wrapped.initCause(new java.io.IOException("Connection prematurely closed DURING response"));
+      stubGet(webClient, "/api/v1/x", wrapped);
+
+      BackendServiceException ex =
+          assertThrows(BackendServiceException.class, () -> client.get("/api/v1/x", String.class));
+
+      assertEquals(504, ex.getStatusCode());
+      assertEquals(BackendServiceException.CODE_BACKEND_TIMEOUT, ex.getProblemCode());
+      assertEquals(
+          1.0d,
+          meterRegistry
+              .get(MetricNames.BACKEND_CLIENT_ERRORS)
+              .tags(
+                  MetricNames.TAG_REASON, MetricNames.REASON_TIMEOUT, MetricNames.TAG_METHOD, "GET")
+              .counter()
+              .count(),
+          "the transport fault is counted as one, not as a 4xx the caller caused");
     }
 
     @Test

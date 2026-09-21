@@ -36,6 +36,7 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import okhttp3.mockwebserver.SocketPolicy;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -173,6 +174,17 @@ class BackendApiClientProblemJsonTest {
                           + " account holds no role.\","
                           + "\"code\":\"NO_ROLE\",\"correlationId\":\"corr-no-role\"}");
               case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
+              // A successful response whose body is cut off mid-flight: headers and status go out,
+              // then the socket closes before Content-Length is satisfied. This is the production
+              // shape of a backend connection dying under an in-flight request, and the only way
+              // to reach the branch it exercises — Spring wraps a body-side failure into a
+              // WebClientResponseException carrying the status that ALREADY arrived, i.e. a 200.
+              case "/api/v1/body-cut" ->
+                  new MockResponse()
+                      .setResponseCode(200)
+                      .setHeader("Content-Type", "application/json")
+                      .setBody("{\"value\":\"a reasonably long body so half of it is not empty\"}")
+                      .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY);
               default -> new MockResponse().setResponseCode(404);
             };
           }
@@ -363,6 +375,56 @@ class BackendApiClientProblemJsonTest {
     return meterRegistry.find("basetool.backend.client.errors").counters().stream()
         .mapToDouble(io.micrometer.core.instrument.Counter::count)
         .sum();
+  }
+
+  /**
+   * A connection lost while the response body is streaming must be classified as a transport
+   * failure, not as a backend refusal.
+   *
+   * <p>Spring hands such a failure to the caller as a {@code WebClientResponseException} carrying
+   * the status that had already arrived — a 200 — because the status line describes the headers and
+   * the headers were fine. Routing that through the Problem+JSON path produced {@code Backend
+   * returned 200 [UNKNOWN]} in production on 2026-09-20: an error object claiming success, a
+   * "backend client error" WARN naming a client that made no mistake, and the fault counted under
+   * {@code reason=backend_4xx} because 200 is below 500. Five inventory-page loads reported it as
+   * an ERROR with a stack trace whose top frame was {@code fromProblem}, which reads as a parsing
+   * bug rather than a lost connection.
+   *
+   * <p>The assertion that matters is the negative one: the status must NOT be 200. A 504 with
+   * {@code BACKEND_TIMEOUT} is what the sibling failure — the connection dying before any response
+   * — has always produced, and both halves of one transport fault now classify alike.
+   */
+  @Test
+  void get_ShouldClassifyABodyCutMidResponseAsTransportFailure_Not200Unknown() {
+    ch.qos.logback.classic.Logger logger =
+        (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(BackendApiClient.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      BackendServiceException ex =
+          assertThrows(
+              BackendServiceException.class,
+              () -> backendApiClient.get("/api/v1/body-cut", String.class));
+
+      assertEquals(504, ex.getStatusCode(), "a lost connection is a transport failure, not a 200");
+      assertEquals(BackendServiceException.CODE_BACKEND_TIMEOUT, ex.getProblemCode());
+      assertFalse(
+          appender.list.stream()
+              .anyMatch(event -> event.getFormattedMessage().contains("code=UNKNOWN")),
+          "the transport failure must not be logged as an UNKNOWN backend client error");
+      assertTrue(
+          appender.list.stream()
+              .anyMatch(
+                  event ->
+                      event.getLevel() == Level.WARN
+                          && event
+                              .getFormattedMessage()
+                              .contains("Backend timeout / connection failure")),
+          "it is reported once, as what it is");
+    } finally {
+      logger.detachAppender(appender);
+    }
   }
 
   @Test

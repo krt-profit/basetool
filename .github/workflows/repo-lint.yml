@@ -22,6 +22,13 @@ name: Repo Lint
 #                   pick "the next free number" from their own checkout, so two
 #                   of them land on the same one; 0154 named two accepted
 #                   decisions on main for eleven days before anyone noticed.
+#   - alloy-log-masking -> the PII masks in monitoring/alloy/config.alloy. Alloy's
+#                   stage.replace overwrites EVERY capture group and expands no
+#                   back-references, so the natural way to write a mask destroys
+#                   the field name and writes the literal "${1}***${1}***" into
+#                   Loki. Eight of the fourteen stages were written that way from
+#                   the day they were added; it took reading a production log
+#                   export by hand on 2026-09-20 to notice.
 #
 # Each linter runs from its pinned release binary (shellcheck ships
 # preinstalled on the runner), so no third-party action enters the supply
@@ -626,6 +633,46 @@ jobs:
 
       - name: Check provisioned Grafana dashboards
         run: python3 scripts/check-grafana-dashboards.py
+
+  alloy-log-masking:
+    name: alloy-log-masking
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # REQ-OBS-007. Alloy's `stage.replace` does not substitute the match and expands no
+      # back-references: it walks EVERY capture group and overwrites each one with the literal
+      # `replace` value. So the natural way to write a mask -- keep the field name in group 1 so it
+      # survives, `(username=)(\S+)` with replace = "${1}***" -- destroys the field name AND prints
+      # the template text, and the line reaches Loki as `${1}***${1}***` with nothing left to say
+      # which field was scrubbed.
+      #
+      # Eight of the fourteen stages were written that way, and had been since the day each was
+      # added. Nothing failed: the config is valid, `alloy fmt` is happy, the shipper is healthy,
+      # the stream is not silent, and the secret really is gone -- the only symptom is the
+      # REPLACEMENT text, which no alert and no dashboard reads. It was found on 2026-09-20 by
+      # exporting production logs and reading them by hand. The same patterns had a second defect
+      # that leaked rather than over-masked (`\S+` stops at the first space, and Keycloak quotes its
+      # field values, so a login attempt under a full name reached Loki with the surname intact).
+      # Both are fixed; this is what stops them coming back.
+      #
+      # The self-test runs FIRST so the gate can never pass vacuously, exactly as the
+      # grafana-dashboards job above does. It asserts BOTH failure modes are still detected
+      # independently -- a stage can destroy a field name with a purely literal replacement, and a
+      # stage can emit "${1}" with only one group -- because checking for either alone would have
+      # looked sufficient against the real patterns, which had both.
+      - name: Self-test the masking checker
+        # chmod first, like every other script-backed gate here: this repo is developed on Windows
+        # where core.filemode=false, so the executable bit is easy to lose on a re-add and the job
+        # would die with exit 126 before running a single check.
+        run: |
+          chmod +x scripts/check-alloy-log-masking.py scripts/check-alloy-log-masking.test.sh
+          scripts/check-alloy-log-masking.test.sh
+
+      - name: Check the Alloy log-masking stages
+        run: python3 scripts/check-alloy-log-masking.py
 
   keycloak-issuer:
     name: keycloak-issuer

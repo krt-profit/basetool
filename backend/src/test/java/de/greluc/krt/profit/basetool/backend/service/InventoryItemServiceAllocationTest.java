@@ -287,13 +287,45 @@ class InventoryItemServiceAllocationTest {
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     when(jobOrderItemService.requiredMaterialIds(order)).thenReturn(Set.of(materialId));
 
-    assertThrows(
-        BadRequestException.class,
-        () ->
-            service.addAllocation(
-                itemId,
-                new InventoryAllocationWriteDto(
-                    InventoryAllocationDimension.JOB_ORDER, orderId, 2.0, 1L)));
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service.addAllocation(
+                    itemId,
+                    new InventoryAllocationWriteDto(
+                        InventoryAllocationDimension.JOB_ORDER, orderId, 2.0, 1L)));
+
+    // The MESSAGE is pinned, not just the type: it is an i18n key that
+    // GlobalExceptionHandler#resolveDetail looks up, and the popover now shows the resolved
+    // `detail` to the user. A literal English string here would silently put English prose on a
+    // German screen, and a key absent from the bundle would put the key itself there.
+    assertEquals("error.inventory.allocation.duplicate.jobOrder", ex.getMessage());
+  }
+
+  @Test
+  void addAllocation_duplicateMissionTarget_throwsBadRequestWithI18nKey() {
+    InventoryItem item = entry(10.0);
+    UUID missionId = UUID.randomUUID();
+    Mission m = mission(missionId, "Op Nightfall");
+    InventoryMissionAllocation slice = new InventoryMissionAllocation();
+    slice.setInventoryItem(item);
+    slice.setMission(m);
+    slice.setAmount(3.0);
+    item.getMissionAllocations().add(slice);
+    when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(m));
+
+    BadRequestException ex =
+        assertThrows(
+            BadRequestException.class,
+            () ->
+                service.addAllocation(
+                    itemId,
+                    new InventoryAllocationWriteDto(
+                        InventoryAllocationDimension.MISSION, missionId, 2.0, 1L)));
+
+    assertEquals("error.inventory.allocation.duplicate.mission", ex.getMessage());
   }
 
   @Test

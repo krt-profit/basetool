@@ -158,8 +158,21 @@ groups:
       # through a COMPOSE SERVICE NAME that no domain change touches. If a third outbound
       # destination is ever added, it lands in this alert as a false attribution, which is loud;
       # the previous shape failed the other way.
+      #
+      # (2026-09-20) `R:backend` is necessary but NOT sufficient, because reactor-netty's own
+      # connection line is not the only place the exception NAME appears. When a backend call dies
+      # mid-response the application logs its own ERROR with the full cause chain, and that stack
+      # trace quotes `reactor.netty.http.client.PrematureCloseException` while carrying no `R:` at
+      # all — the discriminator this alert is built on is simply absent from it. Five such lines
+      # landed in this Keycloak alert on 2026-09-20 (below the >10 threshold, so nothing fired, and
+      # nothing would have said which system was actually failing if it had). The second exclusion
+      # is the same idea applied to the shape those lines DO carry: the backend's origin as it
+      # appears in a URL (`https://backend:11261/api/v1/...`), matched on `//backend:` so a port
+      # change does not reopen it. Keycloak is reached over the public edge, so its lines can never
+      # contain it. Both exclusions name the backend rather than naming Keycloak, so neither can
+      # narrow this alert into silence.
       - alert: FrontendKeycloakBackchannelFailing
-        expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" != "R:backend" [10m])) > 10'
+        expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" != "R:backend" != "//backend:" [10m])) > 10'
         for: 5m
         labels:
           severity: warning

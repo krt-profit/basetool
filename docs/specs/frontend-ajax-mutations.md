@@ -55,7 +55,10 @@ its back/forward cache.
   explicitly, e.g. the hangar home-location ship count re-rendered on modal open, the category/alias
   placeholder rebuilt on the last delete, the order-detail header re-pulled on **every** status
   change so a reactivated order's reassigned priority renders in place — not only on the terminal
-  transition).
+  transition). **A server-rendered picker whose option list encodes the pre-write state counts as
+  derived UI**: either the handler updates the list, or the pick is resolved against DOM the handler
+  *does* keep current, so a stale option cannot become a refused write (the Lager `+ Zuordnen`
+  popover reads the entry's chips and opens an already-allocated target for editing — REQ-INV-027).
 - [ ] A write that **replaces the entity identity** (delete-old + create-new — e.g. a full-amount
   inventory transfer that appends a new target item and deletes the source) re-keys the affected DOM
   row + its controls to the new id/version, so a follow-up action targets the live entity, not the
@@ -64,7 +67,12 @@ its back/forward cache.
 - [ ] The submit control is disabled for the duration of the in-flight write and re-enabled when it
   settles, so a double-click cannot fire a duplicate create or a stale-version delete. Enforced
   centrally: `krtFetch.write` auto-captures the triggering form's submit button and toggles it
-  (raw-`fetch` write paths — order/refinery create, the mission-data helper — guard it explicitly).
+  (raw-`fetch` write paths — order/refinery create, the mission-data helper, the Lager allocation
+  popover — guard it explicitly). A raw-`fetch` path that wraps its send in `krtFetch.serialize`
+  must disable **before** the wrap, synchronously: serialization defers the send but not the second
+  click, so a guard placed inside the serialized task queues a write that still carries the *first*
+  click's target and re-sends what the first one just consumed. Only the values a queued task must
+  re-read fresh (the optimistic-lock version) belong inside it.
 
 **Enforced by:** per-area Playwright e2e (no-navigation assertion) +
 `MaterialsCategoryEmptyStateInPlaceE2eTest` (empty-state restore) +

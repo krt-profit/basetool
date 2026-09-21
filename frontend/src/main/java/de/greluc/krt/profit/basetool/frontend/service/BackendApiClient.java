@@ -461,6 +461,27 @@ public class BackendApiClient {
   }
 
   private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {
+    if (!e.getStatusCode().isError()) {
+      // Not a backend refusal at all, despite the exception type. A WebClient exchange that fails
+      // while the RESPONSE BODY is still being read is wrapped by Spring's DefaultClientResponse
+      // into a WebClientResponseException carrying the status that had ALREADY arrived — so a
+      // connection torn down mid-body surfaces as "200 OK from GET /api/v1/missions/lookup, but
+      // response failed with cause: PrematureCloseException: Connection prematurely closed DURING
+      // response". The status line is the truth about the headers, not about the call.
+      //
+      // Feeding that to the Problem+JSON path produced `Backend returned 200 [UNKNOWN]`: an error
+      // object that claims success, a WARN naming a "client error" no client made, an empty
+      // correlationId the backend never got to send, and — because 200 < 500 — the transport fault
+      // counted as `reason=backend_4xx`, i.e. blamed on the caller. The page controllers then
+      // logged it at ERROR with a stack trace whose top frame pointed at `fromProblem`, which
+      // reads as a parsing bug rather than a lost connection. Observed in production 2026-09-20.
+      //
+      // The sibling failure — the connection dying BEFORE any response — never had this problem:
+      // Spring raises WebClientRequestException there, which `catch (Exception)` already routes to
+      // handleException. Send this one the same way so both halves of one transport fault are
+      // classified alike (504 / BACKEND_TIMEOUT / reason=timeout).
+      return handleException(e, method, uri);
+    }
     BackendServiceException parsed = BackendServiceException.fromProblem(e, objectMapper);
     // Log every RFC7807 backend failure exactly once, at the boundary, so individual page
     // controllers don't have to repeat the same boilerplate. Field errors and the
@@ -577,9 +598,17 @@ public class BackendApiClient {
           java.util.Collections.emptyList(),
           null);
     }
+    // java.io.IOException is the whole transport family in one predicate: ConnectException
+    // (refused / unreachable), SocketException (reset), SSLException (handshake), and the one
+    // that motivated widening this from the former bare ConnectException — reactor.netty's
+    // PrematureCloseException, which is how a connection dying mid-exchange reaches us.
+    //
+    // Codec failures cannot land here: a body that will not decode raises DecodingException, a
+    // RuntimeException. So broadening to IOException cannot swallow a parsing bug and report it
+    // as a dead backend.
     if (root instanceof TimeoutException
         || root instanceof WebClientRequestException
-        || root instanceof java.net.ConnectException) {
+        || root instanceof java.io.IOException) {
       log.warn("Backend timeout / connection failure on {} {}: {}", method, uri, root.getMessage());
       countBackendError(MetricNames.REASON_TIMEOUT, method);
       throw new BackendServiceException(
@@ -603,7 +632,7 @@ public class BackendApiClient {
           || current instanceof BulkheadFullException
           || current instanceof TimeoutException
           || current instanceof WebClientRequestException
-          || current instanceof java.net.ConnectException) {
+          || current instanceof java.io.IOException) {
         return current;
       }
       if (current.getCause() == current || current.getCause() == null) {

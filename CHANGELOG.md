@@ -2,6 +2,45 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
+  als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
+  die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge
+  und der Frontend-Formatierer Prettier. Betrifft nur den Betrieb, nicht die Nutzung.
+
+### Fixed
+
+- **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
+  die Verbindung mitten in einer Antwort ab, meldete das Frontend intern einen Erfolg mit
+  unbekanntem Fehler und behandelte den Ausfall als Fehler des Aufrufers. Er wird jetzt als das
+  einsortiert, was er ist — eine Transportstörung — und landet in derselben Fehlerklasse und
+  Überwachung wie ein Verbindungsabbruch vor der Antwort (REQ-OBS-011).
+
+- **Das Frontend gibt Verbindungen zum Backend jetzt frei, bevor das Backend sie schließt.** Beide
+  Seiten warteten exakt 20 Sekunden, wodurch das Frontend gelegentlich eine bereits geschlossene
+  Verbindung weiterverwendete — unter HTTP/2 reißen dabei alle gleichzeitig darauf laufenden
+  Anfragen ab, nicht nur eine. Die Frontend-Seite wartet jetzt 10 Sekunden.
+
+- **Betrieb: die Maskierung im Log-Shipper schwärzt wieder genau das Richtige.** Sie überschrieb
+  auch den Feldnamen und schrieb `${1}***${1}***` statt `username=***`; zugleich endete sie beim
+  ersten Leerzeichen, sodass bei einem Anmeldeversuch mit Leerzeichen im Namen der Rest der Eingabe
+  unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
+  (REQ-OBS-007).
+
+- **Ein Auftrag, den du gerade zugeordnet hast, stand weiter in der „+ Zuordnen“-Liste des Lagereintrags.** Wähltest du ihn dort erneut aus, brach das Speichern mit „Fehler beim Aktualisieren des Lagers.“ ab. Die Auswahl öffnet jetzt die vorhandene Zuordnung zum Bearbeiten, der Speichern-Knopf lässt sich während des Schreibens nicht mehr doppelt auslösen, und lehnt der Server eine Zuordnung doch ab — etwa weil ein anderes Mitglied denselben Auftrag Sekunden vorher zugeordnet hat — steht jetzt der tatsächliche Grund im Hinweis statt einer allgemeinen Fehlermeldung (REQ-INV-027, REQ-FE-001).
+
+- **Betrieb: die Maskierung im Log-Shipper kann nicht mehr unbemerkt kaputtgehen.** Die acht fehlerhaften Regeln waren gültige Konfiguration — nichts schlug fehl, nur der Ersatztext war falsch, und aufgefallen ist es erst beim Lesen eines Log-Exports. Ein neuer CI-Check (`alloy-log-masking`) prüft jetzt beide Regeln; zusätzlich maskiert `uname=` bei Grafana-Anmeldungen auch Werte mit Leerzeichen (REQ-OBS-007).
+
+- **Entwicklung: auf Windows-Arbeitsplätzen wurden mehrere Konfigurationsdateien mit CRLF
+  ausgecheckt.** Für `*.alloy` fehlte die Zeilenenden-Regel in `.gitattributes`, sodass der in
+  `monitoring/README.md` dokumentierte Befehl `alloy fmt --test` dort mit „is not formatted
+  correctly" scheiterte, obwohl die Datei fehlerfrei formatiert ist. Dieselbe Lücke ist jetzt auch
+  für `*.tmpl`, `*.toml`, `*.mjs`, `*.py`, `*.service`, `*.timer`, `*.logrotate` und
+  `docker/maintenance/**` geschlossen; die Dateiinhalte bleiben unverändert.
+
+## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
+
 ### Added
 
 - **Du kannst deine Daten jetzt selbst exportieren.** Im Profil, unter „Meine Daten exportieren“: ein PDF als lesbare Zusammenfassung mit einem Verzeichnis aller Abschnitte, eine JSON-Datei als vollständige Auskunft. Namen anderer Mitglieder sind in beiden durch einen Platzhalter ersetzt – in jeder Schreibweise, unter der sie im Tool stehen (REQ-SEC-058).
@@ -184,12 +223,12 @@
   Rest zurück — und jede weitere Seite antwortete für diesen Browser wochenlang mit einem Fehler,
   bis das Cookie von Hand gelöscht wurde. Jetzt wird man in diesem Fall einfach abgemeldet und kann
   sich neu anmelden (REQ-SEC-063).
-  
+
 - **Betrieb: ein absichtlicher 404 schrieb trotzdem eine Warnung ins Log.** Der Aufruf von
   `/favicon.ico` wird bewusst mit der 404-Seite beantwortet — Spring meldete ihn davor trotzdem als
   Warnung, noch bevor die App überhaupt antworten konnte. Diese eine Logzeile ist jetzt
   stummgeschaltet; an der Antwort selbst ändert sich nichts (REQ-OBS-001).
-  
+
 - **Wer mehreren Org-Einheiten angehört, bekam beim Anlegen eine englische Fehlermeldung.** Ohne
   Auswahl im Feld „Zuordnen zu“ und ohne gesetzte aktive Staffel wies der Server den Eintrag ab —
   und die Meldung dazu kam als technischer englischer Text an. Sie ist jetzt deutsch und sagt, was
