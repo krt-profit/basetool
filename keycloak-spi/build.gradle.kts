@@ -81,9 +81,11 @@ dependencies {
   testImplementation(platform(libs.junit.bom))
   testImplementation(libs.junit.jupiter)
   // Mockito to unit-test the authenticator orchestration against a mocked Keycloak flow context.
-  // Pinned directly — this module has no Spring Boot dependency-management to supply a version.
-  testImplementation("org.mockito:mockito-core:5.23.0")
-  testImplementation("org.mockito:mockito-junit-jupiter:5.23.0")
+  // The version comes from the catalog rather than a BOM because this module deliberately has no
+  // Spring Boot dependency management, exactly as with `junit` and `lombok` above; a hardcoded
+  // version here was invisible to `./gradlew refreshVersions`.
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.junit.jupiter)
   testImplementation(libs.keycloak.server.spi)
   testImplementation(libs.keycloak.server.spi.private)
   testImplementation(libs.keycloak.services)
