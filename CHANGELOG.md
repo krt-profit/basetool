@@ -98,6 +98,11 @@
   ist das ein zweiter Verwaltungszugang, den niemand nutzt und den trotzdem jemand aktuell halten
   müsste. Die Provisionierung entfernt ihn und prüft, dass der Port wirklich frei ist.
 
+- **Betrieb: die Konformitätsprüfung konnte die Überwachung des neuen Hosts nicht abfragen.** Sie
+  sprach den Metrik-Dienst über eine Adresse an, die es auf dem neuen Container-Unterbau vom Host
+  aus nicht gibt, und meldete daraufhin „kein Überwachungssystem vorhanden" — über eines, das lief.
+  Drei Prüfungen hängen daran, alle drei sind beim Umzug vorgesehen.
+
 - **Betrieb: die Konformitätsprüfung sah auf dem neuen Host keine Container.** Sie meldete neun
   laufende Dienste als abwesend — aus dem Verzeichnis, in dem eine Root-Anmeldung startet, kann der
   Dienstnutzer nicht lesen, und der Fehler wurde verschluckt. Genau diese Prüfung soll den Umzug

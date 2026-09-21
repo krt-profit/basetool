@@ -460,6 +460,22 @@ python scripts/check-conformance.py --ssh root@<new-host-ip> \
 > that is ever removed. Nothing to do here — it is noted so a future nine-failure run is not
 > misdiagnosed as a privilege problem a third time.
 
+> [!warning] A unit the bundle has just created is ENABLED and not RUNNING
+> `WantedBy=default.target` pulls a unit in when the target is ACTIVATED — at boot, or at the
+> service user's first login. A unit that appears afterwards is enabled, wired into
+> `default.target.wants`, and simply never started; `deploy.sh` restarts the services it is applying
+> rather than starting every generated unit. Measured on the testing host 2026-09-21: `acme` had
+> been installed for days, was `enabled`, and had **no journal entries at all** — it had never
+> attempted to start. Started by hand it came up in twelve seconds and logged
+> `ACME_HOSTS is empty — no certificates are managed on this host`, which is also why nobody
+> noticed: on that host it has nothing to do.
+>
+> **On production it does.** `acme` is what renews the public certificate (ADR-0162), and
+> `AcmeRenewalFailing` reads log lines a container that never runs never writes. `containers-running`
+> above is what catches it — it did — so read that check's output rather than the container list:
+> if it names a service as absent, start it (`systemctl --user start <svc>.service` as the service
+> user) and re-run, rather than assuming the deploy did.
+
 > [!note] `env-reaches-the-units` can only run HERE, and it is the reason this step exists
 > Seven variables are baked into the units at generation time
 > (`check-conformance.py`'s `BAKED_INTO_UNITS`), and setting one of them in the host `.env` does

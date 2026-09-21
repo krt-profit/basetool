@@ -63,6 +63,7 @@ import ipaddress
 import json
 import os
 import shlex
+import urllib.parse
 import shutil
 import socket
 import ssl
@@ -114,13 +115,25 @@ EXPECTED_APP_CONTAINERS = (
 #: is the reason PODMAN_MIGRATION_PLAN.md §3.6 is a rebuild rather than a rename: a runtime swap
 #: has to reproduce these, or the alerts that read them stop having data and stop firing - which
 #: looks exactly like a healthy system.
+#:
+#: Each entry is the cAdvisor name and the name the cgroup collector publishes under, because the
+#: SIGNAL is what has to survive a runtime swap, not the spelling. cAdvisor is deleted on rootless
+#: Podman (its upstream issue is closed as not planned), and `scripts/cgroup-container-metrics.py`
+#: reads the same numbers straight out of the kernel's cgroup files and publishes them as
+#: `basetool_container_*` through node_exporter's textfile collector.
+#:
+#: Asked for the cAdvisor name alone, this check reported all six series missing on a host where
+#: every one of them was being collected under the other name -- "every alert reading them is
+#: silently disarmed" about alerts that were armed. The alert rules themselves were taught the same
+#: `or` normalisation earlier (`basetool:container:present` in containers-runtime.yml); this check
+#: was the half that was left behind.
 REQUIRED_CONTAINER_SERIES = (
-    "container_memory_working_set_bytes",
-    "container_spec_memory_limit_bytes",
-    "container_threads",
-    "container_threads_max",
-    "container_oom_events_total",
-    "container_cpu_usage_seconds_total",
+    ("container_memory_working_set_bytes", "basetool_container_memory_working_set_bytes"),
+    ("container_spec_memory_limit_bytes", "basetool_container_memory_limit_bytes"),
+    ("container_threads", "basetool_container_pids"),
+    ("container_threads_max", "basetool_container_pids_max"),
+    ("container_oom_events_total", "basetool_container_oom_kills_total"),
+    ("container_cpu_usage_seconds_total", "basetool_container_cpu_usage_seconds_total"),
 )
 
 #: Ranges an edge must never report as a client address. If our own probe comes back wearing one,
@@ -1069,11 +1082,33 @@ def _promql(ctx: Context, query: str) -> dict:
     """Run one instant PromQL query on the host and return the parsed response.
 
     Prometheus is not published on the host: it lives on ``net-monitoring-core`` and its web
-    server is basic-auth protected over **plain http** - ``https://`` fails with curl exit 35 and
-    prints nothing under ``-s``, which reads exactly like a quoting failure and is not one.
+    server is basic-auth protected over **plain http** - ``https://`` fails with exit 35 and
+    prints nothing, which reads exactly like a quoting failure and is not one.
 
-    The password is fed to curl through a config on **stdin**, so it never appears on a command
-    line where ``ps`` could read it and never reaches this process.
+    **The query is asked from INSIDE the container, and that is a fix rather than a style.** This
+    used to read the container's IP out of ``inspect`` and curl it FROM THE HOST, which works on
+    Docker because its bridge is host-visible. Under rootless Podman the container network lives in
+    a user namespace and the host has no route into it at all: measured on the testing host
+    2026-09-21, ``inspect`` returned ``10.89.0.22`` and a curl to it timed out after six seconds.
+    Three checks read Prometheus - ``scrape-targets-up``, ``container-metrics``, ``log-streams`` -
+    and all three failed that way, at the two cutover steps that exist to catch exactly this.
+
+    ``wget`` rather than curl because the Prometheus image carries no curl, and the query is
+    percent-encoded HERE rather than handed to ``--data-urlencode``: doing it in Python keeps the
+    shell fragment free of spaces and quotes, which is what makes it safe to pass through
+    ``sh -c``. The password is read inside the container from its own mounted secret, so it never
+    crosses the SSH boundary and never reaches this process.
+
+    Args:
+        ctx: the run context.
+        query: the PromQL expression.
+
+    Returns:
+        The decoded ``/api/v1/query`` response.
+
+    Raises:
+        Skip: when no host access is configured.
+        CheckFailed: when Prometheus cannot be reached or does not answer ``status: success``.
 
     Args:
         ctx: the run context.
@@ -1086,20 +1121,27 @@ def _promql(ctx: Context, query: str) -> dict:
         Skip: when no host access is configured.
         CheckFailed: when Prometheus cannot be reached or does not answer ``status: success``.
     """
-    secret = "/var/iri/monitoring/secrets/prometheus_web_password"
-    cmd = (
-        f'addr=$({ctx.runner.container_cli} inspect prometheus '
-        '--format "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}" '
-        '| cut -d" " -f1); '
-        '[ -n "$addr" ] || { echo NO_PROMETHEUS_ADDRESS >&2; exit 1; }; '
-        f'printf "user = \\"grafana:%s\\"\\n" "$(cat {secret})" | '
-        'curl -sS -K - -G "http://$addr:9090/api/v1/query" '
-        f'--data-urlencode "query={query}"'
+    # The secret as the CONTAINER sees it, not as the host does. The host copy lives at
+    # /var/iri/monitoring/secrets/prometheus_web_password and is mounted here.
+    secret = "/etc/prometheus/secrets/web_password"
+    encoded = urllib.parse.quote(query, safe="")
+    inner = (
+        f"p=$(cat {secret}); "
+        "a=$(printf grafana:%s \"$p\" | base64 -w0); "
+        "wget -q -O- --header=\"Authorization: Basic $a\" "
+        f"\"http://127.0.0.1:9090/api/v1/query?query={encoded}\""
     )
+    cmd = f"{ctx.runner.container_cli} exec prometheus sh -c '{inner}'"
     try:
         raw = ctx.runner.run(cmd)
     except CheckFailed as exc:
-        if "NO_PROMETHEUS_ADDRESS" in str(exc):
+        # Match on what the RUNTIME says, not on a sentinel of our own. The previous version
+        # tested `"NO_PROMETHEUS_ADDRESS" in str(exc)` -- and CheckFailed's message quotes the
+        # command, which itself contained `echo NO_PROMETHEUS_ADDRESS`. Every failure of this
+        # helper, including a plain timeout, therefore reported "no running prometheus container".
+        # That is what sent two separate investigations after a container that was running fine.
+        text = str(exc).lower()
+        if "no such object" in text or "no such container" in text:
             raise CheckFailed(
                 "no running prometheus container on this host - there is no monitoring plane "
                 "here to read, which is a finding about the host rather than about the query"
@@ -1280,11 +1322,16 @@ def check_container_metrics(ctx: Context) -> str:
         CheckFailed: when a required series is absent or empty.
     """
     missing = []
-    for series in REQUIRED_CONTAINER_SERIES:
-        payload = _promql(ctx, f"count({series})")
+    for names in REQUIRED_CONTAINER_SERIES:
+        # `count(a) or count(b)`: the first family that has samples answers, and a host is healthy
+        # if EITHER does. `or` and not a sum, because the two never coexist -- one runtime emits
+        # one of them -- and a sum would hide a half-populated family behind the other.
+        query = " or ".join(f"count({name})" for name in names)
+        series = names[0]
+        payload = _promql(ctx, query)
         results = payload.get("data", {}).get("result", [])
         if not results:
-            missing.append(series)
+            missing.append("/".join(names))
             continue
         try:
             value = float(results[0]["value"][1])

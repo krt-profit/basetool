@@ -2636,6 +2636,20 @@ written, and the four application containers — which *push* spans to `alloy:43
 one. That is why the trace pipeline had never carried a span. Production runs with
 `MONITORING_TRACING_ENABLED=true`, so the omission would have taken effect at cutover, in silence.
 
+**The conformance suite reads Prometheus from INSIDE the container, for the same reason.** It used
+to take the container's IP out of `inspect` and query it from the host, which works on Docker
+because its bridge is host-visible. Under rootless Podman the container network is in a user
+namespace and the host has no route into it: measured 2026-09-21, `inspect` returned `10.89.0.22`
+and a query to it timed out. Three checks read Prometheus — `scrape-targets-up`, `container-metrics`,
+`log-streams` — so all three failed at the two cutover steps that exist to catch exactly this class
+of problem. The same boundary, in the same direction, as Alloy's push to Loki.
+
+**`container-metrics` accepts either container family.** It asked for the cAdvisor names alone and
+reported all six series missing on a host collecting every one of them as `basetool_container_*` —
+"every alert reading them is silently disarmed", about alerts that were armed. The alert rules had
+already been taught that normalisation (`basetool:container:present`); this check was the half left
+behind, which is the shape a runtime migration leaves when a signal is renamed in one place.
+
 **Preconditions the host must satisfy, asserted rather than assumed.** `adm` membership is necessary
 and not sufficient: RHEL writes `/var/log/secure` and `/var/log/audit/audit.log` as `root:root`, so
 the group buys nothing until rsyslog is given `$FileGroup adm` and auditd `log_group = adm`. The role

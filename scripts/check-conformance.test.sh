@@ -367,10 +367,14 @@ case "$cmd" in
       *)            printf '[Container]\nImage=ghcr.io/example/basetool-backend:stable\nVolume=/var/iri/secrets/keystore.p12:/run/secrets/truststore.p12:ro\n' ;;
     esac
     ;;
-  *"docker inspect prometheus"*|*"query="*)
+  # A host with no monitoring plane now looks like what the RUNTIME says, because that is what the
+  # classification reads. It used to echo a sentinel of our own -- and the check matched that
+  # sentinel against an error message that quotes the command, which itself contained the sentinel,
+  # so every failure of the helper (a timeout included) reported "no running prometheus container".
+  *"exec prometheus"*|*"query="*)
     if [ "$scenario" = "no-monitoring" ]; then
-      echo "NO_PROMETHEUS_ADDRESS" >&2
-      exit 1
+      echo 'Error: no such object: "prometheus"' >&2
+      exit 125
     fi
     ;;&
   *"ReadonlyRootfs"*)
@@ -432,14 +436,18 @@ case "$cmd" in
         emit_prom "$(sample '"job":"basetool-backend"' 1),$(sample '"job":"basetool-frontend"' 1),$(sample '"job":"basetool-ingest"' 1),$(sample '"job":"keycloak"' 1)" ;;
     esac
     ;;
-  *"query=count(container_threads)"*)
+  # PERCENT-ENCODED, because the query is now built with urllib.parse.quote and handed to wget
+  # inside the container rather than to curl's --data-urlencode on the host. `count(x)` arrives as
+  # `count%28x%29`, and the ` or ` between the two container families as `%20or%20`. Matching the
+  # readable spelling silently stopped matching anything, which showed up as "unhandled command".
+  *"query=count%28container_threads%29"*)
     case "$scenario" in
       series-missing) emit_prom "" ;;
       series-empty)   emit_prom "$(sample '' 0)" ;;
       *)              emit_prom "$(sample '' 22)" ;;
     esac
     ;;
-  *"query=count(container_"*)
+  *"query=count%28container_"*)
     emit_prom "$(sample '' 22)"
     ;;
   *"loki_distributor_lines_received_total"*)
