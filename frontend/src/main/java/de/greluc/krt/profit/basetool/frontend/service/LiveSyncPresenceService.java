@@ -33,6 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.stereotype.Service;
 
 /**
@@ -225,6 +227,7 @@ public class LiveSyncPresenceService {
    * @param userId user id
    * @return list of section keys from which the user was actually removed
    */
+  @NotNull
   public List<String> clearAll(@NotNull String topic, @NotNull String userId) {
     Map<String, Map<String, Entry>> sections = byTopic.get(topic);
     if (sections == null) {
@@ -252,6 +255,7 @@ public class LiveSyncPresenceService {
    *     value
    * @return list of affected topic/section pairs (empty if nothing expired)
    */
+  @NotNull
   public List<TopicSectionRef> reapExpired(@NotNull Instant now) {
     Instant cutoff = now.minus(ENTRY_TTL);
     List<TopicSectionRef> affected = new ArrayList<>();
@@ -291,6 +295,8 @@ public class LiveSyncPresenceService {
    * @param now reference instant for filtering out entries that would expire on the next reap
    * @return map from section key to the list of editors currently active on that section
    */
+  @NotNull
+  @UnmodifiableView
   public Map<String, List<Entry>> snapshot(@NotNull String topic, @NotNull Instant now) {
     Map<String, List<Entry>> result = liveLocalEntries(topic, now);
     mergeRemoteEntries(topic, now, result);
@@ -521,6 +527,8 @@ public class LiveSyncPresenceService {
    *
    * @return immutable snapshot of topics with at least one tracked editor
    */
+  @NotNull
+  @Unmodifiable
   public List<String> trackedTopics() {
     return List.copyOf(byTopic.keySet());
   }

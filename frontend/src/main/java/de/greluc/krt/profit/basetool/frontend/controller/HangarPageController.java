@@ -48,7 +48,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -110,7 +112,7 @@ public class HangarPageController {
    * @return the decoded backend response
    */
   private <T> T backendSearch(
-      org.springframework.web.util.UriComponentsBuilder uri,
+      @NotNull org.springframework.web.util.UriComponentsBuilder uri,
       String search,
       ParameterizedTypeReference<T> responseType) {
     String base = uri.toUriString();
@@ -143,6 +145,7 @@ public class HangarPageController {
    *     count)
    * @return the {@code hangar} view name, or its {@code hangarResults} fragment selector
    */
+  @NotNull
   @GetMapping
   public String viewHangar(
       @RequestParam(required = false) Integer page,
@@ -377,6 +380,7 @@ public class HangarPageController {
    *     pagination base URL (search-preserving)
    * @return the {@code hangar-squadron} view name, or its {@code squadronResults} fragment selector
    */
+  @NotNull
   @GetMapping("/squadron")
   public String viewSquadron(
       @RequestParam(required = false) Integer page,
@@ -442,6 +446,7 @@ public class HangarPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline {@code hangar} view on validation failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/add")
   public String addShip(
       @Valid @ModelAttribute("shipForm") ShipForm form,
@@ -491,6 +496,7 @@ public class HangarPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline {@code hangar} view on validation failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/{id}/update")
   public String updateShip(
       @PathVariable @NotNull UUID id,
@@ -536,6 +542,7 @@ public class HangarPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /hangar}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String deleteShip(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -561,6 +568,7 @@ public class HangarPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /hangar}
    */
+  @NotNull
   @PostMapping("/home-location")
   public String setHomeLocation(
       @RequestParam("locationId") @NotNull UUID locationId, RedirectAttributes redirectAttributes) {
@@ -741,6 +749,8 @@ public class HangarPageController {
     return ResponseEntity.status(422).contentType(MediaType.APPLICATION_PROBLEM_JSON).body(body);
   }
 
+  @Contract("null -> null")
+  @Nullable
   private Long parseLong(Object o) {
     if (o == null) {
       return null;

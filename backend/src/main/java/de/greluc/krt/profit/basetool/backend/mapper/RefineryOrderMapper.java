@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.RefineryOrderListDto;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -160,6 +161,7 @@ public interface RefineryOrderMapper {
    * MapStruct default that resolves an incoming {@link MissionDto} to a JPA stub Mission carrying
    * only the id - the persistence provider then materialises the managed instance on persist.
    */
+  @Nullable
   default Mission missionDtoToMission(MissionDto dto) {
     if (dto == null) {
       return null;

@@ -32,6 +32,7 @@ import java.util.StringJoiner;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -283,6 +284,8 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
    * @return an immutable list of matchers; empty when nothing valid is configured, which disables
    *     {@code X-Forwarded-For} entirely rather than trusting it.
    */
+  @NotNull
+  @UnmodifiableView
   private static List<IpAddressMatcher> compileTrustedProxies(@Nullable List<String> entries) {
     if (entries == null || entries.isEmpty()) {
       return List.of();

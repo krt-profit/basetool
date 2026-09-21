@@ -207,7 +207,8 @@ public class BankAccountController {
   @PreAuthorize("@bankSecurityService.canSee(#id, authentication)")
   @Transactional
   public BankAccountDto setBalanceTarget(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankBalanceTargetRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SetBankBalanceTargetRequest request) {
     return bankAccountService.setBalanceTarget(id, request.target(), request.version());
   }
 
@@ -227,7 +228,8 @@ public class BankAccountController {
   @PreAuthorize(Roles.HAS_ROLE_BANK_MANAGEMENT)
   @Transactional
   public BankAccountDto setCartelApprovalTiers(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid SetCartelApprovalTiersRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SetCartelApprovalTiersRequest request) {
     return bankAccountService.setCartelApprovalTiers(
         id, request.employeeCeiling(), request.areaLeadCeiling(), request.version());
   }

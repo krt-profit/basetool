@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.model.dto.RegistrationStatusDto;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -51,6 +52,7 @@ public class MyRegistrationStatusController {
    * @param jwt the caller's validated token
    * @return the caller's approval status
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public RegistrationStatusDto myStatus(@AuthenticationPrincipal Jwt jwt) {

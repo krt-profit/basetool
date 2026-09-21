@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -53,6 +54,7 @@ public class DatabaseMigrationConfig {
    * @param env environment used to short-circuit when {@code spring.flyway.enabled=false}
    * @return the registered post-processor
    */
+  @NotNull
   @Bean
   public static BeanPostProcessor flywayMigrationBeanPostProcessor(
       ObjectProvider<DataSource> dataSourceProvider, Environment env) {

@@ -51,6 +51,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -281,6 +282,7 @@ public class JobOrderItemHandoverService {
    * @param handedByGameItem the whole units handed over per game item in this handover
    * @return one snapshot per consumed row, for the post-write audit trail; never {@code null}
    */
+  @NotNull
   private List<ConsumedItem> consumeEarmarkedItemStock(
       UUID jobOrderId, Map<UUID, Integer> handedByGameItem) {
     final List<ConsumedItem> consumed = new ArrayList<>();
@@ -342,7 +344,7 @@ public class JobOrderItemHandoverService {
    *
    * @param handover the handover being created
    */
-  private void stampAuditTrail(JobOrderItemHandover handover) {
+  private void stampAuditTrail(@NotNull JobOrderItemHandover handover) {
     UUID responsibleOrgUnitId =
         handover.getJobOrder() != null && handover.getJobOrder().getResponsibleOrgUnit() != null
             ? handover.getJobOrder().getResponsibleOrgUnit().getId()

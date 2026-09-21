@@ -40,6 +40,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
@@ -220,6 +221,7 @@ public class WebClientConfig {
    * @param pinnedAnchors the operator-pinned anchors
    * @return a trust manager accepting either
    */
+  @NotNull
   static X509TrustManager additiveTrustManager(
       X509TrustManager defaults, X509TrustManager pinnedAnchors) {
     return new X509TrustManager() {
@@ -246,6 +248,7 @@ public class WebClientConfig {
         }
       }
 
+      @NotNull
       @Override
       public X509Certificate[] getAcceptedIssuers() {
         X509Certificate[] a = defaults.getAcceptedIssuers();

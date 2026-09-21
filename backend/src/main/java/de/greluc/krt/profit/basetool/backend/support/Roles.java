@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * Central constant holder for role codes, replacing the raw string literals (S3, part of #905) that
  * used to be copy-pasted across {@code SecurityConfig}, {@code DataInitializer} and every
@@ -90,6 +92,7 @@ public final class Roles {
    * @param code a bare role code, e.g. {@link #ADMIN}
    * @return the prefixed authority, e.g. {@code "ROLE_ADMIN"}
    */
+  @NotNull
   public static String authority(String code) {
     return ROLE_PREFIX + code;
   }

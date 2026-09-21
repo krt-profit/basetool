@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.validation;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Marker contract implemented by write-DTOs that carry a material reference and an amount and
@@ -58,6 +59,7 @@ public interface QuantityAware {
    *
    * @return the referenced game-item id, or {@code null} when the payload targets a material
    */
+  @Nullable
   default UUID gameItemId() {
     return null;
   }

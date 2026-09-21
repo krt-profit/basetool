@@ -1101,7 +1101,7 @@ public class MissionController {
       deprecated = true)
   public MissionDto addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid
+      @NotNull @RequestBody @jakarta.validation.Valid
           de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest request) {
     return redactForPeer(
         missionMapper.toDto(
@@ -1450,7 +1450,7 @@ public class MissionController {
    * @return the matching unit
    */
   private de.greluc.krt.profit.basetool.backend.model.MissionUnit findUnit(
-      de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID unitId) {
+      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID unitId) {
     return mission.getAssignedUnits().stream()
         .filter(u -> unitId.equals(u.getId()))
         .findFirst()
@@ -1465,7 +1465,7 @@ public class MissionController {
    * @return the matching participant
    */
   private de.greluc.krt.profit.basetool.backend.model.MissionParticipant findParticipant(
-      de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID participantId) {
+      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID participantId) {
     return mission.getParticipants().stream()
         .filter(p -> participantId.equals(p.getId()))
         .findFirst()
@@ -1480,7 +1480,7 @@ public class MissionController {
    * @return the matching crew entry
    */
   private de.greluc.krt.profit.basetool.backend.model.MissionCrew findCrew(
-      de.greluc.krt.profit.basetool.backend.model.MissionUnit unit, UUID crewId) {
+      @NotNull de.greluc.krt.profit.basetool.backend.model.MissionUnit unit, UUID crewId) {
     return unit.getCrew().stream()
         .filter(c -> crewId.equals(c.getId()))
         .findFirst()
@@ -1692,7 +1692,8 @@ public class MissionController {
   /**
    * Projects a mission's Ablauf steps into an ordered list of slim DTOs (by {@code orderIndex}).
    */
-  private List<MissionStepDto> toStepDtos(de.greluc.krt.profit.basetool.backend.model.Mission m) {
+  private List<MissionStepDto> toStepDtos(
+      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission m) {
     return m.getSteps().stream()
         .sorted(
             java.util.Comparator.comparingInt(
@@ -1799,7 +1800,7 @@ public class MissionController {
 
   /** Projects a mission's goals into an ordered list of slim DTOs (by {@code orderIndex}). */
   private List<MissionObjectiveDto> toObjectiveDtos(
-      de.greluc.krt.profit.basetool.backend.model.Mission m) {
+      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission m) {
     return m.getObjectives().stream()
         .sorted(
             java.util.Comparator.comparingInt(
@@ -2188,7 +2189,7 @@ public class MissionController {
           "Adds or updates a frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addOrUpdateFrequencySlim(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid
+      @NotNull @RequestBody @jakarta.validation.Valid
           de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest request) {
     var mission =
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value());
@@ -2230,7 +2231,7 @@ public class MissionController {
           "Adds a free-text mission frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addCustomFrequencySlim(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid
+      @NotNull @RequestBody @jakarta.validation.Valid
           de.greluc.krt.profit.basetool.backend.model.dto.request.AddCustomFrequencyRequest
               request) {
     var mission = missionService.addCustomMissionFrequency(id, request.name(), request.value());
@@ -2257,7 +2258,7 @@ public class MissionController {
   public List<MissionFrequencyDto> updateCustomFrequencySlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
-      @RequestBody @jakarta.validation.Valid
+      @NotNull @RequestBody @jakarta.validation.Valid
           de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateCustomFrequencyRequest
               request) {
     var mission =

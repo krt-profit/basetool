@@ -33,6 +33,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A member's <em>fulfilment signal</em> on a {@link MaterialExchangeRequest} — "Ich kann liefern"
@@ -88,6 +89,7 @@ public class MaterialExchangeRequestInterest extends AbstractEntity<UUID> {
    *
    * @return a stable, PII-free single-line representation of this fulfilment signal.
    */
+  @NotNull
   @Override
   public String toString() {
     return "MaterialExchangeRequestInterest{id="

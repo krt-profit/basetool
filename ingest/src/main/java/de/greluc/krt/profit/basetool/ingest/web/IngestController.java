@@ -171,7 +171,7 @@ public class IngestController {
         content = @Content(mediaType = PROBLEM_JSON))
   })
   public @NotNull IngestResponseDto ingestRefineryExtract(
-      @AuthenticationPrincipal Jwt jwt,
+      @NotNull @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "Caller locale, relayed so backend problems come back localized.")
           @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false)
           String acceptLanguage,

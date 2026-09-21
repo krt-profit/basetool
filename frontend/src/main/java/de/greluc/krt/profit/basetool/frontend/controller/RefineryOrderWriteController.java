@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -133,6 +134,7 @@ public class RefineryOrderWriteController {
    * @return redirect to {@code /refinery-orders/create} on failure (preserves input), otherwise to
    *     the source page or the list
    */
+  @NotNull
   @PostMapping("/create")
   @PreAuthorize("isAuthenticated()")
   public String createOrder(
@@ -188,6 +190,7 @@ public class RefineryOrderWriteController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /refinery-orders/{id}} on failure, otherwise to the list
    */
+  @NotNull
   @PostMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String updateOrder(
@@ -232,6 +235,7 @@ public class RefineryOrderWriteController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /refinery-orders}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   @PreAuthorize("isAuthenticated()")
   public String deleteOrder(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
@@ -264,6 +268,7 @@ public class RefineryOrderWriteController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the order detail on failure, otherwise to the list
    */
+  @NotNull
   @PostMapping("/{id}/store")
   @PreAuthorize("isAuthenticated()")
   public String storeOrder(
@@ -319,6 +324,7 @@ public class RefineryOrderWriteController {
    * @param owningOrgUnitId the owning org-unit stamp ({@code null} on the edit path)
    * @return the order DTO ready to POST/PUT
    */
+  @NotNull
   private RefineryOrderDto buildRefineryOrderDto(
       UUID id, RefineryOrderForm form, UUID owningOrgUnitId) {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.RefineryGoodDto> goodsDto =
@@ -415,6 +421,7 @@ public class RefineryOrderWriteController {
    * @param form the bound store form
    * @return the store DTO ready to POST
    */
+  @NotNull
   private static RefineryOrderStoreDto buildStoreDto(RefineryOrderStoreForm form) {
     List<RefineryOrderStoreItemDto> dtoList = new ArrayList<>();
     for (RefineryOrderStoreItemForm f : form.getItems()) {

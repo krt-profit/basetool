@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -135,6 +136,7 @@ public final class AuthenticatedSubject {
    * @param authentication the current authentication, may be {@code null}
    * @return the token, or empty for a token-less or absent authentication
    */
+  @NotNull
   private static Optional<Jwt> token(@Nullable Authentication authentication) {
     if (authentication == null) {
       return Optional.empty();

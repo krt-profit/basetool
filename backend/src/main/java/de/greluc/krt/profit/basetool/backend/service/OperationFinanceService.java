@@ -95,6 +95,7 @@ public class OperationFinanceService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no operation
    *     matches the id
    */
+  @NotNull
   public OperationFinanceDto getOperationFinances(UUID operationId) {
     Operation operation =
         operationRepository
@@ -181,6 +182,7 @@ public class OperationFinanceService {
    * @return the operation-wide total plus the (capped) per-mission roll-up lines
    * @throws NotFoundException when no operation matches the id
    */
+  @NotNull
   public OperationFinanceSummaryDto getOperationFinanceSummary(UUID operationId) {
     Operation operation =
         operationRepository
@@ -243,6 +245,7 @@ public class OperationFinanceService {
    * @throws NotFoundException when the operation does not exist or the mission is not one of its
    *     child missions
    */
+  @NotNull
   public MissionFinanceSummaryDto getMissionFinanceDetail(UUID operationId, UUID missionId) {
     Operation operation =
         operationRepository

@@ -101,6 +101,7 @@ public class PromotionEligibilityService {
    * @param toRank the rank the member would be promoted to
    * @return the per-rule outcome plus an aggregate {@code eligible} flag
    */
+  @NotNull
   public PromotionEligibilityResponse evaluateForRanks(
       @NotNull UUID userId, int fromRank, int toRank) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
@@ -125,6 +126,7 @@ public class PromotionEligibilityService {
    * @param index the member's pre-loaded assigned-level and category→topic maps.
    * @return the per-rule outcome plus the aggregate {@code eligible} flag.
    */
+  @NotNull
   private PromotionEligibilityResponse evaluateForRanks(
       @NotNull UUID userId,
       int fromRank,
@@ -167,6 +169,7 @@ public class PromotionEligibilityService {
    * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
+  @NotNull
   public List<PromotionEligibilityResponse> evaluateAllForUser(@NotNull UUID userId) {
     if (!ownerScopeService.isPromotionFeatureEnabledForCurrentScope()
         || !ownerScopeService.hasPromotionReadAccess()) {
@@ -194,6 +197,7 @@ public class PromotionEligibilityService {
    * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
    */
+  @NotNull
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public List<PromotionEligibilityResponse> evaluateAllForUserAsAdmin(@NotNull UUID userId) {
     return evaluateAllForUser(userId);
@@ -221,6 +225,7 @@ public class PromotionEligibilityService {
    * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}.
    * @return the assigned-level and category→topic maps for the member.
    */
+  @NotNull
   private EvaluationIndex loadEvaluationIndex(@NotNull UUID userId, @Nullable UUID scope) {
     Map<UUID, PromotionLevel> levels = new HashMap<>();
     Map<UUID, UUID> topics = new HashMap<>();
@@ -254,6 +259,7 @@ public class PromotionEligibilityService {
    * @throws IllegalStateException if {@code req} is topic-scoped (must go through {@link
    *     #evaluateTopicScopedDisjoint})
    */
+  @NotNull
   private PromotionRequirementCheckResponse evaluateRequirement(
       @NotNull RankRequirement req, @NotNull Map<UUID, PromotionLevel> levelByCategory) {
     PromotionLevel minimum = req.getMinimumLevel();
@@ -290,6 +296,7 @@ public class PromotionEligibilityService {
    * @return a map from requirement id to its disjoint-matched check result; non-topic-scoped
    *     requirements are absent from the map and must be evaluated separately
    */
+  @NotNull
   private Map<UUID, PromotionRequirementCheckResponse> evaluateTopicScopedDisjoint(
       @NotNull List<RankRequirement> requirements,
       @NotNull Map<UUID, PromotionLevel> levelByCategory,
@@ -350,6 +357,7 @@ public class PromotionEligibilityService {
     return resultByRequirementId;
   }
 
+  @NotNull
   private PromotionRequirementCheckResponse evaluateCategoryRequirement(
       @NotNull RankRequirement req,
       @NotNull PromotionLevel minimum,
@@ -372,6 +380,7 @@ public class PromotionEligibilityService {
         req.getDescription());
   }
 
+  @NotNull
   private PromotionRequirementCheckResponse evaluateGlobalRequirement(
       @NotNull RankRequirement req,
       @NotNull PromotionLevel minimum,

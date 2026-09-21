@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.JobOrderType;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Data transfer record carrying Job Order payload. The same record serves both order kinds (see
@@ -93,6 +94,7 @@ public record JobOrderDto(
    * @param value the replacement assignee rows
    * @return a copy differing only in {@code assignees}
    */
+  @NotNull
   public JobOrderDto withAssignees(List<JobOrderAssigneeDto> value) {
     return new JobOrderDto(
         id,
@@ -126,6 +128,7 @@ public record JobOrderDto(
    * @param value the new {@code redacted} flag
    * @return a copy differing only in {@code redacted}
    */
+  @NotNull
   public JobOrderDto withRedacted(boolean value) {
     return new JobOrderDto(
         id,

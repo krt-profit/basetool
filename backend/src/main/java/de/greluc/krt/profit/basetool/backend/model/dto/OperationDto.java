@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import de.greluc.krt.profit.basetool.backend.model.OperationStatus;
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Data transfer record carrying Operation payload.
@@ -65,6 +66,7 @@ public record OperationDto(
    * @param value the flag value to set on the returned copy
    * @return a new {@code OperationDto} identical to this one except for {@code payoutPreliminary}
    */
+  @NotNull
   public OperationDto withPayoutPreliminary(@org.jetbrains.annotations.Nullable Boolean value) {
     return new OperationDto(
         id, name, description, status, owningSquadron, version, createdAt, updatedAt, value);

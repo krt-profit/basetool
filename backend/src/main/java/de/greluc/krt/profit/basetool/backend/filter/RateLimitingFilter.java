@@ -44,6 +44,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -181,7 +183,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @throws IllegalStateException when any configured pattern is blank or not valid PathPattern
    *     syntax
    */
-  private void precompileAndValidatePatterns(RateLimitProperties properties) {
+  private void precompileAndValidatePatterns(@NotNull RateLimitProperties properties) {
     List<String> globalPaths = properties.getPaths();
     if (globalPaths != null) {
       for (String pattern : globalPaths) {
@@ -336,7 +338,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * matches both the request URI AND the HTTP method. Order is irrelevant here; the caller sorts
    * tightest-first before consumption.
    */
-  private List<BucketSlot> resolveSlots(HttpServletRequest request) {
+  @NotNull
+  private List<BucketSlot> resolveSlots(@NotNull HttpServletRequest request) {
     String path = request.getRequestURI();
     String method = request.getMethod();
     PathContainer parsedPath = PathContainer.parsePath(path);
@@ -436,6 +439,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param rawPattern the raw pattern to compile
    * @return the compiled pattern, or empty when it could not be parsed
    */
+  @NotNull
   private Optional<PathPattern> tryParse(String rawPattern) {
     try {
       return Optional.of(pathPatternParser.parse(rawPattern));
@@ -465,7 +469,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param request the request whose bucket key is being derived
    * @return the bucket key plus the branch it came from; never {@code null}
    */
-  private ClientKey resolveClientKey(HttpServletRequest request) {
+  @NotNull
+  private ClientKey resolveClientKey(@NotNull HttpServletRequest request) {
     Object resolved = request.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE);
     if (resolved instanceof String ip && !ip.isBlank()) {
       boolean forwarded =
@@ -481,6 +486,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     return new ClientKey(request.getRemoteAddr(), KeySource.PEER);
   }
 
+  @Nullable
   private String firstMatchingPattern(PathContainer parsedPath, List<String> patterns) {
     if (patterns == null) {
       return null;
@@ -493,7 +499,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     return null;
   }
 
-  private Bucket createNewBucket(BucketSlot slot) {
+  private Bucket createNewBucket(@NotNull BucketSlot slot) {
     Bandwidth limit =
         Bandwidth.builder()
             .capacity(slot.capacity())
@@ -503,7 +509,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
   }
 
   private void writeTooManyRequests(
-      HttpServletResponse response,
+      @NotNull HttpServletResponse response,
       HttpServletRequest request,
       int rejectedLimit,
       long retryAfterSeconds,
@@ -677,7 +683,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    * @param slotKey the {@code prefix:suffix} slot key
    * @return the bounded rule name, or {@link MetricNames#BUCKET_GLOBAL}
    */
-  private static String bucketLabel(String slotKey) {
+  private static String bucketLabel(@NotNull String slotKey) {
     int separator = slotKey.indexOf(':');
     if (separator >= 0 && "rule".equals(slotKey.substring(0, separator))) {
       return slotKey.substring(separator + 1);

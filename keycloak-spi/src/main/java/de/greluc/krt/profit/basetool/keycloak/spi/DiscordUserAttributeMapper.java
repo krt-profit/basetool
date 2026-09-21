@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
+import org.jetbrains.annotations.NotNull;
 import org.keycloak.broker.oidc.mappers.AbstractJsonUserAttributeMapper;
 
 /**
@@ -39,12 +40,12 @@ public class DiscordUserAttributeMapper extends AbstractJsonUserAttributeMapper 
   private static final String[] COMPATIBLE_PROVIDERS = {DiscordIdentityProviderFactory.PROVIDER_ID};
 
   @Override
-  public String[] getCompatibleProviders() {
+  public @NotNull String[] getCompatibleProviders() {
     return COMPATIBLE_PROVIDERS;
   }
 
   @Override
-  public String getId() {
+  public @NotNull String getId() {
     return PROVIDER_ID;
   }
 }

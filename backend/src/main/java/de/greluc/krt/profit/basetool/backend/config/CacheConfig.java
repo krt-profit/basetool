@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -175,6 +176,7 @@ public class CacheConfig {
    *
    * @return configured Caffeine cache manager with per-cache TTLs (see class Javadoc)
    */
+  @NotNull
   @Bean
   public CacheManager cacheManager() {
     CaffeineCacheManager manager = new CaffeineCacheManager();
@@ -211,7 +213,7 @@ public class CacheConfig {
    * @param name cache name (the constant referenced from {@code @Cacheable(cacheNames = …)})
    * @param ttl write-expire duration
    */
-  private static void register(CaffeineCacheManager manager, String name, Duration ttl) {
+  private static void register(@NotNull CaffeineCacheManager manager, String name, Duration ttl) {
     manager.registerCustomCache(
         name,
         Caffeine.newBuilder()

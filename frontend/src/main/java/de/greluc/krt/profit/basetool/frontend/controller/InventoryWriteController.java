@@ -201,7 +201,8 @@ public class InventoryWriteController {
    * @param form the bound create form
    * @param bindingResult the binding result the violations are recorded on
    */
-  private static void validateCatalogMode(InventoryForm form, BindingResult bindingResult) {
+  private static void validateCatalogMode(
+      @NotNull InventoryForm form, BindingResult bindingResult) {
     boolean material = form.getMaterialId() != null;
     boolean item = form.getGameItemId() != null;
     if (material == item) {
@@ -228,7 +229,8 @@ public class InventoryWriteController {
    * @param form the validated create form
    * @return the backend create payload
    */
-  private static InventoryItemCreateDto buildCreateRequest(InventoryForm form) {
+  @NotNull
+  private static InventoryItemCreateDto buildCreateRequest(@NotNull InventoryForm form) {
     boolean itemMode = form.getGameItemId() != null;
     return new InventoryItemCreateDto(
         Boolean.TRUE.equals(form.getIsGlobal()) ? form.getUserId() : null,
@@ -308,6 +310,7 @@ public class InventoryWriteController {
    * @param source the form's {@code source} field ({@code my} / {@code admin} / {@code aggregated})
    * @return the same-origin listing path
    */
+  @NotNull
   private static String inventorySourceTarget(String source) {
     if ("my".equals(source)) {
       return "/inventory/my";

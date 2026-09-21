@@ -25,6 +25,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Contract every notification-producing domain event implements.
@@ -66,6 +69,7 @@ public interface NotificationEvent {
    *
    * @return the context bank account id, or {@code null}
    */
+  @Nullable
   default UUID contextAccountId() {
     return null;
   }
@@ -78,6 +82,7 @@ public interface NotificationEvent {
    *
    * @return the directed recipient's sub, or {@code null}
    */
+  @Nullable
   default UUID contextRecipientUserId() {
     return null;
   }
@@ -119,6 +124,8 @@ public interface NotificationEvent {
    * @return the notification types superseded for this event's entity; never {@code null}, possibly
    *     empty
    */
+  @NotNull
+  @Unmodifiable
   default Set<NotificationType> resolvesNotificationTypes() {
     return Set.of();
   }

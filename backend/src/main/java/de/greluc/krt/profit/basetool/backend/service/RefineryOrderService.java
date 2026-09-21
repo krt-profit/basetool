@@ -51,7 +51,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -150,6 +152,7 @@ public class RefineryOrderService {
    * @param userId the owning user; never {@code null}
    * @return one slice per (output material, quality), with the summed SCU yield; never {@code null}
    */
+  @NotNull
   public List<OwnedStockSlice> getOwnedOpenRefineryYieldSlices(@NotNull UUID userId) {
     List<RefineryOrder> orders =
         refineryOrderRepository.findOwnedWithGoodsByStatusIn(
@@ -406,6 +409,8 @@ public class RefineryOrderService {
     return saved;
   }
 
+  @Contract("null -> null")
+  @Nullable
   private static Double zeroToNull(Double value) {
     if (value == null) {
       return null;
@@ -833,6 +838,7 @@ public class RefineryOrderService {
    * @param order the refinery order
    * @return the {@code <method> · <location>} label
    */
+  @NotNull
   private static String refineryLabel(RefineryOrder order) {
     return methodName(order) + " · " + locationName(order);
   }
@@ -843,7 +849,7 @@ public class RefineryOrderService {
    * @param order the refinery order
    * @return the location name or {@code -}
    */
-  private static String locationName(RefineryOrder order) {
+  private static String locationName(@NotNull RefineryOrder order) {
     return order.getLocation() != null ? order.getLocation().getName() : "-";
   }
 
@@ -853,7 +859,7 @@ public class RefineryOrderService {
    * @param order the refinery order
    * @return the method name or {@code none}
    */
-  private static String methodName(RefineryOrder order) {
+  private static String methodName(@NotNull RefineryOrder order) {
     return order.getRefiningMethod() != null ? order.getRefiningMethod().getName() : "none";
   }
 
@@ -907,6 +913,7 @@ public class RefineryOrderService {
    * @param quality the grade the item carries, or {@code null} to match on the material alone
    * @return the good, or {@code null} when none matches
    */
+  @Nullable
   private de.greluc.krt.profit.basetool.backend.model.RefineryGood findGood(
       RefineryOrder order, java.util.UUID materialId, Integer quality) {
     for (de.greluc.krt.profit.basetool.backend.model.RefineryGood good : order.getGoods()) {
@@ -940,6 +947,7 @@ public class RefineryOrderService {
    * @param location the order's chosen location, may be {@code null}
    * @return map keyed by material UUID, never {@code null}
    */
+  @NotNull
   public Map<UUID, Integer> getYieldBonusByMaterialForLocation(Location location) {
     if (location == null) {
       return Map.of();

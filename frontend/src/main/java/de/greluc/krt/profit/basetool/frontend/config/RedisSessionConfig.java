@@ -202,6 +202,7 @@ public class RedisSessionConfig {
    *     creation.
    * @return the configured {@link RedisSerializer} for session data
    */
+  @NotNull
   @Bean
   public RedisSerializer<Object> springSessionDefaultRedisSerializer(
       ObjectProvider<MeterRegistry> meterRegistry) {
@@ -484,6 +485,7 @@ public class RedisSessionConfig {
    *
    * @return the session-backed {@link OAuth2AuthorizedClientRepository}
    */
+  @NotNull
   @Bean
   public OAuth2AuthorizedClientRepository authorizedClientRepository() {
     return new HttpSessionOAuth2AuthorizedClientRepository();
@@ -512,6 +514,7 @@ public class RedisSessionConfig {
    * @param <S> the concrete {@link Session} type managed by the repository.
    * @return a session registry backed by the Redis session store.
    */
+  @NotNull
   @Bean
   public <S extends Session> SpringSessionBackedSessionRegistry<S> sessionRegistry(
       FindByIndexNameSessionRepository<S> sessionRepository) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +34,7 @@ public class EtagConfig {
    * Registers Spring's {@link ShallowEtagHeaderFilter} for all paths at near-highest precedence so
    * {@code ETag} / {@code If-None-Match} 304 short-circuits happen before MVC builds the body.
    */
+  @NotNull
   @Bean
   public FilterRegistrationBean<ShallowEtagHeaderFilter> shallowEtagHeaderFilter() {
     FilterRegistrationBean<ShallowEtagHeaderFilter> filter = new FilterRegistrationBean<>();

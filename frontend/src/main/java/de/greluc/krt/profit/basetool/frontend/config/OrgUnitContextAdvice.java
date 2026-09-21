@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -112,6 +113,7 @@ public class OrgUnitContextAdvice {
    * @param request the current HTTP servlet request; never {@code null}.
    * @return the active squadron UUID, or {@code null}.
    */
+  @Nullable
   @ModelAttribute("activeSquadronId")
   public UUID activeSquadronId(HttpServletRequest request) {
     if (!authHelper.isAuthenticated()) {
@@ -159,6 +161,7 @@ public class OrgUnitContextAdvice {
    *     dedicated per-id GET.
    * @return matching squadron, or {@code null}.
    */
+  @Nullable
   @ModelAttribute("activeSquadron")
   public SquadronDto activeSquadron(
       @ModelAttribute("activeSquadronId") UUID activeSquadronId,
@@ -190,6 +193,7 @@ public class OrgUnitContextAdvice {
    *     dedicated per-id GET.
    * @return matching option (kind-tagged), or {@code null}.
    */
+  @Nullable
   @ModelAttribute("activeOrgUnit")
   public OrgUnitMembershipOptionDto activeOrgUnit(
       @ModelAttribute("activeSquadronId") UUID activeOrgUnitId,

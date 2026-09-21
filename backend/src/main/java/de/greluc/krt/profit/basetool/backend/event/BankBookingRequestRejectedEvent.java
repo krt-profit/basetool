@@ -28,7 +28,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published right after a bank employee rejects a booking request (epic #666 F2,
@@ -57,11 +59,14 @@ public record BankBookingRequestRejectedEvent(
     @Nullable UUID actorSub)
     implements BankBookingRequestEvent {
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.BANK_BOOKING_REQUEST_REJECTED;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
@@ -82,6 +87,7 @@ public record BankBookingRequestRejectedEvent(
     return requestId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
@@ -99,6 +105,8 @@ public record BankBookingRequestRejectedEvent(
    *
    * @return the singleton {@link NotificationType#BANK_BOOKING_REQUEST_CREATED}
    */
+  @NotNull
+  @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
     return Set.of(NotificationType.BANK_BOOKING_REQUEST_CREATED);

@@ -123,6 +123,13 @@ keycloak = "26.7.4"
 # claiming lockstep was stale, hence this note. Restore the lockstep, or drop this pin
 # entirely, once the Boot BOM moves to 6.1.x.
 junit = "6.1.3"
+# Lombok for the keycloak-spi module ONLY. Every other module gets Lombok from Spring Boot's
+# dependency management, which manages 1.18.46 under Boot 4.1.1 -- keycloak-spi is deliberately not
+# a Spring Boot module and has no BOM to supply one, exactly as with `junit` above. Keep this number
+# EQUAL to the Boot-managed version: two Lombok versions in one repo means two readings of
+# `lombok.config`, which is a single shared file at the repo root. Verify after a Boot bump with
+# `./gradlew :backend:dependencyInsight --configuration compileClasspath --dependency org.projectlombok:lombok`.
+lombok = "1.18.46"
 
 [libraries]
 
@@ -163,3 +170,4 @@ keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }

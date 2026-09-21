@@ -79,6 +79,7 @@ public class AdminTermsController {
    * @return one page of consent rows, newest-pending-first by default
    * @throws ResponseStatusException {@code 400} if the filter or a sort property is not whitelisted
    */
+  @NotNull
   @GetMapping
   @Operation(
       summary = "Consent overview",
@@ -106,6 +107,7 @@ public class AdminTermsController {
    *
    * @return the pending count and the version it refers to
    */
+  @NotNull
   @GetMapping("/pending-count")
   @Operation(
       summary = "Number of users who have not accepted",

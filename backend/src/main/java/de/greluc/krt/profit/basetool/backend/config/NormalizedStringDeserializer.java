@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.config;
 
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
@@ -38,6 +39,7 @@ import tools.jackson.databind.ValueDeserializer;
  */
 public class NormalizedStringDeserializer extends ValueDeserializer<String> {
 
+  @Nullable
   @Override
   public String deserialize(JsonParser p, DeserializationContext ctxt) {
     String text = p.getValueAsString();

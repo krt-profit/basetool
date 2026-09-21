@@ -156,6 +156,7 @@ public class BankAccountService {
    * @return the detail payload
    * @throws NotFoundException when the account does not exist
    */
+  @NotNull
   public BankAccountDetailDto getAccountDetail(
       @NotNull UUID accountId, @NotNull BankCapabilitiesDto capabilities) {
     BankAccount account = requireAccount(accountId);
@@ -229,6 +230,7 @@ public class BankAccountService {
    *     unset)
    * @throws NotFoundException when the account does not exist
    */
+  @NotNull
   public BankBalanceSeriesDto getBalanceSeries(
       @NotNull UUID accountId, @NotNull Instant from, @NotNull Instant to) {
     BankAccount account = requireAccount(accountId);
@@ -572,6 +574,7 @@ public class BankAccountService {
    * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
    * @return the booking DTO with holder annotation and counter-side labels for transfers
    */
+  @NotNull
   private BankBookingDto toBookingDto(
       @NotNull UUID accountId,
       @NotNull BankBookingRow row,

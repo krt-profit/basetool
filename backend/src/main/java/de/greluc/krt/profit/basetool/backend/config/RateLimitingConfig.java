@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.filter.RateLimitingFilter;
 import de.greluc.krt.profit.basetool.backend.support.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,6 +49,7 @@ public class RateLimitingConfig {
    * @return the {@link RateLimitingFilter} bean injected into the servlet container registration
    *     below
    */
+  @NotNull
   @Bean
   public RateLimitingFilter rateLimitingFilter(
       RateLimitProperties properties,
@@ -65,6 +67,7 @@ public class RateLimitingConfig {
    * @param filter the rate-limiting filter created by {@link #rateLimitingFilter}
    * @return Servlet registration with the order and URL patterns set
    */
+  @NotNull
   @Bean
   public org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
       rateLimitingFilterRegistration(RateLimitingFilter filter) {
@@ -84,6 +87,7 @@ public class RateLimitingConfig {
    * @param meterRegistry counts each rejection on {@code basetool_request_body_rejected_total}
    * @return the filter (registered by {@link #requestBodySizeLimitFilterRegistration})
    */
+  @NotNull
   @Bean
   public de.greluc.krt.profit.basetool.backend.filter.RequestBodySizeLimitFilter
       requestBodySizeLimitFilter(
@@ -102,6 +106,7 @@ public class RateLimitingConfig {
    * @param filter the body-size filter
    * @return the servlet registration
    */
+  @NotNull
   @Bean
   public org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>
       requestBodySizeLimitFilterRegistration(

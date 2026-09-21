@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.Builder;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Inbound JSON record for UEX Corp's commodity-price endpoint. Mapped onto the project's {@code
@@ -43,6 +44,7 @@ public record UexCommodityPriceDto(
     @JsonProperty("status_buy") Integer statusBuy,
     @JsonProperty("status_sell") Integer statusSell,
     @JsonProperty("date_modified") Long dateModified) {
+  @Nullable
   public Instant getParsedDateModified() {
     return dateModified != null ? Instant.ofEpochSecond(dateModified) : null;
   }

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.config;
 
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -84,7 +85,8 @@ public class MonitoringScrapeSecurityConfig {
    */
   @Bean
   @Order(1)
-  public SecurityFilterChain monitoringScrapeFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
+      throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
         // CSRF protection is deliberately off on this chain: it is a stateless, basic-auth-only
         // machine endpoint with no session cookie, so there is no browser credential a forged

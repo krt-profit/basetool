@@ -37,6 +37,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A single wanted-listing (Gesuch) on the Materialbörse — something its owner is <b>looking for</b>
@@ -206,6 +207,7 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
    *
    * @return a stable, PII-free single-line representation of this request.
    */
+  @NotNull
   @Override
   public String toString() {
     return "MaterialExchangeRequest{id="

@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -428,7 +429,7 @@ public class OperationController {
         description = "Operation not found, or participantKey is not part of the operation.")
   })
   public OperationPayoutStatusDto setPayoutStatus(
-      @PathVariable UUID id, @Valid @RequestBody OperationPayoutStatusUpdateDto dto) {
+      @PathVariable UUID id, @NotNull @Valid @RequestBody OperationPayoutStatusUpdateDto dto) {
     return operationPayoutService.setPayoutStatus(id, dto.participantKey(), dto.paidOut());
   }
 

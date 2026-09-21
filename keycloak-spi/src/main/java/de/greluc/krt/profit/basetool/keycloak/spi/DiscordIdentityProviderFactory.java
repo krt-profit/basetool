@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
+import org.jetbrains.annotations.NotNull;
 import org.keycloak.broker.oidc.OAuth2IdentityProviderConfig;
 import org.keycloak.broker.provider.AbstractIdentityProviderFactory;
 import org.keycloak.broker.social.SocialIdentityProviderFactory;
@@ -41,22 +42,23 @@ public class DiscordIdentityProviderFactory
   public static final String PROVIDER_ID = "discord";
 
   @Override
-  public String getName() {
+  public @NotNull String getName() {
     return "Discord";
   }
 
   @Override
-  public DiscordIdentityProvider create(KeycloakSession session, IdentityProviderModel model) {
+  public @NotNull DiscordIdentityProvider create(
+      KeycloakSession session, IdentityProviderModel model) {
     return new DiscordIdentityProvider(session, new OAuth2IdentityProviderConfig(model));
   }
 
   @Override
-  public OAuth2IdentityProviderConfig createConfig() {
+  public @NotNull OAuth2IdentityProviderConfig createConfig() {
     return new OAuth2IdentityProviderConfig();
   }
 
   @Override
-  public String getId() {
+  public @NotNull String getId() {
     return PROVIDER_ID;
   }
 }

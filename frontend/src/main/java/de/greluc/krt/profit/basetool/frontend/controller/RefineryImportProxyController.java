@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -107,6 +108,7 @@ public class RefineryImportProxyController {
    * @param redirectAttributes flash sink for the pre-fill and review attributes
    * @return redirect to {@code /refinery-orders/create}
    */
+  @NotNull
   @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
   public String importExtract(
@@ -158,8 +160,9 @@ public class RefineryImportProxyController {
    * @param redirectAttributes flash sink for the error key
    * @return redirect to {@code /refinery-orders/create}
    */
+  @NotNull
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  public String handleOversizedUpload(RedirectAttributes redirectAttributes) {
+  public String handleOversizedUpload(@NotNull RedirectAttributes redirectAttributes) {
     redirectAttributes.addFlashAttribute("importErrorKey", "refineryImport.error.invalidFile");
     return "redirect:/refinery-orders/create";
   }
@@ -175,6 +178,7 @@ public class RefineryImportProxyController {
    * @return the parsed JSON object node, or {@code null} when the upload is missing, too large, not
    *     JSON, or not a JSON object
    */
+  @Nullable
   static JsonNode parseExtractObject(MultipartFile file) {
     if (file == null || file.isEmpty() || file.getSize() > MAX_EXTRACT_BYTES) {
       return null;
@@ -298,6 +302,7 @@ public class RefineryImportProxyController {
    * @param issue the finding
    * @return the draft row index, or {@code null}
    */
+  @Nullable
   private static Integer draftRowIndex(ImportIssueDto issue) {
     if (issue == null || issue.field() == null) {
       return null;

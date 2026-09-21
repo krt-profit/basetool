@@ -141,6 +141,7 @@ public class PersonalBlueprintService {
    * @param productKeys the product keys to add
    * @return a summary of how many keys were added vs. skipped and why
    */
+  @NotNull
   @Transactional
   public PersonalBlueprintBatchResult addBatch(
       @NotNull UUID ownerUserId, @NotNull List<String> productKeys) {
@@ -300,6 +301,7 @@ public class PersonalBlueprintService {
    * @param productKeys the product keys to add
    * @return a summary of added vs. skipped keys
    */
+  @NotNull
   @Transactional
   public PersonalBlueprintBatchResult addBatchForUser(
       @NotNull UUID targetSub, @NotNull List<String> productKeys) {

@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -235,6 +237,7 @@ public class UexCommodityService {
     log.info("Finished synchronization. Processed {} items.", processed);
   }
 
+  @Nullable
   private UUID processSingleDto(UexCommodityPriceDto dto) {
     if (dto.idCommodity() == null || dto.idTerminal() == null) {
       log.warn(
@@ -277,7 +280,7 @@ public class UexCommodityService {
     return materialPriceRepository.save(price).getId();
   }
 
-  private Material resolveOrCreateMaterial(UexCommodityPriceDto dto) {
+  private Material resolveOrCreateMaterial(@NotNull UexCommodityPriceDto dto) {
     return materialRepository
         .findByIdCommodity(dto.idCommodity())
         .orElseGet(
@@ -303,6 +306,7 @@ public class UexCommodityService {
                         }));
   }
 
+  @NotNull
   private MaterialType determineMaterialType(UexCommodityDto dto) {
     if (Integer.valueOf(1).equals(dto.isRefined())) {
       return MaterialType.REFINED;

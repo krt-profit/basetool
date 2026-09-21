@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,8 +66,10 @@ public class CsrfTokenController {
    * @return a JSON object {@code {"headerName": "...", "token": "..."}} the client writes back into
    *     the {@code _csrf_header} / {@code _csrf} meta tags before retrying a 403'd write
    */
+  @NotNull
+  @Unmodifiable
   @GetMapping("/csrf")
-  public Map<String, String> csrf(CsrfToken token) {
+  public Map<String, String> csrf(@NotNull CsrfToken token) {
     return Map.of("headerName", token.getHeaderName(), "token", token.getToken());
   }
 }

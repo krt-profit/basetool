@@ -37,6 +37,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A single offer on the Materialbörse — something its owner has released for trade
@@ -210,6 +211,7 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
    *
    * @return a stable, PII-free single-line representation of this offer.
    */
+  @NotNull
   @Override
   public String toString() {
     return "MaterialExchangeOffer{id="

@@ -104,6 +104,7 @@ public class BankPageController {
    * @param model Spring MVC model
    * @return the dashboard template, or its {@code bankGrid} fragment view
    */
+  @NotNull
   @GetMapping("/bank")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String dashboard(
@@ -205,6 +206,7 @@ public class BankPageController {
    * @return the detail template, or its {@code bookings} / {@code balanceChart} / {@code
    *     accountBody} fragment for an AJAX swap
    */
+  @NotNull
   @GetMapping("/bank/accounts/{id}")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String accountDetail(
@@ -279,6 +281,7 @@ public class BankPageController {
    * @param model Spring MVC model populated with the bookings + period + pagination attributes
    * @return the {@code bank-account-detail :: bookings} fragment view
    */
+  @NotNull
   private String bookingsFragment(
       UUID id, Integer page, Integer size, String from, String to, Model model) {
     addBookingsModel(id, page, size, from, to, model);
@@ -295,6 +298,7 @@ public class BankPageController {
    * @param model Spring MVC model populated with the chart attributes
    * @return the {@code bank-account-detail :: balanceChart} fragment view
    */
+  @NotNull
   private String balanceChartFragment(UUID id, String chartRange, Model model) {
     BankAccountDetailDto detail = null;
     try {
@@ -436,6 +440,7 @@ public class BankPageController {
    * @param model Spring MVC model
    * @return the holder-detail template, or its {@code holderBookings} fragment for an AJAX swap
    */
+  @NotNull
   @GetMapping("/bank/holders/{id}")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String holderDetail(
@@ -467,6 +472,7 @@ public class BankPageController {
    * @param model Spring MVC model populated with {@code bookings} and {@code paginationBaseUrl}
    * @return the {@code bank-holder-detail :: holderBookings} fragment view
    */
+  @NotNull
   private String holderBookingsFragment(UUID id, Integer page, Model model) {
     int effectivePage = page == null || page < 0 ? 0 : page;
     PageResponse<BankHolderBookingDto> bookings;

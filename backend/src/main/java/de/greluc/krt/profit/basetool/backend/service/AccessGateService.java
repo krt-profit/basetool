@@ -524,7 +524,7 @@ public class AccessGateService {
    * @param o the job order whose requesting org unit gates the escape.
    * @return {@code true} iff the caller directly belongs to the order's requesting org unit.
    */
-  private boolean isOrderRequesterRow(JobOrder o) {
+  private boolean isOrderRequesterRow(@NotNull JobOrder o) {
     OrgUnit requesting = o.getRequestingOrgUnit();
     return requesting != null
         && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
@@ -622,7 +622,10 @@ public class AccessGateService {
    * @return {@code true} iff the current caller may see/edit the row per the rules above
    */
   private <T> boolean permitsRow(
-      Optional<T> row, Function<T, User> owner, Function<T, OrgUnit> orgUnit, boolean edit) {
+      @NotNull Optional<T> row,
+      Function<T, User> owner,
+      Function<T, OrgUnit> orgUnit,
+      boolean edit) {
     return row.map(
             r -> {
               User rowOwner = owner.apply(r);

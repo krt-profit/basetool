@@ -56,6 +56,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -169,6 +172,7 @@ public class RefineryOrderPageController {
    * @return the {@code refinery-orders-index} view name, or its {@code refineryOrdersResults}
    *     fragment selector
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("isAuthenticated()")
   public String viewOrders(
@@ -236,6 +240,7 @@ public class RefineryOrderPageController {
    * @param onlyMine the resolved own-orders toggle
    * @return {@code /refinery-orders?status=...&onlyMine=true} carrying the current filter
    */
+  @NotNull
   private static String buildPaginationBaseUrl(List<String> status, Boolean onlyMine) {
     List<String> queryParts = new ArrayList<>();
     for (String s : status) {
@@ -257,6 +262,7 @@ public class RefineryOrderPageController {
    * @param principal authenticated OIDC user (used to derive the default owner)
    * @return the {@code refinery-orders-create} view name
    */
+  @NotNull
   @GetMapping("/create")
   @PreAuthorize("isAuthenticated()")
   public String viewCreateForm(
@@ -306,6 +312,7 @@ public class RefineryOrderPageController {
    * @param model the model to enrich with the import review attributes on success
    * @return the pre-filled form, or {@code null} when there is nothing to hand off
    */
+  @Nullable
   private RefineryOrderForm applyRefineryHandoff(String handoff, OidcUser principal, Model model) {
     RefineryImportDraftDto draft =
         ingestHandoffService
@@ -423,6 +430,7 @@ public class RefineryOrderPageController {
    * @param principal the authenticated user (drives the create-form catalogs + owner options)
    * @return the create-form fragment view name
    */
+  @NotNull
   @PostMapping(
       value = "/import",
       headers = "X-Requested-With=XMLHttpRequest",
@@ -497,6 +505,7 @@ public class RefineryOrderPageController {
    * @param principal the authenticated user (its Keycloak subject scopes the single-use consume)
    * @return the {@code refinery-orders-create :: refineryImportFormBody} fragment view name
    */
+  @NotNull
   @PostMapping(value = "/import-handoff", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
   public String importHandoff(
@@ -546,6 +555,7 @@ public class RefineryOrderPageController {
    * @return the {@code refinery-orders-details} view name, one of its section fragment selectors,
    *     or {@code :: fragmentError} on an unknown fragment / failed fragment load
    */
+  @NotNull
   @GetMapping("/{id}")
   @PreAuthorize("isAuthenticated()")
   public String viewOrderDetail(
@@ -836,6 +846,7 @@ public class RefineryOrderPageController {
     }
   }
 
+  @NotNull
   private List<MaterialDto> fetchMaterials() {
     try {
       PageResponse<MaterialDto> p =
@@ -849,6 +860,7 @@ public class RefineryOrderPageController {
     return new ArrayList<>();
   }
 
+  @NotNull
   private List<RefiningMethodDto> fetchMethods() {
     try {
       PageResponse<RefiningMethodDto> p =
@@ -862,6 +874,7 @@ public class RefineryOrderPageController {
     return new ArrayList<>();
   }
 
+  @NotNull
   private List<LocationDto> fetchAllLocations() {
     try {
       PageResponse<LocationDto> p =
@@ -930,6 +943,7 @@ public class RefineryOrderPageController {
     return locations;
   }
 
+  @NotNull
   private List<MissionListDto> fetchMissions() {
     return fetchMissions(null);
   }
@@ -946,6 +960,7 @@ public class RefineryOrderPageController {
    *     or {@code null} to apply the cut-off without preservation.
    * @return mutable list of missions in newest-first order; empty on backend failure.
    */
+  @NotNull
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
       // The explicit newest-first sort is load-bearing: without it the backend's default is
@@ -982,6 +997,7 @@ public class RefineryOrderPageController {
    * @param preserveMissionId mission id to retain regardless of the cut-off, or {@code null}.
    * @return mutable list of missions in newest-first order.
    */
+  @NotNull
   static List<MissionListDto> filterAndSortMissionsForDropdown(
       List<MissionListDto> all, java.time.Instant cutoff, UUID preserveMissionId) {
     if (all == null || all.isEmpty()) {
@@ -1090,6 +1106,7 @@ public class RefineryOrderPageController {
    * @param ids the distinct user ids the form references; never {@code null}, possibly empty.
    * @return a map from user id to display name for the referenced users; never {@code null}.
    */
+  @NotNull
   private Map<UUID, String> resolveSeedUserNames(Collection<UUID> ids) {
     Map<UUID, String> names = new HashMap<>();
     for (UUID id : ids) {
@@ -1122,6 +1139,7 @@ public class RefineryOrderPageController {
    * @return the active job orders visible to the caller as reference projections; never {@code
    *     null}
    */
+  @NotNull
   private List<JobOrderReferenceDto> fetchActiveJobOrders() {
     try {
       List<JobOrderReferenceDto> content =
@@ -1146,6 +1164,8 @@ public class RefineryOrderPageController {
     }
   }
 
+  @Contract("null -> null")
+  @Nullable
   private UUID getCurrentUserId(OidcUser principal) {
     if (principal == null) {
       return null;

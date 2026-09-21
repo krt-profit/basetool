@@ -25,6 +25,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -189,7 +191,7 @@ public class ClientErrorReportController {
     HttpMessageNotReadableException.class,
     HttpMediaTypeNotSupportedException.class
   })
-  public ResponseEntity<Void> handleUnreadableBody(Exception e) {
+  public ResponseEntity<Void> handleUnreadableBody(@NotNull Exception e) {
     log.debug("Unreadable client error report body [exception={}]", e.getClass().getSimpleName());
     return ResponseEntity.badRequest().build();
   }
@@ -204,6 +206,7 @@ public class ClientErrorReportController {
    * @return the URL up to its first {@code ?} or {@code #}, or {@code null} when {@code source} was
    *     {@code null}
    */
+  @Contract("null -> null")
   private static @Nullable String stripQuery(@Nullable String source) {
     if (source == null) {
       return null;

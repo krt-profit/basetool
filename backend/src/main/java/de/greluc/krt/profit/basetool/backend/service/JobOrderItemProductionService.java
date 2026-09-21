@@ -57,6 +57,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -401,7 +402,7 @@ public class JobOrderItemProductionService {
       JobOrder jobOrder,
       JobOrderItem line,
       int amount,
-      JobOrderItemProductionCreateDto.BookInDto bookIn) {
+      @NotNull JobOrderItemProductionCreateDto.BookInDto bookIn) {
     final boolean personal = Boolean.TRUE.equals(bookIn.personal());
     final boolean allocateToOrder = !Boolean.FALSE.equals(bookIn.allocateToOrder());
     if (personal && allocateToOrder) {

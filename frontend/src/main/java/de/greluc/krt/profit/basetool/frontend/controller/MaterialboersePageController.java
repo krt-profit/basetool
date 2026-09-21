@@ -133,6 +133,7 @@ public class MaterialboersePageController {
    * @param model the Thymeleaf model.
    * @return the view name or fragment selector.
    */
+  @NotNull
   @GetMapping
   public String board(
       @RequestParam(required = false) String mode,
@@ -370,6 +371,7 @@ public class MaterialboersePageController {
    * @param kind the raw request value, or {@code null}.
    * @return the literal {@code "MATERIAL"} or {@code "ITEM"}, or {@code null} for anything else.
    */
+  @Nullable
   private static String normaliseKind(String kind) {
     if ("MATERIAL".equals(kind)) {
       return "MATERIAL";
@@ -535,6 +537,7 @@ public class MaterialboersePageController {
    * @param id the offer id as a string, or {@code null}.
    * @return the offer detail, or {@code null} if absent/unparseable.
    */
+  @Nullable
   private MaterialExchangeOfferDto loadDetail(String id) {
     UUID offerId = parseUuid(id);
     if (offerId == null) {
@@ -578,6 +581,7 @@ public class MaterialboersePageController {
    * @param requested the requested offer id as a string, or {@code null}.
    * @return the selected offer id as a string, or {@code null} if the list is empty.
    */
+  @Nullable
   private static String pickSelectedId(List<MaterialExchangeOfferDto> offers, String requested) {
     UUID requestedId = parseUuid(requested);
     if (requestedId != null && offers.stream().anyMatch(offer -> requestedId.equals(offer.id()))) {
@@ -623,6 +627,7 @@ public class MaterialboersePageController {
    * @param id the request id as a string, or {@code null}.
    * @return the request detail, or {@code null} if absent/unparseable.
    */
+  @Nullable
   private MaterialRequestDto loadRequestDetail(String id) {
     UUID requestId = parseUuid(id);
     if (requestId == null) {
@@ -667,6 +672,7 @@ public class MaterialboersePageController {
    * @param requested the requested request id as a string, or {@code null}.
    * @return the selected request id as a string, or {@code null} if the list is empty.
    */
+  @Nullable
   private static String pickSelectedRequestId(List<MaterialRequestDto> requests, String requested) {
     UUID requestedId = parseUuid(requested);
     if (requestedId != null
@@ -732,6 +738,7 @@ public class MaterialboersePageController {
    * @param value the string, or {@code null}.
    * @return the UUID, or {@code null} if absent/unparseable.
    */
+  @Nullable
   private static UUID parseUuid(String value) {
     if (value == null || value.isBlank()) {
       return null;

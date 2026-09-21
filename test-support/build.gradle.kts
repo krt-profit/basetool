@@ -44,6 +44,17 @@ dependencies {
   api("org.springframework:spring-web")
   api("org.springframework:spring-webmvc")
 
+  // Lombok + the JetBrains annotations, on both source sets and compile-only on each: this module
+  // is `testImplementation` for its two consumers, so anything that leaked onto its runtime
+  // classpath would land on theirs. The version is Boot-managed via the BOM imported above, which
+  // is what keeps it equal to the one backend/frontend/ingest compile against.
+  compileOnly("org.projectlombok:lombok")
+  annotationProcessor("org.projectlombok:lombok")
+  compileOnly(libs.jetbrains.annotations)
+  testCompileOnly("org.projectlombok:lombok")
+  testAnnotationProcessor("org.projectlombok:lombok")
+  testCompileOnly(libs.jetbrains.annotations)
+
   // Only the TESTS need the servlet API: the engine itself names no servlet type, but
   // StaticWebApplicationContext and RequestMappingHandlerMapping load one when the fixture builds a
   // registry. Compile-scoping it would claim a dependency this module does not have.

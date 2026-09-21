@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintRequirementMo
 import de.greluc.krt.profit.basetool.backend.model.scwiki.BlueprintSummaryProperty;
 import java.util.List;
 import java.util.Objects;
+import org.jetbrains.annotations.NotNull;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -106,7 +107,7 @@ public interface BlueprintMapper {
    * @return the effective lower quality bound, or {@code null} when neither segments nor the raw
    *     bound provide one
    */
-  default Double effectiveQualityMin(BlueprintRequirementModifier modifier) {
+  default Double effectiveQualityMin(@NotNull BlueprintRequirementModifier modifier) {
     List<BlueprintModifierSegment> segments = modifier.getSegments();
     if (segments == null || segments.isEmpty()) {
       return modifier.getQualityMin();
@@ -129,7 +130,7 @@ public interface BlueprintMapper {
    * @return the effective upper quality bound, or {@code null} when neither segments nor the raw
    *     bound provide one
    */
-  default Double effectiveQualityMax(BlueprintRequirementModifier modifier) {
+  default Double effectiveQualityMax(@NotNull BlueprintRequirementModifier modifier) {
     List<BlueprintModifierSegment> segments = modifier.getSegments();
     if (segments == null || segments.isEmpty()) {
       return modifier.getQualityMax();

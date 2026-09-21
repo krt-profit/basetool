@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.GrantedAuthority;
 
 /**
@@ -72,6 +73,7 @@ public record OrgUnitContextualAuthority(String roleName, UUID orgUnitId)
    * @return the string Spring Security stores in the {@code Authentication} object; never {@code
    *     null}.
    */
+  @NotNull
   @Override
   public String getAuthority() {
     return "ROLE_" + roleName + "@" + orgUnitId;

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 
 import java.util.List;
 import java.util.Locale;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 
 /** Outbound response payload for the Page operation. */
@@ -38,7 +39,8 @@ public record PageResponse<T>(
    * @param <T> the element type of the page content
    * @return an envelope carrying the page's content, paging metadata and lowercase sort tokens
    */
-  public static <T> PageResponse<T> of(Page<T> page) {
+  @NotNull
+  public static <T> PageResponse<T> of(@NotNull Page<T> page) {
     List<String> sort =
         page.getSort().stream()
             .map(

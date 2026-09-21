@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -85,6 +86,7 @@ public class MaterialCollectionPageController {
    *     locations}
    * @return the {@code material-collection} view name, or its {@code collectionResults} fragment
    */
+  @NotNull
   @GetMapping("/{jobOrderId}/material-collection")
   @PreAuthorize("isAuthenticated()")
   public String viewMaterialCollection(

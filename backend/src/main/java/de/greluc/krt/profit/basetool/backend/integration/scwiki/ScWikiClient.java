@@ -37,6 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -599,7 +601,7 @@ public class ScWikiClient {
    * @param rows the merged rows across every fetched page
    * @return the number of distinct UUIDs plus the number of rows that carried no UUID
    */
-  private static <T extends ScWikiRow> int countDistinctRows(List<T> rows) {
+  private static <T extends ScWikiRow> int countDistinctRows(@NotNull List<T> rows) {
     Set<UUID> seenIds = HashSet.newHashSet(rows.size());
     int idlessRows = 0;
     for (T row : rows) {
@@ -631,6 +633,7 @@ public class ScWikiClient {
    * @param resourceLabel human-readable label for log lines
    * @return the parsed DTO, or {@code null} on 404 / error / unparseable body
    */
+  @Nullable
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
     // One latch for this single-resource fetch too: the transport and the parse branch below are
@@ -848,6 +851,7 @@ public class ScWikiClient {
      * @param data the merged rows (possibly empty)
      * @return a result carrying {@code data} with {@code notModified == false, complete == true}
      */
+    @NotNull
     public static <T> FetchResult<T> of(List<T> data) {
       return new FetchResult<>(data, false, true);
     }
@@ -863,6 +867,7 @@ public class ScWikiClient {
      * @param data the rows merged before the walk was abandoned (possibly empty)
      * @return a result carrying {@code data} with {@code notModified == false, complete == false}
      */
+    @NotNull
     public static <T> FetchResult<T> partial(List<T> data) {
       return new FetchResult<>(data, false, false);
     }
@@ -876,6 +881,7 @@ public class ScWikiClient {
      * @param <T> per-row payload type
      * @return a not-modified result with an empty data list
      */
+    @NotNull
     public static <T> FetchResult<T> unchanged() {
       return new FetchResult<>(List.of(), true, false);
     }
@@ -901,6 +907,7 @@ public class ScWikiClient {
      * @param body the parsed page envelope
      * @return an outcome wrapping {@code body} with {@code notModified == false}
      */
+    @NotNull
     private static <T> PageOutcome<T> ok(ScWikiResponseDto<T> body) {
       return new PageOutcome<>(body, false);
     }
@@ -913,6 +920,7 @@ public class ScWikiClient {
      * @param <T> per-row payload type
      * @return a not-modified outcome
      */
+    @NotNull
     private static <T> PageOutcome<T> unchanged() {
       return new PageOutcome<>(null, true);
     }
@@ -923,6 +931,7 @@ public class ScWikiClient {
      * @param <T> per-row payload type
      * @return an error outcome
      */
+    @NotNull
     private static <T> PageOutcome<T> error() {
       return new PageOutcome<>(null, false);
     }

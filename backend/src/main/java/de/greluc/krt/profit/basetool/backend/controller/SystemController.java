@@ -28,6 +28,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,6 +51,8 @@ public class SystemController {
    *
    * @return {@code {status, version, message}} map
    */
+  @NotNull
+  @Unmodifiable
   @GetMapping("/v1/system/ping")
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -69,6 +73,7 @@ public class SystemController {
    *
    * @return ping response with UTC timestamp
    */
+  @NotNull
   @GetMapping("/v2/system/ping")
   @PreAuthorize("isAuthenticated()")
   @Operation(

@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +75,7 @@ public class BankDashboardService {
    * @param userId the caller's user id (the employee filter)
    * @return the dashboard payload
    */
+  @NotNull
   public BankDashboardDto getDashboard(boolean management, @NotNull UUID userId) {
     List<BankAccount> accounts =
         management
@@ -167,6 +169,7 @@ public class BankDashboardService {
    * @param ownersById the owning org units (parent pre-loaded) keyed by id
    * @return the owning Bereich org unit, or {@code null} when the account has none
    */
+  @Nullable
   private OrgUnit resolveBereich(
       @NotNull BankAccount account, @NotNull Map<UUID, OrgUnit> ownersById) {
     OrgUnit ownerRef = account.getOrgUnit();

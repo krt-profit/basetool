@@ -97,6 +97,7 @@ public class AdminMaterialsPageController {
    * @param model Thymeleaf model populated with materials, refined-materials and categories
    * @return the {@code admin/materials} view name
    */
+  @NotNull
   @GetMapping
   public String listMaterials(Model model) {
     try {
@@ -152,6 +153,7 @@ public class AdminMaterialsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/materials}
    */
+  @NotNull
   @PostMapping("/categories")
   public String createCategory(@RequestParam String name, RedirectAttributes redirectAttributes) {
     try {
@@ -179,6 +181,7 @@ public class AdminMaterialsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/materials}
    */
+  @NotNull
   @PostMapping("/categories/{id}/delete")
   public String deleteCategory(@PathVariable UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -206,7 +209,8 @@ public class AdminMaterialsPageController {
    */
   @ResponseBody
   @PostMapping(value = "/categories", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> createCategoryAjax(@RequestBody Map<String, Object> request) {
+  public ResponseEntity<Object> createCategoryAjax(
+      @NotNull @RequestBody Map<String, Object> request) {
     Object nameValue = request.get("name");
     if (!(nameValue instanceof String name) || name.isBlank()) {
       return ResponseEntity.badRequest().build();

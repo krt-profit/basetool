@@ -70,6 +70,7 @@ public class TermsDocumentController {
    * @param locale the caller's resolved language
    * @return the structured document, always {@code 200}
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("permitAll()")
   // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -57,7 +58,7 @@ public interface JobTypeMapper {
    * persist.
    */
   @AfterMapping
-  default void setParentAfterMapping(@MappingTarget JobType target, JobTypeDto source) {
+  default void setParentAfterMapping(@MappingTarget JobType target, @NotNull JobTypeDto source) {
     UUID parentId = source.parentId();
     if (parentId != null) {
       JobType parent = new JobType();

@@ -44,6 +44,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -127,6 +128,7 @@ public class DiscordRegistrationAdminController {
    * @param body optional body carrying the optimistic-lock version
    * @return the now-active user (with its bumped version)
    */
+  @NotNull
   @PostMapping("/{id}/approve")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PendingRegistrationDto approve(
@@ -146,6 +148,7 @@ public class DiscordRegistrationAdminController {
    * @param body optional body carrying the reason and the optimistic-lock version
    * @return the now-rejected user (with its bumped version)
    */
+  @NotNull
   @PostMapping("/{id}/reject")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PendingRegistrationDto reject(
@@ -169,6 +172,7 @@ public class DiscordRegistrationAdminController {
    * @param body optional body carrying a note and the optimistic-lock version
    * @return the now-pending registration (with its bumped version)
    */
+  @NotNull
   @PostMapping("/{id}/reopen")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(summary = "Reopen a rejected registration back into the approval queue.")
@@ -202,12 +206,13 @@ public class DiscordRegistrationAdminController {
    * @param body the target account id + the optimistic-lock version
    * @return the surviving target account (with its bumped version)
    */
+  @NotNull
   @PostMapping("/{id}/link")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public PendingRegistrationDto link(
       @PathVariable UUID id,
       @AuthenticationPrincipal Jwt jwt,
-      @Valid @RequestBody LinkRegistrationRequest body) {
+      @NotNull @Valid @RequestBody LinkRegistrationRequest body) {
     return toDto(
         userRegistrationService.linkRegistrationToExistingAccount(
             id, body.targetUserId(), body.version(), userService.getUserIdFromJwt(jwt)));
@@ -232,6 +237,7 @@ public class DiscordRegistrationAdminController {
    * @param body the source account to empty, and the registration's optimistic-lock version
    * @return the surviving account
    */
+  @NotNull
   @PostMapping("/{id}/merge")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(summary = "Move an older account's own data onto this registration.")
@@ -247,7 +253,7 @@ public class DiscordRegistrationAdminController {
   public PendingRegistrationDto merge(
       @PathVariable UUID id,
       @CurrentUserId UUID adminUserId,
-      @Valid @RequestBody MergeAccountRequest body) {
+      @NotNull @Valid @RequestBody MergeAccountRequest body) {
     return toDto(userAccountMergeService.merge(body.sourceUserId(), id, adminUserId));
   }
 
@@ -260,6 +266,7 @@ public class DiscordRegistrationAdminController {
    * @param user the registration to map
    * @return the DTO, with {@code callsignCollision} resolved for this row
    */
+  @NotNull
   private PendingRegistrationDto toDto(User user) {
     return toDto(user, userRegistrationService.findCollidingCallsigns(List.of(user)));
   }
@@ -271,7 +278,8 @@ public class DiscordRegistrationAdminController {
    * @param collidingCallsigns lower-cased usernames held by more than one account
    * @return the DTO
    */
-  private PendingRegistrationDto toDto(User user, Set<String> collidingCallsigns) {
+  @NotNull
+  private PendingRegistrationDto toDto(@NotNull User user, Set<String> collidingCallsigns) {
     return new PendingRegistrationDto(
         user.getId(),
         user.getEffectiveName(),

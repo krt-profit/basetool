@@ -44,6 +44,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -125,6 +127,7 @@ public class OrgUnitBankPageController {
    * @param model Spring MVC model
    * @return the template, or its {@code orgUnitBankAccounts} / {@code orgUnitBank} fragment view
    */
+  @NotNull
   @GetMapping("/org-unit-bank")
   @PreAuthorize(MEMBER_OR_ABOVE)
   public String orgUnitBank(
@@ -256,6 +259,7 @@ public class OrgUnitBankPageController {
    * @param principal the authenticated OIDC user, or {@code null} outside a user context
    * @return a non-blank label, or {@code null} when nothing identifies the caller
    */
+  @Contract("null -> null")
   @Nullable
   private static String requesterHandle(@Nullable OidcUser principal) {
     if (principal == null) {
@@ -376,6 +380,7 @@ public class OrgUnitBankPageController {
    * @param model Spring MVC model
    * @return the template, or one of its fragment views
    */
+  @NotNull
   @GetMapping("/org-unit-bank/accounts/{id}")
   @PreAuthorize(MEMBER_OR_ABOVE)
   public String orgUnitBankAccount(
@@ -532,6 +537,7 @@ public class OrgUnitBankPageController {
    * @param balances the visible balance cards (never {@code null})
    * @return account id to its scaled sparkline; same iteration order as {@code balances}
    */
+  @NotNull
   private static Map<UUID, BankSparkline.Spark> sparksByAccountId(
       List<OrgUnitBankBalanceDto> balances) {
     Map<UUID, BankSparkline.Spark> sparks = new LinkedHashMap<>();

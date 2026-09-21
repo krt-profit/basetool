@@ -29,7 +29,10 @@ import java.security.KeyStore;
 import java.time.Duration;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import org.jboss.logging.Logger;
+import lombok.extern.jbosslog.JBossLog;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Builds the {@link HttpClient} the {@link BackendAccountChecker} uses to call the Basetool backend
@@ -43,9 +46,8 @@ import org.jboss.logging.Logger;
  * certificate then fails, which the checker maps to {@link BackendAccountChecker.Result#UNKNOWN}
  * (fail open) rather than admitting an unverified connection.
  */
+@JBossLog
 final class BackendTrustSupport {
-
-  private static final Logger LOG = Logger.getLogger(BackendTrustSupport.class);
 
   private BackendTrustSupport() {
     // Utility class — not instantiable.
@@ -61,8 +63,10 @@ final class BackendTrustSupport {
    * @param truststorePassword the truststore password; may be {@code null}/blank
    * @return a configured {@link HttpClient}
    */
-  static HttpClient httpClient(
-      Duration connectTimeout, String truststorePath, String truststorePassword) {
+  static @NotNull HttpClient httpClient(
+      @NotNull Duration connectTimeout,
+      @Nullable String truststorePath,
+      @Nullable String truststorePassword) {
     HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(connectTimeout);
     SSLContext sslContext = sslContext(truststorePath, truststorePassword);
     if (sslContext != null) {
@@ -81,7 +85,9 @@ final class BackendTrustSupport {
    * @return the pinned {@link SSLContext}, or {@code null} to use the default JVM truststore (no
    *     truststore configured, or a load failure — never an insecure trust-all context)
    */
-  private static SSLContext sslContext(String truststorePath, String truststorePassword) {
+  @Contract("null, _ -> null")
+  private static @Nullable SSLContext sslContext(
+      @Nullable String truststorePath, @Nullable String truststorePassword) {
     if (truststorePath == null || truststorePath.isBlank()) {
       return null;
     }
@@ -100,7 +106,7 @@ final class BackendTrustSupport {
     } catch (GeneralSecurityException | IOException e) {
       // Misconfigured / unreadable truststore — fall back to default trust. The HTTPS call then
       // fails against the self-signed cert and the precheck fails open; never trust-all.
-      LOG.warn(
+      log.warn(
           "Failed to load the backend truststore; the Discord account-existence precheck will fail"
               + " open until it is fixed.",
           e);

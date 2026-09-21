@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Set;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -103,6 +104,7 @@ import tools.jackson.databind.exc.InvalidTypeIdException;
  * tokens, and none of it belongs in a log line.
  */
 @Slf4j
+@RequiredArgsConstructor
 public class FaultTolerantSessionSerializer implements RedisSerializer<Object> {
 
   /**
@@ -144,7 +146,7 @@ public class FaultTolerantSessionSerializer implements RedisSerializer<Object> {
   private static final String CAUSE_OTHER = "other";
 
   /** The serializer this one guards; every write and every successful read goes straight to it. */
-  private final RedisSerializer<Object> delegate;
+  private final @NotNull RedisSerializer<Object> delegate;
 
   /**
    * Supplies the registry the drop counter binds to.
@@ -154,21 +156,7 @@ public class FaultTolerantSessionSerializer implements RedisSerializer<Object> {
    * hard {@code MeterRegistry} dependency there drags Micrometer's auto-configuration into
    * session-repository creation.
    */
-  private final ObjectProvider<MeterRegistry> meterRegistry;
-
-  /**
-   * Creates a tolerant wrapper around {@code delegate}.
-   *
-   * @param delegate the serializer that does the actual work.
-   * @param meterRegistry provider for the registry {@code basetool_session_value_dropped_total}
-   *     binds to; resolved lazily, once per drop.
-   */
-  public FaultTolerantSessionSerializer(
-      @NotNull RedisSerializer<Object> delegate,
-      @NotNull ObjectProvider<MeterRegistry> meterRegistry) {
-    this.delegate = delegate;
-    this.meterRegistry = meterRegistry;
-  }
+  private final @NotNull ObjectProvider<MeterRegistry> meterRegistry;
 
   /**
    * Serialises a session value, propagating any failure.

@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -93,6 +94,7 @@ public class BlueprintOverviewPageController {
    * @return the {@code blueprint-overview} view name, or its {@code results} fragment for an AJAX
    *     swap request
    */
+  @NotNull
   @GetMapping
   public String view(
       @RequestParam(required = false) Integer page,

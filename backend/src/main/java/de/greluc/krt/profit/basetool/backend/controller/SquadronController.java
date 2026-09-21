@@ -160,7 +160,8 @@ public class SquadronController {
   @PatchMapping("/{id}/promotion-enabled")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto setPromotionEnabled(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid SquadronPromotionToggleRequest body) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SquadronPromotionToggleRequest body) {
     return squadronMapper.toDto(squadronService.setPromotionEnabled(id, body.enabled()));
   }
 
@@ -178,7 +179,7 @@ public class SquadronController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto setProfitEligible(
       @PathVariable @NotNull UUID id,
-      @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {
+      @NotNull @RequestBody @Valid SquadronProfitEligibleToggleRequest body) {
     return squadronMapper.toDto(squadronService.setProfitEligible(id, body.eligible()));
   }
 

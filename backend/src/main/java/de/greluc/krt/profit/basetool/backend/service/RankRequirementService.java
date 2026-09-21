@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -341,6 +342,7 @@ public class RankRequirementService {
         .orElseThrow(() -> new EntityNotFoundException("RankRequirement not found: " + id));
   }
 
+  @Contract("null -> null")
   @Nullable
   private PromotionTopic resolveTopic(@Nullable UUID topicId) {
     if (topicId == null) {
@@ -351,6 +353,7 @@ public class RankRequirementService {
         .orElseThrow(() -> new EntityNotFoundException("PromotionTopic not found: " + topicId));
   }
 
+  @Contract("null -> null")
   @Nullable
   private PromotionCategory resolveCategory(@Nullable UUID categoryId) {
     if (categoryId == null) {

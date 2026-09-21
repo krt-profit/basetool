@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -85,6 +86,7 @@ public class AppLinkController {
    *
    * @return a {@code 303} redirect to the help page, with no query string attached
    */
+  @NotNull
   @GetMapping("/app/callback")
   public RedirectView callback() {
     RedirectView redirect = new RedirectView(HELP_PATH);
@@ -107,6 +109,7 @@ public class AppLinkController {
    *
    * @return the {@code app-link-help} view name
    */
+  @NotNull
   @GetMapping(HELP_PATH)
   public String linkHelp() {
     return "app-link-help";

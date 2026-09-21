@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +76,7 @@ public class OrgChartReadService {
    *
    * @return the assembled chart; never {@code null}. Empty scopes render as empty groups.
    */
+  @NotNull
   public OrgChartDto getOrgChart() {
     List<OrgUnit> units = orgUnitRepository.findActiveSquadronsAndSpecialCommands();
     List<OrgUnit> bereiche = orgUnitRepository.findActiveBereiche();
@@ -176,7 +178,7 @@ public class OrgChartReadService {
    * @param bereichIds the ids of the active Bereiche.
    * @return {@code true} iff the unit is grouped under a Bereich.
    */
-  private static boolean hasChartedBereichParent(OrgUnit unit, Set<UUID> bereichIds) {
+  private static boolean hasChartedBereichParent(@NotNull OrgUnit unit, Set<UUID> bereichIds) {
     return unit.getParent() != null && bereichIds.contains(unit.getParent().getId());
   }
 
@@ -189,8 +191,11 @@ public class OrgChartReadService {
    * @param positionsByUnit positions grouped by org-unit id.
    * @return the assembled Bereich tier; never {@code null}.
    */
+  @NotNull
   private BereichChartDto buildBereich(
-      OrgUnit bereich, List<OrgUnit> units, Map<UUID, List<OrgChartPosition>> positionsByUnit) {
+      OrgUnit bereich,
+      @NotNull List<OrgUnit> units,
+      Map<UUID, List<OrgChartPosition>> positionsByUnit) {
     List<SquadronChartDto> squadrons =
         units.stream()
             .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)
@@ -224,7 +229,8 @@ public class OrgChartReadService {
    * @param positions the Bereich's positions.
    * @return the Bereichsleitung DTO; never {@code null}.
    */
-  private AreaLeadershipDto buildBereichLeadership(List<OrgChartPosition> positions) {
+  @NotNull
+  private AreaLeadershipDto buildBereichLeadership(@NotNull List<OrgChartPosition> positions) {
     OrgChartNodeDto lead =
         positions.stream()
             .filter(p -> p.getPositionType() == OrgChartPositionType.BEREICHSLEITER)
@@ -238,7 +244,8 @@ public class OrgChartReadService {
         nodesOfType(positions, OrgChartPositionType.BEREICHSOPERATOR));
   }
 
-  private AreaLeadershipDto buildAreaLeadership(List<OrgChartPosition> positions) {
+  @NotNull
+  private AreaLeadershipDto buildAreaLeadership(@NotNull List<OrgChartPosition> positions) {
     OrgChartNodeDto lead =
         positions.stream()
             .filter(p -> p.getPositionType() == OrgChartPositionType.AREA_LEAD)
@@ -252,7 +259,8 @@ public class OrgChartReadService {
         nodesOfType(positions, OrgChartPositionType.AREA_OPERATOR));
   }
 
-  private SquadronChartDto buildSquadron(OrgUnit unit, List<OrgChartPosition> positions) {
+  @NotNull
+  private SquadronChartDto buildSquadron(OrgUnit unit, @NotNull List<OrgChartPosition> positions) {
     OrgChartNodeDto lead =
         positions.stream()
             .filter(p -> p.getPositionType() == OrgChartPositionType.SQUADRON_LEAD)
@@ -295,7 +303,9 @@ public class OrgChartReadService {
    * @param siblings every position of the owning Staffel, used to find this Kommando's children.
    * @return the assembled Kommando DTO; never {@code null}.
    */
-  private CommandChartDto buildCommand(OrgChartPosition command, List<OrgChartPosition> siblings) {
+  @NotNull
+  private CommandChartDto buildCommand(
+      @NotNull OrgChartPosition command, List<OrgChartPosition> siblings) {
     User leader = command.getUser();
     OrgChartNodeDto deputy =
         siblings.stream()
@@ -323,6 +333,7 @@ public class OrgChartReadService {
         ensigns);
   }
 
+  @NotNull
   private SpecialCommandChartDto buildSpecialCommand(
       OrgUnit unit, List<OrgChartPosition> positions) {
     List<OrgChartNodeDto> commanders = nodesOfType(positions, OrgChartPositionType.SK_COMMANDER);
@@ -335,11 +346,11 @@ public class OrgChartReadService {
   }
 
   private List<OrgChartNodeDto> nodesOfType(
-      List<OrgChartPosition> positions, OrgChartPositionType type) {
+      @NotNull List<OrgChartPosition> positions, OrgChartPositionType type) {
     return positions.stream().filter(p -> p.getPositionType() == type).map(mapper::toNode).toList();
   }
 
-  private static boolean isChildOf(OrgChartPosition child, OrgChartPosition parent) {
+  private static boolean isChildOf(@NotNull OrgChartPosition child, OrgChartPosition parent) {
     return child.getParent() != null && parent.getId().equals(child.getParent().getId());
   }
 }

@@ -380,7 +380,8 @@ public class PersonalInventoryItemService {
    * @param item the personal inventory item
    * @return the {@code name @ location} label
    */
-  private static String personalLabel(PersonalInventoryItem item) {
+  @NotNull
+  private static String personalLabel(@NotNull PersonalInventoryItem item) {
     return item.getName() + " @ " + item.getLocationNameSnapshot();
   }
 

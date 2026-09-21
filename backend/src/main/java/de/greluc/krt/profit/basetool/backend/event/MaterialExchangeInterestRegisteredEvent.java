@@ -24,7 +24,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published right after a member registers interest in a Materialbörse offer (#1187,
@@ -57,11 +59,14 @@ public record MaterialExchangeInterestRegisteredEvent(
   /** Loose entity-type tag stored on the produced notification for deep-linking to the board. */
   public static final String ENTITY_TYPE = "MATERIAL_EXCHANGE_OFFER";
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.MATERIAL_EXCHANGE_INTEREST_REGISTERED;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
@@ -72,6 +77,7 @@ public record MaterialExchangeInterestRegisteredEvent(
     return ownerUserId;
   }
 
+  @NotNull
   @Override
   public String entityType() {
     return ENTITY_TYPE;
@@ -82,6 +88,7 @@ public record MaterialExchangeInterestRegisteredEvent(
     return offerId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();

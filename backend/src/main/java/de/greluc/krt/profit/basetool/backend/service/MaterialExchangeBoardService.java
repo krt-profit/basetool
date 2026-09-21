@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -206,6 +207,7 @@ public class MaterialExchangeBoardService {
    *
    * @return the tab counts.
    */
+  @NotNull
   public MaterialExchangeCountsDto counts() {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
     long all = offerRepository.countByStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -224,6 +226,7 @@ public class MaterialExchangeBoardService {
    * @return the viewer-relative offer detail.
    * @throws NotFoundException if no offer with that id exists.
    */
+  @NotNull
   public MaterialExchangeOfferDto detail(UUID offerId) {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
     MaterialExchangeOffer offer = loadWithDetail(offerId);
@@ -294,8 +297,9 @@ public class MaterialExchangeBoardService {
    * @param alreadyReleased whether an active offer already backs this row.
    * @return the picker entry.
    */
+  @NotNull
   private static MaterialExchangeReleasableItemDto toReleasableDto(
-      InventoryItem item, boolean alreadyReleased) {
+      @NotNull InventoryItem item, boolean alreadyReleased) {
     boolean isItem = item.getGameItem() != null;
     String locationName = item.getLocation() == null ? null : item.getLocation().getName();
     if (isItem) {
@@ -330,6 +334,7 @@ public class MaterialExchangeBoardService {
    * @param viewerId the requesting member, or {@code null} if unresolved.
    * @return the offer detail.
    */
+  @NotNull
   public MaterialExchangeOfferDto detailDto(MaterialExchangeOffer offer, @Nullable UUID viewerId) {
     boolean mine = isMine(offer, viewerId);
     int count = (int) interestRepository.countByOfferId(offer.getId());
@@ -362,6 +367,7 @@ public class MaterialExchangeBoardService {
    * @param interestedHandles the interessenten handles (owner-only), or {@code null}.
    * @return the assembled DTO.
    */
+  @NotNull
   private MaterialExchangeOfferDto toDto(
       MaterialExchangeOffer offer,
       @Nullable UUID viewerId,
@@ -422,7 +428,7 @@ public class MaterialExchangeBoardService {
    * @param offers the board page's offers.
    * @return the distinct owner ids (a defensively null-owner offer contributes nothing).
    */
-  private static Set<UUID> ownerIdsOf(Collection<MaterialExchangeOffer> offers) {
+  private static Set<UUID> ownerIdsOf(@NotNull Collection<MaterialExchangeOffer> offers) {
     return offers.stream()
         .map(MaterialExchangeBoardService::ownerIdOf)
         .filter(Objects::nonNull)
@@ -436,7 +442,7 @@ public class MaterialExchangeBoardService {
    * @return the owner's user id, or {@code null}.
    */
   @Nullable
-  private static UUID ownerIdOf(MaterialExchangeOffer offer) {
+  private static UUID ownerIdOf(@NotNull MaterialExchangeOffer offer) {
     return offer.getOwner() == null ? null : offer.getOwner().getId();
   }
 
@@ -454,6 +460,7 @@ public class MaterialExchangeBoardService {
    *     empty map.
    * @return owner id → their ordered affiliation badges; members with no membership are absent.
    */
+  @NotNull
   private Map<UUID, List<OrgUnitReferenceDto>> ownerOrgUnitBadges(Set<UUID> ownerIds) {
     if (ownerIds.isEmpty()) {
       return Map.of();
@@ -558,7 +565,7 @@ public class MaterialExchangeBoardService {
    * @param offer the offer, with its item loaded.
    * @return the clamped offered quantity in SCU.
    */
-  private static double effectiveOfferedAmount(MaterialExchangeOffer offer) {
+  private static double effectiveOfferedAmount(@NotNull MaterialExchangeOffer offer) {
     Double offered = offer.getOfferedAmount();
     Double stock = offer.getInventoryItem().getAmount();
     double offeredValue = offered == null ? 0.0 : offered;
@@ -579,7 +586,7 @@ public class MaterialExchangeBoardService {
    * @return the clamped whole-unit quantity, or {@code null} if the offer states none.
    */
   @Nullable
-  private static Integer effectiveItemQuantity(MaterialExchangeOffer offer) {
+  private static Integer effectiveItemQuantity(@NotNull MaterialExchangeOffer offer) {
     Integer quantity = offer.getItemQuantity();
     if (quantity == null) {
       return null;
