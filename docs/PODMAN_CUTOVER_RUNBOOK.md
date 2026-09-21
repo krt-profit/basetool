@@ -495,6 +495,14 @@ chmod 644 /var/iri/monitoring/certs/basetool-ca.crt
 restorecon -RF /var/iri/monitoring/secrets /var/iri/monitoring/certs
 ```
 
+> [!note] Listed from the snapshot, not assumed — 2026-09-21
+> `restic dump latest .../monitoring/secrets.tar.gz | tar -tzv`, run from the target:
+> `secrets/alertmanager.yml` (2234 B), `secrets/prometheus_web_password` (45 B),
+> `secrets/prometheus-web.yml` (90 B), `secrets/scrape_password` (38 B),
+> `certs/basetool-ca.crt` (1257 B), `certs/grafana.crt` (1176 B), `certs/grafana.key` (1704 B).
+> Every file this step depends on is in there — including the two the gates could otherwise only
+> get by hand, and including the `grafana.*` pair the next box warns about.
+
 > [!important] `grafana.crt` is the one file in that archive NOT to restore
 > The archive carries the old host's `certs/grafana.{crt,key}` too. Grafana's leaf is **self-signed
 > and per-host** — §0.6 minted one for this host on 2026-09-21 with this host's SAN. Untarring the
