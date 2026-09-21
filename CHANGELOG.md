@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Entwicklung: die Architektur ist jetzt vollständig nach arc42 dokumentiert.** Zwölf Kapitel unter `docs/arc42/` — Kontext, Bausteine, Laufzeit, Verteilung, Querschnitt, Qualität, Risiken und Glossar — mit dem Stand **nach** dem Podman-Umzug. Sie verweisen auf Specs und ADRs, statt sie zu wiederholen. Rein entwicklungsseitig.
+
 ### Changed
 
 - **Entwicklung: das Logging ist jetzt erzwungen einheitlich.** Produktionscode holt seinen Logger
@@ -18,9 +22,10 @@
   Anwendung ändert sich nicht (ADR-0192).
 
 - **Entwicklung: die letzten handgeschriebenen Accessoren sind jetzt Lombok.** Der Sweep aus
-  ADR-0192 hatte nur den Produktionsbereich erfasst; zwölf Getter und Setter in den Metrik-Beans
-  und in zwei Testklassen sind jetzt Annotationen. Was stehen bleibt, ist gezählt statt behauptet:
-  123 Accessoren, die Lombok nicht schreiben kann. Rein entwicklungsseitig.
+  ADR-0192 hatte nur den Produktionsbereich erfasst; acht Getter und Setter in den Metrik-Beans und
+  in einer Testklasse sind jetzt Annotationen. Was stehen bleibt, ist gezählt statt behauptet: 123
+  Accessoren, die Lombok nicht schreiben kann, plus vier Interface-Implementierungen, die von Hand
+  bleiben, damit sie „@Override“ tragen können. Rein entwicklungsseitig.
 
 - **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
   als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,

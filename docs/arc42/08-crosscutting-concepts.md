@@ -1,0 +1,131 @@
+# 8. Cross-cutting concepts
+
+These rules hold across modules. Each names its authority; this section exists to make them
+findable from one place, not to restate them.
+
+## 8.1 Security and access
+
+Keycloak is the only identity provider; the applications never handle a credential. The backend is
+an OAuth2 **resource server**, the frontend an OAuth2 **client**. Authorisation is centralised on
+`@PreAuthorize` so the permission model can be read off the code, and ArchUnit tests enforce the
+invariants that keep it that way.
+
+Beyond roles there are three mechanisms that are easy to miss:
+
+- **Contextual grants** — LOGISTICIAN and MISSION_MANAGER rights, and SK-lead grants, depend on the
+  caller's relationship to the object, not only on a realm role.
+- **Per-`sub` isolation** — personal data (inventory, blueprints, hangar) is keyed on the Keycloak
+  subject, so it is invisible to everyone else regardless of role.
+- **Guest field redaction** — some surfaces return a reduced projection rather than refusing, so a
+  page can exist for a caller who may see *some* of it.
+
+Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
+[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
+
+## 8.2 Multi-org-unit tenancy
+
+The tenant is the **OrgUnit**. Scoping happens in the service layer through `OwnerScopeService`,
+and the aggregates genuinely differ: strict-Staffel scoping for most, a public escape for
+non-internal Missions, and a separate responsible/requesting pair for Job Orders. Creation stamps
+ownership according to a documented matrix, the admin area and promotion are explicit carve-outs,
+and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
+and across the module boundary.
+
+Authority: [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (`REQ-ORG-*`).
+
+## 8.3 Persistence and schema
+
+Flyway owns the schema; Hibernate runs `ddl-auto=validate` in **every** profile, including tests, so
+a drift between entity and column fails at start-up rather than at runtime. Seeding is explicit
+(`DataInitializer`). N+1 queries are treated as defects.
+
+Authority: [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-*`),
+[`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md).
+
+## 8.4 Concurrency — the landmine field
+
+Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest granularity the data
+allows** (§4.5, §6.3). The specific traps — the `support.OptimisticLock` helper family, Mission's
+manual per-section counters and their DB-enforced atomic bump, pessimistic locking for bulk
+reorders, the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
+— are enumerated in [`backend/CLAUDE.md`](../../backend/CLAUDE.md). **Read that before touching any
+multi-step transaction.** The frontend half — propagating the new version to every DOM element that
+carries it — is in [`frontend/CLAUDE.md`](../../frontend/CLAUDE.md).
+
+## 8.5 API conventions
+
+Versioned `/api/v1` paths with `@ApiDeprecation`, DTO-only boundaries (records + MapStruct +
+Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
+`Pageable`/`PageResponse` with whitelisted sort fields, UTC everywhere, and a committed
+`openapi.json` per REST-serving module.
+
+Authority: [`api-conventions.md`](../specs/api-conventions.md) (`REQ-API-*`).
+
+## 8.6 Frontend behaviour
+
+Two binding rules shape every UI change:
+
+- **The design system is binding** — the DAS KARTELL design system, delivered as a git submodule,
+  must be populated before any UI work. UI built against an absent design system is not "no design
+  system applies"; it is unreviewed.
+- **Live update is binding** — every create/update/delete/toggle/reorder/filter/paginate updates
+  the DOM in place via `krtFetch`, with no full-page reload on success, and on shared surfaces a
+  peer's change propagates without a manual reload.
+
+Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
+[`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`), ADR-0012/0013/0031.
+
+## 8.7 Resilience of the frontend → backend call
+
+One centrally-configured WebClient, wrapped by Resilience4j (Timeout, Retry, CircuitBreaker,
+Bulkhead), with state transitions logged so a `SERVICE_UNAVAILABLE` or `BACKEND_TIMEOUT` always has
+a matching log line.
+
+**Reactor context propagation is mandatory** for anything that must be visible inside an exchange
+filter: `WebClient.exchange()` runs on a Reactor-Netty worker thread and a plain `ThreadLocal` is
+not copied there. The accessors that exist cover the active-OrgUnit pin and the correlation id.
+Forgetting one is silent — the holder is simply empty on the worker thread.
+
+## 8.8 Audit
+
+Nine audited areas (Bank, Lager, Aufträge, Raffinerie, Mein Inventar, Missionen, Operationen,
+Rollen, Beförderung) log **every** state-mutating activity to an append-only trail. Adding a
+mutation to an audited area without its audit event is an incomplete change — including the event
+type, the recording call, the viewer's per-area filter, the DE/EN labels and the coverage list. No
+user free text and no personal data in the details payload.
+
+Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`).
+
+## 8.9 Observability
+
+One access-log line per request; MDC carrying `correlationId`, `userId` and `orgUnitId`, propagated
+across module boundaries; JSON logging in production. Business metrics are `basetool_*` with
+bounded labels. **Never log names, e-mail addresses or tokens** — unconditionally.
+
+Monitoring moves with every feature: a new scheduled job needs task metrics, a new audited area its
+event counter, a new status enum its queue gauge, a new public surface its probe. A renamed or
+removed metric that breaks a dashboard or an alert rule is an incomplete change.
+
+Authority: [`observability.md`](../specs/observability.md) (`REQ-OBS-*`), `monitoring/`.
+
+## 8.10 Internationalisation
+
+Every user-visible string comes from `messages.properties` / `_de` / `_en` — labels, buttons,
+tooltips, errors, flash messages, placeholders, titles. No hardcoded text in HTML, JS or Java.
+Inside `.properties` files German umlauts are `\uXXXX`-escaped; everywhere else they are literal
+UTF-8.
+
+## 8.11 Configuration
+
+Type-safe `@ConfigurationProperties` with `@Validated` for anything that matters, so a
+misconfiguration fails at start-up rather than at first use. On the host, `env.d` files are
+*rendered* from `.env` by `render-env-d.py`; the compose environment blocks are closed allow-lists,
+so a variable not named there cannot be pulled in from `.env` by accident.
+
+## 8.12 Testing
+
+Every feature ships with tests, and Gradle is the only sanctioned test path. **Never a production
+credential in a test or a local stack** — dedicated test artifacts exist for exactly this
+(`.env.test`, the committed throwaway TLS material of [ADR-0139](../adr/0139-shared-committed-tls-material-for-the-test-stack.md),
+a stripped realm export). Deliberately publishing a worthless artefact and leaking a real one are
+opposite acts; one is not licence for the other.
