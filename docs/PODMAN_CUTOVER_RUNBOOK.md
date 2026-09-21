@@ -332,6 +332,21 @@ sudo -u deploy test -r /etc/iri/backup.env && echo readable
 
 ### 0.9 One backup and one restore drill have run on the Podman host
 
+> [!note] What is already established, and what this gate still wants — 2026-09-21
+> **Established.** The target reaches the production repository: `restic snapshots` from it lists
+> all 95, today's included (gate 0.8, met). The newest snapshot was listed **from the target** and
+> holds all nine artifacts §1.4 reads — both dumps, `config/dotenv`, `keystore.p12`,
+> `realm-export.json`, `providers.tar.gz`, `monitoring/{secrets.tar.gz,grafana.db,alertmanager.tar.gz}`.
+> A restore cannot produce what a snapshot does not hold, so that listing is the strongest statement
+> available short of running one — and it is how `config/users.acl` was found to be missing.
+> Separately, a full backup **and** restore drill ran on the testing host with the cutover code and
+> recovered all seven artifacts.
+>
+> **Still wanted here.** That drill, on THIS host, against THAT snapshot. Nothing above proves the
+> restore executes on this machine — only that it has the inputs and that the same code works
+> elsewhere.
+
+
 Not "the scripts exist" — one real run each. The plan is explicit that a week of production without
 a working backup outweighs any dump-and-restore cycle, which makes this a cutover gate rather than
 follow-up work.
@@ -592,7 +607,39 @@ Any difference stops the cutover; the old host is still serving.
   > hand. It fails loudly, which is the one merciful thing about it.
 - **`.env`**, and afterwards `chown deploy:deploy` + `chmod 640` — the deployer reads it and
   `render-env-d.py` renders every `env.d` file from it.
-- **The redis ACL** (`users.acl`).
+- **The redis ACL** (`users.acl`) — and this one is not in the snapshot either.
+
+  > [!danger] Without it, redis comes up with NO authentication — the 2026-07-10 defect, reissued
+  > `backup.sh` in this repository captures `config/users.acl`. The version **deployed on the old
+  > host does not**: `grep -c users.acl` answers `0` there, and its own log line names four items
+  > — "capturing host config (.env, keystore, realm-export, providers)". Confirmed a third way on
+  > 2026-09-21 by listing the newest production snapshot **from the target**: `/config/users.acl`
+  > is absent while all nine other artifacts are present.
+  >
+  > `IRI_REDIS_ACL_HOST_PATH=/var/iri/redis/users.acl` is baked into the redis unit as a bind
+  > mount. A bind source that does not exist makes podman create a **directory** there, redis loads
+  > no ACL file — and an `aclfile` that omits a `default` entry makes redis reset that user to
+  > `nopass ~* &* +@all`. That is not a theoretical chain: it is exactly what production shipped on
+  > 2026-07-10, leaving the session store, OAuth2 refresh tokens included, readable and writable
+  > with no authentication on the internal network. `redis-requires-auth` exists because of it.
+  >
+  > It is a plain root-owned file (`root:root 644`, ~310 bytes), so unlike the certificate volumes
+  > it needs no `podman unshare` — nothing about it is namespaced:
+  >
+  > ```bash
+  > ssh root@<old-host> "base64 -w0 /var/iri/redis/users.acl" \
+  >   | ssh root@<new-host> "base64 -d > /var/iri/redis/users.acl \
+  >       && chown root:root /var/iri/redis/users.acl \
+  >       && chmod 644 /var/iri/redis/users.acl \
+  >       && restorecon -F /var/iri/redis/users.acl \
+  >       && grep -c '^user default ' /var/iri/redis/users.acl"
+  > ```
+  >
+  > That last `grep` **must answer 1**. A zero there is the whole defect: the file exists, redis
+  > loads it, and resets `default` to `nopass` because the file does not name it.
+  >
+  > `redis-requires-auth` at §1.8 catches a miss, and it is the last line rather than the first:
+  > by then the host is minutes from serving.
 
 > [!note] The uid translation applies to the restored data too
 > A `pg_restore` into a cluster the container initialises itself never raises the question, which is
