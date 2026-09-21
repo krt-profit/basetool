@@ -145,6 +145,13 @@ loki.source.file "keycloak" {
 //
 // So the two halves failed in opposite directions: the group defect over-masked (the field NAME was
 // destroyed, never the point), the `\S+` defect under-masked (a spaced value's tail survived).
+//
+// Both halves are GATED now, not merely written down: scripts/check-alloy-log-masking.py fails the
+// build on a `${` in any `replace` or on a second capturing group in any `expression`, and runs as
+// the `alloy-log-masking` job of repo-lint.yml. Neither broken form fails on its own -- the config
+// is valid, `alloy fmt` accepts it, the shipper stays healthy and the stream is not silent -- so
+// the rule is asserted as text rather than trusted to review. Eight of the fourteen stages below
+// were written the broken way, and a production log export read by hand was the only detector.
 loki.process "keycloak_mask" {
 	forward_to = [loki.write.default.receiver]
 
@@ -442,12 +449,15 @@ loki.process "container_mask" {
 		drop_counter_reason = "reject_old_samples_guard"
 	}
 
-	// Grafana logs its Keycloak-OIDC admin logins with `uname=` and the user's e-mail.
+	// Grafana logs its Keycloak-OIDC admin logins with `uname=` and the user's e-mail. The value
+	// group takes the quoted run first, like the Keycloak pair above: Grafana's logfmt quotes any
+	// value containing a space, and the name comes from Keycloak, so a bare \S+ would stop at the
+	// space and ship the tail.
 	stage.match {
 		selector = "{app=\"mon-grafana\"}"
 
 		stage.replace {
-			expression = "uname=(\\S+)"
+			expression = "uname=(\"[^\"]*\"|\\S+)"
 			replace    = "***"
 		}
 

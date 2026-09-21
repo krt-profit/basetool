@@ -21,6 +21,8 @@
   unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
   (REQ-OBS-007).
 
+- **Betrieb: die Maskierung im Log-Shipper kann nicht mehr unbemerkt kaputtgehen.** Die acht fehlerhaften Regeln waren gültige Konfiguration — nichts schlug fehl, nur der Ersatztext war falsch, und aufgefallen ist es erst beim Lesen eines Log-Exports. Ein neuer CI-Check (`alloy-log-masking`) prüft jetzt beide Regeln; zusätzlich maskiert `uname=` bei Grafana-Anmeldungen auch Werte mit Leerzeichen (REQ-OBS-007).
+
 ## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
 
 ### Added
