@@ -1,17 +1,17 @@
-; systemd service for the weekly Profit Basetool Docker housekeeping.
+; systemd service for the weekly Profit Basetool container housekeeping.
 ;
 ; Installation (on the production host, one-time — see docs/deployment.md):
-;   sudo cp /var/iri/code/scripts/iri-docker-cleanup.service /etc/systemd/system/
-;   sudo cp /var/iri/code/scripts/iri-docker-cleanup.timer   /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-container-cleanup.service /etc/systemd/system/
+;   sudo cp /var/iri/code/scripts/iri-container-cleanup.timer   /etc/systemd/system/
 ;   sudo systemctl daemon-reload
-;   sudo systemctl enable --now iri-docker-cleanup.timer
+;   sudo systemctl enable --now iri-container-cleanup.timer
 ;
 ; Run an immediate cleanup (bypassing the next scheduled tick):
-;   sudo systemctl start iri-docker-cleanup.service
+;   sudo systemctl start iri-container-cleanup.service
 ;
 ; Inspect:
-;   systemctl status iri-docker-cleanup.timer
-;   journalctl -u iri-docker-cleanup.service -f
+;   systemctl status iri-container-cleanup.timer
+;   journalctl -u iri-container-cleanup.service -f
 ;
 ; Runs as the same unprivileged `deploy` user as iri-backup / iri-deploy (member
 ; of the `docker` group, no shell, no sudo): it needs the Docker socket to prune
@@ -21,7 +21,7 @@
 ; the unreachable $HOME/.docker — the same reason deploy.sh pins it.
 
 [Unit]
-Description=Profit Basetool — weekly Docker housekeeping (prune unused images/cache/volumes)
+Description=Profit Basetool — weekly container housekeeping (prune unused containers/images/networks)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Wants=network-online.target docker.service
 After=network-online.target docker.service
@@ -62,12 +62,12 @@ User=deploy
 ; docker-cleanup.cron drop-in used to export.
 Environment=DOCKER_CONFIG=/var/lib/iri/.docker
 
-ExecStart=/var/iri/code/scripts/docker-cleanup.sh
+ExecStart=/var/iri/code/scripts/container-cleanup.sh
 
-; stdout/stderr to journald AND to /var/log/iri-docker-cleanup.log for
+; stdout/stderr to journald AND to /var/log/iri-container-cleanup.log for
 ; logrotate-kept history.
-StandardOutput=append:/var/log/iri-docker-cleanup.log
-StandardError=append:/var/log/iri-docker-cleanup.log
+StandardOutput=append:/var/log/iri-container-cleanup.log
+StandardError=append:/var/log/iri-container-cleanup.log
 
 ; --- Hardening (mirrors iri-backup.service) --------------------------------
 ; NOT NoNewPrivileges=true, and the reason is the whole point of this unit.
@@ -117,13 +117,13 @@ LockPersonality=true
 ; Writable paths the script needs:
 ;   /var/lib/iri        — DOCKER_CONFIG (deploy has no usable $HOME)
 ;   /var/iri/monitoring — the node_exporter textfile dir the script writes the
-;                         basetool_docker_cleanup_* metrics into
-;   /var/log            — append to iri-docker-cleanup.log
-;   /var/lock           — the docker-cleanup flock
+;                         basetool_container_cleanup_* metrics into
+;   /var/log            — append to iri-container-cleanup.log
+;   /var/lock           — the container-cleanup flock
 ReadWritePaths=/var/lib/iri /var/iri/monitoring /var/log /var/lock
 
-; docker prune is light on this host; cap generously. The heavy lifting is
-; delegated to the docker daemon out-of-band from this sandbox.
+; Pruning is light on this host; cap generously. The heavy lifting happens inside the container
+; runtime, out-of-band from this sandbox.
 MemoryMax=1G
 CPUQuota=200%
 

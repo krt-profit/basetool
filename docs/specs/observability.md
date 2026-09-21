@@ -639,7 +639,7 @@ not silent — so the only detector was a human reading a log export.
   amendment) records it.
 - **Ops-automation host logs** (`app="ops-deploy"` / `"ops-backup"` / `"ops-cleanup"` /
   `"ops-restore-drill"`) — the four systemd units' own log files under the existing
-  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-docker-cleanup.log`,
+  `/var/log:/hostlog:ro` mount (`iri-deploy.log`, `iri-backup.log`, `iri-container-cleanup.log`,
   `iri-restore-drill.log`). Motive: the units write with `StandardOutput=append:`, which **replaces**
   journald rather than teeing to it, so `journalctl -u iri-deploy.service` carries only systemd's own
   unit records — the script output that explains *why* a deploy rolled back was reachable over SSH
@@ -2258,7 +2258,7 @@ therefore alerts on:
   were dead. Three ops-automation tails are **not** guarded (`ops-backup`, `ops-cleanup`,
   `ops-restore-drill`): those units are separate or optional installs, and with no file there is no
   series, so a guard would fire forever on a correctly-configured host — their liveness is covered
-  metric-side by `BackupStaleOrMissing` / `DockerCleanupStaleOrMissing` / `RestoreDrill*` instead.
+  metric-side by `BackupStaleOrMissing` / `ContainerCleanupStaleOrMissing` / `RestoreDrill*` instead.
   `LokiWriteFailing` fires on `rate(loki_write_dropped_entries_total[15m]) > 0`; a **persistent**
   firing with `reason="ingester_error"` and no other symptom is most often the idle-container stale-line
   re-delivery guarded by the `stage.drop older_than = "167h"` in `loki.process.container_mask` (see

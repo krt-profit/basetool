@@ -3,29 +3,27 @@
 Each item says what it costs and what closing it involves. Nothing here is a vague "could be
 cleaner" — an entry earns its place by naming a failure that can actually happen.
 
-## 11.1 `iri-docker-cleanup` does not work on the Podman runtime — **open, and it fires an alert**
+## 11.1 The cleanup rename is carried by two names for a while — **transitional, with a removal condition**
 
-`scripts/docker-cleanup.sh` calls `docker system df` and `docker volume prune` directly. It is the
-**only** operational script that does not source `scripts/lib/container-runtime.sh`, the abstraction
-that `deploy.sh`, `backup.sh` and `restore-drill.sh` all use.
+The weekly cleanup job was `iri-docker-cleanup` and called `docker` directly; on this runtime that
+failed at its first command while the timer stayed enabled, and the alert fired on `absent()` with
+no way to satisfy it. Fixed in ADR-0194 — §7.4a has what did and did not translate, including the
+step that would have destroyed the edge's certificates if it had.
 
-Measured on the migration target, 2026-09-21: there is **no `docker` binary** (the Ansible role
-installs `podman` and not `podman-docker`), the timer is nevertheless **`enabled`**, and no
-`docker_cleanup` series exists in any textfile.
+What remains is the *shape of the rename*, and it is debt with a deadline. **The alert rules ride
+the config bundle; the scripts are installed by the Ansible role.** The two halves therefore reach a
+host independently and in either order, so for the length of that window the alert accepts **both**
+metric names and Alloy watches **both** log paths:
 
-**Cost.** The weekly run fails at its first command, so nothing reclaims unused images, build cache
-or anonymous volumes — on a single host with finite disk, that is a slow leak toward the condition
-the script exists to prevent. Worse, the alert is
-`(time() - basetool_docker_cleanup_last_success_timestamp) > 8d **or absent(...)**`, so it starts
-firing an hour after the cutover and can never be satisfied. **An alert that is always firing is an
-alert nobody reads**, and this one sits in the same group as the backup and restore-drill staleness
-alerts.
+- `basetool_container_cleanup_last_success_timestamp` **or** `basetool_docker_cleanup_last_success_timestamp`
+- `/hostlog/iri-container-cleanup.log` **and** `/hostlog/iri-docker-cleanup.log`
 
-**Closing it** means porting the script onto `lib/container-runtime.sh` (Podman's `system df` and
-`image prune` differ from Docker's in output, not only in name), renaming the unit and the metric,
-and updating the alert rule, the Ansible role and the dashboards together — a metric rename that
-misses one of those is exactly the failure mode §8.9 warns about. The script's prose is also German,
-which the English-only rule forbids; that is a good moment to fix it rather than a separate errand.
+`container_cleanup_rename_test.yml` locks all four combinations, including the one that matters
+most: old metric stale, new metric fresh, alert silent.
+
+**Remove both halves once every host has run the role.** A rule that accepts a name nothing writes
+is how a rename quietly never finishes — and while it stands, a host that somehow kept writing only
+the old name would look healthy forever, which is precisely the state the alert exists to report.
 
 ## 11.2 The frontend hand-mirrors the backend's DTOs
 

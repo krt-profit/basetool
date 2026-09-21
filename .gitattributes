@@ -42,7 +42,7 @@
 *.volume text eol=lf
 # The SYSTEM units and their log rotation, for the identical reason, and they were missed when the
 # block above was written: `ansible/roles/basetool_host/tasks/25-scripts.yml` copies iri-deploy,
-# iri-backup, iri-restore-drill, iri-docker-cleanup and iri-container-metrics onto the host
+# iri-backup, iri-restore-drill, iri-container-cleanup and iri-container-metrics onto the host
 # verbatim. A CRLF checkout puts a carriage return inside `ExecStart=`, so systemd looks for an
 # executable whose name ends in one and reports 203/EXEC for a path that is plainly right. The same
 # failure this migration has already spent a session on, for a different reason.

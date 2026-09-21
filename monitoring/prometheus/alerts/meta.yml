@@ -445,7 +445,7 @@ groups:
       # docker-housekeeping timer is documented as optional outright); with no file, local.file_match
       # yields no target and no series, so an absent()-guard on them would fire forever on a correct
       # configuration — a dead alert, exactly what REQ-OBS-014 forbids. Their liveness is already
-      # covered from the metric side by BackupStaleOrMissing / DockerCleanupStaleOrMissing /
+      # covered from the metric side by BackupStaleOrMissing / ContainerCleanupStaleOrMissing /
       # RestoreDrillStaleOrMissing.
       - alert: LogStreamSilent
         expr: absent(loki_source_file_read_lines_total{path="/hostlog/iri-deploy.log"})

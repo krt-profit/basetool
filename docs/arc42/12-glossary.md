@@ -59,7 +59,7 @@ worth reading even if you know the domain.
 
 | Looks like | Actually |
 | --- | --- |
-| `iri-docker-cleanup` | Named for a runtime that no longer exists on the host. It is broken post-cutover — §11.1. |
+| `basetool_docker_cleanup_*` | The cleanup job's **former** metric name. The alert still accepts it while the rename crosses two delivery channels — §11.1. Nothing writes it once a host has run the Ansible role. |
 | `versions.properties` | Vestigial. Zero entries, nothing reads it. Versions live in `gradle/libs.versions.toml`. |
 | `keycloak.<domain>` in `edge-certs` | A fifth certificate directory that nothing serves and nothing renews, left from before ADR-0166. |
 | `IRI_COSIGN_VERIFY=false` | A break-glass for a Sigstore outage, **not** the way to run an unsigned image. The sanctioned override for a different signing identity is `IRI_COSIGN_IDENTITY_REGEXP`. |

@@ -19,7 +19,7 @@
 # here. .dockerignore additionally bars secrets from the build context,
 # release-images.yml asserts the built bundle carries none, and deploy.sh
 # re-asserts their absence before applying. deploy.sh and the four OPERATIONAL
-# units (iri-deploy, iri-backup, iri-restore-drill, iri-docker-cleanup) are
+# units (iri-deploy, iri-backup, iri-restore-drill, iri-container-cleanup) are
 # deliberately left OUT so a promoted bundle can never overwrite the running
 # deployer — a deployer that updates itself mid-run is a self-update hazard.
 # Those are provisioning, and ansible/roles/basetool_host delivers them.

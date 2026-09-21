@@ -34,6 +34,14 @@
 
 ### Fixed
 
+- **Betrieb: die wöchentliche Aufräum-Aufgabe läuft wieder — und hätte beinahe Zertifikate
+  gelöscht.** Sie rief `docker` direkt auf; auf dem neuen Host gibt es kein `docker`, der Timer war
+  trotzdem aktiv und ihr Alarm feuerte dauerhaft. Sie erkennt die Laufzeit jetzt selbst. Zwei
+  Schritte entfallen auf Podman: `podman volume prune` kennt kein „nur anonyme" und hätte
+  `edge-certs` und `edge-acme-state` mitgenommen, und `builder prune` ist dort nur ein zweiter
+  Image-Prune. Der Grund für den Volume-Schritt wurde dafür an der Quelle beseitigt: die
+  Restore-Probe ließ bei jedem Lauf ein 156-MB-Volume zurück (ADR-0194).
+
 - **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
   die Verbindung mitten in einer Antwort ab, meldete das Frontend intern einen Erfolg mit
   unbekanntem Fehler und behandelte den Ausfall als Fehler des Aufrufers. Er wird jetzt als das

@@ -289,10 +289,21 @@ loki.source.file "ops_backup" {
 	forward_to = [loki.process.ops_automation_mask.receiver]
 }
 
-// The unit and its log file are named iri-docker-cleanup; the stream label is shortened to
-// ops-cleanup to keep the app label set short and symmetric with its three siblings.
+// The unit and its log file are named iri-container-cleanup; the stream label stays ops-cleanup to
+// keep the app label set short and symmetric with its three siblings -- and because the alert and
+// the dashboard both point a reader at `{app="ops-cleanup"}`, which a label rename would break for
+// every historical query.
+//
+// BOTH file names are watched. The unit was renamed from iri-docker-cleanup with ADR-0194, and the
+// scripts reach a host through the Ansible role while this file rides the config bundle, so the two
+// halves land independently. Watching only the new name would leave a gap in the very stream the
+// alert tells the operator to read over the last 10 days. Drop the old path once every host has run
+// the role.
 local.file_match "ops_cleanup" {
-	path_targets = [{__path__ = "/hostlog/iri-docker-cleanup.log", app = "ops-cleanup"}]
+	path_targets = [
+		{__path__ = "/hostlog/iri-container-cleanup.log", app = "ops-cleanup"},
+		{__path__ = "/hostlog/iri-docker-cleanup.log", app = "ops-cleanup"},
+	]
 }
 
 loki.source.file "ops_cleanup" {

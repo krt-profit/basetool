@@ -73,21 +73,37 @@ insists the old host's deploy timer is **disabled**, not merely stopped.
 | `iri-restore-drill` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
 | `iri-cert-expiry` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
 | `iri-container-metrics` | The cgroup textfile collector that replaces part of cAdvisor |
-| `iri-docker-cleanup` | **Broken after the cutover — see below** |
+| `iri-container-cleanup` | Weekly prune of stopped containers, unused images and networks — runtime-aware (§7.4a) |
 
-> [!warning] `iri-docker-cleanup` does not work on this runtime, and its alert cannot be satisfied
-> `scripts/docker-cleanup.sh` calls `docker system df` and `docker volume prune` **directly**. It is
-> the only operational script that does not source `scripts/lib/container-runtime.sh`, the
-> abstraction `deploy.sh`, `backup.sh` and `restore-drill.sh` all use.
+### 7.4a The weekly cleanup is runtime-aware, and two of its steps are not portable
+
+The job was `iri-docker-cleanup` until 2026-09-21 and called `docker` directly — the only
+operational script that did not go through `lib/container-runtime.sh`. On this host there is no
+`docker` binary at all, so the weekly run failed at its first command while the timer stayed
+enabled and the alert fired on `absent()` with no way to satisfy it. ADR-0194 records the fix.
+
+Three steps translate; **two do not**, and the difference is the part worth knowing:
+
+| step | Docker | Podman |
+| --- | --- | --- |
+| stopped containers, unused images, unused networks | pruned | pruned |
+| build cache | pruned | skipped — `podman builder prune` is an alias for `image prune`, already run |
+| anonymous volumes | pruned | **skipped** |
+
+> [!danger] `podman volume prune` would take the edge's certificates with it
+> Docker's `volume prune`, without `--all`, removes **only anonymous** volumes. Podman has no such
+> distinction — *"Volumes that are not currently owned by a container will be removed. Note all
+> data will be destroyed"* — and its only filter is `label=`. Measured on the target,
+> `podman volume ls --filter dangling=true` listed **`edge-certs` and `edge-acme-state`**: the TLS
+> material and the ACME account, which are in no snapshot (§1.6 of the cutover runbook carries them
+> by hand). They are "dangling" whenever the stack is down, which is exactly when a maintenance job
+> runs.
 >
-> Measured on the migration target on 2026-09-21: **there is no `docker` binary** (the role installs
-> `podman` and does not install `podman-docker`), the timer is nevertheless **`enabled`**, and no
-> `docker_cleanup` series exists in any textfile. The alert is
-> `(time() - basetool_docker_cleanup_last_success_timestamp) > 8d **or absent(...)**`, so it starts
-> firing an hour after the cutover and stays firing, and the weekly run fails at its first command.
->
-> It is recorded here rather than quietly fixed because it is a *cutover gap*, not a style problem:
-> see §11.1 for what closing it involves.
+> A mechanical rename of this job would therefore have been **worse than the broken job it
+> replaced**. The step is skipped on Podman, and the reason it existed was removed at its source:
+> the restore drill's throwaway Postgres left its anonymous data volume behind on every run
+> (156 MB, measured), and `rt_rm_force` now passes `-v`. On Docker, the weekly prune had been
+> silently absorbing that leak for as long as it existed — which is why nobody had seen it.
 
 ## 7.5 Delivery
 

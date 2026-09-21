@@ -561,7 +561,7 @@ expect_call "docker copies it directly, where one daemon reads for everybody" do
   'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
   'cp /work/krt_basetool.dump iri-restore-drill:/tmp/krt_basetool.dump'
 expect_call "and it is removed whatever state it is in" podman \
-  'rt_rm_force iri-restore-drill' 'rm -f iri-restore-drill'
+  'rt_rm_force iri-restore-drill' 'rm -f -v iri-restore-drill'
 
 say ""
 say "== credentials never reach a command line =="

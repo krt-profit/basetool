@@ -2,7 +2,7 @@
 # The account the operational scripts run as, and what it is allowed to reach.
 #
 # THE PROBLEM THIS SOLVES. `iri-deploy.service`, `iri-backup.service`,
-# `iri-restore-drill.service` and `iri-docker-cleanup.service` all declare
+# `iri-restore-drill.service` and `iri-container-cleanup.service` all declare
 # `User=deploy` and `Group=docker`. Measured 2026-09-18 on both Rocky hosts:
 # neither the user nor the group exists, because there is no Docker. As written,
 # all four units fail to start on the platform the migration is moving to — a

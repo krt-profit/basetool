@@ -20,7 +20,7 @@
 #
 # `/var/iri(/.*)?` is written for the CONTAINER STORE and it is right for almost everything under
 # that tree. It is wrong for one directory: `/var/iri/code/scripts` holds deploy.sh, backup.sh,
-# restore-drill.sh, docker-cleanup.sh and cgroup-container-metrics.py, and every one of them is the
+# restore-drill.sh, container-cleanup.sh and cgroup-container-metrics.py, and every one of them is the
 # ExecStart of a systemd unit. systemd will not execute a `container_file_t` file, so under
 # enforcing all five fail identically:
 #

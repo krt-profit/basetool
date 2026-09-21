@@ -43,7 +43,7 @@
     - deploy.sh
     - backup.sh
     - restore-drill.sh
-    - docker-cleanup.sh
+    - container-cleanup.sh
     - lib/container-runtime.sh
     # The renderer deploy.sh calls when the config bundle carries env.d templates. It belongs
     # here and not in the bundle for the same reason deploy.sh does: it is tooling the deployer
@@ -77,8 +77,8 @@
     - iri-backup.timer
     - iri-restore-drill.service
     - iri-restore-drill.timer
-    - iri-docker-cleanup.service
-    - iri-docker-cleanup.timer
+    - iri-container-cleanup.service
+    - iri-container-cleanup.timer
   notify: Reload systemd for the operational units
 
 - name: Install the log rotation the units write for
@@ -92,7 +92,7 @@
     - { src: iri-deploy.logrotate, dest: iri-deploy }
     - { src: iri-backup.logrotate, dest: iri-backup }
     - { src: iri-restore-drill.logrotate, dest: iri-restore-drill }
-    - { src: iri-docker-cleanup.logrotate, dest: iri-docker-cleanup }
+    - { src: iri-container-cleanup.logrotate, dest: iri-container-cleanup }
 
 # The two flocks the units coordinate through. /var/lock is a tmpfs whose mode differs between
 # distributions -- world-writable on the Ubuntu Docker host, root-only on Rocky -- so on the new
@@ -131,7 +131,7 @@
     - iri-deploy.service
     - iri-backup.service
     - iri-restore-drill.service
-    - iri-docker-cleanup.service
+    - iri-container-cleanup.service
   when: not ansible_check_mode
 
 - name: Enable the timers for the next boot, without starting them
@@ -146,7 +146,7 @@
     - iri-deploy.timer
     - iri-backup.timer
     - iri-restore-drill.timer
-    - iri-docker-cleanup.timer
+    - iri-container-cleanup.timer
   when: not ansible_check_mode
 
 - name: Say what is now on the host and what still has to happen

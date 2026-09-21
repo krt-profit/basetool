@@ -360,7 +360,7 @@ Named here rather than discovered later:
 - **The deployer.** `deploy.sh` speaks Compose throughout, and `REQ-OPS-003`'s digest pin, health
   gate and automatic rollback are guarantees that have to move across rather than be re-invented.
   Phase 3.
-- **`backup.sh`, `docker-cleanup.sh`, `restore-drill.sh`** all speak Docker.
+- **`backup.sh`, `container-cleanup.sh`, `restore-drill.sh`** all speak Docker.
 - **The monitoring plane**, which has never run on the testing host at all, and the cgroup
   collector (`scripts/cgroup-container-metrics.py`) that replaces cAdvisor's missing series.
   Phase 4, and [`PODMAN_MIGRATION_PLAN.md`](PODMAN_MIGRATION_PLAN.md) §10.

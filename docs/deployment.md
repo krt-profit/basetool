@@ -261,7 +261,7 @@ sudo cp -r keycloak-theme/      /var/iri/code/
 sudo cp -r docker/              /var/iri/code/   # maintenance page assets
 sudo chown -R deploy:docker     /var/iri/code
 # 0750 (rwx owner deploy, rx group docker, none for other) — consistent with
-# docker-cleanup.sh below. systemd and the manual `sudo -u deploy` invocations run
+# container-cleanup.sh below. systemd and the manual `sudo -u deploy` invocations run
 # as the owner, so world-exec is unnecessary.
 sudo chmod 0750                 /var/iri/code/scripts/deploy.sh
 ```
@@ -465,60 +465,84 @@ live.
 > journald for those streams instead of teeing to it. `journalctl -u
 > iri-deploy.service` therefore shows only systemd's own unit records (Starting /
 > Succeeded / Failed / the exit code) — never a line the script printed. The same
-> applies to `iri-backup`, `iri-docker-cleanup` and `iri-restore-drill`. Once the
+> applies to `iri-backup`, `iri-container-cleanup` and `iri-restore-drill`. Once the
 > monitoring plane is up, the off-host equivalent is Grafana → Explore → Loki with
 > `{app="ops-deploy"}` (`ops-backup` / `ops-cleanup` / `ops-restore-drill`).
 
-### 8. Weekly Docker housekeeping (optional)
+### 8. Weekly container housekeeping (optional)
 
-Every `deploy.sh` run already does a best-effort prune of dangling images, but
-over time unused image layers, build cache and stopped containers still
-accumulate and can fill the disk. [`scripts/docker-cleanup.sh`](../scripts/docker-cleanup.sh)
-is a stand-alone janitor that prunes unused images (`-a`), build cache, stopped
-containers, unused networks and anonymous volumes — each only when no container
-references it, and each gated by an age window so freshly pulled images survive
-(image default: 14 days, comfortably outliving the `deploy.sh` rollback anchor).
-It is safe by construction: all persistent production data lives in `/var/iri/...`
-bind mounts, which the Docker daemon does not manage and `docker volume prune`
-cannot touch.
+Every `deploy.sh` run already does a best-effort prune of dangling images, but over time unused
+image layers, build cache and stopped containers still accumulate and can fill the disk.
+[`scripts/container-cleanup.sh`](../scripts/container-cleanup.sh) is a stand-alone janitor. It
+detects the runtime through [`lib/container-runtime.sh`](../scripts/lib/container-runtime.sh) rather
+than calling a binary by name, and prunes stopped containers, unused images (`-a`) and unused
+networks on both — each only when nothing references it, and each gated by an age window so freshly
+pulled images survive (image default: 14 days, comfortably outliving the `deploy.sh` rollback
+anchor).
 
-The job runs as the **`deploy`** user (not root), consistent with `deploy.sh`
-and the `iri-deploy.timer` pipeline — `deploy` is in the `docker` group, so it
-can reach the Docker socket. The unit sets `DOCKER_CONFIG=/var/lib/iri/.docker`
-because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason
-`deploy.sh` pins it.
+**Two steps are Docker-only, and that asymmetry is deliberate (ADR-0194):**
+
+| step | Docker | Podman |
+| --- | --- | --- |
+| build cache | pruned | skipped — `podman builder prune` is an alias for `image prune`, already run |
+| anonymous volumes | pruned | **skipped** — see below |
+
+> [!warning] `podman volume prune` is not the same command as `docker volume prune`
+> Docker's, without `--all`, removes **only anonymous** volumes. Podman has no such distinction:
+> *"Volumes that are not currently owned by a container will be removed. Note all data will be
+> destroyed"*, and its only filter is `label=`. Measured on the migration target 2026-09-21,
+> `podman volume ls --filter dangling=true` listed **`edge-certs` and `edge-acme-state`** — the
+> edge's TLS material and the ACME account, which are in no snapshot. They count as "dangling"
+> whenever the stack is down, which is exactly when a maintenance job runs.
+>
+> So the step is skipped on Podman, and the reason it existed was fixed at the source instead: the
+> restore drill's throwaway Postgres used to leave its anonymous data volume behind on every run
+> (156 MB, measured), and `rt_rm_force` now removes a container's anonymous volume with the
+> container. On Docker the weekly prune had been quietly absorbing that leak for as long as it
+> existed.
+
+Persistent production data is unaffected on either runtime: it lives in `/var/iri/...` **bind
+mounts**, which are not volumes at all and which no prune command can reach.
+
+The job runs as the **`deploy`** user (not root), consistent with `deploy.sh` and the
+`iri-deploy.timer` pipeline. How `deploy` reaches the containers differs by runtime and is not this
+script's concern: on Docker through the `docker` group, on the rootless Podman host through a
+sudoers rule naming two commands against the service user — which is strictly narrower, the
+`docker` group being root-equivalent by design. The unit sets `DOCKER_CONFIG=/var/lib/iri/.docker`
+because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason `deploy.sh` pins it;
+it is inert under Podman.
 
 Preview what it would reclaim, then install the weekly systemd timer (Saturday
 02:00 UTC):
 
 ```bash
-sudo -u deploy /var/iri/code/scripts/docker-cleanup.sh --dry-run   # show plan + disk usage
+sudo -u deploy /var/iri/code/scripts/container-cleanup.sh --dry-run   # show plan + disk usage
 
-sudo chown deploy:deploy /var/iri/code/scripts/docker-cleanup.sh   # owner = deploy
-sudo chmod 0750          /var/iri/code/scripts/docker-cleanup.sh   # rwx for deploy, none for others
+sudo chown deploy:deploy /var/iri/code/scripts/container-cleanup.sh   # owner = deploy
+sudo chmod 0750          /var/iri/code/scripts/container-cleanup.sh   # rwx for deploy, none for others
 
-sudo touch /var/log/iri-docker-cleanup.log
-sudo chown deploy:adm /var/log/iri-docker-cleanup.log
-sudo chmod 0640       /var/log/iri-docker-cleanup.log
-sudo cp /var/iri/code/scripts/iri-docker-cleanup.logrotate /etc/logrotate.d/iri-docker-cleanup
+sudo touch /var/log/iri-container-cleanup.log
+sudo chown deploy:adm /var/log/iri-container-cleanup.log
+sudo chmod 0640       /var/log/iri-container-cleanup.log
+sudo cp /var/iri/code/scripts/iri-container-cleanup.logrotate /etc/logrotate.d/iri-container-cleanup
 
-sudo cp /var/iri/code/scripts/iri-docker-cleanup.service /etc/systemd/system/
-sudo cp /var/iri/code/scripts/iri-docker-cleanup.timer   /etc/systemd/system/
+sudo cp /var/iri/code/scripts/iri-container-cleanup.service /etc/systemd/system/
+sudo cp /var/iri/code/scripts/iri-container-cleanup.timer   /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now iri-docker-cleanup.timer     # arm the weekly tick
+sudo systemctl enable --now iri-container-cleanup.timer     # arm the weekly tick
 ```
 
-Force an immediate run with `sudo systemctl start iri-docker-cleanup.service`;
-follow it with `tail -f /var/log/iri-docker-cleanup.log` (not `journalctl` — see the
+Force an immediate run with `sudo systemctl start iri-container-cleanup.service`;
+follow it with `tail -f /var/log/iri-container-cleanup.log` (not `journalctl` — see the
 note under *First deploy*), or in Loki with `{app="ops-cleanup"}`. The `UTC` suffix on
 the timer's `OnCalendar` pins the schedule to UTC regardless of the host's local
 timezone. Retention windows and the volume-prune toggle are overridable via
 `IRI_CLEANUP_*` environment variables — see the script header or
-`docker-cleanup.sh --help`.
+`container-cleanup.sh --help`.
 
 > **Migrating from the old cron drop-in?** This job used to run from
-> `/etc/cron.d/iri-docker-cleanup`. Remove it once the timer is armed so the
-> cleanup does not run twice: `sudo rm -f /etc/cron.d/iri-docker-cleanup`.
+> `/etc/cron.d/iri-container-cleanup`. Remove it once the timer is armed so the
+> cleanup does not run twice: `sudo rm -f /etc/cron.d/iri-container-cleanup`.
 
 ---
 

@@ -1,0 +1,24 @@
+# logrotate(8) configuration for /var/log/iri-container-cleanup.log.
+#
+# Installation (on the production host, one-time):
+#   sudo cp /var/iri/code/scripts/iri-container-cleanup.logrotate /etc/logrotate.d/iri-container-cleanup
+#   sudo chown root:root /etc/logrotate.d/iri-container-cleanup
+#   sudo chmod 0644       /etc/logrotate.d/iri-container-cleanup
+#
+# Manual test:
+#   sudo logrotate --debug /etc/logrotate.d/iri-container-cleanup
+#
+# `copytruncate` is required because iri-container-cleanup.service appends via
+# `StandardOutput=append:...`, holding the fd open across its run — a naive
+# `create` (rename + recreate) would leave systemd writing into the rotated file.
+
+/var/log/iri-container-cleanup.log {
+    weekly
+    rotate 8
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0640 deploy adm
+}

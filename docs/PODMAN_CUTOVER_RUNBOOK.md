@@ -112,7 +112,7 @@ migration — a partial run leaves one of them behind:
 
 ```bash
 systemd-analyze verify \
-  /etc/systemd/system/iri-{deploy,backup,restore-drill,docker-cleanup,container-metrics,cert-expiry}.service
+  /etc/systemd/system/iri-{deploy,backup,restore-drill,container-cleanup,container-metrics,cert-expiry}.service
 systemctl start iri-deploy.service && systemctl show iri-deploy.service -p Result --value   # success
 ```
 

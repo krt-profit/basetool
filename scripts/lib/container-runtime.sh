@@ -934,9 +934,20 @@ rt_run_on_network() {
 # The throwaway container the restore drill proves recoverability in
 # =============================================================================
 
-# rt_rm_force <name> — remove a container whatever state it is in, quietly.
+# rt_rm_force <name> — remove a container whatever state it is in, quietly, TOGETHER WITH ITS
+# ANONYMOUS VOLUME.
+#
+# `-v` removes only anonymous volumes ("Remove anonymous volumes associated with the container"),
+# never named ones, so it cannot touch edge-certs or edge-acme-state. Without it the restore
+# drill's throwaway Postgres left its data volume behind on every run: the `postgres` image
+# declares `VOLUME /var/lib/postgresql/data`, and `rm` without `-v` keeps it. Measured on the
+# migration target 2026-09-21 — one drill run, one orphaned 156 MB volume.
+#
+# Nobody noticed on Docker because the weekly cleanup's `docker volume prune` (anonymous-only
+# there) swept them up. Podman has no anonymous-only prune, so that compensation cannot be carried
+# across, and the leak is fixed where it is made instead (ADR-0194).
 rt_rm_force() {
-  ${RT_CLI} rm -f "$1" >/dev/null 2>&1 || true
+  ${RT_CLI} rm -f -v "$1" >/dev/null 2>&1 || true
 }
 
 # rt_run_detached <name> <image> [--env K=V]... — start a detached container.
