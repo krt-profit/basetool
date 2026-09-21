@@ -106,6 +106,45 @@ public class WebClientConfig {
   private static final int MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
 
   /**
+   * How long a <b>backend-facing</b> pooled connection may sit idle before this side discards it.
+   *
+   * <p>This is one half of a two-sided timer and only the shorter half is safe. The backend's
+   * embedded Tomcat closes an idle HTTP/2 connection after its own keep-alive window — read out of
+   * the {@code Http2Protocol} actually on the classpath (11.0.25): {@code keepAliveTimeout =
+   * 20_000&nbsp;ms}, a default nothing in this repository overrides. Both sides were set to
+   * 20&nbsp;s, which is not "aligned" but <b>collided</b>: the client's window necessarily starts
+   * later than the server's (it begins when the last response finished arriving, the server's when
+   * it finished being written), so an equal length guarantees a slice of time in which this pool
+   * still considers a connection live and the peer has already sent its {@code GOAWAY}. Dispatching
+   * onto it loses every stream riding that connection at once — and under HTTP/2 with {@code
+   * strictConnectionReuse} that is the whole burst, not one request. Production,
+   * 2026-09-20T19:30:31Z: fourteen streams on one connection died in the same millisecond, nine
+   * before their response and five mid-body, against a backend that neither restarted nor logged
+   * anything but 200s.
+   *
+   * <p>10&nbsp;s restores the margin: this side always evicts first, by a factor of two, and the
+   * background sweep below halves with it so a connection is swept well inside the peer's window
+   * rather than after it. The cost is re-handshaking a connection that idled for ten seconds, which
+   * a pool carrying a page render's fan-out reaches only between bursts of user activity.
+   *
+   * <p>Not used by {@code frontend-oauth-pool}: that one talks to Keycloak, whose Quarkus HTTP idle
+   * timeout is minutes, so its 20&nbsp;s is genuinely below its upstream and is left alone.
+   *
+   * <p>Package-private so {@code WebClientBackendPoolIdleBoundTest} can assert the margin against
+   * the keep-alive default of the Tomcat actually on the classpath, rather than against a number
+   * copied into a test and free to drift from the one the server runs.
+   */
+  static final java.time.Duration BACKEND_POOL_MAX_IDLE_TIME = java.time.Duration.ofSeconds(10);
+
+  /**
+   * Background sweep period for {@link #BACKEND_POOL_MAX_IDLE_TIME}. Half the idle bound, so an
+   * expired connection is closed promptly instead of lingering up to a full bound past it — which
+   * is what pushed the old pair's effective retention from 20&nbsp;s out to 30.
+   */
+  private static final java.time.Duration BACKEND_POOL_EVICT_INTERVAL =
+      java.time.Duration.ofSeconds(5);
+
+  /**
    * Context-attributes mapper for the {@link DefaultOAuth2AuthorizedClientManager} that yields an
    * empty map, deliberately replacing Spring's request-parameter-derived default.
    *
@@ -366,12 +405,18 @@ public class WebClientConfig {
         // the
         // 1000 ceiling is hit. metrics(true) exposes reactor.netty.connection.provider.* so pool
         // saturation -- the silent 1001st-viewer drop -- is visible on the dashboard and alertable.
+        //
+        // The idle bound is the shared BACKEND_POOL_MAX_IDLE_TIME even though this pool's
+        // connections are rarely idle: "idle" here means a connection with no live stream on it,
+        // and such a connection faces the same Tomcat keep-alive as any other. Its former 30 s sat
+        // ABOVE that keep-alive, so this pool was the worse half of the same collision. It cannot
+        // touch a running stream -- a streaming connection is not in the pool while it streams.
         provider =
             reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(1000)
-                .maxIdleTime(java.time.Duration.ofSeconds(30))
+                .maxIdleTime(BACKEND_POOL_MAX_IDLE_TIME)
                 .pendingAcquireTimeout(java.time.Duration.ofSeconds(10))
-                .evictInBackground(java.time.Duration.ofSeconds(30))
+                .evictInBackground(BACKEND_POOL_EVICT_INTERVAL)
                 .metrics(true)
                 .build();
       } else {
@@ -384,14 +429,17 @@ public class WebClientConfig {
         // let the two budgets diverge. Keeping them equal means a saturation wait fails fast at the
         // caller's real patience instead of the backend later running a query for a request the
         // frontend already abandoned. metrics(true) exposes reactor.netty.connection.provider.* for
-        // pool observability. Idle/life timeouts unchanged.
+        // pool observability. The idle bound and its sweep are BACKEND_POOL_MAX_IDLE_TIME /
+        // BACKEND_POOL_EVICT_INTERVAL — deliberately shorter than the peer's keep-alive rather than
+        // equal to it; see that constant for why equal is the one setting that cannot work.
+        // maxLifeTime is unrelated to that race (connection age, not idleness) and is unchanged.
         reactor.netty.resources.ConnectionProvider.Builder pool =
             reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(100)
-                .maxIdleTime(java.time.Duration.ofSeconds(20))
+                .maxIdleTime(BACKEND_POOL_MAX_IDLE_TIME)
                 .maxLifeTime(java.time.Duration.ofSeconds(60))
                 .pendingAcquireTimeout(java.time.Duration.ofSeconds(5))
-                .evictInBackground(java.time.Duration.ofSeconds(10))
+                .evictInBackground(BACKEND_POOL_EVICT_INTERVAL)
                 .metrics(true);
         if (http2) {
           // Order matters and is not obvious: ConnectionProvider.Builder#maxConnections NULLS any
@@ -486,7 +534,8 @@ public class WebClientConfig {
           // one or two connections carry everything and are idle between bursts by design -- so the
           // 3 s timeout fires on the connection the whole application is riding, closes it, and the
           // next request in flight dies with `PrematureCloseException: Connection prematurely
-          // closed BEFORE response`. `maxIdleTime(20s)` never gets a say because 3 s comes first.
+          // closed BEFORE response`. The pool's own idle bound never gets a say because 3 s comes
+          // first.
           //
           // Observed, not theorised: the first E2E run after HTTP/2 landed carried 169 of exactly
           // that pair in the frontend log, and five write flows failed because krtFetch fell back
