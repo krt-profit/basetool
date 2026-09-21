@@ -171,6 +171,46 @@ sudo chmod 640 grafana.key && sudo chmod 644 grafana.crt
 ```
 
 Done on the testing host 2026-09-20; Grafana came up healthy and the monitoring plane reached 9/9.
+**Done on `rocky-16gb-nbg1-1` 2026-09-21**: SAN `DNS:grafana, DNS:grafana.profit-base.online` from
+`.env.example`'s value (no `.env` on the host yet), owner 100471, `container_file_t`, valid to
+2028-12-24 — and the expiry collector picked it up on the same run.
+
+### 0.6a `certs/basetool-ca.crt` — the one Prometheus scrapes THROUGH
+
+Done on `rocky-16gb-nbg1-1` 2026-09-21 for the Grafana half above; **this half is still open**, and
+it was not listed anywhere in these prerequisites until now. `prometheus.yml` scrapes the three JVM
+apps and Keycloak over **https** with
+
+```yaml
+    tls_config:
+      ca_file: /etc/prometheus/certs/basetool-ca.crt
+```
+
+and no `insecure_skip_verify`. Without that file on the host, all four application scrape targets
+fail — `scrape-targets-up` catches it at §1.8, but it is a prerequisite rather than something to
+discover in the window.
+
+It is the **public** half of the shared `keystore.p12`, exported per
+[`MONITORING_ROLLOUT_RUNBOOK.md` §3.6](MONITORING_ROLLOUT_RUNBOOK.md). Two things make it an
+operator step rather than an automated one:
+
+- it needs `/var/iri/secrets/keystore.p12` to be on the host already, which is part of the secrets
+  that have to be carried across (§1.6 and the copy that precedes it), and
+- `openssl pkcs12` prompts for the keystore password interactively, which is deliberate — passing it
+  as `-storepass` / `-passin pass:` would put it in shell history.
+
+```bash
+openssl pkcs12 -in /var/iri/secrets/keystore.p12 -clcerts -nokeys \
+  | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
+# add -legacy to the pkcs12 call if OpenSSL 3.x rejects the keytool-made p12
+chmod 644 /var/iri/monitoring/certs/basetool-ca.crt
+restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
+openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext subjectAltName
+```
+
+Once it is there the expiry collector picks it up on its next run with no further step:
+`basetool_certificate_files` goes from 1 to 2 and `CertificateExpiringSoon` covers the trust anchor
+that nothing serves and nothing probes.
 
 ### 0.6b `.env` carries `KC_METRICS_ENABLED=true`
 
