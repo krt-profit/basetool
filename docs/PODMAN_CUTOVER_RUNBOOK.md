@@ -595,6 +595,14 @@ Any difference stops the cutover; the old host is still serving.
   `edge-acme-webroot` is **not** carried: it is the http-01 challenge root, written during a
   validation and empty between them.
 
+  > [!note] The volume holds FIVE vhost directories and only four are live
+  > `ACME_HOSTS` and the `EDGE_HOST_*` variables both name four — the frontend, ingest, grafana and
+  > api hosts. `edge-certs` additionally holds `keycloak.<domain>`, left from when Keycloak had its
+  > own vhost; it is served under a path on the frontend host now, so nothing renews that directory
+  > and nothing serves it. Carrying it is harmless and simpler than pruning during a cutover — this
+  > is here so the count does not read as a missing certificate, which is the wrong thing to start
+  > investigating at 03:40. All five expire on the same day (81 days out, checked 2026-09-21).
+
 - **Redis's session store, if the logins are to survive.** `backup.sh` captures `users.acl` — the
   ACL file — and not the data. `/var/iri/redis` holds `dump.rdb` (~450 KB) and an `appendonlydir`:
   the Spring Session store. Left behind, **every logged-in member is logged out at the moment of
