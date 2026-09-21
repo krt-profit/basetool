@@ -93,6 +93,16 @@
   SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
   und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
 
+- **Betrieb: die Cockpit-Weboberfläche wird entfernt.** Rockys Server-Installation bringt sie mit,
+  und ihr Socket lauscht auf allen Netzwerkschnittstellen. Die Hosts werden über SSH verwaltet, also
+  ist das ein zweiter Verwaltungszugang, den niemand nutzt und den trotzdem jemand aktuell halten
+  müsste. Die Provisionierung entfernt ihn und prüft, dass der Port wirklich frei ist.
+
+- **Betrieb: die Konformitätsprüfung sah auf dem neuen Host keine Container.** Sie meldete neun
+  laufende Dienste als abwesend — aus dem Verzeichnis, in dem eine Root-Anmeldung startet, kann der
+  Dienstnutzer nicht lesen, und der Fehler wurde verschluckt. Genau diese Prüfung soll den Umzug
+  absichern; sie hätte im entscheidenden Moment eine gesunde Maschine als kaputt gemeldet.
+
 - **Betrieb: das Löschen des Token-Ablaufdatums wirkt jetzt auch.** Ein Zugangstoken ohne Ablauf soll keine Ablaufdatei haben — genau das hatte der Deploy bisher nicht umgesetzt: die alte Kennzahl blieb liegen und der kritische Alarm feuerte dauerhaft dafür, dass man seiner eigenen Anweisung gefolgt war. Die Kennzahl wird jetzt entfernt, auch bei leerer oder unlesbarer Datei.
 
 - **Betrieb: ein toter Trace-Pfad fällt jetzt auf.** Die einzige Regel, die ihn beobachtete,

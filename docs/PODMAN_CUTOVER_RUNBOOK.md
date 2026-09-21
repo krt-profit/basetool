@@ -448,6 +448,17 @@ python scripts/check-conformance.py --ssh root@<new-host-ip> \
 > report *absent* for services that are running; and `.env` is `0640 deploy:deploy`, so
 > `env-reaches-the-units` cannot read it. Measured 2026-09-20 as `sysadm` against the testing host:
 > nine checks failed for want of privilege and one skipped, none of it about the host.
+>
+> **Root was not sufficient either, until 2026-09-21, and it failed the same way.** `ssh root@<host>`
+> starts in `/root`, which is `0550 root:root`. `sudo` keeps the *caller's* working directory, so
+> the moment a probe reached the rootless containers — `sudo -n -u <service-user> … podman ps` —
+> sudo tried to chdir there as that user and died with `cannot chdir to /root: Permission denied`.
+> The runtime-detection loop swallows that, falls back to bare `podman`, and root's own podman owns
+> no containers: the same nine checks, the same *absent*, a completely different cause. Measured on
+> the testing host: from `/root` the probe lists nothing, from `/` it lists every container.
+> `HostRunner.run` now roots every command at `/`, and 53 of the suite's own 85 assertions fail if
+> that is ever removed. Nothing to do here — it is noted so a future nine-failure run is not
+> misdiagnosed as a privilege problem a third time.
 
 > [!note] `env-reaches-the-units` can only run HERE, and it is the reason this step exists
 > Seven variables are baked into the units at generation time

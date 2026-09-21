@@ -226,6 +226,27 @@ basetool_host_alloy_listen: ":12345"
 #
 # Tempo is 4327 and not 4317 because alloy itself binds 0.0.0.0:4317 for its own OTLP receiver, and
 # 0.0.0.0 includes loopback -- the two would collide on the host.
+# --- cockpit --------------------------------------------------------------------------------
+# Rocky's server install pulls in the cockpit web console, and its socket binds 0.0.0.0:9090 on
+# every interface. @greluc: not wanted -- the hosts are administered over SSH (see the Production
+# Access runbook) and a second administrative entrance is a second thing to keep patched, watched
+# and reasoned about. Measured 2026-09-21: installed and listening on the testing host (firewalld
+# was the only thing in the way, which is not a reason to keep it), and absent on the migration
+# target, which is the state this makes deliberate rather than incidental.
+basetool_host_remove_cockpit: true
+
+# The set is named rather than globbed: `dnf remove cockpit*` would also take anything a future
+# package happens to prefix that way, and a removal list that can grow on its own is not a list.
+basetool_host_cockpit_packages:
+  - cockpit
+  - cockpit-bridge
+  - cockpit-packagekit
+  - cockpit-podman
+  - cockpit-storaged
+  - cockpit-system
+  - cockpit-ws
+  - cockpit-ws-selinux
+
 # --- fail2ban --------------------------------------------------------------------------------
 # Intrusion prevention for SSH, banning through firewalld. Only the sshd jail is enabled; see the
 # jail.local template for why a jail on the edge would be a liability rather than a defence.

@@ -263,6 +263,25 @@ class HostRunner:
         if not self.available:
             raise Skip("no --ssh target and no --host-stub")
 
+        # EVERY host command runs from `/`, and that is load-bearing rather than tidy.
+        #
+        # `ssh root@<host>` starts in /root, which is 0550 root:root on the RHEL family. sudo keeps
+        # the CALLER's working directory, so the moment a probe reaches the rootless containers --
+        # `sudo -n -u <service-user> XDG_RUNTIME_DIR=... podman ps` -- sudo tries to chdir there as
+        # that user and fails with
+        #
+        #     cannot chdir to /root: Permission denied
+        #
+        # The runtime-detection loop in `container_cli` swallows that (`2>/dev/null`), finds no
+        # candidate, falls back to bare `podman`, and root's own podman has no containers. The
+        # result is not an error: it is NINE checks reporting a perfectly healthy host as absent,
+        # from the exact invocation the cutover runbook prescribes. Measured on the testing host
+        # 2026-09-21 -- from /root the probe lists nothing, from / it lists every container.
+        #
+        # `cd /;` rather than `cd / &&` on purpose: `&&` binds looser than `|`, and a couple of
+        # probes are pipelines. A semicolon cannot change how the command that follows parses.
+        command = f"cd /; {command}"
+
         if self.stub:
             # A command LINE, not a path: the stub has to be launchable on every platform the
             # self-test runs on, and Windows cannot exec a .sh directly. Splitting it means the

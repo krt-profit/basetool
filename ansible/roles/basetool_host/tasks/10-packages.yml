@@ -141,3 +141,64 @@
     - basetool_host_podman_path.rc | default(1) == 0
     - basetool_host_quadlet_memory.stdout | int >= 0
     - basetool_host_quadlet_memory.rc | int == 0
+
+# --- cockpit ------------------------------------------------------------------------------------
+#
+# The web console ships with Rocky's server install and its socket listens on 0.0.0.0:9090. These
+# hosts are administered over SSH and nothing else, so it is a second administrative entrance that
+# nobody uses and everybody has to keep patched. It is removed rather than merely firewalled: on the
+# testing host firewalld (80/443 only) was the one thing between it and the internet, and "a
+# listener nobody reaches" is one rule change away from "a listener".
+#
+# The socket is stopped BEFORE the packages go, so the port is free immediately rather than at the
+# next reboot, and so removal cannot race an in-flight connection.
+
+- name: Stop the cockpit socket before removing what serves it
+  ansible.builtin.systemd_service:
+    name: cockpit.socket
+    state: stopped
+    enabled: false
+  register: basetool_host_cockpit_socket
+  failed_when: false
+  when:
+    - basetool_host_remove_cockpit | bool
+    - not ansible_check_mode
+
+- name: Remove the cockpit web console
+  # `state: absent` over a named list. dnf ignores the entries that are not installed, so this is a
+  # no-op on a host that never had it -- which the migration target already is.
+  ansible.builtin.dnf:
+    name: "{{ basetool_host_cockpit_packages }}"
+    state: absent
+    autoremove: false
+  register: basetool_host_cockpit_removed
+  when: basetool_host_remove_cockpit | bool
+
+- name: Ask whether anything still answers on 9090
+  # The point of the removal is the closed port, not the absent package, so that is what gets
+  # checked. `ss` rather than a package query: it reports what is true now.
+  ansible.builtin.shell: |
+    set -o pipefail
+    ss -lntH 'sport = :9090' 2>/dev/null | wc -l
+  args:
+    executable: /bin/bash
+  register: basetool_host_port_9090
+  changed_when: false
+  failed_when: false
+  when:
+    - basetool_host_remove_cockpit | bool
+    - not ansible_check_mode
+
+- name: Refuse a host that still has a web console listening
+  ansible.builtin.assert:
+    that:
+      - basetool_host_port_9090.stdout | default('0') | trim | int == 0
+    fail_msg: >-
+      Something is still listening on :9090 after the cockpit removal
+      ({{ basetool_host_port_9090.stdout | default('?') | trim }} socket(s)). Removing the package
+      is not the goal; the free port is. Read `ss -lntp 'sport = :9090'` before assuming it is
+      cockpit -- on this stack nothing else should want that port, because Prometheus runs as a
+      container and publishes nothing.
+  when:
+    - basetool_host_remove_cockpit | bool
+    - not ansible_check_mode

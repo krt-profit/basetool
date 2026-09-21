@@ -220,6 +220,23 @@ cat > "${WORK}/hoststub.sh" <<'STUB'
 cmd="${1:-}"
 scenario="${STUB_SCENARIO:-healthy}"
 
+# EVERY command must arrive rooted at /, and this guard is why the whole suite notices if it stops.
+#
+# `ssh root@<host>` starts in /root, which is 0550 root:root on the RHEL family. sudo keeps the
+# caller's working directory, so the first probe that reaches the rootless containers --
+# `sudo -n -u <service-user> ... podman ps` -- dies with "cannot chdir to /root: Permission denied".
+# The runtime-detection loop swallows that, falls back to bare podman, and root's own podman has no
+# containers: NINE checks then report a healthy host as absent, from the exact invocation the
+# cutover runbook prescribes. Measured on the testing host 2026-09-21.
+#
+# Asserting it here rather than in one scenario means no check can quietly lose the prefix: the
+# arms below all match with a leading `*`, so the prefix does not disturb them.
+case "$cmd" in
+  "cd /; "*) ;;
+  *) echo "hoststub: command did not arrive rooted at / -- see HostRunner.run in check-conformance.py" >&2
+     exit 1 ;;
+esac
+
 emit_prom() { printf '{"status":"success","data":{"resultType":"vector","result":[%s]}}\n' "$1"; }
 sample() { printf '{"metric":{%s},"value":[0,"%s"]}' "$1" "$2"; }
 
