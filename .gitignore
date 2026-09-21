@@ -97,6 +97,3 @@ ansible/collections/
 ansible/gpg/
 # ansible-lint drops a cache here the first time it runs. Fetched state, like collections/.
 ansible/.ansible/
-
-# Local knowledge-graph tooling output (the /graphify skill); never a build input.
-graphify-out/
