@@ -42,9 +42,14 @@ system will misread §7 completely, and parts of §8 with it. The Docker-era sha
 is recorded in the migration plan and the cutover runbook, which exist precisely so the transition
 is legible in both directions.
 
-> [!important] Keep this folder honest the way the rest of the documentation is kept honest
-> `CLAUDE.md` binds every change to move its specs, its ADRs and the knowledge base in the same unit
-> of work. This folder is under the same rule. An architecture document nobody updates is worse than
-> none, because a stale diagram still reads as authoritative — and unlike a stale spec, nothing here
-> fails a build. The check is a human one: when a module, a boundary, a deployment unit or a
-> cross-cutting rule changes, §5, §7 or §8 changes with it.
+> [!important] This folder is binding, and updating it is part of the change
+> [`CLAUDE.md`](../../CLAUDE.md) states the rule explicitly: **the arc42 documentation moves with the
+> change whenever it is affected**, in the same PR — a module boundary or a new building block (§5),
+> a runtime scenario (§6), the host, a deployment unit, a timer or the delivery path (§7), a
+> cross-cutting rule (§8), a quality scenario (§10), a known risk (§11), a new domain term (§12), or
+> the system boundary and its neighbours (§3).
+>
+> Because this folder links rather than restates, most changes touch nothing here — and the ones
+> that do are exactly the ones a later reader cannot reconstruct from the diff. **Nothing gates it.**
+> No build fails on a stale chapter, and a stale architecture document still reads as authoritative,
+> which is why the rule is written down instead of assumed.

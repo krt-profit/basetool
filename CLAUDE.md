@@ -99,6 +99,22 @@ in its [`INDEX.md`](docs/specs/INDEX.md)), and architecture/design decisions in
   ([`docs/specs/observability.md`](docs/specs/observability.md), REQ-OBS-005…011).
 - **Every architecturally significant or design decision is recorded as an ADR**
   ([`docs/adr/README.md`](docs/adr/README.md)) before or with the change that implements it.
+- **The arc42 architecture documentation moves with the change, whenever it is affected**
+  ([`docs/arc42/`](docs/arc42/README.md)). Twelve chapters describe the system as a whole. A change
+  that touches a **module boundary or a new building block** (§5), a **runtime scenario** the
+  chapters walk through (§6), the **host, the runtime, a deployment unit, a timer or the delivery
+  path** (§7), a **cross-cutting rule** (§8), a **quality scenario or what measures it** (§10), or a
+  **known risk or piece of debt** (§11) updates that chapter **in the same PR**. So does a new
+  domain term (§12) and a change to the system boundary or an external neighbour (§3).
+  - It is a **map, not a second copy**: where a subject has a canonical home — a spec, an ADR, the
+    role matrix, a runbook — the chapter links it rather than restating it. Most changes therefore
+    touch nothing here, and the ones that do are exactly the ones a later reader cannot reconstruct
+    from the diff.
+  - **§7 is written for the post-cutover runtime** and says so in its first line. A change to the
+    Quadlet units, the host services, the uid translation or the operational timers lands there.
+  - **Nothing gates this.** No build fails on a stale chapter — and a stale architecture document
+    still reads as authoritative, which is precisely why the rule is written down instead of
+    assumed.
 - **README, the role matrix and the user wiki move with the change.** Whenever a change affects
   user-facing behaviour, architecture, env vars, the access/permission model, or any feature the
   handbook documents, keep these in sync **as part of the same unit of work**: the
@@ -343,6 +359,7 @@ the Boot-managed version, because `lombok.config` is a single shared file at the
 - **Maintain `CHANGELOG.md`** for every user-visible change (features, fixes, env-var additions). No exceptions.
 - **CHANGELOG entries must be short, terse and to the point — only the essentials.** One to three sentences per bullet covering *what* changed and *why it matters to the user*. No multi-paragraph design rationales, no exhaustive file lists, no copy-pasted commit messages, no architectural reasoning that belongs in the PR description or Javadoc. Mention the area affected (controller / migration / config) and the user-visible effect — anything beyond that is noise. If a bullet grows past ~3 sentences, cut it.
 - Keep `README.md`, the [`ROLES_AND_PERMISSIONS.md`](ROLES_AND_PERMISSIONS.md) role matrix and the German `basetool.wiki` handbook current whenever a change affects them — this is the binding *"README, the role matrix and the user wiki move with the change"* rule from the Requirements section above, restated here so it is not forgotten at documentation time.
+- Keep the **arc42 architecture documentation** ([`docs/arc42/`](docs/arc42/README.md)) current whenever a change affects it — the binding *"the arc42 architecture documentation moves with the change"* rule from the Requirements section above, restated here for the same reason. The chapter map is in that folder's `README.md`; §5, §7, §8 and §11 are the ones a code change usually touches.
 - **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
 - **Javadoc is gate-enforced.** Checkstyle fails the build on missing or malformed Javadoc (presence, summary period, placement, paragraphs, at-clause order) — there is no warn-only grace period. Note it only checks *form*: the quality bar above is on you.
 
