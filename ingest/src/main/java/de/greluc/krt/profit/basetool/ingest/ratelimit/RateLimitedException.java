@@ -19,16 +19,24 @@
 
 package de.greluc.krt.profit.basetool.ingest.ratelimit;
 
+import lombok.Getter;
+
 /**
  * Thrown by {@link SubjectRateLimiter} when the authenticated caller has exhausted their
  * per-subject ingest budget. Translated by the gateway's {@code GlobalExceptionHandler} into an RFC
  * 7807 {@code 429 Too Many Requests} with a {@code Retry-After} header carrying {@link
  * #getRetryAfterSeconds()}.
  */
+@Getter
 public class RateLimitedException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * Seconds until the caller's bucket refills enough for one more request; surfaced verbatim in the
+   * {@code Retry-After} response header. Read through the Lombok-generated {@code
+   * getRetryAfterSeconds()}.
+   */
   private final long retryAfterSeconds;
 
   /**
@@ -40,14 +48,5 @@ public class RateLimitedException extends RuntimeException {
   public RateLimitedException(long retryAfterSeconds) {
     super("Ingest per-subject rate limit exceeded");
     this.retryAfterSeconds = retryAfterSeconds;
-  }
-
-  /**
-   * Returns the suggested wait before retrying, in seconds.
-   *
-   * @return a positive number of seconds for the {@code Retry-After} header.
-   */
-  public long getRetryAfterSeconds() {
-    return retryAfterSeconds;
   }
 }

@@ -21,7 +21,11 @@ package de.greluc.krt.profit.basetool.keycloak.spi;
 
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
-import org.jboss.logging.Logger;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.jbosslog.JBossLog;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
@@ -64,6 +68,8 @@ import org.keycloak.models.UserModel;
  * <p>It never logs the token, the membership payload, the candidate names/e-mail, or any Discord id
  * — only the coarse decision.
  */
+@JBossLog
+@RequiredArgsConstructor
 public class DiscordGuildRoleGateAuthenticator implements Authenticator {
 
   /**
@@ -86,30 +92,18 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
 
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
   private static final String HTTPS_PREFIX = "https://";
-  private static final Logger LOG = Logger.getLogger(DiscordGuildRoleGateAuthenticator.class);
 
-  private final DiscordMembershipChecker checker;
-  private final DiscordGuildNicknameReader nicknameReader;
-  private final BackendAccountChecker backendChecker;
+  /** The fail-closed membership decision logic. */
+  private final @NotNull DiscordMembershipChecker checker;
 
-  /**
-   * Creates the authenticator.
-   *
-   * @param checker the fail-closed membership decision logic
-   * @param nicknameReader the best-effort per-guild server-nickname reader (a precheck candidate)
-   * @param backendChecker the fail-open backend account-existence client
-   */
-  public DiscordGuildRoleGateAuthenticator(
-      DiscordMembershipChecker checker,
-      DiscordGuildNicknameReader nicknameReader,
-      BackendAccountChecker backendChecker) {
-    this.checker = checker;
-    this.nicknameReader = nicknameReader;
-    this.backendChecker = backendChecker;
-  }
+  /** The best-effort per-guild server-nickname reader (a precheck candidate). */
+  private final @NotNull DiscordGuildNicknameReader nicknameReader;
+
+  /** The fail-open backend account-existence client. */
+  private final @NotNull BackendAccountChecker backendChecker;
 
   @Override
-  public void authenticate(AuthenticationFlowContext context) {
+  public void authenticate(@NotNull AuthenticationFlowContext context) {
     Map<String, String> config = config(context);
     String guildId =
         trimToNull(config.get(DiscordGuildRoleGateAuthenticatorFactory.CONFIG_GUILD_ID));
@@ -122,7 +116,7 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
             DEFAULT_API_BASE_URL);
 
     if (guildId == null || roleId == null) {
-      LOG.error(
+      log.error(
           "Discord guild/role gate is misconfigured (missing guildId/roleId); failing closed.");
       deny(context, ERROR_MESSAGE_KEY);
       return;
@@ -130,7 +124,7 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
 
     Brokered brokered = brokered(context);
     if (brokered == null || brokered.accessToken() == null) {
-      LOG.warn("No federated Discord access token on the auth session; failing closed.");
+      log.warn("No federated Discord access token on the auth session; failing closed.");
       deny(context, ERROR_MESSAGE_KEY);
       return;
     }
@@ -139,14 +133,14 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
         checker.check(apiBaseUrl, guildId, roleId, brokered.accessToken());
     if (result != DiscordMembershipChecker.Result.ALLOWED) {
       // Coarse reason only — never the token, payload or any Discord id.
-      LOG.infof("Discord membership gate denied login (reason=%s).", result);
+      log.infof("Discord membership gate denied login (reason=%s).", result);
       deny(context, ERROR_MESSAGE_KEY);
       return;
     }
 
     // Membership confirmed. Now the fail-open duplicate-account guard (REQ-SEC-022).
     if (accountAlreadyExists(context, apiBaseUrl, guildId, brokered)) {
-      LOG.info(
+      log.info(
           "Discord first-login denied: a Basetool account already exists for this identity; "
               + "directing the user to link instead.");
       deny(context, ACCOUNT_EXISTS_MESSAGE_KEY);
@@ -168,7 +162,10 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * @return {@code true} iff a collision is confidently established and the login must be denied
    */
   private boolean accountAlreadyExists(
-      AuthenticationFlowContext context, String apiBaseUrl, String guildId, Brokered brokered) {
+      @NotNull AuthenticationFlowContext context,
+      @NotNull String apiBaseUrl,
+      @NotNull String guildId,
+      @NotNull Brokered brokered) {
     // ADR-0036: an already-authenticated session means an existing account is LINKING Discord, not
     // registering. Skip — otherwise the precheck would match the very account being linked and
     // wrongly deny a legitimate link.
@@ -191,13 +188,13 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
     return existence == BackendAccountChecker.Result.EXISTS;
   }
 
-  private void deny(AuthenticationFlowContext context, String messageKey) {
+  private void deny(@NotNull AuthenticationFlowContext context, @NotNull String messageKey) {
     Response challenge =
         context.form().setError(messageKey).createErrorPage(Response.Status.FORBIDDEN);
     context.failure(AuthenticationFlowError.ACCESS_DENIED, challenge);
   }
 
-  private Map<String, String> config(AuthenticationFlowContext context) {
+  private @NotNull Map<String, String> config(@NotNull AuthenticationFlowContext context) {
     AuthenticatorConfigModel model = context.getAuthenticatorConfig();
     return (model != null && model.getConfig() != null) ? model.getConfig() : Map.of();
   }
@@ -210,7 +207,8 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * @param context the authentication flow context
    * @return the brokered identity, or {@code null} when no brokered context is present
    */
-  Brokered brokered(AuthenticationFlowContext context) {
+  @Nullable
+  Brokered brokered(@NotNull AuthenticationFlowContext context) {
     SerializedBrokeredIdentityContext serialized =
         SerializedBrokeredIdentityContext.readFromAuthenticationSession(
             context.getAuthenticationSession(), AbstractIdpAuthenticator.BROKERED_CONTEXT_NOTE);
@@ -233,7 +231,7 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * @param context the authentication flow context
    * @return {@code true} when an existing user is linking Discord to their account
    */
-  boolean isAccountLinking(AuthenticationFlowContext context) {
+  boolean isAccountLinking(@NotNull AuthenticationFlowContext context) {
     return context.getAuthenticationSession() != null
         && context.getAuthenticationSession().getAuthenticatedUser() != null;
   }
@@ -245,6 +243,7 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    *
    * @return the trimmed URL, or {@code null} when unset/blank
    */
+  @Nullable
   String backendPrecheckUrl() {
     return trimToNull(System.getenv(BACKEND_PRECHECK_URL_ENV));
   }
@@ -256,20 +255,24 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    *
    * @return the secret, or {@code null} when unset
    */
+  @Nullable
   String backendSharedSecret() {
     return System.getenv(SHARED_SECRET_ENV);
   }
 
-  private static boolean isHttps(String url) {
+  @Contract(pure = true)
+  private static boolean isHttps(@NotNull String url) {
     return url.length() >= HTTPS_PREFIX.length()
         && url.regionMatches(true, 0, HTTPS_PREFIX, 0, HTTPS_PREFIX.length());
   }
 
-  private static String trimToNull(String value) {
+  @Contract(value = "null -> null", pure = true)
+  private static @Nullable String trimToNull(@Nullable String value) {
     return (value == null || value.isBlank()) ? null : value.trim();
   }
 
-  private static String orDefault(String value, String fallback) {
+  @Contract(pure = true)
+  private static @NotNull String orDefault(@Nullable String value, @NotNull String fallback) {
     String trimmed = trimToNull(value);
     return trimmed == null ? fallback : trimmed;
   }
@@ -309,5 +312,6 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * @param username the brokered Discord username, or {@code null}
    * @param email the brokered Discord e-mail, or {@code null}
    */
-  record Brokered(String accessToken, String username, String email) {}
+  record Brokered(
+      @Nullable String accessToken, @Nullable String username, @Nullable String email) {}
 }

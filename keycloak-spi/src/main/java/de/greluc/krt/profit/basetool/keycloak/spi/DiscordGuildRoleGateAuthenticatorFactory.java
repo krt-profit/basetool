@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.keycloak.spi;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
@@ -106,7 +108,7 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   };
 
   @Override
-  public Authenticator create(KeycloakSession session) {
+  public @NotNull Authenticator create(KeycloakSession session) {
     return INSTANCE;
   }
 
@@ -126,17 +128,17 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   }
 
   @Override
-  public String getId() {
+  public @NotNull String getId() {
     return PROVIDER_ID;
   }
 
   @Override
-  public String getDisplayType() {
+  public @NotNull String getDisplayType() {
     return "Discord Guild + KRT-Mitglied Gate";
   }
 
   @Override
-  public String getReferenceCategory() {
+  public @NotNull String getReferenceCategory() {
     return "Discord";
   }
 
@@ -146,7 +148,7 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   }
 
   @Override
-  public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
+  public @NotNull AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
     return REQUIREMENT_CHOICES;
   }
 
@@ -156,7 +158,7 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   }
 
   @Override
-  public String getHelpText() {
+  public @NotNull String getHelpText() {
     return "Denies first-broker login unless the federated Discord user is a member of the "
         + "configured guild and holds the configured KRT-Mitglied role (matched by numeric id); "
         + "fails closed on any error or ambiguity. When configured (KRT_BACKEND_PRECHECK_URL + "
@@ -166,7 +168,7 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   }
 
   @Override
-  public List<ProviderConfigProperty> getConfigProperties() {
+  public @NotNull @Unmodifiable List<ProviderConfigProperty> getConfigProperties() {
     ProviderConfigProperty guildId =
         new ProviderConfigProperty(
             CONFIG_GUILD_ID,

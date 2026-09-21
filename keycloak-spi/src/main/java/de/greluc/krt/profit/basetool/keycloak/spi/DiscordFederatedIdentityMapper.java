@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.keycloak.spi;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.jetbrains.annotations.NotNull;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.KeycloakSession;
@@ -112,29 +113,29 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
   }
 
   @Override
-  public String getDisplayCategory() {
+  public @NotNull String getDisplayCategory() {
     return TOKEN_MAPPER_CATEGORY;
   }
 
   @Override
-  public String getDisplayType() {
+  public @NotNull String getDisplayType() {
     return "Discord Federated Identity";
   }
 
   @Override
-  public String getHelpText() {
+  public @NotNull String getHelpText() {
     return "Maps the user's linked Discord account id (from the federated identity link) into a "
         + "token claim. Works for accounts that registered via Discord AND accounts that linked "
         + "Discord later, on every login method — unlike importing the id into a user attribute.";
   }
 
   @Override
-  public List<ProviderConfigProperty> getConfigProperties() {
+  public @NotNull List<ProviderConfigProperty> getConfigProperties() {
     return CONFIG_PROPERTIES;
   }
 
   @Override
-  public String getId() {
+  public @NotNull String getId() {
     return PROVIDER_ID;
   }
 
@@ -154,10 +155,10 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
    */
   @Override
   protected void setClaim(
-      IDToken token,
-      ProtocolMapperModel mappingModel,
-      UserSessionModel userSession,
-      KeycloakSession keycloakSession,
+      @NotNull IDToken token,
+      @NotNull ProtocolMapperModel mappingModel,
+      @NotNull UserSessionModel userSession,
+      @NotNull KeycloakSession keycloakSession,
       ClientSessionContext clientSessionCtx) {
     RealmModel realm = keycloakSession.getContext().getRealm();
     UserModel user = userSession.getUser();

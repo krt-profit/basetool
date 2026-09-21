@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,6 +61,7 @@ import org.springframework.security.web.savedrequest.SavedRequest;
  * never lands on a blank page.
  */
 @Slf4j
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
 
   /**
@@ -80,8 +83,14 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
    */
   static final String SOURCEMAP_PREFIX = "/sm/";
 
-  private final RequestCache requestCache;
-  private final AuthenticationSuccessHandler delegate;
+  /** The request cache used to look up and remove the saved request; never {@code null}. */
+  private final @NotNull RequestCache requestCache;
+
+  /**
+   * The success handler invoked when the saved request is absent or points to a non-asset URL;
+   * never {@code null}.
+   */
+  private final @NotNull AuthenticationSuccessHandler delegate;
 
   /**
    * Builds a handler around the caller's request cache and a fresh {@link
@@ -100,21 +109,6 @@ public class AssetAwareAuthenticationSuccessHandler implements AuthenticationSuc
    */
   public AssetAwareAuthenticationSuccessHandler(@NotNull RequestCache requestCache) {
     this(requestCache, defaultDelegate(requestCache));
-  }
-
-  /**
-   * Constructor for tests that need to inject a mock {@link RequestCache} and a mock delegate so
-   * the handler can be exercised without spinning up a real Spring Security context.
-   *
-   * @param requestCache the request cache used to look up and remove the saved request; never
-   *     {@code null}
-   * @param delegate the success handler invoked when the saved request is absent or points to a
-   *     non-asset URL; never {@code null}
-   */
-  AssetAwareAuthenticationSuccessHandler(
-      @NotNull RequestCache requestCache, @NotNull AuthenticationSuccessHandler delegate) {
-    this.requestCache = requestCache;
-    this.delegate = delegate;
   }
 
   /**

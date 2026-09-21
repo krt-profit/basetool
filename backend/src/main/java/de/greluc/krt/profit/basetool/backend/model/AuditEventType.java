@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
  * enum itself. Like {@link BankAuditEventType} this is the source of truth and is deliberately NOT
  * mirrored by a database CHECK constraint (V113/V154 precedent): the set grows with the domains.
  */
+@RequiredArgsConstructor
 public enum AuditEventType {
 
   // ---------------------------------------------------------------- INVENTORY (Lager) --
@@ -654,16 +656,7 @@ public enum AuditEventType {
   MARKET_AUDIT_PURGED(AuditDomain.MARKET);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
-  private final AuditDomain domain;
-
-  /**
-   * Binds an event type to its functional area.
-   *
-   * @param domain the area this event type belongs to
-   */
-  AuditEventType(@NotNull AuditDomain domain) {
-    this.domain = domain;
-  }
+  private final @NotNull AuditDomain domain;
 
   /**
    * The functional area this event type belongs to.

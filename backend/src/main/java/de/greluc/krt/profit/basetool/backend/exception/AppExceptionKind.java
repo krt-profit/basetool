@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -35,6 +36,7 @@ import org.springframework.http.HttpStatus;
  * GlobalExceptionHandler.handle*} method used to hardcode before S4 — this enum only relocates them
  * next to the exception types they describe, it does not change any of them.
  */
+@RequiredArgsConstructor
 public enum AppExceptionKind {
 
   /** {@code BadRequestException} — service-layer rule {@code @Valid} cannot express. */
@@ -186,23 +188,6 @@ public enum AppExceptionKind {
   private final String typeSuffix;
   private final String logLabel;
   private final ErrorDisclosurePolicy disclosurePolicy;
-
-  AppExceptionKind(
-      HttpStatus status,
-      String code,
-      String titleKey,
-      String detailKey,
-      String typeSuffix,
-      String logLabel,
-      ErrorDisclosurePolicy disclosurePolicy) {
-    this.status = status;
-    this.code = code;
-    this.titleKey = titleKey;
-    this.detailKey = detailKey;
-    this.typeSuffix = typeSuffix;
-    this.logLabel = logLabel;
-    this.disclosurePolicy = disclosurePolicy;
-  }
 
   /**
    * The HTTP status the RFC&nbsp;7807 response carries.

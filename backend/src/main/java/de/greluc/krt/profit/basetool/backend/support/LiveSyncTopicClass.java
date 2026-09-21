@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * @see LiveSyncTopic the parsed form, which resolves a wire string onto one of these
  */
+@RequiredArgsConstructor
 public enum LiveSyncTopicClass {
 
   /**
@@ -165,24 +167,11 @@ public enum LiveSyncTopicClass {
    */
   public static final int MAX_SECTIONS_PER_FRAME = 16;
 
-  private final String prefix;
+  private final @NotNull String prefix;
   private final boolean perResource;
-  private final Set<String> allowedSections;
-  private final String metricLabel;
-  private final LiveSyncAuthorization authorization;
-
-  LiveSyncTopicClass(
-      @NotNull String prefix,
-      boolean perResource,
-      @NotNull Set<String> allowedSections,
-      @NotNull String metricLabel,
-      @NotNull LiveSyncAuthorization authorization) {
-    this.prefix = prefix;
-    this.perResource = perResource;
-    this.allowedSections = allowedSections;
-    this.metricLabel = metricLabel;
-    this.authorization = authorization;
-  }
+  private final @NotNull Set<String> allowedSections;
+  private final @NotNull String metricLabel;
+  private final @NotNull LiveSyncAuthorization authorization;
 
   /**
    * Resolves a wire prefix onto a class.

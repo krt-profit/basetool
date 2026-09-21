@@ -269,6 +269,19 @@ dependencies {
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   compileOnly(libs.jetbrains.annotations)
+
+  // The same two toolchains on the TEST source set. The three lines above configure `main` only:
+  // Gradle's `testCompileOnly` does NOT extend `compileOnly`, and `testAnnotationProcessor` does
+  // not
+  // extend `annotationProcessor`, so until these were added the test sources could use neither
+  // Lombok nor the JetBrains annotations. That was never a decision -- it was the default
+  // source-set wiring -- and it stopped the "maximize Lombok" / "JetBrains annotations wherever
+  // they
+  // communicate a real contract" conventions (CLAUDE.md `Java conventions`) at the `src/main`
+  // boundary. Lombok stays off the runtime classpath here exactly as it does for `main`.
+  testCompileOnly("org.projectlombok:lombok")
+  testAnnotationProcessor("org.projectlombok:lombok")
+  testCompileOnly(libs.jetbrains.annotations)
   // Optional: metadata for IDE assistance on configuration properties
   annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 
@@ -547,6 +560,12 @@ dependencies {
   "e2eImplementation"("org.postgresql:postgresql")
   // JUnit Platform launcher so the custom Test task can discover Jupiter tests.
   "e2eRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+  // Lombok + the JetBrains annotations on the `e2e` source set too. `e2eImplementation` extends
+  // `testImplementation` (above), but `e2eCompileOnly` extends nothing, so the compile-only halves
+  // have to be named here or the 100 Playwright sources get neither.
+  "e2eCompileOnly"("org.projectlombok:lombok")
+  "e2eAnnotationProcessor"("org.projectlombok:lombok")
+  "e2eCompileOnly"(libs.jetbrains.annotations)
 }
 
 // Checkstyle auto-creates `checkstyleE2e` and wires it into `check`. E2E code,

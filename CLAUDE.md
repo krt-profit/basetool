@@ -323,11 +323,20 @@ Moved to [`docs/specs/observability.md`](docs/specs/observability.md) (`REQ-OBS-
 
 ## Java conventions
 
+**Both toolkits below are wired into every module and every source set** — `main`, `test`, and the
+frontend's `e2e` — as `compileOnly` + `annotationProcessor`, so neither ever reaches a runtime
+classpath, an image or an SBOM ([ADR-0192](docs/adr/0192-lombok-and-the-jetbrains-annotations-apply-to-every-source-set.md)).
+There is no source set where "Lombok isn't available here" is a reason not to use it. `keycloak-spi`
+resolves Lombok from the version catalog rather than a Boot BOM and must keep that pin **equal** to
+the Boot-managed version, because `lombok.config` is a single shared file at the repository root.
+
 - **Constructor injection only** (favor Lombok `@RequiredArgsConstructor`). No field `@Autowired`.
 - **Records** for DTOs and immutable config wrappers.
-- **Lombok** — maximize it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Data`) to avoid boilerplate.
-- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`) wherever they communicate a real contract.
-- **Logging**: `@Slf4j` — never instantiate loggers manually.
+- **Lombok** — maximize it (`@Slf4j`, `@Getter`, `@Setter`, `@Builder`, `@RequiredArgsConstructor`, `@NoArgsConstructor`, `@AllArgsConstructor`, `@Data`) to avoid boilerplate. A constructor whose body does nothing but assign its fields is `@RequiredArgsConstructor`, **including on an enum** (Lombok forces the generated constructor private there) and including next to a second, delegating constructor (`@RequiredArgsConstructor(access = AccessLevel.PACKAGE)` preserves a package-private test seam exactly). Move the constructor's `@param` prose onto the fields; do not drop it.
+- **JetBrains annotations** (`@NotNull`, `@Nullable`, `@Contract`, `@Unmodifiable`) wherever they communicate a real contract — and **only where the code establishes it**. A parameter the body dereferences is `@NotNull`; one the body null-checks, or a return documented as absent, is `@Nullable`; a framework-callback parameter the body never touches gets nothing, because its nullity is that framework's contract and not ours. `@Unmodifiable` is for a value that really is a `List.of` / `Set.of` / `List.copyOf`; a mutable `ArrayList` handed back by a getter keeps `@NotNull` alone. Nothing gates these, so a wrong one is a lie nothing will catch — guessing is worse than leaving it off.
+- **A field's `@NotNull` is not free.** Lombok recognises `org.jetbrains.annotations.NotNull` as a non-null annotation, so a field carrying it makes the generated setter, constructor, `@With` and builder emit a runtime null-check. That is usually what you want — but it is a behaviour change, not documentation.
+- **Lombok annotates its own generated code**: `lombok.config` sets `lombok.addNullAnnotations = jetbrains`, so `toString()`, `equals`, `builder()`/`build()`, `@With` and `@Builder.Singular` adders carry the right nullity without anyone writing it. Lombok separately *copies* a field's `@NotNull` / `@Nullable` onto the accessors it derives, with no configuration — do not add `lombok.copyableAnnotations` entries for them.
+- **Logging**: `@Slf4j` — never instantiate loggers manually. In `keycloak-spi`, which logs through JBoss Logging inside the Keycloak JVM, that is `@JBossLog`.
 
 ## Documentation
 

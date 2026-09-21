@@ -28,6 +28,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.keycloak.broker.oidc.AbstractOAuth2IdentityProvider;
 import org.keycloak.broker.oidc.OAuth2IdentityProviderConfig;
 import org.keycloak.broker.oidc.mappers.AbstractJsonUserAttributeMapper;
@@ -114,7 +117,8 @@ public class DiscordIdentityProvider
    * @param session the current Keycloak session
    * @param config the brokered identity-provider config (endpoints are set here)
    */
-  public DiscordIdentityProvider(KeycloakSession session, OAuth2IdentityProviderConfig config) {
+  public DiscordIdentityProvider(
+      KeycloakSession session, @NotNull OAuth2IdentityProviderConfig config) {
     super(session, config);
     config.setAuthorizationUrl(AUTH_URL);
     config.setTokenUrl(TOKEN_URL);
@@ -122,7 +126,7 @@ public class DiscordIdentityProvider
   }
 
   @Override
-  protected String getDefaultScopes() {
+  protected @NotNull String getDefaultScopes() {
     return DEFAULT_SCOPE;
   }
 
@@ -138,12 +142,12 @@ public class DiscordIdentityProvider
    * @return the authorization-URL builder with {@code prompt=none} appended
    */
   @Override
-  protected UriBuilder createAuthorizationUrl(AuthenticationRequest request) {
+  protected @NotNull UriBuilder createAuthorizationUrl(AuthenticationRequest request) {
     return super.createAuthorizationUrl(request).queryParam("prompt", "none");
   }
 
   @Override
-  protected BrokeredIdentityContext doGetFederatedIdentity(String accessToken) {
+  protected @NotNull BrokeredIdentityContext doGetFederatedIdentity(@NotNull String accessToken) {
     HttpRequest request =
         HttpRequest.newBuilder(URI.create(PROFILE_URL))
             .timeout(HTTP_TIMEOUT)
@@ -180,8 +184,8 @@ public class DiscordIdentityProvider
    * @return the brokered identity keyed by the Discord user id (snowflake)
    */
   @Override
-  protected BrokeredIdentityContext extractIdentityFromProfile(
-      EventBuilder event, JsonNode profile) {
+  protected @NotNull BrokeredIdentityContext extractIdentityFromProfile(
+      EventBuilder event, @NotNull JsonNode profile) {
     String id = getJsonProperty(profile, "id");
     String username = getJsonProperty(profile, "username");
     String email = getJsonProperty(profile, "email");
@@ -215,7 +219,7 @@ public class DiscordIdentityProvider
    * @param profile the parsed {@code /users/@me} profile, mutated in place when a name is found
    * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
    */
-  private void enrichWithGuildNickname(JsonNode profile, String accessToken) {
+  private void enrichWithGuildNickname(@Nullable JsonNode profile, @NotNull String accessToken) {
     String guildId = configuredGuildId();
     if (guildId == null || !(profile instanceof ObjectNode objectProfile)) {
       return;
@@ -231,7 +235,8 @@ public class DiscordIdentityProvider
    *
    * @return the trimmed guild id, or {@code null} when unset or blank (nickname capture disabled)
    */
-  private String configuredGuildId() {
+  @Contract(pure = true)
+  private @Nullable String configuredGuildId() {
     String value = System.getenv(GUILD_ID_ENV);
     return (value == null || value.isBlank()) ? null : value.trim();
   }

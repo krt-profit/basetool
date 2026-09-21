@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
@@ -74,6 +75,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class TaskMetrics {
 
   /**
@@ -84,20 +86,13 @@ public class TaskMetrics {
    */
   private static final String MDC_CORRELATION_ID = "correlationId";
 
-  private final MeterRegistry registry;
+  /** The meter registry the scrape endpoint exposes. */
+  private final @NotNull MeterRegistry registry;
+
   private final Map<ScheduledJob, AtomicLong> lastSuccessHolders = new ConcurrentHashMap<>();
 
   /** One holder per job whose bean exists, so the enabled gauge is registered once. */
   private final Map<ScheduledJob, AtomicLong> enabledJobs = new ConcurrentHashMap<>();
-
-  /**
-   * Binds the wrapper to the auto-configured Micrometer registry.
-   *
-   * @param registry the meter registry the scrape endpoint exposes
-   */
-  public TaskMetrics(@NotNull MeterRegistry registry) {
-    this.registry = registry;
-  }
 
   /**
    * Runs {@code work} while recording the executions counter, duration timer and last-success gauge

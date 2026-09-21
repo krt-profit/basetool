@@ -28,7 +28,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.jboss.logging.Logger;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.jbosslog.JBossLog;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -48,10 +51,9 @@ import org.keycloak.util.JsonSerialization;
  *
  * <p>This class never logs the secret, the candidate names/e-mail, or the response body.
  */
+@JBossLog
+@RequiredArgsConstructor
 public class BackendAccountChecker {
-
-  /** A fail-open UNKNOWN silently disables the duplicate-account check, so each cause is logged. */
-  private static final Logger LOG = Logger.getLogger(BackendAccountChecker.class);
 
   /** HTTP header carrying the shared secret presented to the internal backend endpoint. */
   static final String SECRET_HEADER = "X-KRT-SPI-Secret";
@@ -66,20 +68,14 @@ public class BackendAccountChecker {
     UNKNOWN
   }
 
-  private final HttpClient httpClient;
-  private final Duration requestTimeout;
-
   /**
-   * Creates a checker.
-   *
-   * @param httpClient the HTTP client used for the backend call; its {@code SSLContext} must trust
-   *     the backend's certificate (a TLS failure simply yields {@link Result#UNKNOWN})
-   * @param requestTimeout per-request timeout; exceeding it yields {@link Result#UNKNOWN}
+   * The HTTP client used for the backend call; its {@code SSLContext} must trust the backend's
+   * certificate (a TLS failure simply yields {@link Result#UNKNOWN}).
    */
-  public BackendAccountChecker(HttpClient httpClient, Duration requestTimeout) {
-    this.httpClient = httpClient;
-    this.requestTimeout = requestTimeout;
-  }
+  private final @NotNull HttpClient httpClient;
+
+  /** Per-request timeout; exceeding it yields {@link Result#UNKNOWN}. */
+  private final @NotNull Duration requestTimeout;
 
   /**
    * Asks the backend whether an account already exists for the supplied Discord identity.
@@ -92,13 +88,17 @@ public class BackendAccountChecker {
    * @return {@link Result#EXISTS} only on a clean positive; otherwise {@link Result#NOT_EXISTS} or,
    *     on any error/ambiguity, {@link Result#UNKNOWN} (fail open)
    */
-  public Result check(
-      String url, String sharedSecret, String username, String email, String serverNickname) {
+  public @NotNull Result check(
+      @NotNull String url,
+      @NotNull String sharedSecret,
+      @Nullable String username,
+      @Nullable String email,
+      @Nullable String serverNickname) {
     String body;
     try {
       body = buildBody(username, email, serverNickname);
     } catch (IOException e) {
-      LOG.warnf(e, "Could not serialise the account-existence probe body; skipping the check.");
+      log.warnf(e, "Could not serialise the account-existence probe body; skipping the check.");
       return Result.UNKNOWN;
     }
 
@@ -111,21 +111,21 @@ public class BackendAccountChecker {
       // TLS handshake failure / timeout / connection reset / DNS failure — fail open. Logged
       // because failing OPEN means the duplicate-account check silently did not happen: the login
       // proceeds and nothing else records that the probe never ran.
-      LOG.warnf(
+      log.warnf(
           e,
           "Account-existence probe could not reach the backend (%s); skipping the check.",
           e.getClass().getSimpleName());
       return Result.UNKNOWN;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.warn("Account-existence probe was interrupted; skipping the check.");
+      log.warn("Account-existence probe was interrupted; skipping the check.");
       return Result.UNKNOWN;
     }
 
     if (response.statusCode() != 200) {
       // 503 (feature off) / 401 (bad secret) / 5xx / anything else — fail open. The status is the
       // diagnosis and a 401 in particular is a misconfiguration that would otherwise never surface.
-      LOG.warnf(
+      log.warnf(
           "Account-existence probe answered HTTP %d; skipping the check.", response.statusCode());
       return Result.UNKNOWN;
     }
@@ -142,7 +142,8 @@ public class BackendAccountChecker {
    * @return the JSON request body
    * @throws IOException when serialisation fails
    */
-  private static String buildBody(String username, String email, String serverNickname)
+  private static @NotNull String buildBody(
+      @Nullable String username, @Nullable String email, @Nullable String serverNickname)
       throws IOException {
     Map<String, String> payload = new LinkedHashMap<>();
     putIfPresent(payload, "username", username);
@@ -158,7 +159,8 @@ public class BackendAccountChecker {
    * @param key the JSON field name
    * @param value the candidate value; may be {@code null}/blank
    */
-  private static void putIfPresent(Map<String, String> payload, String key, String value) {
+  private static void putIfPresent(
+      @NotNull Map<String, String> payload, @NotNull String key, @Nullable String value) {
     if (value != null && !value.isBlank()) {
       payload.put(key, value);
     }
@@ -172,7 +174,8 @@ public class BackendAccountChecker {
    * @param body the JSON request body
    * @return the prepared request
    */
-  private HttpRequest buildRequest(String url, String sharedSecret, String body) {
+  private @NotNull HttpRequest buildRequest(
+      @NotNull String url, @NotNull String sharedSecret, @NotNull String body) {
     return HttpRequest.newBuilder(URI.create(url))
         .timeout(requestTimeout)
         .header("Content-Type", "application/json")
@@ -190,12 +193,12 @@ public class BackendAccountChecker {
    * @return {@link Result#EXISTS} / {@link Result#NOT_EXISTS} on a clean boolean, else {@link
    *     Result#UNKNOWN}
    */
-  private static Result parseExists(String body) {
+  private static @NotNull Result parseExists(@Nullable String body) {
     JsonNode root;
     try {
       root = JsonSerialization.readValue(body, JsonNode.class);
     } catch (IOException e) {
-      LOG.warnf(e, "Account-existence response was not readable JSON; skipping the check.");
+      log.warnf(e, "Account-existence response was not readable JSON; skipping the check.");
       return Result.UNKNOWN;
     }
     if (root == null) {

@@ -4,6 +4,12 @@
 
 ### Changed
 
+- **Entwicklung: Lombok und die JetBrains-Annotationen stehen jetzt in jedem Modul und jedem
+  Quellbereich zur Verfügung** — auch in Tests, im E2E-Bereich, im Keycloak-Provider und im
+  Test-Hilfsmodul, wo bisher schlicht keins von beiden eingebunden war. Zusätzlich versieht Lombok
+  den von ihm erzeugten Code selbst mit den Nullbarkeits-Angaben. Rein entwicklungsseitig; das
+  Verhalten der Anwendung ändert sich nicht (ADR-0192).
+
 - **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
   als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
   die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge
