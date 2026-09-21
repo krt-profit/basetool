@@ -112,6 +112,41 @@ Four files under `/var/iri/monitoring/secrets/`: `scrape_password`, `prometheus_
 `prometheus-web.yml`, `alertmanager.yml` — provisioned per
 [`MONITORING_ROLLOUT_RUNBOOK.md` §3](MONITORING_ROLLOUT_RUNBOOK.md).
 
+> [!warning] Mint them from the OLD host's values, or fix `.env` afterwards — one or the other
+> This step provisions fresh secrets. §1.4 restores `.env` **from the old host**. Those two halves
+> have to agree, and nothing in either step says so: the rollout runbook states the rule
+> (§3.2 and the Phase-5 block: "`PROMETHEUS_WEB_PASSWORD` must equal the `prometheus_web_password`
+> file"), but it is written for a first install, where both halves are created together.
+>
+> What breaks if they diverge is not Prometheus itself — its self-scrape reads the file and agrees
+> with itself — but everything that authenticates **to** it out of `.env`:
+>
+> | reads `PROMETHEUS_WEB_PASSWORD` from `.env` | symptom on a mismatch |
+> |---|---|
+> | Grafana's Prometheus datasource | every panel 401s; the stack looks up and shows nothing |
+> | Tempo's metrics-generator `remote_write` | `TempoRemoteWriteFailing`, service graph goes stale |
+>
+> `meta.yml`'s triage note for that alert already names this as cause (1) — "the shared `grafana`
+> web-auth credential matches" — which is the same defect arriving eight hours later and read as a
+> Tempo problem.
+>
+> **Resolved 2026-09-21, and it needs neither:** the snapshot has carried `secrets.tar.gz` all
+> along, so §1.4 now restores the old host's four secrets over the generated ones. They then agree
+> with the `.env` that arrives in the same step, by construction. The three generated here exist so
+> the monitoring stack can start BEFORE the window; they are superseded, not reconciled.
+>
+> Done on `rocky-16gb-nbg1-1` on 2026-09-21: `scrape_password`, `prometheus_web_password` and the
+> bcrypt `prometheus-web.yml` generated on the host (the values never left it), owner 165533, mode
+> 600, `container_file_t`. `alertmanager.yml` is **not** generated — it carries the SMTP credential,
+> the healthchecks.io ping URL and the Discord webhook, none of which can be invented, and it comes
+> from the snapshot in §1.4.
+>
+> `scrape_password` is a special case worth knowing: **no scrape job reads it any more.** ADR-0134
+> moved the three app jobs onto the internal-only management port with no `basic_auth`, so the only
+> `password_file:` left in `prometheus.yml` is the self-scrape's `web_password`. It is still
+> provisioned because the apps fail closed without `MONITORING_SCRAPE_PASSWORD` set, not because
+> anything scrapes with it.
+
 > [!important] The owner is **not** 65534 on a rootless host
 > The runbook says `chown 65534:65534`, which is right under Docker, where the container's uid is
 > the host's. Under rootless Podman container uid N is host uid **`subuid_base + N - 1`**. Verified
@@ -211,6 +246,11 @@ openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -ext 
 Once it is there the expiry collector picks it up on its next run with no further step:
 `basetool_certificate_files` goes from 1 to 2 and `CertificateExpiringSoon` covers the trust anchor
 that nothing serves and nothing probes.
+
+> [!tip] Or take it from the snapshot and skip the keystore password entirely
+> `backup.sh` archives `certs/` alongside `secrets/`, so `basetool-ca.crt` is already in every
+> snapshot. §1.4's step 2b restores it, which needs no `keystore.p12` on the host and no interactive
+> password. The export above stays documented for the case where there is no usable snapshot.
 
 ### 0.6b `.env` carries `KC_METRICS_ENABLED=true`
 
@@ -394,8 +434,52 @@ restic restore <snapshot-id> --target /var/iri/backup/restore
 ```
 
 > The `npm.tar.gz` step in `backup.md` is **obsolete** — Nginx Proxy Manager was retired by
-> ADR-0162 and the backup captures the edge's certificate volumes instead. Restore those to the
-> `edge-certs`, `edge-acme-state` and `edge-acme-webroot` volumes; see step 1.6.
+> ADR-0162. `backup.sh` **in this repository** captures the edge's certificate volumes instead —
+> but the version **deployed on the old host does not**, so THIS snapshot has no edge volumes in it
+> and there is nothing here to restore. They are carried by hand instead; see step 1.6, which has
+> the commands. Verified against the deployed source on 2026-09-21, not inferred from a quiet log.
+
+```bash
+# 2b. the monitoring secrets and certs, from .../restore/.../monitoring/secrets.tar.gz
+#
+# This archive was in every snapshot and this step restored none of it until 2026-09-21, which left
+# three things to do by hand that the backup had been carrying all along:
+#
+#   secrets/alertmanager.yml         the SMTP credential, the healthchecks.io ping URL and the
+#                                    Discord webhook -- the one monitoring secret that CANNOT be
+#                                    regenerated, because none of the three can be invented
+#   secrets/scrape_password          }  random values. §0.5 generates fresh ones so the stack can
+#   secrets/prometheus_web_password  }  start BEFORE the window; restoring the old ones here is what
+#   secrets/prometheus-web.yml       }  makes them agree with the `.env` restored in step 2 again
+#   certs/basetool-ca.crt            the CA `prometheus.yml` pins for the four app scrapes (§0.6a)
+#
+# Restoring them over the generated ones is deliberate: both states are self-consistent, and this
+# one matches the .env that arrives with it.
+R=<the restore target from step 1>
+IRI_UID=$(id -u iri)
+OWNER=$(( $(grep '^iri:' /etc/subuid | cut -d: -f2) + 65534 - 1 ))    # 165533
+tar -C /var/iri/monitoring -xzf "${R}"/*/monitoring/secrets.tar.gz
+chown "${OWNER}:${OWNER}" /var/iri/monitoring/secrets/*
+chmod 600 /var/iri/monitoring/secrets/*
+chmod 644 /var/iri/monitoring/certs/basetool-ca.crt
+restorecon -RF /var/iri/monitoring/secrets /var/iri/monitoring/certs
+```
+
+> [!important] `grafana.crt` is the one file in that archive NOT to restore
+> The archive carries the old host's `certs/grafana.{crt,key}` too. Grafana's leaf is **self-signed
+> and per-host** — §0.6 minted one for this host on 2026-09-21 with this host's SAN. Untarring the
+> archive overwrites it with the old host's. Either restore the archive before §0.6 mints, or put
+> the minted pair back afterwards. Nothing verifies that leaf (the grafana vhost is the one that
+> does not `include upstream-tls.conf`), so a wrong one fails quietly rather than loudly — which is
+> why it is called out here rather than left to be noticed.
+
+> [!note] A changed `prometheus-web.yml` needs a RECREATE, not a reload
+> It is a single-file bind mount: replacing it on the host makes a new inode while the container's
+> mount stays pinned to the old one, so Prometheus keeps validating the hash it loaded at start.
+> After this step, `prometheus`, `tempo` and `grafana` all have to be recreated — the last two
+> because they authenticate to Prometheus with the same `grafana` credential and can wedge on a
+> cached 401. The first deploy in §1.7 creates all three from scratch, so doing this step BEFORE it
+> costs nothing extra.
 
 ```bash
 # 3. databases only, then the dumps. `podman exec`, not `docker compose exec`:
@@ -423,9 +507,77 @@ Any difference stops the cutover; the old host is still serving.
 
 ### 1.6 Carry what a restore does not
 
-- **Certificates**, seeded from the old host rather than re-issued. Let's Encrypt allows five
-  duplicate certificates per week for this SAN set; a re-issue during a cutover spends one and a
-  rollback spends another.
+- **Certificates and the ACME account**, seeded from the old host rather than re-issued. Let's
+  Encrypt allows five duplicate certificates per week for this SAN set; a re-issue during a cutover
+  spends one and a rollback spends another.
+
+  > [!warning] They are NOT in the backups, so this is a copy and not a restore
+  > `backup.sh` in this repository captures the three `edge-*` volumes — and the version **deployed
+  > on the old host does not**: `grep -c edge-acme-state /var/iri/code/scripts/backup.sh` answers
+  > `0` there, and its restore drill emits four artifacts rather than seven. Read from the deployed
+  > source on 2026-09-21, not inferred from a quiet log. So no snapshot contains the edge TLS
+  > material or the ACME account, and a restore cannot produce them however carefully it is run.
+  >
+  > Carry them by hand, **before** the first deploy, so the edge finds certificates on its first
+  > start and `acme` never issues. Together they are about 150 KB. They contain private keys: move
+  > them host-to-host, never through a workstation's disk.
+
+  On the **old** host:
+
+  ```bash
+  tar -C /var/lib/docker/volumes/code_edge-certs/_data      -czf /tmp/edge-certs.tgz .
+  tar -C /var/lib/docker/volumes/code_edge-acme-state/_data -czf /tmp/edge-acme-state.tgz .
+  ```
+
+  On the **new** host, as the service user. The volumes are created by hand first so the seeding
+  precedes the deploy; Quadlet's `.volume` units declare `VolumeName=edge-certs` and adopt a volume
+  of that name rather than making a second one:
+
+  ```bash
+  IRI_UID=$(id -u iri)
+  U="sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} podman"
+  for v in edge-certs edge-acme-state; do
+    ${U} volume create "${v}"
+    ${U} unshare tar -C "$(${U} volume inspect "${v}" --format '{{.Mountpoint}}')" -xzf "/tmp/${v}.tgz"
+  done
+  ```
+
+  `podman unshare` is the whole point of that second line: it runs the extraction **inside the user
+  namespace**, so the `uid 101` the old host's tar carries lands as `100000 + 101 - 1 = 100100` on
+  disk and reads back as 101 inside the container. A plain `tar -x` would write it as uid 101 on the
+  host, which is some unrelated account, and nginx would find its own keys unreadable.
+
+  Verify — the directories are `iri:iri`, the files `100100`, and `privkey.pem` is `600`:
+
+  ```bash
+  find "$(sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman volume inspect edge-certs \
+    --format '{{.Mountpoint}}')" -maxdepth 2 -printf '%u:%g %m %p\n'
+  ```
+
+  `edge-acme-webroot` is **not** carried: it is the http-01 challenge root, written during a
+  validation and empty between them.
+
+- **Redis's session store, if the logins are to survive.** `backup.sh` captures `users.acl` — the
+  ACL file — and not the data. `/var/iri/redis` holds `dump.rdb` (~450 KB) and an `appendonlydir`:
+  the Spring Session store. Left behind, **every logged-in member is logged out at the moment of
+  cutover**, and the per-IP rate-limit buckets reset with it. Nothing is lost that cannot be
+  recreated by logging in again, which is why this is a choice rather than a defect — but it is a
+  user-visible one that was written down nowhere until 2026-09-21, so it was going to be a surprise
+  rather than a decision.
+
+  To carry it, with redis stopped on both sides, the same shape as the certificates (redis runs as
+  container uid 999, so `100000 + 999 - 1 = 100998`):
+
+  ```bash
+  # old host
+  tar -C /var/iri/redis -czf /tmp/redis-data.tgz dump.rdb appendonlydir
+  # new host, before the first deploy starts redis
+  sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman unshare \
+    tar -C /var/iri/redis -xzf /tmp/redis-data.tgz
+  ```
+
+  Skipping it is fine and needs no command — but say so out loud beforehand, because the first
+  report will be "everyone got logged out".
 - **`.env`**, and afterwards `chown deploy:deploy` + `chmod 640` — the deployer reads it and
   `render-env-d.py` renders every `env.d` file from it.
 - **The redis ACL** (`users.acl`).
