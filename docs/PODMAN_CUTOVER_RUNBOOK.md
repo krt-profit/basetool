@@ -342,9 +342,24 @@ sudo -u deploy test -r /etc/iri/backup.env && echo readable
 > Separately, a full backup **and** restore drill ran on the testing host with the cutover code and
 > recovered all seven artifacts.
 >
-> **Still wanted here.** That drill, on THIS host, against THAT snapshot. Nothing above proves the
-> restore executes on this machine — only that it has the inputs and that the same code works
-> elsewhere.
+> **Done on `rocky-16gb-nbg1-1` 2026-09-21**, against snapshot `9c0ad7f0` — that morning's
+> production backup, pulled from the off-site repository by this host:
+>
+> | artifact | result |
+> | --- | --- |
+> | `db_backend` | **1** — 242 flyway rows, 109 public tables |
+> | `db_keycloak` | **1** — 100 public tables |
+> | `grafana_sqlite` | **1** — 2.9 MB, valid SQLite header |
+> | `monitoring_secrets` | **1** — restored and readable |
+> | `edge_certs` / `acme_state` / `redis_acl` | **0** — not in the snapshot; carried by hand, §1.6 |
+>
+> The drill cleaned up after itself: 4 KB left behind and no stray Postgres container. The three
+> zeros are the drill confirming, independently and on the target, what reading the deployed
+> `backup.sh` had already shown — they are the reason §1.6 carries commands rather than a bullet.
+>
+> **They will keep `RestoreDrillArtifactNotRestorable` firing on this host until the carry happens,
+> and that is the point.** It is a standing reminder with the artifact name in its label, not noise
+> to silence.
 
 
 Not "the scripts exist" — one real run each. The plan is explicit that a week of production without
@@ -617,11 +632,12 @@ Any difference stops the cutover; the old host is still serving.
   > is absent while all nine other artifacts are present.
   >
   > `IRI_REDIS_ACL_HOST_PATH=/var/iri/redis/users.acl` is baked into the redis unit as a bind
-  > mount. A bind source that does not exist makes podman create a **directory** there, redis loads
-  > no ACL file — and an `aclfile` that omits a `default` entry makes redis reset that user to
-  > `nopass ~* &* +@all`. That is not a theoretical chain: it is exactly what production shipped on
-  > 2026-07-10, leaving the session store, OAuth2 refresh tokens included, readable and writable
-  > with no authentication on the internal network. `redis-requires-auth` exists because of it.
+  > mount, and `restore-drill.sh` states the consequence in its own words: *"redis refuses to start,
+  > and a hand-written replacement can leave it open."* Both halves matter — the first is loud, the
+  > second is not. An `aclfile` that omits a `default` entry makes redis reset that user to
+  > `nopass ~* &* +@all`, which is exactly what production shipped on 2026-07-10, leaving the
+  > session store, OAuth2 refresh tokens included, readable and writable with no authentication on
+  > the internal network. `redis-requires-auth` exists because of that day.
   >
   > It is a plain root-owned file (`root:root 644`, ~310 bytes), so unlike the certificate volumes
   > it needs no `podman unshare` — nothing about it is namespaced:
