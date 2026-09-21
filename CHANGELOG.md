@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
+  als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
+  die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge
+  und der Frontend-Formatierer Prettier. Betrifft nur den Betrieb, nicht die Nutzung.
+
 ### Fixed
 
 - **Eine kurz abreißende Verbindung zum Backend lässt Seiten nicht mehr grundlos leer wirken.** Riss
