@@ -601,8 +601,17 @@ rules, because the masks broke both ways:
   first space, so a value containing one is masked only up to the space. Match the quoted run first
   — `("[^"]*"|\S+)`.
 
+**Both rules are gate-enforced.** `scripts/check-alloy-log-masking.py` fails the build when any
+`stage.replace` in `monitoring/alloy/config.alloy` carries a `${` in its `replace` or more than one
+capturing group in its `expression` (`(?:…)` and `(?i)` do not count, named groups do, and no group
+at all is fine — Alloy then replaces the whole match). It runs as the `alloy-log-masking` job of
+[`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with its self-test first so the gate
+cannot pass vacuously. It has to be a gate rather than a convention: neither broken form fails on
+its own — the config is valid, `alloy fmt` accepts it, the shipper stays healthy and the stream is
+not silent — so the only detector was a human reading a log export.
+
 > [!warning] Corrected 2026-09-20
-> Seven of the thirteen replace stages were written the regexp-substitution way and had been since
+> Eight of the fourteen replace stages were written the regexp-substitution way and had been since
 > they were added, so every masked line read `${1}***${1}***` in place of `username="…"`,
 > `ipAddress="…"`, `uname=…`, the bearer/token keyword and the GHCR account name — the field name
 > destroyed along with the value, and a template placeholder written into Loki. That half
@@ -613,6 +622,11 @@ rules, because the masks broke both ways:
 > username is whatever a person typed into the login form, so Keycloak's own username rules do not
 > constrain it. Both halves are fixed; the exposure is bounded to spaced values in the two Keycloak
 > streams, and no token, address or JWT pattern was ever affected (those carry no spaces).
+>
+> The count was corrected on 2026-09-21: this callout first read “seven of the thirteen”. The
+> file holds **fourteen** `stage.replace` blocks and **eight** were broken — two in
+> `keycloak_mask`, two in `ops_automation_mask`, four in `container_mask` — which is what the
+> gate above reports and what the fixing commit itself changed.
 - **Keycloak container stdout** (`app="keycloak-stdout"`) — Keycloak runs `--log=console,file`, so
   its console carries the same lines as the masked file log plus the JVM/container-level output that
   never enters the file at all (the ADR-0095 motive, applied to the identity provider). The

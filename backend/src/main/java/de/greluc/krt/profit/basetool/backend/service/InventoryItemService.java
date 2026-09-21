@@ -680,7 +680,7 @@ public class InventoryItemService {
           assertMaterialRequiredByJobOrder(item.getMaterial(), jobOrder);
         }
         if (findJobOrderSlice(item, dto.targetId()) != null) {
-          throw new BadRequestException("This job order is already allocated on the entry");
+          throw new BadRequestException("error.inventory.allocation.duplicate.jobOrder");
         }
         assertFits(sumJobOrderAllocated(item, null) + amount, item.getAmount());
         InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
@@ -702,7 +702,7 @@ public class InventoryItemService {
                 .findById(dto.targetId())
                 .orElseThrow(() -> new NotFoundException("Mission not found"));
         if (findMissionSlice(item, dto.targetId()) != null) {
-          throw new BadRequestException("This mission is already allocated on the entry");
+          throw new BadRequestException("error.inventory.allocation.duplicate.mission");
         }
         assertFits(sumMissionAllocated(item, null) + amount, item.getAmount());
         InventoryMissionAllocation slice = new InventoryMissionAllocation();

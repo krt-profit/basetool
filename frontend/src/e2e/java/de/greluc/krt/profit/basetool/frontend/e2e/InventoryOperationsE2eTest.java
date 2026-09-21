@@ -31,6 +31,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.options.SelectOption;
 import java.nio.file.Path;
@@ -121,6 +122,20 @@ class InventoryOperationsE2eTest {
   private static String sellItemId;
   private static String assignOrderMatId;
   private static String assignOrderItemId;
+
+  /**
+   * Own fixture for {@link #rePickingAnAllocatedOrderEditsItsSliceInsteadOfPosting()}: that test
+   * allocates and then re-allocates on the same entry, so it must not share the {@code
+   * assignOrder*} row whose amount another test asserts.
+   */
+  private static String rePickMatId;
+
+  /** The 100-SCU entry {@link #rePickMatId} is booked in on. */
+  private static String rePickItemId;
+
+  /** The job order that entry is earmarked to, twice. */
+  private static String rePickOrderId;
+
   private static String assignMissionMatId;
   private static String assignMissionItemId;
   private static String herkunftMatId;
@@ -192,6 +207,13 @@ class InventoryOperationsE2eTest {
     assignOrderId =
         seeder.createJobOrder(
             USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Assign Order", assignOrderMatId, 650, 100);
+
+    rePickMatId = seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Inv Re-Pick Mat");
+    rePickItemId =
+        seeder.createInventoryItem(USERNAME, PASSWORD, rePickMatId, opsHubLocId, SEED_QUALITY, 100);
+    rePickOrderId =
+        seeder.createJobOrder(
+            USERNAME, PASSWORD, IRIDIUM_ID, "E2E Inv Re-Pick Order", rePickMatId, 650, 100);
 
     // REQ-INV-039: an order whose need the check-in picker must state. Deliberately left with
     // no linked stock and never written to by another test, so the label is a fixed 400.
@@ -424,6 +446,64 @@ class InventoryOperationsE2eTest {
                           + assignOrderId
                           + "']"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+        });
+  }
+
+  /**
+   * <em>Re-picking an order that is already on the entry edits its slice.</em> The "+ Zuordnen"
+   * {@code <option>} list drops already-allocated targets in Thymeleaf, which happens at
+   * fragment-<em>render</em> time only: the success handler re-renders the chips and not the
+   * picker, and the actor is excluded from his own live-sync room, so after his own allocation the
+   * order he just earmarked is still on the list. Picking it again used to {@code POST} a duplicate
+   * and take the backend's 400 ("a target appears at most once per entry per dimension",
+   * REQ-INV-027) as a generic "Fehler beim Aktualisieren des Lagers." toast — a dead end reachable
+   * by one user, with no race and no second tab.
+   *
+   * <p>The pick is now resolved against the chips, which <em>are</em> current: an already-allocated
+   * target opens its existing slice in edit mode, prefilled with its amount, and saving issues a
+   * {@code PATCH}. The stale option is asserted deliberately — it is the precondition this test
+   * exists for, so pruning the option list later must fail here rather than pass for a new reason.
+   */
+  @Test
+  void rePickingAnAllocatedOrderEditsItsSliceInsteadOfPosting() {
+    runFlow(
+        "inventory-zuweisen-erneut",
+        page -> {
+          openMyInventoryToEntry(page, rePickMatId, rePickItemId);
+          assignAllocationViaChip(page, rePickItemId, "JOB_ORDER", rePickOrderId, "40");
+
+          Locator split =
+              page.locator(
+                  "div.assoc-split[data-entry-id='"
+                      + rePickItemId
+                      + "'][data-assoc-field='JOB_ORDER']");
+          assertThat(
+                  split.locator(
+                      "[data-assoc-chip='jobOrder'][data-target-id='" + rePickOrderId + "']"))
+              .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
+
+          split.locator("button[data-trigger='inv-my-assoc-add-open']").click();
+          Locator pop = split.locator("[data-assoc-pop]");
+          pop.locator(".krt-combobox__input").click();
+          Locator option =
+              pop.locator("li.krt-combobox__option[data-value='" + rePickOrderId + "']");
+          assertThat(option).isVisible();
+
+          option.click();
+          assertEquals(
+              "edit",
+              pop.getAttribute("data-assoc-mode"),
+              "a target already on the entry must open its slice, not arm a duplicate add");
+          assertThat(pop.locator("[data-assoc-amount-input]")).hasValue("40");
+          assertThat(pop.locator("button[data-trigger='inv-my-assoc-remove']")).isVisible();
+
+          pop.locator("[data-assoc-amount-input]").fill("60");
+          Response response =
+              page.waitForResponse(
+                  r -> r.url().contains("/allocation"),
+                  () -> pop.locator("button[data-trigger='inv-my-assoc-save']").click());
+          assertEquals("PATCH", response.request().method(), "editing a slice is a PATCH");
+          assertEquals(200, response.status(), "and it is not the duplicate-target 400");
         });
   }
 

@@ -26,6 +26,9 @@
 *.html text eol=lf
 *.css text eol=lf
 *.js text eol=lf
+# `*.mjs` is the same language one extension over — the ESM build scripts and flat lint
+# configs under `frontend/` — and was missed for the same reason `*.ts` was.
+*.mjs text eol=lf
 *.svg text eol=lf
 *.json text eol=lf
 *.xml text eol=lf
@@ -54,3 +57,48 @@ Dockerfile text eol=lf
 # CRLF into a local test stack, so the line ending is pinned rather than left to
 # core.autocrlf — the same reasoning as the Keycloak templates above.
 docker/edge/** text eol=lf
+
+# The maintenance page's nginx snippets, for the identical reason, and missed when the block above
+# was written: `docker-compose.yml` bind-mounts `docker/maintenance/nginx/http.conf` and
+# `server_proxy.conf` into nginx-proxy-manager's `/data/nginx/custom` hook. A local test stack
+# started from a Windows checkout mounts the CRLF copy — precisely the case the edge rule exists
+# to prevent.
+docker/maintenance/** text eol=lf
+
+# Alloy's configuration is bind-mounted into `grafana/alloy` and format-checked with
+# `alloy fmt --test`, which `monitoring/README.md` and the monitoring rollout runbook document as
+# copy-pasteable commands run against the WORKING COPY (`-v "$PWD/monitoring/alloy:/cfg"`).
+# Without this rule a Windows checkout failed them with "file /cfg/config.alloy is not formatted
+# correctly" for the line endings alone, on a file with no formatting problem at all — and Linux
+# CI stayed green, so it read as a local mistake rather than a missing attribute. Verified
+# 2026-09-20 against the pinned v1.19.2: the same file piped through `tr -d '\r'` passes.
+*.alloy text eol=lf
+
+# Templates rendered on the host into a file whose own extension is already pinned above:
+# `monitoring/alertmanager/alertmanager.yml.tmpl` becomes `alertmanager.yml` via `envsubst`
+# (MONITORING_ROLLOUT_RUNBOOK §3.5). `*.yml` carries the rule; `*.yml.tmpl` matches `*.tmpl` and
+# nothing covered it.
+*.tmpl text eol=lf
+
+# The systemd units and their log rotation. `docs/backup.md` and `docs/deployment.md` copy these
+# onto the production host verbatim (`sudo cp /var/iri/code/scripts/iri-backup.service …`), and a
+# CRLF copy is not cosmetic there: logrotate rejects the whole file with "lines must begin with a
+# keyword or a filename" and skips it in silence, and a carriage return inside `ExecStart=` makes
+# systemd report 203/EXEC for a path that is plainly right. Both were observed on the
+# rootless-podman host, which received four timers and four logrotate configs with CRLF.
+*.service text eol=lf
+*.timer text eol=lf
+*.logrotate text eol=lf
+
+# `*.py` for the same reason as `*.sh`: the scripts under `scripts/` and `.github/scripts/` carry
+# a `#!/usr/bin/env python3` shebang and three of them are marked executable, so a CRLF working
+# copy makes the kernel look for an interpreter whose name ends in a carriage return, and report
+# 203/EXEC for one that is plainly installed. The blobs are LF and Linux CI checks out LF, so this
+# can only ever bite a Windows working tree — which is the case this whole file exists for.
+*.py text eol=lf
+
+# `gradle/libs.versions.toml` is rewritten in place by `./gradlew refreshVersions`, which appends
+# `## ⬆ = "…"` markers line by line. On a CRLF working copy that turns an annotate-only run
+# into a whole-file line-ending diff. `.gitleaks.toml` is read inside a container, by the same
+# reasoning as the edge configuration above.
+*.toml text eol=lf

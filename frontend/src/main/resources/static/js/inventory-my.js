@@ -2154,6 +2154,18 @@ function assocRerender(split, dto) {
     }
 }
 
+// The chip for `targetId` in this split, or null. The chips are re-rendered from each write's own
+// response (assocRerender), so they — unlike the picker's server-rendered <option> list — always
+// reflect what is currently allocated on the entry.
+function assocFindChip(split, targetId) {
+    if (!split || !targetId) return null;
+    const chips = split.querySelectorAll('[data-assoc-chip][data-target-id]');
+    for (let i = 0; i < chips.length; i++) {
+        if (chips[i].getAttribute('data-target-id') === targetId) return chips[i];
+    }
+    return null;
+}
+
 // Sends the allocation write, serialized per entry so a rapid second edit of the same row waits
 // for the fresh version (REQ-INV-026 / REQ-FE-003 avoid a self-inflicted 409).
 function assocSubmit(split, pop, method) {
@@ -2173,6 +2185,21 @@ function assocSubmit(split, pop, method) {
         }
         amount = Math.round(amount * 1000) / 1000;
     }
+    // REQ-FE-001: a raw-fetch write path guards double-submit ITSELF — krtFetch.write's automatic
+    // submitter capture only covers writes routed through it, and this one is a bare fetch(). Disable
+    // NOW, synchronously, before serialize() defers the send: `targetId` above was read at CLICK
+    // time, so a second click would enqueue a task still carrying the first click's target and
+    // re-POST the slice the first one just created — a 400 duplicate. Enter auto-repeat in the
+    // amount input reaches the same handler, so the guard covers the keyboard path too.
+    const buttons = pop.querySelectorAll('button');
+    buttons.forEach(function (b) {
+        b.disabled = true;
+    });
+    const release = function () {
+        buttons.forEach(function (b) {
+            b.disabled = false;
+        });
+    };
     const run = function () {
         // Read the entry version at SEND time, not click time (REQ-FE-003): both chip dimensions
         // share the entry @Version and the inv-assoc key, so a rapid 2nd edit of the same entry is
@@ -2184,9 +2211,9 @@ function assocSubmit(split, pop, method) {
         return assocSend(entryId, method, body, split, pop);
     };
     if (window.krtFetch && typeof window.krtFetch.serialize === 'function') {
-        return window.krtFetch.serialize('inv-assoc:' + entryId, run);
+        return window.krtFetch.serialize('inv-assoc:' + entryId, run).finally(release);
     }
-    return run();
+    return Promise.resolve().then(run).finally(release);
 }
 
 async function assocSend(entryId, method, body, split, pop) {
@@ -2238,8 +2265,24 @@ async function assocSend(entryId, method, body, split, pop) {
             if (typeof window.showFrontendErrorToast === 'function') {
                 window.showFrontendErrorToast(assocI18n.overallocated);
             }
-        } else if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(assocI18n.failed);
+        } else {
+            // Show WHY, not just that it failed. The backend's RFC 7807 detail is localized at the
+            // throw site (GlobalExceptionHandler#resolveDetail) and relayed verbatim by the proxy
+            // (BackendErrorResponses#propagateBackendError), so a refusal the user can act on — a
+            // target a peer allocated a moment ago — arrives as German prose instead of the generic
+            // „Fehler beim Aktualisieren des Lagers.“. The popover stays open so they can correct it.
+            let detail = null;
+            try {
+                const problem = await response.json();
+                if (problem && typeof problem.detail === 'string' && problem.detail.trim() !== '') {
+                    detail = problem.detail;
+                }
+            } catch {
+                /* not problem+json — fall back to the generic wording */
+            }
+            if (typeof window.showFrontendErrorToast === 'function') {
+                window.showFrontendErrorToast(detail || assocI18n.failed);
+            }
         }
     } catch (e) {
         console.error(e);
@@ -2315,12 +2358,19 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         if (!value) return;
         const pop = el.closest('[data-assoc-pop]');
         if (!pop) return;
+        // The <option> list drops already-allocated targets in Thymeleaf, at fragment-RENDER time
+        // only: assocRerender rewrites the chips and not the picker, and the actor is excluded from
+        // their own live-sync room, so a target THIS viewer allocated since the render is still on
+        // list. Picking it used to POST a duplicate and take a 400 shown as a generic failure.
+        // The chips are current, so resolve the pick against them and open the existing slice in
+        // edit mode — which is what a user reaching for a target already on the entry wants anyway.
+        const existing = assocFindChip(pop.closest('.assoc-split'), value);
         pop.setAttribute('data-assoc-target', value);
-        pop.setAttribute('data-assoc-mode', 'add');
-        assocShowAmountSection(pop, false);
+        pop.setAttribute('data-assoc-mode', existing ? 'edit' : 'add');
+        assocShowAmountSection(pop, !!existing);
         const input = pop.querySelector('[data-assoc-amount-input]');
         if (input) {
-            input.value = '';
+            input.value = existing ? existing.getAttribute('data-amount') : '';
             input.focus();
         }
     });
