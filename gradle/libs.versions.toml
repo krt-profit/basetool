@@ -58,6 +58,7 @@ testcontainers = "2.0.5"
 # `flyway-core` and `flyway-database-postgresql` carry no behaviour change, no deprecation and no
 # breaking change; verified by running the migration tests, not on the notes alone.
 flyway = "13.6.0"
+##  ⬆ = "13.7.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
@@ -68,6 +69,7 @@ mapstruct = "1.6.3"
 # of 2026-06 — no 1.7.0 final yet.
 resilience4j = "2.4.0"
 bucket4j = "8.19.0"
+##    ⬆ = "8.20.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.0"
@@ -81,6 +83,7 @@ archunit = "1.5.0"
 springdocOpenapi = "3.1.1"
 okhttp3 = "5.5.0"
 playwright = "1.62.0"
+##      ⬆ = "1.63.0"
 axeCorePlaywright = "4.13.0"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
