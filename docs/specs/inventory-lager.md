@@ -450,7 +450,20 @@ their hints — renders **whole (no decimals) for a `PIECE` material** and to th
 `isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)` — the same owner-scoped
 inventory-edit gate, **no new role**. They refuse a personal entry (personal stock carries no
 assignment), refuse a job-order target whose material the order does not require (REQ-ORDERS-018),
-reject a duplicate target, hold PIECE amounts whole, and enforce R5. Each mutation is audited
+reject a duplicate target, hold PIECE amounts whole, and enforce R5.
+
+**The duplicate-target refusal is not a UI dead end.** The `+ Zuordnen` picker drops targets already
+on the entry, but it does so in Thymeleaf, at fragment-**render** time: the success handler
+re-renders the chips and not the `<option>` list, and the writer is excluded from their own live-sync
+room (REQ-FE-015), so a target *this* viewer just allocated stays on their list until the fragment is
+re-pulled. The picker therefore resolves a pick against the **chips** — which are re-rendered from
+every write's own response and so are always current — and an already-allocated target opens its
+existing slice in **edit** mode (amount prefilled, *Entfernen* shown, save issues the `PATCH`)
+instead of arming a duplicate `POST`. A duplicate that still reaches the backend — two viewers
+racing on one shared entry, which no client-side check can rule out — is refused with **400** and
+its localized problem `detail` is shown to the user (the throw sites carry
+`error.inventory.allocation.duplicate.{jobOrder,mission}`, resolved per `Accept-Language` by
+`GlobalExceptionHandler#resolveDetail`), not swallowed into a generic failure toast. Each mutation is audited
 (`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
 single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
 
@@ -579,7 +592,8 @@ there is no separate income-attribution input.
 `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
 `DatabaseIndexMigrationTest`, `InventoryInputAjaxControllerTest` (single-target shorthand),
-e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from) ·
+e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking an
+already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `support/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
 `InventoryItemService#createInventoryItem`, `InventoryCheckoutService` (book-out / merge / SELL),
