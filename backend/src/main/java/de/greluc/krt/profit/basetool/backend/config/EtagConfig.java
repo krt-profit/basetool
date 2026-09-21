@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,6 +46,7 @@ public class EtagConfig {
    *
    * @return a fresh filter instance that leaves the streaming endpoints alone
    */
+  @NotNull
   @Bean
   public ShallowEtagHeaderFilter shallowEtagFilter() {
     return new StreamAwareShallowEtagHeaderFilter();
@@ -62,6 +64,7 @@ public class EtagConfig {
    * @param shallowEtagFilter the filter bean to register
    * @return servlet container registration with URL patterns and order set
    */
+  @NotNull
   @Bean
   public FilterRegistrationBean<ShallowEtagHeaderFilter> shallowEtagHeaderFilter(
       ShallowEtagHeaderFilter shallowEtagFilter) {

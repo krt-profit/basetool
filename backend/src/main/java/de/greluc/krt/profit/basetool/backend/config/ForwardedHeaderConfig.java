@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.config;
 import de.greluc.krt.profit.basetool.backend.filter.ClientIpContextFilter;
 import de.greluc.krt.profit.basetool.backend.support.RateLimitProperties;
 import jakarta.servlet.DispatcherType;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.server.autoconfigure.servlet.ForwardedHeaderFilterCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -66,9 +67,10 @@ public class ForwardedHeaderConfig {
    * @param properties supplies the trusted-proxy allowlist the resolution honours.
    * @return the registration, ordered at {@link Ordered#HIGHEST_PRECEDENCE}.
    */
+  @NotNull
   @Bean
   public FilterRegistrationBean<ClientIpContextFilter> clientIpContextFilter(
-      RateLimitProperties properties) {
+      @NotNull RateLimitProperties properties) {
     // The filter takes the raw list, not the properties bean: resolution is a cross-cutting
     // primitive and which key supplies the allowlist is a wiring detail that belongs here. The
     // deployed key stays app.rate-limit.trusted-proxies for continuity (REQ-SEC-011).
@@ -94,6 +96,7 @@ public class ForwardedHeaderConfig {
    * @param customizerProvider the optional customizer Boot's own registration honours.
    * @return the registration, ordered at {@link Ordered#HIGHEST_PRECEDENCE} {@code + 1}.
    */
+  @NotNull
   @Bean
   public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter(
       ObjectProvider<ForwardedHeaderFilterCustomizer> customizerProvider) {

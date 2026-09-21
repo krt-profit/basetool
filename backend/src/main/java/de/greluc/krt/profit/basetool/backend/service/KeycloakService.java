@@ -207,6 +207,7 @@ public class KeycloakService {
    * @return list of Keycloak users with their resolved realm role names and (for the non-skipped
    *     subset) Discord link, or empty on any failure
    */
+  @NotNull
   public List<KeycloakUserDto> fetchUsers(
       Collection<String> appRoleNames, Set<UUID> knownDiscordLinkedIds) {
     if (!properties.isEnabled() || properties.getAdminUrl() == null) {
@@ -289,6 +290,7 @@ public class KeycloakService {
    * @param token a valid admin access token.
    * @return every Keycloak user across all pages; never {@code null}, possibly empty.
    */
+  @NotNull
   private List<KeycloakUserDto> fetchAllUsers(String token) {
     int pageSize = properties.getPageSize();
     List<KeycloakUserDto> all = new ArrayList<>();
@@ -362,6 +364,7 @@ public class KeycloakService {
    * @throws IllegalStateException when the realm matches none of the app's roles — the run must be
    *     skipped rather than write a role-strip for every account (see below).
    */
+  @NotNull
   private Map<UUID, Set<String>> fetchRoleMemberships(
       Collection<String> appRoleNames, String token) {
     Map<UUID, Set<String>> byUser = new HashMap<>();
@@ -449,6 +452,7 @@ public class KeycloakService {
    * @param token a valid admin access token.
    * @return every realm role name across all pages; never {@code null}, possibly empty.
    */
+  @NotNull
   private List<String> fetchRealmRoleNames(String token) {
     int pageSize = properties.getPageSize();
     List<String> names = new ArrayList<>();
@@ -496,6 +500,7 @@ public class KeycloakService {
    *
    * @return the default role's name for the configured realm; never {@code null}.
    */
+  @NotNull
   private String defaultRoleName() {
     return "default-roles-" + properties.getRealm().toLowerCase(Locale.ROOT);
   }
@@ -517,6 +522,7 @@ public class KeycloakService {
    * @param canonicalByLower the app's mappable role names, keyed by their lower-cased form.
    * @return the granted app role names under the local catalog's casing; never {@code null}.
    */
+  @NotNull
   private Set<String> fetchDefaultRoleGrants(String token, Map<String, String> canonicalByLower) {
     List<Map<String, Object>> composites;
     try {

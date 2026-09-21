@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
@@ -36,6 +37,7 @@ public class ImpressumController {
    *
    * @return the {@code impressum} view name
    */
+  @NotNull
   @GetMapping("/impressum")
   public String showImpressum() {
     return "impressum";

@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -74,6 +75,7 @@ public class AdminAnnouncementPageController {
    * @param model Thymeleaf model populated with {@code adminAnnouncement} (raw JSON map)
    * @return the {@code admin/announcement} view name
    */
+  @NotNull
   @GetMapping
   public String showAnnouncementPage(Model model) {
     try {
@@ -99,6 +101,7 @@ public class AdminAnnouncementPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/announcement}
    */
+  @NotNull
   @PostMapping("/update")
   public String updateAnnouncement(
       @RequestParam String content,
@@ -143,7 +146,8 @@ public class AdminAnnouncementPageController {
    */
   @ResponseBody
   @PostMapping(value = "/update", headers = "X-Requested-With=XMLHttpRequest")
-  public ResponseEntity<Object> updateAnnouncementAjax(@RequestBody Map<String, Object> request) {
+  public ResponseEntity<Object> updateAnnouncementAjax(
+      @NotNull @RequestBody Map<String, Object> request) {
     Object contentValue = request.get("content");
     if (!(contentValue instanceof String content)) {
       return ResponseEntity.badRequest().build();
@@ -176,6 +180,7 @@ public class AdminAnnouncementPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/announcement} (optionally with {@code ?error=...})
    */
+  @NotNull
   @PostMapping("/delete")
   public String deleteAnnouncement(RedirectAttributes redirectAttributes) {
     try {

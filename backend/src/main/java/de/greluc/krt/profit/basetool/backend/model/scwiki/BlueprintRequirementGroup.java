@@ -42,6 +42,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * One named build slot of a {@link Blueprint} (SC Wiki {@code blueprint_requirement_group}), e.g.
@@ -122,6 +124,8 @@ public class BlueprintRequirementGroup extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the modifier lines
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintRequirementModifier> getModifiers() {
     return Collections.unmodifiableList(modifiers);
   }
@@ -131,7 +135,7 @@ public class BlueprintRequirementGroup extends AbstractEntity<UUID> {
    *
    * @param modifier the line to add
    */
-  public void addModifier(BlueprintRequirementModifier modifier) {
+  public void addModifier(@NotNull BlueprintRequirementModifier modifier) {
     modifier.setRequirementGroup(this);
     modifiers.add(modifier);
   }
@@ -141,6 +145,8 @@ public class BlueprintRequirementGroup extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the ingredient lines belonging to this group
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintIngredient> getIngredients() {
     return Collections.unmodifiableList(ingredients);
   }

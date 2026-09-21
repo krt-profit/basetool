@@ -131,6 +131,7 @@ public class BankLedgerService {
    * @throws BadRequestException when a counterparty org unit is named that is not one of the
    *     counterparty user's memberships (REQ-BANK-044)
    */
+  @NotNull
   @Transactional
   public BankTransactionDto bookDeposit(@NotNull BankDepositRequest request) {
     if (request.splitEnabled()) {
@@ -205,6 +206,7 @@ public class BankLedgerService {
    *     {@code BANK_SPLIT_TOO_SMALL} when the slice rounds below 1 aUEC, or {@code
    *     BANK_SPLIT_NO_TARGETS} when no active squadron account remains to distribute to
    */
+  @NotNull
   private BankTransactionDto bookSplitDeposit(
       @NotNull BankDepositRequest request, @NotNull BankHolder holder) {
     BigDecimal gross = request.amount();
@@ -360,6 +362,7 @@ public class BankLedgerService {
    * @throws BadRequestException when a counterparty org unit is named that is not one of the
    *     counterparty user's memberships (REQ-BANK-044)
    */
+  @NotNull
   @Transactional
   public BankTransactionDto bookWithdrawal(@NotNull BankWithdrawalRequest request) {
     BankAccount account = writer.lockAccount(request.accountId());
@@ -442,6 +445,7 @@ public class BankLedgerService {
    * @throws BankConflictException with {@code BANK_SELF_TRANSFER}, {@code BANK_ACCOUNT_CLOSED},
    *     {@code BANK_HOLDER_INACTIVE} or {@code BANK_OVERDRAFT}
    */
+  @NotNull
   @Transactional
   public BankTransactionDto bookTransfer(
       @NotNull BankTransferRequest request, boolean destinationVisible) {
@@ -551,6 +555,7 @@ public class BankLedgerService {
    *     BANK_ACCOUNT_CLOSED} when the CARTEL account is missing/closed, or {@code BANK_OVERDRAFT}
    *     when the fee would overdraw it
    */
+  @NotNull
   @Transactional
   public BankTransactionDto bookHolderTransfer(@NotNull BankHolderTransferRequest request) {
     if (request.sourceHolderId().equals(request.destinationHolderId())) {
@@ -620,6 +625,7 @@ public class BankLedgerService {
    * @throws BankConflictException with {@code BANK_NOT_REVERSIBLE}, {@code BANK_ALREADY_REVERSED},
    *     {@code BANK_ACCOUNT_CLOSED} or {@code BANK_OVERDRAFT}
    */
+  @NotNull
   @Transactional
   public BankTransactionDto reverseTransaction(@NotNull UUID transactionId, @Nullable String note) {
     final BankTransaction original =
@@ -706,6 +712,7 @@ public class BankLedgerService {
    * @return counts and total for the admin notice; one summarizing audit event is written when
    *     anything was zeroed
    */
+  @NotNull
   @Transactional
   public BankWipeResetResultDto resetAllBalances() {
     List<BankAccount> accounts = accountRepository.findAllForUpdateOrderById();
@@ -868,6 +875,7 @@ public class BankLedgerService {
    * @param arrow the direction marker ({@code "<-"} deposit, {@code "->"} withdrawal)
    * @return the counterparty suffix, or an empty string when there is none
    */
+  @NotNull
   private static String counterpartyDetail(
       @Nullable CounterpartySnapshot counterparty, @NotNull String arrow) {
     if (counterparty == null) {
@@ -889,6 +897,7 @@ public class BankLedgerService {
    *     the amount that arrives (on-top); only distinguishes when the fee is positive
    * @return the fee suffix, or an empty string when there is no fee
    */
+  @NotNull
   private static String feeDetail(@NotNull BigDecimal fee, boolean feeInclusive) {
     if (fee.signum() <= 0) {
       return "";
@@ -902,6 +911,7 @@ public class BankLedgerService {
    * @param tx the persisted header
    * @return the acknowledgement
    */
+  @NotNull
   private static BankTransactionDto toDto(@NotNull BankTransaction tx) {
     return new BankTransactionDto(tx.getId(), tx.getType(), tx.getNote(), tx.getCreatedAt());
   }

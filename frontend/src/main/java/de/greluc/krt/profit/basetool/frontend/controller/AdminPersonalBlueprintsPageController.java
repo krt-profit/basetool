@@ -46,6 +46,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
@@ -114,6 +115,7 @@ public class AdminPersonalBlueprintsPageController {
    * @return the {@code admin/personal-blueprints} view name, or its {@code results} fragment for an
    *     AJAX swap
    */
+  @NotNull
   @GetMapping
   public String view(
       @RequestParam(required = false) String userSub,
@@ -183,6 +185,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin Blueprints page for the user
    */
+  @NotNull
   @PostMapping("/{userSub}/items/{id}/update-note")
   public String updateNote(
       @PathVariable UUID userSub,
@@ -215,6 +218,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin Blueprints page for the user
    */
+  @NotNull
   @PostMapping("/{userSub}/items/{id}/delete")
   public String delete(
       @PathVariable UUID userSub,
@@ -316,6 +320,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin Blueprints page
    */
+  @NotNull
   @PostMapping("/delete-all-users")
   public String deleteAllUsers(RedirectAttributes redirectAttributes) {
     try {
@@ -368,6 +373,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
    * @return the member DTO for the seed option, or {@code null} when the lookup fails.
    */
+  @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
       return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
@@ -416,6 +422,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param userSub target user's Keycloak {@code sub}
    * @return the redirect view string
    */
+  @NotNull
   private String redirectToUser(UUID userSub) {
     return "redirect:/admin/personal-blueprints?userSub=" + userSub;
   }
@@ -426,6 +433,7 @@ public class AdminPersonalBlueprintsPageController {
    * @param iso the ISO-8601 instant string, or blank
    * @return the parsed instant, or {@code null}
    */
+  @Nullable
   private static Instant parseInstantOrNull(String iso) {
     if (iso == null || iso.isBlank()) {
       return null;

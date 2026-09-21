@@ -44,6 +44,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
@@ -212,7 +213,7 @@ public class MaterialExchangeService {
    *     current stock, or the game item is not produced by any active blueprint.
    */
   private MaterialExchangeOfferDto releaseFromItemStock(
-      InventoryItem item, MaterialExchangeReleaseRequest request, UUID viewerId) {
+      InventoryItem item, @NotNull MaterialExchangeReleaseRequest request, UUID viewerId) {
     final int quantity = requireOfferableItemQuantity(request.offeredAmount(), item);
     ResolvedProduct product =
         blueprintProductService

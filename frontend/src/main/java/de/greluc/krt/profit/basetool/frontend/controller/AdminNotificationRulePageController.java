@@ -73,6 +73,7 @@ public class AdminNotificationRulePageController {
    * @param model the view model
    * @return the template name
    */
+  @org.jetbrains.annotations.NotNull
   @GetMapping
   public String page(Model model) {
     try {

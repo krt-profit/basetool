@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -89,8 +90,9 @@ public class AdminDefaultBlueprintsPageController {
    * @param model Thymeleaf model populated with the current default set
    * @return the {@code admin/default-blueprints} view name
    */
+  @NotNull
   @GetMapping
-  public String view(Model model) {
+  public String view(@NotNull Model model) {
     model.addAttribute("defaults", fetchDefaults());
     return "admin/default-blueprints";
   }
@@ -141,6 +143,7 @@ public class AdminDefaultBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the default-blueprints page
    */
+  @NotNull
   @PostMapping("/add")
   public String add(
       @RequestParam(name = "productKeys", required = false) List<String> productKeys,
@@ -188,6 +191,7 @@ public class AdminDefaultBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the default-blueprints page
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String remove(@PathVariable String id, RedirectAttributes redirectAttributes) {
     try {

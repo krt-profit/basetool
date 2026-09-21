@@ -4,6 +4,19 @@
 
 ### Changed
 
+- **Entwicklung: das Logging ist jetzt erzwungen einheitlich.** Produktionscode holt seinen Logger
+  ausschließlich über Lombok — `@Slf4j`, im Keycloak-Provider `@JBossLog`; jede andere
+  Logging-Annotation ist ein Compile-Fehler, und ein neuer CI-Check (`logging-facade`) weist
+  handgeschriebene Logger und Konsolenausgaben im Produktionscode zurück. Rein entwicklungsseitig
+  (ADR-0193).
+
+- **Entwicklung: Lombok und die JetBrains-Annotationen stehen jetzt in jedem Modul und jedem
+  Quellbereich zur Verfügung** — auch in Tests, im E2E-Bereich, im Keycloak-Provider und im
+  Test-Hilfsmodul, wo bisher schlicht keins von beiden eingebunden war. Lombok versieht zusätzlich
+  den von ihm erzeugten Code selbst mit Nullbarkeits-Angaben, und 1.063 Stellen haben eine aus dem
+  eigenen Code abgeleitete Nullbarkeits-Angabe bekommen. Rein entwicklungsseitig; das Verhalten der
+  Anwendung ändert sich nicht (ADR-0192).
+
 - **Mehrere Betriebs-Abhängigkeiten wurden aktualisiert**: der Log-Speicher Loki (schließt mehrere
   als hoch eingestufte Schwachstellen in der Netzwerkbibliothek), der Alarm-Verteiler Alertmanager,
   die Container-Messung cAdvisor, der ACME-Client `lego`, der Edge-Proxy nginx sowie CI-Werkzeuge

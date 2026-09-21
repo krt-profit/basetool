@@ -25,6 +25,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -44,10 +46,14 @@ import org.springframework.security.web.csrf.CsrfException;
  * subtypes {@code MissingCsrfTokenException} / {@code InvalidCsrfTokenException}) is counted; every
  * other {@link AccessDeniedException} passes through uncounted.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class CsrfMetricsAccessDeniedHandler implements AccessDeniedHandler {
 
-  private final MeterRegistry meterRegistry;
-  private final AccessDeniedHandler delegate;
+  /** The registry the counter is bumped against. */
+  private final @NotNull MeterRegistry meterRegistry;
+
+  /** The access-denied handler the call is forwarded to after counting. */
+  private final @NotNull AccessDeniedHandler delegate;
 
   /**
    * Builds the handler with a fresh {@link AccessDeniedHandlerImpl} delegate (the default {@code
@@ -58,19 +64,6 @@ public class CsrfMetricsAccessDeniedHandler implements AccessDeniedHandler {
    */
   public CsrfMetricsAccessDeniedHandler(@NotNull MeterRegistry meterRegistry) {
     this(meterRegistry, new AccessDeniedHandlerImpl());
-  }
-
-  /**
-   * Constructor seam for tests: injects the delegate so the {@code 403} write can be asserted
-   * without a real servlet response.
-   *
-   * @param meterRegistry the registry the counter is bumped against
-   * @param delegate the access-denied handler the call is forwarded to after counting
-   */
-  CsrfMetricsAccessDeniedHandler(
-      @NotNull MeterRegistry meterRegistry, @NotNull AccessDeniedHandler delegate) {
-    this.meterRegistry = meterRegistry;
-    this.delegate = delegate;
   }
 
   /**

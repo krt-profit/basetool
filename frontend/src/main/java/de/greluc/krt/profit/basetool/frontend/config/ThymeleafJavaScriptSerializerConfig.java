@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.io.Writer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.annotation.Configuration;
 import org.thymeleaf.dialect.IDialect;
 import org.thymeleaf.exceptions.TemplateProcessingException;
@@ -188,6 +190,7 @@ public class ThymeleafJavaScriptSerializerConfig {
       return ASCII_ESCAPES;
     }
 
+    @Nullable
     @Override
     public SerializableString getEscapeSequence(int ch) {
       // The escape outputs (e.g. the 6-char string "'") are intentionally Unicode escape
@@ -205,6 +208,7 @@ public class ThymeleafJavaScriptSerializerConfig {
       };
     }
 
+    @NotNull
     private static SerializedString jsUnicodeEscape(int codePoint) {
       // Uppercase hex to match Thymeleaf's stock JacksonThymeleafEscapes output byte-for-byte;
       // mixing cases would surface as a diff in any snapshot test that compares rendered HTML

@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockEntryDto
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialCollectionEntryDto;
 import java.util.List;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -55,6 +57,7 @@ public class JobOrderInventoryOwnerRedactor {
    * @param groups the item-stock groups to redact; a {@code null} input is returned unchanged.
    * @return the groups with each nested {@link JobOrderItemStockEntryDto} owner/location nulled.
    */
+  @Nullable
   public List<JobOrderItemStockGroupDto> redactItemStockGroups(
       List<JobOrderItemStockGroupDto> groups) {
     if (groups == null) {
@@ -80,7 +83,8 @@ public class JobOrderInventoryOwnerRedactor {
    * @param entry the entry to redact.
    * @return a copy with owner/location nulled.
    */
-  private JobOrderItemStockEntryDto redactItemStockEntry(JobOrderItemStockEntryDto entry) {
+  @NotNull
+  private JobOrderItemStockEntryDto redactItemStockEntry(@NotNull JobOrderItemStockEntryDto entry) {
     return new JobOrderItemStockEntryDto(
         entry.inventoryEntryId(),
         entry.version(),
@@ -102,6 +106,7 @@ public class JobOrderInventoryOwnerRedactor {
    *     unchanged.
    * @return the entries with owner/location nulled.
    */
+  @Nullable
   public List<MaterialCollectionEntryDto> redactMaterialCollection(
       List<MaterialCollectionEntryDto> entries) {
     if (entries == null) {
@@ -135,6 +140,7 @@ public class JobOrderInventoryOwnerRedactor {
    *     unchanged.
    * @return the items with owner/location nulled.
    */
+  @Nullable
   public List<InventoryItemDto> redactInventoryItems(List<InventoryItemDto> items) {
     if (items == null) {
       return null;
@@ -149,7 +155,8 @@ public class JobOrderInventoryOwnerRedactor {
    * @param item the inventory-item projection to redact.
    * @return a copy with owner/location nulled.
    */
-  private InventoryItemDto redactInventoryItem(InventoryItemDto item) {
+  @NotNull
+  private InventoryItemDto redactInventoryItem(@NotNull InventoryItemDto item) {
     return new InventoryItemDto(
         item.id(),
         null,

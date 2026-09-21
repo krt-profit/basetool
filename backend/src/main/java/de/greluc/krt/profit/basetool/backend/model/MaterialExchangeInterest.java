@@ -33,6 +33,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A member's <em>interest</em> registration on a {@link MaterialExchangeOffer} — "Interesse
@@ -82,6 +83,7 @@ public class MaterialExchangeInterest extends AbstractEntity<UUID> {
    *
    * @return a stable, PII-free single-line representation of this interest registration.
    */
+  @NotNull
   @Override
   public String toString() {
     return "MaterialExchangeInterest{id="

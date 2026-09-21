@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -235,7 +236,7 @@ public class JobOrderAssigneeService {
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label
    */
-  private static String orderLabel(JobOrder jobOrder) {
+  private static String orderLabel(@NotNull JobOrder jobOrder) {
     return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 }

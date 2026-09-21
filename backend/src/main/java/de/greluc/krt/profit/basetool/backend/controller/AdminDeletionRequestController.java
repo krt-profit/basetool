@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -107,7 +108,7 @@ public class AdminDeletionRequestController {
     @ApiResponse(responseCode = "404", description = "No such pending request")
   })
   public DeletionRequestDto decline(
-      @PathVariable UUID id, @Valid @RequestBody DecideDeletionRequestRequest request) {
+      @PathVariable UUID id, @NotNull @Valid @RequestBody DecideDeletionRequestRequest request) {
     return DeletionRequestController.toDto(
         deletionRequestService.decline(id, request.requiredNote(), request.version()), null);
   }
@@ -142,7 +143,7 @@ public class AdminDeletionRequestController {
     @ApiResponse(responseCode = "404", description = "No such pending request")
   })
   public ResponseEntity<Void> execute(
-      @PathVariable UUID id, @Valid @RequestBody DecideDeletionRequestRequest request) {
+      @PathVariable UUID id, @NotNull @Valid @RequestBody DecideDeletionRequestRequest request) {
     // request.note() is deliberately not read here: an execution has nowhere durable to
     // record a note (see DeletionRequestService#decline). The field stays on the shared
     // request record because a refusal requires it.

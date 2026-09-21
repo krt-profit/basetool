@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import de.greluc.krt.profit.basetool.frontend.support.StringNormalization;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
@@ -50,7 +51,7 @@ public class GlobalBindingAdvice {
    * and length-capped at {@link StringNormalization#MAX_FREE_TEXT_LENGTH} before validation runs.
    */
   @InitBinder
-  public void initBinder(WebDataBinder binder) {
+  public void initBinder(@NotNull WebDataBinder binder) {
     binder.registerCustomEditor(
         String.class, new NormalizedStringEditor(StringNormalization.MAX_FREE_TEXT_LENGTH, true));
   }

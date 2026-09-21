@@ -38,6 +38,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A squadron's <em>claim</em> ("Eintragung") for a partial quantity of one material bucket on a
@@ -138,6 +139,7 @@ public class MaterialClaim extends AbstractEntity<UUID> {
    *
    * @return a stable, PII-free single-line representation of this claim.
    */
+  @NotNull
   @Override
   public String toString() {
     return "MaterialClaim{id="

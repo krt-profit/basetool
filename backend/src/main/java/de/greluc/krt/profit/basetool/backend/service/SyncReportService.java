@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -68,6 +69,7 @@ public class SyncReportService {
    *
    * @return a fresh run id
    */
+  @NotNull
   public UUID beginRun() {
     return UUID.randomUUID();
   }
@@ -80,7 +82,7 @@ public class SyncReportService {
    * @param source the sync source system
    * @param eventType the kind of finding
    */
-  private void countSyncEvent(SyncSourceSystem source, SyncEventType eventType) {
+  private void countSyncEvent(@NotNull SyncSourceSystem source, @NotNull SyncEventType eventType) {
     meterRegistry
         .counter(
             MetricNames.SYNC_EVENTS,

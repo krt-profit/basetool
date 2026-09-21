@@ -27,7 +27,9 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published right after an org-unit officer/lead's bank booking request is persisted
@@ -57,11 +59,14 @@ public record BankBookingRequestCreatedEvent(
     @Nullable UUID actorSub)
     implements BankBookingRequestEvent {
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.BANK_BOOKING_REQUEST_CREATED;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
@@ -77,6 +82,7 @@ public record BankBookingRequestCreatedEvent(
     return requestId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();

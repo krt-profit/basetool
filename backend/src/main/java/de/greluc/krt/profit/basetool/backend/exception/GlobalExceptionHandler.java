@@ -40,6 +40,8 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.context.MessageSource;
@@ -212,7 +214,7 @@ public class GlobalExceptionHandler {
     return MESSAGE_NOT_FOUND_SENTINEL.equals(resolved) ? message : resolved;
   }
 
-  private static ResponseEntity<ProblemDetail> toEntity(ProblemDetail pd) {
+  private static ResponseEntity<ProblemDetail> toEntity(@NotNull ProblemDetail pd) {
     return ResponseEntity.status(pd.getStatus())
         .contentType(MediaType.APPLICATION_PROBLEM_JSON)
         .body(pd);
@@ -249,7 +251,7 @@ public class GlobalExceptionHandler {
    */
   private void logProblem(
       @org.jetbrains.annotations.NotNull HttpServletRequest req,
-      @org.jetbrains.annotations.NotNull ProblemDetail pd,
+      ProblemDetail pd,
       @org.jetbrains.annotations.NotNull String shortMessage,
       @org.jetbrains.annotations.Nullable Map<String, ?> extra) {
     logProblem(req, pd, shortMessage, extra, false);
@@ -376,6 +378,7 @@ public class GlobalExceptionHandler {
    * @param ex the optimistic-locking throwable being mapped to the 409
    * @return the mutable, insertion-ordered context map appended verbatim to the WARN line
    */
+  @NotNull
   private static Map<String, Object> optimisticLockContext(Exception ex) {
     Map<String, Object> context = new LinkedHashMap<>();
     context.put("exception", ex.getClass().getSimpleName());
@@ -630,7 +633,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(AppException.class)
   public ResponseEntity<ProblemDetail> handleAppException(
-      AppException ex, HttpServletRequest request) {
+      @NotNull AppException ex, HttpServletRequest request) {
     boolean suppressed = ex.disclosurePolicy() == ErrorDisclosurePolicy.SUPPRESSED;
     String detail =
         suppressed ? tr(ex.detailKey()) : resolveDetail(ex.getMessage(), ex.detailKey());
@@ -744,7 +747,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(IllegalStateException.class)
   public ResponseEntity<ProblemDetail> handleIllegalState(
-      IllegalStateException ex, HttpServletRequest request) {
+      @NotNull IllegalStateException ex, HttpServletRequest request) {
     ProblemDetail pd =
         problem(
             HttpStatus.BAD_REQUEST,
@@ -768,7 +771,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(ResponseStatusException.class)
   public ResponseEntity<ProblemDetail> handleResponseStatus(
-      ResponseStatusException ex, HttpServletRequest request) {
+      @NotNull ResponseStatusException ex, HttpServletRequest request) {
     HttpStatus status =
         (ex.getStatusCode() instanceof HttpStatus hs)
             ? hs
@@ -802,7 +805,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(ErrorResponseException.class)
   public ResponseEntity<ProblemDetail> handleErrorResponseException(
-      ErrorResponseException ex, HttpServletRequest request) {
+      @NotNull ErrorResponseException ex, HttpServletRequest request) {
     HttpStatus status =
         (ex.getStatusCode() instanceof HttpStatus hs)
             ? hs
@@ -849,7 +852,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
   public ResponseEntity<ProblemDetail> handleHttpMessageNotReadable(
-      org.springframework.http.converter.HttpMessageNotReadableException ex,
+      @NotNull org.springframework.http.converter.HttpMessageNotReadableException ex,
       HttpServletRequest request) {
     // Most-specific cause carries the actual JSON parse error (path, line, column) which is the
     // information needed to triage "400 BAD_REQUEST" reports without a reproduction.
@@ -906,6 +909,8 @@ public class GlobalExceptionHandler {
    * @return the message with quoted values masked, or {@code null} when {@code message} is {@code
    *     null}
    */
+  @Contract("null -> null")
+  @Nullable
   static String maskQuotedValues(String message) {
     if (message == null) {
       return null;
@@ -968,7 +973,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(
       org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ProblemDetail> handleTypeMismatch(
-      org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
+      @NotNull org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex,
       HttpServletRequest request) {
     ProblemDetail pd =
         problem(
@@ -1006,7 +1011,8 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMediaTypeNotSupported(
-      org.springframework.web.HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+      @NotNull org.springframework.web.HttpMediaTypeNotSupportedException ex,
+      HttpServletRequest request) {
     ProblemDetail pd =
         problem(
             HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -1034,7 +1040,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ProblemDetail> handleMethodNotSupported(
-      HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+      @NotNull HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
     ProblemDetail pd =
         problem(
             HttpStatus.METHOD_NOT_ALLOWED,
@@ -1072,7 +1078,8 @@ public class GlobalExceptionHandler {
     NoSuchElementException.class,
     NoResourceFoundException.class
   })
-  public ResponseEntity<ProblemDetail> handleNotFound(Exception ex, HttpServletRequest request) {
+  public ResponseEntity<ProblemDetail> handleNotFound(
+      @NotNull Exception ex, @NotNull HttpServletRequest request) {
     // 404 is an expected, user-driven outcome (e.g. stale links, external crawlers hitting
     // deleted mission IDs). Log at DEBUG only and do NOT include the stacktrace to keep
     // the error log focused on real problems.
@@ -1126,7 +1133,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(RestClientException.class)
   public ResponseEntity<ProblemDetail> handleRestClientException(
-      RestClientException ex, HttpServletRequest request) {
+      @NotNull RestClientException ex, HttpServletRequest request) {
     // The message reaches the server log only; SUPPRESSED replaces it for the client. Deliberately
     // the exception's TYPE and not getMessage(), which for HttpClientErrorException embeds the
     // upstream response body — that belongs in the logged stack trace, not in a summary line.
@@ -1174,7 +1181,7 @@ public class GlobalExceptionHandler {
    */
   @ExceptionHandler(AsyncRequestNotUsableException.class)
   public void handleDisconnectedClient(
-      AsyncRequestNotUsableException ex, HttpServletRequest request) {
+      @NotNull AsyncRequestNotUsableException ex, @NotNull HttpServletRequest request) {
     log.debug("Client disconnected from {}: {}", request.getRequestURI(), ex.getMessage());
   }
 
@@ -1263,6 +1270,7 @@ public class GlobalExceptionHandler {
    * ResponseStatusException} / {@link ErrorResponseException} where the original cause is not known
    * to this handler.
    */
+  @NotNull
   private static String codeForStatus(HttpStatus status) {
     return switch (status) {
       case UNAUTHORIZED -> CODE_UNAUTHENTICATED;

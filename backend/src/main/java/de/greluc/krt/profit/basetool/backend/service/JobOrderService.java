@@ -56,6 +56,9 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -223,7 +226,7 @@ public class JobOrderService {
    *
    * @param jobOrder the persisted, flushed job order
    */
-  private void publishJobOrderCreated(JobOrder jobOrder) {
+  private void publishJobOrderCreated(@NotNull JobOrder jobOrder) {
     OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
     OrgUnit requesting = jobOrder.getRequestingOrgUnit();
     eventPublisher.publishEvent(
@@ -248,7 +251,7 @@ public class JobOrderService {
    *
    * @param jobOrder the persisted, flushed job order after the requester edit
    */
-  private void publishJobOrderUpdatedByRequester(JobOrder jobOrder) {
+  private void publishJobOrderUpdatedByRequester(@NotNull JobOrder jobOrder) {
     OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
     OrgUnit requesting = jobOrder.getRequestingOrgUnit();
     eventPublisher.publishEvent(
@@ -497,8 +500,9 @@ public class JobOrderService {
    * @return the re-fetched managed order plus the removed-count and withdrawn-claim count for
    *     audit.
    */
+  @NotNull
   private MaterialReplaceOutcome replaceMaterialsWithinTransaction(
-      UUID id, JobOrder managed, List<CreateJobOrderMaterialDto> materials) {
+      UUID id, JobOrder managed, @NotNull List<CreateJobOrderMaterialDto> materials) {
     List<UUID> newMaterialIds =
         materials.stream().map(CreateJobOrderMaterialDto::materialId).toList();
     Set<UUID> removedMaterialIds = new LinkedHashSet<>();
@@ -723,7 +727,8 @@ public class JobOrderService {
    * @param line the payload describing its new state.
    * @throws BadRequestException when the update would orphan or under-run booked production.
    */
-  private static void assertLineEditable(JobOrderItem existing, CreateJobOrderItemLineDto line) {
+  private static void assertLineEditable(
+      @NotNull JobOrderItem existing, CreateJobOrderItemLineDto line) {
     int manufactured =
         existing.getManufacturedAmount() == null ? 0 : existing.getManufacturedAmount();
     if (manufactured <= 0) {
@@ -758,7 +763,7 @@ public class JobOrderService {
    * @param orderId the owning order id, for the error message.
    * @throws BadRequestException when the line carries production or delivery.
    */
-  private static void assertLineRemovable(JobOrderItem gone, UUID orderId) {
+  private static void assertLineRemovable(@NotNull JobOrderItem gone, UUID orderId) {
     int manufactured = gone.getManufacturedAmount() == null ? 0 : gone.getManufacturedAmount();
     int delivered = gone.getDeliveredAmount() == null ? 0 : gone.getDeliveredAmount();
     if (manufactured > 0 || delivered > 0) {
@@ -929,7 +934,7 @@ public class JobOrderService {
    * @param jobOrder the managed order being edited.
    * @throws BadRequestException when the order already has a delivery and is therefore frozen.
    */
-  private static void assertRequesterEditable(JobOrder jobOrder) {
+  private static void assertRequesterEditable(@NotNull JobOrder jobOrder) {
     boolean hasDelivery =
         (jobOrder.getHandovers() != null && !jobOrder.getHandovers().isEmpty())
             || (jobOrder.getItemHandovers() != null && !jobOrder.getItemHandovers().isEmpty());
@@ -1124,7 +1129,7 @@ public class JobOrderService {
    * @param jobOrder the managed {@link JobOrder} entity to complete
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void completeJobOrderWithinTransaction(JobOrder jobOrder) {
+  public void completeJobOrderWithinTransaction(@NotNull JobOrder jobOrder) {
     boolean wasTerminal =
         (jobOrder.getStatus() == JobOrderStatus.COMPLETED
             || jobOrder.getStatus() == JobOrderStatus.REJECTED);
@@ -1254,6 +1259,8 @@ public class JobOrderService {
    * @param comment raw comment from the create/update DTO, may be {@code null}
    * @return the trimmed comment, or {@code null} when absent/blank
    */
+  @Contract("null -> null")
+  @Nullable
   private static String normalizeComment(String comment) {
     if (comment == null) {
       return null;
@@ -1280,7 +1287,7 @@ public class JobOrderService {
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label
    */
-  private static String orderLabel(JobOrder jobOrder) {
+  private static String orderLabel(@NotNull JobOrder jobOrder) {
     return JobOrderAuditLabel.of(jobOrder.getDisplayId());
   }
 
@@ -1290,6 +1297,7 @@ public class JobOrderService {
    * @param orgUnit the org unit, or {@code null}
    * @return {@code <id>(<KIND>)} or {@code -} when {@code null}
    */
+  @NotNull
   private static String orgUnitRef(OrgUnit orgUnit) {
     return orgUnit == null ? "-" : orgUnit.getId() + "(" + orgUnit.getKind() + ")";
   }

@@ -40,6 +40,7 @@ import java.time.ZoneId;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -179,6 +180,7 @@ public class BankAdminController {
    * @param before the exclusive cutoff (ISO instant); entries older than this are removed
    * @return the number of bank audit rows deleted
    */
+  @NotNull
   @Operation(summary = "Purge the bank audit log's entries older than a cutoff (admin)")
   @DeleteMapping("/audit")
   public AuditPurgeResultDto purgeAuditLog(

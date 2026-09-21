@@ -151,7 +151,8 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public PersonalBlueprintBatchResult addBatchForUser(
-      @PathVariable UUID userId, @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
+      @PathVariable UUID userId,
+      @NotNull @Valid @RequestBody PersonalBlueprintBatchCreateRequest request) {
     return service.addBatchForUser(userId, request.productKeys());
   }
 
@@ -202,6 +203,7 @@ public class AdminPersonalBlueprintController {
    *
    * @return the count of removed blueprints across all users
    */
+  @NotNull
   @DeleteMapping
   @Operation(
       summary = "Clear every user's removable owned blueprints (keeps auto-granted defaults).")
@@ -250,7 +252,7 @@ public class AdminPersonalBlueprintController {
     @ApiResponse(responseCode = "403", description = "Caller is not an administrator.")
   })
   public BlueprintImportResultDto applyImportForUser(
-      @PathVariable UUID userId, @Valid @RequestBody BlueprintImportApplyRequest request) {
+      @PathVariable UUID userId, @NotNull @Valid @RequestBody BlueprintImportApplyRequest request) {
     return importService.applyImport(userId, request.resolutions());
   }
 }

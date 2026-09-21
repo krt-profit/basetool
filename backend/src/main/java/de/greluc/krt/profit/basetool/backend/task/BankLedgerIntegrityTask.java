@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -122,7 +123,7 @@ public class BankLedgerIntegrityTask {
    *
    * @param report the fresh integrity report whose per-invariant list sizes become the gauge values
    */
-  private void updateViolationGauges(BankLedgerIntegrityService.IntegrityReport report) {
+  private void updateViolationGauges(@NotNull BankLedgerIntegrityService.IntegrityReport report) {
     violationGauges
         .get(MetricNames.CATEGORY_NEGATIVE_ACCOUNT_BALANCE)
         .set(report.negativeAccountBalances().size());

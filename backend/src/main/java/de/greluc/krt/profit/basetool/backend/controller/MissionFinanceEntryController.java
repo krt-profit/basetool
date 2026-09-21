@@ -34,6 +34,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -229,7 +230,7 @@ public class MissionFinanceEntryController {
    * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
    *     participant/user to redact
    */
-  private MissionFinanceEntryDto redactParticipantPii(MissionFinanceEntryDto dto) {
+  private MissionFinanceEntryDto redactParticipantPii(@NotNull MissionFinanceEntryDto dto) {
     MissionParticipantDto participant = dto.participant();
     if (participant == null || participant.user() == null) {
       return dto;

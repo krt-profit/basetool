@@ -48,7 +48,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -114,6 +117,7 @@ public class AdminUexPageController {
    *     most recent UEX sweep timestamp
    * @return the {@code admin/uex} view name
    */
+  @NotNull
   @GetMapping
   public String listData(Model model) {
     try {
@@ -179,6 +183,7 @@ public class AdminUexPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect back to {@code /admin/uex}
    */
+  @NotNull
   @PostMapping("/{kind}/{id}/loading-dock")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String updateLoadingDockOverride(
@@ -207,6 +212,7 @@ public class AdminUexPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect back to {@code /admin/uex}
    */
+  @NotNull
   @PostMapping("/terminals/{id}/auto-load")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String updateTerminalAutoLoadOverride(
@@ -227,6 +233,7 @@ public class AdminUexPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/uex} (optionally with {@code ?error=...})
    */
+  @NotNull
   @PostMapping("/terminals/{id}/toggle-visibility")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleTerminalVisibility(
@@ -402,6 +409,7 @@ public class AdminUexPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/uex}
    */
+  @NotNull
   private String dispatchOverride(
       String baseUri,
       String action,
@@ -448,6 +456,8 @@ public class AdminUexPageController {
    * @return per-star-system groups, sorted case-insensitively by system name (unknown system goes
    *     last under an empty-string label)
    */
+  @NotNull
+  @Unmodifiable
   List<StarSystemGroup> buildHierarchy(
       List<CityDto> cities,
       List<SpaceStationDto> stations,
@@ -652,7 +662,7 @@ public class AdminUexPageController {
   }
 
   private <T> List<T> parseAndSort(
-      List<Map<String, Object>> rows,
+      @NotNull List<Map<String, Object>> rows,
       java.util.function.Function<Map<String, Object>, T> mapper,
       java.util.function.Function<T, String> nameAccessor) {
     List<T> list = rows.stream().map(mapper).collect(Collectors.toCollection(ArrayList::new));
@@ -666,10 +676,13 @@ public class AdminUexPageController {
     return list;
   }
 
+  @Nullable
   private String parseString(Object o) {
     return o == null ? null : o.toString();
   }
 
+  @Contract("null -> null")
+  @Nullable
   private UUID parseUuid(Object o) {
     if (o == null) {
       return null;
@@ -681,6 +694,8 @@ public class AdminUexPageController {
     }
   }
 
+  @Contract("null -> null")
+  @Nullable
   private Boolean parseNullableBoolean(Object o) {
     if (o == null) {
       return null;
@@ -691,6 +706,8 @@ public class AdminUexPageController {
     return Boolean.parseBoolean(o.toString());
   }
 
+  @Contract("null -> null")
+  @Nullable
   private Instant parseInstant(Object o) {
     if (o == null) {
       return null;

@@ -60,6 +60,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -144,7 +145,7 @@ public class JobOrderItemService {
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
    */
-  public void applyItemLine(@NotNull JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
+  public void applyItemLine(JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
     GameItem gameItem =
         Entities.require(
             gameItemRepository.findById(line.gameItemId()),
@@ -366,7 +367,8 @@ public class JobOrderItemService {
     return ids;
   }
 
-  private JobOrderItemDto toItemDto(JobOrderItem item) {
+  @NotNull
+  private JobOrderItemDto toItemDto(@NotNull JobOrderItem item) {
     List<JobOrderItemMaterialDto> materials =
         item.getMaterials().stream()
             .sorted(
@@ -410,7 +412,7 @@ public class JobOrderItemService {
    *     item.gameItem}; {@code false} for a consistent line (and when either side is unset, which
    *     the {@code nullable = false} columns already preclude)
    */
-  private static boolean isBlueprintStale(JobOrderItem item) {
+  private static boolean isBlueprintStale(@NotNull JobOrderItem item) {
     Blueprint blueprint = item.getBlueprint();
     GameItem gameItem = item.getGameItem();
     if (blueprint == null || gameItem == null) {
@@ -420,6 +422,7 @@ public class JobOrderItemService {
     return output == null || !gameItem.getId().equals(output.getId());
   }
 
+  @NotNull
   private static Map<UUID, QualityRequirement> qualityChoicesByMaterial(
       List<CreateJobOrderItemMaterialDto> choices) {
     Map<UUID, QualityRequirement> map = new LinkedHashMap<>();
@@ -431,6 +434,7 @@ public class JobOrderItemService {
     return map;
   }
 
+  @NotNull
   private static QualityRequirement defaultQuality(Integer minQuality) {
     return minQuality != null && minQuality >= GOOD_QUALITY_THRESHOLD
         ? QualityRequirement.GOOD
@@ -535,19 +539,21 @@ public class JobOrderItemService {
         blueprintRef(blueprint), scaledBy, materials, subAssemblies, unresolved);
   }
 
-  private GameItemReferenceDto gameItemRef(GameItem gameItem) {
+  @NotNull
+  private GameItemReferenceDto gameItemRef(@NotNull GameItem gameItem) {
     return new GameItemReferenceDto(
         gameItem.getId(),
         gameItem.getName(),
         gameItem.getKind() == null ? null : gameItem.getKind().name());
   }
 
-  private BlueprintReferenceDto blueprintRef(Blueprint blueprint) {
+  @NotNull
+  private BlueprintReferenceDto blueprintRef(@NotNull Blueprint blueprint) {
     return new BlueprintReferenceDto(
         blueprint.getId(), blueprint.getOutputName(), blueprint.getScwikiKey());
   }
 
-  private static String unresolvedLabel(BlueprintIngredient ingredient) {
+  private static String unresolvedLabel(@NotNull BlueprintIngredient ingredient) {
     return ingredient.getWikiNameSnapshot() != null
         ? ingredient.getWikiNameSnapshot()
         : "(unresolved ingredient)";
@@ -565,6 +571,7 @@ public class JobOrderItemService {
    * @param ingredient the blueprint ingredient to examine
    * @return the bridged material, or {@code null} when the ingredient is not a bridgeable item line
    */
+  @Nullable
   private Material bridgedMaterial(BlueprintIngredient ingredient) {
     if (ingredient.getKind() != BlueprintIngredientKind.ITEM) {
       return null;
@@ -589,7 +596,8 @@ public class JobOrderItemService {
    * @param ingredient the owning ingredient (for the wiki-name fallback)
    * @return the matching material, or {@code null} when none exists
    */
-  private Material resolveItemMaterial(GameItem subItem, BlueprintIngredient ingredient) {
+  @Nullable
+  private Material resolveItemMaterial(@NotNull GameItem subItem, BlueprintIngredient ingredient) {
     String name = subItem.getName() != null ? subItem.getName() : ingredient.getWikiNameSnapshot();
     if (name == null || name.isBlank()) {
       return null;

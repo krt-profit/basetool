@@ -36,6 +36,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
@@ -85,6 +87,7 @@ public class JobOrderStockProjectionService {
    * @param jobOrder the managed order to project.
    * @return the assembled order DTO.
    */
+  @NotNull
   public JobOrderDto mapToDtoWithStock(JobOrder jobOrder) {
     StockResolver stockResolver =
         (orderId, materialId, floor) -> {
@@ -111,6 +114,7 @@ public class JobOrderStockProjectionService {
    * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK).
    * @return the assembled order DTO with per-bucket stock and (for SK orders) claims.
    */
+  @NotNull
   private JobOrderDto mapToDtoWithStock(
       JobOrder jobOrder, StockResolver stockResolver, ClaimResolver claimResolver) {
     JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
@@ -210,7 +214,7 @@ public class JobOrderStockProjectionService {
    * @param page the scoped page of managed orders to project.
    * @return the page mapped to DTOs, stock- and claim-enriched.
    */
-  public Page<JobOrderDto> mapPageWithStock(Page<JobOrder> page) {
+  public Page<JobOrderDto> mapPageWithStock(@NotNull Page<JobOrder> page) {
     List<JobOrder> orders = page.getContent();
     OrderLinkedStockIndex stockIndex =
         loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
@@ -236,6 +240,7 @@ public class JobOrderStockProjectionService {
    *     that answers {@code 0.0} for everything without touching the database.
    * @return the batched lookup, never {@code null}.
    */
+  @NotNull
   public OrderLinkedStockIndex loadOrderLinkedStockIndex(Collection<UUID> orderIds) {
     return new OrderLinkedStockIndex(loadStockIndex(orderIds));
   }
@@ -249,6 +254,7 @@ public class JobOrderStockProjectionService {
    * @param qualityRequirement the bucket's quality requirement.
    * @return the minimum quality to sum at, or {@code null} for no floor.
    */
+  @Nullable
   public static Integer qualityFloorFor(
       de.greluc.krt.profit.basetool.backend.model.QualityRequirement qualityRequirement) {
     return qualityRequirement == de.greluc.krt.profit.basetool.backend.model.QualityRequirement.GOOD
@@ -408,7 +414,7 @@ public class JobOrderStockProjectionService {
    * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
    */
   private static double sumStockAtFloor(
-      Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
+      @NotNull Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
       UUID jobOrderId,
       UUID materialId,
       Integer qualityFloor) {
@@ -439,7 +445,7 @@ public class JobOrderStockProjectionService {
    * @param jobOrder the order.
    * @return whether the order is a public SK order.
    */
-  private static boolean isSpecialCommandResponsible(JobOrder jobOrder) {
+  private static boolean isSpecialCommandResponsible(@NotNull JobOrder jobOrder) {
     return jobOrder.getResponsibleOrgUnit() != null
         && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
   }
@@ -452,6 +458,7 @@ public class JobOrderStockProjectionService {
    * @param qualityName the {@code GOOD}/{@code NONE} quality name.
    * @return the composite bucket key.
    */
+  @NotNull
   private static String bucketKey(UUID materialId, String qualityName) {
     return materialId + "|" + qualityName;
   }

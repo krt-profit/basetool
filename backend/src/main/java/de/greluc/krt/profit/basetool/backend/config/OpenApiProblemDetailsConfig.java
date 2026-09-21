@@ -27,6 +27,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -93,7 +94,7 @@ public class OpenApiProblemDetailsConfig {
     responses.addApiResponse(code, new ApiResponse().description(description).content(content));
   }
 
-  private void ensureProblemDetailSchema(OpenAPI openApi) {
+  private void ensureProblemDetailSchema(@NotNull OpenAPI openApi) {
     Components components = openApi.getComponents();
     if (components == null) {
       components = new Components();

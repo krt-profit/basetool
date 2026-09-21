@@ -24,7 +24,9 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationEventType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061). The seeded
@@ -44,6 +46,7 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
   /** Loose entity-type tag stored on the produced notifications for deep-linking. */
   public static final String ENTITY_TYPE = "DELETION_REQUEST";
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.ACCOUNT_DELETION_REQUESTED;
@@ -57,12 +60,15 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
     return userId;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     // Not org-unit scoped: an erasure request is answered by the controller, not by a squadron.
     return Map.of();
   }
 
+  @NotNull
   @Override
   public String entityType() {
     return ENTITY_TYPE;
@@ -73,6 +79,7 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
     return userId;
   }
 
+  @NotNull
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();

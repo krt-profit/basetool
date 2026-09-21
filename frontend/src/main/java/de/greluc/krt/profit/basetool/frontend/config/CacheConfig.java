@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.frontend.service.CacheDomain;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -64,6 +65,7 @@ public class CacheConfig {
    *
    * @return the configured {@link CaffeineCacheManager}
    */
+  @NotNull
   @Bean
   public CacheManager cacheManager() {
     CaffeineCacheManager cacheManager = new CaffeineCacheManager();

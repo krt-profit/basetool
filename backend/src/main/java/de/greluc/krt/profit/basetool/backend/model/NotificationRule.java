@@ -40,6 +40,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * An admin-managed rule mapping a {@link #eventType} to the recipients (via {@link #selectors}) who
@@ -106,6 +108,8 @@ public class NotificationRule extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the selectors
    */
+  @NotNull
+  @UnmodifiableView
   public Set<NotificationRuleSelector> getSelectors() {
     return Collections.unmodifiableSet(selectors);
   }
@@ -115,7 +119,7 @@ public class NotificationRule extends AbstractEntity<UUID> {
    *
    * @param selector the selector to add
    */
-  public void addSelector(NotificationRuleSelector selector) {
+  public void addSelector(@NotNull NotificationRuleSelector selector) {
     selector.setRule(this);
     selectors.add(selector);
   }

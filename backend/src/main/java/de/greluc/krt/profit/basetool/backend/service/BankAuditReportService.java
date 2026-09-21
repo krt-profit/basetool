@@ -185,7 +185,7 @@ public class BankAuditReportService {
    * @param events the audit events
    * @return account id → display number, for the referenced accounts that still exist
    */
-  private Map<java.util.UUID, String> resolveAccountNos(List<BankAuditEvent> events) {
+  private Map<java.util.UUID, String> resolveAccountNos(@NotNull List<BankAuditEvent> events) {
     List<java.util.UUID> accountIds =
         events.stream()
             .map(BankAuditEvent::getAccountId)

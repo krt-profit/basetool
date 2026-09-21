@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Outbound projection of a single {@code InventoryItem} stock row. Since the Lager keeps every
@@ -81,6 +82,7 @@ public record InventoryItemDto(
    * @param newVersion the version the client should echo on its next write.
    * @return a copy of this DTO carrying {@code newVersion}.
    */
+  @NotNull
   public InventoryItemDto withVersion(Long newVersion) {
     return new InventoryItemDto(
         id,

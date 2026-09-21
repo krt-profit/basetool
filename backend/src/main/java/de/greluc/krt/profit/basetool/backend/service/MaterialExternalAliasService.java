@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -95,6 +96,7 @@ public class MaterialExternalAliasService {
    * @param externalName the external commodity name (case-insensitive match)
    * @return the resolved material if an alias exists, {@code null} otherwise
    */
+  @Nullable
   public Material resolveMaterialByAlias(
       MaterialExternalAliasSource sourceSystem, String externalName) {
     if (externalName == null || externalName.isBlank()) {
@@ -135,7 +137,7 @@ public class MaterialExternalAliasService {
    * @throws DuplicateEntityException if an alias for the same source / external name already exists
    */
   @Transactional
-  public MaterialExternalAlias create(MaterialExternalAliasWriteRequest request) {
+  public MaterialExternalAlias create(@NotNull MaterialExternalAliasWriteRequest request) {
     MaterialExternalAliasSource source =
         MaterialExternalAliasSource.valueOf(request.sourceSystem());
     Material material =
@@ -249,7 +251,7 @@ public class MaterialExternalAliasService {
    * @param request the validated write payload
    */
   private void applyWritableFields(
-      MaterialExternalAlias alias,
+      @NotNull MaterialExternalAlias alias,
       Material material,
       MaterialExternalAliasSource source,
       MaterialExternalAliasWriteRequest request) {

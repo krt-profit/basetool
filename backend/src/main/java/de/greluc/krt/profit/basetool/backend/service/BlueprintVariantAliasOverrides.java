@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -99,6 +100,7 @@ public class BlueprintVariantAliasOverrides {
    * @param familyKey a structural family key (normalized, quote-stripped), or {@code null}
    * @return the canonical family key for a registered alias, else {@code familyKey} unchanged
    */
+  @Nullable
   @Contract("null -> null; !null -> !null")
   public String canonical(String familyKey) {
     if (familyKey == null) {

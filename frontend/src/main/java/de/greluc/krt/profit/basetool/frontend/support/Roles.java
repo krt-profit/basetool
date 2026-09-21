@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.support;
 
 import java.util.Set;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Central constant holder for role codes on the frontend side (S3 Phase 3, part of #909), replacing
@@ -66,6 +67,7 @@ public final class Roles {
    * @param code a bare role code, e.g. {@link #ADMIN}
    * @return the prefixed authority, e.g. {@code "ROLE_ADMIN"}
    */
+  @NotNull
   public static String authority(String code) {
     return ROLE_PREFIX + code;
   }

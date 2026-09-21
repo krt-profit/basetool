@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+
 /**
  * The fixed catalogue of functional ranks ("Funktionsränge") a user can hold in the Profit-Bereich
  * org chart. Each value carries the {@link OrgChartScope} it belongs to so {@code OrgChartService}
@@ -34,6 +37,7 @@ package de.greluc.krt.profit.basetool.backend.model;
  * <p>These ranks are purely descriptive: holding one grants <b>no</b> application permission.
  * Authorization stays with the global roles and the {@code org_unit_membership} flags.
  */
+@RequiredArgsConstructor
 public enum OrgChartPositionType {
 
   /** Bereichsleiter — the single head of the Profit-Bereich. At most one across the whole chart. */
@@ -92,10 +96,6 @@ public enum OrgChartPositionType {
 
   private final OrgChartScope scope;
 
-  OrgChartPositionType(OrgChartScope scope) {
-    this.scope = scope;
-  }
-
   /**
    * Returns the scope this functional rank belongs to. Drives the scope/type consistency check in
    * {@code OrgChartService} (area ranks must be placed in the area leadership with no OrgUnit;
@@ -104,6 +104,7 @@ public enum OrgChartPositionType {
    *
    * @return the owning scope; never {@code null}.
    */
+  @NotNull
   public OrgChartScope scope() {
     return scope;
   }

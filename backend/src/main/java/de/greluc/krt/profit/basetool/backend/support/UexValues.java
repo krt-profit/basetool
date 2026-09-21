@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -104,6 +105,7 @@ public final class UexValues {
    * @return {@code true} iff {@code flag} equals 1, {@code false} for 0, {@code null} for a {@code
    *     null} input
    */
+  @Contract("null -> null")
   public static @Nullable Boolean asBooleanOrNull(@Nullable Integer flag) {
     if (flag == null) {
       return null;

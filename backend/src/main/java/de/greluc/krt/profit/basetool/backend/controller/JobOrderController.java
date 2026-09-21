@@ -70,6 +70,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -509,7 +510,8 @@ public class JobOrderController {
    * @param dto the full job-order DTO
    * @return the redacted DTO safe for a requester-only viewer
    */
-  private JobOrderDto cleanupJobOrderForRequester(JobOrderDto dto) {
+  @NotNull
+  private JobOrderDto cleanupJobOrderForRequester(@NotNull JobOrderDto dto) {
     return new JobOrderDto(
         dto.id(),
         dto.displayId(),
@@ -935,6 +937,7 @@ public class JobOrderController {
    * @param dto the new material lines + comment (carries the expected version)
    * @return the redacted, persisted DTO
    */
+  @NotNull
   @PutMapping("/{id}/requested")
   @Operation(
       summary = "Requester edit of a material order",
@@ -976,6 +979,7 @@ public class JobOrderController {
    * @param dto the new item lines + comment (carries the expected version)
    * @return the redacted, persisted DTO
    */
+  @NotNull
   @PutMapping("/{id}/items/requested")
   @Operation(
       summary = "Requester edit of an item order",
@@ -1042,7 +1046,7 @@ public class JobOrderController {
   })
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto updateBlueprintVariantCounting(
-      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
+      @PathVariable UUID id, @NotNull @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
         id, dto.countBlueprintsWithVariants(), dto.version());
   }
@@ -1064,7 +1068,7 @@ public class JobOrderController {
               + " squadron logistician/officer: escalate own squadron's order to an SK only.")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @ownerScopeService.canEditJobOrder(#id)")
   public JobOrderDto reassignResponsibleOrgUnit(
-      @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
+      @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
     return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
   }
 

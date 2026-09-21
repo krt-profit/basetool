@@ -88,6 +88,7 @@ public class ShipDataPageController {
    * @param model Thymeleaf model populated with both forms, both lists and the optional error key
    * @return the {@code ship-data} view name
    */
+  @NotNull
   @GetMapping
   @SuppressWarnings("unchecked")
   public String listData(Model model) {
@@ -142,6 +143,7 @@ public class ShipDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
    */
+  @NotNull
   @PostMapping("/manufacturers/{id}/visibility")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleManufacturerVisibility(
@@ -168,6 +170,7 @@ public class ShipDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /ship-data} (optionally with {@code ?error=...})
    */
+  @NotNull
   @PostMapping("/ship-types/{id}/visibility")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleShipTypeVisibility(
@@ -195,6 +198,7 @@ public class ShipDataPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /ship-data}
    */
+  @NotNull
   @PostMapping("/reset-fitted")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String resetAllFitted(RedirectAttributes redirectAttributes) {

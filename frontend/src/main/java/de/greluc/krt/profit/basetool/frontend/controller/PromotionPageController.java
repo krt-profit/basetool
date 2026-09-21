@@ -37,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -147,6 +149,7 @@ public class PromotionPageController {
    * DTO), wird {@code null} weitergegeben und der Marker einfach nicht angezeigt — die Seite
    * funktioniert weiterhin als reine Übersicht.
    */
+  @NotNull
   @GetMapping("/overview")
   public String overview(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
@@ -197,6 +200,7 @@ public class PromotionPageController {
    * ("Schwachstellen"-Highlighting), ohne dass der Nutzer alle Beförderbarkeits-Karten
    * gegenüberstellen muss.
    */
+  @NotNull
   @GetMapping("/my-evaluations")
   public String myEvaluations(
       @ModelAttribute("promotionFeatureEnabled") Boolean promotionFeatureEnabled, Model model) {
@@ -279,6 +283,7 @@ public class PromotionPageController {
    * order of {@link PromotionTopicDto} entries in {@code topics} matches the column order of {@code
    * allCategories}, which is what the row body relies on.
    */
+  @NotNull
   @GetMapping("/manage")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String manage(
@@ -376,6 +381,7 @@ public class PromotionPageController {
   }
 
   /** Schritt 8: Admin-Bereich – Themenbereiche, Kategorien & Stufeninhalte verwalten. */
+  @NotNull
   @GetMapping("/admin/topics")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminTopics(
@@ -416,6 +422,7 @@ public class PromotionPageController {
    * @return the Thymeleaf view (or {@code view :: fragment}) name for the rank-requirements admin
    *     page
    */
+  @NotNull
   @GetMapping("/admin/rank-requirements")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String adminRankRequirements(
@@ -529,6 +536,7 @@ public class PromotionPageController {
    *
    * @return the user's rank as an {@link Integer}, or {@code null} when unavailable
    */
+  @Nullable
   private Integer fetchCurrentUserRank() {
     try {
       de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =

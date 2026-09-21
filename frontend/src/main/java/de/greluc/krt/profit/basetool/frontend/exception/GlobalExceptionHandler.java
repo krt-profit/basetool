@@ -210,6 +210,7 @@ public class GlobalExceptionHandler {
    * @param model the view model the 404 page renders from; never {@code null}
    * @return the {@code error/error} view name
    */
+  @NotNull
   @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
   @ResponseStatus(HttpStatus.NOT_FOUND)
   public String handleNotFound(@NotNull Model model) {
@@ -480,6 +481,7 @@ public class GlobalExceptionHandler {
    * Catch-all fallback. Renders a 500 error page; unwraps a {@link BackendServiceException} cause
    * to propagate the backend's status code (e.g. 503 / 504) rather than masking it as 500.
    */
+  @NotNull
   @ExceptionHandler(Exception.class)
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public String handleException(

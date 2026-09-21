@@ -194,6 +194,7 @@ public class OperationPayoutService {
    * @return per-participant payout breakdown, sorted by participant name
    * @throws NotFoundException when no match
    */
+  @NotNull
   public List<OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
     Operation operation =
         Entities.require(
@@ -320,6 +321,7 @@ public class OperationPayoutService {
    * @return the payout rows (sorted by participant name) plus the aggregated donation total
    * @throws NotFoundException when no operation matches the id
    */
+  @NotNull
   public OperationPayoutSummaryDto getOperationPayoutSummary(@NotNull UUID id) {
     List<OperationPayoutDto> payouts = restrictToOwnRowIfEscapeOnly(id, getOperationPayouts(id));
     BigDecimal totalDonations =
@@ -433,6 +435,7 @@ public class OperationPayoutService {
    * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
    *     row
    */
+  @NotNull
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public OperationPayoutStatusDto setPayoutStatusWithinTransaction(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {

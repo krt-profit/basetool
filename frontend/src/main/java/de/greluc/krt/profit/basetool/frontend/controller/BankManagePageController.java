@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -95,6 +96,7 @@ public class BankManagePageController {
    * @param model Spring MVC model
    * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
    */
+  @NotNull
   @GetMapping("/bank/manage")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String manage(

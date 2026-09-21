@@ -24,6 +24,7 @@ import jakarta.persistence.Entity;
 import java.util.UUID;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Staffel tenant — the original organisational unit the multi-tenancy work was built around (see
@@ -85,6 +86,7 @@ public class Squadron extends OrgUnit {
    *
    * @return always {@link OrgUnitKind#SQUADRON}, never {@code null}.
    */
+  @NotNull
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.SQUADRON;

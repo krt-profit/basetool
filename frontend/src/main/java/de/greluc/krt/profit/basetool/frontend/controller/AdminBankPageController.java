@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -67,6 +68,7 @@ public class AdminBankPageController {
    *
    * @return the {@code admin/bank} view name
    */
+  @NotNull
   @GetMapping("/admin/bank")
   public String bankAdmin() {
     return "admin/bank";
@@ -78,6 +80,7 @@ public class AdminBankPageController {
    *
    * @return a redirect to the unified audit-log page, bank tab
    */
+  @NotNull
   @GetMapping("/admin/bank-audit")
   public String bankAuditRedirect() {
     return "redirect:/admin/audit-log?domain=BANK";
@@ -93,6 +96,7 @@ public class AdminBankPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect back to the admin bank page
    */
+  @NotNull
   @PostMapping("/admin/bank/wipe-reset")
   public String wipeReset(
       @RequestParam(required = false) String confirm, RedirectAttributes redirectAttributes) {

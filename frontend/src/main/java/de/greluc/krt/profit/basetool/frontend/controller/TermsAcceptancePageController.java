@@ -81,6 +81,7 @@ public class TermsAcceptancePageController {
    * @return the {@code terms-accept} view, or a redirect to the start page when consent is already
    *     on record
    */
+  @NotNull
   @GetMapping("/terms/accept")
   public String showAcceptancePage(Model model) {
     try {

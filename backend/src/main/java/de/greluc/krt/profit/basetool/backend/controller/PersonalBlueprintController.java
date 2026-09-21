@@ -149,7 +149,7 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "400", description = "Validation failed.")
   })
   public PersonalBlueprintBatchResult addBatch(
-      @Valid @RequestBody PersonalBlueprintBatchCreateRequest request,
+      @NotNull @Valid @RequestBody PersonalBlueprintBatchCreateRequest request,
       @CurrentUserId UUID ownerUserId) {
     return service.addBatch(ownerUserId, request.productKeys());
   }
@@ -203,6 +203,7 @@ public class PersonalBlueprintController {
    * @param ownerUserId the caller's {@code app_user.id}
    * @return the count of removed blueprints
    */
+  @NotNull
   @DeleteMapping
   @Operation(
       summary = "Clear the caller's removable owned blueprints (keeps auto-granted defaults).")
@@ -308,7 +309,8 @@ public class PersonalBlueprintController {
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
   public BlueprintImportResultDto applyImport(
-      @Valid @RequestBody BlueprintImportApplyRequest request, @CurrentUserId UUID ownerUserId) {
+      @NotNull @Valid @RequestBody BlueprintImportApplyRequest request,
+      @CurrentUserId UUID ownerUserId) {
     return importService.applyImport(ownerUserId, request.resolutions());
   }
 }

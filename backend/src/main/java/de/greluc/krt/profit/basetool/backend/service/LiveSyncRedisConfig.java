@@ -27,6 +27,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.util.UUID;
 import java.util.concurrent.ThreadPoolExecutor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -63,6 +64,7 @@ public class LiveSyncRedisConfig {
    * @param properties the channel and the on/off switch
    * @return the bridge, registered both as the fan-out and as the channel's message listener
    */
+  @NotNull
   @Bean
   @ConditionalOnProperty(
       prefix = "app.live-sync.redis-fanout",
@@ -87,6 +89,7 @@ public class LiveSyncRedisConfig {
    *
    * @return a fan-out that carries nothing beyond this JVM
    */
+  @NotNull
   @Bean
   @ConditionalOnMissingBean(LiveSyncFanout.class)
   public LiveSyncFanout localLiveSyncFanout() {
@@ -103,6 +106,7 @@ public class LiveSyncRedisConfig {
    *
    * @return the initialised executor
    */
+  @NotNull
   @Bean(destroyMethod = "shutdown")
   @ConditionalOnProperty(
       prefix = "app.live-sync.redis-fanout",
@@ -135,6 +139,7 @@ public class LiveSyncRedisConfig {
    * @param meterRegistry registry the subscription gauge binds to
    * @return the listener container
    */
+  @NotNull
   @Bean
   @ConditionalOnProperty(
       prefix = "app.live-sync.redis-fanout",

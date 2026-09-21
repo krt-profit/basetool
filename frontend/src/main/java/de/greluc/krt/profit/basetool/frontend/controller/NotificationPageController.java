@@ -138,6 +138,7 @@ public class NotificationPageController {
    *
    * @return a fresh emitter holding the browser connection open for {@link #STREAM_TIMEOUT_MS}
    */
+  @org.jetbrains.annotations.NotNull
   protected SseEmitter newEmitter() {
     return new SseEmitter(STREAM_TIMEOUT_MS);
   }
@@ -151,6 +152,7 @@ public class NotificationPageController {
    * @param model the view model
    * @return the notifications template name
    */
+  @org.jetbrains.annotations.NotNull
   @GetMapping
   public String page(Model model) {
     try {
@@ -181,6 +183,7 @@ public class NotificationPageController {
    * @param page the zero-based page index to fetch (page 0 is the initial server render)
    * @return the localized page slice with the total count and the more-pages flag
    */
+  @org.jetbrains.annotations.NotNull
   @ResponseBody
   @GetMapping(value = "/page-items", headers = "X-Requested-With=XMLHttpRequest")
   public NotificationPageSliceDto pageItems(@RequestParam(defaultValue = "1") int page) {
@@ -221,6 +224,7 @@ public class NotificationPageController {
    * @param authentication the authenticated principal owning the session
    * @return the SSE emitter writing to the browser
    */
+  @org.jetbrains.annotations.NotNull
   @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public SseEmitter stream(HttpServletRequest request, Authentication authentication) {
     SseEmitter emitter = newEmitter();
@@ -293,6 +297,7 @@ public class NotificationPageController {
    *
    * @return the unread count payload (fail-soft to zero on a backend hiccup)
    */
+  @org.jetbrains.annotations.NotNull
   @ResponseBody
   @GetMapping(value = "/unread-count", headers = "X-Requested-With=XMLHttpRequest")
   public NotificationCountResponse unreadCount() {
@@ -438,7 +443,9 @@ public class NotificationPageController {
     return result != null && result.page() + 1 < result.totalPages();
   }
 
-  private NotificationViewDto toView(NotificationDto dto, Locale locale) {
+  @org.jetbrains.annotations.NotNull
+  private NotificationViewDto toView(
+      @org.jetbrains.annotations.NotNull NotificationDto dto, Locale locale) {
     return new NotificationViewDto(
         dto.id(),
         render(dto.type(), dto.params(), locale),

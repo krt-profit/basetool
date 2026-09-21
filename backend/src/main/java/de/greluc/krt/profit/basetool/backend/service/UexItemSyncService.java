@@ -44,6 +44,8 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -336,6 +338,7 @@ public class UexItemSyncService {
    * @param now timestamp to stamp on the row
    * @return the persisted entity, or {@code null} if the DTO was unusable
    */
+  @Nullable
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public GameItem upsertItemWithinTransaction(UexItemDto dto, UexCategory category, Instant now) {
     if (dto.id() == null || !StringUtils.hasText(dto.name())) {
@@ -439,6 +442,7 @@ public class UexItemSyncService {
    * @param dto inbound UEX row
    * @return existing row if matched; {@code null} otherwise
    */
+  @Nullable
   private GameItem resolveExistingItem(UexItemDto dto) {
     if (dto.id() != null) {
       Optional<GameItem> byUex = gameItemRepository.findByUexItemId(dto.id());
@@ -466,6 +470,7 @@ public class UexItemSyncService {
    * @param dto inbound UEX row
    * @return resolved manufacturer, or {@code null}
    */
+  @Nullable
   private Manufacturer resolveManufacturer(UexItemDto dto) {
     if (dto.idCompany() != null && dto.idCompany() != 0) {
       Optional<Manufacturer> byId =
@@ -487,6 +492,7 @@ public class UexItemSyncService {
    * @param dto inbound UEX row
    * @return resolved ship type, or {@code null} if {@code id_vehicle} is 0 / unknown
    */
+  @Nullable
   private ShipType resolveLinkedShipType(UexItemDto dto) {
     if (dto.idVehicle() == null || dto.idVehicle() == 0) {
       return null;
@@ -502,6 +508,7 @@ public class UexItemSyncService {
    * @param category resolved category for the row
    * @return derived kind, or {@link GameItemKind#GENERIC} if no specific match applies
    */
+  @NotNull
   static GameItemKind deriveKind(UexCategory category) {
     if (category == null || category.getSection() == null) {
       return GameItemKind.GENERIC;

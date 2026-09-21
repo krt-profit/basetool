@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Data transfer record carrying Mission Frequency payload.
@@ -40,6 +41,7 @@ public record MissionFrequencyDto(
   public record FrequencyTypeRef(UUID id, String name) {}
 
   /** Convenience accessor returning the nested {@code frequencyType.id()}, or {@code null}. */
+  @Nullable
   public UUID frequencyTypeId() {
     return frequencyType != null ? frequencyType.id() : null;
   }

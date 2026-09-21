@@ -239,7 +239,8 @@ public class OrgUnitBankController {
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Set or clear an org-unit account's balance target (responsible holder)")
   public OrgUnitBankAccountSettingsDto setBalanceTarget(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid OrgUnitBalanceTargetRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid OrgUnitBalanceTargetRequest request) {
     return orgUnitBankAccessService.setBalanceTarget(id, request.target(), request.version());
   }
 
@@ -351,7 +352,7 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto setRoleApprovalLimit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull String roleCode,
-      @RequestBody @Valid SetBankApprovalLimitRequest request) {
+      @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
     return orgUnitBankAccessService.setRoleApprovalLimit(id, roleCode, request.limit());
   }
 
@@ -381,7 +382,8 @@ public class OrgUnitBankController {
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Set the all-members approval limit on an org-unit account")
   public OrgUnitBankAccountSettingsDto setAllMembersApprovalLimit(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankApprovalLimitRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
     return orgUnitBankAccessService.setAllMembersApprovalLimit(id, request.limit());
   }
 
@@ -411,7 +413,8 @@ public class OrgUnitBankController {
   @PreAuthorize("isAuthenticated()")
   @Operation(summary = "Set the area-members (Mitglieder des Bereichs) approval limit")
   public OrgUnitBankAccountSettingsDto setAreaMembersApprovalLimit(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid SetBankApprovalLimitRequest request) {
+      @PathVariable @NotNull UUID id,
+      @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
     return orgUnitBankAccessService.setAreaMembersApprovalLimit(id, request.limit());
   }
 
@@ -443,7 +446,7 @@ public class OrgUnitBankController {
   public OrgUnitBankAccountSettingsDto setUserApprovalLimit(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID userId,
-      @RequestBody @Valid SetBankApprovalLimitRequest request) {
+      @NotNull @RequestBody @Valid SetBankApprovalLimitRequest request) {
     return orgUnitBankAccessService.setUserApprovalLimit(id, userId, request.limit());
   }
 
@@ -514,7 +517,7 @@ public class OrgUnitBankController {
   @Operation(summary = "Cancel one of the caller's own pending booking requests")
   @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Request cancelled")})
   public BankBookingRequestDto cancelOwnBookingRequest(
-      @PathVariable UUID id, @Valid @RequestBody CancelBankBookingRequest request) {
+      @PathVariable UUID id, @NotNull @Valid @RequestBody CancelBankBookingRequest request) {
     return orgUnitBankAccessService.cancelOwnBookingRequest(id, request.version());
   }
 

@@ -25,6 +25,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
@@ -91,7 +95,7 @@ public final class EndpointEnumeration {
    * @param context the web application context whose dispatcher to read
    * @return every call to sweep, deduplicated and in a stable order
    */
-  public static List<Call> mappings(WebApplicationContext context) {
+  public static @NotNull List<Call> mappings(@NotNull WebApplicationContext context) {
     RequestMappingHandlerMapping handlerMapping =
         context.getBean(MAPPING_BEAN, RequestMappingHandlerMapping.class);
     Set<Call> calls = new LinkedHashSet<>();
@@ -135,7 +139,8 @@ public final class EndpointEnumeration {
    * @param verb the verb to report patterns for
    * @return the matching patterns, deduplicated and in lexicographic order
    */
-  public static List<String> patterns(WebApplicationContext context, HttpMethod verb) {
+  public static @NotNull @Unmodifiable List<String> patterns(
+      @NotNull WebApplicationContext context, @NotNull HttpMethod verb) {
     RequestMappingHandlerMapping handlerMapping =
         context.getBean(MAPPING_BEAN, RequestMappingHandlerMapping.class);
     Set<String> matched = new TreeSet<>();
@@ -153,7 +158,7 @@ public final class EndpointEnumeration {
    * @param info the mapping to read
    * @return its pattern strings, in lexicographic order; empty when it declares none
    */
-  private static Set<String> patternsOf(RequestMappingInfo info) {
+  private static @NotNull Set<String> patternsOf(@NotNull RequestMappingInfo info) {
     Set<String> patterns = new TreeSet<>();
     if (info.getPathPatternsCondition() != null) {
       info.getPathPatternsCondition()
@@ -172,7 +177,7 @@ public final class EndpointEnumeration {
    * @param info the mapping to read
    * @return its verbs, never empty
    */
-  private static Set<HttpMethod> verbsOf(RequestMappingInfo info) {
+  private static @NotNull Set<HttpMethod> verbsOf(@NotNull RequestMappingInfo info) {
     Set<HttpMethod> verbs = new LinkedHashSet<>();
     info.getMethodsCondition().getMethods().forEach(m -> verbs.add(HttpMethod.valueOf(m.name())));
     if (verbs.isEmpty()) {
@@ -196,7 +201,8 @@ public final class EndpointEnumeration {
    * @return {@code true} for the root itself and anything below it, {@code false} for a sibling
    *     that merely shares its opening characters
    */
-  public static boolean isUnder(String path, String root) {
+  @Contract(pure = true)
+  public static boolean isUnder(@NotNull String path, @NotNull String root) {
     return path.equals(root) || path.startsWith(root + "/");
   }
 
@@ -214,7 +220,8 @@ public final class EndpointEnumeration {
    * @param pattern the mapping's path pattern
    * @return the concrete path, or {@code null} when the pattern cannot be made concrete
    */
-  static String substituteVariables(String pattern) {
+  @Contract(pure = true)
+  static @Nullable String substituteVariables(@NotNull String pattern) {
     if (pattern.contains("**") || pattern.contains(":")) {
       return null;
     }

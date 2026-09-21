@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -92,7 +93,8 @@ public class NotificationController {
     @ApiResponse(responseCode = "200", description = "SSE stream opened."),
     @ApiResponse(responseCode = "401", description = "Authentication required.")
   })
-  public SseEmitter stream(@CurrentUserId UUID recipientUserId, HttpServletResponse response) {
+  public SseEmitter stream(
+      @CurrentUserId UUID recipientUserId, @NotNull HttpServletResponse response) {
     response.setHeader("X-Accel-Buffering", "no");
     return streamService.subscribe(recipientUserId);
   }
@@ -155,6 +157,7 @@ public class NotificationController {
    * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the unread count payload
    */
+  @NotNull
   @GetMapping("/unread-count")
   @Operation(summary = "Count the caller's unread notifications (always-on bell badge).")
   @ApiResponses({
@@ -188,6 +191,7 @@ public class NotificationController {
    * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the bulk result (count updated + resulting unread count of zero)
    */
+  @NotNull
   @PostMapping("/read-all")
   @Operation(summary = "Mark all of the caller's notifications read.")
   @ApiResponses({
@@ -222,6 +226,7 @@ public class NotificationController {
    * @param recipientUserId the caller's id, resolved from the JWT subject claim
    * @return the bulk result (count deleted + remaining unread count)
    */
+  @NotNull
   @DeleteMapping("/read")
   @Operation(summary = "Delete all of the caller's already-read notifications.")
   @ApiResponses({

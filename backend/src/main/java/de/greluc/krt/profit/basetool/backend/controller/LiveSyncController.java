@@ -185,7 +185,7 @@ public class LiveSyncController {
     @ApiResponse(responseCode = "429", description = "Signal rate exceeded; drop the frame.")
   })
   public ResponseEntity<Void> changed(
-      @CurrentUserId UUID sub, @Valid @RequestBody LiveSyncChangedRequest request) {
+      @CurrentUserId UUID sub, @NotNull @Valid @RequestBody LiveSyncChangedRequest request) {
     LiveSyncTopic topic = LiveSyncTopic.parse(request.topic());
     if (topic == null) {
       authorizer.recordInvalidTopic();

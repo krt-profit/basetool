@@ -1233,7 +1233,7 @@ public class OrgUnitMembershipService {
    * SpecialCommandService.updateSpecialCommand} so the optimistic-lock surface is uniform across
    * the SK administration endpoints.
    */
-  private void assertVersionMatches(OrgUnitMembership m, Long version) {
+  private void assertVersionMatches(@NotNull OrgUnitMembership m, Long version) {
     OptimisticLock.check(m.getVersion(), version, OrgUnitMembership.class, null);
   }
 

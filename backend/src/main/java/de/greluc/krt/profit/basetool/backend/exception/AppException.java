@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -239,6 +241,8 @@ public abstract sealed class AppException extends RuntimeException
    *
    * @return extension properties to copy onto the problem response; never {@code null}
    */
+  @NotNull
+  @Unmodifiable
   public Map<String, Object> extraProperties() {
     return Map.of();
   }
@@ -252,6 +256,7 @@ public abstract sealed class AppException extends RuntimeException
    *
    * @return extra fields for the WARN log line, or {@code null} for none
    */
+  @Nullable
   public Map<String, ?> logExtra() {
     return null;
   }

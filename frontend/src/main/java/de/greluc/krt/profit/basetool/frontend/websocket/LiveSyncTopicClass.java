@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.websocket;
 
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -60,6 +61,7 @@ import org.jetbrains.annotations.Nullable;
  * prefixed form to {@link #BANK_ACCOUNT} (a per-account room). {@link LiveSyncTopic#parse(String)}
  * disambiguates them by the presence of the id segment.
  */
+@RequiredArgsConstructor
 public enum LiveSyncTopicClass {
 
   /** Per-mission room: the mission detail page. Carries editor-presence dots. */
@@ -341,15 +343,49 @@ public enum LiveSyncTopicClass {
       null,
       null);
 
-  private final String prefix;
+  /** The wire prefix identifying the class. */
+  private final @NotNull String prefix;
+
+  /**
+   * {@code true} if a concrete topic carries a resource UUID, {@code false} for a bare-prefix
+   * global room.
+   */
   private final boolean scoped;
-  private final Set<String> allowedSections;
+
+  /** The section-key whitelist the relay forwards for this class. */
+  private final @NotNull Set<String> allowedSections;
+
+  /** Whether this class carries editor-presence dots. */
   private final boolean presenceEnabled;
-  private final String metricLabel;
-  private final String authProbePath;
-  private final String capabilityField;
-  private final String fallbackProbePath;
-  private final Set<String> requiredAnyRole;
+
+  /** The bounded {@code topic_class} metric label value. */
+  private final @NotNull String metricLabel;
+
+  /**
+   * The authenticated backend read that authorizes a subscribe, or {@code null} when the socket
+   * authentication (or a {@link #requiredAnyRole} local check) authorizes it.
+   */
+  private final @Nullable String authProbePath;
+
+  /**
+   * For a global class authorized by a capability, the boolean field of the {@link #authProbePath}
+   * response that must be {@code true}; {@code null} otherwise.
+   */
+  private final @Nullable String capabilityField;
+
+  /**
+   * A second per-resource read tried when the {@link #authProbePath} explicitly refuses (403/404),
+   * so a subscribe is denied only when both refuse; {@code null} when the class has no fallback
+   * read.
+   */
+  private final @Nullable String fallbackProbePath;
+
+  /**
+   * For a global class authorized by a <b>local</b> role check, the set of authorities of which the
+   * caller must hold at least one (matched against the authorities captured at handshake, no
+   * backend call); {@code null} when the class is not locally role-gated.
+   */
+  private final @Nullable Set<String> requiredAnyRole;
 
   /**
    * Defines one topic class.
@@ -385,49 +421,6 @@ public enum LiveSyncTopicClass {
         capabilityField,
         null,
         null);
-  }
-
-  /**
-   * Defines one topic class, including the two bank-specific authorization extensions.
-   *
-   * @param prefix the wire prefix identifying the class
-   * @param scoped {@code true} if a concrete topic carries a resource UUID, {@code false} for a
-   *     bare-prefix global room
-   * @param allowedSections the section-key whitelist the relay forwards for this class
-   * @param presenceEnabled whether this class carries editor-presence dots
-   * @param metricLabel the bounded {@code topic_class} metric label value
-   * @param authProbePath the authenticated backend read that authorizes a subscribe, or {@code
-   *     null} when the socket authentication (or a {@link #requiredAnyRole} local check) authorizes
-   *     it
-   * @param capabilityField for a global class authorized by a capability, the boolean field of the
-   *     {@link #authProbePath} response that must be {@code true}; {@code null} otherwise
-   * @param fallbackProbePath a second per-resource read tried when the {@link #authProbePath}
-   *     explicitly refuses (403/404), so a subscribe is denied only when both refuse; {@code null}
-   *     when the class has no fallback read
-   * @param requiredAnyRole for a global class authorized by a <b>local</b> role check, the set of
-   *     authorities of which the caller must hold at least one (matched against the authorities
-   *     captured at handshake, no backend call); {@code null} when the class is not locally
-   *     role-gated
-   */
-  LiveSyncTopicClass(
-      @NotNull String prefix,
-      boolean scoped,
-      @NotNull Set<String> allowedSections,
-      boolean presenceEnabled,
-      @NotNull String metricLabel,
-      @Nullable String authProbePath,
-      @Nullable String capabilityField,
-      @Nullable String fallbackProbePath,
-      @Nullable Set<String> requiredAnyRole) {
-    this.prefix = prefix;
-    this.scoped = scoped;
-    this.allowedSections = allowedSections;
-    this.presenceEnabled = presenceEnabled;
-    this.metricLabel = metricLabel;
-    this.authProbePath = authProbePath;
-    this.capabilityField = capabilityField;
-    this.fallbackProbePath = fallbackProbePath;
-    this.requiredAnyRole = requiredAnyRole;
   }
 
   /**

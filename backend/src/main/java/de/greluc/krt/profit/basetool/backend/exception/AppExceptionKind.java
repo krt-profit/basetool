@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.exception;
 
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -35,6 +37,7 @@ import org.springframework.http.HttpStatus;
  * GlobalExceptionHandler.handle*} method used to hardcode before S4 — this enum only relocates them
  * next to the exception types they describe, it does not change any of them.
  */
+@RequiredArgsConstructor
 public enum AppExceptionKind {
 
   /** {@code BadRequestException} — service-layer rule {@code @Valid} cannot express. */
@@ -187,23 +190,6 @@ public enum AppExceptionKind {
   private final String logLabel;
   private final ErrorDisclosurePolicy disclosurePolicy;
 
-  AppExceptionKind(
-      HttpStatus status,
-      String code,
-      String titleKey,
-      String detailKey,
-      String typeSuffix,
-      String logLabel,
-      ErrorDisclosurePolicy disclosurePolicy) {
-    this.status = status;
-    this.code = code;
-    this.titleKey = titleKey;
-    this.detailKey = detailKey;
-    this.typeSuffix = typeSuffix;
-    this.logLabel = logLabel;
-    this.disclosurePolicy = disclosurePolicy;
-  }
-
   /**
    * The HTTP status the RFC&nbsp;7807 response carries.
    *
@@ -218,6 +204,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed code for this kind
    */
+  @NotNull
   public String code() {
     return code;
   }
@@ -227,6 +214,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed title bundle key for this kind
    */
+  @NotNull
   public String titleKey() {
     return titleKey;
   }
@@ -237,6 +225,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed detail bundle key for this kind
    */
+  @NotNull
   public String detailKey() {
     return detailKey;
   }
@@ -247,6 +236,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed problem-type suffix for this kind
    */
+  @NotNull
   public String typeSuffix() {
     return typeSuffix;
   }
@@ -256,6 +246,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed log label for this kind
    */
+  @NotNull
   public String logLabel() {
     return logLabel;
   }
@@ -266,6 +257,7 @@ public enum AppExceptionKind {
    *
    * @return the fixed disclosure policy for this kind
    */
+  @NotNull
   public ErrorDisclosurePolicy disclosurePolicy() {
     return disclosurePolicy;
   }

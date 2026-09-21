@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import java.time.Duration;
 import java.util.Locale;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.LocaleResolver;
@@ -37,6 +38,7 @@ public class LocaleConfig implements WebMvcConfigurer {
    * Cookie-based {@link LocaleResolver}: persists the user's locale in the {@code KRT_LOCALE}
    * cookie (default German, 90-day (3-month) max-age, path {@code /}).
    */
+  @NotNull
   @Bean
   public LocaleResolver localeResolver() {
     CookieLocaleResolver clr = new CookieLocaleResolver("KRT_LOCALE");
@@ -52,6 +54,7 @@ public class LocaleConfig implements WebMvcConfigurer {
    * <p>Registered for every path, so it is also the first thing every public, probed endpoint
    * meets.
    */
+  @NotNull
   @Bean
   public LocaleChangeInterceptor localeChangeInterceptor() {
     LocaleChangeInterceptor lci = new LocaleChangeInterceptor();

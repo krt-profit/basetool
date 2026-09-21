@@ -85,6 +85,7 @@ public class LeitungPageController {
    * @param model the Thymeleaf model, populated with {@code leitung}.
    * @return the view name, or its {@code leitungSections} selector for the fragment path.
    */
+  @NotNull
   @GetMapping
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
   public String leitung(@RequestParam(required = false) String fragment, Model model) {

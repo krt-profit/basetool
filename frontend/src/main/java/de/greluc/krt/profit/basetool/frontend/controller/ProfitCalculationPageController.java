@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -72,6 +73,7 @@ public class ProfitCalculationPageController {
    *     starSystems}
    * @return the {@code materials-profit-calculation} view name
    */
+  @NotNull
   @GetMapping
   @PreAuthorize(
       "hasAnyRole('" + Roles.KRT_MEMBER + "', '" + Roles.OFFICER + "', '" + Roles.ADMIN + "')")

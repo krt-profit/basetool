@@ -95,11 +95,13 @@ public class UserAccountMergeService {
   private record OwnedRows(String table, String column, List<String> conflictKeys) {
 
     /** A table with no unique constraint over the user column: every row simply moves. */
+    @NotNull
     static OwnedRows of(String table, String column) {
       return new OwnedRows(table, column, List.of());
     }
 
     /** A table whose unique constraint can make the same member hold a row on both accounts. */
+    @NotNull
     static OwnedRows deduped(String table, String column, String... conflictKeys) {
       return new OwnedRows(table, column, List.of(conflictKeys));
     }

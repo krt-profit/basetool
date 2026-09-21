@@ -65,6 +65,17 @@ dependencies {
   compileOnly(libs.keycloak.core)
   compileOnly(libs.jetbrains.annotations)
 
+  // Lombok, on both source sets. `compileOnly` + `annotationProcessor` keeps it out of the JAR
+  // exactly as the Keycloak SPIs are kept out -- nothing here reaches the Keycloak JVM, so the
+  // module's "bundles no third-party code at all" property (see the SBOM note above) is untouched.
+  // The version comes from the catalog rather than a BOM because this module deliberately has no
+  // Spring Boot dependency management; the catalog entry explains the lockstep it has to keep.
+  compileOnly(libs.lombok)
+  annotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.jetbrains.annotations)
+
   // The Keycloak SPI jars are needed on the TEST classpath too (the unit tests
   // instantiate the factories/providers directly), mirroring the compileOnly set.
   testImplementation(platform(libs.junit.bom))

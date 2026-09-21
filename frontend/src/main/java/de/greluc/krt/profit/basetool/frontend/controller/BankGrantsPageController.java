@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -75,6 +76,7 @@ public class BankGrantsPageController {
    * @param model Spring MVC model
    * @return the grants template, or its {@code grantsMatrix} fragment for an AJAX swap
    */
+  @NotNull
   @GetMapping("/bank/grants")
   @PreAuthorize("hasRole('" + Roles.BANK_MANAGEMENT + "')")
   public String grants(

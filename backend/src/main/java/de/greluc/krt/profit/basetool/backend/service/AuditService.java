@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -220,6 +221,7 @@ public class AuditService {
    * @param label the raw label, or {@code null}
    * @return the label clamped to 255 chars, or {@code null}
    */
+  @Contract("null -> null")
   private static @Nullable String truncate(@Nullable String label) {
     if (label == null) {
       return null;

@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -290,6 +291,7 @@ public class JobOrderQueryService {
    * @param jobOrderIds the orders to index; never empty when this is called.
    * @return the summed earmarks, never {@code null}.
    */
+  @NotNull
   private Map<UUID, Map<UUID, Double>> loadItemStockIndex(List<UUID> jobOrderIds) {
     Map<UUID, Map<UUID, Double>> index = new HashMap<>();
     for (de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemStockRow row :
@@ -322,6 +324,7 @@ public class JobOrderQueryService {
    * @param itemStockByOrder the batched earmark sums.
    * @return the order's per-game-item needs, empty when it orders no items.
    */
+  @NotNull
   private List<de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto>
       gameItemNeedsOf(
           @org.jetbrains.annotations.NotNull JobOrder order,

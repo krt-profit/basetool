@@ -62,6 +62,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -140,6 +141,7 @@ public class RefineryImportService {
    * @throws BadRequestException with an i18n key when {@code schemaVersion != 1} or {@code
    *     orders[0].panelType} is not {@code SETUP}
    */
+  @NotNull
   public RefineryImportDraftDto buildDraft(
       @NotNull RefineryExtractDto extract, @Nullable UUID callerId) {
     if (extract.schemaVersion() == null || extract.schemaVersion() != SUPPORTED_SCHEMA_VERSION) {
@@ -323,6 +325,7 @@ public class RefineryImportService {
    * @param rawName verbatim screen read, e.g. {@code "STILERON (ORE)"}
    * @return the matched material, or empty when no stage produced a hit
    */
+  @NotNull
   public Optional<Material> matchMaterial(@Nullable String rawName) {
     return Optional.ofNullable(matchMaterialDetailed(rawName, prepareMatchContext()).material());
   }
@@ -406,6 +409,7 @@ public class RefineryImportService {
    *     pre-cropped panel input, which never contains the header)
    * @return the matched location, or empty when none or several candidates share the folded name
    */
+  @NotNull
   public Optional<Location> matchRefineryLocation(@Nullable String rawName) {
     String canonical = MaterialNameCanonicalizer.canonicalCore(rawName);
     if (canonical == null || canonical.isEmpty()) {
@@ -458,7 +462,7 @@ public class RefineryImportService {
    * @param issues sink for the mismatch findings
    */
   private void reconcileHeaderTotals(
-      RefineryExtractOrderDto order,
+      @NotNull RefineryExtractOrderDto order,
       List<RefineryExtractGoodDto> sourceGoods,
       List<ImportIssueDto> issues) {
     Long toRefineTotal = order.rawToRefineTotal();
@@ -498,6 +502,7 @@ public class RefineryImportService {
    *
    * @return the per-request matching context
    */
+  @NotNull
   private MatchContext prepareMatchContext() {
     List<Material> candidates = materialRepository.findRefineryInputCandidates(MaterialType.RAW);
     Map<String, List<Material>> canonicalIndex = new HashMap<>();
@@ -627,7 +632,8 @@ public class RefineryImportService {
    * @param goods the contract's goods list (never {@code null} after bean validation)
    * @return a new sorted list
    */
-  private List<RefineryExtractGoodDto> sortedByRowIndex(List<RefineryExtractGoodDto> goods) {
+  private List<RefineryExtractGoodDto> sortedByRowIndex(
+      @NotNull List<RefineryExtractGoodDto> goods) {
     return goods.stream()
         .sorted(
             Comparator.comparing(
@@ -643,6 +649,7 @@ public class RefineryImportService {
    * @param callerId id of the authenticated uploader; may be {@code null} in unit-test contexts
    * @return the owner reference, or {@code null}
    */
+  @Contract("null -> null")
   private @Nullable UserReferenceDto resolveOwnerReference(@Nullable UUID callerId) {
     if (callerId == null) {
       return null;
@@ -660,6 +667,7 @@ public class RefineryImportService {
    * @param sourceImages the order's source-image provenance; {@code null}-safe
    * @return the latest capture instant, or {@code null}
    */
+  @Contract("null -> null")
   private static @Nullable Instant deriveStartedAt(
       @Nullable List<RefineryExtractImageDto> sourceImages) {
     if (sourceImages == null) {
@@ -683,6 +691,7 @@ public class RefineryImportService {
    * @param suggestions ranked candidates, nullable
    * @return the assembled issue
    */
+  @NotNull
   private static ImportIssueDto issue(
       String field,
       @Nullable String rawValue,
@@ -729,6 +738,7 @@ public class RefineryImportService {
      * @param material the matched material
      * @return the match result
      */
+    @NotNull
     static MaterialMatch exact(Material material) {
       return new MaterialMatch(material, false, null, null);
     }
@@ -741,6 +751,7 @@ public class RefineryImportService {
      * @param suggestions the ranked alternatives shown alongside the flag
      * @return the match result
      */
+    @NotNull
     static MaterialMatch fuzzy(
         Material material, double score, List<ImportSuggestionDto> suggestions) {
       return new MaterialMatch(material, true, score, suggestions);
@@ -752,6 +763,7 @@ public class RefineryImportService {
      * @param suggestions ranked candidates for the manual pick list, or {@code null}
      * @return the match result
      */
+    @NotNull
     static MaterialMatch unmatched(@Nullable List<ImportSuggestionDto> suggestions) {
       return new MaterialMatch(null, false, null, suggestions);
     }

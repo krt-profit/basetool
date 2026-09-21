@@ -83,6 +83,7 @@ public final class BankDashboardViewAssembler {
    * @param account the backend card payload
    * @return the card view with pre-computed points
    */
+  @NotNull
   public static BankDashboardCardView toCardView(@NotNull BankDashboardAccountDto account) {
     BankSparkline.Spark spark = BankSparkline.of(account.sparkline());
     return new BankDashboardCardView(account, spark.points(), spark.flat());
@@ -99,6 +100,7 @@ public final class BankDashboardViewAssembler {
    * @param cards the account cards, already ordered A→Z by name
    * @return the ordered, non-empty groups for the by-Bereich view
    */
+  @NotNull
   public static List<BankDashboardGroupView> buildGroups(List<BankDashboardCardView> cards) {
     List<BankDashboardCardView> krt = new ArrayList<>();
     List<BankDashboardCardView> special = new ArrayList<>();
@@ -187,6 +189,7 @@ public final class BankDashboardViewAssembler {
    * @param department the Bereich's department enum name, or {@code null}
    * @return the colour class, or {@code null} when the Bereich has no department
    */
+  @Nullable
   private static String deptClass(@Nullable String department) {
     return department == null
         ? null

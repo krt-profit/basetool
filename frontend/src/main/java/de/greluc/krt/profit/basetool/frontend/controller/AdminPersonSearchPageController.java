@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -75,6 +76,7 @@ public class AdminPersonSearchPageController {
    * @param model the view model
    * @return the view or fragment name
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String page(

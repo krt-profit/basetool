@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.channels.UnresolvedAddressException;
 import java.util.Locale;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
@@ -78,6 +79,7 @@ import tools.jackson.databind.ObjectMapper;
  * LogbackErrorSpike} alert watches (REQ-OBS-011/-013).
  */
 @Slf4j
+@RequiredArgsConstructor
 public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
 
   /** Stable RFC-7807 code echoed in the body and used as the metric tag value. */
@@ -98,29 +100,17 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   /** Bounded depth for the cause-chain walk — guards against a self-referential cause cycle. */
   private static final int MAX_CAUSE_DEPTH = 12;
 
-  private final MessageSource messageSource;
-  private final ProblemResponseFactory problemResponseFactory;
-  private final ObjectMapper objectMapper;
-  private final MeterRegistry meterRegistry;
+  /** Resolves the localized {@code problem.service_unavailable.*} title/detail. */
+  private final @NotNull MessageSource messageSource;
 
-  /**
-   * Creates the filter with the collaborators needed to render and count a localized RFC-7807 503.
-   *
-   * @param messageSource resolves the localized {@code problem.service_unavailable.*} title/detail
-   * @param problemResponseFactory assembles the RFC-7807 {@link ProblemDetail} body
-   * @param objectMapper serializes the {@link ProblemDetail} with uniform JSON escaping
-   * @param meterRegistry counts the re-mapped 503 on {@code basetool_http_error_total}
-   */
-  public IdentityProviderUnavailableFilter(
-      @NotNull MessageSource messageSource,
-      @NotNull ProblemResponseFactory problemResponseFactory,
-      @NotNull ObjectMapper objectMapper,
-      @NotNull MeterRegistry meterRegistry) {
-    this.messageSource = messageSource;
-    this.problemResponseFactory = problemResponseFactory;
-    this.objectMapper = objectMapper;
-    this.meterRegistry = meterRegistry;
-  }
+  /** Assembles the RFC-7807 {@link ProblemDetail} body. */
+  private final @NotNull ProblemResponseFactory problemResponseFactory;
+
+  /** Serializes the {@link ProblemDetail} with uniform JSON escaping. */
+  private final @NotNull ObjectMapper objectMapper;
+
+  /** Counts the re-mapped 503 on {@code basetool_http_error_total}. */
+  private final @NotNull MeterRegistry meterRegistry;
 
   /**
    * Runs the downstream chain and, on an {@link AuthenticationServiceException} whose cause chain

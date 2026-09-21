@@ -42,6 +42,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * One stat contribution a {@link BlueprintRequirementGroup} makes to the crafted item — the "stat
@@ -126,6 +128,8 @@ public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
    *
    * @return the unmodifiable, ordered segment list
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintModifierSegment> getSegments() {
     return Collections.unmodifiableList(segments);
   }
@@ -136,7 +140,7 @@ public class BlueprintRequirementModifier extends AbstractEntity<UUID> {
    *
    * @param segment the segment to add
    */
-  public void addSegment(BlueprintModifierSegment segment) {
+  public void addSegment(@NotNull BlueprintModifierSegment segment) {
     segment.setModifier(this);
     segments.add(segment);
   }

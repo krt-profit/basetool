@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.model.NotificationType;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * Published when a member's Art. 17 erasure request reaches a terminal state without producing a
@@ -58,6 +60,7 @@ public record AccountDeletionRequestResolvedEvent(UUID userId) implements Notifi
   /** The loose entity type both deletion-request notifications are tagged with. */
   public static final String ENTITY_TYPE = AccountDeletionRequestedEvent.ENTITY_TYPE;
 
+  @NotNull
   @Override
   public NotificationEventType eventType() {
     return NotificationEventType.ACCOUNT_DELETION_REQUEST_RESOLVED;
@@ -77,6 +80,8 @@ public record AccountDeletionRequestResolvedEvent(UUID userId) implements Notifi
     return userId;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return Map.of();
@@ -92,6 +97,8 @@ public record AccountDeletionRequestResolvedEvent(UUID userId) implements Notifi
     return userId;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
     return Map.of();
@@ -102,6 +109,8 @@ public record AccountDeletionRequestResolvedEvent(UUID userId) implements Notifi
    *
    * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
    */
+  @NotNull
+  @Unmodifiable
   @Override
   public Set<NotificationType> resolvesNotificationTypes() {
     return Set.of(NotificationType.ACCOUNT_DELETION_REQUESTED);

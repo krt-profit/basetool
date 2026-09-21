@@ -75,6 +75,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -1898,6 +1899,7 @@ public class OrgUnitBankAccessService {
    * @param code the role code
    * @return the role, or {@code null}
    */
+  @Contract("null -> null")
   @Nullable
   private static MembershipRole parseMembershipRole(@Nullable String code) {
     if (code == null) {

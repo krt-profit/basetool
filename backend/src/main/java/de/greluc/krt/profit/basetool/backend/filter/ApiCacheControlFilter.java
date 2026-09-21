@@ -24,6 +24,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
@@ -97,6 +98,7 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
    * @param uri the raw request URI; never {@code null} here, {@code shouldNotFilter} rejects null.
    * @return {@link #NO_STORE} for a sensitive family, {@link #REVALIDATE} otherwise.
    */
+  @NotNull
   private static String cacheControlFor(String uri) {
     return NoStoreApiScopes.matches(PathContainer.parsePath(uri)) ? NO_STORE : REVALIDATE;
   }
