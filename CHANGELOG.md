@@ -21,6 +21,13 @@
   unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
   (REQ-OBS-007).
 
+- **Entwicklung: auf Windows-Arbeitsplätzen wurden mehrere Konfigurationsdateien mit CRLF
+  ausgecheckt.** Für `*.alloy` fehlte die Zeilenenden-Regel in `.gitattributes`, sodass der in
+  `monitoring/README.md` dokumentierte Befehl `alloy fmt --test` dort mit „is not formatted
+  correctly" scheiterte, obwohl die Datei fehlerfrei formatiert ist. Dieselbe Lücke ist jetzt auch
+  für `*.tmpl`, `*.toml`, `*.mjs`, `*.py`, `*.service`, `*.timer`, `*.logrotate` und
+  `docker/maintenance/**` geschlossen; die Dateiinhalte bleiben unverändert.
+
 ## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
 
 ### Added
