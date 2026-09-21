@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -118,6 +119,7 @@ public abstract class JobOrderMapper {
    * @param assignees the assignee edges to project; {@code null} returns {@code null}.
    * @return the sorted assignee DTO list.
    */
+  @Nullable
   public List<JobOrderAssigneeDto> mapAndSortAssignees(Set<JobOrderAssignee> assignees) {
     if (assignees == null) {
       return null;
@@ -139,6 +141,7 @@ public abstract class JobOrderMapper {
    * first, then alphabetical by material name (case-insensitive). The deterministic order keeps the
    * materials table stable across reloads.
    */
+  @Nullable
   public List<JobOrderMaterialDto> mapAndSortMaterials(Set<JobOrderMaterial> materials) {
     if (materials == null) {
       return null;

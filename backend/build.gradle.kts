@@ -99,6 +99,19 @@ dependencies {
   compileOnly("org.projectlombok:lombok")
   annotationProcessor("org.projectlombok:lombok")
   compileOnly(libs.jetbrains.annotations)
+
+  // The same two toolchains on the TEST source set. The three lines above configure `main` only:
+  // Gradle's `testCompileOnly` does NOT extend `compileOnly`, and `testAnnotationProcessor` does
+  // not
+  // extend `annotationProcessor`, so until these were added the test sources could use neither
+  // Lombok nor the JetBrains annotations. That was never a decision -- it was the default
+  // source-set wiring -- and it stopped the "maximize Lombok" / "JetBrains annotations wherever
+  // they
+  // communicate a real contract" conventions (CLAUDE.md `Java conventions`) at the `src/main`
+  // boundary. Lombok stays off the runtime classpath here exactly as it does for `main`.
+  testCompileOnly("org.projectlombok:lombok")
+  testAnnotationProcessor("org.projectlombok:lombok")
+  testCompileOnly(libs.jetbrains.annotations)
   // PDF generation
   implementation(libs.openpdf.core)
   // Ensure MapStruct understands Lombok-generated accessors

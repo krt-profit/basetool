@@ -140,6 +140,7 @@ public class LeitungViewService {
    * @param canManageRoster the resolved "may manage the subordinate roster" capability.
    * @return the unit DTO; never {@code null}.
    */
+  @NotNull
   private LeitungUnitDto unit(
       @NotNull OrgUnit orgUnit, boolean canAppointLead, boolean canManageRoster) {
     List<LeitungMemberDto> members =
@@ -175,6 +176,7 @@ public class LeitungViewService {
    * @param m the membership row; never {@code null}.
    * @return the roster DTO.
    */
+  @NotNull
   private static LeitungMemberDto member(@NotNull OrgUnitMembership m) {
     return new LeitungMemberDto(
         m.getId().getUserId(),

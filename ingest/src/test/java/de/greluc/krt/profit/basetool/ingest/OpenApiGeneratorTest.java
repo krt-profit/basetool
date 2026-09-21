@@ -30,10 +30,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -57,9 +56,8 @@ import tools.jackson.databind.json.JsonMapper;
  * fails the build rather than quietly shrinking the committed spec.
  */
 @SpringBootTest
+@Slf4j
 class OpenApiGeneratorTest {
-
-  private static final Logger log = LoggerFactory.getLogger(OpenApiGeneratorTest.class);
 
   @Autowired private WebApplicationContext context;
 

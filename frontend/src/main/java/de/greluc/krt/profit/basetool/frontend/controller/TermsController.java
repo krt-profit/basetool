@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,6 +76,7 @@ public class TermsController {
    * @param model receives the document under {@code terms}, or nothing when it could not be read
    * @return the {@code terms} view name
    */
+  @NotNull
   @GetMapping("/terms")
   public String showTerms(Model model) {
     // The only bearer-less backend call the frontend makes (REQ-SEC-052). Named rather than

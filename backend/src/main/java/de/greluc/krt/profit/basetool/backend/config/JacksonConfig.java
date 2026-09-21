@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -74,6 +75,7 @@ public class JacksonConfig {
    *
    * @return a module wiring {@link NormalizedStringDeserializer} as the {@code String} deserializer
    */
+  @NotNull
   private static SimpleModule normalizedStringModule() {
     SimpleModule module = new SimpleModule();
     module.addDeserializer(String.class, new NormalizedStringDeserializer());

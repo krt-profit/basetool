@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.InventoryJobOrderAllocation;
 import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import java.util.Objects;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Shared renderers for the audit-subject strings of an inventory row, so the item-CRUD service and
@@ -44,6 +45,7 @@ public final class InventoryAuditLabels {
    * @param item the inventory row (associations may be lazily loaded but must be within the tx)
    * @return the {@code <material|gameItem> @ location} label
    */
+  @NotNull
   public static String label(InventoryItem item) {
     String mat;
     if (item.getMaterial() != null) {
@@ -65,7 +67,7 @@ public final class InventoryAuditLabels {
    * @param item the inventory row (allocations lazily loaded but must be within the tx)
    * @return {@code #<displayId>} of the entry's first earmarked job order, {@code -} when none
    */
-  public static String jobOrderRef(InventoryItem item) {
+  public static String jobOrderRef(@NotNull InventoryItem item) {
     return item.getJobOrderAllocations().stream()
         .map(InventoryJobOrderAllocation::getJobOrder)
         .filter(Objects::nonNull)
@@ -82,7 +84,7 @@ public final class InventoryAuditLabels {
    * @param item the inventory row (allocations lazily loaded but must be within the tx)
    * @return the name of the entry's first earmarked mission, {@code -} when none
    */
-  public static String missionName(InventoryItem item) {
+  public static String missionName(@NotNull InventoryItem item) {
     return item.getMissionAllocations().stream()
         .map(InventoryMissionAllocation::getMission)
         .filter(Objects::nonNull)

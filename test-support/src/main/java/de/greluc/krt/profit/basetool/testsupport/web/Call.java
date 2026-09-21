@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.testsupport.web;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpMethod;
 
 /**
@@ -32,7 +33,7 @@ import org.springframework.http.HttpMethod;
  * @param method the HTTP verb
  * @param path the concrete path, with every variable substituted
  */
-public record Call(HttpMethod method, String path) {
+public record Call(@NotNull HttpMethod method, @NotNull String path) {
 
   /**
    * Renders the call the way an assertion message should read: {@code GET /api/v1/missions}.
@@ -44,7 +45,7 @@ public record Call(HttpMethod method, String path) {
    * @return the verb and path, separated by a single space
    */
   @Override
-  public String toString() {
+  public @NotNull String toString() {
     return method.name() + " " + path;
   }
 }

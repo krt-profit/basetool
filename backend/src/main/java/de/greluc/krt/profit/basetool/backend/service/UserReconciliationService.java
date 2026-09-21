@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
@@ -736,6 +737,7 @@ public class UserReconciliationService {
    * @param raw the raw {@code discord_guild_nickname} claim value, possibly {@code null}
    * @return the trimmed, length-bounded nickname, or {@code null} when the claim is absent or blank
    */
+  @Contract("null -> null")
   @Nullable
   private static String normalizeGuildNickname(@Nullable String raw) {
     if (raw == null) {

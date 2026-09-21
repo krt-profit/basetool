@@ -328,6 +328,7 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       setAuthenticated(true);
     }
 
+    @NotNull
     @Override
     public Object getCredentials() {
       return "";

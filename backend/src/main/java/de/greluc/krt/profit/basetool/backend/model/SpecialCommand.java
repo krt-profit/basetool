@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Spezialkommando tenant — a cross-cutting organisational unit that a user may join in addition to
@@ -73,6 +74,7 @@ public class SpecialCommand extends OrgUnit {
    *
    * @return always {@link OrgUnitKind#SPECIAL_COMMAND}, never {@code null}.
    */
+  @NotNull
   @Override
   public OrgUnitKind getKind() {
     return OrgUnitKind.SPECIAL_COMMAND;

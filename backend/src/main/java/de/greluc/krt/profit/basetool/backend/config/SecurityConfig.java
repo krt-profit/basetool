@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.ssl.SslBundles;
@@ -266,6 +267,7 @@ public class SecurityConfig {
    * @return an {@link OAuth2TokenValidator} that errors unless the JWT's {@code aud} intersects the
    *     expected set.
    */
+  @NotNull
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
     return new JwtClaimValidator<List<String>>(
         JwtClaimNames.AUD,
@@ -305,6 +307,7 @@ public class SecurityConfig {
    * @param customConverter the project-specific authorities converter bean
    * @return wired {@code JwtAuthenticationConverter}
    */
+  @NotNull
   @Bean
   public JwtAuthenticationConverter jwtAuthenticationConverter(
       Converter<Jwt, Collection<GrantedAuthority>> customConverter) {
@@ -325,6 +328,7 @@ public class SecurityConfig {
    * @param meterRegistry the registry the gauge is published to
    * @return the window the role gate records refusals into
    */
+  @NotNull
   @Bean
   public RefusedSubjectWindow noRoleRefusedSubjectWindow(MeterRegistry meterRegistry) {
     RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
@@ -347,6 +351,7 @@ public class SecurityConfig {
    * @param meterRegistry the registry the gauge is published to
    * @return the window the consent filter records refusals into
    */
+  @NotNull
   @Bean
   public RefusedSubjectWindow refusedSubjectWindow(MeterRegistry meterRegistry) {
     RefusedSubjectWindow window = new RefusedSubjectWindow(Duration.ofMinutes(15), 5_000);
@@ -392,7 +397,7 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(
       HttpSecurity http,
       JwtAuthenticationConverter jwtAuthenticationConverter,
-      org.springframework.core.env.Environment env,
+      @NotNull org.springframework.core.env.Environment env,
       SecurityProblemResponseHandler securityProblemResponseHandler,
       MessageSource messageSource,
       ProblemResponseFactory problemResponseFactory,
@@ -862,6 +867,7 @@ public class SecurityConfig {
    *
    * @return CORS source applied to all paths
    */
+  @NotNull
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();

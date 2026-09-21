@@ -68,6 +68,8 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -153,6 +155,7 @@ public class InventoryCheckoutService {
    *     terminal or a valid sell amount, or when a {@code TRANSFER} carries neither a target user
    *     nor a target location
    */
+  @Nullable
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
       UUID id, InventoryItemBookOutDto dto, UUID currentUserId, boolean isAdmin) {
@@ -321,7 +324,7 @@ public class InventoryCheckoutService {
    * @throws BadRequestException when the transfer changes neither user nor location
    */
   private InventoryItemDto bookOutTransfer(
-      InventoryItem item,
+      @NotNull InventoryItem item,
       InventoryItemBookOutDto dto,
       double remainingAmount,
       UUID sourceId,
@@ -443,9 +446,10 @@ public class InventoryCheckoutService {
    * @return the created finance-entry ids (read off the managed entities, so a unit-test mock's
    *     null {@code save()} return does not matter); empty for a fully-personal sale
    */
+  @NotNull
   private List<UUID> createSaleFinanceEntries(
       InventoryItem item,
-      InventoryItemBookOutDto dto,
+      @NotNull InventoryItemBookOutDto dto,
       UUID currentUserId,
       Map<UUID, Double> missionReductions) {
     BigDecimal totalSold = BigDecimal.valueOf(dto.amount() != null ? dto.amount() : 0.0);
@@ -780,7 +784,8 @@ public class InventoryCheckoutService {
    *     {@code row} unchanged when the merge does not apply or finds no matching sibling.
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public InventoryItem mergeStockIfRequested(InventoryItem row, boolean clientRequestedMerge) {
+  public InventoryItem mergeStockIfRequested(
+      @NotNull InventoryItem row, boolean clientRequestedMerge) {
     final Material material = row.getMaterial();
     final boolean gameItemRow = row.getGameItem() != null;
     if (material == null && !gameItemRow) {
@@ -880,7 +885,7 @@ public class InventoryCheckoutService {
    * @param item the inventory row.
    * @return {@code true} iff amounts on this row must be whole numbers.
    */
-  private static boolean requiresWholeUnits(InventoryItem item) {
+  private static boolean requiresWholeUnits(@NotNull InventoryItem item) {
     return item.getGameItem() != null
         || (item.getMaterial() != null
             && item.getMaterial().getQuantityType() == QuantityType.PIECE);
@@ -894,7 +899,8 @@ public class InventoryCheckoutService {
    * @param item the whole-unit row the amount was rejected for.
    * @return the catalog-appropriate problem detail.
    */
-  private static String wholeUnitAmountDetail(InventoryItem item) {
+  @NotNull
+  private static String wholeUnitAmountDetail(@NotNull InventoryItem item) {
     return item.getGameItem() != null
         ? "Amount must be a whole number for item stock"
         : "Amount must be a whole number for PIECE materials";
@@ -937,6 +943,7 @@ public class InventoryCheckoutService {
    * @param notes the ordered accumulator of distinct notes.
    * @return the combined note, or {@code null} when no folded row carried a note.
    */
+  @Nullable
   private static String mergeNotes(Set<String> notes) {
     if (notes.isEmpty()) {
       return null;
@@ -1030,7 +1037,7 @@ public class InventoryCheckoutService {
    * @param currentUserId the UUID of the authenticated user (JWT sub)
    */
   @Transactional
-  public void bulkCheckout(BulkCheckoutRequest request, UUID currentUserId) {
+  public void bulkCheckout(@NotNull BulkCheckoutRequest request, UUID currentUserId) {
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
@@ -1112,8 +1119,9 @@ public class InventoryCheckoutService {
    *     a target location, or when a {@code PERSONALIZE} selection contains a row earmarked for a
    *     job order or mission
    */
+  @NotNull
   @Transactional
-  public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
+  public BulkRebookResultDto bulkRebook(@NotNull BulkRebookRequest request, UUID currentUserId) {
     log.info(
         "Bulk rebook ({}) requested by user {} for {} items",
         request.mode(),
@@ -1166,7 +1174,9 @@ public class InventoryCheckoutService {
    * @throws NotFoundException when an id is unknown
    * @throws AccessDeniedException when a row belongs to another user
    */
-  private List<InventoryItem> loadOwnRowsForRebook(List<UUID> itemIds, UUID currentUserId) {
+  @NotNull
+  private List<InventoryItem> loadOwnRowsForRebook(
+      @NotNull List<UUID> itemIds, UUID currentUserId) {
     final List<UUID> orderedIds = itemIds.stream().distinct().sorted().toList();
     final List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -1200,6 +1210,7 @@ public class InventoryCheckoutService {
    * @throws BadRequestException when neither a target user nor a target location was given
    * @throws NotFoundException when the target user or location is unknown
    */
+  @NotNull
   private BulkRebookResultDto bulkRebookToTarget(
       List<InventoryItem> rows, BulkRebookRequest request, User owner, boolean mergeStock) {
     // REQ-INV-025 parity: a transfer with no target at all would silently move nothing, so reject
@@ -1261,7 +1272,7 @@ public class InventoryCheckoutService {
    * @return {@code true} iff neither the owner nor the location would change
    */
   private static boolean isSameStackTarget(
-      InventoryItem item, User targetUser, Location targetLocation) {
+      @NotNull InventoryItem item, @NotNull User targetUser, Location targetLocation) {
     final boolean sameUser = targetUser.getId().equals(item.getUser().getId());
     final boolean sameLocation =
         targetLocation == null
@@ -1288,8 +1299,9 @@ public class InventoryCheckoutService {
    * @return the moved / skipped counts
    * @throws BadRequestException when personalizing a selection that contains an earmarked row
    */
+  @NotNull
   private BulkRebookResultDto bulkRebookPersonalMarker(
-      List<InventoryItem> rows,
+      @NotNull List<InventoryItem> rows,
       BulkRebookRequest request,
       boolean targetPersonal,
       boolean mergeStock) {
@@ -1353,7 +1365,7 @@ public class InventoryCheckoutService {
    * @param mergeStock the per-action stock-merge opt-in
    */
   private void rebookWholeRow(
-      InventoryItem source,
+      @NotNull InventoryItem source,
       User targetUser,
       Location targetLocation,
       OrgUnit targetOwningOrgUnit,

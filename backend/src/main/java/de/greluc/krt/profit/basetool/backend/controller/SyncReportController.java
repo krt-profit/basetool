@@ -32,6 +32,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -107,6 +109,7 @@ public class SyncReportController {
    *     1)
    * @return the number of rows deleted
    */
+  @NotNull
   @Operation(
       summary = "Delete old sync-report events",
       description =
@@ -130,6 +133,7 @@ public class SyncReportController {
    * @param source raw request parameter
    * @return the parsed source, or {@code null} for combined / unrecognised
    */
+  @Nullable
   private static SyncSourceSystem parseSource(String source) {
     if (source == null || source.isBlank()) {
       return null;

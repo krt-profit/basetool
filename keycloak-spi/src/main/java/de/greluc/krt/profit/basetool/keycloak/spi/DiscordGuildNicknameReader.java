@@ -27,7 +27,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
-import org.jboss.logging.Logger;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.jbosslog.JBossLog;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -56,12 +59,9 @@ import org.keycloak.util.JsonSerialization;
  *
  * <p>This class never logs the token, the response body, or any captured name.
  */
+@JBossLog
+@RequiredArgsConstructor
 public class DiscordGuildNicknameReader {
-
-  /**
-   * A silent empty result is indistinguishable from "user has no nickname", so causes are logged.
-   */
-  private static final Logger LOG = Logger.getLogger(DiscordGuildNicknameReader.class);
 
   /**
    * Defensive upper bound on the captured nickname length. Discord caps a server nickname at 32
@@ -70,19 +70,11 @@ public class DiscordGuildNicknameReader {
    */
   private static final int MAX_NICK_LENGTH = 100;
 
-  private final HttpClient httpClient;
-  private final Duration requestTimeout;
+  /** The HTTP client used for the Discord call. */
+  private final @NotNull HttpClient httpClient;
 
-  /**
-   * Creates a reader.
-   *
-   * @param httpClient the HTTP client used for the Discord call
-   * @param requestTimeout per-request timeout; exceeding it yields an empty result (fail open)
-   */
-  public DiscordGuildNicknameReader(HttpClient httpClient, Duration requestTimeout) {
-    this.httpClient = httpClient;
-    this.requestTimeout = requestTimeout;
-  }
+  /** Per-request timeout; exceeding it yields an empty result (fail open). */
+  private final @NotNull Duration requestTimeout;
 
   /**
    * Reads the user's explicit per-guild server nickname ({@code nick}) in the given guild,
@@ -95,7 +87,8 @@ public class DiscordGuildNicknameReader {
    * @return the trimmed, length-bounded per-guild nickname, or {@link Optional#empty()} when absent
    *     or on any error
    */
-  public Optional<String> readNickname(String apiBaseUrl, String guildId, String accessToken) {
+  public @NotNull Optional<String> readNickname(
+      @NotNull String apiBaseUrl, @NotNull String guildId, @NotNull String accessToken) {
     return fetchMemberBody(apiBaseUrl, guildId, accessToken)
         .flatMap(DiscordGuildNicknameReader::extractNick);
   }
@@ -112,8 +105,8 @@ public class DiscordGuildNicknameReader {
    * @return the trimmed, length-bounded guild display name, or {@link Optional#empty()} when
    *     neither a nickname nor a global name is present, or on any error
    */
-  public Optional<String> readGuildDisplayName(
-      String apiBaseUrl, String guildId, String accessToken) {
+  public @NotNull Optional<String> readGuildDisplayName(
+      @NotNull String apiBaseUrl, @NotNull String guildId, @NotNull String accessToken) {
     return fetchMemberBody(apiBaseUrl, guildId, accessToken)
         .flatMap(DiscordGuildNicknameReader::extractGuildDisplayName);
   }
@@ -129,7 +122,8 @@ public class DiscordGuildNicknameReader {
    * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
    * @return the raw response body on HTTP 200, otherwise {@link Optional#empty()}
    */
-  private Optional<String> fetchMemberBody(String apiBaseUrl, String guildId, String accessToken) {
+  private @NotNull Optional<String> fetchMemberBody(
+      @NotNull String apiBaseUrl, @NotNull String guildId, @NotNull String accessToken) {
     String url = apiBaseUrl + "/users/@me/guilds/" + guildId + "/member";
     HttpResponse<String> response;
     try {
@@ -139,18 +133,18 @@ public class DiscordGuildNicknameReader {
       // Timeout / connection reset / DNS failure / truncated read — fail open (no name). At DEBUG,
       // not WARN: a missing server nickname is cosmetic and the membership gate has already logged
       // any real Discord outage at WARN, so this would only duplicate it.
-      LOG.debugf(
+      log.debugf(
           e,
           "Could not fetch the Discord guild nickname (%s); continuing without it.",
           e.getClass().getSimpleName());
       return Optional.empty();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.debug("Interrupted while fetching the Discord guild nickname; continuing without it.");
+      log.debug("Interrupted while fetching the Discord guild nickname; continuing without it.");
       return Optional.empty();
     }
     if (response.statusCode() != 200) {
-      LOG.debugf(
+      log.debugf(
           "Discord guild-nickname lookup answered HTTP %d; continuing without it.",
           response.statusCode());
       return Optional.empty();
@@ -158,7 +152,7 @@ public class DiscordGuildNicknameReader {
     return Optional.ofNullable(response.body());
   }
 
-  private HttpRequest buildRequest(String url, String accessToken) {
+  private @NotNull HttpRequest buildRequest(@NotNull String url, @NotNull String accessToken) {
     return HttpRequest.newBuilder(URI.create(url))
         .timeout(requestTimeout)
         .header("Authorization", "Bearer " + accessToken)
@@ -174,7 +168,7 @@ public class DiscordGuildNicknameReader {
    * @return the trimmed nickname (at most {@value #MAX_NICK_LENGTH} characters), or {@link
    *     Optional#empty()} when the field is absent, null, blank, or the body is unparseable
    */
-  static Optional<String> extractNick(String body) {
+  static @NotNull Optional<String> extractNick(@Nullable String body) {
     return parseMember(body).flatMap(member -> normalizedText(member.get("nick")));
   }
 
@@ -189,7 +183,7 @@ public class DiscordGuildNicknameReader {
    * @return the guild display name (nick, else global name), or {@link Optional#empty()} when
    *     neither field is usable or the body is unparseable
    */
-  static Optional<String> extractGuildDisplayName(String body) {
+  static @NotNull Optional<String> extractGuildDisplayName(@Nullable String body) {
     return parseMember(body)
         .flatMap(
             member -> {
@@ -209,11 +203,11 @@ public class DiscordGuildNicknameReader {
    * @param body the raw guild-member response body
    * @return the parsed member node, or {@link Optional#empty()} when the body is null/unparseable
    */
-  private static Optional<JsonNode> parseMember(String body) {
+  private static @NotNull Optional<JsonNode> parseMember(@Nullable String body) {
     try {
       return Optional.ofNullable(JsonSerialization.readValue(body, JsonNode.class));
     } catch (IOException e) {
-      LOG.debugf(e, "Discord guild-nickname payload was not readable JSON; ignoring it.");
+      log.debugf(e, "Discord guild-nickname payload was not readable JSON; ignoring it.");
       return Optional.empty();
     }
   }
@@ -226,7 +220,7 @@ public class DiscordGuildNicknameReader {
    * @param node the JSON node to normalise; may be {@code null}
    * @return the trimmed, length-bounded text, or {@link Optional#empty()} when absent/null/blank
    */
-  private static Optional<String> normalizedText(JsonNode node) {
+  private static @NotNull Optional<String> normalizedText(@Nullable JsonNode node) {
     if (node == null || node.isNull()) {
       return Optional.empty();
     }

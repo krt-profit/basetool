@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -85,6 +86,7 @@ public class MeFrontendController {
    * @param redirectAttributes flash attribute carrier for the success toast.
    * @return redirect view to the referring page so the next render sees the new context.
    */
+  @NotNull
   @PostMapping("/active-org-unit")
   public RedirectView setActiveOrgUnit(
       @RequestParam(value = "orgUnitId", required = false) @Nullable String orgUnitId,
@@ -105,10 +107,11 @@ public class MeFrontendController {
    * @param redirectAttributes flash attribute carrier for the success toast.
    * @return redirect view to the referring page.
    */
+  @NotNull
   private RedirectView applyActiveOrgUnitSelection(
       @Nullable String rawOrgUnitId,
       @Nullable String referer,
-      HttpServletRequest request,
+      @NotNull HttpServletRequest request,
       RedirectAttributes redirectAttributes) {
     HttpSession session = request.getSession(true);
     if (rawOrgUnitId == null || rawOrgUnitId.isBlank()) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.config;
 
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -92,7 +93,8 @@ public class ManagementPortSecurityConfig {
    */
   @Bean
   @Order(0)
-  public SecurityFilterChain managementPortActuatorFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain managementPortActuatorFilterChain(@NotNull HttpSecurity http)
+      throws Exception {
     http.securityMatcher(UNAUTHENTICATED_READ_ENDPOINTS)
         .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
         .requestCache(RequestCacheConfigurer::disable)

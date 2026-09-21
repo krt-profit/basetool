@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -103,6 +104,7 @@ public class HomeController {
    * @param request the current request; the session is taken from it only for a member
    * @return {@code landing} for an anonymous visitor, {@code index} for a member
    */
+  @NotNull
   @GetMapping("/")
   public String home(
       Model model,
@@ -228,6 +230,7 @@ public class HomeController {
    * @param id announcement id to mark as read
    * @return redirect back to {@code /}
    */
+  @NotNull
   @org.springframework.web.bind.annotation.PostMapping("/announcement/read")
   public String markAnnouncementAsRead(
       @org.springframework.web.bind.annotation.RequestParam String id) {

@@ -60,6 +60,7 @@ public class TermsController {
    * @param userId the caller's {@code app_user.id}
    * @return the consent status and the version in force, always {@code 200}
    */
+  @NotNull
   @GetMapping("/status")
   @PreAuthorize("isAuthenticated()")
   @Operation(
@@ -101,6 +102,7 @@ public class TermsController {
    * @return the resulting consent status, always {@code 200} and always {@code accepted = true};
    *     repeating the call is a no-op rather than an error
    */
+  @NotNull
   @PostMapping("/acceptance")
   @PreAuthorize("isAuthenticated() and !hasRole('INGEST_GATEWAY')")
   @Operation(

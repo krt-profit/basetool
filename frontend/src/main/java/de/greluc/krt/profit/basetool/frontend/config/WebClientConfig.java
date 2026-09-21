@@ -49,6 +49,7 @@ import java.util.function.Function;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.ssl.NoSuchSslBundleException;
 import org.springframework.boot.ssl.SslBundle;
 import org.springframework.boot.ssl.SslBundles;
@@ -320,6 +321,7 @@ public class WebClientConfig {
    * is sent and disarms it when the response completes, which is the HTTP/2-correct unit, and the
    * {@code backendApi} TimeLimiter closes the outer bound at 5 s.
    */
+  @NotNull
   private ReactorClientHttpConnector connector(boolean streaming) {
     return connector(streaming, "frontend-pool");
   }
@@ -338,6 +340,7 @@ public class WebClientConfig {
    * @param poolName the connection provider's name, which is also its metric tag
    * @return the configured connector
    */
+  @NotNull
   private ReactorClientHttpConnector connector(boolean streaming, String poolName) {
     // The SSE relay never negotiates HTTP/2 (see the Javadoc); everything else follows the
     // property.
@@ -574,7 +577,7 @@ public class WebClientConfig {
 
   private ExchangeFilterFunction resilienceFilter(
       String instanceName,
-      CircuitBreakerRegistry cbRegistry,
+      @NotNull CircuitBreakerRegistry cbRegistry,
       RetryRegistry retryRegistry,
       TimeLimiterRegistry timeLimiterRegistry,
       BulkheadRegistry bulkheadRegistry) {
@@ -692,6 +695,7 @@ public class WebClientConfig {
    *
    * @return the refresh-token response client on the idle-evicting OAuth pool
    */
+  @NotNull
   @Bean
   public OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest>
       oauthRefreshTokenResponseClient() {
@@ -712,6 +716,7 @@ public class WebClientConfig {
    *
    * @return the authorization-code response client on the idle-evicting OAuth pool
    */
+  @NotNull
   @Bean
   public OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
       oauthAuthorizationCodeTokenResponseClient() {
@@ -743,6 +748,7 @@ public class WebClientConfig {
    * @param oauthRefreshTokenResponseClient the pool-hardened refresh-token response client
    * @return the single-flight authorized-client manager
    */
+  @NotNull
   @Bean
   public OAuth2AuthorizedClientManager authorizedClientManager(
       ClientRegistrationRepository clientRegistrationRepository,

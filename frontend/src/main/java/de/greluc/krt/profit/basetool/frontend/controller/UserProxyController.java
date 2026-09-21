@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -183,6 +184,7 @@ public class UserProxyController {
    * @param userId the user to resolve; never {@code null}.
    * @return the user's raw JSON map, or {@code null} when the lookup fails.
    */
+  @Nullable
   @GetMapping("/{userId}")
   @PreAuthorize("isAuthenticated()")
   public Map<String, Object> getUser(@PathVariable UUID userId) {

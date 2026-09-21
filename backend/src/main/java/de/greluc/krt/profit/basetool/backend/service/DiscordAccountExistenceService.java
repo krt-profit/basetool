@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -103,6 +104,7 @@ public class DiscordAccountExistenceService {
    * @param value the raw candidate; may be {@code null}
    * @return the trimmed, lower-cased value, or {@code null} when blank/empty
    */
+  @Contract("null -> null")
   @Nullable
   private static String normalize(@Nullable String value) {
     if (value == null) {

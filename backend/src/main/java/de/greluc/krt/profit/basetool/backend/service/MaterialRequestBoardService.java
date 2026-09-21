@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -191,6 +192,7 @@ public class MaterialRequestBoardService {
    *
    * @return the tab counts.
    */
+  @NotNull
   public MaterialExchangeCountsDto counts() {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
     long all = requestRepository.countByStatus(MaterialExchangeRequestStatus.ACTIVE);
@@ -210,6 +212,7 @@ public class MaterialRequestBoardService {
    * @return the viewer-relative request detail.
    * @throws NotFoundException if no request with that id exists.
    */
+  @NotNull
   public MaterialRequestDto detail(UUID requestId) {
     UUID viewerId = authHelperService.currentUserId().orElse(null);
     MaterialExchangeRequest request = loadWithDetail(requestId);
@@ -226,6 +229,7 @@ public class MaterialRequestBoardService {
    * @param viewerId the requesting member, or {@code null} if unresolved.
    * @return the request detail.
    */
+  @NotNull
   public MaterialRequestDto detailDto(MaterialExchangeRequest request, @Nullable UUID viewerId) {
     boolean mine = isMine(request, viewerId);
     int count = (int) interestRepository.countByRequestId(request.getId());
@@ -258,6 +262,7 @@ public class MaterialRequestBoardService {
    * @param interestedHandles the supplier handles (owner-only), or {@code null}.
    * @return the assembled DTO.
    */
+  @NotNull
   private MaterialRequestDto toDto(
       MaterialExchangeRequest request,
       @Nullable UUID viewerId,
@@ -306,7 +311,7 @@ public class MaterialRequestBoardService {
    * @param requests the board page's requests.
    * @return the distinct owner ids (a defensively null-owner request contributes nothing).
    */
-  private static Set<UUID> ownerIdsOf(Collection<MaterialExchangeRequest> requests) {
+  private static Set<UUID> ownerIdsOf(@NotNull Collection<MaterialExchangeRequest> requests) {
     return requests.stream()
         .map(MaterialRequestBoardService::ownerIdOf)
         .filter(Objects::nonNull)
@@ -320,7 +325,7 @@ public class MaterialRequestBoardService {
    * @return the owner's user id, or {@code null}.
    */
   @Nullable
-  private static UUID ownerIdOf(MaterialExchangeRequest request) {
+  private static UUID ownerIdOf(@NotNull MaterialExchangeRequest request) {
     return request.getOwner() == null ? null : request.getOwner().getId();
   }
 
@@ -336,6 +341,7 @@ public class MaterialRequestBoardService {
    *     empty map.
    * @return owner id → their ordered affiliation badges; members with no membership are absent.
    */
+  @NotNull
   private Map<UUID, List<OrgUnitReferenceDto>> ownerOrgUnitBadges(Set<UUID> ownerIds) {
     if (ownerIds.isEmpty()) {
       return Map.of();

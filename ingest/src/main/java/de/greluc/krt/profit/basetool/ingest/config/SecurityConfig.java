@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.ssl.SslBundles;
@@ -176,6 +177,7 @@ public class SecurityConfig {
    * @param expectedAudiences the accepted audience values; an empty set matches no token
    * @return a validator that errors unless the JWT's {@code aud} intersects the expected set
    */
+  @NotNull
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
     return new JwtClaimValidator<List<String>>(
         JwtClaimNames.AUD, aud -> aud != null && !Collections.disjoint(aud, expectedAudiences));
@@ -353,6 +355,7 @@ public class SecurityConfig {
    *
    * @return a CORS source applied to all paths
    */
+  @NotNull
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();

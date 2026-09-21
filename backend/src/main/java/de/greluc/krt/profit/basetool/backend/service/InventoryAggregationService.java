@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -584,7 +585,7 @@ public class InventoryAggregationService {
    * @return the materials, each carrying its sorted stacks and material-wide totals
    */
   private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      buildGroupedFromStacks(List<InventoryStackAggregate> aggregates) {
+      buildGroupedFromStacks(@NotNull List<InventoryStackAggregate> aggregates) {
     return aggregates.stream()
         .collect(
             java.util.stream.Collectors.groupingBy(
@@ -608,8 +609,9 @@ public class InventoryAggregationService {
    * @param matStacks every per-stack aggregate of one material in the current scope; never empty
    * @return the populated material group with its nested stacks
    */
+  @NotNull
   private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildMaterialGroup(
-      List<InventoryStackAggregate> matStacks) {
+      @NotNull List<InventoryStackAggregate> matStacks) {
     List<InventoryStackDto> stacks = new java.util.ArrayList<>(matStacks.size());
     de.greluc.krt.profit.basetool.backend.model.dto.MaterialReferenceDto material = null;
     double totalAmount = 0.0;
@@ -658,7 +660,7 @@ public class InventoryAggregationService {
    * @return the game-item groups, each carrying its sorted stacks and item-wide total
    */
   private List<de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto>
-      buildGroupedFromItemStacks(List<InventoryItemStackAggregate> aggregates) {
+      buildGroupedFromItemStacks(@NotNull List<InventoryItemStackAggregate> aggregates) {
     return aggregates.stream()
         .collect(
             java.util.stream.Collectors.groupingBy(
@@ -681,8 +683,9 @@ public class InventoryAggregationService {
    * @param itemStacks every per-stack aggregate of one game item in the current scope; never empty
    * @return the populated game-item group with its nested stacks
    */
+  @NotNull
   private de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto buildItemGroup(
-      List<InventoryItemStackAggregate> itemStacks) {
+      @NotNull List<InventoryItemStackAggregate> itemStacks) {
     List<InventoryStackDto> stacks = new java.util.ArrayList<>(itemStacks.size());
     de.greluc.krt.profit.basetool.backend.model.dto.InventoryGameItemReferenceDto gameItem = null;
     double totalAmount = 0.0;
@@ -1057,6 +1060,7 @@ public class InventoryAggregationService {
    *     earmarked to the order
    * @throws NotFoundException when the job order is unknown
    */
+  @NotNull
   public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
     JobOrder jobOrder =
         jobOrderRepository

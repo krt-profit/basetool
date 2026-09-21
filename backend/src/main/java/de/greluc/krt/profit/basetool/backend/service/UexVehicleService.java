@@ -37,6 +37,8 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -212,7 +214,7 @@ public class UexVehicleService {
    * @param shipType local row being updated
    * @param dto inbound DTO
    */
-  private static void applyVehicleFields(ShipType shipType, UexVehicleDto dto) {
+  private static void applyVehicleFields(@NotNull ShipType shipType, @NotNull UexVehicleDto dto) {
     shipType.setUexSlug(dto.slug());
     shipType.setNameFull(dto.nameFull());
     shipType.setScu(dto.scu());
@@ -289,6 +291,7 @@ public class UexVehicleService {
    * @param dto inbound vehicle row
    * @return resolved manufacturer, or {@code null}
    */
+  @Nullable
   private Manufacturer resolveManufacturer(UexVehicleDto dto) {
     if (dto.idCompany() != null && dto.idCompany() != 0) {
       Optional<Manufacturer> byId =

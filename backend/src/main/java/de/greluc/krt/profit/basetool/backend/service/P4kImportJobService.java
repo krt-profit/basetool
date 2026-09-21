@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -330,6 +331,7 @@ public class P4kImportJobService {
    * @param filename the raw filename, or {@code null}
    * @return the trimmed filename, or {@code null} when blank
    */
+  @Contract("null -> null")
   @Nullable
   private static String trimFilename(@Nullable String filename) {
     if (filename == null) {

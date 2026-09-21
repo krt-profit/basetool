@@ -189,6 +189,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
       this.body = body.clone();
     }
 
+    @NotNull
     @Override
     public ServletInputStream getInputStream() {
       ByteArrayInputStream delegate = new ByteArrayInputStream(body);
@@ -216,6 +217,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
       };
     }
 
+    @NotNull
     @Override
     public BufferedReader getReader() {
       return new BufferedReader(

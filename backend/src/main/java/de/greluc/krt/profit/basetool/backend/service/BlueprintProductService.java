@@ -334,6 +334,7 @@ public class BlueprintProductService {
    * @param q case-insensitive output-name substring ({@code ""} = no filter)
    * @return product accumulators keyed by normalized product key
    */
+  @NotNull
   private Map<String, ProductAccumulator> buildProductMap(String q) {
     Map<String, ProductAccumulator> map = new LinkedHashMap<>();
     for (BlueprintProductRow row : blueprintRepository.findActiveProductRows(q)) {
@@ -367,6 +368,7 @@ public class BlueprintProductService {
    * @param keys the product keys to test
    * @return the owned product keys
    */
+  @NotNull
   private Set<String> ownedKeys(UUID ownerUserId, List<String> keys) {
     if (keys.isEmpty()) {
       return Set.of();

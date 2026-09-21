@@ -40,6 +40,7 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.MessageSource;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -106,6 +107,7 @@ public class AdminSettingsPageController {
    * @param model Thymeleaf model populated with the value+version pairs
    * @return the {@code admin-settings} view name
    */
+  @NotNull
   @GetMapping
   public String viewSettings(Model model) {
     int yellowDays = 30;
@@ -239,6 +241,7 @@ public class AdminSettingsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/settings}
    */
+  @NotNull
   @PostMapping
   public String updateSettings(
       @RequestParam("ageYellowDays") String ageYellowDaysStr,

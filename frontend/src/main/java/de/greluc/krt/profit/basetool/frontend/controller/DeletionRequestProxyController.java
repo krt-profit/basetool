@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -80,6 +81,7 @@ public class DeletionRequestProxyController {
    *     deletionRequestUnavailable} from
    * @return the fragment view name
    */
+  @NotNull
   @GetMapping(params = "fragment=card")
   @PreAuthorize("isAuthenticated()")
   public String card(Model model) {
@@ -111,7 +113,7 @@ public class DeletionRequestProxyController {
   @ResponseBody
   @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<Object> request(@RequestBody Map<String, Object> request) {
+  public ResponseEntity<Object> request(@NotNull @RequestBody Map<String, Object> request) {
     Object eraseHistory = request.get("eraseHistory");
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("eraseHistory", Boolean.TRUE.equals(eraseHistory));

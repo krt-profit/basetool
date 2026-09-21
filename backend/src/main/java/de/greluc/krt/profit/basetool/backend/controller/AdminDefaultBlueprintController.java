@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -96,7 +97,8 @@ public class AdminDefaultBlueprintController {
     @ApiResponse(responseCode = "409", description = "Product is already a default.")
   })
   public DefaultBlueprintResponse add(
-      @Valid @RequestBody DefaultBlueprintCreateRequest request, @CurrentUserId UUID adminUserId) {
+      @NotNull @Valid @RequestBody DefaultBlueprintCreateRequest request,
+      @NotNull @CurrentUserId UUID adminUserId) {
     // created_by is a provenance column that also holds the literal "system" for seeded
     // rows, so it stays text and takes the rendered id rather than a foreign key.
     return service.add(request.productKey(), adminUserId.toString());

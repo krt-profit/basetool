@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.health;
 
 import java.time.Duration;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.redis.health.DataRedisReactiveHealthIndicator;
@@ -59,6 +61,7 @@ import reactor.core.publisher.Mono;
  */
 @Component("redisHealthIndicator")
 @ConditionalOnEnabledHealthIndicator("redis")
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class BoundedRedisHealthIndicator implements ReactiveHealthIndicator {
 
   /**
@@ -69,8 +72,11 @@ public class BoundedRedisHealthIndicator implements ReactiveHealthIndicator {
    */
   static final Duration TIMEOUT = Duration.ofSeconds(3);
 
-  private final ReactiveHealthIndicator delegate;
-  private final Duration timeout;
+  /** The health indicator whose result is bounded. */
+  private final @NotNull ReactiveHealthIndicator delegate;
+
+  /** Maximum wall-clock time the delegate may take before the check is reported {@code DOWN}. */
+  private final @NotNull Duration timeout;
 
   /**
    * Production constructor used by Spring; wraps the real {@link DataRedisReactiveHealthIndicator}
@@ -84,20 +90,6 @@ public class BoundedRedisHealthIndicator implements ReactiveHealthIndicator {
   @Autowired
   public BoundedRedisHealthIndicator(@NotNull ReactiveRedisConnectionFactory connectionFactory) {
     this(new DataRedisReactiveHealthIndicator(connectionFactory), TIMEOUT);
-  }
-
-  /**
-   * Visible-for-testing constructor that lets unit tests substitute a scripted delegate and a short
-   * timeout to make the bound observable without a real Redis.
-   *
-   * @param delegate the health indicator whose result is bounded
-   * @param timeout maximum wall-clock time the delegate may take before the check is reported
-   *     {@code DOWN}
-   */
-  BoundedRedisHealthIndicator(
-      @NotNull ReactiveHealthIndicator delegate, @NotNull Duration timeout) {
-    this.delegate = delegate;
-    this.timeout = timeout;
   }
 
   /**

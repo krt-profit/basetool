@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 
 import java.util.Locale;
 import java.util.UUID;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,6 +65,7 @@ public record LiveSyncTopic(
    * @param raw the topic as it arrived, untrimmed and untrusted
    * @return the parsed topic, or {@code null} if it names no room this backend serves
    */
+  @Contract("null -> null")
   @Nullable
   public static LiveSyncTopic parse(@Nullable String raw) {
     if (raw == null) {

@@ -79,6 +79,7 @@ public class BankBookingController {
    *
    * @return the current fee rate (fraction in {@code [0, 1)})
    */
+  @NotNull
   @Operation(summary = "Read the current in-game transfer-fee rate")
   @GetMapping("/transfer-fee-rate")
   @PreAuthorize(Roles.HAS_ROLE_BANK_EMPLOYEE)

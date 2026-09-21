@@ -45,6 +45,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Inventory Item JPA entity — one warehouse stock row, discriminated by catalog kind (REQ-INV-029,
@@ -203,6 +205,8 @@ public class InventoryItem extends AbstractEntity<UUID> {
    * @return {@code value} rounded to three decimals, or {@code null} when {@code value} is {@code
    *     null}
    */
+  @Contract("null -> null")
+  @Nullable
   public static Double roundToScuScale(Double value) {
     if (value == null) {
       return null;

@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -462,7 +463,8 @@ public class InventoryItemService {
    *     reference
    */
   @Transactional
-  public InventoryItemDto createInventoryItem(InventoryItemCreateDto dto, UUID currentUserId) {
+  public InventoryItemDto createInventoryItem(
+      @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
     final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
     // REQ-SEC-005 / REQ-ORG-016: the receiver decides whose ledger this row lands in, so it is an
@@ -886,7 +888,7 @@ public class InventoryItemService {
    * @throws BadRequestException when the amount is missing, non-positive, or fractional for a PIECE
    *     material or game-item row.
    */
-  private double requireWriteAmount(InventoryAllocationWriteDto dto, InventoryItem item) {
+  private double requireWriteAmount(@NotNull InventoryAllocationWriteDto dto, InventoryItem item) {
     Double raw = dto.amount();
     if (raw == null) {
       throw new BadRequestException("An allocation amount is required");
@@ -933,7 +935,7 @@ public class InventoryItemService {
    * @param excludeTargetId the job-order id whose slice to exclude, or {@code null} to sum all.
    * @return the Σ of the (non-excluded) job-order slice amounts.
    */
-  private double sumJobOrderAllocated(InventoryItem item, UUID excludeTargetId) {
+  private double sumJobOrderAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getJobOrderAllocations().stream()
         .filter(a -> a.getJobOrder() != null)
         .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getJobOrder().getId()))
@@ -948,7 +950,7 @@ public class InventoryItemService {
    * @param excludeTargetId the mission id whose slice to exclude, or {@code null} to sum all.
    * @return the Σ of the (non-excluded) mission slice amounts.
    */
-  private double sumMissionAllocated(InventoryItem item, UUID excludeTargetId) {
+  private double sumMissionAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getMissionAllocations().stream()
         .filter(a -> a.getMission() != null)
         .filter(a -> excludeTargetId == null || !excludeTargetId.equals(a.getMission().getId()))
@@ -964,7 +966,8 @@ public class InventoryItemService {
    * @param targetId the job-order id.
    * @return the matching slice, or {@code null}.
    */
-  private InventoryJobOrderAllocation findJobOrderSlice(InventoryItem item, UUID targetId) {
+  private InventoryJobOrderAllocation findJobOrderSlice(
+      @NotNull InventoryItem item, UUID targetId) {
     return item.getJobOrderAllocations().stream()
         .filter(a -> a.getJobOrder() != null && targetId.equals(a.getJobOrder().getId()))
         .findFirst()
@@ -978,7 +981,7 @@ public class InventoryItemService {
    * @param targetId the mission id.
    * @return the matching slice, or {@code null}.
    */
-  private InventoryMissionAllocation findMissionSlice(InventoryItem item, UUID targetId) {
+  private InventoryMissionAllocation findMissionSlice(@NotNull InventoryItem item, UUID targetId) {
     return item.getMissionAllocations().stream()
         .filter(a -> a.getMission() != null && targetId.equals(a.getMission().getId()))
         .findFirst()

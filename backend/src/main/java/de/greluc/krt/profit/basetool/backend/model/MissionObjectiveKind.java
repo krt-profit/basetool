@@ -19,12 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.model;
 
+import lombok.RequiredArgsConstructor;
+
 /**
  * Classification of a mission goal (Ziel). The three kinds drive the grouped read-only display on
  * the mission overview — primary goals first, then secondary goals, then explicit non-goals — and
  * the kind is the only goal attribute (besides ids and counts) that may appear in the audit trail,
  * since it is a non-personal enum whereas the goal title is user free text.
  */
+@RequiredArgsConstructor
 public enum MissionObjectiveKind {
 
   /** A primary objective ("Hauptziel") — a core, must-achieve goal of the mission. */
@@ -41,15 +44,6 @@ public enum MissionObjectiveKind {
 
   /** Zero-based grouping rank used to order the kinds on the overview (lower sorts first). */
   private final int rank;
-
-  /**
-   * Creates a kind with its overview grouping rank.
-   *
-   * @param rank the zero-based group position (lower sorts first)
-   */
-  MissionObjectiveKind(int rank) {
-    this.rank = rank;
-  }
 
   /**
    * Returns the grouping rank used to order goals on the mission overview: primary goals (0) before

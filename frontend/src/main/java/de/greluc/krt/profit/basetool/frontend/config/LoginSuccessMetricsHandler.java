@@ -25,6 +25,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -39,22 +40,14 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
  * visible as failures-with-zero-successes ({@code FrontendLoginBroken}) rather than only inferable
  * from a Keycloak-side event regex that misses code-to-token errors (#1041 item 18, REQ-OBS-011).
  */
+@RequiredArgsConstructor
 public class LoginSuccessMetricsHandler implements AuthenticationSuccessHandler {
 
-  private final MeterRegistry meterRegistry;
-  private final AuthenticationSuccessHandler delegate;
+  /** The registry the {@code basetool_login_total} counter is bumped against. */
+  private final @NotNull MeterRegistry meterRegistry;
 
-  /**
-   * Wraps the real success handler with the success counter.
-   *
-   * @param meterRegistry the registry the {@code basetool_login_total} counter is bumped against
-   * @param delegate the success handler that performs the actual post-login navigation
-   */
-  public LoginSuccessMetricsHandler(
-      @NotNull MeterRegistry meterRegistry, @NotNull AuthenticationSuccessHandler delegate) {
-    this.meterRegistry = meterRegistry;
-    this.delegate = delegate;
-  }
+  /** The success handler that performs the actual post-login navigation. */
+  private final @NotNull AuthenticationSuccessHandler delegate;
 
   /**
    * Counts the successful login, then delegates the redirect/navigation unchanged.

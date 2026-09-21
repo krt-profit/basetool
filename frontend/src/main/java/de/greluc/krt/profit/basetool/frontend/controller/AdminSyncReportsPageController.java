@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -76,6 +77,7 @@ public class AdminSyncReportsPageController {
    * @param model Thymeleaf model
    * @return the {@code admin/sync-reports} view name
    */
+  @NotNull
   @GetMapping("/admin/sync-reports")
   public String combined(
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -91,6 +93,7 @@ public class AdminSyncReportsPageController {
    * @param model Thymeleaf model
    * @return the {@code admin/sync-reports} view name
    */
+  @NotNull
   @GetMapping("/admin/sync-reports/scwiki")
   public String scwiki(
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -106,6 +109,7 @@ public class AdminSyncReportsPageController {
    * @param model Thymeleaf model
    * @return the {@code admin/sync-reports} view name
    */
+  @NotNull
   @GetMapping("/admin/sync-reports/uex")
   public String uex(
       @RequestParam(required = false, defaultValue = "0") int page,
@@ -128,6 +132,7 @@ public class AdminSyncReportsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect back to the matching sync-reports tab
    */
+  @NotNull
   @PostMapping("/admin/sync-reports/delete-old")
   public String deleteOld(
       @RequestParam(required = false) String source,
@@ -217,6 +222,7 @@ public class AdminSyncReportsPageController {
    * @param source the canonical source ({@code "SCWIKI"} / {@code "UEX"}), or {@code null}
    * @return the matching sync-reports page path
    */
+  @NotNull
   private static String redirectPathFor(@Nullable String source) {
     if (source == null) {
       return "/admin/sync-reports";
@@ -262,6 +268,7 @@ public class AdminSyncReportsPageController {
    * @return the {@code admin/sync-reports} view name, or its {@code results} fragment for an AJAX
    *     swap
    */
+  @NotNull
   private String render(
       String source, String activeTab, String basePath, int page, String fragment, Model model) {
     int safePage = Math.max(page, 0);
@@ -299,7 +306,7 @@ public class AdminSyncReportsPageController {
    *
    * @param model Thymeleaf model to fill
    */
-  private void populateEmpty(Model model) {
+  private void populateEmpty(@NotNull Model model) {
     model.addAttribute("events", List.of());
     model.addAttribute("currentPage", 0);
     model.addAttribute("totalPages", 0);

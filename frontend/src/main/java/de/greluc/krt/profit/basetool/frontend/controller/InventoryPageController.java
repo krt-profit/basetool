@@ -42,6 +42,7 @@ import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -223,6 +224,7 @@ public class InventoryPageController {
    * @return the {@code inventory-index} view name, or its {@code inventoryResults} fragment
    *     selector
    */
+  @NotNull
   @GetMapping
   public String viewAggregatedInventory(
       @RequestParam(required = false) String view,
@@ -308,6 +310,7 @@ public class InventoryPageController {
    * @return the {@code inventory-material} view name, or its {@code inventoryMaterialResults}
    *     fragment selector
    */
+  @NotNull
   @GetMapping("/material/{materialId}")
   public String viewMaterialInventory(
       @PathVariable @NotNull UUID materialId,
@@ -370,6 +373,7 @@ public class InventoryPageController {
    * @return the {@code inventory-game-item} view name, or its {@code inventoryGameItemResults}
    *     fragment selector
    */
+  @NotNull
   @GetMapping("/game-item/{gameItemId}")
   public String viewGameItemInventory(
       @PathVariable @NotNull UUID gameItemId,
@@ -522,6 +526,7 @@ public class InventoryPageController {
    *     auth-derived UX flags
    * @return either the full {@code inventory-my} view or its table fragment
    */
+  @NotNull
   @GetMapping("/my")
   public String viewMyInventory(
       @RequestParam(required = false) String view,
@@ -1014,6 +1019,7 @@ public class InventoryPageController {
    * @param fragment when true, return the table fragment
    * @return either the full {@code inventory-admin} view or its fragment
    */
+  @NotNull
   @GetMapping("/all")
   public String viewAllInventory(
       @RequestParam(required = false) String view,
@@ -1164,6 +1170,7 @@ public class InventoryPageController {
    * @param model Thymeleaf model populated with the entries page and association catalogs
    * @return the {@code inventory-my :: stackEntries} fragment view name
    */
+  @NotNull
   @GetMapping("/my/stack/entries")
   public String viewMyStackEntries(
       @RequestParam @NotNull UUID materialId,
@@ -1218,6 +1225,7 @@ public class InventoryPageController {
    * @param model Thymeleaf model populated with the entries page and the job-order catalog
    * @return the {@code fragments/inventory-stack-entries :: stackEntriesMy} fragment view name
    */
+  @NotNull
   @GetMapping("/my/game-item-stack/entries")
   public String viewMyGameItemStackEntries(
       @RequestParam @NotNull UUID gameItemId,
@@ -1302,6 +1310,7 @@ public class InventoryPageController {
    * @param model Thymeleaf model populated with the entries page and association catalogs
    * @return the {@code inventory-admin :: stackEntries} fragment view name
    */
+  @NotNull
   @GetMapping("/all/stack/entries")
   public String viewAllStackEntries(
       @RequestParam @NotNull UUID materialId,
@@ -1351,6 +1360,7 @@ public class InventoryPageController {
    * @param model Thymeleaf model populated with the entries page and the job-order catalog
    * @return the {@code fragments/inventory-stack-entries :: stackEntriesAdmin} fragment view name
    */
+  @NotNull
   @GetMapping("/all/game-item-stack/entries")
   public String viewAllGameItemStackEntries(
       @RequestParam @NotNull UUID gameItemId,
@@ -1433,6 +1443,7 @@ public class InventoryPageController {
    * @param model Thymeleaf model populated with the form and dropdown catalogs
    * @return the {@code inventory-input} view name
    */
+  @NotNull
   @GetMapping("/input")
   public String viewInputPage(@RequestParam(required = false) String source, Model model) {
     InventoryForm form;
@@ -1508,6 +1519,7 @@ public class InventoryPageController {
    * @return the active orders with their needs; an empty list when the lookup fails, which leaves
    *     the already-rendered labels standing rather than blanking them
    */
+  @NotNull
   @ResponseBody
   @GetMapping(value = "/order-needs", headers = "X-Requested-With=XMLHttpRequest")
   public Map<String, Object> orderNeedsAjax() {
@@ -1528,6 +1540,7 @@ public class InventoryPageController {
    * @return outstanding amount by {@code orderId|materialId}; entries only where something is still
    *     needed, so a fully covered bucket renders no suffix rather than a "0" one.
    */
+  @NotNull
   private static Map<String, Double> orderNeedAmounts(
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
     Map<String, Double> amounts = new LinkedHashMap<>();
@@ -1562,6 +1575,7 @@ public class InventoryPageController {
    * @return {@code {"materials": {orderId: [...]}, "gameItems": {orderId: [...]}}}, never {@code
    *     null}.
    */
+  @NotNull
   private static Map<String, Object> orderNeeds(
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
     Map<UUID, List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderMaterialNeedDto>>
@@ -1598,6 +1612,7 @@ public class InventoryPageController {
    * @return outstanding whole units by {@code orderId|gameItemId}; entries only where something is
    *     still needed, so a covered game item renders no suffix rather than a "0" one.
    */
+  @NotNull
   private static Map<String, Integer> orderGameItemNeedAmounts(
       List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders) {
     Map<String, Integer> amounts = new LinkedHashMap<>();
@@ -1647,6 +1662,7 @@ public class InventoryPageController {
    * @param form the inbound inventory form; may be {@code null} before binding.
    * @return the selected user DTO for the seed option, or {@code null}.
    */
+  @Nullable
   private de.greluc.krt.profit.basetool.frontend.model.dto.UserDto fetchSelectedInputUser(
       InventoryForm form) {
     if (form == null || !Boolean.TRUE.equals(form.getIsGlobal()) || form.getUserId() == null) {
@@ -1725,6 +1741,7 @@ public class InventoryPageController {
     return new ArrayList<>();
   }
 
+  @NotNull
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto>
       fetchMaterials() {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.MaterialReferenceDto> materials =
@@ -1741,6 +1758,7 @@ public class InventoryPageController {
     return materials;
   }
 
+  @NotNull
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto>
       fetchLocations() {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.LocationReferenceDto> locations =
@@ -1757,6 +1775,7 @@ public class InventoryPageController {
     return locations;
   }
 
+  @NotNull
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>
       fetchActiveJobOrders() {
     return fetchActiveJobOrders(false);
@@ -1775,6 +1794,7 @@ public class InventoryPageController {
    * @return the active orders the caller may see; empty (never {@code null}) when the lookup fails,
    *     so a picker degrades to unlabelled options rather than the page failing
    */
+  @NotNull
   private List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto>
       fetchActiveJobOrders(boolean withNeeds) {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> orders =
@@ -1807,6 +1827,7 @@ public class InventoryPageController {
     return new ArrayList<>();
   }
 
+  @Nullable
   private static String currentAuthName() {
     org.springframework.security.core.Authentication auth =
         org.springframework.security.core.context.SecurityContextHolder.getContext()

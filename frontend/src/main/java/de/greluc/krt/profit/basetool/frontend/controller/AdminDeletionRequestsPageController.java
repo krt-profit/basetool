@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,6 +79,7 @@ public class AdminDeletionRequestsPageController {
    * @param model the view model
    * @return the view name
    */
+  @NotNull
   @GetMapping
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String page(Model model) {
@@ -108,9 +110,10 @@ public class AdminDeletionRequestsPageController {
    * @param model the view model
    * @return the fragment view name
    */
+  @NotNull
   @GetMapping(params = "fragment=rows")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-  public String rows(Model model) {
+  public String rows(@NotNull Model model) {
     model.addAttribute(
         "requests", backendApiClient.get("/api/v1/admin/deletion-requests", REQUEST_LIST_TYPE));
     return "admin/deletion-requests :: rows";
@@ -129,7 +132,7 @@ public class AdminDeletionRequestsPageController {
   @PostMapping(value = "/{id}/decline", headers = "X-Requested-With=XMLHttpRequest")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public ResponseEntity<Object> decline(
-      @PathVariable UUID id, @RequestBody Map<String, Object> request) {
+      @PathVariable UUID id, @NotNull @RequestBody Map<String, Object> request) {
     Object note = request.get("note");
     if (!(note instanceof String text) || text.isBlank()) {
       return ResponseEntity.badRequest().build();

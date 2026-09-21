@@ -150,6 +150,7 @@ public class BankBookingRequestService {
    * @throws BadRequestException when a counterparty is named on a non-withdrawal, or its org unit
    *     is not one of that user's memberships
    */
+  @NotNull
   @Transactional
   public BankBookingRequestDto create(
       @NotNull UUID accountId,
@@ -402,6 +403,7 @@ public class BankBookingRequestService {
    *     missing Begr&uuml;ndung on a mandating account
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
+  @NotNull
   @Transactional
   public BankBookingRequestDto updateOwn(
       @NotNull UUID requestId,
@@ -529,6 +531,7 @@ public class BankBookingRequestService {
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
+  @NotNull
   @Transactional
   public BankBookingRequestDto cancelOwn(@NotNull UUID requestId, long version) {
     BankBookingRequest request = lockRequest(requestId);
@@ -616,6 +619,7 @@ public class BankBookingRequestService {
    *     ADR-0039)
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
+  @NotNull
   @Transactional
   public BankBookingRequestDto confirm(
       @NotNull UUID requestId,
@@ -778,6 +782,7 @@ public class BankBookingRequestService {
    * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when already decided
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
+  @NotNull
   @Transactional
   public BankBookingRequestDto reject(
       @NotNull UUID requestId,
@@ -981,6 +986,7 @@ public class BankBookingRequestService {
    * @param request the request entity
    * @return the wire DTO
    */
+  @NotNull
   private BankBookingRequestDto toDto(@NotNull BankBookingRequest request) {
     BankAccount account = request.getAccount();
     OrgUnit orgUnit = account.getOrgUnit();

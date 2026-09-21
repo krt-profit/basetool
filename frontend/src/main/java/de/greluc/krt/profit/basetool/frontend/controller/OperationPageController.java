@@ -135,6 +135,7 @@ public class OperationPageController {
    *     be honoured only for an authenticated caller; every caller is one now (ADR-0159)
    * @return the {@code operations-index} view name, or the results fragment for AJAX
    */
+  @NotNull
   @GetMapping
   public String listOperations(
       @RequestParam(required = false) String search,
@@ -238,6 +239,7 @@ public class OperationPageController {
    * @return the {@code operation-detail} view name, its {@code missions} fragment for an AJAX swap,
    *     or a redirect on backend failure of the full-page load
    */
+  @NotNull
   @GetMapping("/{id}")
   public String operationDetails(
       @PathVariable @NotNull UUID id,
@@ -278,6 +280,7 @@ public class OperationPageController {
    * @return the {@code operation-detail :: <fragment>} view, or {@code :: fragmentError} on an
    *     unknown fragment or a backend failure
    */
+  @NotNull
   private String operationFragment(
       UUID id,
       Integer page,
@@ -400,7 +403,7 @@ public class OperationPageController {
    * @param authentication current user's authentication
    * @param model Thymeleaf model to populate
    */
-  private void loadPayoutModel(UUID id, Authentication authentication, Model model) {
+  private void loadPayoutModel(UUID id, Authentication authentication, @NotNull Model model) {
     model.addAttribute(
         "operation", backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
     OperationPayoutSummaryDto payoutSummary =
@@ -422,7 +425,7 @@ public class OperationPageController {
    * @param size page size for the embedded missions table
    * @param model Thymeleaf model to populate
    */
-  private void loadFinanceModel(UUID id, Integer page, Integer size, Model model) {
+  private void loadFinanceModel(UUID id, Integer page, Integer size, @NotNull Model model) {
     model.addAttribute(
         "operationFinance",
         backendApiClient.get(
@@ -448,6 +451,7 @@ public class OperationPageController {
    *     missionsPage}
    * @return the {@code operation-detail :: missions} fragment view
    */
+  @NotNull
   private String missionsFragment(UUID id, Integer page, Integer size, Model model) {
     try {
       model.addAttribute(
@@ -499,6 +503,7 @@ public class OperationPageController {
    *     financeDetailError})
    * @return the {@code operation-detail :: financeDetail} fragment view
    */
+  @NotNull
   @GetMapping("/{id}/finance/{missionId}")
   public String operationMissionFinance(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID missionId, Model model) {
@@ -548,6 +553,7 @@ public class OperationPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /operations}
    */
+  @NotNull
   @PostMapping("/create")
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String createOperation(
@@ -571,6 +577,7 @@ public class OperationPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /operations}
    */
+  @NotNull
   @PostMapping("/{id}/update")
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
   public String updateOperation(
@@ -692,6 +699,7 @@ public class OperationPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /operations}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String deleteOperation(

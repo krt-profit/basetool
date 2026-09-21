@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -209,8 +210,9 @@ public class UexManufacturerService {
    * @param now timestamp to stamp on the row
    * @return whether the row was created, updated as canonical, or merged as an alias
    */
+  @NotNull
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public UpsertOutcome upsertCompanyWithinTransaction(UexCompanyDto dto, Instant now) {
+  public UpsertOutcome upsertCompanyWithinTransaction(@NotNull UexCompanyDto dto, Instant now) {
     String abbreviation = StringUtils.hasText(dto.nickname()) ? dto.nickname() : dto.name();
 
     Manufacturer manufacturer = resolveManufacturer(dto, abbreviation);
@@ -285,7 +287,7 @@ public class UexManufacturerService {
    * @param abbreviation derived short code
    */
   private static void applyCanonicalFields(
-      Manufacturer manufacturer, UexCompanyDto dto, String abbreviation) {
+      @NotNull Manufacturer manufacturer, @NotNull UexCompanyDto dto, String abbreviation) {
     manufacturer.setName(dto.name());
     manufacturer.setAbbreviation(abbreviation);
     if (StringUtils.hasText(dto.nickname())) {

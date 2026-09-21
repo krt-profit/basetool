@@ -82,6 +82,7 @@ public class AdminLocationsPageController {
    * @param model Thymeleaf model populated with the sorted location list
    * @return the {@code admin/locations} view name
    */
+  @NotNull
   @GetMapping
   public String listData(Model model) {
     try {
@@ -121,6 +122,7 @@ public class AdminLocationsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/locations}
    */
+  @NotNull
   @PostMapping("/{id}/toggle-visibility")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleLocationVisibility(
@@ -172,6 +174,7 @@ public class AdminLocationsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/locations}
    */
+  @NotNull
   @PostMapping("/{id}/toggle-home-location")
   @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
   public String toggleHomeLocation(

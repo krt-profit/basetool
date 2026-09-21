@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -99,7 +100,8 @@ public class MissionPeerRedactor {
    * @param dto the full mission DTO
    * @return a redacted copy safe for a member below Logistician
    */
-  public MissionDto cleanupMissionForPeer(MissionDto dto) {
+  @NotNull
+  public MissionDto cleanupMissionForPeer(@NotNull MissionDto dto) {
     // Both flags, not just canManageManagers: the Verwaltung tab opens on either
     // (mission-detail.html), and the owner field it shows is the one canEdit lets a caller change.
     boolean managing =
@@ -187,7 +189,8 @@ public class MissionPeerRedactor {
    * @param dto the unit DTO straight from the mapper; never {@code null}.
    * @return a copy whose ship owner is reduced to the public callsign tuple.
    */
-  public MissionUnitDto cleanupUnitForPeer(MissionUnitDto dto) {
+  @NotNull
+  public MissionUnitDto cleanupUnitForPeer(@NotNull MissionUnitDto dto) {
     return new MissionUnitDto(
         dto.id(),
         dto.name(),
@@ -218,7 +221,8 @@ public class MissionPeerRedactor {
    * @param dto the ship DTO nested in an assigned unit; never {@code null}.
    * @return a copy whose owner is redacted for a peer.
    */
-  public ShipDto cleanupShipForPeer(ShipDto dto) {
+  @NotNull
+  public ShipDto cleanupShipForPeer(@NotNull ShipDto dto) {
     return new ShipDto(
         dto.id(),
         dto.name(),
@@ -240,7 +244,8 @@ public class MissionPeerRedactor {
    * @param dto the participant DTO
    * @return a redacted copy safe for a member below Logistician
    */
-  public MissionParticipantDto cleanupParticipantForPeer(MissionParticipantDto dto) {
+  @NotNull
+  public MissionParticipantDto cleanupParticipantForPeer(@NotNull MissionParticipantDto dto) {
     UserDto cleanedUser = dto.user() != null ? cleanupUserForPeer(dto.user()) : null;
     return new MissionParticipantDto(
         dto.id(),
@@ -275,6 +280,7 @@ public class MissionPeerRedactor {
    * @return a redacted copy safe for a member below Logistician, or {@code null} for a {@code null}
    *     input
    */
+  @Nullable
   @Contract("null -> null; !null -> !null")
   public UserDto cleanupUserForPeer(@Nullable UserDto dto) {
     // Null in, null out - the same contract UserDtoRedaction.toPeerShape carries, and the reason

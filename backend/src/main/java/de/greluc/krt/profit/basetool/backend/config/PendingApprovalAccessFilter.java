@@ -279,7 +279,8 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
    * @param request the current request
    * @return the refusal to write, or {@code null} when the request may proceed down the chain
    */
-  private Refusal refusalFor(HttpServletRequest request) {
+  @Nullable
+  private Refusal refusalFor(@NotNull HttpServletRequest request) {
     PathContainer path =
         PathContainer.parsePath(
             request.getRequestURI().substring(request.getContextPath().length()));

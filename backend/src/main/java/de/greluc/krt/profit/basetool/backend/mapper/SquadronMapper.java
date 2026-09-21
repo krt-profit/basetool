@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.SquadronReferenceDto;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -73,6 +74,7 @@ public interface SquadronMapper {
    * @return the reference DTO carrying the org unit's id/name/shorthand, or {@code null} when the
    *     {@code orgUnit} is {@code null}.
    */
+  @Nullable
   default SquadronReferenceDto orgUnitToReferenceDto(OrgUnit orgUnit) {
     if (orgUnit == null) {
       return null;

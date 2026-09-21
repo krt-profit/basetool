@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.metrics;
 
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -30,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
  * enumeration. The high-frequency {@code NotificationStreamService} SSE heartbeat is deliberately
  * excluded — it is a liveness ping, not a batch job with success/failure semantics.
  */
+@RequiredArgsConstructor
 public enum ScheduledJob {
 
   /** The 5-minute Keycloak directory mirror ({@code UserSyncTask#syncUsers}). */
@@ -77,16 +79,8 @@ public enum ScheduledJob {
    */
   BUSINESS_METRICS("business_metrics");
 
-  private final String label;
-
-  /**
-   * Binds the constant to its bounded {@code job} tag value.
-   *
-   * @param label the fixed, snake-case Prometheus tag value for this job
-   */
-  ScheduledJob(@NotNull String label) {
-    this.label = label;
-  }
+  /** The fixed, snake-case Prometheus tag value for this job. */
+  private final @NotNull String label;
 
   /**
    * The bounded {@code job} tag value for this job on the {@code basetool_scheduled_job_*} meters.

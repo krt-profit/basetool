@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -105,6 +106,7 @@ public class BankRequestQueuePageController {
    * @param model Spring MVC model
    * @return the template, or its {@code requestQueue} fragment view
    */
+  @NotNull
   @GetMapping("/bank/requests")
   @PreAuthorize("hasRole('" + Roles.BANK_EMPLOYEE + "')")
   public String queue(

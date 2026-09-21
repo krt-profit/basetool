@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -136,6 +137,7 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    *
    * @return the subscribe-authorization executor
    */
+  @NotNull
   @Bean(destroyMethod = "shutdownNow")
   public ExecutorService liveSyncSubscribeAuthExecutor() {
     return new ThreadPoolExecutor(
@@ -160,6 +162,7 @@ public class LiveSyncWebSocketConfig implements WebSocketConfigurer {
    *
    * @return the handler bean
    */
+  @NotNull
   @Bean
   public LiveSyncWebSocketHandler liveSyncWebSocketHandler() {
     LiveSyncFanout fanout = fanoutProvider.getIfAvailable(NoopLiveSyncFanout::new);

@@ -114,6 +114,7 @@ public class UserController {
    *
    * @return the number of users reconciled this run
    */
+  @NotNull
   @PostMapping("/sync")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -360,6 +361,7 @@ public class UserController {
    * @param jwt caller's JWT — never {@code null} thanks to the {@code @PreAuthorize}
    * @return the user DTO
    */
+  @NotNull
   @GetMapping("/me")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -458,11 +460,12 @@ public class UserController {
    * @param request update payload (carries the expected version)
    * @return the persisted DTO
    */
+  @NotNull
   @PutMapping("/me/description")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateMyDescription(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
+      @NotNull @RequestBody @jakarta.validation.Valid UserDescriptionRequest request) {
     de.greluc.krt.profit.basetool.backend.model.User me =
         userService.updateUserDescription(
             userService.getUserIdFromJwt(jwt),
@@ -483,6 +486,7 @@ public class UserController {
    * @return the current default payout preference (possibly {@code null}) plus the user-row
    *     version.
    */
+  @NotNull
   @GetMapping("/me/payout-preference")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -502,11 +506,12 @@ public class UserController {
    * @param request the new preference plus the expected version.
    * @return the persisted preference and the new version.
    */
+  @NotNull
   @PutMapping("/me/payout-preference")
   @PreAuthorize("isAuthenticated()")
   public MyPayoutPreferenceResponse updateMyPayoutPreference(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestBody @jakarta.validation.Valid MyPayoutPreferenceRequest request) {
+      @NotNull @RequestBody @jakarta.validation.Valid MyPayoutPreferenceRequest request) {
     de.greluc.krt.profit.basetool.backend.model.User me =
         userService.updateUserDefaultPayoutPreference(
             userService.getUserIdFromJwt(jwt), request.preference(), request.version());
@@ -521,6 +526,7 @@ public class UserController {
    * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the current opt-in flag plus the user-row version.
    */
+  @NotNull
   @GetMapping("/me/blueprint-sharing")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
@@ -542,11 +548,12 @@ public class UserController {
    * @param request the new opt-in value plus the expected version.
    * @return the persisted flag and the new version.
    */
+  @NotNull
   @PutMapping("/me/blueprint-sharing")
   @PreAuthorize("isAuthenticated()")
   public MyBlueprintSharingResponse updateMyBlueprintSharing(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestBody @jakarta.validation.Valid MyBlueprintSharingRequest request) {
+      @NotNull @RequestBody @jakarta.validation.Valid MyBlueprintSharingRequest request) {
     de.greluc.krt.profit.basetool.backend.model.User me =
         userService.updateUserShareBlueprintsGlobally(
             userService.getUserIdFromJwt(jwt),
@@ -561,6 +568,7 @@ public class UserController {
    * @param announcementId announcement just read
    * @return the persisted DTO
    */
+  @NotNull
   @PutMapping("/me/read-announcement/{announcementId}")
   @PreAuthorize("isAuthenticated()")
   public UserDto updateReadAnnouncement(
@@ -583,7 +591,7 @@ public class UserController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public UserDto updateUserAttributes(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
+      @NotNull @RequestBody @jakarta.validation.Valid UserAttributesRequest request) {
     return userMapper.toDto(
         userService.updateUserAttributes(
             id,
@@ -612,6 +620,7 @@ public class UserController {
    *     empty.
    * @return the user's complete post-write membership list.
    */
+  @NotNull
   @PatchMapping("/{id}/memberships")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse patchMemberships(
@@ -634,6 +643,7 @@ public class UserController {
    * @return the user's memberships (Staffel + every SK) as full {@link OrgUnitMembershipDto}s,
    *     wrapped in the same response shape the membership-delta PATCH returns.
    */
+  @NotNull
   @GetMapping("/{id}/memberships/detail")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public MembershipDeltaResponse getMembershipsDetail(@PathVariable @NotNull UUID id) {
@@ -681,7 +691,7 @@ public class UserController {
   public UserDto consolidateAccount(
       @PathVariable @NotNull UUID id,
       @CurrentUserId UUID adminUserId,
-      @RequestBody @jakarta.validation.Valid ConsolidateAccountRequest body) {
+      @NotNull @RequestBody @jakarta.validation.Valid ConsolidateAccountRequest body) {
     return userMapper.toDto(
         accountConsolidationService.consolidate(
             id, body.targetUserId(), body.version(), adminUserId));
@@ -821,6 +831,7 @@ public class UserController {
    * @param user the caller's own entity, the source of the email; never {@code null}
    * @return a copy of {@code dto} with {@code email} populated from {@code user}
    */
+  @NotNull
   private UserDto withSelfEmail(
       @NotNull UserDto dto, @NotNull de.greluc.krt.profit.basetool.backend.model.User user) {
     return new UserDto(

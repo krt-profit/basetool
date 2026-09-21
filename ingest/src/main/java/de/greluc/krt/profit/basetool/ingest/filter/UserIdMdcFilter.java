@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -77,6 +78,7 @@ public class UserIdMdcFilter extends OncePerRequestFilter {
    *     authenticated by something other than a bearer token, or carries a token without a subject
    *     — in which case the {@link CorrelationIdFilter#ANONYMOUS} seed stands
    */
+  @Nullable
   private static String authenticatedSubject() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {

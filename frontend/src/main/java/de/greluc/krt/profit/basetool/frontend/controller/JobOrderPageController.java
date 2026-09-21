@@ -55,6 +55,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -206,6 +209,7 @@ public class JobOrderPageController {
    *     and the aging thresholds for the row-color rendering
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
    */
+  @NotNull
   @GetMapping
   public String viewOrders(
       @RequestParam(required = false) List<String> status,
@@ -347,6 +351,7 @@ public class JobOrderPageController {
    * @param squadronIds the selected squadron ids (empty = no squadron filter)
    * @return {@code /orders?status=...&squadronId=...} carrying the current filter
    */
+  @NotNull
   private static String buildPaginationBaseUrl(List<String> status, List<UUID> squadronIds) {
     List<String> queryParts = new ArrayList<>();
     for (String s : status) {
@@ -365,6 +370,7 @@ public class JobOrderPageController {
    *
    * @return the {@code order-detail} view name
    */
+  @NotNull
   @GetMapping("/{id}")
   public String viewOrderDetail(
       @PathVariable UUID id,
@@ -641,6 +647,7 @@ public class JobOrderPageController {
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code order-create} view name
    */
+  @NotNull
   @GetMapping("/create")
   public String viewCreateForm(
       @RequestParam(required = false) String source,
@@ -680,6 +687,7 @@ public class JobOrderPageController {
    * @param redirectAttributes flash carrier for the block cases
    * @return the {@code orders-create} view (in edit mode) or a redirect to the detail page
    */
+  @NotNull
   @GetMapping("/{id}/items/edit")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
   public String viewEditItemForm(
@@ -733,7 +741,8 @@ public class JobOrderPageController {
    * @param order the item order being edited
    * @return the JS-serializable prefill list (Thymeleaf inlines it as a JSON array)
    */
-  private List<java.util.Map<String, Object>> buildEditItems(JobOrderDto order) {
+  @NotNull
+  private List<java.util.Map<String, Object>> buildEditItems(@NotNull JobOrderDto order) {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemDto> items =
         order.items() != null ? order.items() : List.of();
     java.util.Map<UUID, Integer> idToIndex = new java.util.HashMap<>();
@@ -803,6 +812,7 @@ public class JobOrderPageController {
    * @param amount the whole-unit amount to scale by (defaults to 1)
    * @return the derivation preview, or {@code null} on failure
    */
+  @Nullable
   @GetMapping("/item-derivation/{blueprintId}")
   @ResponseBody
   public ItemDerivationDto itemDerivation(
@@ -891,6 +901,7 @@ public class JobOrderPageController {
     }
   }
 
+  @NotNull
   private List<MaterialDto> fetchMaterials() {
     try {
       List<MaterialDto> list =
@@ -912,6 +923,7 @@ public class JobOrderPageController {
    *
    * @return the acting user, or {@code null} when the lookup fails
    */
+  @Nullable
   private UserDto fetchActingUser() {
     try {
       return backendApiClient.get("/api/v1/users/me", UserDto.class);
@@ -954,6 +966,7 @@ public class JobOrderPageController {
    * @param order the loaded order (any kind)
    * @return distinct item names lacking derived materials, in line order; never {@code null}
    */
+  @NotNull
   private List<String> itemsWithoutDerivedMaterials(JobOrderDto order) {
     List<String> names = new ArrayList<>();
     if (order == null || !"ITEM".equals(order.type()) || order.items() == null) {
@@ -1043,6 +1056,7 @@ public class JobOrderPageController {
    *     deliveredPct}, {@code openAmountScu}, {@code openAmountPiece}, {@code hasScuMaterial},
    *     {@code hasPieceMaterial}, {@code claims}, {@code handovers})
    */
+  @NotNull
   private Map<String, Object> computeKpi(JobOrderDto order) {
     Map<String, Object> kpi = new LinkedHashMap<>();
     kpi.put("fulfilled", 0);
@@ -1145,6 +1159,7 @@ public class JobOrderPageController {
     return kpi;
   }
 
+  @NotNull
   private List<SquadronDto> fetchSquadrons() {
     try {
       PageResponse<SquadronDto> p =
@@ -1255,7 +1270,7 @@ public class JobOrderPageController {
    *     profit-eligible {@code responsibleOptions} subset from.
    */
   private void applyOwnerPickerOptions(
-      Model model, List<OrgUnitMembershipOptionDto> requestingOptions) {
+      Model model, @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
     List<OrgUnitMembershipOptionDto> responsibleOptions =
         requestingOptions.stream().filter(o -> Boolean.TRUE.equals(o.isProfitEligible())).toList();
     model.addAttribute("responsibleOptions", responsibleOptions);
@@ -1264,6 +1279,8 @@ public class JobOrderPageController {
     model.addAttribute("requestingHasSpecialCommand", containsSpecialCommand(requestingOptions));
   }
 
+  @Contract("null -> null")
+  @Nullable
   private UUID getCurrentUserId(OidcUser principal) {
     if (principal == null) {
       return null;

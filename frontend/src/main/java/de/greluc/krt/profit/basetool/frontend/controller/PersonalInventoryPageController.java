@@ -104,6 +104,7 @@ public class PersonalInventoryPageController {
    * @return the {@code personal-inventory} view name, or its {@code results} fragment for an AJAX
    *     filter swap
    */
+  @NotNull
   @GetMapping
   public String view(
       @RequestParam(required = false) String q,
@@ -133,6 +134,7 @@ public class PersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/add")
   public String add(
       @Valid @ModelAttribute("personalInventoryForm") PersonalInventoryForm form,
@@ -183,6 +185,7 @@ public class PersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
    */
+  @NotNull
   @PostMapping("/{id}/update")
   public String update(
       @PathVariable @NotNull UUID id,
@@ -226,6 +229,7 @@ public class PersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /personal-inventory}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -404,7 +408,8 @@ public class PersonalInventoryPageController {
    * and the page metadata used by the pagination fragment. Used both by the GET handler and by the
    * POST handlers when re-rendering after a validation error.
    */
-  private void populateListing(Model model, String q, Integer page, Integer size, String sort) {
+  private void populateListing(
+      @NotNull Model model, String q, Integer page, Integer size, String sort) {
     model.addAttribute("filterQuery", q == null ? "" : q);
     PageResponse<PersonalInventoryItemDto> items = fetchItems(q, page, size, sort);
     model.addAttribute("items", items != null ? items.content() : Collections.emptyList());

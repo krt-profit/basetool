@@ -32,6 +32,7 @@ import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -108,7 +109,7 @@ public class BankRequestController {
   @PostMapping("/{id}/confirm")
   public BankBookingRequestDto confirm(
       @PathVariable UUID id,
-      @Valid @RequestBody ConfirmBankBookingRequest request,
+      @NotNull @Valid @RequestBody ConfirmBankBookingRequest request,
       Authentication authentication) {
     return bankBookingRequestService.confirm(
         id,
@@ -133,7 +134,7 @@ public class BankRequestController {
   @PostMapping("/{id}/reject")
   public BankBookingRequestDto reject(
       @PathVariable UUID id,
-      @Valid @RequestBody RejectBankBookingRequest request,
+      @NotNull @Valid @RequestBody RejectBankBookingRequest request,
       Authentication authentication) {
     return bankBookingRequestService.reject(
         id, request.reason(), request.version(), authentication);

@@ -261,7 +261,7 @@ public class MissionPageController {
    * @param binder Spring data binder for the current request
    */
   @InitBinder
-  public void initBinder(WebDataBinder binder) {
+  public void initBinder(@NotNull WebDataBinder binder) {
     binder.registerCustomEditor(String.class, new StringTrimmerEditor(true));
   }
 
@@ -272,6 +272,7 @@ public class MissionPageController {
    *
    * @return the {@code missions-index} view name
    */
+  @NotNull
   @GetMapping
   public String listMissions(
       @RequestParam(required = false) String search,
@@ -362,6 +363,7 @@ public class MissionPageController {
    * @return the {@code mission-detail} view name, or a {@code mission-detail :: <fragment>}
    *     selector
    */
+  @NotNull
   @GetMapping("/{id}")
   public String missionDetail(
       @PathVariable @NotNull UUID id,
@@ -675,6 +677,7 @@ public class MissionPageController {
    * @param principal authenticated OIDC user
    * @return the {@code mission-create} view name
    */
+  @NotNull
   @GetMapping("/new")
   public String createMissionForm(
       Model model,
@@ -814,6 +817,7 @@ public class MissionPageController {
     }
   }
 
+  @NotNull
   private String fetchRoundingMode() {
     try {
       Map<String, Object> setting =

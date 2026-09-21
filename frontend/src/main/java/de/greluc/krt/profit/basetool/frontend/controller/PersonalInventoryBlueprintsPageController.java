@@ -43,6 +43,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -130,11 +131,12 @@ public class PersonalInventoryBlueprintsPageController {
    * @return the {@code personal-inventory-blueprints} view name, or its {@code blueprintList}
    *     fragment selector
    */
+  @NotNull
   @GetMapping
   public String view(
       @RequestParam(required = false) String q,
       @RequestParam(required = false) String fragment,
-      Model model) {
+      @NotNull Model model) {
     model.addAttribute("filterQuery", q == null ? "" : q);
     model.addAttribute("blueprints", fetchAllOwned(q));
     if (fragment != null && "list".equalsIgnoreCase(fragment)) {
@@ -239,6 +241,7 @@ public class PersonalInventoryBlueprintsPageController {
    *
    * @return an empty recipe DTO
    */
+  @NotNull
   private static PersonalBlueprintRecipeDto emptyRecipe() {
     return new PersonalBlueprintRecipeDto(null, 0, List.of(), List.of());
   }
@@ -283,6 +286,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the Blueprints page
    */
+  @NotNull
   @PostMapping("/{id}/update-note")
   public String updateNote(
       @PathVariable @NotNull UUID id,
@@ -313,6 +317,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the Blueprints page
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
@@ -336,6 +341,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the Blueprints page
    */
+  @NotNull
   @PostMapping("/delete-all")
   public String deleteAll(RedirectAttributes redirectAttributes) {
     try {
@@ -508,6 +514,7 @@ public class PersonalInventoryBlueprintsPageController {
    * @param iso the ISO-8601 instant string, or blank
    * @return the parsed instant, or {@code null}
    */
+  @Nullable
   private static Instant parseInstantOrNull(String iso) {
     if (iso == null || iso.isBlank()) {
       return null;

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import java.time.Duration;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
@@ -114,7 +115,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
    *     {@code null} and never empty
    */
   private static void addAssetTree(
-      ResourceHandlerRegistry registry, String pathPattern, String... locations) {
+      @NotNull ResourceHandlerRegistry registry, String pathPattern, String... locations) {
     registry
         .addResourceHandler(pathPattern)
         .addResourceLocations(locations)

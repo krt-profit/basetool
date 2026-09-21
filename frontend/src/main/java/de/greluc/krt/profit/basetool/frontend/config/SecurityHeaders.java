@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
@@ -176,6 +177,7 @@ public final class SecurityHeaders {
    * @return the {@code scheme://host[:port]} origin, or an empty string if it cannot be derived (in
    *     which case {@code form-action} stays {@code 'self'}-only)
    */
+  @NotNull
   private static String keycloakOriginOf(String issuerUri) {
     if (issuerUri == null || issuerUri.isBlank()) {
       return "";

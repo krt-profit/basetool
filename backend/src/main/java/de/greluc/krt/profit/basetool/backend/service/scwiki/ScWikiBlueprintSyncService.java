@@ -56,6 +56,9 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -407,7 +410,7 @@ public class ScWikiBlueprintSyncService {
    * @param runId current run id for unresolved-ingredient events
    * @return number of ingredient lines that could not be resolved to a material / game item
    */
-  private int applyRequirementGraph(Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
+  private int applyRequirementGraph(@NotNull Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
     bp.clearIngredients();
     bp.clearRequirementGroups();
     bp.clearSummaryProperties();
@@ -541,7 +544,7 @@ public class ScWikiBlueprintSyncService {
    * @param runId current run id for unresolved-ingredient events
    * @return number of ingredient lines that could not be resolved to a material / game item
    */
-  private int applyIngredients(Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
+  private int applyIngredients(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
     List<ScWikiBlueprintIngredientDto> incoming =
         dto.ingredients() == null ? List.of() : dto.ingredients();
     List<BlueprintIngredient> lines = bp.getIngredients();
@@ -601,7 +604,7 @@ public class ScWikiBlueprintSyncService {
    * @param dto the inbound blueprint DTO
    * @param runId current run id for unresolved events
    */
-  private void applyDismantleReturns(Blueprint bp, ScWikiBlueprintDto dto, UUID runId) {
+  private void applyDismantleReturns(Blueprint bp, @NotNull ScWikiBlueprintDto dto, UUID runId) {
     List<ScWikiBlueprintIngredientDto> incoming =
         dto.dismantleReturns() == null ? List.of() : dto.dismantleReturns();
     List<BlueprintDismantleReturn> lines = bp.getDismantleReturns();
@@ -639,7 +642,7 @@ public class ScWikiBlueprintSyncService {
    * @param ref the inbound flat ingredient / return line
    * @return the resolved material, or {@code null}
    */
-  private Material resolveMaterialForResource(ScWikiBlueprintIngredientDto ref) {
+  private Material resolveMaterialForResource(@NotNull ScWikiBlueprintIngredientDto ref) {
     return resolveMaterial(ref.resourceTypeUuid(), ref.name());
   }
 
@@ -651,7 +654,7 @@ public class ScWikiBlueprintSyncService {
    * @param child the inbound requirement-group child line
    * @return the resolved material, or {@code null}
    */
-  private Material resolveMaterialForChild(ScWikiBlueprintRequirementChildDto child) {
+  private Material resolveMaterialForChild(@NotNull ScWikiBlueprintRequirementChildDto child) {
     return resolveMaterial(child.uuid(), child.name());
   }
 
@@ -663,6 +666,7 @@ public class ScWikiBlueprintSyncService {
    * @param name the Wiki display name, or {@code null}
    * @return the resolved material, or {@code null}
    */
+  @Nullable
   private Material resolveMaterial(UUID resourceTypeUuid, String name) {
     if (resourceTypeUuid != null) {
       var byUuid = materialRepository.findByScwikiUuid(resourceTypeUuid);
@@ -688,6 +692,8 @@ public class ScWikiBlueprintSyncService {
    * @param itemUuid the Wiki item UUID, or {@code null}
    * @return the resolved game item, or {@code null}
    */
+  @Contract("null -> null")
+  @Nullable
   private GameItem resolveGameItem(UUID itemUuid) {
     if (itemUuid == null) {
       return null;

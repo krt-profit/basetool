@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.service;
 import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.interceptor.CacheOperationInvocationContext;
@@ -50,6 +52,8 @@ public class CatalogCacheResolver implements CacheResolver {
    * @throws IllegalStateException if the first argument is not a {@link CachedCatalog} or the
    *     domain cache is not registered (a wiring mistake, surfaced loudly at first call)
    */
+  @NotNull
+  @Unmodifiable
   @Override
   public Collection<? extends Cache> resolveCaches(CacheOperationInvocationContext<?> context) {
     Object[] args = context.getArgs();

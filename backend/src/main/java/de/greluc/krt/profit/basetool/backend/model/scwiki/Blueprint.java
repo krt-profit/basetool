@@ -44,6 +44,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /**
  * A crafting blueprint synced from the SC Wiki {@code /api/blueprints} endpoint
@@ -216,6 +218,8 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the ingredient lines
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintIngredient> getIngredients() {
     return Collections.unmodifiableList(ingredients);
   }
@@ -225,7 +229,7 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @param ingredient the line to add
    */
-  public void addIngredient(BlueprintIngredient ingredient) {
+  public void addIngredient(@NotNull BlueprintIngredient ingredient) {
     ingredient.setBlueprint(this);
     ingredients.add(ingredient);
   }
@@ -246,6 +250,8 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the dismantle-return lines
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintDismantleReturn> getDismantleReturns() {
     return Collections.unmodifiableList(dismantleReturns);
   }
@@ -255,7 +261,7 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @param dismantleReturn the line to add
    */
-  public void addDismantleReturn(BlueprintDismantleReturn dismantleReturn) {
+  public void addDismantleReturn(@NotNull BlueprintDismantleReturn dismantleReturn) {
     dismantleReturn.setBlueprint(this);
     dismantleReturns.add(dismantleReturn);
   }
@@ -271,6 +277,8 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the requirement groups
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintRequirementGroup> getRequirementGroups() {
     return Collections.unmodifiableList(requirementGroups);
   }
@@ -280,7 +288,7 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @param group the group to add
    */
-  public void addRequirementGroup(BlueprintRequirementGroup group) {
+  public void addRequirementGroup(@NotNull BlueprintRequirementGroup group) {
     group.setBlueprint(this);
     requirementGroups.add(group);
   }
@@ -296,6 +304,8 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @return an unmodifiable view of the summary properties
    */
+  @NotNull
+  @UnmodifiableView
   public List<BlueprintSummaryProperty> getSummaryProperties() {
     return Collections.unmodifiableList(summaryProperties);
   }
@@ -305,7 +315,7 @@ public class Blueprint extends AbstractEntity<UUID> {
    *
    * @param summaryProperty the summary property to add
    */
-  public void addSummaryProperty(BlueprintSummaryProperty summaryProperty) {
+  public void addSummaryProperty(@NotNull BlueprintSummaryProperty summaryProperty) {
     summaryProperty.setBlueprint(this);
     summaryProperties.add(summaryProperty);
   }

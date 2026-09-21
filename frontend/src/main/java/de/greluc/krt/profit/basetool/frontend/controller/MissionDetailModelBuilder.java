@@ -91,7 +91,7 @@ public final class MissionDetailModelBuilder {
    * @param mission the fetched mission (with its embedded participants, units and frequencies)
    * @return the bundle of pure view attributes for the detail model
    */
-  public static @NotNull MissionDetailViewModel build(@NotNull MissionDto mission) {
+  public static @NotNull MissionDetailViewModel build(MissionDto mission) {
     List<MissionParticipantDto> participants = sortedParticipants(mission);
     LeadTypeGrouping leads = groupByLeadType(participants);
     UnitAssignments units = unitAssignments(mission);
@@ -117,7 +117,8 @@ public final class MissionDetailModelBuilder {
    * @param mission the mission whose participants to sort
    * @return a mutable, name-sorted participant list
    */
-  private static List<MissionParticipantDto> sortedParticipants(MissionDto mission) {
+  @NotNull
+  private static List<MissionParticipantDto> sortedParticipants(@NotNull MissionDto mission) {
     List<MissionParticipantDto> participants = new ArrayList<>(mission.participants());
     participants.sort(
         (p1, p2) -> {
@@ -135,6 +136,7 @@ public final class MissionDetailModelBuilder {
    * @param participants the sorted participants
    * @return the lead-type grouping
    */
+  @NotNull
   private static LeadTypeGrouping groupByLeadType(List<MissionParticipantDto> participants) {
     Map<String, List<MissionParticipantDto>> participantsByLeadType = new HashMap<>();
     List<JobTypeDto> missionLeadTypes = new ArrayList<>();
@@ -193,6 +195,7 @@ public final class MissionDetailModelBuilder {
    * @param participants the sorted participants
    * @return the account-backed participant user ids
    */
+  @NotNull
   private static Set<UUID> participantUserIds(List<MissionParticipantDto> participants) {
     Set<UUID> participantUserIds = new HashSet<>();
     for (MissionParticipantDto p : participants) {
@@ -213,6 +216,7 @@ public final class MissionDetailModelBuilder {
    * @param mission the mission whose assigned units to index
    * @return the unit-assignment lookups
    */
+  @NotNull
   private static UnitAssignments unitAssignments(MissionDto mission) {
     Map<UUID, String> assignedUnitByParticipantId = new HashMap<>();
     Set<UUID> assignedUnitShipIds = new HashSet<>();
@@ -247,7 +251,8 @@ public final class MissionDetailModelBuilder {
    * @return the participants not yet assigned to any unit
    */
   private static List<MissionParticipantDto> unassignedParticipants(
-      List<MissionParticipantDto> participants, Map<UUID, String> assignedUnitByParticipantId) {
+      @NotNull List<MissionParticipantDto> participants,
+      Map<UUID, String> assignedUnitByParticipantId) {
     return participants.stream()
         .filter(p -> p.id() != null && !assignedUnitByParticipantId.containsKey(p.id()))
         .toList();
@@ -261,6 +266,7 @@ public final class MissionDetailModelBuilder {
    * @param participants the sorted participants
    * @return participant id → participant payload
    */
+  @NotNull
   private static Map<UUID, MissionParticipantDto> participantsById(
       List<MissionParticipantDto> participants) {
     Map<UUID, MissionParticipantDto> participantsById = new HashMap<>();
@@ -282,6 +288,7 @@ public final class MissionDetailModelBuilder {
    * @param mission the mission (for the actual start/end window)
    * @return participant id → participation percentage
    */
+  @NotNull
   private static Map<UUID, Double> participationPercentages(
       List<MissionParticipantDto> participants, MissionDto mission) {
     Map<UUID, Double> participationPercentages = new HashMap<>();
@@ -344,6 +351,7 @@ public final class MissionDetailModelBuilder {
    * @param mission the mission whose frequencies to split
    * @return the frequency grouping
    */
+  @NotNull
   private static FrequencyGrouping groupFrequencies(MissionDto mission) {
     Map<String, MissionFrequencyDto> frequencyByTypeId = new HashMap<>();
     List<MissionFrequencyDto> customFrequencies = new ArrayList<>();

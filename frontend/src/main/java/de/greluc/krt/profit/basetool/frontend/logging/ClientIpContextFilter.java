@@ -33,6 +33,7 @@ import java.util.StringJoiner;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.core.Ordered;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
@@ -222,6 +223,8 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
    * @param entries the raw {@code app.client-ip.trusted-proxies} values; may be {@code null}/empty.
    * @return an immutable list of compiled matchers; empty when nothing valid is configured.
    */
+  @NotNull
+  @UnmodifiableView
   private static List<IpAddressMatcher> compileTrustedProxies(@Nullable List<String> entries) {
     if (entries == null || entries.isEmpty()) {
       return List.of();

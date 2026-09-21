@@ -153,6 +153,7 @@ public class BankHolderService {
    * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
    * @return the holder booking DTO with its account/holder context resolved
    */
+  @NotNull
   private BankHolderBookingDto toHolderBookingDto(
       @NotNull BankHolderBookingRow row,
       @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,

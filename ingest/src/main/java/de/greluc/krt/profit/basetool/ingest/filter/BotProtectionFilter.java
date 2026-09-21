@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.Ordered;
@@ -72,21 +73,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @Order(BotProtectionFilter.ORDER)
 @Slf4j
+@RequiredArgsConstructor
 public class BotProtectionFilter extends OncePerRequestFilter {
 
   /** After correlation id, before the size-cap, rate-limit and Spring Security filters. */
   public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 15;
 
-  private final MeterRegistry meterRegistry;
-
-  /**
-   * Wires the {@code basetool_bot_blocked_total} counter registry.
-   *
-   * @param meterRegistry the Micrometer registry the per-rule bot-block counter is bumped against
-   */
-  public BotProtectionFilter(@NotNull MeterRegistry meterRegistry) {
-    this.meterRegistry = meterRegistry;
-  }
+  /** The Micrometer registry the per-rule bot-block counter is bumped against. */
+  private final @NotNull MeterRegistry meterRegistry;
 
   /**
    * URI path prefixes known to originate from automated scanners, bots, or exploit attempts.

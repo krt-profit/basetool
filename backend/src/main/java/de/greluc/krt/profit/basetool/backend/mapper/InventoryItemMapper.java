@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAllocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -127,6 +129,7 @@ public abstract class InventoryItemMapper {
    * @param gameItem the catalogue entity to project; {@code null} returns {@code null}.
    * @return the slim reference DTO, or {@code null} for a {@code null} input.
    */
+  @Nullable
   public InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
     if (gameItem == null) {
       return null;
@@ -147,7 +150,7 @@ public abstract class InventoryItemMapper {
    * @param item the entry whose job-order remainder to compute; never {@code null}.
    * @return the rounded remainder.
    */
-  public Double jobOrderRest(InventoryItem item) {
+  public Double jobOrderRest(@NotNull InventoryItem item) {
     double allocated =
         item.getJobOrderAllocations().stream()
             .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())
@@ -162,7 +165,7 @@ public abstract class InventoryItemMapper {
    * @param item the entry whose mission remainder to compute; never {@code null}.
    * @return the rounded remainder.
    */
-  public Double missionRest(InventoryItem item) {
+  public Double missionRest(@NotNull InventoryItem item) {
     double allocated =
         item.getMissionAllocations().stream()
             .mapToDouble(a -> a.getAmount() == null ? 0.0 : a.getAmount())

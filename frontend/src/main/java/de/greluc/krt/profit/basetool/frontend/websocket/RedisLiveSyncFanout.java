@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
@@ -333,6 +334,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
     return editors;
   }
 
+  @Nullable
   private static String textOrNull(@NotNull JsonNode node, @NotNull String field) {
     JsonNode value = node.get(field);
     return value != null && value.isString() ? value.asString() : null;

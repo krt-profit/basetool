@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.config;
 
 import jakarta.servlet.DispatcherType;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -56,6 +57,7 @@ public class ForwardedHeaderConfig {
    *
    * @return the filter registration for the forwarded-header filter
    */
+  @NotNull
   @Bean
   public FilterRegistrationBean<ForwardedHeaderFilter> forwardedHeaderFilter() {
     FilterRegistrationBean<ForwardedHeaderFilter> registration =

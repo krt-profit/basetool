@@ -47,6 +47,10 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -231,6 +235,7 @@ public class ScWikiItemSyncService {
    * @return {@link ClosureOutcome#FILLED} for an existing row, {@link ClosureOutcome#CREATED} for a
    *     new {@code WIKI_ONLY} row, or {@link ClosureOutcome#MISSING} when the Wiki returned nothing
    */
+  @NotNull
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public ClosureOutcome fillClosureItemWithinTransaction(
       UUID runId, UUID uuid, ScWikiItemDto dto, Instant now) {
@@ -403,6 +408,8 @@ public class ScWikiItemSyncService {
    *
    * @return the kind passes in claim order
    */
+  @NotNull
+  @Unmodifiable
   private List<KindPass> kindPasses() {
     return List.of(
         new KindPass(
@@ -446,7 +453,7 @@ public class ScWikiItemSyncService {
    *     false} if the response was empty / 304, the sanity cap tripped, or the page walk came back
    *     incomplete — in all of which cases the caller suppresses the orphan sweep
    */
-  private boolean runKindPass(KindPass pass, BackfillContext ctx) {
+  private boolean runKindPass(@NotNull KindPass pass, BackfillContext ctx) {
     Map<String, String> filters =
         StringUtils.hasText(pass.classificationFilter())
             ? Map.of("classification", pass.classificationFilter())
@@ -579,7 +586,7 @@ public class ScWikiItemSyncService {
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public BackfillOutcome upsertBackfillItemWithinTransaction(
-      ScWikiItemDto dto,
+      @NotNull ScWikiItemDto dto,
       GameItemKind passKind,
       UUID runId,
       Instant now,
@@ -650,6 +657,7 @@ public class ScWikiItemSyncService {
    * @param now the shared {@code scwiki_synced_at} timestamp
    * @return the merged row, or {@code null} if the candidate no longer qualifies
    */
+  @Nullable
   private GameItem reconcileIntoUexRow(
       UUID uexRowId, ScWikiItemDto dto, GameItemKind passKind, UUID runId, Instant now) {
     GameItem uexRow = gameItemRepository.findById(uexRowId).orElse(null);
@@ -710,7 +718,7 @@ public class ScWikiItemSyncService {
    * @param dto the Wiki item payload
    * @param now timestamp for {@code scwiki_synced_at}
    */
-  private void applyWikiFields(GameItem item, ScWikiItemDto dto, Instant now) {
+  private void applyWikiFields(@NotNull GameItem item, @NotNull ScWikiItemDto dto, Instant now) {
     item.setScwikiSlug(dto.slug());
     item.setClassName(dto.className());
     item.setClassification(dto.classification());
@@ -749,6 +757,7 @@ public class ScWikiItemSyncService {
    * @param size raw size token
    * @return the integer size class, or {@code null} if not a plain integer
    */
+  @Nullable
   private static Integer parseSize(String size) {
     if (!StringUtils.hasText(size)) {
       return null;
@@ -919,6 +928,8 @@ public class ScWikiItemSyncService {
      * @param dto the item's nested manufacturer reference, may be {@code null}
      * @return the matching local manufacturer, or {@code null}
      */
+    @Contract("null -> null")
+    @Nullable
     private Manufacturer resolveManufacturer(ScWikiItemManufacturerDto dto) {
       if (dto == null) {
         return null;
@@ -945,6 +956,7 @@ public class ScWikiItemSyncService {
      * @param dto the Wiki item payload
      * @return the id of the uuid-less UEX row to merge into, or {@code null} when none is safe
      */
+    @Nullable
     private UUID resolveUuidlessUexMatch(ScWikiItemDto dto) {
       if (StringUtils.hasText(dto.slug())) {
         UUID bySlug = uexIdBySlug.get(dto.slug().trim().toLowerCase(Locale.ROOT));

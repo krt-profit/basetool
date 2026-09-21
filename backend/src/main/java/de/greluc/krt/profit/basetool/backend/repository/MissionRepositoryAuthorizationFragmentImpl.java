@@ -24,6 +24,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * {@code EntityManager.find}-based implementation of {@link MissionRepositoryAuthorizationFragment}
@@ -43,6 +44,7 @@ public class MissionRepositoryAuthorizationFragmentImpl
    * @param id the mission id
    * @return the mission, or empty when none exists
    */
+  @NotNull
   @Override
   public Optional<Mission> findByIdForAuthorization(UUID id) {
     return Optional.ofNullable(entityManager.find(Mission.class, id));

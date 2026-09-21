@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.model.InventoryMissionAllocation;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Allocation-collection helpers for the write paths of the Variante-C inventory model
@@ -58,7 +60,7 @@ public final class InventoryAllocations {
    *     null}
    * @return the total SCU earmarked to job orders
    */
-  public static double sumJobOrder(InventoryItem item) {
+  public static double sumJobOrder(@NotNull InventoryItem item) {
     return item.getJobOrderAllocations().stream()
         .mapToDouble(a -> a.getAmount() != null ? a.getAmount() : 0.0)
         .sum();
@@ -71,7 +73,7 @@ public final class InventoryAllocations {
    *     null}
    * @return the total SCU earmarked to missions
    */
-  public static double sumMission(InventoryItem item) {
+  public static double sumMission(@NotNull InventoryItem item) {
     return item.getMissionAllocations().stream()
         .mapToDouble(a -> a.getAmount() != null ? a.getAmount() : 0.0)
         .sum();
@@ -87,7 +89,7 @@ public final class InventoryAllocations {
    *     null}
    * @return {@code true} when Σ(job) ≤ amount and Σ(mission) ≤ amount within {@link #EPSILON}
    */
-  public static boolean fits(InventoryItem item) {
+  public static boolean fits(@NotNull InventoryItem item) {
     double amount = item.getAmount() != null ? item.getAmount() : 0.0;
     return sumJobOrder(item) <= amount + EPSILON && sumMission(item) <= amount + EPSILON;
   }
@@ -106,7 +108,7 @@ public final class InventoryAllocations {
    *     null}
    * @return the version the client should echo on its next write to this entry
    */
-  public static long forcedNextVersion(InventoryItem saved) {
+  public static long forcedNextVersion(@NotNull InventoryItem saved) {
     return (saved.getVersion() != null ? saved.getVersion() : 0L) + 1L;
   }
 
@@ -121,6 +123,7 @@ public final class InventoryAllocations {
    * @param delivered the initial delivered state of the slice
    * @return the created slice, already added to the entry's collection
    */
+  @NotNull
   public static InventoryJobOrderAllocation addJobOrder(
       InventoryItem item, JobOrder order, double amount, boolean delivered) {
     InventoryJobOrderAllocation slice = new InventoryJobOrderAllocation();
@@ -141,6 +144,7 @@ public final class InventoryAllocations {
    * @param amount the SCU to earmark
    * @return the created slice, already added to the entry's collection
    */
+  @NotNull
   public static InventoryMissionAllocation addMission(
       InventoryItem item, Mission mission, double amount) {
     InventoryMissionAllocation slice = new InventoryMissionAllocation();
@@ -251,6 +255,7 @@ public final class InventoryAllocations {
    * @param orderId the job-order id to match; may be {@code null}
    * @return the matching slice, or {@code null} when none
    */
+  @Nullable
   public static InventoryJobOrderAllocation jobOrderSlice(InventoryItem item, UUID orderId) {
     if (orderId == null) {
       return null;
@@ -272,6 +277,7 @@ public final class InventoryAllocations {
    * @param missionId the mission id to match; may be {@code null}
    * @return the matching slice, or {@code null} when none
    */
+  @Nullable
   public static InventoryMissionAllocation missionSlice(InventoryItem item, UUID missionId) {
     if (missionId == null) {
       return null;

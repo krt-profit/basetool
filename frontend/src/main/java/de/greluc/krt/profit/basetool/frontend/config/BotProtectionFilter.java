@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -60,18 +61,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class BotProtectionFilter extends OncePerRequestFilter {
 
-  private final MeterRegistry meterRegistry;
-
-  /**
-   * Wires the {@code basetool_bot_blocked_total} counter registry (#1041 item 19).
-   *
-   * @param meterRegistry the Micrometer registry the per-rule bot-block counter is bumped against
-   */
-  public BotProtectionFilter(@NotNull MeterRegistry meterRegistry) {
-    this.meterRegistry = meterRegistry;
-  }
+  /** The Micrometer registry the per-rule bot-block counter is bumped against. */
+  private final @NotNull MeterRegistry meterRegistry;
 
   /**
    * URI path prefixes that are known to originate from automated scanners, bots, or exploit

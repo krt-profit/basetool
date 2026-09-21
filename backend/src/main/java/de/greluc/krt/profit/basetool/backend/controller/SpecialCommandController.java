@@ -263,7 +263,7 @@ public class SpecialCommandController {
   })
   public SpecialCommandDto setProfitEligible(
       @PathVariable @NotNull UUID id,
-      @RequestBody @Valid SpecialCommandProfitEligibleToggleRequest body) {
+      @NotNull @RequestBody @Valid SpecialCommandProfitEligibleToggleRequest body) {
     return specialCommandMapper.toDto(specialCommandService.setProfitEligible(id, body.eligible()));
   }
 

@@ -36,6 +36,8 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -219,7 +221,8 @@ public class ScWikiManufacturerSyncService {
    * @param dto the Wiki manufacturer payload
    * @return the matching local manufacturer, or {@code null}
    */
-  private Manufacturer resolve(ScWikiManufacturerDto dto) {
+  @Nullable
+  private Manufacturer resolve(@NotNull ScWikiManufacturerDto dto) {
     Optional<Manufacturer> byUuid = manufacturerRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
       return byUuid.get();

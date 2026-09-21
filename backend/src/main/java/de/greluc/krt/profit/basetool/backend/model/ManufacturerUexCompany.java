@@ -26,6 +26,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -60,6 +61,7 @@ import lombok.ToString;
 @Setter
 @ToString(exclude = "manufacturer")
 @NoArgsConstructor
+@AllArgsConstructor
 public class ManufacturerUexCompany {
 
   /** UEX integer company id (from {@code /companies[].id}); the natural primary key. */
@@ -71,15 +73,4 @@ public class ManufacturerUexCompany {
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "manufacturer_id", nullable = false)
   private Manufacturer manufacturer;
-
-  /**
-   * Creates an alias mapping a UEX company id to its manufacturer.
-   *
-   * @param uexCompanyId UEX integer company id (primary key)
-   * @param manufacturer the manufacturer this id resolves to
-   */
-  public ManufacturerUexCompany(Integer uexCompanyId, Manufacturer manufacturer) {
-    this.uexCompanyId = uexCompanyId;
-    this.manufacturer = manufacturer;
-  }
 }

@@ -38,6 +38,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -97,6 +98,7 @@ public class AdminPersonalInventoryPageController {
    * @return the {@code admin/personal-inventory} view name, or its {@code results} fragment for an
    *     AJAX swap
    */
+  @NotNull
   @GetMapping
   public String view(
       @RequestParam(required = false) String userSub,
@@ -146,6 +148,7 @@ public class AdminPersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin list (with optional form + binding-result flash)
    */
+  @NotNull
   @PostMapping("/{userSub}/add")
   public String add(
       @PathVariable @NotNull UUID userSub,
@@ -192,6 +195,7 @@ public class AdminPersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin list
    */
+  @NotNull
   @PostMapping("/{userSub}/{id}/update")
   public String update(
       @PathVariable @NotNull UUID userSub,
@@ -237,6 +241,7 @@ public class AdminPersonalInventoryPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the admin list
    */
+  @NotNull
   @PostMapping("/{userSub}/{id}/delete")
   public String delete(
       @PathVariable @NotNull UUID userSub,
@@ -253,6 +258,7 @@ public class AdminPersonalInventoryPageController {
     return redirectToList(userSub);
   }
 
+  @NotNull
   private String redirectToList(UUID userSub) {
     return "redirect:/admin/personal-inventory?userSub=" + userSub;
   }
@@ -266,6 +272,7 @@ public class AdminPersonalInventoryPageController {
    * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
    * @return the member DTO for the seed option, or {@code null} when the lookup fails.
    */
+  @Nullable
   private UserDto fetchUser(UUID userSub) {
     try {
       return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);

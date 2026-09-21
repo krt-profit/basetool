@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -565,7 +566,7 @@ public class UexClient {
    * @return the envelope's rows (empty when {@code data} was absent), flagged {@code notModified =
    *     false}
    */
-  private <T> FetchResult<T> unwrapEnvelope(UexResponseDto<T> body, String resourceLabel) {
+  private <T> FetchResult<T> unwrapEnvelope(@NotNull UexResponseDto<T> body, String resourceLabel) {
     String status = LogSafe.text(body.status(), MAX_STATUS_LOG_LENGTH);
     // Absent data is UEX's empty result set, so it cannot carry the verdict — normalise it away and
     // let `status`, the only field the upstream uses to self-report, decide whether this is a
@@ -651,6 +652,7 @@ public class UexClient {
      * @param data the parsed rows (possibly empty)
      * @return a result carrying {@code data} with {@code notModified == false, complete == true}
      */
+    @NotNull
     public static <T> FetchResult<T> of(List<T> data) {
       return new FetchResult<>(data, false, true);
     }
@@ -664,6 +666,7 @@ public class UexClient {
      * @param data whatever rows arrived (possibly empty)
      * @return a result carrying {@code data} with {@code notModified == false, complete == false}
      */
+    @NotNull
     public static <T> FetchResult<T> partial(List<T> data) {
       return new FetchResult<>(data, false, false);
     }
@@ -676,6 +679,7 @@ public class UexClient {
      * @param <T> the per-row payload type
      * @return an unchanged, incomplete result with an empty row list
      */
+    @NotNull
     public static <T> FetchResult<T> unchanged() {
       return new FetchResult<>(List.of(), true, false);
     }

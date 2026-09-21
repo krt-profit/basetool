@@ -34,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -101,8 +102,10 @@ public class ProfileController {
    * @param principal authenticated OIDC user
    * @return the {@code profile} view name
    */
+  @NotNull
   @GetMapping("/profile")
-  public String profile(Model model, @AuthenticationPrincipal OidcUser principal) {
+  public String profile(
+      @NotNull Model model, @NotNull @AuthenticationPrincipal OidcUser principal) {
     model.addAttribute("username", principal.getPreferredUsername());
     model.addAttribute("email", principal.getEmail());
 
@@ -271,6 +274,7 @@ public class ProfileController {
    * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
    *     /profile}
    */
+  @NotNull
   @PostMapping("/profile/description")
   public String updateDescription(
       @Valid @ModelAttribute("profileDescriptionForm") ProfileDescriptionForm form,
@@ -385,6 +389,7 @@ public class ProfileController {
    * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
    *     /profile}
    */
+  @NotNull
   @PostMapping("/profile/payout-preference")
   public String updatePayoutPreference(
       @Valid @ModelAttribute("profilePayoutPreferenceForm") ProfilePayoutPreferenceForm form,
@@ -500,6 +505,7 @@ public class ProfileController {
    * @return inline {@code profile} view on validation failure, otherwise redirect to {@code
    *     /profile}
    */
+  @NotNull
   @PostMapping("/profile/blueprint-sharing")
   public String updateBlueprintSharing(
       @Valid @ModelAttribute("profileBlueprintSharingForm") ProfileBlueprintSharingForm form,
@@ -635,7 +641,7 @@ public class ProfileController {
    * @param bindingResult the validation result carrying at least one error
    * @return a localized, user-presentable validation message
    */
-  private String firstFieldError(BindingResult bindingResult) {
+  private String firstFieldError(@NotNull BindingResult bindingResult) {
     return bindingResult.getFieldErrors().stream()
         .map(org.springframework.validation.FieldError::getDefaultMessage)
         .filter(message -> message != null && !message.isBlank())
@@ -671,7 +677,7 @@ public class ProfileController {
     return initials.toUpperCase(Locale.ROOT);
   }
 
-  private Object getSingleClaim(OidcUser principal, String claim) {
+  private Object getSingleClaim(@NotNull OidcUser principal, String claim) {
     Object value = principal.getAttribute(claim);
     if (value instanceof java.util.List<?> list && !list.isEmpty()) {
       return list.get(0);

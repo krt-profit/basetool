@@ -228,6 +228,7 @@ public class BankGrantService {
    * @param grant the grant
    * @return the active flags as a bracketed list
    */
+  @NotNull
   private static String flagString(@NotNull BankAccountGrant grant) {
     StringBuilder sb = new StringBuilder("[");
     if (grant.isCanDeposit()) {

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -52,6 +53,7 @@ public record BankBookingOutcomeDto(
    * @param transaction the booked ledger transaction
    * @return an outcome carrying only the transaction
    */
+  @NotNull
   public static BankBookingOutcomeDto booked(BankTransactionDto transaction) {
     return new BankBookingOutcomeDto(transaction, null);
   }
@@ -62,6 +64,7 @@ public record BankBookingOutcomeDto(
    * @param pendingRequest the filed pending booking request
    * @return an outcome carrying only the pending request
    */
+  @NotNull
   public static BankBookingOutcomeDto requestRaised(BankBookingRequestDto pendingRequest) {
     return new BankBookingOutcomeDto(null, pendingRequest);
   }

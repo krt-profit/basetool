@@ -84,6 +84,7 @@ public class AdminMaterialAliasesPageController {
    * @param model Thymeleaf model populated with the alias list
    * @return the {@code admin/material-aliases} view name
    */
+  @NotNull
   @GetMapping
   public String list(Model model) {
     try {
@@ -105,6 +106,7 @@ public class AdminMaterialAliasesPageController {
    * @param model Thymeleaf model populated with the alias under edit
    * @return the {@code admin/material-aliases} view name (the edit form lives on the same page)
    */
+  @NotNull
   @GetMapping("/{id}")
   public String edit(@PathVariable @NotNull UUID id, Model model) {
     try {
@@ -133,6 +135,7 @@ public class AdminMaterialAliasesPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/material-aliases}
    */
+  @NotNull
   @PostMapping
   public String create(
       @RequestParam UUID materialId,
@@ -182,6 +185,7 @@ public class AdminMaterialAliasesPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/material-aliases}
    */
+  @NotNull
   @PostMapping("/{id}")
   public String update(
       @PathVariable @NotNull UUID id,
@@ -224,6 +228,7 @@ public class AdminMaterialAliasesPageController {
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/material-aliases}
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String delete(@PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {

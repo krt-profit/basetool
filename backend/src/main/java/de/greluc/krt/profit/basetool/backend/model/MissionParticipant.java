@@ -44,6 +44,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 
 /** Mission Participant JPA entity. */
 @Entity
@@ -138,6 +140,8 @@ public class MissionParticipant extends AbstractEntity<UUID> {
    * @return an unmodifiable snapshot of the affiliated org units; never {@code null}, possibly
    *     empty.
    */
+  @NotNull
+  @UnmodifiableView
   public Set<OrgUnit> getOrgUnits() {
     return Collections.unmodifiableSet(orgUnits);
   }

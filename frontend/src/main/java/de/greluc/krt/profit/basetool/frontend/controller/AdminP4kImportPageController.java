@@ -90,8 +90,9 @@ public class AdminP4kImportPageController {
    * @param model Thymeleaf model
    * @return the {@code admin/p4k-import} view name
    */
+  @NotNull
   @GetMapping
-  public String view(Model model) {
+  public String view(@NotNull Model model) {
     model.addAttribute("jobsUrl", "/admin/p4k-import/jobs");
     return "admin/p4k-import";
   }

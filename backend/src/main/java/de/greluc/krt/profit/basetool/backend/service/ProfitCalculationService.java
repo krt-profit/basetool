@@ -36,6 +36,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -70,6 +71,7 @@ public class ProfitCalculationService {
    * @return profit rows, one per material with both buy and sell sides; alphabetically sorted
    * @throws IllegalArgumentException when {@code shipId} does not resolve to a ship type
    */
+  @NotNull
   public List<ProfitCalculationDto> calculateProfit(UUID shipId, List<String> starSystemNames) {
     log.debug("Calculating profit for shipId: {} and starSystems: {}", shipId, starSystemNames);
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -214,16 +215,19 @@ public final class BankConflictException extends AppException {
     return code.toLowerCase(Locale.ROOT).replace('_', '-');
   }
 
+  @NotNull
   @Override
   public String titleKey() {
     return keyBase() + ".title";
   }
 
+  @NotNull
   @Override
   public String detailKey() {
     return keyBase() + ".detail";
   }
 
+  @NotNull
   @Override
   public String logLabel() {
     return "Bank conflict";
@@ -234,6 +238,8 @@ public final class BankConflictException extends AppException {
     return properties;
   }
 
+  @NotNull
+  @Unmodifiable
   @Override
   public Map<String, ?> logExtra() {
     return Map.of("bankCode", code);
@@ -246,6 +252,7 @@ public final class BankConflictException extends AppException {
    *
    * @return the bundle-key prefix derived from {@link #code}
    */
+  @NotNull
   private String keyBase() {
     return "problem." + code.toLowerCase(Locale.ROOT);
   }

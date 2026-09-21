@@ -143,6 +143,7 @@ public class BankBookingGuards {
    * @param available the current balance
    * @return the 409 conflict to throw
    */
+  @NotNull
   public BankConflictException accountOverdraft(
       @NotNull String accountNo, @NotNull BigDecimal available) {
     return new BankConflictException(

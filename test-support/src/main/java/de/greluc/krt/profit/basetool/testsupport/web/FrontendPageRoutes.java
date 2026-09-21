@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.testsupport.web;
 
 import java.util.List;
 import java.util.Set;
+import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * The frontend's page routes, in one place, for every guard that walks them.
@@ -81,7 +82,7 @@ public final class FrontendPageRoutes {
    * administration surface, then the legal pages) rather than alphabetically, so a missing
    * neighbour is visible to someone reading the list.
    */
-  public static final List<String> PAGES =
+  public static final @Unmodifiable List<String> PAGES =
       List.of(
           "/",
           "/missions",
@@ -188,7 +189,7 @@ public final class FrontendPageRoutes {
    * the return type would classify most of these correctly today and would also, silently,
    * reclassify a page on the day its handler changed shape.
    */
-  public static final List<String> NOT_PAGES =
+  public static final @Unmodifiable List<String> NOT_PAGES =
       List.of(
           // A redirect, and deliberately nothing else. `/app/callback` is the Android App Link
           // (REQ-SEC-038); the browser only reaches it when the link did not resolve to the app,
@@ -247,7 +248,7 @@ public final class FrontendPageRoutes {
    * startsWith}, which would let {@code /error} swallow a future {@code /errors} and quietly remove
    * it from a gate whose whole value is that it covers everything.
    */
-  public static final List<String> NOT_SWEPT_ROOTS =
+  public static final @Unmodifiable List<String> NOT_SWEPT_ROOTS =
       List.of(
           "/api",
           "/csrf",
@@ -266,7 +267,7 @@ public final class FrontendPageRoutes {
    * and is target-agnostic, so it may run against a shared staging deployment as a user who is not
    * an administrator. Every entry must therefore render for an ordinary member.
    */
-  public static final List<String> CORE_SMOKE =
+  public static final @Unmodifiable List<String> CORE_SMOKE =
       List.of(
           "/",
           "/missions",
@@ -298,7 +299,7 @@ public final class FrontendPageRoutes {
    * entry must exist in {@link #PAGES} — so a typo, or a route renamed out from under it, fails the
    * build instead of quietly testing nothing.
    */
-  public static final List<String> ADMIN_SMOKE =
+  public static final @Unmodifiable List<String> ADMIN_SMOKE =
       List.of(
           "/members",
           "/organisation/leitung",
@@ -328,7 +329,7 @@ public final class FrontendPageRoutes {
    * two slices: which pages are worth an axe scan stays a judgement, but every entry being a page
    * route that actually exists is checkable, and {@code PageRouteCatalogueTest} now checks it.
    */
-  public static final List<String> A11Y_SMOKE =
+  public static final @Unmodifiable List<String> A11Y_SMOKE =
       List.of("/", "/missions", "/orders", "/refinery-orders", "/hangar");
 
   /**
@@ -339,6 +340,6 @@ public final class FrontendPageRoutes {
    * failure — an empty list is a legitimate state of a fresh or shared stack, and the {@code smoke}
    * tag exists so the sweep can run against one.
    */
-  public static final Set<String> DETAIL_LIST_PAGES =
+  public static final @Unmodifiable Set<String> DETAIL_LIST_PAGES =
       Set.of("/missions", "/operations", "/orders", "/refinery-orders");
 }

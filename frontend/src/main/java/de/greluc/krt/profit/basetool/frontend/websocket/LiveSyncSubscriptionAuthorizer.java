@@ -374,7 +374,7 @@ public class LiveSyncSubscriptionAuthorizer {
    * @param activeOrgUnitId the captured pin, or {@code null}
    */
   private static void applyAuth(
-      HttpHeaders headers, String accessToken, @Nullable UUID activeOrgUnitId) {
+      @NotNull HttpHeaders headers, String accessToken, @Nullable UUID activeOrgUnitId) {
     headers.setBearerAuth(accessToken);
     if (activeOrgUnitId != null) {
       headers.set(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER, activeOrgUnitId.toString());

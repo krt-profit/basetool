@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jetbrains.annotations.NotNull;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -270,7 +271,7 @@ public abstract class UserMapper {
    * @param user the user whose Staffel memberships to query; never {@code null}.
    * @return the user's Staffel membership rows; never {@code null}, possibly empty.
    */
-  private List<OrgUnitMembership> queryStaffelMemberships(User user) {
+  private List<OrgUnitMembership> queryStaffelMemberships(@NotNull User user) {
     return membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
   }
 }

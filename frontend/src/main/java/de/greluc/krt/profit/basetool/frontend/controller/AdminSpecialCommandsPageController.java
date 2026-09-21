@@ -46,7 +46,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -123,6 +125,7 @@ public class AdminSpecialCommandsPageController {
    * @return the {@code admin/special-commands} view name, or its {@code results} fragment for an
    *     AJAX swap.
    */
+  @NotNull
   @GetMapping
   public String listSpecialCommands(
       @RequestParam(required = false, defaultValue = "false") boolean includeInactive,
@@ -161,6 +164,7 @@ public class AdminSpecialCommandsPageController {
    * @param includeInactive forward to the backend's {@code includeInactive} query param.
    * @return SKs sorted case-insensitively by name plus the truncation flag; never {@code null}.
    */
+  @NotNull
   private CompleteCatalog<SpecialCommandDto> fetchSpecialCommands(boolean includeInactive) {
     CompleteCatalog<Map<String, Object>> catalog =
         CatalogPages.fetchAll(
@@ -201,6 +205,7 @@ public class AdminSpecialCommandsPageController {
    * @return inline list page on validation failure, otherwise redirect to {@code
    *     /admin/special-commands}.
    */
+  @NotNull
   @PostMapping
   public String createSpecialCommand(
       @Valid @ModelAttribute("specialCommandForm") SpecialCommandForm form,
@@ -244,6 +249,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return inline list page on failure, otherwise redirect.
    */
+  @NotNull
   @PostMapping("/{id}/update")
   public String updateSpecialCommand(
       @PathVariable @NotNull UUID id,
@@ -290,6 +296,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands}.
    */
+  @NotNull
   @PostMapping("/{id}/delete")
   public String deleteSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -318,6 +325,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands}.
    */
+  @NotNull
   @PostMapping("/{id}/activate")
   public String activateSpecialCommand(
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
@@ -352,6 +360,7 @@ public class AdminSpecialCommandsPageController {
    * @return the {@code admin/special-command-detail} view name, or its {@code membersResults}
    *     fragment for an AJAX swap.
    */
+  @NotNull
   @GetMapping("/{id}")
   public String detail(
       @PathVariable @NotNull UUID id,
@@ -386,6 +395,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands/{id}}.
    */
+  @NotNull
   @PostMapping("/{id}/members")
   public String addMember(
       @PathVariable @NotNull UUID id,
@@ -417,6 +427,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands/{id}}.
    */
+  @NotNull
   @PostMapping("/{id}/members/{userId}/delete")
   public String removeMember(
       @PathVariable @NotNull UUID id,
@@ -451,6 +462,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands/{id}}.
    */
+  @NotNull
   @PostMapping("/{id}/members/{userId}/flags")
   public String patchMemberFlags(
       @PathVariable @NotNull UUID id,
@@ -491,6 +503,7 @@ public class AdminSpecialCommandsPageController {
    * @param redirectAttributes flash-attribute carrier.
    * @return redirect to {@code /admin/special-commands/{id}}.
    */
+  @NotNull
   @PostMapping("/{id}/members/{userId}/lead")
   public String toggleMemberLead(
       @PathVariable @NotNull UUID id,
@@ -744,6 +757,7 @@ public class AdminSpecialCommandsPageController {
 
   // ---------- helper fetchers for the detail page ---------------------------------
 
+  @Nullable
   private SpecialCommandDto fetchSpecialCommand(UUID id) {
     Map<String, Object> map = backendApiClient.get("/api/v1/special-commands/" + id, MAP_TYPE);
     if (map == null) {
@@ -794,6 +808,8 @@ public class AdminSpecialCommandsPageController {
    * ISO-8601; the conservative branching makes the helper resilient to a future format change
    * without crashing the detail page.
    */
+  @Contract("null -> null")
+  @Nullable
   private static Instant parseInstant(Object o) {
     if (o == null) {
       return null;

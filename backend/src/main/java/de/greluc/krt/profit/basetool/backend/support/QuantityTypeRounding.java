@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.support;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -97,6 +98,7 @@ public final class QuantityTypeRounding {
    * @param quantityType the textual quantity type, possibly {@code null}
    * @return the parsed type, or {@code null} to mean "the SCU default"
    */
+  @Contract("null -> null")
   @Nullable
   private static QuantityType parseQuantityType(@Nullable String quantityType) {
     if (quantityType == null) {

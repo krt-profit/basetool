@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.model.BankBookingRequestType;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -133,6 +134,7 @@ public record BankBookingRequestDto(
    *
    * @return {@code this} when no staff note is set, else a copy with the note removed
    */
+  @NotNull
   public BankBookingRequestDto withoutStaffNote() {
     if (staffNote == null) {
       return this;
