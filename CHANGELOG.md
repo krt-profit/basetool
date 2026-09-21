@@ -21,6 +21,8 @@
   unmaskiert im Log landete. Beides ist behoben; Token, Adressen und JWTs waren nie betroffen
   (REQ-OBS-007).
 
+- **Ein Auftrag, den du gerade zugeordnet hast, stand weiter in der „+ Zuordnen“-Liste des Lagereintrags.** Wähltest du ihn dort erneut aus, brach das Speichern mit „Fehler beim Aktualisieren des Lagers.“ ab. Die Auswahl öffnet jetzt die vorhandene Zuordnung zum Bearbeiten, der Speichern-Knopf lässt sich während des Schreibens nicht mehr doppelt auslösen, und lehnt der Server eine Zuordnung doch ab — etwa weil ein anderes Mitglied denselben Auftrag Sekunden vorher zugeordnet hat — steht jetzt der tatsächliche Grund im Hinweis statt einer allgemeinen Fehlermeldung (REQ-INV-027, REQ-FE-001).
+
 ## [v1.8.7](https://github.com/krt-profit/basetool/releases/tag/v1.8.7) - 2026-09-18
 
 ### Added

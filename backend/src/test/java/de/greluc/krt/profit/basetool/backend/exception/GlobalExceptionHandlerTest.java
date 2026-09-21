@@ -504,6 +504,44 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void handleBadRequest_resolvesTheAllocationDuplicateKeysInBothLocales() {
+    // The Lager allocation popover shows `detail` verbatim on a 400 since the duplicate-target
+    // refusal stopped being a generic "Fehler beim Aktualisieren des Lagers." toast. That makes an
+    // unresolved key a USER-VISIBLE string, so both keys are asserted against both bundles here
+    // rather than trusted to exist.
+    assertEquals(
+        "This job order is already allocated on this stock entry.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.inventory.allocation.duplicate.jobOrder"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "This mission is already allocated on this stock entry.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.inventory.allocation.duplicate.mission"), request)
+            .getBody()
+            .getDetail());
+
+    LocaleContextHolder.setLocale(Locale.GERMAN);
+    assertEquals(
+        "Dieser Auftrag ist diesem Lagereintrag bereits zugeordnet.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.inventory.allocation.duplicate.jobOrder"), request)
+            .getBody()
+            .getDetail());
+    assertEquals(
+        "Dieser Einsatz ist diesem Lagereintrag bereits zugeordnet.",
+        handler
+            .handleAppException(
+                new BadRequestException("error.inventory.allocation.duplicate.mission"), request)
+            .getBody()
+            .getDetail());
+  }
+
+  @Test
   void handleBadRequest_blankMessageFallsBackToGenericLocalized() {
     ResponseEntity<ProblemDetail> resp =
         handler.handleAppException(new BadRequestException(""), request);
