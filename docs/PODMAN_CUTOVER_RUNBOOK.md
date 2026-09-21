@@ -425,7 +425,7 @@ and say nothing about this one. They run in §1.10, once the names have moved.
 
 ```bash
 python scripts/check-conformance.py --ssh root@<new-host-ip> \
-  --only certificate-shared --only client-address-visible --only containers-running \
+  --only certificate-shared --only containers-running \
   --only redis-requires-auth --only scrape-targets-up --only container-metrics \
   --only log-streams --only trace-pipeline --only edge-not-directly-reachable \
   --only containers-unprivileged --only env-reaches-the-units --only containers-read-only
@@ -459,6 +459,15 @@ python scripts/check-conformance.py --ssh root@<new-host-ip> \
 > `HostRunner.run` now roots every command at `/`, and 53 of the suite's own 85 assertions fail if
 > that is ever removed. Nothing to do here — it is noted so a future nine-failure run is not
 > misdiagnosed as a privilege problem a third time.
+
+> [!note] `client-address-visible` is NOT in this list, and cannot be
+> It issues a marked HTTPS request to the **frontend vhost name** and then greps this host's
+> edge log for the marker. At this point DNS still answers with the OLD host, so the probe
+> reaches that one while the grep reads this one: the marker can never appear, and the check
+> fails for a reason that has nothing to do with the new host. It was listed here until
+> 2026-09-21, and it would have gone red inside the window — the worst possible moment to teach
+> an operator that a red check can be ignored. It runs in §1.10, after the names move, where it
+> means what it says.
 
 > [!warning] A unit the bundle has just created is ENABLED and not RUNNING
 > `WantedBy=default.target` pulls a unit in when the target is ACTIVATED — at boot, or at the
