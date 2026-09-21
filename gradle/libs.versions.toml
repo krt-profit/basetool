@@ -57,7 +57,19 @@ testcontainers = "2.0.5"
 # and Databricks fixes and Snowflake-Postgres recognition on databases it does not target.
 # `flyway-core` and `flyway-database-postgresql` carry no behaviour change, no deprecation and no
 # breaking change; verified by running the migration tests, not on the notes alone.
-flyway = "13.6.0"
+# 13.7.0 (2026-09-15): the same shape as 13.6.0 -- every item in it is surface this repo does not
+# use, and it is taken to keep the drift small rather than for anything it fixes. Both new features
+# are Flyway MCP: a Test Migrate tool running pending scripts against a shadow database, and a
+# 3-sided diff that checkpoints the schema model before updating. The bug fixes are drift results
+# not reaching Flyway Pipelines when `publishResult` was off, dry runs not publishing migrate events
+# as deployments, long configuration values breaking the debug configuration table's layout, and
+# `generate`d migration filenames switching from the local timezone to UTC -- this repo hand-numbers
+# its own `V<n>__*.sql` files (see db/migration/README.md) and never runs `generate`. The Snowflake
+# fix is for legacy driver classes on a database this project does not target, the couchbase and
+# databricks-jdbc bumps are for drivers not on this classpath, RgCompare is the schema-comparison
+# engine behind `flyway check`, and "remove unnecessary executable files from JRE package" is the
+# CLI distribution's bundled JRE, not a Maven artifact at all.
+flyway = "13.7.0"
 # Held at 1.6.3 on purpose: the only newer builds refreshVersions sees are 1.7.0 BETAS. The markers
 # below are left in place so the next sweep does not have to re-derive that — clear them when 1.7.0
 # goes final, not before.
@@ -67,7 +79,22 @@ mapstruct = "1.6.3"
 # Stay on 1.6.x stable; only the 1.7.0 betas (Beta1, Beta2) are available upstream as
 # of 2026-06 — no 1.7.0 final yet.
 resilience4j = "2.4.0"
-bucket4j = "8.19.0"
+# 8.20.0 (2026-09-17): three of its commits touch `bucket4j_jdk17-core` and none of them is
+# reachable from here, because both consumers build LOCAL buckets only -- `Bucket.builder()` with
+# `Bandwidth`, drained through `tryConsume` / `tryConsumeAndReturnRemaining`, with no `ProxyManager`,
+# no `asBlocking()` and no request timeout anywhere. The advertised stack-trace suppression is on
+# exactly two exceptions: `BucketExceptions.maxRetriesExceeded`, thrown when a DISTRIBUTED CAS retry
+# strategy gives up, and `TimeoutException`, thrown when a blocking or async consume's request
+# timeout expires. The `IllegalArgumentException`s a bad `basetool.rate-limit.*` value raises while
+# building a bandwidth at startup are untouched and keep their stack traces -- that was the one thing
+# worth checking, because a startup failure without a trace is much harder to place. The other two
+# core commits are an argument check in `AbstractProxyManagerBuilder` and a new, additive
+# `RetryStrategies.exponentialBackoffWithJitter`, both distributed-only. Everything else in the
+# release lives in modules this repo does not depend on -- Lettuce/Redis sentinel support, a MySQL
+# gap-lock deadlock fix, Gemfire/Geode support -- and the Postgres, MariaDB and jackson-databind
+# bumps are in the parent POM and its tests: `bucket4j_jdk17-core` declares no dependencies at all,
+# so nothing can arrive here transitively.
+bucket4j = "8.20.0"
 semver4j = "6.0.0"
 logstashLogback = "9.0"
 archunit = "1.5.0"
@@ -80,7 +107,22 @@ archunit = "1.5.0"
 # false` in prod on top.
 springdocOpenapi = "3.1.1"
 okhttp3 = "5.5.0"
-playwright = "1.62.0"
+# 1.63.0 (2026-09-14): its two behaviour changes reach nothing here. `frameLocator()` called without
+# a selector now searches the whole frame subtree instead of requiring the iframe to be located
+# first, and `:visible` is deprecated in favour of a new `Locator.visible()` -- neither `frameLocator`
+# nor `:visible` appears anywhere in the `e2e` source set, which was checked rather than assumed.
+# The release documents no breaking changes and no other deprecation; the rest is additive (aria and
+# screen snapshots in traces, `httpCredentials` as a list, an `opfs` storage-state option,
+# `onDialogClosed`, the `--no-remove` and `--http-credentials` CLI flags) or packaging: the public
+# API gains JSpecify `@NullMarked` and with it a compile dependency on `org.jspecify:jspecify`, which
+# changes the resolved `e2e` classpath by nothing -- 1.0.1 was already on it through
+# `micrometer-observation`, and nothing in this repo runs NullAway, so the annotations are inert
+# here. It also gains an `Automatic-Module-Name` this non-modular build ignores. Dropping Ubuntu
+# 20.04 is moot -- CI runs `ubuntu-latest`. The bundled browsers move to Chromium 153 / Firefox 155 /
+# WebKit 26.6, which `playwrightInstall` re-downloads on the next run because e2e.yml keys its
+# browser cache on the hash of THIS file. `axe-core:playwright` still asks for 1.60.0 and is still
+# resolved up to whatever is pinned here, exactly as it was at 1.62.0.
+playwright = "1.63.0"
 axeCorePlaywright = "4.13.0"
 jetbrainsAnnotations = "26.1.0"
 lombokMapstructBinding = "0.2.0"
@@ -129,7 +171,20 @@ junit = "6.1.3"
 # EQUAL to the Boot-managed version: two Lombok versions in one repo means two readings of
 # `lombok.config`, which is a single shared file at the repo root. Verify after a Boot bump with
 # `./gradlew :backend:dependencyInsight --configuration compileClasspath --dependency org.projectlombok:lombok`.
+# refreshVersions proposes **1.18.48** (published 2026-09-01) and it is REFUSED for that equality
+# rule alone, not for anything in the release: Boot 4.1.1 still manages 1.18.46, re-verified with the
+# command above on 2026-09-21. Taking it would put 1.18.48 on keycloak-spi and 1.18.46 on every other
+# module, which is the two-readings-of-`lombok.config` split this pin exists to prevent. The marker
+# below stays so the next sweep does not re-derive this -- clear it together with the Boot bump that
+# moves the managed version, not before.
 lombok = "1.18.46"
+##  ⬆ = "1.18.48"
+# Mockito for the keycloak-spi module ONLY, for the same reason as `junit` and `lombok` above: no
+# Spring Boot dependency management to supply a version. It sat hardcoded in
+# `keycloak-spi/build.gradle.kts` until 2026-09-21, where `./gradlew refreshVersions` could not see
+# it and reported it as a dependency "that might have hardcoded versions" on every sweep. Moved here
+# at the same version, so the next sweep annotates it like everything else.
+mockito = "5.23.0"
 
 [libraries]
 
@@ -170,4 +225,6 @@ keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
