@@ -1832,7 +1832,7 @@ services:
   # ===========================================================================
   edge:
     profiles: ["prod"]
-    image: nginxinc/nginx-unprivileged:1.31.5-alpine@sha256:19c132c9ab02d3b783f478743dafc7a7f42e27aa7d2bdcbec1bb1128ca8f2a07
+    image: nginxinc/nginx-unprivileged:1.31.6-alpine@sha256:e75f89810bf5bfbcf58a1cfb32a1a11de55b7623d732e67735d513b720d7436a
     container_name: edge
     restart: unless-stopped
     logging: *default-logging
@@ -1958,7 +1958,7 @@ services:
   # ===========================================================================
   acme:
     profiles: ["prod"]
-    image: goacme/lego:v5.4.1@sha256:ac04a7aaac0270ca2c32f1e79b157087d763e78c4473551c6e093070614536e2
+    image: goacme/lego:v5.5.1@sha256:9c446e8ce05155f87475ce87392a5c55472a7ecd06e244752f762d2f4b162e8d
     container_name: acme
     restart: unless-stopped
     logging: *default-logging
