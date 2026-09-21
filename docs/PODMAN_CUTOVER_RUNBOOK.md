@@ -357,9 +357,15 @@ sudo -u deploy test -r /etc/iri/backup.env && echo readable
 > zeros are the drill confirming, independently and on the target, what reading the deployed
 > `backup.sh` had already shown — they are the reason §1.6 carries commands rather than a bullet.
 >
-> **They will keep `RestoreDrillArtifactNotRestorable` firing on this host until the carry happens,
-> and that is the point.** It is a standing reminder with the artifact name in its label, not noise
-> to silence.
+> **The carry has since happened (§1.6, 2026-09-21) and these three still read `0` — correctly.**
+> `check_artifact` searches the *restored snapshot*, not the host: putting the files on the machine
+> cannot change what a snapshot taken by the old host contains. This was asserted the other way
+> round first, on this page and in chat, and it is worth being blunt about because the mistake sends
+> somebody to investigate a correct alert: **the carry fixes the HOST, the new host's first own
+> backup fixes the BACKUP, and the drill only ever reports on the second.**
+>
+> So `RestoreDrillArtifactNotRestorable` keeps firing here until §1.11 runs — a standing reminder
+> with the artifact name in its label, not noise to silence.
 
 
 Not "the scripts exist" — one real run each. The plan is explicit that a week of production without
@@ -563,6 +569,30 @@ Table-by-table row counts · Flyway count and latest version · realm users, cli
 Any difference stops the cutover; the old host is still serving.
 
 ### 1.6 Carry what a restore does not
+
+> [!note] Done on `rocky-16gb-nbg1-1` on 2026-09-21 — all three carried and verified
+> This section was written to be run inside the window. Everything in it that does not require the
+> old host to be quiesced has already been done, which makes the window shorter; the commands stay
+> because they are also the rollback and the rebuild path.
+>
+> | carried | verified |
+> | --- | --- |
+> | `edge-certs` | five vhost dirs, every `privkey.pem` `100100:100100 600` |
+> | `edge-acme-state` | the lego account and `certificates/profit-base.online.{json,crt,key,issuer.crt}` |
+> | `users.acl` | `root:root 644`, 310 bytes, `grep -c '^user default '` = **1** |
+>
+> Quadlet adopts them rather than shadowing them: `render_volume()` emits `VolumeName=edge-certs`,
+> so the `.volume` unit binds the volume of that name instead of creating `systemd-edge-certs`
+> beside it. Read from the generator, not assumed.
+>
+> **The first attempt failed exactly as the warning below predicts, in the half it does not cover.**
+> The two archives were staged `root:root 600`; `podman unshare tar` runs as the namespaced service
+> user, and every entry came back `Cannot open: Permission denied`. `chown iri:iri` on the staging
+> files fixed it. The warning names the *destination* — the **source archive has to be readable in
+> the namespace too**, and that is the same rule seen from the other end.
+>
+> Still time-bound: the old host keeps renewing these until it is shut down, so a cutover more than
+> a few weeks out re-copies them. All five certificates expire 81 days from 2026-09-21.
 
 - **Certificates and the ACME account**, seeded from the old host rather than re-issued. Let's
   Encrypt allows five duplicate certificates per week for this SAN set; a re-issue during a cutover
@@ -833,6 +863,40 @@ the host back is a boot, and the boot re-arms it.
 > With its deploy timer stopped the old host keeps the bundle it already has and none of this
 > reaches it — which is exactly why the timer stays stopped, and why "bring the old one back" is a
 > complete answer. Bringing it back on a NEWER bundle is not a rollback path and never was.
+
+### 1.11 The first backup on the NEW host — the step that closes the three zeros
+
+§1.6 put the certificates, the ACME account and the redis ACL **on the machine**. It did not put
+them **in a backup**. Every snapshot in the repository at cutover time was written by the old host,
+whose deployed `backup.sh` captures none of the three (§1.6, measured), and `restore-drill.sh`
+reports on what a *restored snapshot* contains. So the drill goes on printing
+`edge_certs=0 acme_state=0 redis_acl=0` — truthfully — until this host has taken one of its own.
+
+> [!danger] Do not skip this because the alert is "already firing"
+> That is precisely the trap. A genuinely broken first backup raises the same alert, with the same
+> labels, in the same state it has been in since before the cutover. Until this gate passes, the
+> three artifacts exist in exactly one place — the new host's disk — and §2 is still the way back.
+
+```bash
+systemctl start iri-backup.service && journalctl -u iri-backup.service -n 40 --no-pager
+```
+
+The log must name all three: `edge-certs: captured`, `edge-acme-state: captured`, and
+`capturing the redis ACL (/var/iri/redis/users.acl)`. `edge-acme-webroot` is created by the edge on
+its first start; a `not present on this host — skipped` for that one is expected, and it is not one
+of the seven.
+
+Then the drill against that snapshot — through its unit, so it runs as `deploy` with the unit's
+environment rather than an ad-hoc shell's:
+
+```bash
+systemctl start iri-restore-drill.service && journalctl -u iri-restore-drill.service -n 60 --no-pager
+grep basetool_restore_drill_artifact_ok /var/iri/monitoring/textfile/restore_drill.prom
+```
+
+**All seven must read `1`**, and `RestoreDrillArtifactNotRestorable` must clear on the next
+evaluation. A zero here after a successful backup means the capture and the restore disagree about
+a path, which is the one failure mode neither half can see on its own.
 
 ---
 
