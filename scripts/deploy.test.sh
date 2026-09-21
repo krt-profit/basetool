@@ -1337,6 +1337,59 @@ scenario_token_expiry_metric() {
 }
 
 # ---------------------------------------------------------------------------
+# Scenario 16b: deleting the expiry file is the DOCUMENTED action when the PAT
+# turns out not to expire, and it has to actually silence the gauge. Until
+# 2026-09-20 write_token_expiry_metric returned early on an absent file without
+# removing ghcr-token.prom, so node_exporter kept serving the last recorded
+# timestamp and GhcrPullTokenExpired fired critical forever -- for following the
+# alert's own instructions. Both no-expiry shapes are covered: the file removed,
+# and the file emptied.
+# ---------------------------------------------------------------------------
+scenario_token_expiry_removed_clears_the_gauge() {
+  echo "Scenario: removing the expiry file removes the gauge"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  write_marker "${MARKER}"
+
+  # First a tick WITH an expiry, so there is something to clear.
+  printf '2026-10-01\n' > "${T_TOKEN}.expiry"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick that records an expiry exits 0"
+  if grep -q '^basetool_ghcr_token_expiry_timestamp [1-9]' \
+       "${T_STATE_DIR}/textfile/ghcr-token.prom" 2>/dev/null; then
+    record 1 "the gauge exists before the expiry file is removed"
+  else
+    record 0 "the gauge exists before the expiry file is removed"
+  fi
+
+  # Now the operator learns the PAT does not expire and deletes the sidecar.
+  rm -f "${T_TOKEN}.expiry"
+  rc=0
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick after removing the expiry file exits 0"
+  if [[ -e "${T_STATE_DIR}/textfile/ghcr-token.prom" ]]; then
+    record 0 "the gauge file is gone once no expiry is recorded"
+  else
+    record 1 "the gauge file is gone once no expiry is recorded"
+  fi
+
+  # An EMPTY file is the same statement and must behave the same way.
+  : > "${T_TOKEN}.expiry"
+  rc=0
+  run_deploy -- "${fake[@]}" || rc=$?
+  assert_exit 0 "$rc" "the tick with an empty expiry file exits 0"
+  if [[ -e "${T_STATE_DIR}/textfile/ghcr-token.prom" ]]; then
+    record 0 "an empty expiry file leaves no gauge behind either"
+  else
+    record 1 "an empty expiry file leaves no gauge behind either"
+  fi
+
+  rm -rf "${tmp}"
+}
+
+# ---------------------------------------------------------------------------
 # Scenario 17: a --force apply of a gated stateful-infra change whose health gate
 # FAILS must leave the config-blocked marker in place (it is cleared only on a
 # SUCCESSFUL apply), so the next automatic tick quietly skips instead of
@@ -1686,6 +1739,7 @@ scenario_config_mirror_ignores_caller_umask
 scenario_edge_reloads_a_renewed_certificate
 scenario_infra_digest_refresh_is_not_gated
 scenario_token_expiry_metric
+scenario_token_expiry_removed_clears_the_gauge
 scenario_forced_gated_rollback_keeps_marker
 scenario_config_bundle_secret_rejected
 scenario_check_only_noop_verifies

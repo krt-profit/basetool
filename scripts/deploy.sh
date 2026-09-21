@@ -1171,18 +1171,37 @@ TOKEN_EXPIRY_FILE="${IRI_GHCR_TOKEN_EXPIRY_FILE:-${TOKEN_FILE}.expiry}"
 TOKEN_METRIC_FILE="${TEXTFILE_DIR}/ghcr-token.prom"
 
 # Emit basetool_ghcr_token_expiry_timestamp from the operator-recorded expiry
-# date. Best-effort and opt-in: absent file → no metric, and the alert does NOT
-# fire on absence (a non-expiring token is a valid, un-alerted state);
-# unparseable → a WARN; never fails the deploy. Called on EVERY tick, including
-# the idempotence no-op, so the gauge does not go stale.
+# date. Best-effort and opt-in: no expiry recorded → NO METRIC, and the alert does
+# not fire on absence (a non-expiring token is a valid, un-alerted state);
+# never fails the deploy. Called on EVERY tick, including the idempotence no-op,
+# so the gauge does not go stale.
+#
+# "No metric" has to mean REMOVING one that is already there, and that is a fix
+# rather than a nicety (2026-09-20). This used to `return 0` on an absent file,
+# which is correct only on a host that never recorded an expiry. On a host where
+# one WAS recorded and was then correctly deleted -- the documented action when
+# the PAT turns out to be non-expiring -- the old ghcr-token.prom stayed on disk,
+# node_exporter kept serving the stale timestamp, and GhcrPullTokenExpired fired
+# CRITICAL forever for doing exactly what the alert's own description asks.
+#
+# An UNPARSEABLE date removes it too. A typo'd date is not a reason to keep
+# asserting the previous one: "no claim" is recoverable, a stale claim is a
+# permanent critical that looks like a real one. The WARN is what says so.
 write_token_expiry_metric() {
   local raw epoch tmp
-  [[ -f "${TOKEN_EXPIRY_FILE}" ]] || return 0
+  if [[ ! -f "${TOKEN_EXPIRY_FILE}" ]]; then
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
+    return 0
+  fi
   raw="$(tr -d '[:space:]' < "${TOKEN_EXPIRY_FILE}" 2>/dev/null || true)"
-  [[ -n "${raw}" ]] || return 0
+  if [[ -z "${raw}" ]]; then
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
+    return 0
+  fi
   epoch="$(date -u -d "${raw}" +%s 2>/dev/null || true)"
   if ! [[ "${epoch}" =~ ^[0-9]+$ ]]; then
-    log "WARN: could not parse GHCR token expiry '${raw}' from ${TOKEN_EXPIRY_FILE}"
+    log "WARN: could not parse GHCR token expiry '${raw}' from ${TOKEN_EXPIRY_FILE}; removing the metric rather than leaving the previous value asserted"
+    rm -f "${TOKEN_METRIC_FILE}" 2>/dev/null || true
     return 0
   fi
   install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true

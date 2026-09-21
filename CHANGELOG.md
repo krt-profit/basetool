@@ -93,6 +93,8 @@
   SSH- und auditd-Überwachung, die Anwendungs-Logs und das Zugriffsprotokoll des Edge blind. Behoben
   und auf dem Testing-Host nachgewiesen (REQ-OBS-019).
 
+- **Betrieb: das Löschen des Token-Ablaufdatums wirkt jetzt auch.** Ein Zugangstoken ohne Ablauf soll keine Ablaufdatei haben — genau das hatte der Deploy bisher nicht umgesetzt: die alte Kennzahl blieb liegen und der kritische Alarm feuerte dauerhaft dafür, dass man seiner eigenen Anweisung gefolgt war. Die Kennzahl wird jetzt entfernt, auch bei leerer oder unlesbarer Datei.
+
 - **Betrieb: ein toter Trace-Pfad fällt jetzt auf.** Die einzige Regel, die ihn beobachtete,
   benutzte „es kamen schon einmal Spans an" als Ersatz für „Tracing ist eingeschaltet" — und konnte
   deshalb einen Pfad, der noch nie funktioniert hat, gar nicht melden. Die Anwendungen melden ihren
