@@ -50,10 +50,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // carrying the active page/size/search from the address bar so the write does not bounce the
     // user back to page 0 or drop the filter (REQ-HANGAR-002). The pagination/search swaps keep
     // the address bar in sync (history:true), so window.location.search is the live state.
+    // The address-bar state is appended strictly AFTER the `?`, re-serialised through
+    // URLSearchParams, so it can only ever be this page's query and never its path: the URL is
+    // same-origin `/hangar` whatever the address bar holds (CodeQL js/client-side-request-forgery).
     function reswapHangar() {
         if (window.krtFetch) {
+            const query = new URLSearchParams(window.location.search).toString();
             window.krtFetch.swap({
-                url: '/hangar' + window.location.search,
+                url: '/hangar?' + query,
                 container: '#hangar-results',
                 history: false,
             });

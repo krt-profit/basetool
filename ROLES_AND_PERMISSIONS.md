@@ -381,10 +381,10 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 |:-----------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Be logged in (`isAuthenticated()`)                                                 |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`)            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Own settings: description, payout preference, blueprint sharing, announcement read-marker, pickable org units, capabilities (`/users/me/**`, `/me/**`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Own settings: description, payout preference, blueprint sharing, announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream (`/notifications/**`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; `/lookup`, `/search-bank` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted below Logistician, and `/{id}` of a member of a foreign Staffel always peer-redacted for a non-admin; the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 

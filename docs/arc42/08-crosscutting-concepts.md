@@ -40,7 +40,10 @@ Authority: [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (`REQ-ORG-*`).
 
 Flyway owns the schema; Hibernate runs `ddl-auto=validate` in **every** profile, including tests, so
 a drift between entity and column fails at start-up rather than at runtime. Seeding is explicit
-(`DataInitializer`). N+1 queries are treated as defects.
+(`DataInitializer`). N+1 queries are treated as defects, and three things fail the build on the
+common shapes of one: statement-count tests over the hot reads, Hibernate refusing a paged query it
+would have to page in memory, and a catalogue sweep that rejects any foreign key without a leading
+index.
 
 Authority: [`data-persistence.md`](../specs/data-persistence.md) (`REQ-DATA-*`),
 [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md).

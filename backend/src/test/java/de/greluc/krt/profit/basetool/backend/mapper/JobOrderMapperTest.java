@@ -83,6 +83,8 @@ class JobOrderMapperTest {
         handoverMapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));
 
     ReflectionTestUtils.setField(mapper, "userMapper", userMapper);
+    // The Bearbeiter-list primer (REQ-DATA-003) seeds the same UserMapper's request memo.
+    ReflectionTestUtils.setField(mapper, "assigneeUserMapper", userMapper);
     ReflectionTestUtils.setField(mapper, "materialMapper", materialMapper);
     ReflectionTestUtils.setField(mapper, "jobOrderHandoverMapper", handoverMapper);
     ReflectionTestUtils.setField(mapper, "squadronMapper", Mappers.getMapper(SquadronMapper.class));

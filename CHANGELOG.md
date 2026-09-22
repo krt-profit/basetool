@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Netty auf 4.2.18.Final angehoben (Sicherheitsupdate).** Schließt CVE-2026-89044 (Request
+  Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
+  Keine Funktionsänderung.
+
 - **Oberfläche: die letzten fest verdrahteten Texte kommen aus den Sprachdateien.** Die
   Terminal-Auswahl beim Ausbuchen, die Lagereintrag-Zeile und der Dateiname des
   Übergabeprotokolls im Auftrag, die Titel des Spezialkommando-Dialogs und der ADMIN-Hinweis
@@ -49,6 +53,15 @@
   Deploy-Timer eine Stunde lang nichts prüft.
 
 ### Changed
+
+- **Schnellere Einsatz-Details, Nutzerlisten und Personenauswahl.** Mitglieder in Teilnehmerlisten,
+  Bearbeiter-Listen und Nutzerseiten werden gesammelt statt einzeln geladen; ein 30-köpfiger Einsatz
+  braucht so viele Datenbankabfragen wie ein 5-köpfiger. Die Personenauswahl lädt pro Tastendruck nur
+  noch Name und Rang statt vollständiger Profile, Bearbeiter-Änderungen an Aufträgen laden keine
+  Mitgliederliste mehr (REQ-DATA-003, REQ-API-012).
+
+- **Datenbank: jeder Fremdschlüssel hat einen Index** (`V245`, 38 neue Indizes); ein neuer Test
+  verhindert, dass wieder einer ohne ausgeliefert wird (REQ-DATA-017).
 
 - **Anmeldung: Das Sitzungs-Cookie heißt jetzt `__Host-SESSION`.** Der Browser nimmt es damit nur
   über HTTPS und nur für genau diese Adresse an, keine andere Seite kann es setzen oder überschreiben.

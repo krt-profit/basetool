@@ -262,7 +262,7 @@ class MissionServiceTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(participantTargetResolver.resolve(null, "TestUser", "Participant name is ambiguous."))
         .thenReturn(new ParticipantTargetResolver.ParticipantTarget(userId, null));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(existingUser));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(existingUser));
     // The resolved user has no memberships, so the participant gets no org-unit affiliation —
     // there is deliberately no IRIDIUM fallback anymore.
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
@@ -293,7 +293,7 @@ class MissionServiceTest {
     user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
@@ -319,7 +319,7 @@ class MissionServiceTest {
     // defaultPayoutPreference deliberately left null — the user never opted in.
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result = missionService.addParticipant(missionId, userId, null, null, "No comment");
@@ -345,7 +345,7 @@ class MissionServiceTest {
     user.setDefaultPayoutPreference(PayoutPreference.DONATE);
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(orgUnitMembershipQueryService.findAllMembershipsForUser(userId)).thenReturn(List.of());
 
     Mission result =

@@ -121,10 +121,21 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
+    // The exempt paths first, as a guard of their own: they pass for everyone, so no identity or
+    // consent question is asked for them at all. This is the same verdict the former single
+    // expression `isTestProfile() || isExempt(...) || ...` reached — both predicates are pure, so
+    // their order changes nothing — but spelled as an early exit it states that the path decides
+    // ALONE here, which CodeQL's java/user-controlled-bypass could not see through the OR chain and
+    // flagged as a request-path-controlled skip of the authentication check (alert #1126). The
+    // exemption list is the shared, decode-aware PublicPaths set (REQ-SEC-029), and the backend's
+    // own consent filter still enforces REQ-SEC-028 on every API call behind these pages.
+    if (isExempt(request)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
     boolean mayProceed;
     try {
-      mayProceed =
-          isTestProfile() || isExempt(request) || !isAuthenticated() || hasAccepted(request);
+      mayProceed = isTestProfile() || !isAuthenticated() || hasAccepted(request);
     } catch (ReauthenticationRequiredException e) {
       // An exception thrown from a SERVLET FILTER never reaches @ExceptionHandler — that advice
       // only sees exceptions raised during controller handling. So the redirect

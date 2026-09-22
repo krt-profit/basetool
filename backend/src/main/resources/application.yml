@@ -126,6 +126,12 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
+        # REQ-DATA-003: a paged query that fetch-joins a collection (an @EntityGraph or JOIN FETCH
+        # over a @OneToMany / @ManyToMany) cannot use SQL OFFSET/LIMIT, so Hibernate would load
+        # every matching row and page in memory (HHH90003004). Fail the query instead, so such a
+        # finder never ships; collections on a page batch-load under default_batch_fetch_size.
+        query:
+          fail_on_pagination_over_collection_fetch: true
       # SEC-03: global statement-execution backstop. Every Hibernate-issued query (JPQL, derived,
       # @Query incl. native, @Modifying, pessimistic-lock waits) is bounded to this many
       # milliseconds, so a single heavy request -- e.g. a size=100000 load-all of the material

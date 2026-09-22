@@ -145,10 +145,11 @@
     netty-codec-http3 4.2.0.Alpha1 - 4.2.12 (fixed 4.2.13.Final). The
     netty 4.1.x line does not contain the HTTP/3 codec at all - it lives
     in the 4.2+ line - so ANY 4.1.x jar is outside the affected range;
-    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.136.Final
-    jars additionally sit only on the keycloak-spi compile classpath
-    (Keycloak server internals, container-provided at runtime); the app
-    modules resolve netty 4.2.17.Final, which is above the fixed version.
+    the broad cpe:2.3:a:netty:netty match flags them anyway. Our 4.1.x jars
+    (4.1.138.Final since the 2026-09-22 `netty41` floor) additionally sit only
+    on the keycloak-spi compile/test classpaths (Keycloak server internals,
+    container-provided at runtime); the app modules resolve netty 4.2.18.Final,
+    which is above the fixed version.
   -->
   <suppress>
     <notes>False positive: CPE confusion. CVE-2026-42582 affects netty-codec-http3 in the 4.2.0-4.2.12 range; the netty 4.1.x line ships no HTTP/3 codec, and these jars are Keycloak-container-provided compile-time deps anyway.</notes>
@@ -157,34 +158,13 @@
   </suppress>
 
   <!--
-    CVE-2026-62380 is a REAL netty CVE, not a CPE mismatch: the SOCKS4/SOCKS5 client encoders
-    (Socks4ClientEncoder / Socks5ClientEncoder) do not validate the domain address and the
-    username/password fields, so an attacker controlling them can inject NUL or CRLF and smuggle
-    a second SOCKS request. Affected: 4.2.0.Final - 4.2.16.Final and the whole 4.1.x line up to
-    and including 4.1.136.Final; fixed in 4.2.17.Final and 4.1.137.Final.
-
-    It is suppressed because it reaches nothing we deploy, on the same build-time-only ground as
-    the protobuf-java and vert.x entries below - NOT because we chose to live with it.
-    Re-verified 2026-09-17 against Keycloak 26.7.4 over the keycloak-spi compileClasspath:
-    every netty 4.1.136.Final jar arrives as a compileOnly transitive of keycloak-services 26.7.4
-    -> quarkus-vertx/quarkus-netty 3.33.3.2, on the keycloak-spi compile classpath alone. 26.7.4
-    moved Quarkus 3.33.3.1 -> 3.33.3.2 and netty did NOT follow it: still 4.1.136.Final, so this
-    entry stays load-bearing rather than lapsing. The SPI
-    ships a plain provider JAR with no bundled dependencies and runs inside the Keycloak container,
-    which supplies its own netty. Meanwhile `:backend:`, `:frontend:` and `:ingest:` runtimeClasspath
-    all resolve netty 4.2.17.Final from the Boot 4.1.1 BOM - already at the fixed version - so no
-    shipped artifact carries a vulnerable encoder, and no basetool code opens a SOCKS proxy anyway.
-
-    Deliberately matched on the whole 4.1.x line rather than pinned to 4.1.136.Final: a Keycloak
-    bump that moves Quarkus onto 4.1.137.Final or later leaves the CVE outside its affected range,
-    so the finding disappears on its own and the entry lapses without silently masking anything.
-    Any netty on a REAL runtime classpath is a 4.2.x coordinate and is untouched by this pattern.
+    The CVE-2026-62380 entry (netty SOCKS4/SOCKS5 client-encoder injection, fixed in 4.1.137.Final)
+    that stood here was deleted on 2026-09-22: the keycloak-spi module now imports a netty 4.1.x BOM
+    floor (`netty41` in gradle/libs.versions.toml), so its compile and test classpaths resolve
+    4.1.138.Final - above that fix, and above the fixes for CVE-2026-75595/75596 (4.1.137.Final) and
+    CVE-2026-89044 (4.1.138.Final) that the same 4.1.136.Final jars had picked up since. Upgraded
+    rather than suppressed, so there is nothing left to suppress.
   -->
-  <suppress>
-    <notes>Build-time-only: CVE-2026-62380 (SOCKS4/SOCKS5 client-encoder NUL/CRLF/credential injection, fixed in 4.1.137.Final / 4.2.17.Final) is real, but our netty 4.1.136.Final jars exist only as compileOnly transitives of keycloak-services 26.7.4 (via Quarkus) on the keycloak-spi module. They are container-provided by Keycloak at runtime and absent from every basetool runtime classpath, all of which resolve netty 4.2.17.Final - above the fix (verified 2026-09-17).</notes>
-    <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@4\.1\..*$</packageUrl>
-    <cve>CVE-2026-62380</cve>
-  </suppress>
 
   <!--
     CVE-2024-7254 (unbounded recursion -> StackOverflowError when parsing

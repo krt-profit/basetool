@@ -126,7 +126,9 @@ class LiveSyncRelayServiceTest {
     // global room's re-fetch fan-out, which is exactly what ADR-0094 sized the second bucket for.
     long accepted = 0;
     long attempts = LiveSyncRelayService.TOPIC_BURST + 40;
-    for (int i = 0; i < attempts; i++) {
+    // `long`, like `attempts`: an `int` counter compared against a `long` bound is the shape that
+    // can wrap before it reaches the bound (CodeQL java/comparison-with-wider-type).
+    for (long i = 0; i < attempts; i++) {
       UUID publisher = new UUID(0L, i);
       if (service.publishFromClient(publisher, INVENTORY, List.of("stock"))
           == LiveSyncRelayService.Outcome.ACCEPTED) {

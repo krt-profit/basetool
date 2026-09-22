@@ -26,9 +26,11 @@ import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.support.StockViewerAccess;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -49,6 +51,13 @@ public abstract class JobOrderMapper {
   // shape as MissionMapper. Depends only on the support-package leaf interface, never on the
   // service layer or SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
   @org.springframework.beans.factory.annotation.Autowired protected StockViewerAccess stockAccess;
+
+  /**
+   * The same {@link UserMapper} the generated subclass maps each assignee's {@code UserDto} with,
+   * injected under its own name so {@link #mapAndSortAssignees(Set)} can seed its request memo for
+   * the whole Bearbeiter list first.
+   */
+  @org.springframework.beans.factory.annotation.Autowired protected UserMapper assigneeUserMapper;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one job order.
@@ -112,6 +121,23 @@ public abstract class JobOrderMapper {
   public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
 
   /**
+   * Seeds the {@link UserMapper} request memo for the Bearbeiter of a whole page of orders at once,
+   * so mapping the page costs two membership/Staffel queries in total rather than two per order
+   * (REQ-DATA-003). Call it before mapping the page; {@link #mapAndSortAssignees(Set)} then finds
+   * every assignee already memoised.
+   *
+   * @param orders the orders about to be mapped; never {@code null}.
+   */
+  public void primeAssignees(@NotNull Collection<JobOrder> orders) {
+    assigneeUserMapper.primeStaffelMemberships(
+        orders.stream()
+            .filter(o -> o.getAssignees() != null)
+            .flatMap(o -> o.getAssignees().stream())
+            .map(JobOrderAssignee::getUser)
+            .toList());
+  }
+
+  /**
    * Maps a set of {@link JobOrderAssignee} edges into a DTO list sorted by the assignee's effective
    * name (case-insensitive), so the Bearbeiter list renders in a stable order across reloads and
    * fragment refreshes.
@@ -124,6 +150,10 @@ public abstract class JobOrderMapper {
     if (assignees == null) {
       return null;
     }
+    // One membership query + one Staffel load for the whole Bearbeiter list instead of up to three
+    // queries per assignee (REQ-DATA-003).
+    assigneeUserMapper.primeStaffelMemberships(
+        assignees.stream().map(JobOrderAssignee::getUser).toList());
     return assignees.stream()
         .map(this::toDto)
         .sorted(

@@ -192,7 +192,7 @@ class InventoryAggregationServiceTest {
     @Test
     void myItemStacks_unknownUser_throwsNotFound_withoutQuerying() {
       UUID userId = UUID.randomUUID();
-      when(userRepository.findById(userId)).thenReturn(Optional.empty());
+      when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class,
@@ -333,7 +333,7 @@ class InventoryAggregationServiceTest {
     @Test
     void myEntryIds_unknownUser_throwsNotFound_withoutQuerying() {
       UUID userId = UUID.randomUUID();
-      when(userRepository.findById(userId)).thenReturn(Optional.empty());
+      when(userRepository.findPlainById(userId)).thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class,
@@ -650,7 +650,7 @@ class InventoryAggregationServiceTest {
   private void stubUser(UUID userId) {
     User user = new User();
     user.setId(userId);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
   }
 
   /** Stubs the owner-scoped item stack query to return no stacks (filter-routing verifications). */
