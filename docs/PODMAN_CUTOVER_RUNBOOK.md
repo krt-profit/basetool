@@ -524,7 +524,33 @@ restic restore <snapshot-id> --target /var/iri/backup/restore
 #      realm-export.json -> /var/iri/code/
 #      providers.tar.gz  -> extract into /var/iri/code/keycloak/
 # The keystore's mode and ACL are re-applied by hand; restic does not carry POSIX ACLs.
+# THE VALUES CHANGE UNDER ROOTLESS -- do not copy the old host's. See the box below.
 ```
+
+> [!danger] The keystore's ownership and ACL must be TRANSLATED, not copied
+> Four containers bind-mount it — `backend`, `frontend`, `ingest` and `keycloak` — and they run as
+> **two different uids**. On the old Docker host that is `root:10001` mode `640` (for the three app
+> images, `USER 10001:10001`) **plus** a POSIX ACL `user:1000:r--` for Keycloak, which runs as 1000.
+> The ACL is not decoration: without it Keycloak cannot read its own keystore.
+>
+> Under rootless Podman every one of those uids is remapped (`subuid_base + N - 1`, base 100000),
+> so applying the old host's literal values yields four containers that cannot read the file. The
+> translated values, derived from the image `USER` lines and cross-checked against Grafana's
+> 472 → 100471:
+>
+> ```bash
+> chown root:110000    /var/iri/secrets/keystore.p12   # backend/frontend/ingest, gid 10001
+> chmod 640            /var/iri/secrets/keystore.p12
+> setfacl -m u:100999:r /var/iri/secrets/keystore.p12   # keycloak, uid 1000
+> restorecon -F        /var/iri/secrets/keystore.p12
+> ```
+>
+> Verify with `getfacl -p`: `group::r--`, `user:100999:r--` and a `mask::r--` that does not mask
+> them away. Done on `rocky-16gb-nbg1-1` 2026-09-22, and the file carried byte-identically
+> (sha256 matched the source).
+>
+> This box exists because the line above named the task without naming the values, and the values
+> are the whole difficulty.
 
 > The `npm.tar.gz` step in `backup.md` is **obsolete** — Nginx Proxy Manager was retired by
 > ADR-0162. `backup.sh` **in this repository** captures the edge's certificate volumes instead —
