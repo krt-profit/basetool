@@ -116,6 +116,16 @@ composition over the REQ-INV-026 merge helper), and is audited as
 null-tolerant window (null ⇒ legacy no-stock behaviour) closed when the modal's
 book-in section shipped.
 
+**On-behalf gate (2026-09-22, APPSEC-01).** The endpoint's own gate
+(`canEditJobOrder`) answers for the *order*, not for the member whose ledger receives
+the stock. An explicit `bookIn.ownerUserId` other than the caller therefore needs the
+same user-level gate as Einbuchen (REQ-SEC-005 / REQ-ORG-016,
+`OwnerScopeService.canManageUserInventory`), evaluated on the requested id **before**
+the owner lookup and before anything is loaded or consumed — so the refusal is no
+existence oracle — and a `personal = true` book-in on behalf of someone else is
+refused outright. Before this, a logistician could book produced stock into any
+member's ledger, another Staffel's and a private pool included.
+
 **Acceptance**
 
 - [ ] A production booking with `bookIn` creates (or merges into) the matching item
@@ -123,12 +133,18 @@ book-in section shipped.
   400.
 - [ ] A payload without `bookIn` (or without `bookIn.locationId`) is rejected as a
   400 validation error at the API boundary.
+- [ ] A `bookIn.ownerUserId` other than the caller whose inventory the caller may not
+  write (`canManageUserInventory` false — e.g. a member of another Staffel) → 403,
+  before the owner lookup and with no stock written; naming oneself needs no check.
+- [ ] `personal = true` on behalf of another member → 403, even when that member is in
+  the caller's scope.
 - [ ] Both audit events (`JOB_ORDER_PRODUCTION_BOOKED`,
   `INVENTORY_RECEIVED_FROM_PRODUCTION`) are written in the same transaction; the
   inventory event carries `jobOrderId`, `gameItemId`, `amount`, `locationId` keys.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` book-in cases,
-`JobOrderItemProductionCreateDtoValidationTest` · **Code:**
+`JobOrderItemProductionCreateDtoValidationTest`, `JobOrderProductionBookInSecurityTest`
+(the 403 through the HTTP chain) · **Code:**
 `JobOrderItemProductionService`, `JobOrderItemProductionCreateDto` · **Issues:** —
 
 ## Out of scope

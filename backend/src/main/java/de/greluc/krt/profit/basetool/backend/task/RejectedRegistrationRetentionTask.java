@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.backend.task;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.RejectedRegistrationRetentionService;
+import de.greluc.krt.profit.basetool.backend.support.RejectedRegistrationRetentionProperties;
 import jakarta.annotation.PostConstruct;
-import java.time.Duration;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -50,33 +50,25 @@ import org.springframework.stereotype.Component;
     havingValue = "true",
     matchIfMissing = true)
 @Slf4j
+@RequiredArgsConstructor
 public class RejectedRegistrationRetentionTask {
 
+  /** The service performing the per-registration purge. */
   private final RejectedRegistrationRetentionService retentionService;
+
+  /** The scheduled-job instrumentation wrapper. */
   private final TaskMetrics taskMetrics;
-  private final Duration maxAge;
 
   /**
-   * Creates the retention task.
-   *
-   * @param retentionService the service performing the per-registration purge
-   * @param taskMetrics the scheduled-job instrumentation wrapper
-   * @param maxAge how long a rejected registration is retained after the rejection before the sweep
-   *     removes it (ISO-8601 duration; default {@code P90D})
+   * The validated retention window (at least one day, BE-MOD-03); its {@code maxAge} sets the
+   * cutoff.
    */
-  public RejectedRegistrationRetentionTask(
-      RejectedRegistrationRetentionService retentionService,
-      TaskMetrics taskMetrics,
-      @Value("${app.registrations.rejected-retention.max-age:P90D}") Duration maxAge) {
-    this.retentionService = retentionService;
-    this.taskMetrics = taskMetrics;
-    this.maxAge = maxAge;
-  }
+  private final RejectedRegistrationRetentionProperties properties;
 
   /**
-   * Purges registrations rejected longer ago than {@link #maxAge}, publishing the {@code
-   * rejected_registration_retention} job metrics. A failure is recorded and swallowed by {@link
-   * TaskMetrics} so the scheduler thread survives.
+   * Purges registrations rejected longer ago than the configured {@code maxAge}, publishing the
+   * {@code rejected_registration_retention} job metrics. A failure is recorded and swallowed by
+   * {@link TaskMetrics} so the scheduler thread survives.
    */
   @Scheduled(fixedDelayString = "${app.registrations.rejected-retention.interval:PT24H}")
   public void purgeExpiredRejectedRegistrations() {
@@ -89,8 +81,10 @@ public class RejectedRegistrationRetentionTask {
    * @return the number of registrations purged this run (the {@code items} metric)
    */
   private int purgeExpired() {
-    log.info("Starting scheduled rejected-registration retention sweep (max age {})...", maxAge);
-    int purged = retentionService.purgeRejectedOlderThan(Instant.now().minus(maxAge));
+    log.info(
+        "Starting scheduled rejected-registration retention sweep (max age {})...",
+        properties.maxAge());
+    int purged = retentionService.purgeRejectedOlderThan(Instant.now().minus(properties.maxAge()));
     log.info("Rejected-registration retention sweep finished — {} registration(s) purged.", purged);
     return purged;
   }

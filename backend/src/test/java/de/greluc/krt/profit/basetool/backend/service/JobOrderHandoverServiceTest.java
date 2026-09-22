@@ -367,11 +367,12 @@ class JobOrderHandoverServiceTest {
         .thenReturn(Optional.of(inventoryItem));
 
     // When & Then — the cross-staffel pre-write guard (MULTI_SQUADRON_PLAN.md §4.4) now reads the
-    // job-order allocation and raises IllegalStateException when the item has no slice for this
-    // order — GlobalExceptionHandler maps it to 400 so the wire format is unchanged.
-    IllegalStateException ex =
-        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
-    assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
+    // job-order allocation and raises a BadRequestException (400, localized detail) when the item
+    // has no slice for this order — no longer a raw IllegalStateException, which is a 500 now
+    // (APPSEC-06).
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
   }
 
   @Test
@@ -577,11 +578,11 @@ class JobOrderHandoverServiceTest {
     when(inventoryItemRepository.findByIdForUpdate(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
 
-    // When & Then — plan §4.4 cross-staffel pre-write guard raises IllegalStateException
-    // (GlobalExceptionHandler maps it to HTTP 400).
-    IllegalStateException ex =
-        assertThrows(IllegalStateException.class, () -> service.createHandover(orderId, createDto));
-    assertTrue(ex.getMessage().contains("Inventory item does not belong to this JobOrder"));
+    // When & Then — plan §4.4 cross-staffel pre-write guard raises a BadRequestException (HTTP
+    // 400 with the localized detail, APPSEC-06).
+    BadRequestException ex =
+        assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
+    assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
   }
 
   @Test

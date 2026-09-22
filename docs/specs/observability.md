@@ -1469,7 +1469,10 @@ and a collector must not add a dependency to a box whose point is a fixed, audit
   `getRemoteAddr()`. It exists because the log line no longer carries the client IP (REQ-OBS-004),
   and a sudden swing from `forwarded` to `peer` is the signature of an edge/proxy-trust
   misconfiguration that would silently collapse every caller onto one bucket. The address itself
-  never becomes a label.
+  never becomes a label. The per-subject limiter (`SubjectRateLimitingFilter`, REQ-SEC-033) writes
+  the same two counters with the bounded values `bucket="subject"` (writes and stream connects) and,
+  since 2026-09-22, `bucket="subject_export"` (the export carve-out, APPSEC-10); both are covered by
+  the `by (application, bucket)` aggregation of `RateLimitRejectionRatioHigh` without a rule change.
 
 - `basetool_api_client_requests_total{client_id}` counter (`ApiClientMetricsFilter`, A8) — one per
   authenticated `/api/**` request, keyed on the token's `azp` and bounded by

@@ -384,12 +384,25 @@ app:
     # bound to a Keycloak identity and cannot be chosen by the caller. 120/min is roughly two writes
     # a second sustained: far above what a person clicking through the UI produces, far below what a
     # script does. Reads stay on the per-IP budget; they are cheap and are what a legitimate client
-    # hits most.
+    # hits most -- except the document-rendering exports, which get the `export` budget below.
     subject:
       enabled: true
       capacity: 120
       refillTokens: 120
       refillPeriod: 1m
+      # APPSEC-10 (owner decision 2026-09-22), the one read carve-out of REQ-SEC-033: every
+      # /api/** path with an `export`, `export.json`, `statement`, `report`, `pdf` or
+      # `three-month-report` segment renders a whole document (Art. 15 export, bank statement,
+      # audit export, handover report PDF), so it spends from a SEPARATE, much tighter per-account
+      # bucket. Ten a minute is far above a person clicking "download" and far below a loop.
+      # Separate from the write bucket above, so downloads never cost an account its writes.
+      # Overridable per host: APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY (tokens, also the refill
+      # amount) and APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD (an ISO-8601 or Boot duration).
+      export:
+        enabled: true
+        capacity: ${APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY:10}
+        refillTokens: ${APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY:10}
+        refillPeriod: ${APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD:1m}
     # Audit finding L-5 (2026-05-20): tighter per-endpoint budgets layered on top of the global
     # 300/min/IP bucket. A spam attacker with one fixed IP trips the per-endpoint budget below
     # before the loose global budget is even touched, so a flood of job-order POSTs from one
@@ -499,17 +512,22 @@ management:
       # change plus a redeploy plus a force-recreate. That matters because the most diagnostic lines
       # in this codebase sit at DEBUG on purpose (bot blocks, the per-IP rate limit, the open circuit
       # breaker, a relayed backend 4xx) — without this endpoint they exist but are unreachable during
-      # an incident. `/actuator/health*` is the only actuator path permitted unauthenticated;
+      # an incident. On the application connector `/actuator/health*` is the only actuator path
+      # permitted unauthenticated (prod's management port adds prometheus and info, see below);
       # everything else falls through to `anyRequest().authenticated()`.
       #
-      # Unlike the frontend and the gateway, the backend deliberately sets NO
-      # `management.server.port` — Actuator rides the ordinary application connector, which is not
-      # host-published and is reachable only from the internal Docker networks. There is therefore
-      # no "internal-only management port" here, and that is precisely what lets the WRITE stay:
-      # it passes through the security chain, where SecurityConfig gates
-      # POST /actuator/loggers/** on ROLE_ADMIN. The `anyRequest().authenticated()` catch-all on
-      # its own would have accepted ANY realm JWT, which is not an acceptable bar for a switch
-      # that can put Spring Security at TRACE (bearer tokens into a 744h-retention log stream).
+      # This file sets no `management.server.port`, so in dev/test/e2e Actuator rides the ordinary
+      # application connector. The prod profile DOES set one: application-prod.yml moves Actuator
+      # to the internal-only management port 11271 (ADR-0134), reachable only from
+      # net-monitoring-scrape and localhost, and the 11261 application connector answers 404 for
+      # /actuator/**. On that port ManagementPortSecurityConfig's @Order(0) chain permits only the
+      # enumerated reads (health, health/**, prometheus, info) without credentials; everything
+      # else, `loggers` included, falls through to SecurityConfig's chain. That is what lets the
+      # WRITE stay in every profile: SecurityConfig gates POST /actuator/loggers/** on ROLE_ADMIN
+      # (verified on the management port by ManagementPortIsolationTest). The
+      # `anyRequest().authenticated()` catch-all on its own would have accepted ANY realm JWT,
+      # which is not an acceptable bar for a switch that can put Spring Security at TRACE (bearer
+      # tokens into a 744h-retention log stream).
       # Read: GET /actuator/loggers/<logger> — any authenticated caller.
       # Write: POST {"configuredLevel":"DEBUG"} — ROLE_ADMIN only, and not persisted, so a restart
       # returns to the configured levels (REQ-OBS-016).

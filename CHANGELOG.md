@@ -15,6 +15,20 @@
 
 ### Changed
 
+- **Exporte und Berichte: höchstens zehn pro Minute und Konto.** Kontoauszüge, Bank-3-Monats-Report,
+  Übergabeprotokolle, Audit- und Datenexporte (Art. 15) zählen gegen ein eigenes Kontingent; darüber
+  antwortet das Backend mit `429`. Einstellbar über `APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY` /
+  `APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD`.
+
+- **Betrieb: das Backend startet in Produktion nicht mehr ohne `IRI_BACKEND_EXPECTED_AUDIENCES`.**
+  Ein leerer Wert schaltete die JWT-Audience-Prüfung bisher still ab; jetzt bricht der Start mit
+  einer klaren Meldung ab, und die aktiven Audiences stehen beim Start im Log.
+
+- **Betrieb: Aufbewahrungsfristen haben Untergrenzen.** Ein Tippfehler wie `P0D` hätte beim nächsten
+  Lauf das ganze Audit-Protokoll bzw. alle Benachrichtigungen gelöscht. Jetzt verweigert das Backend
+  den Start unter 30 Tagen (Audit), 1 Tag (Benachrichtigungen, abgelehnte Registrierungen) oder
+  einem Intervall unter einer Minute.
+
 - **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
   GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
   AspectJ im Backend auf (EPL-2.0 ohne GPL-Zusatz); es wurde nicht genutzt und ist entfernt.
@@ -31,6 +45,16 @@
   gesammelt in `docs/archive/`. Rein dokumentarisch.
 
 ### Fixed
+
+- **Aufträge: Herstellung bucht nur noch in Lager, die man verwalten darf.** Ein Logistiker konnte
+  hergestellte Items auf jedes Mitglied einbuchen, auch einer anderen Staffel und in dessen
+  persönlichen Bestand. Jetzt gilt dieselbe Prüfung wie beim Einbuchen (sonst `403`); „persönlich"
+  geht nur für einen selbst.
+
+- **Fehlermeldungen: ein interner Fehler erscheint nicht mehr als „ungültige Anfrage" mit
+  Originaltext.** Er wird als Serverfehler gemeldet und nur ins Log geschrieben. Die bekannten
+  Fälle (Lagereintrag gehört nicht zum Auftrag, Raffinerieauftrag schon eingelagert, Konto noch in
+  Keycloak) haben eigene, übersetzte Meldungen.
 
 - **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
   Materialbörsen- und Kontolöschungs-Regeln scheiterten beim Speichern, selbst beim Deaktivieren,

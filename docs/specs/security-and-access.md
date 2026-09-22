@@ -1215,6 +1215,12 @@ from masquerading as an application outage (the failure mode that drove the fron
   client scope), the ingest gateway `aud=basetool-ingest` (the `extractor-ingest-only` scope,
   REQ-INGEST-011). Setting the gateway to `basetool-backend` would pass exactly the frontend session
   tokens that interface must refuse.
+- [ ] **The backend's `prod` profile requires it** (APPSEC-08, 2026-09-22): with a blank
+  `app.security.jwt.expected-audiences` the prod context refuses to start
+  (`JwtAudienceStartupCheck`), because blank means "no `aud` check" and a lost `.env` line used to
+  switch enforcement off in silence. The effective audiences are logged at INFO on every start; any
+  other profile keeps "blank = off" and logs it at WARN. The ingest gateway is unchanged (its value
+  stays optional).
 - [x] The **backend's** enforced path is exercised end to end, not only in prod: the E2E realm's
   `basetool-frontend` client carries an `aud-basetool-backend` audience mapper (access token only,
   mirroring the prod scope's mapper) and `E2eStackExtension` arms the stack with
@@ -1227,6 +1233,7 @@ from masquerading as an application outage (the failure mode that drove the fron
 `KeycloakTrustSupport` + `IdentityProviderUnavailableFilter` (tests:
 `IdentityProviderUnavailableFilterTest`, `SecurityConfigInternalJwksDecoderTest`) ·
 `SecurityConfigAudienceValidatorTest` + `E2eAudienceEnforcementParityTest` (the `aud` knob) ·
+`JwtAudienceStartupCheck` + `JwtAudienceStartupCheckTest` (required under `prod`) ·
 `BasetoolErrorController` (503 problem mapping) · the **ingest gateway's** own package-local
 `KeycloakTrustSupport` / `IdentityProviderUnavailableFilter` + matching tests (it cannot depend on
 backend classes across the module boundary, so the pattern is duplicated) · `application-prod.yml`
@@ -1873,8 +1880,8 @@ and a caller with a pool of addresses is not bounded by it at all. The `sub` is 
 identity and cannot be chosen by the client, so it is the only key that bounds an *account*. The
 ingest gateway reached the same conclusion for the same reason (REQ-INGEST-005).
 
-Reads other than the SSE connect are deliberately left to the per-IP budget: they are cheap and are
-what a legitimate client hits most. Writes cost database work and produce audit rows, and an SSE
+Reads other than the SSE connect — and the export carve-out below — are deliberately left to the
+per-IP budget: they are cheap and are what a legitimate client hits most. Writes cost database work and produce audit rows, and an SSE
 connect holds a server-side emitter open, so a reconnect loop is worth bounding by identity. Both
 share one bucket on purpose — they come from the same client, and splitting them would let one
 starve the server while the other stayed within its own budget.
@@ -1890,6 +1897,21 @@ limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, and the
 The subject MUST NOT appear in a metric label or a log message — it is unbounded and it is PII. The
 bucket map MUST be bounded so a flood of distinct subjects cannot grow it without limit.
 
+> [!note] Amended 2026-09-22 — the export carve-out (APPSEC-10, owner decision of 2026-09-22)
+> "Reads stay on the per-IP budget" did not hold up for the reads that render a whole document. Every
+> `/api/**` path with an `export`, `export.json`, `statement`, `report`, `pdf` or `three-month-report`
+> segment — the Art. 15 exports and their admin twin, the audit and bank-audit exports, both bank
+> statements, the three-month bank report, the job-order handover reports and their preview — MUST
+> spend from a **second, separate** per-subject bucket, `app.rate-limit.subject.export`: **10 per
+> minute** by default, overridable per host through `APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY` and
+> `APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD`, a capacity under 1 refusing to start. It is
+> recognised by path segment, not by an endpoint list, so an export added later is covered without
+> anyone remembering this filter. It is separate from the write bucket so downloads never cost an
+> account its writes; an export that is also a write (the preview is a `POST`) spends from both, the
+> export bucket first. The rejection is the same `429` / `RATE_LIMIT_EXCEEDED` contract, counted under
+> the bounded label `bucket="subject_export"`, which the existing per-bucket alert
+> `RateLimitRejectionRatioHigh` and the operations dashboard pick up without a change.
+
 **Acceptance**
 
 - [x] A second write beyond the budget from the same subject is refused with `429` and a retry hint.
@@ -1898,9 +1920,14 @@ bucket map MUST be bounded so a flood of distinct subjects cannot grow it withou
 - [x] An encoded spelling of an API write cannot shed the budget.
 - [x] Anonymous callers pass through untouched.
 - [x] Rejections and attempts are counted under the bounded `bucket=subject` label.
+- [x] An export beyond the export budget is refused with `429` while an ordinary read is not, and
+  the export bucket is separate from the write bucket; counted under `bucket=subject_export`.
+- [x] Every mapped endpoint with an export-like final segment falls under the export budget (the
+  endpoint sweep in `SecurityFilterChainOrderTest`).
 
-**Enforced by:** `SubjectRateLimitingFilterTest` · **Code:** `SubjectRateLimitingFilter`,
-`RateLimitProperties.Subject`, `SecurityConfig`
+**Enforced by:** `SubjectRateLimitingFilterTest`, `SecurityFilterChainOrderTest` (the export sweep),
+`BackendPropertiesValidationTest` · **Code:** `SubjectRateLimitingFilter`,
+`RateLimitProperties.Subject`, `RateLimitProperties.Export`, `SecurityConfig`
 
 ### REQ-SEC-034 — A rejected registration MUST be recoverable through a supported admin action
 
@@ -3671,6 +3698,10 @@ decision is made.
 **The window is not zero on purpose.** REQ-SEC-034 makes a rejection reversible because approval is
 fallible, and purging the row ends that possibility — so the retention period is simultaneously the
 period in which an erroneous rejection can still be reopened. Shortening one shortens the other.
+Since 2026-09-22 (BE-MOD-03) "not zero" is a startup check: the keys bind through the validated
+`RejectedRegistrationRetentionProperties` record, and a `max-age` under **`P1D`** (a `P0D` or
+negative value would have purged every rejection on the next run, one decided a minute ago
+included) or an `interval` under **`PT1M`** refuses to start the context.
 
 **The purge reuses the account-deletion path** (`UserDeletionService`, REQ-DATA-008) rather than
 issuing its own deletes, so it cannot drift from the foreign-key ordering that path owns. `decide`
@@ -3702,9 +3733,11 @@ one event type.
   the committed local purge.
 - [x] The sweep publishes `basetool_scheduled_job_*{task="rejected_registration_retention"}` and is
   covered by `ScheduledJobStale`.
+- [x] A `max-age` under `P1D` or an `interval` under `PT1M` refuses to start the context.
 
-**Enforced by:** `RejectedRegistrationRetentionServiceTest`, `RejectedRegistrationRetentionTaskTest`
-· **Code:** `RejectedRegistrationRetentionService`, `RejectedRegistrationRetentionTask`,
+**Enforced by:** `RejectedRegistrationRetentionServiceTest`, `RejectedRegistrationRetentionTaskTest`,
+`BackendPropertiesValidationTest` (the floor) · **Code:** `RejectedRegistrationRetentionService`,
+`RejectedRegistrationRetentionTask`, `RejectedRegistrationRetentionProperties`,
 `UserRepository.findRejectedDecidedBefore`, `ScheduledJob`, `application.yml` · **Decision:**
 [ADR-0178](../adr/0178-a-refused-registration-is-purged-on-a-retention-window.md)
 
