@@ -76,12 +76,6 @@
         }
     }
 
-    function escapeHtml(s) {
-        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-        });
-    }
-
     function showError(message) {
         if (typeof window.showFrontendErrorToast === 'function') {
             window.showFrontendErrorToast(message || i18n.error || '');
@@ -313,25 +307,25 @@
             list.hidden = !materialListOpen;
             return;
         }
-        list.innerHTML = materialItems
-            .map(function (it) {
-                let unit =
-                    it.quantityType === 'PIECE' ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
-                return (
-                    '<li class="krt-combobox__option" role="option" data-material-id="' +
-                    escapeHtml(it.id) +
-                    '" data-name="' +
-                    escapeHtml(it.name) +
-                    '" data-quantity-type="' +
-                    escapeHtml(it.quantityType) +
-                    '"><strong>' +
-                    escapeHtml(it.name) +
-                    '</strong> <small>' +
-                    escapeHtml(unit) +
-                    '</small></li>'
-                );
-            })
-            .join('');
+        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
+        let html = '';
+        materialItems.forEach(function (it) {
+            let unit =
+                it.quantityType === 'PIECE' ? i18n.unitPiece || 'Stück' : i18n.unitScu || 'SCU';
+            html +=
+                '<li class="krt-combobox__option" role="option" data-material-id="' +
+                escapeAttr(it.id) +
+                '" data-name="' +
+                escapeAttr(it.name) +
+                '" data-quantity-type="' +
+                escapeAttr(it.quantityType) +
+                '"><strong>' +
+                escapeHtml(it.name) +
+                '</strong> <small>' +
+                escapeHtml(unit) +
+                '</small></li>';
+        });
+        list.innerHTML = html;
         list.hidden = !materialListOpen;
     }
 
@@ -410,22 +404,23 @@
             list.hidden = !itemListOpen;
             return;
         }
-        list.innerHTML = productItems
-            .map(function (it) {
-                let meta = it.manufacturerName ? escapeHtml(it.manufacturerName) : '';
-                return (
-                    '<li class="krt-combobox__option" role="option" data-product-key="' +
-                    escapeHtml(it.productKey) +
-                    '" data-name="' +
-                    escapeHtml(it.name) +
-                    '"><strong>' +
-                    escapeHtml(it.name) +
-                    '</strong>' +
-                    (meta ? ' <small>' + meta + '</small>' : '') +
-                    '</li>'
-                );
-            })
-            .join('');
+        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
+        let html = '';
+        productItems.forEach(function (it) {
+            html +=
+                '<li class="krt-combobox__option" role="option" data-product-key="' +
+                escapeAttr(it.productKey) +
+                '" data-name="' +
+                escapeAttr(it.name) +
+                '"><strong>' +
+                escapeHtml(it.name) +
+                '</strong>';
+            if (it.manufacturerName) {
+                html += ' <small>' + escapeHtml(it.manufacturerName) + '</small>';
+            }
+            html += '</li>';
+        });
+        list.innerHTML = html;
         list.hidden = !itemListOpen;
     }
 

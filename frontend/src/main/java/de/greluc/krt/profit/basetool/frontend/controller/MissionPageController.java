@@ -43,8 +43,13 @@ import de.greluc.krt.profit.basetool.frontend.service.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.service.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.CurrentUser;
+import de.greluc.krt.profit.basetool.frontend.support.RelayParams;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +57,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -104,6 +110,13 @@ public class MissionPageController {
   /** Response type for the paged {@code /api/v1/missions/search} mission-overview read. */
   private static final ParameterizedTypeReference<PageResponse<MissionListDto>> MISSION_LIST_PAGE =
       new ParameterizedTypeReference<PageResponse<MissionListDto>>() {};
+
+  /**
+   * The mission statuses {@code GET /api/v1/missions/search} filters on — the only {@code status}
+   * values the list page relays (REQ-SEC-051). The backend stores the status as a string, so this
+   * set is the vocabulary rather than an enum.
+   */
+  static final Set<String> MISSION_STATUSES = Set.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
 
   /** Response type for the single-mission {@code /api/v1/missions/{id}} read. */
   private static final ParameterizedTypeReference<MissionDto> MISSION =
@@ -270,14 +283,34 @@ public class MissionPageController {
    * mission catalog with sensitive fields stripped by the backend; authenticated callers see the
    * full record. Pagination + sort follow the standard URL-driven pattern.
    *
-   * @return the {@code missions-index} view name
+   * <p>Every caller-supplied value reaches the backend URI in the shape the backend's own {@code
+   * GET /api/v1/missions/search} declares (REQ-SEC-051, ADR-0158): the free-text {@code search} as
+   * a {@code WebClient} URI-template variable, encoded exactly once; {@code start} / {@code end}
+   * bound as {@link Instant}; {@code status} narrowed to {@link #MISSION_STATUSES}. They used to be
+   * concatenated into the URI string, where {@code &} in a search opened a second backend query
+   * parameter, {@code #} cut the query off, {@code +} arrived as a space and {@code {x}} made the
+   * template expansion throw (FE-SEC-01).
+   *
+   * @param search optional free-text filter
+   * @param start optional inclusive lower bound on the planned start, ISO-8601 instant
+   * @param end optional inclusive upper bound on the planned start, ISO-8601 instant
+   * @param status optional status filter; values outside {@link #MISSION_STATUSES} are dropped
+   * @param showPast whether the default status filter includes finished missions
+   * @param page optional zero-based page index
+   * @param size optional page size
+   * @param fragment {@code "results"} to render only the results fragment for a live-filter swap
+   * @param model the view model
+   * @param principal the signed-in user
+   * @return the {@code missions-index} view name, or the results fragment selector
    */
   @NotNull
   @GetMapping
   public String listMissions(
       @RequestParam(required = false) String search,
-      @RequestParam(required = false) String start,
-      @RequestParam(required = false) String end,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant start,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant end,
       @RequestParam(required = false) List<String> status,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
       @RequestParam(required = false) Integer page,
@@ -286,14 +319,18 @@ public class MissionPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/missions/search?");
+    List<Object> uriVariables = new ArrayList<>();
     if (search != null && !search.isBlank()) {
-      uri.append("query=").append(search).append("&");
+      uri.append("query={query}&");
+      uriVariables.add(search);
     }
-    if (start != null && !start.isBlank()) {
-      uri.append("start=").append(start).append("&");
+    if (start != null) {
+      uri.append("start={start}&");
+      uriVariables.add(start);
     }
-    if (end != null && !end.isBlank()) {
-      uri.append("end=").append(end).append("&");
+    if (end != null) {
+      uri.append("end={end}&");
+      uriVariables.add(end);
     }
     if (page != null) {
       uri.append("page=").append(page).append("&");
@@ -308,7 +345,16 @@ public class MissionPageController {
     // covers the deterministic ordering contract.
     uri.append("sort=plannedStartTime,desc&");
 
-    if ((status == null || status.isEmpty())) {
+    // Only the four statuses the backend knows are relayed; they are constants, so they may be
+    // written into the template literally. An unknown value is dropped, not relayed (REQ-SEC-051).
+    List<String> knownStatuses =
+        status == null
+            ? List.of()
+            : status.stream()
+                .map(s -> RelayParams.oneOfOrNull(s, MISSION_STATUSES))
+                .filter(Objects::nonNull)
+                .toList();
+    if (knownStatuses.isEmpty()) {
       if (showPast) {
         // The "only if authenticated" half of this condition is gone with the anonymous caller
         // (ADR-0159): every caller here holds a session, so the archive toggle means what it says.
@@ -317,14 +363,16 @@ public class MissionPageController {
         uri.append("status=PLANNED&status=ACTIVE&");
       }
     } else {
-      for (String s : status) {
+      for (String s : knownStatuses) {
         uri.append("status=").append(s).append("&");
       }
     }
 
     try {
       PageResponse<MissionListDto> missionsPage =
-          backendApiClient.get(uri.toString(), MISSION_LIST_PAGE);
+          uriVariables.isEmpty()
+              ? backendApiClient.get(uri.toString(), MISSION_LIST_PAGE)
+              : backendApiClient.get(uri.toString(), MISSION_LIST_PAGE, uriVariables.toArray());
       model.addAttribute("missions", missionsPage.content());
       model.addAttribute("missionsPage", missionsPage);
       model.addAttribute("search", search);

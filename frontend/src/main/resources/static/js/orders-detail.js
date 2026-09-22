@@ -274,13 +274,13 @@ function addHandoverItemRow() {
     row.innerHTML = `
             <div>
                 <label class="form-label-sm">Lagereintrag</label>
-                <select name="items[${index}].inventoryItemId" required class="w-full">
+                <select name="items[${escapeAttr(index)}].inventoryItemId" required class="w-full">
                     ${options}
                 </select>
             </div>
             <div>
                 <label class="form-label-sm">${escapeHtml(labelMenge)} <span data-role="amount-unit"></span> <span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="${escapeAttr(scuHintText)}"><span aria-hidden="true">?</span><span class="scu-hint__bubble" aria-hidden="true">${escapeHtml(scuHintText)}</span></span></label>
-                <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${index}].amount" min="0.001" required class="w-full">
+                <input type="text" inputmode="decimal" data-scu-decimal step="0.001" name="items[${escapeAttr(index)}].amount" min="0.001" required class="w-full">
             </div>
             <div>
                 <button type="button" class="btn btn-quiet-danger btn-icon od-remove-btn" data-trigger="od-remove-handover-row" title="Entfernen" aria-label="Entfernen"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
@@ -1313,14 +1313,12 @@ async function downloadHandoverReport(btn) {
     }
     const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
     try {
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
-        const csrfHeader =
-            document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
         // Forward the user's actual IANA time zone so the backend can render handover date/time
         // in the user's local time zone instead of the server's ZoneId.systemDefault().
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        const downloadHeaders = { [csrfHeader]: csrfToken };
+        // A GET download: no CSRF header needed (the CSRF filter only guards writes).
+        const downloadHeaders = {};
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
@@ -1376,12 +1374,10 @@ async function downloadItemHandoverReport(btn) {
     }
     const filename = 'Übergabe Auftrag #' + orderNumber + ' ' + dateStr + ' ' + timeStr + '.pdf';
     try {
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
-        const csrfHeader =
-            document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
         const userTimeZone =
             Intl && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
-        const downloadHeaders = { [csrfHeader]: csrfToken };
+        // A GET download: no CSRF header needed (the CSRF filter only guards writes).
+        const downloadHeaders = {};
         if (userTimeZone) {
             downloadHeaders['X-User-Time-Zone'] = userTimeZone;
         }
@@ -1497,20 +1493,29 @@ async function previewHandoverReport(btn) {
         recipientHandle: recipientHandle,
         items: items,
     };
-    try {
-        const csrfToken = document.querySelector('meta[name="_csrf"]')?.content || '';
-        const csrfHeader =
-            document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
-        const response = await fetch('/api/v1/orders/' + orderId + '/handovers/report/preview', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', [csrfHeader]: csrfToken },
-            body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
+    if (!window.krtFetch) return;
+    // A read-only POST (renders a PDF, stores nothing) — routed through krtFetch.write so it carries
+    // CSRF, the 403 retry and the re-auth redirect (REQ-FE-002); responseType 'blob' hands the PDF
+    // bytes to the download below. Every failure keeps the page's own error toast.
+    const result = await window.krtFetch.write({
+        method: 'POST',
+        url: '/api/v1/orders/' + encodeURIComponent(orderId) + '/handovers/report/preview',
+        payload: payload,
+        accept: 'application/pdf, application/problem+json',
+        responseType: 'blob',
+        toast: false,
+        errorMessage: MSG_HANDOVER_REPORT_ERROR,
+        onError: function () {
             showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
-            return;
-        }
-        const blob = await response.blob();
+            return true;
+        },
+    });
+    if (!result.ok || !(result.body instanceof Blob)) {
+        if (result.ok) showFrontendErrorToast(MSG_HANDOVER_REPORT_ERROR);
+        return;
+    }
+    try {
+        const blob = result.body;
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -1543,6 +1548,16 @@ async function toggleInventory(row) {
     const orderId = row.getAttribute('data-order-id');
     const materialId = row.getAttribute('data-material-id');
     const amountType = row.getAttribute('data-amount-type');
+    // Markup pieces for the inventory sub-table, declared at function level: the lint rule only
+    // traces a variable declared in the same function scope as the innerHTML sink it feeds. Every
+    // write is a literal or an escapeHtml / escapeAttr result (FE-SEC-05).
+    /** @type {string} */
+    let html;
+    let unlinkColHeader = '';
+    /** @type {string} */
+    let squadronCell;
+    /** @type {string} */
+    let unlinkCell;
 
     let nextRow = row.nextElementSibling;
     if (nextRow && nextRow.classList.contains('inventory-details-row')) {
@@ -1554,7 +1569,7 @@ async function toggleInventory(row) {
     detailsRow.classList.add('inventory-details-row');
     detailsRow.innerHTML = `
             <td colspan="5" class="od-inv-cell">
-                <div class="od-inv-note">${MSG_LOADING_INVENTORY}</div>
+                <div class="od-inv-note">${escapeHtml(MSG_LOADING_INVENTORY)}</div>
             </td>
         `;
     row.parentNode.insertBefore(detailsRow, row.nextSibling);
@@ -1569,27 +1584,28 @@ async function toggleInventory(row) {
         if (items.length === 0) {
             detailsRow.innerHTML = `
                     <td colspan="5" class="od-inv-cell">
-                        <div class="od-inv-note">${MSG_EMPTY_INVENTORY}</div>
+                        <div class="od-inv-note">${escapeHtml(MSG_EMPTY_INVENTORY)}</div>
                     </td>
                 `;
             return;
         }
 
-        const unlinkColHeader = IS_LOGISTICIAN ? `<th class="od-inv-th"></th>` : '';
+        // Optional pieces are assigned through if (not a ternary), so the sink only sees escaped values.
+        if (IS_LOGISTICIAN) unlinkColHeader = `<th class="od-inv-th"></th>`;
         const subColspan = IS_LOGISTICIAN ? 7 : 6;
 
-        let html = `
-                <td colspan="${subColspan}" class="p-0">
+        html = `
+                <td colspan="${escapeAttr(subColspan)}" class="p-0">
                     <div class="od-inv-panel">
                         <div class="table-responsive">
                             <table class="data-table od-inv-table">
                                 <thead>
                                     <tr>
-                                        <th class="od-inv-th">${MSG_OWNER}</th>
-                                        <th class="od-inv-th">${MSG_SQUADRON}</th>
-                                        <th class="od-inv-th">${MSG_LOCATION}</th>
-                                        <th class="od-inv-th">${MSG_QUALITY}</th>
-                                        <th class="od-inv-th">${MSG_QUANTITY}</th>
+                                        <th class="od-inv-th">${escapeHtml(MSG_OWNER)}</th>
+                                        <th class="od-inv-th">${escapeHtml(MSG_SQUADRON)}</th>
+                                        <th class="od-inv-th">${escapeHtml(MSG_LOCATION)}</th>
+                                        <th class="od-inv-th">${escapeHtml(MSG_QUALITY)}</th>
+                                        <th class="od-inv-th">${escapeHtml(MSG_QUANTITY)}</th>
                                         ${unlinkColHeader}
                                     </tr>
                                 </thead>
@@ -1616,22 +1632,24 @@ async function toggleInventory(row) {
             const squadronBadgeClass = isForeignSquadron
                 ? 'squadron-badge squadron-badge-foreign'
                 : 'squadron-badge';
-            const squadronCell = itemSquadronShorthand
-                ? `<span class="${squadronBadgeClass}" title="${escapeAttr(itemSquadronName)}">${escapeHtml(itemSquadronShorthand)}</span>`
-                : `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
-            const unlinkCell = IS_LOGISTICIAN
-                ? `
+            squadronCell = `<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
+            if (itemSquadronShorthand) {
+                squadronCell = `<span class="${escapeAttr(squadronBadgeClass)}" title="${escapeAttr(itemSquadronName)}">${escapeHtml(itemSquadronShorthand)}</span>`;
+            }
+            unlinkCell = '';
+            if (IS_LOGISTICIAN) {
+                unlinkCell = `
                                         <td data-trigger="stop-propagation">
                                             <button type="button" class="btn btn-quiet-danger od-inv-unlink-btn"
                                                     data-trigger="od-unlink-inventory"
                                                     data-order-id="${escapeAttr(orderId)}"
                                                     data-inventory-item-id="${escapeAttr(item.id)}"
                                                     title="${escapeAttr(MSG_INVENTORY_UNLINK_TOOLTIP)}">&times;</button>
-                                        </td>`
-                : '';
+                                        </td>`;
+            }
 
             html += `
-                                    <tr class="${rowClass}">
+                                    <tr class="${escapeAttr(rowClass)}">
                                         <td>${escapeHtml(ownerName)}</td>
                                         <td>${squadronCell}</td>
                                         <td>${escapeHtml(locationName)}</td>
@@ -1981,9 +1999,9 @@ function _renderProdMaterialEntries(card, mat) {
             ' ' +
             escapeHtml(_prodFmtQty(cap, mat.quantityType)) +
             '</small></div><input type="number" min="0" step="' +
-            (mat.quantityType === 'PIECE' ? '1' : 'any') +
+            escapeAttr(mat.quantityType === 'PIECE' ? '1' : 'any') +
             '" value="0" data-prod-alloc data-prod-idx="' +
-            idx +
+            escapeAttr(idx) +
             '"></div>';
     });
     entriesEl.innerHTML = html;
@@ -2422,89 +2440,86 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 // per-edge @Version values are always fresh and there is no manual data-version DOM sync. All
 // bindings are delegated (document level), so they survive the fragment swap.
 (function () {
-    // CSRF header via the shared krtCsrf reader (#575) — retires the bespoke meta read. Not
-    // krtCsrf.headers(), because that forces Content-Type application/json; the assignee calls
-    // vary the content type (json / form / none) and accept an HTML fragment, so build just the
-    // CSRF header here and keep oaSend's per-path content-type logic.
-    function oaCsrf() {
-        const headers = {};
-        const token = window.krtCsrf
-            ? window.krtCsrf.token()
-            : document.querySelector('meta[name="_csrf"]')?.content;
-        const header = window.krtCsrf
-            ? window.krtCsrf.headerName()
-            : document.querySelector('meta[name="_csrf_header"]')?.content;
-        if (token && header) headers[header] = token;
-        return headers;
-    }
-
     function oaOrderId() {
         const sec = document.getElementById('assignees-section');
         return sec ? sec.getAttribute('data-order-id') : null;
     }
 
+    // The assignee edge's 409 is always its optimistic lock (the controller relays the backend's
+    // status without a problem code), so it is surfaced through krtFetch's OPTIMISTIC_LOCK path:
+    // the page's conflict toast plus the reload-confirm — the one sanctioned reload (REQ-FE-001/003)
+    // instead of the former unconditional timed reload.
+    const OA_CONFLICT = {
+        title: ORDER_CONFLICT.title,
+        reloadLabel: ORDER_CONFLICT.reload,
+        reloadQuestion: ORDER_CONFLICT.reloadQuestion,
+        dismissLabel: ORDER_CONFLICT.dismiss,
+        reloadDetailFallback: I18N_NOTE_CONFLICT,
+    };
+
+    /**
+     * Sends one assignee mutation through krtFetch (REQ-FE-002: CSRF, the bare-403 refresh-and-retry
+     * and the re-auth redirect) and swaps the returned #assignees-section fragment in place.
+     *
+     * @param {string} method the HTTP method
+     * @param {string} url the endpoint
+     * @param {{ json?: object, form?: URLSearchParams, successMsg?: string, errorMsg?: string }} [opts]
+     *     `json` is sent as the JSON body, `form` as an urlencoded body; neither sends no body
+     * @returns {Promise<boolean>} true when the mutation succeeded and the section was re-rendered
+     */
     async function oaSend(method, url, opts) {
         opts = opts || {};
-        function buildInit() {
-            const headers = oaCsrf();
-            headers['Accept'] = 'text/html';
-            const init = { method: method, headers: headers };
-            if (opts.json !== undefined) {
-                headers['Content-Type'] = 'application/json';
-                init.body = JSON.stringify(opts.json);
-            } else if (opts.form !== undefined) {
-                headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                init.body = opts.form;
-            }
-            return init;
-        }
-        let res;
-        try {
-            res = await fetch(url, buildInit());
-            // A bare 403 is the CSRF filter rejecting a stale token (post-re-login / evicted
-            // session). Refresh the token once and retry before treating it as a domain
-            // "forbidden" (#575) — matches krtFetch.write's retry-on-403.
-            if (res.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-                const refreshed = await window.krtCsrf.refresh();
-                if (refreshed) res = await fetch(url, buildInit());
-            }
-        } catch {
-            showFrontendErrorToast(opts.errorMsg || I18N_NOTE_ERROR);
-            return false;
-        }
-        if (res.status === 409) {
-            showFrontendErrorToast(I18N_NOTE_CONFLICT);
-            setTimeout(() => window.location.reload(), 1500);
-            return false;
-        }
-        if (res.status === 403) {
-            showFrontendErrorToast(I18N_NOTE_FORBIDDEN);
-            return false;
-        }
-        if (!res.ok) {
-            showFrontendErrorToast(opts.errorMsg || I18N_NOTE_ERROR);
-            return false;
-        }
-        const html = await res.text();
-        const sec = document.getElementById('assignees-section');
-        if (sec) {
-            sec.outerHTML = html;
-            // Let global enhancers re-process the swapped-in subtree (mirrors krtFetch.swap,
-            // which the bespoke outerHTML swap predates).
-            document.dispatchEvent(
-                new CustomEvent('krt:swapped', {
-                    detail: { container: document.getElementById('assignees-section') },
-                }),
-            );
-        }
-        if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
-        // Broadcast the assignee change to peers viewing this order — their order:{id} receiver
-        // re-fetches the assignees fragment into #order-assignees-results (REQ-FE-015). The actor
-        // already applied its own outerHTML swap above, so notify (broadcast-only), not refresh.
-        if (window.krtNotifyOrderChanged) {
-            window.krtNotifyOrderChanged(['assignees']);
-        }
-        return true;
+        if (!window.krtFetch) return false;
+        const errorMsg = opts.errorMsg || I18N_NOTE_ERROR;
+        const common = {
+            method: method,
+            url: url,
+            // The endpoints answer the re-rendered section as an HTML fragment.
+            accept: 'text/html',
+            toast: false,
+            errorMessage: errorMsg,
+            onSuccess: function (html) {
+                const sec = document.getElementById('assignees-section');
+                if (sec && typeof html === 'string') {
+                    // Same-origin Thymeleaf fragment (orders-detail :: assigneesSection).
+                    window.krtFetch.replaceWithTrustedHtml(sec, html);
+                    // Let global enhancers re-process the swapped-in subtree (mirrors
+                    // krtFetch.swap, which this outerHTML swap predates).
+                    document.dispatchEvent(
+                        new CustomEvent('krt:swapped', {
+                            detail: { container: document.getElementById('assignees-section') },
+                        }),
+                    );
+                }
+                if (opts.successMsg) showFrontendSuccessToast(opts.successMsg);
+                // Broadcast the assignee change to peers viewing this order — their order:{id}
+                // receiver re-fetches the assignees fragment into #order-assignees-results
+                // (REQ-FE-015). The actor already applied its own swap above, so notify
+                // (broadcast-only), not refresh.
+                if (window.krtNotifyOrderChanged) {
+                    window.krtNotifyOrderChanged(['assignees']);
+                }
+            },
+            onError: function (status, _body, response) {
+                if (status === 409) {
+                    window.krtFetch.handleProblem(
+                        response,
+                        { code: 'OPTIMISTIC_LOCK', detail: I18N_NOTE_CONFLICT },
+                        { conflict: OA_CONFLICT },
+                    );
+                } else if (status === 403) {
+                    showFrontendErrorToast(I18N_NOTE_FORBIDDEN);
+                } else {
+                    showFrontendErrorToast(errorMsg);
+                }
+                return true;
+            },
+        };
+        const result =
+            opts.form !== undefined
+                ? await window.krtFetch.submitForm(Object.assign(common, { formData: opts.form }))
+                : await window.krtFetch.write(Object.assign(common, { payload: opts.json }));
+        return result.ok;
     }
 
     function oaUpdateCounter() {
@@ -2517,7 +2532,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         const orderId = oaOrderId();
         if (!userId || !orderId) return;
         oaSend('POST', '/orders/' + orderId + '/assignees', {
-            form: 'userId=' + encodeURIComponent(userId),
+            form: new URLSearchParams({ userId: userId }),
             successMsg: I18N_ADDED,
             errorMsg: I18N_ADD_ERROR,
         });

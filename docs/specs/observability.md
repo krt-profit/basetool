@@ -50,6 +50,22 @@ must never reach `ERROR`, or it inflates `logback_events_total{level="error"}` a
 `LogbackErrorSpike` alert on normal user-input mistakes. Only a genuinely unexpected failure (a bare
 `catch (Exception …)`, not a mapped `BackendServiceException`) logs at `ERROR`.
 
+**A `ResponseStatusException` keeps its status (APPSEC-11, 2026-09-22).** Fourteen proxy relays
+forward a backend refusal as `throw new ResponseStatusException(e.getStatusCode(), …)`, and several
+controllers throw one for an explicit `400` / `404` / `413`. The frontend advice's
+`@ExceptionHandler(Exception.class)` catch-all is consulted **before** Spring's own
+`ResponseStatusExceptionResolver`, so every one of them reached the browser as a `500` and the log as
+an `ERROR` with a stack trace — a relayed `409` tripped `LogbackErrorSpike`, and `bank.js`, which
+branches on the `403` / `400` of a statement download, only ever saw `500`.
+`GlobalExceptionHandler#handleResponseStatus` now answers with the carried status: JSON callers get
+`{code, status, title, message, detail}` (the code derived from the status the way
+`BackendServiceException` derives it), everyone else the error page with that status. A `4xx` is
+logged at `DEBUG` — the relay already logged the refusal at `WARN` where it caught it — and a `5xx` at
+`ERROR` without a stack trace, because the throw site owns the trace. The exception's reason is never
+shown or logged: for a relay it is the `WebClientResponseException` message, which names the internal
+backend URL. **Enforced by:** `RelayedBackendStatusMvcTest` (every relay, through the real advice,
+against `MockWebServer`).
+
 A call **short-circuited by an open circuit breaker** (`CallNotPermittedException`) is logged at
 `DEBUG`, never `WARN`. The one-time breaker state transition (`ResilienceEventLogger.onStateTransition`,
 `WARN`) plus the `basetool_backend_client_errors_total{reason="circuit_open"}` counter and the
@@ -443,6 +459,14 @@ level and all three modules. "Names" includes the Keycloak `preferred_username` 
 the `PiiMasker` only scrubs JWTs, e-mail-shaped strings and token keywords, so a bare handle
 would reach the appenders verbatim — log the user's `sub` UUID instead (the row id is in the
 same UUID space and is not PII).
+
+**A session id is a token.** Whoever holds a Spring session id holds the session and the OAuth2
+tokens stored in it, so it is never logged verbatim either. Where a line needs to correlate the
+requests of one session, it logs `SessionIdFingerprint.of(…)` — the first 12 hex characters of the
+id's SHA-256, stable per session and useless for resuming it. Until 2026-09-22 (APPSEC-12) the
+silent-SSO entry point logged the raw id at `INFO` in every profile, and `SessionDebugFilter` did at
+`DEBUG` in dev/test. **Enforced by:** `SessionIdFingerprintTest`, `SsoReAuthenticationEntryPointTest`
+and `SessionDebugFilterTest` (the raw id appears in no captured line).
 
 ### REQ-OBS-005 — Prometheus metrics endpoint, fail-closed
 
@@ -1913,7 +1937,8 @@ Two frontend meters were added by the 2026-08 logging audit:
   (`baseline-tune:`) and errs low.
 - `basetool_client_error_total{kind}` — counter minted by `ClientErrorReportController` for each
   accepted browser-error beacon (REQ-OBS-001). `kind` is resolved **server-side** against exactly
-  three literals — `script_error`, `unhandled_rejection`, `resource_error` — and a beacon carrying
+  four literals — `script_error`, `unhandled_rejection`, `resource_error`, `csp_violation` — and a
+  beacon carrying
   anything else is rejected with 400 and creates **no** series: the endpoint is reachable by every
   authenticated user, so accepting the client's own string would hand a caller unbounded label
   cardinality (REQ-OBS-006). No other dimension is exported; the message and source live only in the
@@ -1930,7 +1955,17 @@ Two frontend meters were added by the 2026-08 logging audit:
   hole where the right-hand side simply does not exist and the rule silently never fires, whereas the
   trailing window is present whenever the 1 h window is. The spike hour sits inside its own
   denominator, capping the achievable ratio at 24. Per `kind` so one class stepping up is not diluted
-  by the other two. The `> 20` floor is unbaselined (`baseline-tune:`).
+  by the others. The `> 20` floor is unbaselined (`baseline-tune:`).
+  `csp_violation` (FE-SEC-04, 2026-09-22) is the beacon's `securitypolicyviolation` listener: the CSP
+  is enforcing and has **no `report-uri`**, so before it a template that shipped an inline script or
+  style without the nonce, or a page that began loading from a host the policy does not allow, was
+  blocked by the browser and reported to no server at all. The report carries only the violated
+  directive (in `message`) and the blocked **origin** (in `source`) — the browser half reduces
+  `blockedURI` to `scheme://host[:port]` or to the bare keyword (`inline`, `eval`, `data`, …), and
+  `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
+  user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
+  and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
+  permanent background, which is exactly what the step-change shape tolerates.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =

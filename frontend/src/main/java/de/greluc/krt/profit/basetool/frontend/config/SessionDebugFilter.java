@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.support.SessionIdFingerprint;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,10 +43,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Redis-backed Spring Session store, such as sessions not surviving frontend restarts, unexpected
  * session creation, or authentication loss after restart.
  *
- * <p>The filter logs session ids and {@code Authentication#getName()} (the Keycloak username). Both
- * are PII / secret material — audit finding M-15 restricts the filter to the {@code dev} and {@code
- * test} Spring profiles so a misconfigured production log level cannot accidentally emit session
- * ids to disk / log shipper. Enable in dev/test via:
+ * <p>The filter logs a session <em>fingerprint</em> ({@link SessionIdFingerprint}, a truncated
+ * SHA-256 that correlates lines of one session without being usable to resume it) — never the raw
+ * session id, which is a bearer credential (APPSEC-12) — and {@code Authentication#getName()} (the
+ * Keycloak username). The username is PII — audit finding M-15 restricts the filter to the {@code
+ * dev} and {@code test} Spring profiles so a misconfigured production log level cannot accidentally
+ * emit usernames to disk / log shipper. Enable in dev/test via:
  *
  * <pre>
  * logging:
@@ -105,7 +108,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
               + " maxInactive={}s | authenticated={}",
           method,
           uri,
-          sessionBefore.getId(),
+          SessionIdFingerprint.of(sessionBefore),
           sessionBefore.isNew(),
           sessionBefore.getCreationTime(),
           sessionBefore.getLastAccessedTime(),
@@ -143,7 +146,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
           "[SESSION] POST {} {} | sessionId={} | sessionCreatedNow={} | authenticated={}",
           method,
           uri,
-          sessionAfter.getId(),
+          SessionIdFingerprint.of(sessionAfter),
           sessionCreatedDuringRequest,
           authAfter != null && authAfter.isAuthenticated());
       if (authAfter != null && authAfter.isAuthenticated()) {
@@ -162,7 +165,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
             "[SESSION] AUTHENTICATION LOST during {} {} | sessionId={}",
             method,
             uri,
-            sessionAfter.getId());
+            SessionIdFingerprint.of(sessionAfter));
       }
     } else if (sessionBefore != null) {
       log.debug("[SESSION] POST {} {} | SESSION INVALIDATED during request", method, uri);

@@ -122,6 +122,9 @@ class JobOrderAssigneeNotesE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, detailUrl);
+        // A full navigation wipes this marker, so its survival at the end proves that all five
+        // krtFetch-driven assignee writes re-rendered the section in place.
+        page.evaluate("() => { window.__krtNoReload = true; }");
 
         // 1) Enroll self (AJAX POST /orders/{id}/assignees, no reload).
         page.waitForResponse(
@@ -156,6 +159,10 @@ class JobOrderAssigneeNotesE2eTest {
             () -> page.locator("#assignees-section [data-trigger='oa-remove-assignee']").click());
         assertThat(page.locator("#assignees-section [data-trigger='oa-edit-note']")).hasCount(0);
         assertTrue(!isEnrolled(), "the user is no longer an assignee after unenroll");
+        assertEquals(
+            Boolean.TRUE,
+            page.evaluate("() => window.__krtNoReload === true"),
+            "the assignee writes must re-render the section in place — no full reload");
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-assignee-notes");
         throw failure;

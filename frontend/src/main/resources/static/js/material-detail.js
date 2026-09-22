@@ -105,10 +105,10 @@ function updateSortIndicators(columnIndex, direction) {
         const iconElement = document.getElementById('sort-icon-' + i);
         if (iconElement) {
             if (i === columnIndex) {
-                iconElement.innerHTML = direction === 'asc' ? '▲' : '▼';
+                iconElement.textContent = direction === 'asc' ? '▲' : '▼';
                 iconElement.style.color = 'var(--color-primary)';
             } else {
-                iconElement.innerHTML = '↕';
+                iconElement.textContent = '↕';
                 iconElement.style.color = 'var(--color-gray-2)';
             }
         }

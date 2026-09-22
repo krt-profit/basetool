@@ -15,6 +15,15 @@
 
 ### Changed
 
+- **Anmeldung: Das Sitzungs-Cookie heißt jetzt `__Host-SESSION`.** Der Browser nimmt es damit nur
+  über HTTPS und nur für genau diese Adresse an, keine andere Seite kann es setzen oder überschreiben.
+  **Mit diesem Update werden alle einmal abgemeldet** und melden sich neu an; die
+  Datenschutzerklärung nennt den neuen Namen.
+
+- **Überwachung: Vom Browser blockierte Inhalte werden gemeldet.** Verstößt eine Seite gegen die
+  Content-Security-Policy, meldet der Fehler-Beacon das jetzt als `csp_violation` (nur Direktive und
+  Ursprung), sichtbar im Dashboard und im Alarm `ClientErrorSpike`.
+
 - **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
   Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
   ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
@@ -37,6 +46,35 @@
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
 
 ### Fixed
+
+- **Einsätze und Operationen: Suche und Zeitraumfilter funktionieren mit Sonderzeichen.** Ein `&`,
+  `#` oder `+` im Suchbegriff veränderte bisher die Anfrage ans Backend, und der Datumsfilter der
+  Operationenliste griff nie. Beide Listen reichen die Filter jetzt unverändert weiter.
+
+- **Hangar-Import: Dateien über 8 MB werden sofort abgelehnt** – mit einer verständlichen Meldung
+  noch vor dem Hochladen, statt erst nach dem Upload mit einem Fehler.
+
+- **Fehlermeldungen: Downloads und Importe melden den echten Grund.** Lehnte das Backend einen
+  Kontoauszug, einen Export, einen Import oder eine Übergabe-PDF ab (z. B. keine Berechtigung,
+  nicht gefunden), kam bisher ein allgemeiner Serverfehler an; jetzt die passende Meldung.
+
+- **Organisationseinheit wechseln: Rücksprung nur noch innerhalb der Anwendung.** Nach dem Wechsel
+  führt die Weiterleitung nur noch auf eine Seite des Basetools, nie auf eine fremde Adresse.
+
+- **Protokolle enthalten keine Sitzungskennungen mehr**, nur noch einen nicht umkehrbaren
+  Fingerabdruck.
+
+- **Operationen: Die Markdown-Vorschau der Beschreibung funktioniert wieder.** Sie forderte die
+  falsche Antwortart an und blieb deshalb leer.
+
+- **Kein automatisches Neuladen mehr.** Ein neu angelegtes Material erscheint in der
+  Material-Verwaltung ohne Neuladen der Seite; bei einem Bearbeitungskonflikt (Lager-Zuordnung,
+  Lager-Notiz, Auftrags-Bearbeiter) wird nicht mehr nach zwei Sekunden neu geladen, sondern wie
+  überall nachgefragt.
+
+- **Sicherheit im Browser.** Alle Speichervorgänge laufen über denselben geschützten Weg
+  (CSRF-Wiederholung, Neuanmeldung, Doppelklick-Schutz), und jede eingefügte Anzeige wird
+  maskiert; der Lint-Lauf erzwingt beides jetzt.
 
 - **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
   Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten

@@ -46,6 +46,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -478,6 +479,77 @@ public class GlobalExceptionHandler {
   }
 
   /**
+   * Answers a {@link ResponseStatusException} with the status it carries instead of letting the
+   * {@link Exception} catch-all below turn it into a {@code 500} + {@code ERROR} + stack trace.
+   *
+   * <p>A {@code @ControllerAdvice} {@code @ExceptionHandler(Exception.class)} is consulted before
+   * Spring's own {@code ResponseStatusExceptionResolver}, so without this entry every {@code throw
+   * new ResponseStatusException(...)} in the module — the proxy relays that forward a backend
+   * {@code 400} / {@code 404} / {@code 409} as {@code new
+   * ResponseStatusException(e.getStatusCode(), ...)}, and every explicit {@code 404} — reached the
+   * caller as a {@code 500} and the log as an {@code ERROR} (APPSEC-11). A client {@code 4xx} at
+   * {@code ERROR} is exactly what REQ-OBS-001 forbids: it inflates {@code
+   * logback_events_total{level="error"}} and trips {@code LogbackErrorSpike} on ordinary user
+   * input.
+   *
+   * <p>Logging: a {@code 4xx} is logged at {@code DEBUG} — the relays already log the backend's
+   * refusal at {@code WARN} where they catch it, and REQ-OBS-001 wants a relayed failure logged
+   * once. A {@code 5xx} is logged at {@code ERROR} without a stack trace: the throw site that
+   * caught the real cause owns the trace. The exception's reason is never shown to the user and
+   * never logged — for a relay it is the {@code WebClientResponseException} message, which names
+   * the internal backend URL.
+   *
+   * <p>JSON callers receive the same compact shape as the other handlers ({@code code}, {@code
+   * status}, {@code title}, {@code message}) plus {@code detail}, which {@code krtFetch} and the
+   * upload pages read; everyone else gets the error page with the matching status.
+   *
+   * @param ex the exception carrying the status to answer with
+   * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic line
+   * @return a JSON {@link ResponseEntity} for XHR callers, or a {@link ModelAndView} of the {@code
+   *     error/error} page carrying the status otherwise
+   */
+  @ExceptionHandler(ResponseStatusException.class)
+  public Object handleResponseStatus(
+      @NotNull ResponseStatusException ex, @NotNull HttpServletRequest request) {
+    Locale locale = LocaleContextHolder.getLocale();
+    HttpStatus status = resolveStatus(ex.getStatusCode().value());
+    String code = codeForStatus(status);
+    String title =
+        resolve(titleKeyForStatus(status), locale, resolve(DEFAULT_TITLE_KEY, locale, "Error"));
+    String message =
+        resolve(
+            CODE_TO_MESSAGE_KEY.getOrDefault(code, DEFAULT_MESSAGE_KEY),
+            locale,
+            "An unexpected error occurred.");
+    if (status.is5xxServerError()) {
+      log.error(
+          "Request {} {} answered with {}", request.getMethod(), request.getRequestURI(), status);
+    } else {
+      log.debug(
+          "Request {} {} answered with {}", request.getMethod(), request.getRequestURI(), status);
+    }
+    if (wantsJson(request)) {
+      Map<String, Object> body = new LinkedHashMap<>();
+      body.put("code", code);
+      body.put("status", status.value());
+      body.put("title", title);
+      body.put("message", message);
+      body.put("detail", message);
+      String correlationId = MDC.get("correlationId");
+      if (correlationId != null && !correlationId.isBlank()) {
+        body.put("correlationId", correlationId);
+      }
+      return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+    ModelAndView page = new ModelAndView("error/error", status);
+    page.addObject("error", title);
+    page.addObject("message", message);
+    page.addObject("status", String.valueOf(status.value()));
+    page.addObject("errorCode", code);
+    return page;
+  }
+
+  /**
    * Catch-all fallback. Renders a 500 error page; unwraps a {@link BackendServiceException} cause
    * to propagate the backend's status code (e.g. 503 / 504) rather than masking it as 500.
    */
@@ -565,6 +637,30 @@ public class GlobalExceptionHandler {
     return isForbiddenCode(problemCode) && isAnonymous();
   }
 
+  /**
+   * Derives the stable problem code for a status that arrived without one — a {@link
+   * ResponseStatusException} carries only the status. The codes are the ones the backend itself
+   * emits for the same statuses ({@code BackendServiceException#deriveCodeFromStatus}), so a page
+   * that branches on {@code code} treats a relayed refusal like a direct one.
+   *
+   * @param status the resolved response status
+   * @return the matching problem code, or {@link BackendServiceException#CODE_UNKNOWN}
+   */
+  private static @NotNull String codeForStatus(@NotNull HttpStatus status) {
+    return switch (status) {
+      case BAD_REQUEST -> "VALIDATION_FAILED";
+      case UNAUTHORIZED -> "UNAUTHENTICATED";
+      case FORBIDDEN -> "ACCESS_DENIED";
+      case NOT_FOUND -> "NOT_FOUND";
+      case CONFLICT -> "CONFLICT";
+      case CONTENT_TOO_LARGE -> "UPLOAD_TOO_LARGE";
+      case LOCKED -> "LOCKED";
+      case SERVICE_UNAVAILABLE -> BackendServiceException.CODE_SERVICE_UNAVAILABLE;
+      case GATEWAY_TIMEOUT -> BackendServiceException.CODE_BACKEND_TIMEOUT;
+      default -> BackendServiceException.CODE_UNKNOWN;
+    };
+  }
+
   private static @NotNull String titleKeyForStatus(@NotNull HttpStatus status) {
     return switch (status) {
       case BAD_REQUEST -> "error.400.title";
@@ -642,6 +738,8 @@ public class GlobalExceptionHandler {
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
     m.put(BackendServiceException.CODE_UNKNOWN, "error.unexpected");
+    // A ResponseStatusException 413 (an upload relay refusing an oversized file) — APPSEC-03/-11.
+    m.put("UPLOAD_TOO_LARGE", "error.uploadTooLarge");
     return Map.copyOf(m);
   }
 }

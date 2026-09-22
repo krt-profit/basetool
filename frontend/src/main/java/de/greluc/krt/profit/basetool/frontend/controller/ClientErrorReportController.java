@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -111,7 +113,8 @@ public class ClientErrorReportController {
       Set.of(
           MetricNames.CLIENT_ERROR_SCRIPT_ERROR,
           MetricNames.CLIENT_ERROR_UNHANDLED_REJECTION,
-          MetricNames.CLIENT_ERROR_RESOURCE_ERROR);
+          MetricNames.CLIENT_ERROR_RESOURCE_ERROR,
+          MetricNames.CLIENT_ERROR_CSP_VIOLATION);
 
   private final MeterRegistry meterRegistry;
 
@@ -127,7 +130,7 @@ public class ClientErrorReportController {
    * @param line the 1-based line number within {@code source}, or {@code null} when the browser did
    *     not supply one (promise rejections never do)
    * @param column the 1-based column number within {@code source}, or {@code null}
-   * @param kind the browser-error class; only the three {@link #ALLOWED_KINDS} literals are
+   * @param kind the browser-error class; only the four {@link #ALLOWED_KINDS} literals are
    *     accepted, any other value causes the whole report to be rejected
    */
   public record ClientErrorReport(
@@ -164,7 +167,11 @@ public class ClientErrorReportController {
         "Client error reported [kind={}, message={}, source={}, line={}, column={}]",
         kind,
         LogSafe.text(report.message(), MAX_FIELD_LENGTH),
-        LogSafe.text(stripQuery(report.source()), MAX_FIELD_LENGTH),
+        LogSafe.text(
+            MetricNames.CLIENT_ERROR_CSP_VIOLATION.equals(kind)
+                ? originOnly(report.source())
+                : stripQuery(report.source()),
+            MAX_FIELD_LENGTH),
         report.line(),
         report.column());
     return ResponseEntity.noContent().build();
@@ -194,6 +201,45 @@ public class ClientErrorReportController {
   public ResponseEntity<Void> handleUnreadableBody(@NotNull Exception e) {
     log.debug("Unreadable client error report body [exception={}]", e.getClass().getSimpleName());
     return ResponseEntity.badRequest().build();
+  }
+
+  /**
+   * Reduces a CSP violation's blocked URI to its origin ({@code scheme://host[:port]}) server-side,
+   * so a path, query or fragment naming a user, a search term or a token cannot reach the log even
+   * when the client half is bypassed (FE-SEC-04). A value that is not a hierarchical URL — the
+   * browser's keywords for inline code and eval, or a {@code data:} scheme — is cut at its first
+   * {@code :}, {@code /}, {@code ?} or {@code #}, which keeps the keyword and drops everything
+   * else. User info in an authority is dropped with the rest.
+   *
+   * @param blocked the reported blocked URI, possibly {@code null}
+   * @return the origin, the bare keyword or scheme, or {@code null} when {@code blocked} was {@code
+   *     null}
+   */
+  @Contract("null -> null")
+  static @Nullable String originOnly(@Nullable String blocked) {
+    if (blocked == null) {
+      return null;
+    }
+    try {
+      URI uri = new URI(blocked.strip());
+      if (uri.getScheme() != null && uri.getHost() != null) {
+        return uri.getScheme()
+            + "://"
+            + uri.getHost()
+            + (uri.getPort() >= 0 ? ":" + uri.getPort() : "");
+      }
+    } catch (URISyntaxException e) {
+      // Not a URI at all: fall through to the keyword cut below.
+    }
+    int cut = blocked.length();
+    for (int i = 0; i < blocked.length(); i++) {
+      char c = blocked.charAt(i);
+      if (c == ':' || c == '/' || c == '?' || c == '#') {
+        cut = i;
+        break;
+      }
+    }
+    return blocked.substring(0, cut);
   }
 
   /**

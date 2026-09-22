@@ -387,7 +387,7 @@ function filterInventory() {
     })
         .then((response) => response.text())
         .then((html) => {
-            container.outerHTML = html;
+            window.krtFetch.replaceWithTrustedHtml(container, html);
             // A fragment swap does not re-fire DOMContentLoaded, so re-apply the persisted tree
             // expansion (REQ-INV-002) — otherwise a filter change or a modal write collapses every
             // row the user had opened.
@@ -830,7 +830,7 @@ function loadStackEntries(headerRow, page) {
             return r.text();
         })
         .then(function (html) {
-            content.innerHTML = html;
+            window.krtFetch.setTrustedHtml(content, html);
             headerRow.setAttribute('data-stack-loaded', 'true');
             // The entries are injected via innerHTML (not krtFetch.swap), so no krt:swapped fires —
             // enhance the Variante-C allocation "+ Zuordnen" <select data-krt-combobox> popovers by
@@ -1649,8 +1649,8 @@ function assocSubmit(split, pop, method) {
         }
         amount = Math.round(amount * 1000) / 1000;
     }
-    // REQ-FE-001: a raw-fetch write path guards double-submit ITSELF — krtFetch.write's automatic
-    // submitter capture only covers writes routed through it, and this one is a bare fetch(). Disable
+    // REQ-FE-001: this write guards double-submit ITSELF — krtFetch.write's automatic
+    // submitter capture only sees form submits, and this is a popover click. Disable
     // NOW, synchronously, before serialize() defers the send: `targetId` above was read at CLICK
     // time, so a second click would enqueue a task still carrying the first click's target and
     // re-POST the slice the first one just created — a 400 duplicate. Enter auto-repeat in the
@@ -1681,79 +1681,47 @@ function assocSubmit(split, pop, method) {
 }
 
 async function assocSend(entryId, method, body, split, pop) {
-    // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with retry-on-403.
-    let headers = window.krtCsrf
-        ? window.krtCsrf.headers()
-        : { 'Content-Type': 'application/json' };
-    function send() {
-        return fetch('/inventory/' + entryId + '/allocation', {
-            method: method,
-            headers: headers,
-            body: JSON.stringify(body),
-        });
-    }
-    try {
-        let response = await send();
-        if (response.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-            const refreshed = await window.krtCsrf.refresh();
-            if (refreshed) {
-                headers = window.krtCsrf.headers();
-                response = await send();
-            }
-        }
-        if (response.ok) {
-            let dto = null;
-            try {
-                dto = await response.json();
-            } catch {
-                /* tolerate empty body */
-            }
-            if (dto) assocRerender(split, dto);
+    // krtFetch.write (REQ-FE-002): CSRF, the bare-403 refresh-and-retry and the re-auth redirect
+    // come from the shared seam. The DELETE mapping reads the same body (dimension, target,
+    // version), hence bodyOnDelete. A 409 OPTIMISTIC_LOCK gets krtFetch's reload-confirm — the one
+    // sanctioned reload — instead of the former unconditional timed reload (REQ-FE-001/003).
+    if (!window.krtFetch) return;
+    await window.krtFetch.write({
+        method: method,
+        url: '/inventory/' + encodeURIComponent(entryId) + '/allocation',
+        payload: body,
+        bodyOnDelete: true,
+        successMessage: assocI18n.saved,
+        errorMessage: assocI18n.failed,
+        conflict: Object.assign({}, inventoryConflictI18n, {
+            reloadDetailFallback: assocI18n.conflict,
+        }),
+        onSuccess: function (dto) {
+            if (dto && typeof dto === 'object') assocRerender(split, dto);
             pop.classList.add('krtm-hidden');
-            if (typeof window.showFrontendSuccessToast === 'function') {
-                window.showFrontendSuccessToast(assocI18n.saved);
-            }
             broadcastInventoryAllChanged();
             // A job-order earmark change shifts that order's material collection.
             if (body && body.field === 'JOB_ORDER') {
                 broadcastOrdersChanged([body.targetId]);
             }
-        } else if (response.status === 409) {
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.conflict);
-            }
-            setTimeout(() => location.reload(), 2000);
-        } else if (response.status === 422) {
+        },
+        onError: function (status) {
             // Over-allocation (REQ-INV-027 R5): a toast, not a reload — the pop stays open so the
             // user can lower the amount.
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(assocI18n.overallocated);
-            }
-        } else {
-            // Show WHY, not just that it failed. The backend's RFC 7807 detail is localized at the
-            // throw site (GlobalExceptionHandler#resolveDetail) and relayed verbatim by the proxy
-            // (BackendErrorResponses#propagateBackendError), so a refusal the user can act on — a
-            // target a peer allocated a moment ago — arrives as German prose instead of the generic
-            // „Fehler beim Aktualisieren des Lagers.“. The popover stays open so they can correct it.
-            let detail = null;
-            try {
-                const problem = await response.json();
-                if (problem && typeof problem.detail === 'string' && problem.detail.trim() !== '') {
-                    detail = problem.detail;
+            if (status === 422) {
+                if (typeof window.showFrontendErrorToast === 'function') {
+                    window.showFrontendErrorToast(assocI18n.overallocated);
                 }
-            } catch {
-                /* not problem+json — fall back to the generic wording */
+                return true;
             }
-            if (typeof window.showFrontendErrorToast === 'function') {
-                window.showFrontendErrorToast(detail || assocI18n.failed);
-            }
-        }
-    } catch (e) {
-        console.error(e);
-        if (typeof window.showFrontendErrorToast === 'function') {
-            window.showFrontendErrorToast(assocI18n.failed);
-        }
-    }
+            // Anything else falls through to krtFetch: a 409 gets the conflict confirm, and every
+            // other refusal toasts the backend's RFC 7807 detail — localized at the throw site
+            // (GlobalExceptionHandler#resolveDetail) and relayed verbatim by the proxy — so the
+            // user sees WHY (e.g. a target a peer allocated a moment ago), falling back to the
+            // generic assocI18n.failed. The popover stays open so they can correct it.
+            return false;
+        },
+    });
 }
 
 // CSP-safe delegated bindings (replaces the 28 inline on*= handlers across this template).

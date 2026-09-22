@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -79,9 +80,15 @@ public class MeFrontendController {
    * re-validates the pin against the membership union and silently falls back to the union read if
    * the pin is foreign. Defence in depth against a spoofed POST.
    *
-   * @param orgUnitId the OrgUnit to activate, blank/null to clear; never silently rejected.
-   * @param referer optional referer field used to redirect back; defaults to {@code /} when
-   *     missing.
+   * <p>{@code orgUnitId} is bound as a {@link UUID}, so a value that is not one is a {@code 400}
+   * from Spring's type conversion instead of the {@code 500} an unguarded {@code UUID.fromString}
+   * used to produce. {@code _referer} is honoured only when it is a same-origin path — see {@link
+   * #safeRedirectTarget(String)} — because the redirect is the one place a crafted form could send
+   * a signed-in user off-site (FE-SEC-02).
+   *
+   * @param orgUnitId the OrgUnit to activate, {@code null} (absent or blank) to clear.
+   * @param referer optional referer field used to redirect back; anything but a same-origin path
+   *     falls back to {@code /}.
    * @param request HTTP request injected by Spring; never {@code null}.
    * @param redirectAttributes flash attribute carrier for the success toast.
    * @return redirect view to the referring page so the next render sees the new context.
@@ -89,7 +96,7 @@ public class MeFrontendController {
   @NotNull
   @PostMapping("/active-org-unit")
   public RedirectView setActiveOrgUnit(
-      @RequestParam(value = "orgUnitId", required = false) @Nullable String orgUnitId,
+      @RequestParam(value = "orgUnitId", required = false) @Nullable UUID orgUnitId,
       @RequestParam(value = "_referer", required = false) @Nullable String referer,
       HttpServletRequest request,
       RedirectAttributes redirectAttributes) {
@@ -97,24 +104,53 @@ public class MeFrontendController {
   }
 
   /**
+   * Returns {@code referer} when it is a path on this origin, otherwise {@code /}.
+   *
+   * <p>Accepted is a path with exactly one leading {@code /}. Everything else falls back: an
+   * absolute URL ({@code https://evil}), a scheme ({@code javascript:x}), a protocol-relative
+   * {@code //evil}, and {@code /\evil} — browsers read a backslash after the leading slash as a
+   * second slash, which makes it protocol-relative too. A control character anywhere falls back as
+   * well, so a line break can never reach the {@code Location} header.
+   *
+   * @param referer the raw {@code _referer} form field, may be {@code null}
+   * @return {@code referer} when it is a same-origin path, otherwise {@code "/"}
+   */
+  @Contract(pure = true)
+  static @NotNull String safeRedirectTarget(@Nullable String referer) {
+    if (referer == null
+        || referer.isEmpty()
+        || referer.charAt(0) != '/'
+        || (referer.length() > 1 && (referer.charAt(1) == '/' || referer.charAt(1) == '\\'))) {
+      return "/";
+    }
+    for (int i = 0; i < referer.length(); i++) {
+      if (Character.isISOControl(referer.charAt(i))) {
+        return "/";
+      }
+    }
+    return referer;
+  }
+
+  /**
    * Implementation backing {@link #setActiveOrgUnit}. Writes the chosen OrgUnit id to {@link
    * #ACTIVE_ORG_UNIT_SESSION_KEY} on the frontend session (or clears it on blank input) and emits
    * the {@code orgUnit.switcher.activated} / {@code orgUnit.switcher.cleared} flash toast.
    *
-   * @param rawOrgUnitId the OrgUnit id to activate, blank/null to clear.
-   * @param referer optional referer field used to redirect back.
+   * @param orgUnitId the OrgUnit id to activate, {@code null} to clear.
+   * @param referer optional referer field used to redirect back; validated by {@link
+   *     #safeRedirectTarget(String)}.
    * @param request HTTP request injected by Spring.
    * @param redirectAttributes flash attribute carrier for the success toast.
-   * @return redirect view to the referring page.
+   * @return redirect view to the referring page, or to {@code /} when it is not a same-origin path.
    */
   @NotNull
   private RedirectView applyActiveOrgUnitSelection(
-      @Nullable String rawOrgUnitId,
+      @Nullable UUID orgUnitId,
       @Nullable String referer,
       @NotNull HttpServletRequest request,
       RedirectAttributes redirectAttributes) {
     HttpSession session = request.getSession(true);
-    if (rawOrgUnitId == null || rawOrgUnitId.isBlank()) {
+    if (orgUnitId == null) {
       session.removeAttribute(ACTIVE_ORG_UNIT_SESSION_KEY);
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.cleared");
     } else {
@@ -124,10 +160,9 @@ public class MeFrontendController {
       // change a UUID instance into a String on deserialization — storing the String
       // representation up front avoids that brittleness and matches how the readers parse
       // it back.
-      UUID parsed = UUID.fromString(rawOrgUnitId.trim());
-      session.setAttribute(ACTIVE_ORG_UNIT_SESSION_KEY, parsed.toString());
+      session.setAttribute(ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.activated");
     }
-    return new RedirectView(referer != null && !referer.isBlank() ? referer : "/");
+    return new RedirectView(safeRedirectTarget(referer));
   }
 }

@@ -14,9 +14,10 @@
  * handlers; wiring via addEventListener + delegation). Strings from window.krtP4kImportI18n;
  * the jobs base URL from window.krtP4kImportEndpoints.
  *
- * Every call to the jobs proxy goes through readJson(), which is this module's single "is this
- * actually job data?" test. `resp.ok` is NOT that test — see readJson for why, and why getting it
- * wrong mattered more here than on any click-driven surface.
+ * Every read of the jobs proxy goes through readJson(), and every write (upload, apply) through
+ * krtFetch plus jobFromWrite(); together they are this module's "is this actually job data?" test.
+ * `resp.ok` is NOT that test — see readJson for why, and why getting it wrong mattered more here
+ * than on any click-driven surface.
  */
 (function () {
     'use strict';
@@ -65,33 +66,6 @@
         return (window.krtP4kImportEndpoints || {}).jobs || '/admin/p4k-import/jobs';
     }
 
-    // Escape HTML meta-characters before any value is written via innerHTML. Implemented as a
-    // self-contained replace chain (not a delegate to window.escapeHtml) so it is an unconditional,
-    // statically-recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
-    function esc(v) {
-        return String(v == null ? '' : v)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // Sources the CSRF token from the shared window.krtCsrf reader (the single
-    // source of truth over the meta tags, epic #571) rather than re-reading the
-    // meta elements locally. The token/header-name are merged into the given base
-    // WITHOUT forcing a Content-Type, so the multipart upload keeps the
-    // browser-generated boundary and the body-less apply stays header-only.
-    function csrfHeaders(base) {
-        const headers = base || {};
-        const token = window.krtCsrf ? window.krtCsrf.token() : null;
-        const header = window.krtCsrf ? window.krtCsrf.headerName() : null;
-        if (token && header) {
-            headers[header] = token;
-        }
-        return headers;
-    }
-
     /**
      * The headers every call to the jobs proxy carries.
      *
@@ -102,7 +76,9 @@
      * the redirect branch, fetch follows it, and the consent page arrives as a `200 text/html` that
      * looks like a successful answer.
      *
-     * @returns {Record<string, string>} a fresh header object, safe for csrfHeaders to extend
+     * The two writes (upload, apply) go through krtFetch, which sends the same marker itself.
+     *
+     * @returns {Record<string, string>} a fresh header object for the job-list poll
      */
     function ajaxHeaders() {
         return { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
@@ -205,6 +181,28 @@
         if (uploadBtn) uploadBtn.disabled = true;
     }
 
+    /**
+     * Interprets a krtFetch write outcome against the jobs proxy: the job DTO on success, or null
+     * when the answer was not job data. A 2xx whose body is not an object (a followed redirect to
+     * an HTML page) counts as not-job-data too — see readJson for why `ok` alone is not the test.
+     * When the request failed without reaching the caller's onError / onNetworkError hook, a gate
+     * (re-authentication or the Terms-of-Use consent gate) handled it and is navigating the page
+     * away, so the page falls silent exactly as readJson's gate branch makes it.
+     *
+     * @param {KrtWriteResult} result the krtFetch outcome
+     * @param {boolean} reported whether an onError / onNetworkError hook already surfaced the failure
+     * @returns {any} the job DTO, or null when the answer is not job data
+     */
+    function jobFromWrite(result, reported) {
+        if (result.ok && result.body && typeof result.body === 'object') {
+            return result.body;
+        }
+        if (!result.ok && !reported) {
+            gateTookOver();
+        }
+        return null;
+    }
+
     function upload() {
         const file = selectedFile();
         if (!file) {
@@ -212,29 +210,40 @@
                 window.showFrontendErrorToast(i18n().pickFirst || 'Please choose a file first.');
             return;
         }
+        if (!window.krtFetch) return;
         const fd = new FormData();
         fd.append('file', file);
-        if (uploadBtn) uploadBtn.disabled = true;
-        fetch(jobsUrl(), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders(ajaxHeaders()),
-            body: fd,
-        })
-            .then(readJson)
-            .then(function (job) {
+        let reported = false;
+        // krtFetch.submitForm (REQ-FE-002): CSRF header, the bare-403 refresh-and-retry and both
+        // gate redirects; Content-Type stays unset so the browser writes the multipart boundary.
+        // The upload button is disabled for the in-flight request (double-submit guard).
+        window.krtFetch
+            .submitForm({
+                url: jobsUrl(),
+                method: 'POST',
+                formData: fd,
+                submitter: uploadBtn,
+                toast: false,
+                onError: function () {
+                    reported = true;
+                    toastError();
+                    return true;
+                },
+                onNetworkError: function () {
+                    reported = true;
+                    toastError();
+                    return true;
+                },
+            })
+            .then(function (result) {
+                const job = jobFromWrite(result, reported);
                 if (!job) {
-                    if (uploadBtn) uploadBtn.disabled = false;
-                    if (!gated) toastError();
+                    if (result.ok && !gated) toastError();
                     return;
                 }
                 toastOk(i18n().toastUploaded || 'Catalog uploaded.');
                 resetFile();
                 loadJobs();
-            })
-            .catch(function () {
-                if (uploadBtn) uploadBtn.disabled = false;
-                toastError();
             });
     }
 
@@ -294,9 +303,46 @@
     function renderJobs(jobs) {
         if (!jobsBody) return;
         if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
+        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sink
+        // provably sees escaped values (FE-SEC-05).
         let html = '';
         jobs.forEach(function (job) {
-            html += renderJobRow(job);
+            html +=
+                '<tr>' +
+                '<td>' +
+                escapeHtml(fmtTime(job.createdAt)) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(kindLabel(job)) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(statusLabel(job)) +
+                '</td>' +
+                '<td>' +
+                escapeHtml(job.sourceFilename || '') +
+                '</td>' +
+                '<td>' +
+                escapeHtml(summaryText(job)) +
+                '</td>' +
+                '<td>';
+            // Row actions: only a finished job has any; only a finished PREVIEW can be applied.
+            if (job.status === 'SUCCEEDED') {
+                html +=
+                    '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
+                    escapeAttr(job.id) +
+                    '">' +
+                    escapeHtml(i18n().actionView || 'Details') +
+                    '</button>';
+                if (job.kind === 'PREVIEW') {
+                    html +=
+                        ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="' +
+                        escapeAttr(job.id) +
+                        '">' +
+                        escapeHtml(i18n().actionApply || 'Apply') +
+                        '</button>';
+                }
+            }
+            html += '</td>' + '</tr>';
         });
         jobsBody.innerHTML = html;
     }
@@ -347,50 +393,6 @@
         if (job.status === 'SUCCEEDED')
             return String(createdTotal(job.result)) + ' ' + (i18n().colCreated || 'Created');
         return i18n().summaryRunning || 'Processing...';
-    }
-
-    function actionsHtml(job) {
-        if (job.status !== 'SUCCEEDED') return '';
-        let html =
-            '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
-            esc(job.id) +
-            '">' +
-            esc(i18n().actionView || 'Details') +
-            '</button>';
-        if (job.kind === 'PREVIEW') {
-            html +=
-                ' <button type="button" class="btn btn--cta" data-action="apply" data-job-id="' +
-                esc(job.id) +
-                '">' +
-                esc(i18n().actionApply || 'Apply') +
-                '</button>';
-        }
-        return html;
-    }
-
-    function renderJobRow(job) {
-        return (
-            '<tr>' +
-            '<td>' +
-            esc(fmtTime(job.createdAt)) +
-            '</td>' +
-            '<td>' +
-            esc(kindLabel(job)) +
-            '</td>' +
-            '<td>' +
-            esc(statusLabel(job)) +
-            '</td>' +
-            '<td>' +
-            esc(job.sourceFilename || '') +
-            '</td>' +
-            '<td>' +
-            esc(summaryText(job)) +
-            '</td>' +
-            '<td>' +
-            actionsHtml(job) +
-            '</td>' +
-            '</tr>'
-        );
     }
 
     function findJob(id) {
@@ -448,11 +450,25 @@
             [i18n().rowBlueprints || 'Blueprints', result.blueprints],
         ];
         const body = $('krt-p4k-rows');
-        if (body) {
-            let html = '';
-            rows.forEach(function (pair) {
-                html += renderCountRow(pair[0], pair[1]);
+        // Accumulated from literals and escapeHtml calls only (FE-SEC-05); declared at function
+        // level because the lint rule only traces an accumulator in the sink's own function scope.
+        let html = '';
+        rows.forEach(function (pair) {
+            const c = pair[1] || {};
+            html += '<tr>' + '<th scope="row">' + escapeHtml(pair[0]) + '</th>';
+            [
+                c.matched,
+                c.uuidBackfilled,
+                c.uuidConflicts,
+                c.enriched,
+                c.created,
+                c.unmatched,
+            ].forEach(function (v) {
+                html += '<td>' + escapeHtml(v == null ? 0 : v) + '</td>';
             });
+            html += '</tr>';
+        });
+        if (body) {
             body.innerHTML = html;
         }
 
@@ -470,39 +486,6 @@
                 runIdLine.hidden = true;
             }
         }
-    }
-
-    function renderCountRow(label, counts) {
-        const c = counts || {};
-        return (
-            '<tr>' +
-            '<th scope="row">' +
-            esc(label) +
-            '</th>' +
-            '<td>' +
-            num(c.matched) +
-            '</td>' +
-            '<td>' +
-            num(c.uuidBackfilled) +
-            '</td>' +
-            '<td>' +
-            num(c.uuidConflicts) +
-            '</td>' +
-            '<td>' +
-            num(c.enriched) +
-            '</td>' +
-            '<td>' +
-            num(c.created) +
-            '</td>' +
-            '<td>' +
-            num(c.unmatched) +
-            '</td>' +
-            '</tr>'
-        );
-    }
-
-    function num(v) {
-        return esc(v == null ? 0 : v);
     }
 
     /* ----------------------------------------------------------------- apply */
@@ -533,27 +516,37 @@
             encodeURIComponent(applyTargetId) +
             '/apply?seedNew=' +
             (seed ? 'true' : 'false');
-        if (applyConfirmBtn) applyConfirmBtn.disabled = true;
-        fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders(ajaxHeaders()),
-        })
-            .then(readJson)
-            .then(function (job) {
-                if (applyConfirmBtn) applyConfirmBtn.disabled = false;
+        if (!window.krtFetch) return;
+        let reported = false;
+        // krtFetch.write (REQ-FE-002): a body-less POST with CSRF, the 403 retry and both gate
+        // redirects. The confirm button is disabled for the in-flight request.
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: url,
+                submitter: applyConfirmBtn,
+                toast: false,
+                onError: function () {
+                    reported = true;
+                    toastError();
+                    return true;
+                },
+                onNetworkError: function () {
+                    reported = true;
+                    toastError();
+                    return true;
+                },
+            })
+            .then(function (result) {
+                const job = jobFromWrite(result, reported);
                 if (!job) {
-                    if (!gated) toastError();
+                    if (result.ok && !gated) toastError();
                     return;
                 }
                 toastOk(i18n().toastApplyStarted || 'Apply started.');
                 if (applyPanelEl) applyPanelEl.hidden = true;
                 applyTargetId = null;
                 loadJobs();
-            })
-            .catch(function () {
-                if (applyConfirmBtn) applyConfirmBtn.disabled = false;
-                toastError();
             });
     }
 

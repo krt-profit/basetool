@@ -24,8 +24,8 @@
  * Covers: the WAI-ARIA tab switching (deeplink ?tab= + localStorage), the delete-confirmation modal
  * opener + missions-pager in-place swap, the Markdown description editor (Bearbeiten/Vorschau +
  * formatting toolbar, server-rendered preview), the in-place AJAX operation core save + delete (#576),
- * and the per-participant payout paid-out toggle. Writes go through window.krtFetch / a krtCsrf fetch
- * and update the DOM in place; the classic POST->redirect forms stay the no-JS fallback.
+ * and the per-participant payout paid-out toggle. Writes (and the read-only preview POST) go through
+ * window.krtFetch and update the DOM in place; the classic POST->redirect forms stay the no-JS fallback.
  *
  * The interpolated pieces are the only Thymeleaf expressions, so they stay inline in the page bootstrap:
  * window.operationId, the OPS_DETAIL_MSG toast/conflict strings, and the MSG_PAYOUT_PAID_* strings this
@@ -251,21 +251,28 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
 
     function renderPreview() {
         preview.textContent = '';
-        const headers = window.krtCsrf
-            ? window.krtCsrf.headers()
-            : { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
-        fetch('/operations/markdown-preview', {
+        if (!window.krtFetch) return;
+        // A read-only POST (it renders, it stores nothing) — still routed through krtFetch.write so
+        // it carries CSRF and the 403 retry (REQ-FE-002). No toast either way: a failed preview
+        // simply stays empty, as before. The endpoint produces text/html, hence `accept`.
+        window.krtFetch.write({
             method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ markdown: input.value }),
-        })
-            .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
-            .then((html) => {
-                preview.innerHTML = html;
-            })
-            .catch(() => {
-                preview.textContent = '';
-            });
+            url: '/operations/markdown-preview',
+            payload: { markdown: input.value },
+            accept: 'text/html, application/problem+json',
+            toast: false,
+            onSuccess: function (html) {
+                // Server-rendered by the frontend's own markdown renderer, which escapes the raw
+                // input — the same trust contract as a Thymeleaf fragment.
+                window.krtFetch.setTrustedHtml(preview, typeof html === 'string' ? html : '');
+            },
+            onError: function () {
+                return true;
+            },
+            onNetworkError: function () {
+                return true;
+            },
+        });
     }
 
     // selection-aware wrap (bold/italic), line-prefix (heading/list) and link insert.
@@ -524,7 +531,7 @@ document.addEventListener('change', function (ev) {
         })
             .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
             .then((html) => {
-                body.innerHTML = html;
+                window.krtFetch.setTrustedHtml(body, html);
                 body.setAttribute('data-loaded', 'true');
             })
             .catch(() => {

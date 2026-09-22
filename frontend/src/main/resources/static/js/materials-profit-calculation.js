@@ -193,10 +193,10 @@ function updateSortIndicators(columnIndex, direction) {
         const iconElement = document.getElementById('sort-icon-' + i);
         if (iconElement) {
             if (i === columnIndex) {
-                iconElement.innerHTML = direction === 'asc' ? '▲' : '▼';
+                iconElement.textContent = direction === 'asc' ? '▲' : '▼';
                 iconElement.style.color = 'var(--color-primary)';
             } else {
-                iconElement.innerHTML = '↕';
+                iconElement.textContent = '↕';
                 iconElement.style.color = 'var(--color-gray-2)';
             }
         }
@@ -208,11 +208,11 @@ async function updateProfitCalculation() {
     const body = document.getElementById('profitBody');
 
     if (!shipId) {
-        body.innerHTML = `<tr><td colspan="7" class="profit-msg">${window.krtProfitI18n.selectShip}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="profit-msg">${escapeHtml(window.krtProfitI18n.selectShip)}</td></tr>`;
         return;
     }
 
-    body.innerHTML = `<tr><td colspan="7" class="profit-msg-loading">${window.krtProfitI18n.loading}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="profit-msg-loading">${escapeHtml(window.krtProfitI18n.loading)}</td></tr>`;
 
     try {
         let url = `/api/proxy/materials/profit-calculation?shipId=${shipId}`;
@@ -231,7 +231,7 @@ async function updateProfitCalculation() {
         const data = await response.json();
 
         if (data.length === 0) {
-            body.innerHTML = `<tr><td colspan="7" class="profit-msg">${window.krtProfitI18n.noData}</td></tr>`;
+            body.innerHTML = `<tr><td colspan="7" class="profit-msg">${escapeHtml(window.krtProfitI18n.noData)}</td></tr>`;
             return;
         }
 
@@ -245,12 +245,12 @@ async function updateProfitCalculation() {
                         <strong>${escapeHtml(item.materialName)}</strong>
                     </a>
                 </td>
-                <td>-${formatNumber(item.minBuyPrice)}</td>
-                <td>+${formatNumber(item.maxSellPrice)}</td>
-                <td>${item.profitPerScu > 0 ? '+' : ''}${formatNumber(item.profitPerScu)}</td>
-                <td>${item.marginPercent.toFixed(2)}%</td>
-                <td>${formatNumber(item.fullLoadCost)}</td>
-                <td>${item.maxProfitFullLoad > 0 ? '+' : ''}${formatNumber(item.maxProfitFullLoad)}</td>
+                <td>-${escapeHtml(formatNumber(item.minBuyPrice))}</td>
+                <td>+${escapeHtml(formatNumber(item.maxSellPrice))}</td>
+                <td>${escapeHtml((item.profitPerScu > 0 ? '+' : '') + formatNumber(item.profitPerScu))}</td>
+                <td>${escapeHtml(item.marginPercent.toFixed(2))}%</td>
+                <td>${escapeHtml(formatNumber(item.fullLoadCost))}</td>
+                <td>${escapeHtml((item.maxProfitFullLoad > 0 ? '+' : '') + formatNumber(item.maxProfitFullLoad))}</td>
             `;
             body.appendChild(tr);
         });
@@ -263,7 +263,7 @@ async function updateProfitCalculation() {
         }
     } catch (error) {
         console.error('Error fetching profit calculation:', error);
-        body.innerHTML = `<tr><td colspan="7" class="text-danger profit-msg-error">${window.krtProfitI18n.fetchError}</td></tr>`;
+        body.innerHTML = `<tr><td colspan="7" class="text-danger profit-msg-error">${escapeHtml(window.krtProfitI18n.fetchError)}</td></tr>`;
     }
 }
 
