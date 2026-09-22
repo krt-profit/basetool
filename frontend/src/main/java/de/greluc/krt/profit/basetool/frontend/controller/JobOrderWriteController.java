@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderHandoverItemCrea
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderItemHandoverEntryCreateDto;
-import de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UserDto;
@@ -56,7 +55,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -65,7 +63,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.GrantedAuthority;
@@ -93,9 +90,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * <p>Split out of {@link JobOrderPageController} in the #924 L5 read/write controller split; every
  * route, security annotation, view name and response contract moved over unchanged, so the page
  * templates and the order-detail AJAX layer keep working against the exact same surface. The small
- * leaf helpers shared with the read side ({@code fetchUsers}, {@code getCurrentUserId}, {@code
- * isLogistician} and the {@code PAGE_OF_USER} response type) are duplicated verbatim per the
- * campaign precedent instead of introducing a new shared type.
+ * leaf helpers shared with the read side ({@code getCurrentUserId} and {@code isLogistician}) are
+ * duplicated verbatim per the campaign precedent instead of introducing a new shared type.
  *
  * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
  * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
@@ -138,14 +134,6 @@ public class JobOrderWriteController {
 
   /** The single {@code orders} queue section a create/mutation pokes. */
   private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
-
-  /**
-   * Response type for the user-list pull backing the assignee picker ({@code GET /api/v1/users}).
-   * Mirrors the read-side {@code JobOrderPageController} original (#924 split — duplicated with the
-   * {@link #fetchUsers} leaf helper).
-   */
-  private static final ParameterizedTypeReference<PageResponse<UserDto>> PAGE_OF_USER =
-      new ParameterizedTypeReference<PageResponse<UserDto>>() {};
 
   /**
    * Persists a new item order. Builds the backend item-order payload from the dynamically-bound
@@ -1502,9 +1490,14 @@ public class JobOrderWriteController {
 
   /**
    * Populates the model attributes the {@code assigneesSection} fragment reads — the updated order,
-   * the caller's user id, the Logistician flag and (for Logisticians) the full user list backing
-   * the add-user picker. Shared by the four assignee AJAX endpoints and mirrors what {@link
-   * JobOrderPageController#viewOrderDetail} sets for the initial full-page render.
+   * the caller's user id and the Logistician flag. Shared by the four assignee AJAX endpoints and
+   * mirrors what {@link JobOrderPageController#viewOrderDetail} sets for the initial full-page
+   * render.
+   *
+   * <p>No user list: the add-assignee picker searches the roster on demand ({@code
+   * data-krt-combobox="remote-users"}, #1193), so the {@code GET /api/v1/users?size=1000} this
+   * method used to issue on every assignee mutation fetched up to a thousand full user DTOs that
+   * the fragment never read (BE-PERF-05, removed 2026-09-22).
    *
    * @param model the view model to populate
    * @param principal the authenticated caller
@@ -1516,7 +1509,6 @@ public class JobOrderWriteController {
     model.addAttribute("currentUserId", getCurrentUserId(principal));
     boolean canAssign = isLogistician(principal);
     model.addAttribute("isLogistician", canAssign);
-    model.addAttribute("users", canAssign ? fetchUsers() : new ArrayList<>());
   }
 
   /**
@@ -1526,27 +1518,6 @@ public class JobOrderWriteController {
    * @param version the assignee edge version the client last saw
    */
   public record AssigneeNoteRequest(String note, Long version) {}
-
-  /**
-   * Fetches the full user list backing the assignee picker, degrading to an empty list when the
-   * caller lacks the required rights or the backend call fails. Verbatim duplicate of the read-side
-   * {@code JobOrderPageController#fetchUsers} original (#924 split precedent: duplicate small leaf
-   * helpers instead of introducing a shared type).
-   *
-   * @return the users, or an empty list on failure; never {@code null}
-   */
-  @NotNull
-  private List<UserDto> fetchUsers() {
-    try {
-      PageResponse<UserDto> p = backendApiClient.get("/api/v1/users?size=1000", PAGE_OF_USER);
-      if (p != null && p.content() != null) {
-        return new ArrayList<>(p.content());
-      }
-    } catch (Exception e) {
-      log.warn("Failed to fetch users (might not be an admin/officer)");
-    }
-    return new ArrayList<>();
-  }
 
   /**
    * Resolves the caller's user id from the OIDC subject, falling back to a {@code /api/v1/users/me}

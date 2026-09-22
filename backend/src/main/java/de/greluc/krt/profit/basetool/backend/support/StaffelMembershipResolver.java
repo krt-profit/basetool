@@ -24,9 +24,16 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.SquadronRepository;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
@@ -77,6 +84,10 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class StaffelMembershipResolver {
 
+  /** The primary-Staffel order: case-insensitive by squadron name, so the first is the primary. */
+  private static final Comparator<Squadron> BY_NAME =
+      Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER);
+
   private final SquadronRepository squadronRepository;
   private final OrgUnitRepository orgUnitRepository;
 
@@ -97,18 +108,68 @@ public class StaffelMembershipResolver {
       return List.of();
     }
     List<UUID> staffelIds = squadronRows.stream().map(r -> r.getId().getOrgUnitId()).toList();
-    // Polymorphic batch load + unproxy instead of a Squadron-typed query: this resolver runs for
-    // every embedded UserDto, frequently inside a transaction that already tracks one of the
-    // Staffel ids as a base-typed OrgUnit proxy (e.g. a mission's owningOrgUnit) — a
-    // subclass-typed query would force Hibernate to narrow that proxy (HHH000179, breaks ==). The
-    // instanceof filter replaces the SQL discriminator filter 1:1 and still drops dangling rows
-    // (absent from the batch result).
-    return orgUnitRepository.findAllById(staffelIds).stream()
-        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-        .filter(Squadron.class::isInstance)
-        .map(Squadron.class::cast)
-        .sorted(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
-        .toList();
+    return loadStaffelnById(staffelIds).values().stream().sorted(BY_NAME).toList();
+  }
+
+  /**
+   * Batch variant of {@link #resolveNameSortedStaffeln(List)} for many users at once: every Staffel
+   * referenced by any of the given membership rows is loaded in <em>one</em> polymorphic {@code
+   * findAllById}, then each user's rows are resolved against that map and name-sorted with the same
+   * primary-first order. Backs the {@code UserMapper} batch primer, which seeds its request memo
+   * for a whole page or aggregate before the per-user projection runs, so mapping {@code n} users
+   * costs two queries instead of up to {@code 3n} (REQ-DATA-003). A row whose squadron no longer
+   * resolves is dropped, exactly as the single-user variant drops it.
+   *
+   * @param squadronRowsByUser each user's {@code SQUADRON}-kind membership rows, keyed by user id;
+   *     never {@code null}. A user mapped to an empty list resolves to an empty list.
+   * @return every key of {@code squadronRowsByUser} mapped to that user's squadrons, name-sorted
+   *     (primary first); never {@code null}.
+   */
+  @NotNull
+  public Map<UUID, List<Squadron>> resolveNameSortedStaffelnByUser(
+      @NotNull Map<UUID, List<OrgUnitMembership>> squadronRowsByUser) {
+    Set<UUID> staffelIds =
+        squadronRowsByUser.values().stream()
+            .flatMap(List::stream)
+            .map(r -> r.getId().getOrgUnitId())
+            .collect(Collectors.toSet());
+    Map<UUID, Squadron> staffelnById =
+        staffelIds.isEmpty() ? Map.of() : loadStaffelnById(staffelIds);
+    Map<UUID, List<Squadron>> result = new HashMap<>();
+    squadronRowsByUser.forEach(
+        (userId, rows) ->
+            result.put(
+                userId,
+                rows.stream()
+                    .map(r -> staffelnById.get(r.getId().getOrgUnitId()))
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .sorted(BY_NAME)
+                    .toList()));
+    return result;
+  }
+
+  /**
+   * Loads the given org-unit ids polymorphically and keeps only the ones that are a {@link
+   * Squadron}, keyed by id. Polymorphic batch load + unproxy instead of a Squadron-typed query:
+   * this resolver runs for every embedded {@code UserDto}, frequently inside a transaction that
+   * already tracks one of the Staffel ids as a base-typed {@link OrgUnit} proxy (e.g. a mission's
+   * {@code owningOrgUnit}) — a subclass-typed query would force Hibernate to narrow that proxy
+   * (HHH000179, breaks {@code ==}). The {@code instanceof} filter replaces the SQL discriminator
+   * filter 1:1 and still drops dangling ids (absent from the batch result).
+   *
+   * @param staffelIds the org-unit ids to load; never {@code null}.
+   * @return the resolvable squadrons keyed by id; never {@code null}, possibly empty.
+   */
+  @NotNull
+  private Map<UUID, Squadron> loadStaffelnById(@NotNull Collection<UUID> staffelIds) {
+    Map<UUID, Squadron> byId = new LinkedHashMap<>();
+    for (OrgUnit ou : orgUnitRepository.findAllById(staffelIds)) {
+      if (Hibernate.unproxy(ou, OrgUnit.class) instanceof Squadron squadron) {
+        byId.put(squadron.getId(), squadron);
+      }
+    }
+    return byId;
   }
 
   /**

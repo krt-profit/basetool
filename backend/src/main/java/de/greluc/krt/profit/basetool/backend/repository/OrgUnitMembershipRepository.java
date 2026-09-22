@@ -233,4 +233,23 @@ public interface OrgUnitMembershipRepository
       """)
   Set<UUID> findUserIdsByOrgUnitAndRole(
       @Param("orgUnitId") UUID orgUnitId, @Param("role") MembershipRole role);
+
+  /**
+   * Batch variant of {@link #findUserIdsByOrgUnitAndRole(UUID, MembershipRole)}: the users holding
+   * {@code role} on <em>any</em> of the given org units, in one statement. Backs the {@code
+   * CARTEL_BANK} responsible-holder resolution, which unions the Bereichsleiter of every Profit
+   * Bereich and used to ask once per Bereich (REQ-DATA-003, BE-PERF-15).
+   *
+   * @param orgUnitIds the org units to collect role holders of; never {@code null}, never empty
+   *     (JPQL rejects an empty {@code IN} list, so the caller short-circuits)
+   * @param role the membership role to match; never {@code null}
+   * @return the matching user ids, each once; never {@code null}, possibly empty
+   */
+  @Query(
+      """
+      SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId IN :orgUnitIds
+      AND m.role = :role
+      """)
+  Set<UUID> findUserIdsByOrgUnitIdsAndRole(
+      @Param("orgUnitIds") Collection<UUID> orgUnitIds, @Param("role") MembershipRole role);
 }

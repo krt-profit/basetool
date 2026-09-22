@@ -172,7 +172,7 @@ public class RejectedRegistrationRetentionService {
    */
   @Transactional
   public boolean purgeOneTransactionally(@NotNull UUID userId, @NotNull Instant cutoff) {
-    User user = userRepository.findById(userId).orElse(null);
+    User user = userRepository.findPlainById(userId).orElse(null);
     if (user == null) {
       return false;
     }

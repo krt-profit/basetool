@@ -510,7 +510,7 @@ public class DeletionRequestService {
    */
   @Transactional(readOnly = true)
   public @Nullable String handleOf(@NotNull UUID userId) {
-    return userRepository.findById(userId).map(User::getEffectiveName).orElse(null);
+    return userRepository.findPlainById(userId).map(User::getEffectiveName).orElse(null);
   }
 
   /**

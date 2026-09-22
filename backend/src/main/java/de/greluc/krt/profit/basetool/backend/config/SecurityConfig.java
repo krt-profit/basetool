@@ -620,7 +620,10 @@ public class SecurityConfig {
                     // history is in ADR-0149 and ADR-0159; their behaviour is pinned by
                     // `AnonymousSurfaceSweepTest`, which asserts the status of EVERY mapping rather
                     // than trusting this file to be complete.
-                    .requestMatchers("/api/v1/users/search")
+                    // The slim picker search (BE-PERF-06) is the same query with a reference
+                    // projection, so it carries exactly its full-DTO twin's gate; likewise the
+                    // bank twin below.
+                    .requestMatchers("/api/v1/users/search", "/api/v1/users/search/references")
                     .hasAnyRole(Roles.ADMIN, Roles.OFFICER, Roles.KRT_MEMBER)
                     // Bank-audience search twin (ADR-0089, the #1193 remoteSource switch): the bank
                     // pickers (register holder, grant Bank-Employee role, approval limits) resolve
@@ -630,7 +633,8 @@ public class SecurityConfig {
                     // picker's gate is unchanged. BANK_EMPLOYEE covers BANK_MANAGEMENT via the role
                     // hierarchy; both are listed so the URL gate does not depend on hierarchy
                     // evaluation at the filter layer.
-                    .requestMatchers("/api/v1/users/search-bank")
+                    .requestMatchers(
+                        "/api/v1/users/search-bank", "/api/v1/users/search-bank/references")
                     .hasAnyRole(
                         Roles.ADMIN,
                         Roles.OFFICER,

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.repository.KommandoGroupRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 /**
  * SpEL-level authorisation for the delegated appointment ladder (epic #800, REQ-ROLE-004). It
@@ -71,6 +74,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Transactional(readOnly = true)
 public class OrgRoleManagementSecurityService {
+
+  /** Request-attribute key prefix of the per-request caller-membership memo. */
+  private static final String CALLER_MEMBERSHIPS_ATTR =
+      OrgRoleManagementSecurityService.class.getName() + ".callerMemberships.";
 
   private final AuthHelperService authHelperService;
   private final OrgUnitMembershipRepository membershipRepository;
@@ -249,11 +256,8 @@ public class OrgRoleManagementSecurityService {
    * @return {@code true} iff the caller's membership of that org unit carries {@code rank}.
    */
   private boolean callerHasRoleOnUnit(@NotNull UUID orgUnitId, @NotNull MembershipRole rank) {
-    return authHelperService
-        .currentUserId()
-        .flatMap(uid -> membershipRepository.findById(new OrgUnitMembershipId(uid, orgUnitId)))
-        .map(m -> m.getRole() == rank)
-        .orElse(false);
+    return callerMemberships().stream()
+        .anyMatch(m -> orgUnitId.equals(m.getId().getOrgUnitId()) && m.getRole() == rank);
   }
 
   /**
@@ -263,13 +267,37 @@ public class OrgRoleManagementSecurityService {
    * @return {@code true} iff any of the caller's memberships is an OL member.
    */
   private boolean callerIsPureOlMember() {
-    return authHelperService
-        .currentUserId()
-        .map(
-            uid ->
-                membershipRepository.findAllByIdUserId(uid).stream()
-                    .anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER))
-        .orElse(false);
+    return callerMemberships().stream().anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
+  }
+
+  /**
+   * The calling principal's membership rows, read once per HTTP request (REQ-DATA-003, BE-PERF-15).
+   * Every verdict here is a question about the caller's own ranks, and the Leitung view asks it for
+   * every Bereich, Staffel and Spezialkommando in turn — one {@code findAllByIdUserId} per request
+   * instead of a lookup per unit and verdict. Keyed by caller id, so a request cannot read another
+   * principal's rows. Outside an HTTP request there is no memo and the rows are read directly. Like
+   * the other request memos, it assumes the caller's own ranks do not change within the request
+   * that asks.
+   *
+   * @return the caller's membership rows; empty for an anonymous caller. Never {@code null}.
+   */
+  @NotNull
+  private List<OrgUnitMembership> callerMemberships() {
+    UUID callerId = authHelperService.currentUserId().orElse(null);
+    if (callerId == null) {
+      return List.of();
+    }
+    RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+    if (attrs == null) {
+      return membershipRepository.findAllByIdUserId(callerId);
+    }
+    String key = CALLER_MEMBERSHIPS_ATTR + callerId;
+    if (attrs.getAttribute(key, RequestAttributes.SCOPE_REQUEST) instanceof List<?> cached) {
+      return cached.stream().map(OrgUnitMembership.class::cast).toList();
+    }
+    List<OrgUnitMembership> rows = List.copyOf(membershipRepository.findAllByIdUserId(callerId));
+    attrs.setAttribute(key, rows, RequestAttributes.SCOPE_REQUEST);
+    return rows;
   }
 
   /**

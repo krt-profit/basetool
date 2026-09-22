@@ -31,6 +31,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q10 | A new mutation lands in an audited area with no audit event. | `REQ-AUDIT-001` coverage list; review |
 | Q11 | A metric is renamed and a dashboard or alert rule silently breaks. | The monitoring-moves-with-the-change rule; the dashboard and rule gates |
 | Q12 | A backend call hangs and the page blanks instead of degrading. | Resilience4j Timeout/CircuitBreaker with logged transitions; `REQ-FE-*` |
+| Q13 | A read's statement count starts growing with its row count, or a new foreign key ships without an index. | Hibernate `Statistics` statement-count tests (`BankReadNoNPlusOneTest`, `UserMappingNoNPlusOneTest`); `fail_on_pagination_over_collection_fetch`; `ForeignKeyIndexCoverageTest` over the live catalogue (`REQ-DATA-003`, `REQ-DATA-017`) |
 
 ## 10.3 What operationalises them
 

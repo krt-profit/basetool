@@ -426,7 +426,7 @@ class MissionServiceLifecycleTest {
     void throwsNotFound_whenUserMissing() {
       Mission mission = newMission();
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+      when(userRepository.findPlainById(USER_ID)).thenReturn(Optional.empty());
 
       assertThrows(
           NotFoundException.class, () -> service.updateMissionOwner(MISSION_ID, USER_ID, 0L));
@@ -441,7 +441,7 @@ class MissionServiceLifecycleTest {
       User user = newUser(USER_ID);
 
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+      when(userRepository.findPlainById(USER_ID)).thenReturn(Optional.of(user));
       when(missionOwnershipRepository.findByMissionId(MISSION_ID)).thenReturn(Optional.empty());
       when(missionOwnershipRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
           .thenAnswer(inv -> inv.getArgument(0));
@@ -476,7 +476,7 @@ class MissionServiceLifecycleTest {
       existing.setVersion(5L);
 
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
-      when(userRepository.findById(USER_ID)).thenReturn(Optional.of(newOwner));
+      when(userRepository.findPlainById(USER_ID)).thenReturn(Optional.of(newOwner));
       when(missionOwnershipRepository.findByMissionId(MISSION_ID))
           .thenReturn(Optional.of(existing));
       when(missionOwnershipRepository.saveAndFlush(existing)).thenReturn(existing);

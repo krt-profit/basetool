@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -39,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -119,6 +123,11 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
 
     verify(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
+    // BE-PERF-05: the re-rendered section reads no user list (the picker searches on demand,
+    // #1193), so a Logistician's assignee mutation no longer pulls up to 1000 users.
+    verify(backendApiClient, never()).get(startsWith("/api/v1/users?"), any(Class.class));
+    verify(backendApiClient, never())
+        .get(startsWith("/api/v1/users?"), any(ParameterizedTypeReference.class));
   }
 
   @Test

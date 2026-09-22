@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -77,6 +78,7 @@ class HangarControllerTest {
   @Mock private HangarImportService hangarImportService;
   @Mock private UserService userService;
   @Mock private ShipMapper shipMapper;
+  @Mock private UserMapper userMapper;
 
   @InjectMocks private HangarController controller;
 

@@ -105,7 +105,7 @@ something broke once.
   `source_systems` and `description_en` / `description_de` one release earlier. It is
   the worked example for the two-phase DROP rule below.
 
-- **V126–V244** — grouped by feature rather than listed file by file (the file names
+- **V126–V245** — grouped by feature rather than listed file by file (the file names
   say the rest):
   - **Blueprints** — personal and default blueprints plus their alias tables:
     V126–V127, V157, V163, V176, V228.
@@ -149,9 +149,12 @@ something broke once.
     rank-requirement owner, rounding, indexes, the orphan purge and
     `pg_stat_statements`: V135, V137, V139, V142–V143, V146, V148, V158, V162, V175,
     V226–V227, V240.
+  - **Foreign-key index gate** — V245 indexes the 38 foreign keys the catalogue sweep
+    `db.ForeignKeyIndexCoverageTest` found uncovered; that test now fails any new FK
+    without a leading index (REQ-DATA-017).
 
 This timeline is curated, not exhaustive (checked against the directory on
-2026-09-22, tip V244). `ls | sort -V | tail -1` in this directory is the only reliable
+2026-09-22, tip V245). `ls | sort -V | tail -1` in this directory is the only reliable
 answer to "what is the current tip?".
 
 ## Hard rules
@@ -343,6 +346,8 @@ comment should answer the obvious "why now?" question before they need to.
 - [ ] The matching JPA entity was updated in the same commit.
 - [ ] `./gradlew :backend:test` passed — the suite applies the migration to a
   Testcontainers Postgres and validates the schema against the entities.
+- [ ] A new foreign key comes with an index that leads with its column(s) —
+  `ForeignKeyIndexCoverageTest` fails the build otherwise (REQ-DATA-017).
 - [ ] If indexes were added, [`DatabaseIndexMigrationTest`](../../../../test/java/de/greluc/krt/profit/basetool/backend/db/DatabaseIndexMigrationTest.java)
   knows about them.
 - [ ] The change is mentioned in `CHANGELOG.md` under the right `### Added`
