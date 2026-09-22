@@ -82,6 +82,15 @@ public final class MetricNames {
   public static final String REASON_BACKEND_UNAVAILABLE = "backend_unavailable";
 
   /**
+   * Failure reason: the backend answered {@code 401}/{@code 403} to the gateway's <em>own</em>
+   * service-account identity (ADR-0129). Kept apart from {@link #REASON_BACKEND_REJECT} because the
+   * member did nothing wrong — the gateway's token, secret or on-behalf-of allowlist entry is the
+   * fault — and from {@link #REASON_BACKEND_UNAVAILABLE} because the backend is up and answering,
+   * so {@code IngestBackendUnavailable} would send the operator to the wrong place.
+   */
+  public static final String REASON_BACKEND_AUTH = "backend_auth";
+
+  /**
    * Failure reason: the Redis handoff staging was unreachable, so the relayed draft could not be
    * parked for browser pickup (REQ-INGEST-003). Kept apart from {@link #REASON_INTERNAL} because it
    * is an availability event with an obvious operator action, not an application fault — the caller
@@ -218,6 +227,15 @@ public final class MetricNames {
   public static final String REASON_BAD_PROVENANCE = "bad_provenance";
 
   /**
+   * Client-identity reject reason: an <em>authenticated</em> principal reached the gate that is not
+   * a JWT, so none of the claim-based checks could run. Structurally impossible on today's chain —
+   * the bearer and DPoP providers both yield a JWT authentication — which is exactly why it is
+   * refused rather than waved through: a non-zero count means a new authentication mechanism was
+   * added without the gate knowing about it.
+   */
+  public static final String REASON_NON_JWT_PRINCIPAL = "non_jwt_principal";
+
+  /**
    * Counter {@code basetool_ingest_auth_failures_total} — tag {@code reason}: the RFC 6750 bearer
    * error code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link
    * #AUTH_INVALID_REQUEST} / {@link #AUTH_INSUFFICIENT_SCOPE}), plus {@link #AUTH_NO_CREDENTIALS}
@@ -279,7 +297,8 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_ingest_service_account_token_total} — tag {@code outcome} ({@link
-   * #SA_TOKEN_MINTED} / {@link #SA_TOKEN_CACHED} / {@link #SA_TOKEN_FAILED}).
+   * #SA_TOKEN_MINTED} / {@link #SA_TOKEN_CACHED} / {@link #SA_TOKEN_FAILED} / {@link
+   * #SA_TOKEN_BACKOFF}).
    *
    * <p>Since ADR-0129 the gateway calls the backend under its OWN identity instead of relaying the
    * caller's token, so this grant sits on the critical path of every ingest write: if it fails,
@@ -299,6 +318,14 @@ public final class MetricNames {
    * {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: the grant failed; the ingest write is refused.
    */
   public static final String SA_TOKEN_FAILED = "failed";
+
+  /**
+   * {@link #INGEST_SERVICE_ACCOUNT_TOKEN} outcome: refused without calling Keycloak because a grant
+   * failed within the last few seconds (the provider's failure backoff). Kept apart from {@link
+   * #SA_TOKEN_FAILED} so that series still counts real grant attempts against Keycloak, while this
+   * one shows how many uploads the backoff turned away.
+   */
+  public static final String SA_TOKEN_BACKOFF = "backoff";
 
   /**
    * Error code: the caller authenticated successfully but its <em>client software</em> is not
@@ -333,6 +360,20 @@ public final class MetricNames {
    * and a second identity for the same fact would only invite them to disagree (REQ-OBS-011).
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
+
+  /**
+   * Gauge {@code basetool_ingest_gate_enforcing} — tag {@link #TAG_GATE} ({@code azp} / {@code
+   * scope} / {@code tool} / {@code audience}); {@code 1} while that client gate refuses callers,
+   * {@code 0} while it is unconfigured or only counting under audit-only (REQ-INGEST-011).
+   *
+   * <p>Every gate is switched on by the environment alone, so without this series the question "is
+   * production actually protected" could only be answered by reading the host's environment. Backs
+   * {@code IngestAudienceGateOff}. Published by {@link IngestGatePostureMetric}.
+   */
+  public static final String INGEST_GATE_ENFORCING = "basetool.ingest.gate.enforcing";
+
+  /** Tag key: which ingest client gate {@link #INGEST_GATE_ENFORCING} describes. */
+  public static final String TAG_GATE = "gate";
 
   private MetricNames() {
     // Constants holder — not instantiable.

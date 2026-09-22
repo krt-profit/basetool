@@ -456,7 +456,7 @@ somebody's Art. 15 request than to the member themselves.
 | Material overview / material collection / item stock / claim buckets of a job order (`isAuthenticated()` + `canSeeJobOrder`)                                                                                                                                                                                                                                             |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | View and — while fully undelivered — limitedly edit an order **your own org unit requested** (`GET /orders/requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`; `canViewOwnJobOrders` / `canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester`, REQ-ORDERS-023)                                                                                         |   ✅    |  ✅   |  ✅  |    ✅    |   ✅   |
 | **Edit** job order (status, priority, materials, handover) (`hasRole('LOGISTICIAN')` + `canEditJobOrder`)                                                                                                                                                                                                                                                                |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
-| **Record production** (Herstellung) of an item order — incl. booking the produced units into the Lager for a chosen owner/location (REQ-INV-032) (Logistician+ + `canEditJobOrder`)                                                                                                                                                                                      |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
+| **Record production** (Herstellung) of an item order — incl. booking the produced units into the Lager for a chosen owner/location (REQ-INV-032) (Logistician+ + `canEditJobOrder`; an owner other than yourself additionally needs `canManageUserInventory(<owner>)`, and never into their personal pool — see ² in 3.4) |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Record a (material or item) **handover**, preview its report, unlink a material / inventory item (Logistician+ + `canEditJobOrder`); download a handover report PDF (Logistician+ + `canSeeJobOrder`)                                                                                                                                                                    |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                                                                                                                                                                                                                                                                                       |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
 | Add/withdraw material claims on SK job orders (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                                                                                                                                                                                                                                            |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
@@ -515,8 +515,11 @@ path (`POST /api/v1/inventory`) and the `owner` override of `POST /api/v1/refine
 same gate. **Amended 2026-08-30:** all three previously accepted the flat `ROLE_LOGISTICIAN`, which
 is the OR-union over every membership and carries no org unit, so a logistician of any Staffel could
 write into any other Staffel's member ledger (REQ-SEC-005). The store dialog therefore shows the
-receiver picker only to a Logistician, and the receiver must additionally be in scope. Einbuchen
-additionally refuses `personal = true` for a foreign target; the specified personal-for-someone-else
+receiver picker only to a Logistician, and the receiver must additionally be in scope. The
+production book-in (`bookIn.ownerUserId`, REQ-INV-032) carries the same gate since 2026-09-22
+(APPSEC-01) — before, `canEditJobOrder` alone let a logistician book produced stock into any
+member's ledger. Einbuchen and the production book-in
+additionally refuse `personal = true` for a foreign target; the specified personal-for-someone-else
 capability stays in the refinery store dialog (REQ-INV-035).
 ³ Only for a target member who shares one of the caller's org units, and the list is filtered per
 row to the caller's own scope (`findByOwnerIdScoped`), so a two-Staffel target's orders in the other

@@ -223,11 +223,21 @@ GHCR_USERNAME="${IRI_GHCR_USERNAME:-deploy-bot}"
 COSIGN_VERIFY="${IRI_COSIGN_VERIFY:-true}"
 # The GitHub repository whose release-images.yml workflow identity signed the
 # artifacts. Mirrors promote.yml's `--certificate-identity-regexp`. The `@refs/`
-# suffix is pinned to `heads/main` (main-branch :edge/:sha builds) or `tags/v.+`
-# (release builds) — NOT the broad `refs/.+`, so an image built by a
-# workflow_dispatch run off an arbitrary feature branch is not trusted for prod.
+# suffix is pinned to `heads/main` (main-branch :edge/:sha builds) or a
+# `tags/vMAJOR.MINOR.PATCH` release tag — NOT the broad `refs/.+`, so an image
+# built by a workflow_dispatch run off an arbitrary feature branch is not trusted
+# for prod.
+#
+# ANCHORED at both ends (`^…$`). cosign matches the regexp against the whole
+# certificate SAN with Go's `regexp.MatchString`, which finds a match ANYWHERE in
+# the string: the unanchored form this replaced also accepted
+# `@refs/heads/main-x`, `@refs/heads/maintenance` and `@refs/tags/vfoo`. Every
+# copy of this regexp (promote.yml, promote-testing.yml, release-images.yml's
+# reuse gate, this line) is asserted identical and anchored by
+# scripts/check-cosign-identity.py in repo-lint, and scripts/deploy.test.sh runs
+# this default against accepted and refused subjects.
 COSIGN_REPO="${IRI_COSIGN_REPO:-krt-profit/basetool}"
-COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-https://github.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v.+)}"
+COSIGN_IDENTITY_REGEXP="${IRI_COSIGN_IDENTITY_REGEXP:-^https://github\\.com/${COSIGN_REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$}"
 COSIGN_OIDC_ISSUER="${IRI_COSIGN_OIDC_ISSUER:-https://token.actions.githubusercontent.com}"
 # Verification is a network round-trip — it fetches the signature layer from GHCR
 # and reaches the Sigstore roots — so it fails transiently for exactly the reasons

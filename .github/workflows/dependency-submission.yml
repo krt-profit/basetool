@@ -1,0 +1,58 @@
+name: Dependency Graph
+
+# Submits the resolved Gradle dependency graph of every module to GitHub's dependency graph (audit
+# item CI-SEC-08).
+#
+# Why it is needed: GitHub builds the dependency graph from manifests it can parse STATICALLY, and
+# a Gradle build is not one -- versions come from the version catalog, the Spring Boot BOM and
+# conflict resolution, none of which exists until Gradle runs. So until this workflow the graph
+# listed the Actions pins and the npm lint toolchain and ZERO Maven packages: Dependabot security
+# alerts could not fire for a single Java dependency, and "which of our services ships library X
+# at version Y?" had no answer in the Security tab. OWASP Dependency-Check (dependency-check.yml)
+# answers the CVE question weekly; this makes GitHub's own advisory matching see the same
+# dependencies continuously.
+#
+# `gradle/actions/dependency-submission` runs the build's dependency resolution with GitHub's
+# dependency-graph plugin and uploads the result as a snapshot. It resolves; it compiles and tests
+# nothing.
+#
+# Main only: a submission describes the default branch's graph, and one from a pull request would
+# write a branch's -- possibly a fork's -- graph into the repository's. Same rule as
+# basetool-android's `dependency-graph` job.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-submission-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  submit:
+    name: Submit the Gradle dependency graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The snapshot upload is the one write, and the dependency-graph API authorises it with
+    # `contents: write` (there is no narrower scope for it).
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 25 (Temurin)
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Same pin as every other gradle/actions use in this repository.
+      - name: Submit the resolved dependencies
+        uses: gradle/actions/dependency-submission@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0

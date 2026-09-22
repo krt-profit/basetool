@@ -1278,6 +1278,32 @@ groups:
           summary: "Ingest client-identity gate rejecting callers ({{ $labels.reason }})"
           description: "The ingest gateway refused a caller under reason '{{ $labels.reason }}'. unknown_client/bad_provenance means an unapproved tool is calling the restricted ingest interface; missing_azp/missing_scope means a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Check the gateway log for the matching WARN and the allowlist in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS."
 
+      # (ING-SEC-03, REQ-INGEST-011) The ingest gateway's JWT audience check is OFF.
+      #
+      # Every client gate of the gateway is switched on by the environment alone, and the audience is
+      # the one an operator must set by hand, LAST, after the audit-only pass of the client-identity
+      # gate (docs/INGEST_KEYCLOAK_SETUP.md step 7a). Until 2026-09-22 nothing but reading the host's
+      # environment said whether it had been: on 2026-08-28 it held the backend's value, i.e.
+      # effectively off, and nobody could see it. basetool_ingest_gate_enforcing{gate="audience"} is
+      # 1 once IRI_INGEST_EXPECTED_AUDIENCES carries a value, 0 otherwise.
+      #
+      # Why no environment or profile matcher: this Prometheus scrapes the production stack only
+      # (external_labels monitor=basetool-prod; dev, test and e2e run no monitoring plane), so the
+      # series it sees is by construction the production gateway's. The rule is scoped to the ingest
+      # application label so a future second gateway would be judged on its own.
+      #
+      # Expected to fire from the first deploy of the gauge until the operator completes step 7a;
+      # that is the point — it turns an unverified assumption into a standing, visible task. `for:`
+      # spans a restart, during which the gauge is absent and the rule is silent anyway.
+      - alert: IngestAudienceGateOff
+        expr: max by (application) (basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest"}) == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ingest gateway runs without its JWT audience check"
+          description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience) once a live extractor token carries aud=basetool-ingest, after the client-identity gate has left audit-only — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
+
       # A8 / REQ-OBS-018: a client nobody registered here is driving the backend API.
       #
       # The backend counterpart of IngestUnknownClient above, and deliberately weaker: the ingest

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.RejectedRegistrationRetentionService;
+import de.greluc.krt.profit.basetool.backend.support.RejectedRegistrationRetentionProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -42,12 +43,18 @@ class RejectedRegistrationRetentionTaskTest {
 
   private static final Duration MAX_AGE = Duration.ofDays(90);
 
+  /** The sweep interval; irrelevant to these direct calls, but the properties record needs one. */
+  private static final Duration INTERVAL = Duration.ofHours(24);
+
   @Mock private RejectedRegistrationRetentionService retentionService;
 
   private final TaskMetrics taskMetrics = new TaskMetrics(new SimpleMeterRegistry());
 
   private RejectedRegistrationRetentionTask task() {
-    return new RejectedRegistrationRetentionTask(retentionService, taskMetrics, MAX_AGE);
+    return new RejectedRegistrationRetentionTask(
+        retentionService,
+        taskMetrics,
+        new RejectedRegistrationRetentionProperties(true, MAX_AGE, INTERVAL));
   }
 
   // covers REQ-SEC-057 — the cutoff is "now - max-age"

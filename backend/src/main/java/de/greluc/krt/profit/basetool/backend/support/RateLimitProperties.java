@@ -123,6 +123,39 @@ public class RateLimitProperties {
 
     /** Refill window for {@link #refillTokens}. */
     @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
+
+    /**
+     * The separate, much tighter per-subject budget for the expensive export and report reads
+     * (APPSEC-10, owner decision 2026-09-22); see {@link Export}.
+     */
+    @Valid @NotNull private Export export = new Export();
+  }
+
+  /**
+   * Per-subject budget for the export, statement, report and PDF endpoints (REQ-SEC-033 carve-out,
+   * APPSEC-10) — prefix {@code app.rate-limit.subject.export}.
+   *
+   * <p>These are GETs, so the write-only default of {@link Subject} skips them, yet each one
+   * renders a whole document: a PDF over a period's postings, a member's complete Art. 15 export,
+   * an audit trail. A client looping on one of them costs orders of magnitude more than the cheap
+   * reads the per-IP budget is sized for. The bucket is keyed on the subject like the write budget
+   * but is separate from it, so a burst of downloads never eats into the account's ordinary writes.
+   */
+  @Data
+  public static class Export {
+    /** Whether the export budget is enforced; it also needs {@link Subject#isEnabled()}. */
+    private boolean enabled = true;
+
+    /** Export requests a single subject may make within {@link #refillPeriod}. */
+    @Min(1)
+    private int capacity = 10;
+
+    /** Tokens returned to a subject's export bucket each {@link #refillPeriod}. */
+    @Min(1)
+    private int refillTokens = 10;
+
+    /** Refill window for {@link #refillTokens}. */
+    @NotNull private Duration refillPeriod = Duration.ofMinutes(1);
   }
 
   /** The per-subject budget; see {@link Subject}. */

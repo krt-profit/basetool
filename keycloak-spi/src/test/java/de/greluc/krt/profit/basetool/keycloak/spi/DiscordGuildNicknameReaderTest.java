@@ -40,9 +40,9 @@ import org.junit.jupiter.api.Test;
  * timeout — capturing a nickname must never throw, so a Discord hiccup can never break the login.
  * Also covers the two views of the member object: {@link
  * DiscordGuildNicknameReader#readGuildDisplayName} falling back to {@code user.global_name} (the
- * approval-queue label), and {@link DiscordGuildNicknameReader#readNickname} staying nick-only (the
- * conservative precheck candidate). The pure {@code extractNick} / {@code extractGuildDisplayName}
- * parsing is checked directly too.
+ * approval-queue label), and {@code extractNick} staying nick-only (the conservative precheck
+ * candidate, parsed from the member object the membership gate already read). The pure {@code
+ * extractNick} / {@code extractGuildDisplayName} parsing is checked directly too.
  */
 class DiscordGuildNicknameReaderTest {
 
@@ -164,16 +164,13 @@ class DiscordGuildNicknameReaderTest {
   }
 
   @Test
-  void readNickname_ignoresGlobalName_soThePrecheckStaysConservative() throws IOException {
-    // readNickname (the precheck candidate) must NOT fall back to the global name — otherwise a
+  void extractNick_ignoresGlobalName_soThePrecheckStaysConservative() {
+    // extractNick (the precheck candidate) must NOT fall back to the global name — otherwise a
     // common display name could trigger a false account-collision denial at first-broker login.
-    HttpServer server =
-        start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}"));
-    try {
-      assertTrue(read(server, Duration.ofSeconds(2)).isEmpty());
-    } finally {
-      server.stop(0);
-    }
+    assertTrue(
+        DiscordGuildNicknameReader.extractNick(
+                "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}")
+            .isEmpty());
   }
 
   @Test
@@ -196,7 +193,7 @@ class DiscordGuildNicknameReaderTest {
   private static Optional<String> read(HttpServer server, Duration requestTimeout) {
     DiscordGuildNicknameReader reader =
         new DiscordGuildNicknameReader(HttpClient.newHttpClient(), requestTimeout);
-    return reader.readNickname(baseUrl(server), GUILD, TOKEN);
+    return reader.readGuildDisplayName(baseUrl(server), GUILD, TOKEN);
   }
 
   private static Optional<String> readDisplay(HttpServer server, Duration requestTimeout) {

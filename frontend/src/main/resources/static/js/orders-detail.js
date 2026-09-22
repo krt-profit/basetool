@@ -2037,6 +2037,7 @@ function _prodResetBookIn() {
     const personalCb = document.getElementById('production-personal');
     if (personalCb) {
         personalCb.checked = false;
+        personalCb.disabled = false;
     }
     const allocateCb = document.getElementById('production-allocate');
     if (allocateCb) {
@@ -2058,6 +2059,25 @@ function _prodSyncPersonalAllocate() {
     const personal = !!(personalCb && personalCb.checked);
     allocateCb.disabled = personal;
     allocateCb.checked = !personal;
+}
+
+// A personal book-in is only ever into one's OWN private pool: the backend refuses personal = true
+// on behalf of another member with a 403 (REQ-INV-032, APPSEC-01, as Einbuchen does). So while the
+// owner picker names someone other than the acting user, "persönlich" is disabled and cleared, and
+// the earmark checkbox follows. Picking oneself again re-enables it (unchecked, the default).
+function _prodSyncPersonalForOwner() {
+    const personalCb = document.getElementById('production-personal');
+    if (!personalCb) {
+        return;
+    }
+    const ownerEl = document.getElementById('production-owner');
+    const ownerId = (ownerEl && ownerEl.value) || '';
+    const onBehalf = ownerId !== '' && ownerId !== _prodActingUserId();
+    personalCb.disabled = onBehalf;
+    if (onBehalf && personalCb.checked) {
+        personalCb.checked = false;
+        _prodSyncPersonalAllocate();
+    }
 }
 
 // Repopulates the book-in org-unit picker for the resolved owner — the #1328 Umbuchen semantics
@@ -2361,6 +2381,7 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         _prodReconcile();
     });
     window.krtEvents.on('change', 'od-production-owner-changed', function () {
+        _prodSyncPersonalForOwner();
         _prodRefreshOrgUnitPicker();
     });
     window.krtEvents.on('change', 'od-production-personal-toggle', function () {

@@ -77,6 +77,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Guard against an existing tag or release branch
         env:
@@ -92,19 +93,10 @@ jobs:
             exit 1
           fi
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-read-only: true
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+          cache-read-only: 'true'
 
       - name: Tidy historical CHANGELOG drift
         run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
@@ -162,7 +154,8 @@ jobs:
         run: |
           set -euo pipefail
           # Commit only the known release artifacts -- never an incidental change
-          # such as the gradlew mode bit flipped by `chmod +x` in an earlier step.
+          # an earlier step left in the working tree (a `chmod +x ./gradlew` used to
+          # flip the mode bit here; it is gone, and this list still stands guard).
           paths=(CHANGELOG.md backend/docs frontend/docs ingest/docs keycloak-spi/docs)
           mapfile -t files < <(git diff --name-only HEAD -- "${paths[@]}")
           if [ "${#files[@]}" -eq 0 ]; then
@@ -207,28 +200,53 @@ jobs:
           } > "$body"
           echo "path=${body}" >> "$GITHUB_OUTPUT"
 
+      # The release identity is the `basetool-release` GitHub App (ADR-0201), and nothing else can
+      # do this step. The tag ruleset "Version" restricts creating and updating `v*` tags to two
+      # bypass actors -- @greluc and this App -- so GITHUB_TOKEN is refused, and so is the PAT that
+      # RELEASE_TOKEN held until 2026-09-22 (measured: `Resource not accessible by personal access
+      # token`, HTTP 403, on the v1.10.0 release). An App token also does what GITHUB_TOKEN cannot:
+      # the events it causes trigger other workflows.
+      - name: Refuse to start without the release App's key
+        env:
+          HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set -- opening the release PR needs the basetool-release GitHub App (ADR-0201); a PAT or GITHUB_TOKEN is refused by the tag ruleset"
+            exit 1
+          fi
+
+      - name: Mint a basetool-release App token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # The App's CLIENT ID, and a literal on purpose: it is public (GET /apps/basetool-release
+          # returns it), so a variable would hide nothing, and it is the same App the tag ruleset
+          # names as a bypass actor -- rotating one without the other is a change worth reviewing.
+          # Not `app-id`: that input is deprecated in v3 and is the one a v4 bump will remove.
+          client-id: Iv23liHT1h5peKsDnrUD
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Scoped to what this step needs, not to everything the installation allows.
+          permission-contents: read
+          permission-pull-requests: write
+
       - name: Open the release PR
         env:
           # The krt-profit org policy forbids Actions from creating PRs with the
           # default GITHUB_TOKEN (the same constraint refresh-versions.yml
-          # documents), so a dedicated RELEASE_TOKEN -- a fine-grained PAT or
-          # GitHub App token with contents:write + pull-requests:write -- opens
-          # the PR instead. Using a real identity here is also what makes the
-          # PR's required status checks run at all: a PR opened by GITHUB_TOKEN
-          # does NOT trigger pull_request workflows (GitHub's anti-recursion
-          # rule), so the branch-protection checks would never report and the PR
-          # could never be merged. release-publish.yml already prefers the same
-          # secret for the tag push, so one token drives the whole release flow.
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          # documents), so the basetool-release App opens it instead. A real
+          # identity here is also what makes the PR's required status checks run
+          # at all: a PR opened by GITHUB_TOKEN does NOT trigger pull_request
+          # workflows (GitHub's anti-recursion rule), so the branch-protection
+          # checks would never report and the PR could never be merged. The
+          # commit above stays GITHUB_TOKEN's on purpose: its github-actions[bot]
+          # author is the one the DCO check exempts. release-publish.yml mints the
+          # same App's token for the tag, so one identity drives the release.
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           TAG: ${{ steps.ver.outputs.tag }}
           BRANCH: ${{ steps.ver.outputs.branch }}
           NOTES: ${{ steps.notes.outputs.path }}
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::RELEASE_TOKEN secret is not set -- add a fine-grained PAT or GitHub App token with contents:write + pull-requests:write so the release PR can be opened (the org policy forbids GITHUB_TOKEN from creating PRs)."
-            exit 1
-          fi
           # Best-effort label so humans can filter release PRs; the publish
           # workflow keys off the release/ branch name, not the label.
           gh label create release --color FFA500 --description "Automated release PR" 2>/dev/null || true

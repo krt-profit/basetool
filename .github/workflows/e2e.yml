@@ -21,7 +21,11 @@ on:
     # skips e2e until the next push — a real, recurring footgun.
     types: [opened, synchronize, reopened, labeled]
   schedule:
-    - cron: '0 3 * * *' # nightly 03:00 UTC
+    # Daily. Scheduled at 02:37 UTC, off the full hour when every repository on GitHub queues its
+    # crons -- but GitHub starts scheduled runs late (4 to 6.5 hours were measured on this
+    # repository's weekly workflows in September 2026), so read it as "once a day", not as a time
+    # (audit item CI-16).
+    - cron: '37 2 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -59,12 +63,88 @@ permissions:
   contents: read
 
 jobs:
+  # Builds the two application images ONCE per run and hands them to all fifteen matrix cells as
+  # an artifact (audit item CI-06). Before, every cell ran `docker compose up --build` itself: the
+  # same backend and frontend images, from the same commit, built fifteen times in parallel -- each
+  # build a full multi-stage Gradle compile inside Docker, each a fresh chance at the Maven Central
+  # 429 that kills a cell before a single test runs (Delivery note, "Same class, different
+  # remote"). One build, fifteen `docker load`s.
+  #
+  # An artifact, not the GitHub Actions layer cache ADR-0137 rejected: that decision is about
+  # `cache-to: type=gha`, which wrote gigabytes per run into the shared 10 GB cache store and had
+  # them evicted before anything read them. A run-scoped artifact does not touch the cache store,
+  # is read by the fifteen cells of THIS run only, and expires after a day.
+  #
+  # The gate is the matrix job's gate verbatim, so a PR without the `e2e` label builds nothing.
+  build-stack:
+    name: Build E2E images
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
+      (github.event.action != 'labeled' &&
+      contains(github.event.pull_request.labels.*.name, 'e2e'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The names docker-compose.build.yml gives the built services, with the tag
+      # E2eStackExtension sets (IRI_BASETOOL_VERSION=e2e-local, its IMAGE_TAG constant). The matrix
+      # cells boot them with `--no-build`, and E2eStackExtension refuses to start in prebuilt mode
+      # when either is missing, so a rename on one side fails loudly instead of pulling from GHCR.
+      BACKEND_IMAGE: ghcr.io/krt-profit/basetool-backend:e2e-local
+      FRONTEND_IMAGE: ghcr.io/krt-profit/basetool-frontend:e2e-local
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The same two builds `docker compose ... up --build` ran in every cell: context `.`, the
+      # module Dockerfile, no build args (docker-compose.build.yml passes none). Retried once, for
+      # the same reason E2eStackExtension retried its `up --build`: the Gradle dependency download
+      # inside the image build is the network call that fails transiently.
+      - name: Build the backend and frontend images
+        run: |
+          set -euo pipefail
+          build() {
+            local dockerfile="$1" tag="$2" attempt
+            for attempt in 1 2; do
+              if docker build --file "$dockerfile" --tag "$tag" .; then
+                return 0
+              fi
+              echo "::warning::building ${tag} failed (attempt ${attempt}/2)"
+              sleep 15
+            done
+            return 1
+          }
+          build backend/Dockerfile "$BACKEND_IMAGE"
+          build frontend/Dockerfile "$FRONTEND_IMAGE"
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep ':e2e-local '
+
+      # zstd ships on the runner; -T0 uses every core. Uploaded uncompressed by the artifact action
+      # (compression-level 0), because it is compressed already.
+      - name: Save the images
+        run: |
+          set -euo pipefail
+          docker save "$BACKEND_IMAGE" "$FRONTEND_IMAGE" | zstd -T0 -3 -q -o e2e-images.tar.zst
+          ls -l e2e-images.tar.zst
+
+      - name: Upload the images
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-images
+          path: e2e-images.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
   e2e:
     # The DEVICE belongs in the name. With fifteen jobs and only the browser in it, five are
     # indistinguishable per engine — when one was cancelled at its timeout, working out WHICH
     # device class it was meant comparing artifact sizes, and the run log interleaves all five
     # under one name so it cannot be read per job at all.
     name: E2E flows (${{ matrix.browser }}, ${{ matrix.device }})
+    needs: build-stack
     # PRs: only when labelled `e2e`. A `labeled` event must be the `e2e` label
     # itself, so toggling an unrelated label never spins up this heavy stack;
     # open/synchronize/reopened run whenever the label is currently present.
@@ -72,7 +152,8 @@ jobs:
     #
     # This expression is mirrored verbatim into the `concurrency.group` selector above so that
     # runs which will skip cannot cancel the run that will execute. Editing it here without
-    # editing it there fails the `e2e-gate-mirror` repo-lint job.
+    # editing it there fails the `e2e-gate-mirror` repo-lint check. `build-stack` carries the same
+    # expression, so the two jobs run or skip together.
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.action == 'labeled' && github.event.label.name == 'e2e') ||
@@ -107,31 +188,41 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          distribution: temurin
-          java-version: '25'
+          persist-credentials: false
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Cache the Playwright-managed browsers (~/.cache/ms-playwright) so the
-      # playwrightInstall task is a no-op on a hit. Keyed on the version catalog,
-      # so a Playwright bump (gradle/libs.versions.toml) invalidates the cache.
+      # Cache the Playwright-managed browser (~/.cache/ms-playwright) so the playwrightInstall task
+      # is a no-op on a hit. Keyed on the version catalog, so a Playwright bump
+      # (gradle/libs.versions.toml) invalidates it -- and on the BROWSER, because each cell now
+      # installs only its own engine (`-Pe2e.browser`, audit item CI-06): a shared key would hand a
+      # Firefox cell a Chromium-only cache and let the first engine to finish decide what the key
+      # holds for everyone.
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: |
-            playwright-${{ runner.os }}-
+            playwright-${{ runner.os }}-${{ matrix.browser }}-
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Download the E2E images
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-images
+          path: ${{ runner.temp }}/e2e-images
+
+      - name: Load the E2E images
+        env:
+          ARCHIVE: ${{ runner.temp }}/e2e-images/e2e-images.tar.zst
+        run: |
+          set -euo pipefail
+          zstd -d -c "$ARCHIVE" | docker load
+          rm -f "$ARCHIVE"
 
       # WebKit has no launch-level DNS override, so the ephemeral stack's Keycloak
       # issuer host must be mapped to the loopback at the OS level. Chromium (a
@@ -140,18 +231,23 @@ jobs:
       - name: Map host.docker.internal to the loopback (needed by WebKit)
         run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
-      # E2eStackExtension builds the images and brings the stack up itself (no
-      # E2E_BASE_URL => ephemeral mode); the Dockerfiles are multi-stage, so no
-      # separate bootJar step is needed. Docker + compose v2 ship on the runner.
+      # E2eStackExtension brings the stack up itself (no E2E_BASE_URL => ephemeral mode).
+      # `-Pe2e.prebuilt=true` makes it boot the images loaded above with `--no-build` instead of
+      # building them, and refuse to start if either is missing. Docker + compose v2 ship on the
+      # runner.
       - name: Run e2e flows
+        env:
+          BROWSER: ${{ matrix.browser }}
+          DEVICE: ${{ matrix.device }}
         run: >-
           ./gradlew :frontend:e2eTest
-          -Pe2e.browser=${{ matrix.browser }}
-          -Pe2e.device=${{ matrix.device }}
+          -Pe2e.browser="$BROWSER"
+          -Pe2e.device="$DEVICE"
+          -Pe2e.prebuilt=true
           --stacktrace
 
       # Playwright traces, failure screenshots/HTML dumps and the docker compose
-      # build/boot logs all land under frontend/build/e2e.
+      # boot logs all land under frontend/build/e2e.
       - name: Upload e2e artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

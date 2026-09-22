@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.logging;
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
+import de.greluc.krt.profit.basetool.ingest.metrics.IngestGatePostureMetric;
 import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,9 +42,9 @@ import org.springframework.stereotype.Component;
  * <p>The banner surfaces exactly the facts an on-call engineer reaches for when an ingest incident
  * starts: which profiles are live, which backend the relay forwards to, which frontend URL the
  * extractor is sent to, how long a handoff stays valid, which Keycloak issues the tokens being
- * validated, whether the per-IP throttle is armed, and the effective logging knobs. This is the
- * difference between reading a misconfiguration off the first ten log lines and inferring it from a
- * 502 an hour later.
+ * validated, whether the throttles are armed and with which budgets, which client gates actually
+ * refuse callers (REQ-INGEST-011), and the effective logging knobs. This is the difference between
+ * reading a misconfiguration off the first ten log lines and inferring it from a 502 an hour later.
  *
  * <p>No secret is ever printed: the Redis password, the keystore password and the monitoring-scrape
  * credentials are deliberately absent, and the Redis endpoint is rendered host:port only, with any
@@ -58,6 +59,12 @@ public class StartupBannerListener {
   private final IngestProperties ingestProperties;
   private final LoggingProperties loggingProperties;
   private final RateLimitProperties rateLimitProperties;
+
+  /**
+   * Supplies the client-gate posture line — booleans and list sizes only, never a configured client
+   * id, scope, tool or audience (REQ-OBS-004).
+   */
+  private final IngestGatePostureMetric gatePostureMetric;
 
   @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:unknown}")
   private String keycloakIssuerUri;
@@ -81,13 +88,20 @@ public class StartupBannerListener {
     log.info("============================================================");
     log.info(" Profit Basetool :: {} ready", applicationName);
     log.info(" Active profiles     : {}", Arrays.toString(environment.getActiveProfiles()));
-    log.info(" Backend relay       : {}", ingestProperties.getBackendBaseUrl());
-    log.info(" Frontend handoff    : {}", ingestProperties.getFrontendBaseUrl());
-    log.info(" Handoff TTL         : {}", ingestProperties.getHandoffTtl());
-    log.info(" Max payload (bytes) : {}", ingestProperties.getMaxPayloadBytes());
+    log.info(" Backend relay       : {}", ingestProperties.backendBaseUrl());
+    log.info(" Frontend handoff    : {}", ingestProperties.frontendBaseUrl());
+    log.info(" Handoff TTL         : {}", ingestProperties.handoffTtl());
+    log.info(" Max payload (bytes) : {}", ingestProperties.maxPayloadBytes());
     log.info(" Redis staging       : {}", sanitiseRedisEndpoint(redisHost, redisPort));
     log.info(" Keycloak issuer     : {}", keycloakIssuerUri);
-    log.info(" Per-IP rate limit   : {}", rateLimitProperties.isEnabled());
+    log.info(
+        " Rate limits         : {} (subject {}/{}, ip {}/{})",
+        rateLimitProperties.enabled(),
+        rateLimitProperties.capacity(),
+        rateLimitProperties.refillPeriod(),
+        rateLimitProperties.ipCapacity(),
+        rateLimitProperties.refillPeriod());
+    log.info(" Client gates        : {}", gatePostureMetric.posture().describe());
     log.info(" Correlation header  : {}", loggingProperties.correlationIdHeader());
     log.info(" Slow request (ms)   : {}", loggingProperties.slowRequestThresholdMs());
     log.info(" Structured logging  : {}", loggingProperties.structuredEnabled());

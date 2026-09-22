@@ -249,21 +249,40 @@ migration version numbering*
 ([`flyway-migrations.yml`](.github/workflows/flyway-migrations.yml)).
 Further PR checks run alongside (some only when their paths are
 touched) and are expected to pass:
-[`repo-lint.yml`](.github/workflows/repo-lint.yml) (shellcheck,
-actionlint, hadolint, ansible-lint, Quadlet drift, ADR registry,
-monitoring and logging-facade gates),
-[`gitleaks.yml`](.github/workflows/gitleaks.yml) (secret scan),
+[`repo-lint.yml`](.github/workflows/repo-lint.yml) — four jobs by
+toolchain: *Linters* (shellcheck, actionlint, zizmor, hadolint),
+*Repository gates* (Quadlet drift, ADR numbering and registry, the cosign
+signer identity, image pins, dashboards, log masking, ansible-lint, …),
+*Self-tests* (the operational scripts' suites) and *Container checks*
+(Prometheus rules and config, Alertmanager, Alloy, Loki, the edge nginx,
+the Keycloak issuer). Every check is a step named `<check> / …` and runs
+even when an earlier one failed, so the job log lists every finding;
+[`gitleaks.yml`](.github/workflows/gitleaks.yml) (secret scan; on a PR
+it reads `.gitleaks.toml` from the **base** commit, so an allowlist
+change takes effect from the next PR on),
 [`wrapper-validation.yml`](.github/workflows/wrapper-validation.yml),
 [`deploy-script.yml`](.github/workflows/deploy-script.yml) and
 [`keycloak-provisioner.yml`](.github/workflows/keycloak-provisioner.yml).
 [`cache-janitor.yml`](.github/workflows/cache-janitor.yml) is housekeeping,
 not a check: after each CodeQL run and when a PR closes it deletes Actions
 caches nothing will read again, so the repository stays under GitHub's 10 GB
-cache cap.
+cache cap. [`dependency-submission.yml`](.github/workflows/dependency-submission.yml)
+is housekeeping too: on every push to `main` it submits the resolved Gradle
+dependency graph, so GitHub's dependency graph and Dependabot alerts see the
+Java dependencies at all.
+
+Workflow changes follow the same bar as code: every `uses:` pinned to a full
+commit SHA (the repository's Actions policy refuses anything else), every
+`actions/checkout` with `persist-credentials: false`, permissions declared
+per job and no wider than the job uses, and no `${{ }}` expression pasted
+into a `run:` script — pass it through `env:`. `zizmor` in repo-lint checks
+all four; a finding you accept goes into `.github/zizmor.yml` with its
+reason.
 
 The Playwright end-to-end suite ([`e2e.yml`](.github/workflows/e2e.yml))
-runs on a PR **only when it carries the `e2e` label** (and nightly on
-`main`). Maintainers apply the label to any PR that touches frontend
+runs on a PR **only when it carries the `e2e` label** (and once a day on
+`main`; GitHub starts scheduled runs hours after their cron time, so none
+of this repository's schedules is a clock time). Maintainers apply the label to any PR that touches frontend
 flows, auth / session, controllers or migrations; ask for it if your PR
 does.
 

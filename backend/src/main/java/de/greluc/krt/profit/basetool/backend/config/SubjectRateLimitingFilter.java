@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -65,14 +66,25 @@ import tools.jackson.databind.ObjectMapper;
  * REQ-INGEST-005); this is that control applied to the backend's own surface.
  *
  * <p><b>What it covers.</b> Every {@code /api/**} write — {@code POST}, {@code PUT}, {@code PATCH},
- * {@code DELETE} — plus the notification SSE connect. Reads are deliberately left to the per-IP
- * budget: they are cheap, cacheable and the surface a legitimate client hits most. Writes are what
- * cost database work and produce audit rows, and an SSE connect holds a server-side resource open,
- * so a reconnect loop is worth bounding by identity rather than by address.
+ * {@code DELETE} — plus the notification SSE connect, and the exports on a bucket of their own
+ * (below). Other reads are deliberately left to the per-IP budget: they are cheap, cacheable and
+ * the surface a legitimate client hits most. Writes are what cost database work and produce audit
+ * rows, and an SSE connect holds a server-side resource open, so a reconnect loop is worth bounding
+ * by identity rather than by address.
  *
  * <p>The two budgets share one bucket on purpose. A reconnect storm that also blocks the account's
  * writes is the intended outcome: both come from the same misbehaving client, and splitting them
  * would let one starve the server while the other stayed within its own budget.
+ *
+ * <p><b>The export carve-out</b> (APPSEC-10, owner decision 2026-09-22). The export, statement,
+ * report and PDF endpoints are reads, but each one renders a whole document — a period's postings,
+ * a member's complete Art. 15 export, an audit trail. They get a second, much tighter per-subject
+ * bucket of their own ({@code app.rate-limit.subject.export}, 10 per minute by default). It is
+ * recognised by path segment ({@link #EXPORT_SEGMENTS}) rather than by a list of endpoints, so an
+ * export added later is covered without anyone remembering this filter. It is deliberately separate
+ * from the write bucket: a member downloading a handful of statements must not lose their ordinary
+ * writes for it. An export that is also a write (the handover-report preview is a {@code POST})
+ * spends from both.
  *
  * <p>Anonymous requests pass straight through — they carry no subject to key on. That is no longer
  * a hole worth naming a ceiling for: since ADR-0159 the only paths an anonymous caller reaches are
@@ -107,6 +119,17 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   private static final PathPattern LIVE_SYNC_CONNECT =
       PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream");
 
+  /**
+   * Path segments that mark an expensive document-rendering endpoint (APPSEC-10): any {@code
+   * /api/**} path carrying one of them, compared on the decoded value, spends from the export
+   * budget. Today that is the Art. 15 exports ({@code /users/me/export}, {@code /export/pdf}, the
+   * admin twin), the audit and bank-audit exports ({@code /export}, {@code /export.json}), both
+   * bank statements, the three-month bank report and the job-order handover reports including the
+   * preview.
+   */
+  static final Set<String> EXPORT_SEGMENTS =
+      Set.of("export", "export.json", "statement", "report", "pdf", "three-month-report");
+
   /** Correlation id echoed onto the problem body, matching the other filter-level problems. */
   private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
@@ -116,6 +139,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
   private final Cache<String, Bucket> buckets;
+  private final Cache<String, Bucket> exportBuckets;
 
   /**
    * Builds the filter and its bounded bucket cache.
@@ -144,6 +168,11 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
             .maximumSize(MAX_TRACKED_SUBJECTS)
             .build();
+    this.exportBuckets =
+        Caffeine.newBuilder()
+            .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
+            .maximumSize(MAX_TRACKED_SUBJECTS)
+            .build();
   }
 
   /**
@@ -153,7 +182,7 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
    * is percent-encoded, so an encoded spelling must not shed the budget.
    *
    * @param request the incoming request.
-   * @return {@code true} when the request is neither an API write nor the SSE connect.
+   * @return {@code true} when the request is neither an API write, an SSE connect nor an export.
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
@@ -168,9 +197,44 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     if (!API_SCOPE.matches(path)) {
       return true;
     }
-    return !isWrite(request.getMethod())
-        && !SSE_CONNECT.matches(path)
-        && !LIVE_SYNC_CONNECT.matches(path);
+    return !spendsFromWriteBudget(request.getMethod(), path) && !spendsFromExportBudget(path);
+  }
+
+  /**
+   * Whether a request spends from the shared write/SSE bucket.
+   *
+   * @param method the request method; may be {@code null} for a malformed request.
+   * @param path the decoded-matchable request path, already known to be under {@code /api/**}.
+   * @return {@code true} for an API write or one of the two stream connects.
+   */
+  private static boolean spendsFromWriteBudget(String method, @NotNull PathContainer path) {
+    return isWrite(method) || SSE_CONNECT.matches(path) || LIVE_SYNC_CONNECT.matches(path);
+  }
+
+  /**
+   * Whether a request spends from the export bucket: the budget is switched on and the path is an
+   * export by {@link #isExportPath(PathContainer)}.
+   *
+   * @param path the decoded-matchable request path, already known to be under {@code /api/**}.
+   * @return {@code true} when the export budget applies to this path.
+   */
+  private boolean spendsFromExportBudget(@NotNull PathContainer path) {
+    return properties.getSubject().getExport().isEnabled() && isExportPath(path);
+  }
+
+  /**
+   * Whether a path names an expensive document-rendering endpoint — one of its segments, decoded
+   * and stripped of matrix parameters, is in {@link #EXPORT_SEGMENTS}. Package-private so the
+   * endpoint sweep in {@code SecurityFilterChainOrderTest} can hold every mapped export to it.
+   *
+   * @param path the request path.
+   * @return {@code true} when any segment marks an export.
+   */
+  static boolean isExportPath(@NotNull PathContainer path) {
+    return path.elements().stream()
+        .filter(PathContainer.PathSegment.class::isInstance)
+        .map(PathContainer.PathSegment.class::cast)
+        .anyMatch(segment -> EXPORT_SEGMENTS.contains(segment.valueToMatch()));
   }
 
   @Override
@@ -186,18 +250,70 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
       return;
     }
 
-    Bucket bucket = buckets.get(subject.get(), key -> newBucket());
+    PathContainer path = PathContainer.parsePath(request.getRequestURI());
+    // The export bucket first: it is the tighter of the two, so a looping download is refused
+    // before it spends the account's write budget as well.
+    if (spendsFromExportBudget(path)
+        && !tryConsume(
+            request,
+            response,
+            exportBuckets.get(subject.get(), key -> newExportBucket()),
+            MetricNames.BUCKET_SUBJECT_EXPORT,
+            properties.getSubject().getExport().getCapacity(),
+            properties.getSubject().getExport().getRefillPeriod())) {
+      return;
+    }
+    if (spendsFromWriteBudget(request.getMethod(), path)
+        && !tryConsume(
+            request,
+            response,
+            buckets.get(subject.get(), key -> newBucket()),
+            MetricNames.BUCKET_SUBJECT,
+            properties.getSubject().getCapacity(),
+            properties.getSubject().getRefillPeriod())) {
+      return;
+    }
+    chain.doFilter(request, response);
+  }
+
+  /**
+   * Spends one token from {@code bucket}, counting the attempt, and writes the 429 when it is
+   * empty.
+   *
+   * @param request the request being budgeted.
+   * @param response the response, written only on a rejection.
+   * @param bucket the subject's bucket for this budget.
+   * @param bucketLabel the bounded {@code bucket} metric label of this budget.
+   * @param capacity the budget's capacity, reported in the rejection headers and log line.
+   * @param refillPeriod the budget's refill window, reported in the rejection log line.
+   * @return {@code true} when a token was spent and the request may continue.
+   * @throws IOException if the rejection body cannot be written.
+   */
+  private boolean tryConsume(
+      @NotNull HttpServletRequest request,
+      @NotNull HttpServletResponse response,
+      @NotNull Bucket bucket,
+      @NotNull String bucketLabel,
+      int capacity,
+      @NotNull Duration refillPeriod)
+      throws IOException {
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     // Every attempt, so rejections/requests gives the per-subject rejection ratio. Bounded label
     // only — the subject is never exported, it is unbounded and PII.
     meterRegistry
-        .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+        .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel)
         .increment();
     if (probe.isConsumed()) {
-      chain.doFilter(request, response);
-      return;
+      return true;
     }
-    reject(request, response, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+    reject(
+        request,
+        response,
+        TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()),
+        bucketLabel,
+        capacity,
+        refillPeriod);
+    return false;
   }
 
   /**
@@ -230,33 +346,57 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
+   * Creates a bucket carrying one subject's export budget.
+   *
+   * @return a fresh full export bucket.
+   */
+  private Bucket newExportBucket() {
+    RateLimitProperties.Export budget = properties.getSubject().getExport();
+    return Bucket.builder()
+        .addLimit(
+            Bandwidth.builder()
+                .capacity(budget.getCapacity())
+                .refillGreedy(budget.getRefillTokens(), budget.getRefillPeriod())
+                .build())
+        .build();
+  }
+
+  /**
    * Writes the 429, mirroring the per-IP limiter's header and body contract.
    *
    * @param request the refused request.
    * @param response the response to write.
    * @param retryAfterSeconds seconds until the subject's bucket refills enough for one more call.
+   * @param bucketLabel the bounded {@code bucket} label of the budget that refused.
+   * @param capacity that budget's capacity, reported as {@code X-Rate-Limit-Limit}.
+   * @param refillPeriod that budget's refill window, for the log line.
    * @throws IOException if the body cannot be written.
    */
   private void reject(
-      HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
+      HttpServletRequest request,
+      HttpServletResponse response,
+      long retryAfterSeconds,
+      String bucketLabel,
+      int capacity,
+      Duration refillPeriod)
       throws IOException {
     long retryAfter = Math.max(1, retryAfterSeconds);
     meterRegistry
-        .counter(
-            MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
+        .counter(MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, bucketLabel)
         .increment();
     // WARN, unlike the per-IP limiter's DEBUG: this budget is per authenticated account, so its
     // volume is bounded by the number of real users and every hit is actionable. The subject is
     // already in the userId MDC field (REQ-OBS-001) and is never repeated into the message.
     log.warn(
-        "Per-subject rate limit exceeded (capacity={} per {}, retryAfter={}s)",
-        properties.getSubject().getCapacity(),
-        properties.getSubject().getRefillPeriod(),
+        "Per-subject rate limit exceeded (bucket={}, capacity={} per {}, retryAfter={}s)",
+        bucketLabel,
+        capacity,
+        refillPeriod,
         retryAfter);
 
     response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.setHeader("X-Rate-Limit-Limit", String.valueOf(properties.getSubject().getCapacity()));
+    response.setHeader("X-Rate-Limit-Limit", String.valueOf(capacity));
     response.setHeader("X-Rate-Limit-Remaining", "0");
     response.setHeader("X-Rate-Limit-Retry-After-Seconds", String.valueOf(retryAfter));
     String correlationId = response.getHeader(CORRELATION_ID_HEADER);

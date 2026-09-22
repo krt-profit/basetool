@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
+import de.greluc.krt.profit.basetool.backend.support.NotificationRetentionProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -46,6 +47,9 @@ class NotificationRetentionTaskTest {
   private static final Duration READ_MAX_AGE = Duration.ofDays(90);
   private static final Duration UNREAD_MAX_AGE = Duration.ofDays(180);
 
+  /** The sweep interval; irrelevant to these direct calls, but the properties record needs one. */
+  private static final Duration INTERVAL = Duration.ofHours(24);
+
   @Mock private NotificationService notificationService;
 
   private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
@@ -54,7 +58,10 @@ class NotificationRetentionTaskTest {
 
   private NotificationRetentionTask task() {
     return new NotificationRetentionTask(
-        notificationService, taskMetrics, meterRegistry, READ_MAX_AGE, UNREAD_MAX_AGE);
+        notificationService,
+        taskMetrics,
+        meterRegistry,
+        new NotificationRetentionProperties(true, READ_MAX_AGE, UNREAD_MAX_AGE, INTERVAL));
   }
 
   private double deleted(String kind) {

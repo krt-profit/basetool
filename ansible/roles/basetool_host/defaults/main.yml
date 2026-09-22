@@ -180,7 +180,10 @@ basetool_host_deploy_user_dirs:
 # pins (1.12.1 and 1.19.2, measured 2026-09-18), and a second pin that has to be kept in step with
 # the first is a drift source, not a safeguard. The compose file stays the single place a version
 # is chosen; `dnf` is asked for the package, and the assertion that the two agree belongs in a
-# check, not in a duplicated constant.
+# check, not in a duplicated constant. That check exists since 2026-09-22 (OPS-SEC-06):
+# `check-conformance.py --only host-exporter-versions` compares each host's node_exporter_build_info
+# and alloy_build_info against the compose pins and fails on any difference. A role pin was the
+# rejected alternative -- it would also hold both packages back from dnf-automatic's security fixes.
 basetool_host_observability_packages:
   - node-exporter                # EPEL 10. Host metrics, the systemd collector, and the textfile
                                  # collector that deploy.sh and the cgroup collector write into.
@@ -239,6 +242,14 @@ basetool_host_alloy_listen: ":12345"
 #                  doubled rather than copied, and GOMEMLIMIT stays at 75 % of it.
 # The cgroup collector reads both units, so ContainerMemoryHigh, ContainerOomKilled and
 # ContainerPidsHigh watch them under the names `alloy` and `node-exporter`, as they did as containers.
+# The persistent journal's retention (REQ-OBS-010, OPS-PRIV-01). The container stdout of the whole
+# stack is journald's under LogDriver=journald -- the edge access log with every client address among
+# it -- so the journal is held to the same 31 days as the Loki copy. The size cap is journald's own
+# default ceiling (4G) made explicit, so the disk budget is a reviewed number rather than a percentage
+# of whatever filesystem the host happens to have.
+basetool_host_journal_max_retention: "31d"
+basetool_host_journal_max_use: "4G"
+
 basetool_host_alloy_memory_max: "512M"
 basetool_host_alloy_gomemlimit: "360MiB"
 basetool_host_node_exporter_memory_max: "64M"
@@ -513,3 +524,37 @@ basetool_host_jvm_truststore_services:
 # right, and the CIS profile installs firewalld regardless. Set this false only on a host whose
 # packet filtering genuinely lives somewhere else -- and then say where.
 basetool_host_manage_firewall: true
+
+# --- unattended security updates (OPS-SEC-01, REQ-OPS-032) ------------------------------------------
+# dnf-automatic, SECURITY ADVISORIES ONLY, applied without a person. The retired Ubuntu host had
+# unattended-upgrades; this host had nothing until 2026-09-22, so the kernel, openssh, haproxy, glibc
+# and the host-native node_exporter and alloy were patched only when somebody remembered to.
+# Set false only on a host whose patching genuinely happens elsewhere -- and then say where.
+basetool_host_manage_updates: true
+
+# The container runtime is EXCLUDED, by the owner's decision of 2026-09-22. A podman, crun, conmon,
+# netavark, aardvark-dns, containers-common or passt (pasta) update changes how every container on
+# the host starts, and this stack's behaviour has been measured release by release (the pasta
+# forwarder, the log driver default, the Quadlet keys the generator relies on). Those move on a
+# deliberate, tested maintenance -- on the testing host first -- never at 07:00 on their own.
+# `dnf` treats each entry as a glob, so `podman-*` covers podman-docker and podman-remote without
+# touching prometheus-podman-exporter.
+basetool_host_updates_exclude:
+  - podman
+  - podman-*
+  - crun
+  - conmon
+  - netavark
+  - aardvark-dns
+  - containers-common
+  - containers-common-*
+  - passt
+  - passt-*
+
+# When the timer fires, host-local time. AWAY from everything that stops or reads the stack: the
+# backup quiesces the writers from 04:15 for up to an hour, the restore drill runs Sunday 05:30, the
+# weekly cleanup Saturday 02:00 UTC and the certificate collector 03:40. Nothing in the security set
+# restarts a container (the runtime is excluded above), and deploy.sh never calls dnf, so the
+# five-minute deploy ticks cannot collide with it.
+basetool_host_updates_on_calendar: "*-*-* 07:00:00"
+basetool_host_updates_randomized_delay: "15min"

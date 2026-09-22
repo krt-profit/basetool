@@ -17,14 +17,12 @@ name: Release · Publish
 #      multi-arch GHCR images and the eight SBOM files attached as assets.
 #
 # The tag push is what drives release-images.yml to build/sign/push the images.
-# IMPORTANT: a tag created with the default GITHUB_TOKEN does NOT trigger other
-# workflows (GitHub's anti-recursion rule), so the image build would not start.
-# To get a fully automatic build, set a `RELEASE_TOKEN` secret (a fine-grained
-# PAT or GitHub App token with `contents: write`); the tag is then created with
-# it and release-images.yml fires normally. Without the secret the tag is still
-# created (with GITHUB_TOKEN) and everything else publishes -- only the image
-# build must be kicked once by hand (Actions -> Release Images -> Run workflow),
-# and this job prints a warning saying so.
+# The tag is created with a token of the `basetool-release` GitHub App (ADR-0201):
+# the tag ruleset "Version" lets only @greluc and that App create `v*` tags, and
+# an App token -- unlike GITHUB_TOKEN -- causes events that trigger other
+# workflows, so release-images.yml fires on its own. There is no fallback any
+# more: GITHUB_TOKEN is refused by the ruleset, so a run without the App's key
+# stops with an error instead of half-publishing a release nobody can build.
 
 on:
   pull_request:
@@ -75,13 +73,39 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
+          persist-credentials: false
+
+      # The release identity is the `basetool-release` GitHub App (ADR-0201), and nothing else can
+      # do this step. The tag ruleset "Version" restricts creating and updating `v*` tags to two
+      # bypass actors -- @greluc and this App -- so GITHUB_TOKEN is refused, and so is the PAT that
+      # RELEASE_TOKEN held until 2026-09-22 (measured: `Resource not accessible by personal access
+      # token`, HTTP 403, on the v1.10.0 release). An App token also does what GITHUB_TOKEN cannot:
+      # the events it causes trigger other workflows.
+      - name: Refuse to start without the release App's key
+        env:
+          HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set -- creating the release tag needs the basetool-release GitHub App (ADR-0201); a PAT or GITHUB_TOKEN is refused by the tag ruleset"
+            exit 1
+          fi
+
+      - name: Mint a basetool-release App token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # The App's CLIENT ID, and a literal on purpose: it is public (GET /apps/basetool-release
+          # returns it), so a variable would hide nothing, and it is the same App the tag ruleset
+          # names as a bypass actor -- rotating one without the other is a change worth reviewing.
+          # Not `app-id`: that input is deprecated in v3 and is the one a v4 bump will remove.
+          client-id: Iv23liHT1h5peKsDnrUD
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Scoped to what this step needs, not to everything the installation allows.
+          permission-contents: write
 
       - name: Create the release tag at the merge commit
         env:
-          # Prefer RELEASE_TOKEN so the tag push triggers release-images.yml;
-          # fall back to GITHUB_TOKEN (tag still created, but no auto image build).
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           TAG: ${{ steps.ver.outputs.tag }}
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
@@ -92,9 +116,6 @@ jobs:
             gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
               -f "ref=refs/tags/${TAG}" -f "sha=${MERGE_SHA}" >/dev/null
             echo "Created tag ${TAG} at ${MERGE_SHA}"
-          fi
-          if [ "${HAS_RELEASE_TOKEN}" != "true" ]; then
-            echo "::warning::RELEASE_TOKEN is not set, so the tag was created with GITHUB_TOKEN and release-images.yml will NOT auto-run. Build the images manually (Actions -> Release Images -> Run workflow), or add a RELEASE_TOKEN secret for full automation."
           fi
 
       - name: Build release notes body

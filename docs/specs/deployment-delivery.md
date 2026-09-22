@@ -83,6 +83,19 @@ image built and signed by our own release pipeline can be promoted. `release-ima
 every build with Trivy and uploads SARIF to the Security tab, but *that* scan stays advisory — the
 same finding is advisory at build time and blocking at promotion, and REQ-OPS-024 says why.
 
+The two gates answer different threats and neither stands in for the other: **the approval gate
+guards against mistakes** — the wrong version, the wrong moment, a promotion nobody meant — and
+**the signature gate guards against tampering** — a digest our own release pipeline did not produce.
+A reviewer cannot see from a tag whether its digest was forged; a signature cannot tell whether
+promoting it now is wise.
+
+`promote.yml` runs **from `main` only**. `workflow_dispatch` executes the workflow file of the ref it
+is dispatched on, so a branch's copy could drop a gate; the `production` environment accepts
+deployments from `main` only (a repository setting since 2026-09-22), and the workflow's first job
+also fails on any other ref, so the refusal is stated before six scan runners are spent. Every job
+declares its own permissions; only `promote` and `sync-testing` can write to the registry, and no
+job holds `id-token: write` — a keyless `cosign verify` needs no OIDC token (audit item CI-SEC-04).
+
 **Acceptance**
 
 - [ ] `release-images.yml` never writes the `:stable` tag for any artifact (backend/frontend/
@@ -96,6 +109,10 @@ same finding is advisory at build time and blocking at promotion, and REQ-OPS-02
   before re-tagging; an image not signed by our own release pipeline cannot be promoted.
 - [ ] A `scan` job runs ahead of `approve` and fails the run on a fixed HIGH/CRITICAL finding in any
   of the three app images, on either architecture, unless `allow_vulnerable` was set (REQ-OPS-024).
+- [ ] A run dispatched from any ref other than `refs/heads/main` fails in `validate-inputs`, before
+  any scan, approval or re-tag.
+- [ ] No job in `promote.yml` or `promote-testing.yml` holds `id-token: write`; permissions are
+  declared per job, and only the re-tagging jobs hold `packages: write`.
 
 **Enforced by:** `.github/workflows/release-images.yml` · `.github/workflows/promote.yml` (`environment`, cosign gate) · **Runbook:** `docs/deployment.md` → *Promoting to production*
 
@@ -302,7 +319,9 @@ tick (the manual-staging fallback in the runbook still applies).
 **Acceptance**
 
 - [ ] `release-images.yml` builds, asserts (only the JAR, no secret-shaped file) and cosign-signs
-  a `basetool-keycloak-spi` artifact; it never writes `:stable` (REQ-OPS-002).
+  a `basetool-keycloak-spi` artifact; it never writes `:stable` (REQ-OPS-002). The JAR is compiled
+  in its own job (`keycloak-spi-jar`, `contents: read`, no Gradle cache) and handed over as a
+  run-scoped artifact; the job that pushes and signs (`build-keycloak-spi`) runs no Gradle.
 - [ ] `promote.yml` promotes `keycloak-spi` in lock-step with the four other artifacts.
 - [ ] `deploy.sh` resolves + cosign-trusts the `keycloak-spi:stable` digest, stages the JAR into
   `keycloak/providers/`, and recreates only keycloak (health-gated) when the digest changes.
@@ -310,7 +329,7 @@ tick (the manual-staging fallback in the runbook still applies).
   gated until `--force`.
 - [ ] A failed keycloak recreate restores the previous JAR and records the failure for backoff.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
+**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + JAR rollback) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
 
 ### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
 
@@ -525,6 +544,24 @@ to face the internet.
 both directions: a container that should be read-only and is not, and `keycloak` becoming read-only
 without this record being updated.
 
+**The config tree is mounted read-only, everywhere** (since 2026-09-22). `/var/iri/code` is what the
+deployer rewrites from the signed config bundle on every release; a container that can write into it
+can change what the next release applies. `keycloak` mounted its theme, its provider directory and
+`realm-export.json` writable until then. The realm export is no longer mounted into the production
+container at all — production runs `start` without `--import-realm`, so the file was never read — and
+`generate-quadlet.py` refuses any bind mount from the config tree without `:ro`.
+
+**The data networks carry no egress** (since 2026-09-22, ADR-0162 as extended). `net-db-backend`,
+`net-db-keycloak` and the three `net-redis-*` networks are `Internal=true` in the Quadlet units, so
+`db-backend`, `db-keycloak` and `redis` — which are on nothing else — have no outbound path. The
+compose file keeps them non-internal because the local `-dev` twins publish their ports there.
+
+**A container gets its stop grace** (since 2026-09-22). `stop_grace_period` becomes both
+`[Container] StopTimeout=` (what `podman rm -f` waits before `SIGKILL`) and `[Service]
+TimeoutStopSec=` fifteen seconds longer; until then only the second was generated and podman killed
+every container after its 10 s default, cutting off the JVMs' graceful shutdown, the dskit drains and
+PostgreSQL's clean shutdown.
+
 **Acceptance**
 
 - [ ] Every `prod`-profile service in `docker-compose.yml` (backend, frontend, ingest, keycloak,
@@ -537,6 +574,13 @@ without this record being updated.
   `PidsLimit=` and `ReadOnly=true`; only `acme` adds a capability (`CHOWN`); `db-backend`,
   `db-keycloak` and `redis` run with `User=`/`Group=` 70, 70 and 999. `check-conformance.py`'s
   `containers-unprivileged` and `containers-read-only` assert the running host.
+- [ ] Every `Volume=` whose source is under `/var/iri/code` ends in `:ro`, and the production
+  `keycloak` unit mounts no `realm-export.json` (`generate-quadlet.py` refuses the first,
+  `generate-quadlet.test.sh` asserts both).
+- [ ] `net-db-backend`, `net-db-keycloak`, `net-redis-backend`, `net-redis-frontend` and
+  `net-redis-ingest` are `Internal=true`; no unit whose every network is internal publishes a port or
+  aliases the host gateway (`generate-quadlet.py` refuses it).
+- [ ] Every unit with a `TimeoutStopSec=` carries a `StopTimeout=` fifteen seconds below it.
 - [ ] An image bump for any of these services is only promoted after the new image has been
   booted under its unit's hardening once (clean start + healthcheck).
 
@@ -558,9 +602,21 @@ would otherwise be pulled and run **unverified** — as the service user under r
 as root-equivalent `docker`-group code on a Docker host. The host gate closes that TOCTOU: the tag verified at promote time is no longer
 assumed to be the artifact the host pulls later.
 
-The trusted signer identity is pinned to `…/release-images.yml@refs/(heads/main|tags/v.+)` — a
-main-branch or tagged build only, never a `workflow_dispatch` build off an arbitrary branch — and
-the **same** identity is used by `promote.yml` and by `deploy.sh` so the two halves cannot diverge.
+The trusted signer identity is pinned to
+`^https://github\.com/<repo>/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
+— a main-branch or release-tagged build only, never a `workflow_dispatch` build off an arbitrary
+branch — and the **same** identity is used by `promote.yml`, `promote-testing.yml` and `deploy.sh`
+so the halves cannot diverge. It is **anchored at both ends**: cosign matches the regexp anywhere in
+the certificate SAN, so the unanchored `…@refs/(heads/main|tags/v.+)` it replaced on 2026-09-22 also
+trusted `refs/heads/main-x`, `refs/heads/maintenance` and `refs/tags/vfoo` (audit item CI-SEC-01).
+`scripts/check-cosign-identity.py` (repo-lint) asserts every copy is anchored, that the copies are
+byte-identical after shell unquoting, and that they accept and refuse the right subjects;
+`scripts/deploy.test.sh` runs deploy.sh's default against the same subjects.
+
+The signing side matches it: `release-images.yml`'s `ref-guard` job refuses to build, push or sign
+from any ref other than `refs/heads/main` or a `vMAJOR.MINOR.PATCH` tag, and a tag only when its
+commit is an ancestor of `main` (audit item CI-SEC-02) — so a release identity never covers code
+that did not pass review. Who may create such a tag at all is the tag ruleset's `creation` rule.
 The gate is **fail-closed**: a host without `cosign` (with verification enabled) aborts the tick
 rather than falling back to trusting an unverified image. A single break-glass override
 (`IRI_COSIGN_VERIFY=false`) exists **only** to ride out a Sigstore public-good outage that is
@@ -593,7 +649,8 @@ on a genuinely bad signature, which still aborts fail-closed.
   retry budget escalates to the security abort and the deploy-failure metric.
 - [ ] The retry log line and the abort both quote cosign's own stderr, so a registry/Sigstore error
   is distinguishable from a signature mismatch without host access.
-- [ ] `deploy.sh` runs `cosign verify` (identity `…/release-images.yml@refs/(heads/main|tags/v.+)`,
+- [ ] `deploy.sh` runs `cosign verify` (identity
+  `^…/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`, anchored,
   issuer `token.actions.githubusercontent.com`) against every resolved `image@digest` — backend,
   frontend, ingest, and the config + keycloak-spi bundles when resolved — **before** the first
   `pull`, `create`/`cp` extraction or apply, and aborts the tick non-zero on any verification failure.
@@ -610,13 +667,22 @@ on a genuinely bad signature, which still aborts fail-closed.
   sudo's `secure_path` on Rocky omits the directory the role installs into.
 - [ ] The host cosign is installed by the Ansible role from the upstream release, checked against
   a sha256 pinned in the role's defaults; upgrading it is a reviewed change to that pin.
-- [ ] `promote.yml` verifies against the identical `@refs/(heads/main|tags/v.+)` identity regexp.
+- [ ] `promote.yml` and `promote-testing.yml` verify against the identical, anchored identity
+  regexp; `release-images.yml`'s reuse gate uses the same regexp narrowed to `heads/main`.
+  `scripts/check-cosign-identity.py` fails repo-lint on an unanchored or divergent copy, and
+  `scripts/deploy.test.sh` refuses `refs/heads/main-x`, `refs/heads/maintenance`, `refs/tags/vfoo`
+  and `refs/tags/v1.9.2-rc1` while accepting `refs/heads/main` and `refs/tags/v1.9.2`.
+- [ ] `release-images.yml` signs nothing unless the run's ref is `refs/heads/main` or a
+  `vMAJOR.MINOR.PATCH` tag whose commit is an ancestor of `main` (`ref-guard` job, which every
+  signing job depends on).
 - [ ] The host `cosign` is a major **≥** the cosign the CI signs with (`cosign-installer` pin, 3.x);
   a host on cosign 2.x cannot verify the 3.x signatures and is a mis-bootstrap, not a supported mode.
 
 **Enforced by:** `scripts/deploy.sh` (`verify_signature`, `verify_digest_or_die`, cosign pre-flight)
-· `scripts/deploy.test.sh` (signature-gate self-tests) · `.github/workflows/promote.yml` (pinned
-identity) · `ansible/roles/basetool_host/tasks/15-cosign.yml` · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
+· `scripts/deploy.test.sh` (signature-gate self-tests, including the anchored identity) ·
+`.github/workflows/promote.yml` (pinned identity) · `scripts/check-cosign-identity.py` (repo-lint:
+every copy anchored and identical) · `.github/workflows/release-images.yml` (`ref-guard`) ·
+`ansible/roles/basetool_host/tasks/15-cosign.yml` · **Runbook:** `docs/deployment.md` → *Signature verification (cosign)* · **Decision:** ADR-0075
 
 ### REQ-OPS-016 — Deploy host runtime hardening
 
@@ -784,7 +850,8 @@ were `712 × (ssl_client) Z`.
 **Acceptance**
 
 - [ ] `backend`, `frontend` and `ingest` (via their `x-*` compose templates) **and `grafana`** set
-  `init: true`, which the generator carries into the units as `PodmanArgs=--init`; a prod container
+  `init: true`, which the generator carries into the units as Quadlet's `RunInit=true` (a
+  `PodmanArgs=--init` until 2026-09-22); a prod container
   that runs a wget-HTTPS healthcheck with a bare runtime as PID 1 is a regression.
 - [ ] A long-lived (>17 h) app container's `pids` count stays flat instead of climbing ≈1 per 30 s
   healthcheck — no `<defunct>` `ssl_client` accumulation (spot-check: `docker exec <svc> sh -c 'cut
@@ -814,7 +881,7 @@ time; (3) `ContainerPidsHigh` as the runtime backstop for a task leak from any *
 
 **Enforced by:** `docker-compose.yml` (`x-backend` / `x-frontend` / `x-ingest` templates, `init:
 true`) · `docker-compose.monitoring.yml` (`x-mon-base` anchor, `init: true`) ·
-`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` job of
+`.github/scripts/check_pid1_reaping.py` (wired into the `pid1-reaping` check of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with a self-test that keeps it from
 passing vacuously) · verification recipe in the `x-backend` service comment
 
@@ -926,8 +993,9 @@ passes, and the doubt case is always a full build:
 2. the derived source tag has the expected `sha-<hex>` shape;
 3. all three app images resolve under that tag in GHCR;
 4. each resolved index carries **both** `linux/amd64` and `linux/arm64` children;
-5. each digest cosign-verifies against this workflow's identity pinned to `refs/heads/main` —
-   deliberately narrower than promote.yml's `(heads/main|tags/v.+)`, because the only legitimate
+5. each digest cosign-verifies against this workflow's identity pinned to `refs/heads/main` and
+   anchored (`^…@refs/heads/main$`) —
+   deliberately narrower than promote.yml's `(heads/main|tags/vX.Y.Z)`, because the only legitimate
    producer of a reuse candidate is the main-branch run of that commit.
 
 The digest is **re-signed** by the tag run even though gate 5 already proved it is signed, so the
@@ -952,7 +1020,12 @@ produced artifact.
   when all five gates above pass; every other outcome, including its own failure, yields a full build.
 - [ ] On a reuse run the `merge` job re-tags the digest `plan` **verified** (no second resolution
   between check and use) and signs it; `build` and `scan` are skipped.
-- [ ] A `workflow_dispatch` run always builds, on any ref.
+- [ ] A `workflow_dispatch` run always builds — on `main` or a release tag on `main`; any other ref
+  is refused by `ref-guard` before anything is built (REQ-OPS-015, since 2026-09-22).
+- [ ] The BuildKit image the builds boot is pinned **by digest** in
+  `.github/actions/setup-buildx/Dockerfile`, a carrier nothing builds, which the composite action
+  reads and Dependabot's `docker` ecosystem bumps; the `mirror.gcr.io` fallback pulls the same
+  digest (audit item CI-SEC-13).
 - [ ] The version baked on the release commit is the release being cut, not the previous tag plus a
   commit count. `app_version.py --selftest` asserts every branch, including that one, and runs in
   `repo-lint.yml`.
@@ -974,8 +1047,8 @@ tested, the same principle REQ-OPS-002 applies to production.
 
 Two properties are **identical** to the production path and must stay that way:
 
-1. **Provenance.** The cosign identity is the same regexp pinned to
-   `release-images.yml@refs/(heads/main|tags/v.+)`. An image built off an arbitrary feature
+1. **Provenance.** The cosign identity is the same anchored regexp pinned to
+   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` (REQ-OPS-015). An image built off an arbitrary feature
    branch is not promotable to testing either. A rehearsal that accepts weaker provenance is a
    rehearsal of something else.
 2. **Lock-step.** The three app images, `basetool-config` and `basetool-keycloak-spi` move
@@ -1190,7 +1263,10 @@ fail-closed, exactly as REQ-OPS-015 specifies.
 - [ ] The attestation runs on a reuse run too (REQ-OPS-021), so every digest a release tag points
   at was attested by the run that applied the tag, not only by the run that built it.
 - [ ] Both workflows declare `id-token: write` **and** `attestations: write`; `release-publish.yml`
-  additionally keeps `contents: write` for the release itself.
+  additionally keeps `contents: write` for the release itself. In `release-images.yml` both are
+  declared **per job, on the signing jobs only** (`merge`, `build-config`, `build-keycloak-spi`);
+  the jobs that run the project's build (`build`, `keycloak-spi-jar`) hold neither, so no build step
+  can mint a certificate under the release identity (audit item CI-SEC-04, 2026-09-22).
 - [ ] A published artifact verifies with `gh attestation verify` alone — no cosign, and no copy of
   the signer-identity regexp that `deploy.sh` and `promote.yml` must keep in sync.
 - [ ] `deploy.sh` is **unchanged**: the host-side gate remains the cosign verification of
@@ -1241,8 +1317,9 @@ the scan job's step summary and raised as a `::warning::` in the approval record
 exercised invisibly, and the reason belongs in the deployment notes.
 
 **Not scanned:** `basetool-config` and `basetool-keycloak-spi`. Both are `FROM scratch` artifacts
-with no base image and no OS package database; the provider JAR's Java dependencies are gated more
-strictly by OWASP Dependency-Check.
+with no base image and no OS package database; the provider JAR's Java dependencies are scanned by
+OWASP Dependency-Check at `failBuildOnCVSS = 7.0`. That scan is a signal, not a merge gate: it is
+not a required check (corrected 2026-09-22 — this said "gated more strictly", as ADR-0155 did).
 
 **Not gated:** `promote-testing.yml`. A vulnerable build must stay exercisable in an environment
 that is not production — gating it would make the bypass routine and wear it out.
@@ -1420,10 +1497,12 @@ to the shared group and restores the defect exactly.
   second one beside it.
 - [ ] `concurrency.group` contains `jobs.e2e.if` verbatim, and CI fails when it stops doing so; the
   checker self-tests against a known-drifted workflow first, so it cannot pass vacuously.
+- [ ] The `build-stack` job, which builds the E2E images once per run for all matrix cells (since
+  2026-09-22), carries the same gate expression, so a run whose gate is false builds nothing.
 
-**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`) ·
-`.github/scripts/check_e2e_gate_mirror.py` · `.github/workflows/repo-lint.yml`
-(`e2e-gate-mirror`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
+**Enforced by:** `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
+`jobs.build-stack.if`) · `.github/scripts/check_e2e_gate_mirror.py` ·
+`.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md)
 
 ## Out of scope
 
@@ -1628,6 +1707,44 @@ reads an empty value as *no explicit config* and falls back to the classpath `lo
 `-XX:ArchiveClassesAtExit` `RUN` in each) · **Related:** REQ-OPS-030 (the training run this cleans up
 after, and the same silent-degradation failure class), REQ-OPS-014 (the runtime posture the fixed
 UID/GID serves)
+
+### REQ-OPS-032 — The host applies security updates unattended, and says when it has not
+
+The production host installs **security advisories** without a person, daily, and reports whether it
+did (OPS-SEC-01, 2026-09-22). Until then nothing on the Rocky host patched it: the retired Ubuntu
+host had unattended-upgrades and the bootstrap role had no successor, so the kernel, openssh,
+haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only when somebody ran
+`dnf upgrade` by hand.
+
+- **`dnf-automatic`, `upgrade_type = security`, `apply_updates = yes`, `reboot = never`**, configured
+  as a whole file by the bootstrap role (`tasks/45-updates.yml`). A feature update is never applied
+  unattended.
+- **The container runtime is excluded** — `podman`, `crun`, `conmon`, `netavark`, `aardvark-dns`,
+  `containers-common` and `passt` (pasta) — by the owner's decision of 2026-09-22: they change how
+  every container starts, and they move on a tested maintenance, testing host first.
+- **The window is 07:00 host-local plus up to 15 minutes**, clear of the backup (04:15, up to an hour),
+  the restore drill (Sunday 05:30), the weekly cleanup (Saturday 02:00 UTC) and the certificate
+  collector (03:40).
+- **A reboot is an owner decision**, never automatic. The host reports that one is due instead:
+  `scripts/host-updates-metrics.sh` writes `basetool_host_reboot_required` from `needs-restarting -r`,
+  run from `dnf-automatic.service`'s `ExecStopPost=` and again at boot.
+- **Every run records itself**: the same script writes the run's timestamp and outcome from systemd's
+  `$SERVICE_RESULT`. `HostSecurityUpdatesFailing`, `HostSecurityUpdatesStale` and
+  `HostRebootRequired` read them (REQ-OBS-011).
+
+**Acceptance**
+
+- [ ] `check-conformance.py --only security-updates-enabled` passes against the host: the timer is
+  enabled and active, the configuration is security-only and applies, and `podman` is excluded.
+- [ ] `host-updates-metrics.test.sh` passes: a run is recorded by the run, a boot refresh keeps it,
+  and a reboot state that cannot be read is left out rather than written as `0`.
+- [ ] `ops_audit_2026_09_alerts_test.yml` passes: each of the three alerts fires and stays silent where
+  it must.
+
+**Enforced by:** `ansible/roles/basetool_host/tasks/45-updates.yml` ·
+`scripts/host-updates-metrics.sh` · `scripts/iri-host-updates-metrics.service` ·
+`monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` · **Decision:**
+[ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 
 ## Open questions
 

@@ -1,0 +1,44 @@
+name: Set up JDK 25 and Gradle
+
+description: >
+  Installs Temurin JDK 25 and configures gradle/actions/setup-gradle, the two steps every
+  Gradle-running workflow in this repository starts with. One place for both pins.
+
+# Why a composite (audit item CI-09): the same two steps, with the same two SHA pins, were
+# copy-pasted into nine workflows, and each copy carried a `Make gradlew executable` step that
+# did nothing -- `gradlew` is committed with mode 100755 (`git ls-files -s gradlew`), and
+# actions/checkout restores the mode. A JDK or setup-gradle bump was nine edits that had to agree;
+# it is one now, and Dependabot's github-actions ecosystem watches this directory too.
+#
+# Requires a prior actions/checkout: a local action is loaded from the workspace.
+
+inputs:
+  cache-read-only:
+    description: >
+      Passed to setup-gradle. 'true' restores the Gradle caches without writing them. The default
+      is the safe one; a workflow that is meant to keep the caches warm (a `main` push) passes an
+      expression that evaluates to 'false' there.
+    required: false
+    default: 'true'
+  cache-disabled:
+    description: >
+      Passed to setup-gradle. 'true' neither restores nor writes the Gradle caches -- for a build
+      whose output is released (release-images.yml's provider JAR), which should not be assembled
+      from a cache an earlier run wrote (zizmor `cache-poisoning`).
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 25 (Temurin)
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      with:
+        distribution: temurin
+        java-version: '25'
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      with:
+        cache-read-only: ${{ inputs.cache-read-only }}
+        cache-disabled: ${{ inputs.cache-disabled }}

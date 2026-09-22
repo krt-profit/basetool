@@ -258,7 +258,7 @@ python scripts/generate-quadlet.py --check    # what CI runs: fail on drift
 python scripts/generate-quadlet.py --list     # each service's disposition and why
 ```
 
-`repo-lint.yml`'s `quadlet-drift` job runs `--check` and the translation self-test
+`repo-lint.yml`'s `quadlet-drift` check runs `--check` and the translation self-test
 (`generate-quadlet.test.sh`). Dispositions: `node-exporter` and `alloy` become host services, the
 podman exporter is a user unit the role installs, `cadvisor` and `socket-proxy` are deleted; every
 other service is a container. The edge's six network addresses are pinned by the generator and must
@@ -319,9 +319,13 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
 The tag run **does not rebuild**: it cosign-verifies and re-tags the `:sha-<short>` digest `main`
 already built, so `:X.Y.Z` and `:sha-<short>` are the same bytes (REQ-OPS-021, ADR-0137). Any doubt
-falls back to a full build. The tag is created with the `RELEASE_TOKEN` secret so that it triggers
-`release-images.yml`; without it the publish job warns and the images have to be started by hand
-(*Actions → Release Images → Run workflow*), which always does a full build.
+falls back to a full build. The tag is created with a short-lived token of the **`basetool-release`
+GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
+lets only that App and @greluc create `v*` tags, and an App token's events trigger
+`release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
+publish job stops with an error. The manual path is @greluc creating the tag at the release PR's
+merge commit and re-running the failed publish job, which then skips the tag and publishes the
+rest.
 
 Nothing is deployed yet: `:stable` still names the previous release.
 
@@ -337,8 +341,14 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
    architectures, failing on a fixed HIGH/CRITICAL finding. Break-glass: `-f allow_vulnerable=true`,
    which is announced in the approval record.
 2. **Approval** by the required reviewer on the `production` GitHub Environment (one `approve` job).
-3. **Signature** — cosign-verify against the `release-images.yml@refs/(heads/main|tags/v.+)`
-   identity, then re-tag all five artifacts to `:stable` in lock-step, `fail-fast`.
+3. **Signature** — cosign-verify against the anchored
+   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, then re-tag all five
+   artifacts to `:stable` in lock-step, `fail-fast`.
+
+`promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
+`production` environment accepts deployments from `main` only. The approval gate guards against a
+mistaken promotion; the signature gate guards against a tampered image — neither stands in for the
+other.
 
 A production promotion also carries `:testing` forward whenever testing would otherwise fall behind
 (`sync-testing`, decided by commit ancestry, never by timestamp).
@@ -506,6 +516,37 @@ systemctl start iri-deploy.timer
 
 `backend` and `keycloak` are not restarted with it; their pools reconnect.
 
+### Network changes are installed, not applied
+
+A changed `.network` unit reaches the host like any other and is **not** applied by it: Quadlet
+creates a network with `podman network create --ignore`, so an existing network keeps its old
+settings until it is removed and recreated. `deploy.sh` does not do that on its own (it would be a
+full-stack outage behind an automatic tick). Take it as a maintenance, testing host first, with the
+members of the changed networks stopped. For the 2026-09-22 change that made the data networks
+`Internal=true` (ADR-0162):
+
+```bash
+systemctl stop iri-deploy.timer
+# every member of the five networks; stopping a database also stops what Requires= it
+${UCTL} stop frontend.service ingest.service backend.service keycloak.service \
+  postgres-exporter-backend.service postgres-exporter-keycloak.service redis-exporter.service \
+  db-backend.service db-keycloak.service redis.service
+${UPOD} network rm net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest
+${UCTL} restart net-db-backend-network.service net-db-keycloak-network.service \
+  net-redis-backend-network.service net-redis-frontend-network.service net-redis-ingest-network.service
+for n in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend net-redis-ingest; do
+  ${UPOD} network inspect "$n" --format "$n {{.Internal}}"          # expect: true
+done
+${UCTL} start db-backend.service db-keycloak.service redis.service
+${UCTL} start keycloak.service backend.service ingest.service frontend.service \
+  postgres-exporter-backend.service postgres-exporter-keycloak.service redis-exporter.service
+systemctl start iri-deploy.timer
+```
+
+Then `python scripts/check-conformance.py --ssh <host>` from a workstation, and from inside a
+database container confirm there is no way out: `${UPOD} exec db-backend wget -q -T 5 -O- https://1.1.1.1`
+must fail, while `${UPOD} exec backend …` still resolves `db-backend`.
+
 ### Stateful-infra upgrades
 
 A changed **`postgres:` or `quay.io/keycloak/keycloak:` tag** is operator-gated (REQ-OPS-006).
@@ -553,7 +594,15 @@ deliberate host change:
 ansible-playbook site.yml --limit production --tags deploy,scripts --check --diff
 ansible-playbook site.yml --limit production --tags deploy,scripts
 ansible-playbook site.yml --limit production --tags observability   # the two collectors and their timers
+ansible-playbook site.yml --limit production --tags updates         # dnf-automatic (REQ-OPS-032)
 ```
+
+**Host patching** is `dnf-automatic`, set up by the same role: security advisories daily at 07:00
+(+ up to 15 minutes), the container runtime excluded, **never a reboot** (ADR-0199). A due reboot
+raises `HostRebootRequired`; take it as a maintenance — the stack comes back on its own, because the
+units are `WantedBy=default.target` and `iri` lingers. The runtime (podman, crun, conmon, netavark,
+aardvark-dns, containers-common, passt) is updated by hand, testing host first:
+`dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
 
 Confirm by content, never by mtime:
 `sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.
@@ -768,9 +817,13 @@ verifying image signatures (cosign keyless)
   keycloak-spi: signature OK
 ```
 
-- Identity `https://github.com/krt-profit/basetool/.github/workflows/release-images.yml@refs/(heads/main|tags/v.+)`,
+- Identity `^https://github\.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`,
   issuer `https://token.actions.githubusercontent.com` — the same as `promote.yml`. A
-  `workflow_dispatch` build off a feature branch is not trusted.
+  `workflow_dispatch` build off a feature branch is not trusted. **Anchored since 2026-09-22**: the
+  earlier unanchored `…@refs/(heads/main|tags/v.+)` also matched `refs/heads/main-x` or
+  `refs/tags/vfoo`. A host running a `deploy.sh` from before that date still verifies with the old
+  regexp — `deploy.sh` reaches the host only through the Ansible role (`--tags scripts`), not through
+  the promoted bundle.
 - **Fail-closed**, with three attempts and doubling delay first (`IRI_COSIGN_VERIFY_ATTEMPTS`,
   `IRI_COSIGN_VERIFY_DELAY`), so a registry blip is not a security alarm; the abort quotes cosign's
   own error and records `DeployFailed`.
@@ -794,8 +847,8 @@ then `ansible-playbook site.yml --limit production --tags cosign`, then
 
 The GHCR pull token has to be a **classic** PAT: GitHub Packages does not accept fine-grained
 tokens. Scope `read:packages` only, 90-day expiry, authorised for the organisation's SSO if
-enforced. Its scope is account-wide, which the short expiry compensates for. `RELEASE_TOKEN` is a
-separate CI secret and unrelated.
+enforced. Its scope is account-wide, which the short expiry compensates for. The release workflows'
+`basetool-release` App key (ADR-0201) is a separate CI secret and unrelated.
 
 If the token expires, record the date in the sidecar: `deploy.sh` publishes it every tick as
 `basetool_ghcr_token_expiry_timestamp`, and `GhcrPullTokenExpiring` (under 14 days) /

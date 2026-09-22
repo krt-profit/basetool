@@ -137,18 +137,78 @@ concurrency:
   group: release-images-${{ github.sha }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  packages: write          # push to ghcr.io
-  id-token: write          # cosign keyless OIDC (Sigstore Fulcio) + provenance attestation
-  attestations: write      # SLSA provenance + SBOM attestation
-  security-events: write   # Trivy SARIF upload
+# Nothing at the workflow level; every job names exactly what it uses (audit item CI-SEC-04).
+# Only the jobs that SIGN hold `id-token: write` -- the OIDC token Fulcio turns into the signing
+# certificate -- and `attestations: write`: `merge`, `build-config` and `build-keycloak-spi`. The
+# jobs that run the project's own build (`build`, `keycloak-spi-jar`) never see a token that can
+# mint a signature, so a compromised build step can push an image by digest at most, and an
+# unsigned digest is refused by promote.yml and by the host (REQ-OPS-002, REQ-OPS-015).
+permissions: {}
 
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
 
 jobs:
+  # A signature is only worth what its identity says, and the identity promote.yml and deploy.sh
+  # trust is `release-images.yml@refs/heads/main` or `@refs/tags/vMAJOR.MINOR.PATCH`. This job
+  # refuses every other ref BEFORE anything is built, pushed or signed (audit item CI-SEC-02):
+  #
+  #   - `workflow_dispatch` accepts any branch, and a run from a feature branch used to build,
+  #     push and sign exactly like `main`. Its signature carried `@refs/heads/<branch>` and was
+  #     refused downstream, but it still spent a release pipeline and pushed `:sha-*` tags.
+  #   - A `v*` tag can be created on ANY commit, including one that never reached `main`. The tag
+  #     ruleset restricts who may create one; this asserts WHAT it points at: a tag run signs only
+  #     a commit that is already an ancestor of `main`, so a signature under a release identity
+  #     can never cover code that skipped review.
+  #
+  # Every signing job depends on this one, directly (`build-config`, `keycloak-spi-jar`,
+  # `build-keycloak-spi`) or through `plan` (`build`, `merge`, `scan`).
+  ref-guard:
+    name: Check the ref may publish signed images
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout (full history — the tag check is an ancestry question)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Refuse any ref other than main or a release tag on main
+        env:
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          case "$REF" in
+            refs/heads/main)
+              echo "ref ${REF}: main may publish signed images"
+              exit 0
+              ;;
+            refs/tags/v*)
+              if ! printf '%s' "${REF#refs/tags/}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+                echo "::error::${REF} is not a vMAJOR.MINOR.PATCH release tag; its signature would match no trusted identity"
+                exit 1
+              fi
+              # Explicit, because a later edit to the checkout above must not turn this into a
+              # comparison against a stale or missing `origin/main`. Anonymous: the repository is
+              # public and the checkout persists no credential.
+              git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+              if ! git merge-base --is-ancestor "$SHA" origin/main; then
+                echo "::error::${REF} points at ${SHA}, which is not on main; a release tag may only sign reviewed code"
+                exit 1
+              fi
+              echo "ref ${REF}: ${SHA} is an ancestor of main"
+              ;;
+            *)
+              echo "::error::${REF} may not publish signed images; run this workflow from main or a release tag"
+              exit 1
+              ;;
+          esac
+
   # Decide whether this run has to build the three app images at all, or whether
   # it may re-tag the already-built, already-signed index the main-branch run
   # produced for the very same commit (REQ-OPS-021, ADR-0137).
@@ -170,8 +230,12 @@ jobs:
   # rather than to a bad release.
   plan:
     name: Plan (rebuild or reuse)
+    needs: ref-guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Reads only: resolves tags and verifies signatures of the private packages.
+    permissions:
+      packages: read
 
     outputs:
       # 'true' only when every gate below passed. Consumers must compare against
@@ -300,7 +364,8 @@ jobs:
 
             # Gate 5 — the digest must carry this workflow's own keyless
             # signature, minted on the MAIN branch. Pinned to `refs/heads/main`
-            # rather than promote.yml's wider `(heads/main|tags/v.+)`: the only
+            # rather than promote.yml's wider `(heads/main|tags/vX.Y.Z)`, and
+            # anchored like it (scripts/check-cosign-identity.py): the only
             # legitimate producer of a reuse candidate is the main-branch run of
             # this very commit, so anything else — a tag-run signature included —
             # means the provenance is not what this optimisation assumes and the
@@ -308,7 +373,7 @@ jobs:
             # promote.yml (REQ-OPS-002) and scripts/deploy.sh (REQ-OPS-015) stand
             # on; reuse must not widen it.
             if ! cosign verify "${image}@${digest}" \
-                 --certificate-identity-regexp "https://github.com/${REPO}/\.github/workflows/release-images\.yml@refs/heads/main" \
+                 --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/heads/main$" \
                  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
                  >/dev/null; then
               decide false '{}' "no valid main-branch signature on ${image}@${digest}"
@@ -328,6 +393,12 @@ jobs:
     if: needs.plan.outputs.reuse != 'true'
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 30
+    # Pushes the per-arch image BY DIGEST and nothing else. No `id-token`: this is the job that
+    # runs the project's Gradle build inside the Dockerfile, and it never holds a token that could
+    # mint a signature -- `merge` signs, after every cell has finished.
+    permissions:
+      contents: read
+      packages: write
 
     strategy:
       fail-fast: false
@@ -366,6 +437,7 @@ jobs:
           # resolution to fall back to a bare short SHA on every main-branch
           # build. `0` = full history.
           fetch-depth: 0
+          persist-credentials: false
 
       # Compute the human-readable version string baked into the frontend
       # image's `META-INF/build-info.properties` (and, transitively, the
@@ -538,6 +610,11 @@ jobs:
     if: ${{ always() && needs.plan.outputs.reuse != 'true' && contains(fromJSON('["success", "failure"]'), needs.build.result) }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 20
+    # Pulls the private image to scan it and uploads SARIF; writes nothing to the registry.
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -656,6 +733,14 @@ jobs:
     if: ${{ always() && needs.plan.result == 'success' && (needs.plan.outputs.reuse == 'true' || needs.build.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The signing job: tags the index, cosign-signs it keyless (`id-token`) and records the SLSA
+    # statement in GitHub's attestation store (`attestations`). It checks nothing out and runs no
+    # project code.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
 
     strategy:
       fail-fast: false
@@ -970,14 +1055,26 @@ jobs:
   # matching child. No Trivy scan (a scratch image has no OS packages to flag).
   # Same tag scheme + same cosign keyless signature as the app images, so
   # promote.yml flips it to :stable through the identical verify-and-retag path.
+  #
+  # Builds, pushes AND signs in one job, unlike the app images: the bundle is a `FROM scratch`
+  # image made of `COPY` lines alone, so this job runs no project code that a signing token would
+  # need to be kept away from -- which is the line `build-keycloak-spi` below is split along.
   build-config:
     name: Build & sign config bundle
+    needs: ref-guard
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Local wrapper — retries the BuildKit image pull and falls back to a
       # mirror registry, see the build job above. The `docker-container` driver
@@ -1149,34 +1246,40 @@ jobs:
   # root before the scratch image is built multi-arch for parity. Same tag scheme +
   # same cosign keyless signature as the app images, so promote.yml flips it to
   # :stable through the identical verify-and-retag path (REQ-OPS-007, ADR-0055).
-  build-keycloak-spi:
-    name: Build & sign keycloak-spi bundle
+  #
+  # TWO jobs since 2026-09-22 (audit item CI-SEC-04). The JAR is compiled by the project's own
+  # Gradle build, and a job that runs the build must not also hold the OIDC token that mints a
+  # signing certificate: anything that can execute in the build -- a plugin, a dependency's
+  # annotation processor -- could otherwise ask Fulcio for a certificate under this workflow's
+  # release identity. `keycloak-spi-jar` compiles with read-only repository access and hands the
+  # JAR over as a run-scoped artifact; `build-keycloak-spi` packages, pushes and signs it and runs
+  # no Gradle at all. The second job keeps the old id and name, so nothing that refers to it moves.
+  keycloak-spi-jar:
+    name: Compile keycloak-spi provider JAR
+    needs: ref-guard
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          distribution: temurin
-          java-version: '25'
+          persist-credentials: false
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      # `cache-disabled`, not `cache-read-only`: this JAR is signed and shipped to the production
+      # Keycloak, and a release artifact should not be assembled from a cache any earlier run could
+      # have written (zizmor `cache-poisoning`). The dependency download costs well under a minute
+      # for one small module.
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          cache-read-only: true
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+          cache-disabled: 'true'
 
       # Plain library JAR (compileOnly Keycloak SPIs, Java-21 bytecode via
       # `--release 21` in keycloak-spi/build.gradle.kts). `:keycloak-spi:jar` runs
       # compile + jar only — no tests, no Checkstyle/Spotless (ci.yml covers those).
-      # The artifact is moved to the build-context root because .dockerignore bars
-      # `**/build`, so the scratch image cannot COPY from keycloak-spi/build/libs.
       - name: Build keycloak-spi provider JAR
         run: |
           set -euo pipefail
@@ -1188,7 +1291,48 @@ jobs:
             ls -la keycloak-spi/build/libs >&2 || true
             exit 1
           fi
-          cp "${jars[0]}" keycloak-spi.jar
+          mkdir -p /tmp/keycloak-spi-jar
+          cp "${jars[0]}" /tmp/keycloak-spi-jar/keycloak-spi.jar
+          ls -l /tmp/keycloak-spi-jar/keycloak-spi.jar
+
+      - name: Upload the provider JAR
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: keycloak-spi-jar
+          path: /tmp/keycloak-spi-jar/keycloak-spi.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  build-keycloak-spi:
+    name: Build & sign keycloak-spi bundle
+    needs: [ref-guard, keycloak-spi-jar]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+    steps:
+      # For the Dockerfile and .dockerignore only; nothing from the checkout is executed.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Into the build-context root, because .dockerignore bars `**/build`, so the scratch image
+      # cannot COPY from keycloak-spi/build/libs.
+      - name: Download the provider JAR
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: keycloak-spi-jar
+          path: .
+
+      - name: Check the provider JAR arrived
+        run: |
+          set -euo pipefail
+          test -s keycloak-spi.jar || { echo "::error::keycloak-spi.jar missing or empty after download" >&2; exit 1; }
           ls -l keycloak-spi.jar
 
       # Local wrapper — retries the BuildKit image pull and falls back to a

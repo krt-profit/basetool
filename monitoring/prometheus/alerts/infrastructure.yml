@@ -155,6 +155,32 @@ groups:
           summary: "No container metrics: fewer than 10 named containers are reporting"
           description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. On Docker that is cAdvisor or the docker-socket-proxy; on Podman it is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer."
 
+      # The databases and the session store themselves (OPS-MON-03, added 2026-09-22). Until then
+      # nothing alerted on either being DOWN: TargetDown watches the exporters, and an exporter that
+      # cannot reach its database stays up and answers the scrape with `pg_up 0` / `redis_up 0`. The
+      # backend's health check would eventually take it with it, but that reads as a backend outage
+      # and costs the minutes it takes to look in the wrong place.
+      #
+      # The nightly backup does NOT touch these: it quiesces frontend, backend and ingest and leaves
+      # both databases and Redis running (REQ-OPS-009), so `for: 2m` needs no carve-out for 04:15.
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL down: {{ $labels.database }}"
+          description: "postgres-exporter for {{ $labels.database }} has not been able to connect to its database for 2 minutes (pg_up == 0) while the exporter itself answers -- the database is down, refusing connections, or out of connection slots. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or db-keycloak.service) and its journal (`journalctl CONTAINER_NAME=db-backend`)."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis down"
+          description: "redis-exporter has not been able to reach Redis for 2 minutes (redis_up == 0) while the exporter itself answers. Redis holds every web session and the live-sync fan-out, so members are being logged out and live updates have stopped. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status redis.service` and `journalctl CONTAINER_NAME=redis`; a missing or unreadable /var/iri/redis/users.acl stops it from starting at all (ADR-0088)."
+
       - alert: PostgresConnectionsCritical
         expr: sum by (database) (pg_stat_activity_count) / on(database) pg_settings_max_connections > 0.80
         for: 5m
@@ -306,6 +332,65 @@ groups:
         annotations:
           summary: "Certificate expiry metrics are stale"
           description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
+
+      # A container whose own health check says it is unhealthy (OPS-MON-03, added 2026-09-22). The
+      # podman exporter publishes podman_container_health per container ID (-1 unknown, 0 healthy,
+      # 1 unhealthy, 2 starting -- prometheus-podman-exporter 1.20.0, the EPEL 10 build the role
+      # installs), and podman_container_info carries the name; the join is the same one the
+      # basetool:container:* recording rules use.
+      #
+      # Ten of the eighteen containers carry a health check; this covers all ten, the databases, Redis,
+      # Keycloak, Grafana and Alertmanager included -- deploy.sh's targeted restart watches only the
+      # three application modules. `for: 10m` rides out a slow start and the nightly quiesce: the
+      # backup STOPS the writers rather than leaving them unhealthy (and a stopped Quadlet container is
+      # removed, so it has no series), and a restarting one reports 2, starting, not 1.
+      - alert: ContainerUnhealthy
+        expr: >-
+          max by (name) (
+            (podman_container_health == 1) * on (id) group_left(name) podman_container_info
+          ) == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container unhealthy: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} has failed its own health check for 10 minutes. For backend, frontend and ingest deploy.sh restarts it on its next tick (DeployHealthRestartFailing pages if that does not help); for every other container nothing restarts it automatically. Check `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run {{ $labels.name }}` and `journalctl CONTAINER_NAME={{ $labels.name }}`."
+
+      # Unattended security updates (OPS-SEC-01, REQ-OPS-032, added 2026-09-22). dnf-automatic applies
+      # security advisories daily and scripts/host-updates-metrics.sh records each run from the unit's
+      # own ExecStopPost=. "Unattended" is the part nobody watches, so these three say when it is not
+      # happening, when it fails, and when an installed fix waits for a reboot only an owner can do.
+      - alert: HostSecurityUpdatesFailing
+        expr: basetool_host_updates_last_run_success == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unattended security updates failed on the host"
+          description: "The last dnf-automatic run failed, so security advisories published since the previous good run are not installed. `journalctl -u dnf-automatic.service` on the host shows why (a repository that could not be reached, a dependency conflict, the runtime exclusion blocking a required update)."
+
+      # Stale over two days, held for a day: a fresh host is not paged before its first 07:00 window
+      # (absent() waits out the same 26 hours), and a timer that stopped is reported after its third
+      # missed run at the latest.
+      - alert: HostSecurityUpdatesStale
+        expr: >-
+          (time() - basetool_host_updates_last_run_timestamp_seconds) > 48 * 3600
+          or absent(basetool_host_updates_last_run_timestamp_seconds)
+        for: 26h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unattended security updates have not run"
+          description: "dnf-automatic has not finished a run for more than two days, or has never recorded one -- the host is not being patched. Check `systemctl list-timers dnf-automatic.timer` and `systemctl status dnf-automatic.service`, and that /etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf (installed by the basetool_host role, tasks/45-updates.yml) is present."
+
+      - alert: HostRebootRequired
+        expr: basetool_host_reboot_required == 1
+        for: 24h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host reboot required to activate installed updates"
+          description: "An installed update (typically a kernel, glibc or systemd fix) only takes effect after a reboot, and the host has not rebooted for a day since (`needs-restarting -r`). dnf-automatic never reboots on its own -- restarting the one production host is an owner decision. Plan a reboot; the stack comes back by itself (Quadlet units are WantedBy=default.target and the service user lingers)."
 
       - alert: HostDiskWarning
         expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) > 0.80

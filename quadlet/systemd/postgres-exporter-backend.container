@@ -15,7 +15,8 @@ EnvironmentFile=/var/iri/code/env.d/postgres-exporter-backend.env
 Exec=--no-collector.stat_replication --collector.database_wraparound --collector.long_running_transactions
 Memory=32M
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500 --init
+RunInit=true
+PodmanArgs=--oom-score-adj=500
 
 [Service]
 Restart=always

@@ -1,0 +1,187 @@
+name: Re-tag a signature-verified digest
+
+description: >
+  Resolves <image>:<source-tag> to its manifest digest, cosign-verifies that digest against this
+  repository's release-images.yml keyless identity, and moves <image>:<target-tag> onto it. The
+  promotion step shared by promote.yml (:stable) and promote-testing.yml (:testing).
+
+# One copy instead of two (audit item CI-08). promote.yml's and promote-testing.yml's promote jobs
+# were 94 of 99 lines identical -- the digest resolution with its retry, the cosign verification
+# with its narrow retry, the re-tag and the summary -- and the one line that must never differ
+# between them, the signer-identity regexp, was the one most likely to (it did not, but nothing
+# said so except scripts/check-cosign-identity.py). The regexp now exists once for both CI halves.
+#
+# The caller logs in to GHCR first (a composite action cannot read `secrets`), with a token that can
+# write the target tag.
+#
+# No `Set up Docker Buildx` on purpose. Promotion only runs `docker buildx imagetools inspect` /
+# `create`, which are pure registry-side manifest operations performed by the buildx CLI plugin
+# that ships with the runner's Docker — no build is ever dispatched, so no builder instance is
+# needed. Booting a `docker-container` builder anyway would pull `moby/buildkit` from Docker Hub
+# once per matrix module purely to leave it idle, and that pull is the flake that failed release
+# run 30160708503 in release-images.yml.
+
+inputs:
+  module:
+    description: The artifact to promote, i.e. the suffix of `basetool-<module>`.
+    required: true
+  source-tag:
+    description: The tag whose digest is promoted (e.g. "1.4.3", "sha-abc1234", "stable").
+    required: true
+  target-tag:
+    description: The rolling tag to move onto that digest ("stable" or "testing").
+    required: true
+  registry:
+    description: The registry host.
+    required: false
+    default: ghcr.io
+  owner:
+    description: The package namespace.
+    required: false
+    default: ${{ github.repository_owner }}
+
+outputs:
+  digest:
+    description: The manifest digest that was verified and re-tagged.
+    value: ${{ steps.resolve.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install cosign
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+    - name: Resolve source digest
+      id: resolve
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.registry }}/${{ inputs.owner }}/basetool-${{ inputs.module }}
+        VERSION: ${{ inputs.source-tag }}
+      run: |
+        set -euo pipefail
+        # Retried, and this is the step that actually bit: the 1.7.18 promotion to
+        # :testing got `403 Forbidden` on manifests/1.7.18 ninety seconds after the
+        # :stable promotion had resolved the very same tag successfully. GHCR
+        # answers 403 for a read it cannot serve, so a blip is indistinguishable
+        # from a missing image — and a read is idempotent, so a retry costs
+        # nothing. release-images.yml has carried exactly this since run
+        # 30931003203 hit the identical shape; the promote path never got it.
+        DIGEST=""
+        for attempt in 1 2 3; do
+          # `if cmd; then` rather than `cmd && …`: a `run:` block is `bash -e`, and
+          # an AND-OR list whose FIRST command fails still trips errexit, which
+          # would abort on attempt 1 and make the retry decorative. The inner test
+          # is a full `if` for the same reason.
+          if DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{.Manifest.Digest}}'); then
+            if [ -n "${DIGEST}" ]; then break; fi
+          fi
+          echo "::warning::digest lookup attempt ${attempt} failed for ${IMAGE}:${VERSION}; retrying" >&2
+          sleep $((attempt * 10))
+        done
+        if [ -z "${DIGEST}" ]; then
+          echo "::error::could not resolve ${IMAGE}:${VERSION} after 3 attempts" >&2
+          exit 1
+        fi
+        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+        echo "Source: ${IMAGE}:${VERSION} → ${DIGEST}"
+
+    # The release-images workflow signs every pushed digest with a Fulcio cert that carries the
+    # workflow's full ref as subject. Restricting the identity to that exact workflow file rejects
+    # images signed by any other workflow in the org (or by anyone with stolen credentials who never
+    # had access to fire our release pipeline in the first place).
+    #
+    # The `@refs/` suffix is pinned to `heads/main` (main-branch :edge/:sha builds) or a
+    # `tags/vMAJOR.MINOR.PATCH` release tag — NOT the broad `refs/.+` — so an image built by a
+    # workflow_dispatch run of release-images off an arbitrary feature branch is promotable to
+    # neither production nor testing. Testing exists to rehearse what may later become production;
+    # a path that accepted weaker provenance would make it a rehearsal of something else. The
+    # host-side gate in scripts/deploy.sh (verify_signature, REQ-OPS-015) verifies against the SAME
+    # identity. Anchored at both ends: cosign finds the regexp ANYWHERE in the certificate SAN, so
+    # the unanchored form this replaced (audit item CI-SEC-01) also trusted `refs/heads/main-x`,
+    # `refs/heads/maintenance` and `refs/tags/vfoo`. scripts/check-cosign-identity.py keeps every
+    # copy anchored and equal.
+    #
+    # A signature is uploaded to the registry AFTER the digest it covers, so a promotion fired while
+    # the release run is still signing reads a digest that exists and a signature that does not yet.
+    # That is exactly how the v1.6.11 promotion died: `cosign sign` logged "Signing artifact..." at
+    # 14:00:20.69 and this step reported "no signatures found" at 14:00:20.81 — 120 ms apart, on
+    # the identical digest. The image was never unsigned. `cosign sign` in release-images.yml has
+    # retried since day one; this side did not, which left one half of an eventually-consistent
+    # registry hardened and the other half racing it.
+    #
+    # The retry is NARROW on purpose. Only an ABSENT signature is transient. A signature that is
+    # present and fails the identity check fails at once: retrying that would mean waiting for
+    # somebody to publish a matching one, which is the failure mode this gate exists to catch
+    # (REQ-OPS-002).
+    - name: Verify source image signature (cosign keyless)
+      shell: bash
+      env:
+        IMAGE_REF: ${{ inputs.registry }}/${{ inputs.owner }}/basetool-${{ inputs.module }}@${{ steps.resolve.outputs.digest }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        attempts=6
+        delay=5
+        for i in $(seq 1 "$attempts"); do
+          if err="$(cosign verify "${IMAGE_REF}" \
+               --certificate-identity-regexp "^https://github\\.com/${REPO}/\\.github/workflows/release-images\\.yml@refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$" \
+               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+               2>&1 >/dev/null)"; then
+            echo "Signature OK"
+            exit 0
+          fi
+          case "$err" in
+            *"no signatures found"*|*"no matching signatures"*|*MANIFEST_UNKNOWN*|*NAME_UNKNOWN*)
+              if [ "$i" -lt "$attempts" ]; then
+                echo "::warning::no signature on ${IMAGE_REF} yet (attempt ${i}/${attempts}) — a release run may still be uploading it; retrying in ${delay}s" >&2
+                sleep "$delay"
+                delay=$((delay * 2))
+                continue
+              fi
+              ;;
+            *)
+              # Present but wrong — wrong identity, wrong issuer, bad chain.
+              # Not a race, and not something a later attempt can improve.
+              echo "::error::signature on ${IMAGE_REF} did not verify against this repository's release workflow identity" >&2
+              echo "$err" >&2
+              exit 1
+              ;;
+          esac
+        done
+        echo "::error::no signature appeared on ${IMAGE_REF} after ${attempts} attempts" >&2
+        echo "$err" >&2
+        exit 1
+
+    # `buildx imagetools create` rewrites the registry manifest reference without pulling or
+    # repushing layers. The target tag and the source tag now point at the same digest, so the
+    # cosign signature attached to that digest remains valid for both — no re-sign.
+    - name: Re-tag the verified digest
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.registry }}/${{ inputs.owner }}/basetool-${{ inputs.module }}
+        SOURCE_DIGEST: ${{ steps.resolve.outputs.digest }}
+        TARGET: ${{ inputs.target-tag }}
+      run: |
+        set -euo pipefail
+        docker buildx imagetools create \
+          --tag "${IMAGE}:${TARGET}" \
+          "${IMAGE}@${SOURCE_DIGEST}"
+        echo "Promoted ${SOURCE_DIGEST} → ${IMAGE}:${TARGET}"
+
+    - name: Summarise
+      shell: bash
+      env:
+        MODULE: ${{ inputs.module }}
+        VERSION: ${{ inputs.source-tag }}
+        DIGEST: ${{ steps.resolve.outputs.digest }}
+        TARGET: ${{ inputs.target-tag }}
+      run: |
+        {
+          echo "### Promoted basetool-${MODULE} to ${TARGET}"
+          echo ""
+          echo "| Field | Value |"
+          echo "|---|---|"
+          echo "| Source tag | \`${VERSION}\` |"
+          echo "| Digest | \`${DIGEST}\` |"
+          echo "| New tag | \`${TARGET}\` |"
+        } >> "$GITHUB_STEP_SUMMARY"

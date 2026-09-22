@@ -434,6 +434,51 @@ QUADLET_ONLY_ENV: dict[str, dict[str, str]] = {
 START_TIMEOUT_MARGIN_SEC = 60
 
 
+#: Added to a service's stop grace before systemd may call its stop timed out.
+#:
+#: Compose's ``stop_grace_period`` is TWO values under Quadlet, and until 2026-09-22 only one of them
+#: was generated. ``[Service] TimeoutStopSec=`` bounds how long systemd waits for the whole stop --
+#: but the stop itself is Quadlet's ``ExecStop``, a ``podman rm -f``, and that sends SIGKILL after
+#: the CONTAINER's own stop timeout, which ``[Container] StopTimeout=`` sets and which defaults to
+#: podman's 10 s. So every container was killed after 10 s whatever compose said: the JVMs' 20 s
+#: graceful-shutdown phase, Tempo's and Loki's 30 s drains and PostgreSQL's clean shutdown were all
+#: cut off, and the longer ``TimeoutStopSec=`` only described a wait that never happened.
+#:
+#: ``StopTimeout=`` now carries the grace itself and ``TimeoutStopSec=`` the grace plus this margin.
+#: podman-systemd.unit(5) asks for exactly that ordering -- the stop timeout "should be lower than
+#: the actual systemd unit timeout to make sure the podman rm command is not killed by systemd" --
+#: and fifteen seconds covers podman's own teardown after the SIGKILL (the ``rm``, the network
+#: detach, the cidfile) on this host.
+STOP_TIMEOUT_MARGIN_SEC = 15
+
+
+#: Networks that are ``Internal=true`` under Quadlet although compose declares them without
+#: ``internal:`` (ADR-0162, as extended on 2026-09-22 for OPS-SEC-05).
+#:
+#: These five carry the databases and Redis and nothing that needs the internet: ``db-backend``,
+#: ``db-keycloak`` and ``redis`` are members of these networks ONLY, so an internal network takes
+#: their outbound path away entirely, and every other member (the three JVMs, Keycloak and the
+#: three exporters) keeps a non-internal network of its own for whatever egress it has. Name
+#: resolution survives: aardvark-dns answers on an internal network, which the five
+#: ``net-proxy-*`` networks have relied on since ADR-0162 made them internal.
+#:
+#: Quadlet-side and not ``internal: true`` in compose, for the same reason ``READ_ONLY`` is: the
+#: compose file also runs the LOCAL stacks, and there the ``-dev`` twins of these three services
+#: publish ``127.0.0.1:15432``, ``:15433`` and ``:6379`` on these very networks so a developer's
+#: ``bootRun`` can reach them. An internal network carries no DNAT, so the same line in compose would
+#: silently break every local database connection. Production publishes nothing on them.
+#:
+#: ``_verify_internal_networks`` refuses a unit whose every network is internal while it publishes a
+#: port or dials the host gateway, because on such a container both would be dead ends.
+QUADLET_INTERNAL_NETWORKS = frozenset({
+    "net-db-backend",
+    "net-db-keycloak",
+    "net-redis-backend",
+    "net-redis-frontend",
+    "net-redis-ingest",
+})
+
+
 #: Compose service keys this tool actually reads and turns into a unit directive.
 #:
 #: THIS LIST IS NOT A LIST OF NAMES THE TOOL HAS SEEN. Until 2026-09-17 there was one set, called
@@ -465,9 +510,10 @@ IGNORED_SERVICE_KEYS = {
     "logging": (
         "compose pins json-file with max-size 10m / max-file 5 because the backend alone writes "
         "~150 MB/day and would fill /var/lib/docker/containers. Podman's effective driver here is "
-        "journald, which rotates on its own budget instead -- so the SETTING is not translated but "
-        "the PROBLEM is not solved either: journald's SystemMaxUse has to carry it, and that is "
-        "host configuration (Ansible), not a unit directive"
+        "journald, which rotates on its own budget instead -- so the SETTING is not translated and "
+        "the PROBLEM moves to host configuration: journald's SystemMaxUse= and MaxRetentionSec= "
+        "(31 days, REQ-OBS-010), set by the bootstrap role in 27-observability.yml, not a unit "
+        "directive"
     ),
 }
 
@@ -646,6 +692,20 @@ def _volume(spec: str, service: str) -> str:
     elif not source.startswith("/"):
         # a named volume -- Quadlet references the unit, not the raw name
         source = f"{source}.volume"
+    # The CONFIG TREE is mounted read-only, always. /var/iri/code is what the deployer rewrites on
+    # every release from the signed config bundle; a container that can write into it can change
+    # what the next release applies, or plant a file the next backup carries off the host. Until
+    # 2026-09-22 keycloak mounted its theme, its provider directory and realm-export.json writable,
+    # and nothing noticed, because a writable mount that is never written looks exactly like a
+    # read-only one. Refused here so the next such line fails the build instead of shipping.
+    if source == PROJECT_DIR_ON_HOST or source.startswith(PROJECT_DIR_ON_HOST + "/"):
+        options = parts[2].split(",") if len(parts) > 2 else []
+        if "ro" not in options:
+            raise Refusal(
+                f"{service}: mounts {source} from the config tree without `:ro`. The deployer "
+                "rewrites that tree on every release, and a container that can write into it can "
+                "change what the next release applies. Mount it read-only."
+            )
     return ":".join([source] + parts[1:])
 
 
@@ -944,20 +1004,27 @@ def render_network(name: str, spec: dict[str, Any]) -> str:
             lines.append(f"Gateway={entry['gateway']}")
     if spec.get("enable_ipv6"):
         lines.append("IPv6=true")
-    if spec.get("internal"):
+    if spec.get("internal") and name in QUADLET_INTERNAL_NETWORKS:
+        raise Refusal(
+            f"{name}: compose already declares it internal, and QUADLET_INTERNAL_NETWORKS names it "
+            "again. Remove the table entry -- two places saying one thing are two places that can "
+            "come to disagree."
+        )
+    if spec.get("internal") or name in QUADLET_INTERNAL_NETWORKS:
         lines.append("Internal=true")
     opts = spec.get("driver_opts", {}) or {}
     if opts.get("com.docker.network.bridge.enable_ip_masquerade") == "false":
         lines += [
             "",
             "# Compose disabled masquerading here so this bridge carries ingress and no egress.",
-            "# netavark 2.1 has no equivalent for a managed, non-internal bridge -- its documented",
-            "# options are mtu, metric, no_default_route and isolate, and masquerading is tied to",
-            "# mode=managed. no_default_route is the candidate: the edge is on this one",
-            "# non-internal network and five Internal=true ones, so with no default route anywhere",
-            "# it has no egress. THAT IS A HYPOTHESIS ABOUT A SECURITY CONTROL -- measure it in",
-            "# Phase 1 before trusting it (plan §3.5).",
-            "PodmanArgs=--opt no_default_route=true",
+            "# netavark has no masquerade switch for a managed bridge; no_default_route is the",
+            "# equivalent: the edge is on this one non-internal network and five Internal=true",
+            "# ones, so with no default route anywhere it has no egress. Measured 2026-09-16",
+            "# (docs/archive/PODMAN_MIGRATION_PLAN.md section 13): a plain network reaches the",
+            "# internet, this option blocks it, and the container keeps only a link-scope route.",
+            # Quadlet's own key for `podman network create --opt`, not a raw PodmanArgs= line: a
+            # key is validated by the generator, an argument string is passed through unread.
+            "Options=no_default_route=true",
         ]
     return "\n".join(lines) + "\n"
 
@@ -1144,18 +1211,23 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         podman_args.append(f"--cpus={limits['cpus']}")
     # All nine monitoring containers carry oom_score_adj: 500 -- deliberately MORE attractive to
     # the OOM killer than the application, so that under memory pressure the kernel takes Grafana
-    # before it takes the backend. Quadlet has no key for it; podman run does. A POSITIVE
-    # adjustment is what an unprivileged process is allowed to set, so this survives rootless.
+    # before it takes the backend. Quadlet has no key for it (podman-systemd.unit(5) for 5.8, read
+    # 2026-09-22, lists none, and none for --cpus either); podman run does. A POSITIVE adjustment
+    # is what an unprivileged process is allowed to set, so this survives rootless.
     if "oom_score_adj" in spec:
         podman_args.append(f"--oom-score-adj={spec['oom_score_adj']}")
     # `init: true` runs a minimal init as PID 1 so orphaned children get reaped. This is not a
     # nicety: the JVM runs as PID 1 and does NOT reap, the health probe's BusyBox wget forks an
     # `ssl_client` helper it never waits on, and each probe left one <defunct> until the pids cap
-    # was reached -- the 2026-07-12 native-thread OOM, at roughly 17h uptime. Quadlet 5.8.2 has no
-    # Init= key (checked against `man 5 podman-systemd.unit` on the target host), so it goes
-    # through podman's own flag.
+    # was reached -- the 2026-07-12 native-thread OOM, at roughly 17h uptime.
+    #
+    # Quadlet's own `RunInit=` key, which is `podman run --init`. This went through PodmanArgs until
+    # 2026-09-22 on the belief that Quadlet had no key for it; the key is `RunInit=`, not `Init=`,
+    # and podman-systemd.unit(5) for 5.8 documents it ("a minimal init process inside the container
+    # that forwards signals and reaps processes"). A key is parsed and validated by the generator; a
+    # PodmanArgs string is appended unread, so a typo in it ships.
     if spec.get("init"):
-        podman_args.append("--init")
+        container.append("RunInit=true")
     # `extra_hosts` -> AddHost=, which Podman 5.8.2 documents with the same `hostname:ip` form
     # compose uses and allows more than once. The value is a VALUE_VARS interpolation rather than
     # a path, so it resolves against that table and refuses on anything unrecorded -- a literal
@@ -1166,9 +1238,20 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     # ...and the Quadlet-only ones, for names that are host services here. See PODMAN_HOST_ALIASES.
     for alias in PODMAN_HOST_ALIASES.get(service, ()):
         container.append(f"AddHost={alias}:host-gateway")
-    nofile = (spec.get("ulimits") or {}).get("nofile")
+    # `Ulimit=` is Quadlet's key for `podman run --ulimit` (podman-systemd.unit(5), 5.8). It went
+    # through PodmanArgs until 2026-09-22 for the same wrong reason RunInit= did.
+    ulimits = spec.get("ulimits") or {}
+    unknown_ulimits = set(ulimits) - {"nofile"}
+    if unknown_ulimits:
+        raise Refusal(
+            f"{service}: unrecognised ulimit(s) {sorted(unknown_ulimits)}. Teach the generator, or "
+            "the unit ships without them and looks complete."
+        )
+    nofile = ulimits.get("nofile")
     if isinstance(nofile, dict):
-        podman_args.append(f"--ulimit nofile={nofile['soft']}:{nofile['hard']}")
+        container.append(f"Ulimit=nofile={nofile['soft']}:{nofile['hard']}")
+    elif nofile is not None:
+        container.append(f"Ulimit=nofile={nofile}:{nofile}")
     if "pids_limit" in spec:
         container.append(f"PidsLimit={spec['pids_limit']}")
     if podman_args:
@@ -1203,9 +1286,13 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         # signal anyone would get. An edge that stays down after five minutes is a total outage; one
         # that keeps retrying every 60s recovers by itself when the cause clears.
         unit.append("StartLimitIntervalSec=0")
+    # Two keys, not one -- see STOP_TIMEOUT_MARGIN_SEC. `StopTimeout=` is what podman waits before
+    # the SIGKILL; `TimeoutStopSec=` is what systemd waits for podman.
     grace = spec.get("stop_grace_period")
     if grace:
-        service_section.append(f"TimeoutStopSec={str(grace).rstrip('s')}")
+        stop = _seconds(grace, f"{service}.stop_grace_period")
+        container.append(f"StopTimeout={stop}")
+        service_section.append(f"TimeoutStopSec={stop + STOP_TIMEOUT_MARGIN_SEC}")
 
     # Everything in [Container] is folded by Quadlet into one ExecStart=, where systemd expands
     # `%` specifiers. Exec=, Entrypoint= and HealthCmd= are escaped at the point they are built;
@@ -1472,6 +1559,60 @@ def _verify_front_end(
             )
 
 
+def _verify_internal_networks(
+    units: dict[str, str], net_defs: dict[str, dict[str, Any]], used: set[str]
+) -> None:
+    """Refuse a container that an internal network would silently cut off.
+
+    An ``Internal=true`` network has no gateway route and no DNAT. A container whose EVERY network
+    is internal therefore cannot be reached through a published port and cannot dial the host
+    gateway -- and neither failure is loud: the unit starts, the health check (which runs inside the
+    container) passes, and the port or the host service simply never answers. ADR-0162 met the first
+    half of that once already, when the edge's published ports sat on an internal network and served
+    nothing.
+
+    Args:
+        units: service name -> rendered ``.container`` text.
+        net_defs: the compose network definitions.
+        used: the networks some emitted container actually joins.
+
+    Raises:
+        Refusal: when a container on internal networks only publishes a port or aliases the host
+            gateway, or when ``QUADLET_INTERNAL_NETWORKS`` names a network no container joins.
+    """
+    stale = sorted(QUADLET_INTERNAL_NETWORKS - used)
+    if stale:
+        raise Refusal(
+            f"QUADLET_INTERNAL_NETWORKS names {', '.join(stale)}, which no translated container "
+            "joins. The entry protects nothing and would read as if it did."
+        )
+
+    def internal(net: str) -> bool:
+        return bool((net_defs.get(net) or {}).get("internal")) or net in QUADLET_INTERNAL_NETWORKS
+
+    for service, text in sorted(units.items()):
+        lines = text.splitlines()
+        nets = [
+            line.split("=", 1)[1].split(":", 1)[0].removesuffix(".network")
+            for line in lines if line.startswith("Network=")
+        ]
+        if not nets or not all(internal(net) for net in nets):
+            continue
+        reaching_out = [
+            line for line in lines
+            if line.startswith("PublishPort=")
+            or (line.startswith("AddHost=") and line.endswith(":host-gateway"))
+        ]
+        if reaching_out:
+            raise Refusal(
+                f"{service}: every network it joins is internal ({', '.join(nets)}), yet the unit "
+                f"carries {', '.join(reaching_out)}. An internal network has no DNAT and no route "
+                "to the host gateway, so that line would start clean and never work. Give the "
+                "service a non-internal network, or drop the network from "
+                "QUADLET_INTERNAL_NETWORKS."
+            )
+
+
 def generate() -> tuple[dict[str, str], list[str]]:
     """Build every unit and allow-list.
 
@@ -1491,6 +1632,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
     front_networks: dict[str, list[str]] = {}
     used_networks: set[str] = set()
     used_volumes: set[str] = set()
+    rendered_units: dict[str, str] = {}
 
     for path in (COMPOSE_APP, COMPOSE_MON):
         doc = yaml.safe_load(io.open(path, encoding="utf-8"))
@@ -1519,6 +1661,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 notes.append(f"{service}: {kind} -- {reason}")
                 continue
             files[f"quadlet/systemd/{service}.container"] = render_container(service, spec)
+            rendered_units[service] = files[f"quadlet/systemd/{service}.container"]
             # QUADLET_ONLY_ENV counts here for the same reason it counts for EnvironmentFile=:
             # redis's whole environment is Quadlet-only now, and keying off the compose map alone
             # made --check report its template as stale on the very run that wrote it.
@@ -1552,6 +1695,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
         notes.append("networks with no translated member, omitted: " + ", ".join(unused))
 
     _verify_front_end(front_networks, net_defs)
+    _verify_internal_networks(rendered_units, net_defs, used_networks)
 
     return files, notes
 

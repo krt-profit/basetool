@@ -58,6 +58,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,6 +110,7 @@ public class JobOrderItemProductionService {
   private final LocationRepository locationRepository;
   private final OwnerScopeService ownerScopeService;
   private final InventoryCheckoutService inventoryCheckoutService;
+  private final AuthHelperService authHelperService;
 
   /**
    * One consumed inventory row's scalar snapshot, captured before the row is decremented/deleted so
@@ -155,10 +157,17 @@ public class JobOrderItemProductionService {
    * @throws ProductionAllocationException when the amount exceeds the line's
    *     remaining-to-manufacture, or the consumption does not exactly cover every required
    *     material's demand (a well-formed 422, distinct from a stale-version 409)
+   * @throws AccessDeniedException when the book-in names another member whose inventory the caller
+   *     may not write, or a personal book-in on behalf of another member (see {@link
+   *     #assertMayBookInFor}); raised before anything is loaded or consumed
    */
   @Transactional
   public JobOrderItemDto bookProduction(
       UUID jobOrderId, UUID jobOrderItemId, JobOrderItemProductionCreateDto dto) {
+    // Before anything is loaded or consumed: whose ledger the produced stock lands in is an
+    // authorization input, not a detail of the final book-in step (REQ-INV-032, APPSEC-01).
+    assertMayBookInFor(dto.bookIn());
+
     JobOrder jobOrder =
         jobOrderRepository
             .findById(jobOrderId)
@@ -255,9 +264,9 @@ public class JobOrderItemProductionService {
 
       var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
       if (orderSlice == null) {
-        // The entry is not earmarked to this order — a stale payload or a concurrent unlink.
-        // GlobalExceptionHandler maps IllegalStateException to 400.
-        throw new IllegalStateException("Inventory item does not belong to this JobOrder");
+        // The entry is not earmarked to this order — a stale payload or a concurrent unlink. A
+        // client-side condition, so a 400 with a localized detail (APPSEC-06).
+        throw new BadRequestException(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
       if (inventoryItem.getMaterial() == null
           || !inventoryItem.getMaterial().getId().equals(c.materialId())) {
@@ -360,6 +369,48 @@ public class JobOrderItemProductionService {
         .filter(d -> d.id().equals(jobOrderItemId))
         .findFirst()
         .orElseThrow(() -> new NotFoundException("Item line not found after production booking"));
+  }
+
+  /**
+   * Refuses a book-in into another member's ledger that the caller may not write (REQ-INV-032,
+   * REQ-SEC-005, REQ-ORG-016). The same two gates the Einbuchen endpoint applies in {@link
+   * InventoryItemService#createInventoryItem}:
+   *
+   * <ul>
+   *   <li>an explicit {@code ownerUserId} other than the caller requires {@link
+   *       OwnerScopeService#canManageUserInventory(UUID)} — the endpoint's own gate ({@code
+   *       canEditJobOrder}) answers for the <em>order</em>, not for the member whose stock is
+   *       written, so without this a logistician could book produced stock into any member's
+   *       ledger, another Staffel's included;
+   *   <li>a {@code personal} book-in on behalf of someone else is refused outright: the private
+   *       pool is the owner's own, and the write-time stock merge would otherwise fold their
+   *       private rows into the response.
+   * </ul>
+   *
+   * <p>Evaluated on the <em>requested</em> id before any user lookup, so an unauthorised caller
+   * cannot tell "user does not exist" from "access denied". An absent {@code ownerUserId} means the
+   * caller themselves and needs no check. A caller whose id cannot be read is treated as "someone
+   * else", which fails closed.
+   *
+   * @param bookIn the book-in target of the production payload; never {@code null} (validated at
+   *     the API boundary)
+   * @throws AccessDeniedException when the caller may not write the named owner's inventory, or
+   *     asks for a personal book-in on behalf of another member
+   */
+  private void assertMayBookInFor(@NotNull JobOrderItemProductionCreateDto.BookInDto bookIn) {
+    final UUID ownerUserId = bookIn.ownerUserId();
+    if (ownerUserId == null
+        || authHelperService.currentUserId().map(ownerUserId::equals).orElse(false)) {
+      return;
+    }
+    if (!ownerScopeService.canManageUserInventory(ownerUserId)) {
+      throw new AccessDeniedException(
+          "You are not allowed to book produced stock in for this user");
+    }
+    if (Boolean.TRUE.equals(bookIn.personal())) {
+      throw new AccessDeniedException(
+          "You are not allowed to book produced stock into another user's personal inventory");
+    }
   }
 
   /**

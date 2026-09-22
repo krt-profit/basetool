@@ -5,7 +5,7 @@
     <#elseif section = "form">
         <div class="login-container">
             <h1 class="krt-title-lato">${msg("updatePasswordTitle")}</h1>
-            <form id="kc-passwd-update-form" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
+            <form id="kc-passwd-update-form" action="${url.loginAction}" method="post">
                 <div class="form-group">
                     <label for="password-new" class="krt-label">${msg("passwordNew")}</label>
                     <input type="password" id="password-new" name="password-new" class="krt-input" autofocus autocomplete="new-password" aria-invalid="<#if messagesPerField.existsError('password','password-confirm')>true</#if>" />
