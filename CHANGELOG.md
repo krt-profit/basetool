@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
+  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
+  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
+  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
+  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
+
 - **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
   inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
   kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
