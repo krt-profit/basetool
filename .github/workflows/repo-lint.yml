@@ -605,6 +605,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The gateway's audience is basetool-ingest; every frontend session token carries
       # basetool-backend, so a gateway configured with the backend's value admits the very tokens
