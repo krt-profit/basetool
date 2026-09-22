@@ -392,8 +392,14 @@ scope here — see *Out of scope*) · **Code:** the extractor's explicit Send ac
 
 If the user opts into "remember me", the extractor persists the device-grant **refresh
 token** in the Windows Credential Manager (DPAPI) — never in plaintext on disk, never in a
-log. The refresh token is **DPoP-bound** and stored together with its key (`REQ-INGEST-012`), so a
-lifted token is useless without the key.
+log. The refresh token is **DPoP-bound** (`REQ-INGEST-012`) to a **non-exportable** P-256 key the
+extractor creates in Windows CNG (the TPM via the Microsoft Platform Crypto Provider, else the
+Software KSP with export policy 0). The Credential Manager record holds only the token and the key's
+*name*, so a copied record cannot be redeemed on another machine.
+
+> **Correction (2026-09-22, SIB-SEC-04).** Until extractor 2.9.1 the exported key sat in the same
+> record, which made a copied record a working login; a legacy record is revoked and deleted on the
+> first send after updating.
 
 > **Correction (2026-09-22).** This paragraph used to say refresh-token rotation with reuse-detection
 > protects the stored token. Rotation is **off** realm-wide (`INGEST_KEYCLOAK_SETUP.md` step 4,
@@ -658,7 +664,9 @@ The extractor presents its access token to the gateway under the **`DPoP` scheme
 the gateway validates that proof itself (Spring Security `.dPoP()`). Sender-constraining pays here
 because the party that validates the proof is the party that consumes the token, and this is the
 only internet-facing hop. The refresh token stays bound too (`REQ-INGEST-007`): it is long-lived and
-sits on disk, which is the credential most worth protecting.
+sits on disk, which is the credential most worth protecting. The client's key is non-exportable (see
+`REQ-INGEST-007`); the software fallback still lets code already running as that user ask Windows to
+sign, only the TPM path resists an administrator.
 
 **The scheme follows the server, never the client's preference.** A key accompanies the request only
 when Keycloak actually bound the token (`token_type: DPoP`). Presenting an *unbound* token under the
