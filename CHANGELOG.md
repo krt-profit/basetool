@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: die Host-Einrichtung hätte allen Containern die Namensauflösung genommen.** Die
+  Aliasliste wurde in eine einzige Zeile geschrieben statt in eine pro Adresse — ein erfolgreicher
+  Lauf hätte das Backend, die Grafana-Anmeldung und sämtliche externen Prüfungen stillgelegt.
+  Gefunden im Trockenlauf, nie angewendet. Eine Nachkontrolle liest die Datei jetzt zurück und
+  bricht ab, wenn das wieder passiert. Rein betriebsseitig.
+
 - **Betrieb: die IPv6-Prüfungen der öffentlichen Adressen laufen wieder.** Ein Container erreicht
   auf dem neuen Server die eigene Maschine nicht über deren öffentliche Adresse; der Umweg, der
   das löst, gab es bisher nur für IPv4. Die v6-Prüfungen scheiterten deshalb an sich selbst und
