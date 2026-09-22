@@ -10,13 +10,17 @@
 (Keycloak client + audience scope) and #642 (the gateway) closed on 2026-06-17, and #1247 (backend
 audience enforcement) on 2026-08-28. What the document is for now:
 
-1. **the record of the configured state** — [*Configured state*](#configured-state) below; and
+1. **the record of the configured state** — [*Configured state*](#configured-state) below;
 2. **the repeatable procedure for onboarding a new approved ingest client** —
-   [*Onboarding a new approved client*](#onboarding-a-new-approved-client).
+   [*Onboarding a new approved client*](#onboarding-a-new-approved-client); and
+3. **how a new or out-of-date realm gets the same shape** —
+   [*New or out-of-date realm: run the provisioner*](#new-or-out-of-date-realm-run-the-provisioner).
 
-Steps 1–9 further down are the original setup sequence, kept as the procedure for rebuilding a realm
-from scratch and as the record of *why* each value is what it is. They are corrected to what is
-deployed, not to what was first written.
+Steps 1–9 further down are the original setup sequence, kept as the record of *why* each value is
+what it is. They are corrected to what is deployed, not to what was first written. **Since
+2026-09-22 they are no longer the procedure for building a realm:** their Keycloak half is code in
+`scripts/provision-keycloak-realm.py`, and replaying them by hand is how the testing realm fell four
+months behind production without anybody deciding it should.
 
 The **prod realm dump (with secrets) is not in this repository**: only a **sanitized reference**
 lives at [`docs/keycloak/realm-config.reference.json`](keycloak/realm-config.reference.json)
@@ -39,13 +43,16 @@ the throwaway `frontend/src/e2e/resources/realm-export.e2e.json` test artifact �
 
 ## Configured state
 
-Keycloak side, read from the realm export of **2026-09-09** (the reference above):
+Keycloak side, read from the realm export of **2026-09-09** (the reference above) and re-confirmed
+row by row against production's configuration snapshot of **2026-09-22**
+(`scripts/keycloak-config-snapshot.sql`), which also added the `basetool-android` row:
 
 |         Object          |                                                                                              State                                                                                               |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `basetool-sc-extractor` | public, no secret, device grant on, direct access grants off, service accounts off, `fullScopeAllowed: false`; default scopes include `extractor-ingest` **and** `extractor-ingest-only`          |
 | `basetool-ingest-gateway` | confidential, service account only (standard flow and direct access grants off), empty redirect/origin lists — the gateway's own identity for the hop to the backend (step 9); still carries both ingest scopes, inherited from the realm defaults at creation (hardening step 9b leaves that to its own audience needs) |
 | `basetool-frontend`     | carries `extractor-ingest` (so its relayed token has `aud=basetool-backend`), **not** `extractor-ingest-only`                                                                                    |
+| `basetool-android`      | carries **both** ingest scopes as defaults, inherited from the realm defaults when it was provisioned — so an app token has `aud=basetool-ingest` and `extractor-ingest-only` in `scope`, and only the gateway's `azp` allowlist (step 7c) keeps it out of ingest; it also carries its own `aud=basetool-backend` mapper |
 | `extractor-ingest`      | audience mapper `aud-basetool-backend` → `basetool-backend`; `include.in.token.scope: false`; no longer a realm default scope (hardening step 9, 2026-09-09)                                     |
 | `extractor-ingest-only` | audience mapper `aud-basetool-ingest` → `basetool-ingest`; `include.in.token.scope: true`; no longer a realm default scope                                                                       |
 | Realm                   | `revokeRefreshToken: false` (step 4); client policies: only `krt-mobile-dpop`, scoped to `basetool-android` by its marker role — none applies to the extractor (step 8)                         |
@@ -81,6 +88,95 @@ sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user restart inge
 ```
 
 The renderer refuses, naming every missing variable, rather than writing a half-rendered file.
+
+## New or out-of-date realm: run the provisioner
+
+`scripts/provision-keycloak-realm.py` ([ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
+`REQ-OPS-033`) brings a realm to the **production shape** of everything the Basetool owns: the five
+clients (`basetool-frontend`, `backend-service`, `basetool-ingest-gateway`, `basetool-sc-extractor`,
+`basetool-android`; `grafana` with `--grafana-origin`), both ingest scopes and their audience mappers,
+every client's scope assignments, the Android client's role scope and marker role, the DPoP profile
+and policy, the service-account roles, and the realm's token and session settings. The values are
+production's, read on 2026-09-22 with `scripts/keycloak-config-snapshot.sql`. Steps 1–9 below stay
+as the explanation of those values; they are not the procedure any more.
+
+What to know before running it:
+
+- **Dry run by default.** It prints every planned change and writes nothing (exit `2` when there is
+  something to do, `0` when the realm is already in shape). `--apply` writes, then re-plans and fails
+  unless the second plan is empty.
+- **It never deletes what only the target has.** An extra client, mapper, redirect URI or scope
+  assignment is listed under *only on this realm* and left alone. The exceptions are existing
+  decisions: the Android client's realm-role scope is converged both ways (`REQ-SEC-035`),
+  `offline_access` is withheld from it (ADR-0131), and a client the run *creates* gets exactly its
+  production scope lists.
+- **Origins are arguments.** `--public-origin https://<the environment's host>` feeds the frontend's
+  and the app's redirect URIs, web origins and post-logout list; nothing production-specific is
+  hard-coded.
+- **It never prints a secret.** A confidential client it creates gets a secret Keycloak generates;
+  the output names the Admin Console path (*Clients → the client → Credentials*) and the `.env`
+  variable(s) that need it — for `basetool-ingest-gateway` all five values of
+  [step 9b](#9b--five-values-in-the-prod-env).
+- **The identity** is the short-lived `basetool-provisioner` of
+  [`docs/keycloak/README.md`](keycloak/README.md#why-a-service-account-and-not-the-admin-user)
+  (`manage-clients` + `manage-realm`). Granting service-account roles needs `manage-users`, which that
+  identity deliberately lacks: the script then exits `3` and prints the roles to assign by hand in
+  the Admin Console. Everything else is applied.
+- **It reproduces production as it is**, including three things marked `PROD-AS-IS` in the script:
+  the extractor's unused authorization-code flow (the hardening runbook's thirteenth finding), both
+  ingest scopes on `basetool-android` and `basetool-ingest-gateway`, and the compose-internal
+  `http://frontend:18081` pair on the frontend. Deciding any of them is a production decision first.
+- **It does not do** the realm-wide hardening (Require SSL, events, OTP, default roles —
+  [`KEYCLOAK_HARDENING_RUNBOOK.md`](KEYCLOAK_HARDENING_RUNBOOK.md)), the Discord identity provider
+  ([`DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md)), or the realm's default client
+  scopes; an ingest scope that is a realm default is reported, because every client created later
+  would inherit its audience.
+
+The sequence, on the host that runs the realm (root, from `/`). Every `apply` is a write: on
+production it needs the owner's per-action approval, on testing it is the owner's call.
+
+```bash
+cd /
+install -d -m 0700 /root/kc-realm
+# 1. copy BOTH scripts next to each other — the realm provisioner imports the mobile one
+install -m 0700 provision-keycloak-realm.py provision-keycloak-mobile-client.py /root/kc-realm/
+# 2. open a kcadm session: the KCCFG/kc/KCADM definitions and the truststore + credentials
+#    commands of docs/keycloak/README.md, "Runbook — provisioning the mobile client", steps 1-2
+# 3. the rollback basis
+kc get clients -r iri                   > /root/kc-realm/clients.before.json
+kc get client-scopes -r iri             > /root/kc-realm/client-scopes.before.json
+kc get client-policies/profiles -r iri  > /root/kc-realm/profiles.before.json
+kc get client-policies/policies -r iri  > /root/kc-realm/policies.before.json
+kc get realms/iri                       > /root/kc-realm/realm.before.json
+# 4. dry run, read it
+python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+  --public-origin https://<the environment's host> --kcadm-command "$KCADM"
+# 5. apply — a second run must then report "No changes"
+python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
+  --public-origin https://<the environment's host> --kcadm-command "$KCADM" --apply
+# 6. clean up the session file (it holds a token and the truststore password in cleartext)
+sudo -u iri podman exec keycloak rm -f "$KCCFG"
+```
+
+Then, in this order:
+
+1. **Secrets and `.env`.** For every client the run created confidential, copy its secret from the
+   Admin Console into the variables the output names. Set `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend`
+   — only now, because only now does the frontend's token carry that audience (`REQ-INGEST-008`; an
+   access token issued before the apply lacks it until its 300 s lifetime runs out, so wait five
+   minutes or expect one re-login). Apply the `.env` change
+   ([above](#applying-an-env-change-on-the-production-host)) or let the next deploy render it.
+2. **Verify the tokens**, not only the config: [step 5b](#step-5--verify-both-token-sets-carry-the-audience-gate-for-step-6)
+   on a fresh frontend login.
+3. **Verify the shape**: run `scripts/keycloak-config-snapshot.sql` on this host and on production
+   (the recipe is in the file's header) and `diff` the two. What may still differ is listed there —
+   the origins, Keycloak-version artefacts on built-ins, and what the provisioner reported as *only
+   on this realm*. Any other line is drift.
+
+**Rollback.** The five `*.before.json` files. The client-policy lists are replaced wholesale on
+write, so restore them with `kc update client-policies/policies -r iri -f - < …policies.before.json`
+(and the same for profiles); a client or scope the run created can be deleted by id. Detaching the
+DPoP policy alone is the safe partial rollback for the Android client.
 
 ## Onboarding a new approved client
 

@@ -584,6 +584,24 @@ ${UCTL} restart keycloak.service
 ${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 ```
 
+### Keycloak realm shape
+
+The realm lives in `db-keycloak`, not in any artifact: delivery never touches it, and
+`realm-export.json` only seeds an empty one. What the Basetool needs from it — its clients, the two
+ingest audience scopes, scope assignments, the DPoP policy, service-account roles, token settings —
+is brought to production's shape by `scripts/provision-keycloak-realm.py` (`REQ-OPS-033`,
+[ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)):
+dry run by default, `--apply` to write, origins from `--public-origin`, nothing deleted that only
+the target has. Run it on a **new** host's realm, and on the **testing** host whenever
+`scripts/keycloak-config-snapshot.sql` diffs against production outside the environment-specific
+lines. The procedure, and the `.env` values a newly created confidential client needs, are in
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
+On production an `--apply` is a gated write like any other.
+
+The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
+frontend's token carries that audience only once the realm is in shape — so on a host whose realm
+was never provisioned, **provision first, then set the variable**.
+
 ### Updating the operational scripts and units
 
 `deploy.sh`, the other scripts and the `iri-*` units are **not** in the config bundle — a deployer
