@@ -73,6 +73,13 @@ working as rootless containers, and two had no reason to exist any more:
 | **cadvisor** | **deleted** | Its rootless-Podman support is closed as not-planned upstream. Its series return from `prometheus-podman-exporter` plus `scripts/cgroup-container-metrics.py`, normalised by the `basetool:container:*` recording rules that dashboards and alerts read. The exporter labels by `id` alone, so the network and start-time rules join `podman_container_info` to recover the container name. |
 | **socket-proxy** | **deleted** | It existed only to hand cAdvisor and Alloy a read-only view of the Docker socket. There is no Docker socket. |
 
+Becoming host services cost node-exporter and alloy two things the container shape gave them for
+free, and both came back on 2026-09-22: a **memory ceiling** (a role-written `20-resources.conf`
+drop-in per unit, `MemoryMax` + `GOMEMLIMIT` at the container budgets) and **being watched** — the
+cgroup collector now reads their unit cgroups under `system.slice` and publishes them under their old
+container names, so the container memory, OOM and pids alerts cover them as before. See
+REQ-OBS-014.
+
 Because those names belong to *host* services, the Quadlet units carry
 `AddHost=<name>:host-gateway` aliases (`alloy` for the JVMs and Keycloak; `node-exporter`, `alloy`
 and `podman-exporter` for Prometheus). The alias lives in the generated unit rather than in

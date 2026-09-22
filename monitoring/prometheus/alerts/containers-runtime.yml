@@ -204,3 +204,36 @@ groups:
             minutes. Either nothing is running on this host, or the cgroup layout stopped matching
             its pattern -- in which case the file is fresh, ContainerCgroupCollectorStale stays
             green, and every container-level alert has no data to fire on.
+
+      # The two HOST services the collector reads beside the containers (added 2026-09-22), each
+      # named. As containers, alloy and node-exporter were watched by the container alerts for free;
+      # as host services they were watched by nothing until the collector learned to read their unit
+      # cgroups. That coverage rests on two unit names in the collector (alloy.service,
+      # prometheus-node-exporter.service) -- a package that renames either, or a drop-in that moves
+      # it out of system.slice, takes the series away with no error anywhere, and ContainerMemoryHigh
+      # and ContainerOomKilled go quiet about the service exactly as they did before.
+      #
+      # The `and on()` guard keeps it inert where the collector is not the one that knows about host
+      # services: an older collector publishes no `_host_services` gauge at all, and a host without
+      # the collector has no series whatsoever.
+      #
+      # It does NOT fire when node_exporter is down, because then the whole textfile is gone and the
+      # guard with it. TargetDown{job="node"} is the alert for that, and it pages sooner.
+      - alert: HostServiceMetricsMissing
+        expr: >-
+          (
+            absent(basetool_container_memory_usage_bytes{name="alloy"})
+            or absent(basetool_container_memory_usage_bytes{name="node-exporter"})
+          )
+          and on() count(basetool_container_metrics_host_services)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No resource metrics for the host service {{ $labels.name }}"
+          description: >-
+            The cgroup collector is running but has not published {{ $labels.name }}'s cgroup for
+            30 minutes. Either the service is stopped (SystemdUnitFailed or TargetDown will say so),
+            or its unit was renamed or moved out of system.slice -- in which case its memory, OOM
+            and pids alerts have lost their input. Compare DEFAULT_HOST_SERVICES in
+            scripts/cgroup-container-metrics.py with `systemctl status` on the host.

@@ -72,10 +72,10 @@ behind Keycloak OIDC and restricted to the realm role `Admin` (REQ-OBS-008).
 | blackbox_exporter | Quadlet unit | same pattern |
 | postgres_exporter ×2 | Quadlet units | same pattern |
 | redis_exporter | Quadlet unit | same pattern |
-| Alloy | host service (`alloy.service`, rpm.grafana.com) | `27-observability.yml` + `alloy.service.d/10-log-sources.conf` |
-| node_exporter | host service (`prometheus-node-exporter.service`, EPEL) | `27-observability.yml` (`basetool_host_node_exporter_flags`) |
+| Alloy | host service (`alloy.service`, rpm.grafana.com) | `27-observability.yml` + `alloy.service.d/10-log-sources.conf`, `20-resources.conf` (512M, `GOMEMLIMIT=360MiB`) |
+| node_exporter | host service (`prometheus-node-exporter.service`, EPEL) | `27-observability.yml` (`basetool_host_node_exporter_flags`) + `prometheus-node-exporter.service.d/20-resources.conf` (64M, `GOMEMLIMIT=48MiB`) |
 | prometheus-podman-exporter | user unit of `iri` (EPEL) | `27-observability.yml` |
-| container metrics collector | `iri-container-metrics.timer` (root, read-only) | `scripts/cgroup-container-metrics.py` |
+| container metrics collector | `iri-container-metrics.timer` (root, read-only) | `scripts/cgroup-container-metrics.py` — the container cgroups plus the two host services above |
 | certificate expiry collector | `iri-cert-expiry.timer` (root, read-only) | `scripts/cert-expiry-metrics.py` |
 
 **Versions are deliberately not listed here.** A hand-maintained version column went stale on the
@@ -198,9 +198,10 @@ section above.
 | **CertificateFileExpiringSoon** | A CA-issued certificate **file** under `/var/iri/monitoring/certs` expires in under 14 days. No listener serves it, so no probe sees it; the labels name `path`, `subject` and `issuer`. Re-issue it, put the file in place, restart what reads it, then re-read with `sudo systemctl start iri-cert-expiry.service`. |
 | **SelfSignedCertificateExpiring** | A **self-signed** certificate file expires in under 90 days — in practice `basetool-ca.crt`, the internal trust anchor. 90 days because replacing a root means re-issuing everything it signed and rolling the anchor through the edge's `proxy_ssl_trusted_certificate` and the blackbox `https_internal` module together. Start the rotation now. Grafana's self-signed leaf lands here too and is a one-file job. |
 | **CertificateMetricsStale** | The certificate collector stopped writing (newest sample >36h), or never wrote on a host whose node_exporter has been up 36h. `systemctl status iri-cert-expiry.timer iri-cert-expiry.service`; check `/var/iri/monitoring/textfile/certificates.prom`. |
-| **ContainerRestartLoop** | A container is crash-looping. `${SYSTEMCTL} status <svc>.service` and `journalctl _SYSTEMD_USER_UNIT=<svc>.service`, check the last deploy and the unit's `Memory=` / `PidsLimit=`; roll back if a bad image shipped. **Known gap (2026-09-22):** the rule still reads cAdvisor's `container_start_time_seconds`, which nothing produces on the Podman host, so it cannot fire until it is moved to `basetool:container:start_time_seconds` (REQ-OBS-014). Until then read restarts from dashboard `02` ("Container Restarts"). |
+| **ContainerRestartLoop** | A container is crash-looping. `${SYSTEMCTL} status <svc>.service` and `journalctl _SYSTEMD_USER_UNIT=<svc>.service`, check the last deploy and the unit's `Memory=` / `PidsLimit=`; roll back if a bad image shipped. Reads `basetool:container:start_time_seconds` (the podman exporter's start time, one series per name across recreates). Until 2026-09-22 it read cAdvisor's `container_start_time_seconds` and could not fire on the Podman host (REQ-OBS-014). |
 | **ContainerMetricsMissing / CoreContainerMetricsMissing** | Fewer containers report `basetool:container:present` than expected, so the container alerts are blind. Check the collector: `systemctl status iri-container-metrics.timer`, `/var/iri/monitoring/textfile/containers.prom`, and `ContainerCgroupCollectorStale` / `…FoundNothing`. |
 | **ContainerCgroupCollectorStale / ContainerCgroupCollectorFoundNothing** | The cgroup collector stopped writing, or writes a fresh file matching **no** cgroup (a changed slice layout). Every container memory/OOM/CPU/pids alert has lost its input. `sudo /var/iri/code/scripts/cgroup-container-metrics.py --dry-run` shows what it would write; the cgroups it reads are `user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<name>.service`. |
+| **HostServiceMetricsMissing** | The cgroup collector stopped publishing `alloy` or `node-exporter`, the two host services it reads beside the containers. Either the service is down (`TargetDown` / `SystemdUnitFailed` say so) or its unit was renamed or moved out of `system.slice`, and its memory/OOM/pids alerts have lost their input. Compare `DEFAULT_HOST_SERVICES` in `scripts/cgroup-container-metrics.py` with `systemctl status alloy prometheus-node-exporter`. |
 | **ContainerOomKilled** | A container was OOM-killed. Check its `Memory=` limit and anon memory on dashboard `02`; on the memory-capped host confirm the OOM hit the intended sacrifice victim, not a core service. |
 | **ContainerCpuThrottledHigh** | A container is CPU-starved against its `--cpus` quota (>25% of CFS periods throttled). Read the throttled seconds, not only the ratio (sizing section below). |
 | **ContainerPidsHigh** | A container is within 20% of its **own** pids cap (cap-relative, so it covers the 512-capped monitoring services and the 2048-capped JVMs). Every task counts, so an unreaped-zombie or thread leak (2026-07-12 ingest native-thread OOM; 2026-07-26 grafana at 512/512 with 493 `ssl_client` zombies) exhausts it and the kernel refuses new tasks — usually first seen as a health check failing with `can't fork`. Confirm with `cat /sys/fs/cgroup/user.slice/user-$(id -u iri).slice/user@$(id -u iri).service/app.slice/<svc>.service/pids.{current,max,events}` and count zombies with `ps -eo stat,ppid \| awk '$1 ~ /^Z/'`. Reap them (`--init`) or cap the leaking pool. Do NOT raise the cap. |
@@ -493,8 +494,10 @@ collector otherwise reports the **old** CA's expiry until the next 03:40.
 written by HotSpot and glibc outside logback and is **JVM-version-dependent**, so every bump of the
 `eclipse-temurin:25-jre-alpine` runtime digest in the three Dockerfiles owes a re-check — otherwise
 the rule keeps parsing, keeps deploying and can never fire again. It was verified on
-`…@sha256:28db6fdf…` (2026-08-29); **the Dockerfiles pin `…@sha256:3137541d…` as of 2026-09-22, so
-this re-check is currently owed.**
+`…@sha256:28db6fdf…` (2026-08-29) and **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
+2026-09-22**, the digest the Dockerfiles pin: steps 1–3 below, plus the stream check on production
+(`{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path). The
+next digest bump owes it again.
 
 On a workstation, never on production:
 
@@ -597,12 +600,19 @@ cat ${CG}/frontend.service/memory.max
 ${PODMAN} inspect --format '{{.Name}} limit={{.HostConfig.Memory}}' frontend backend ingest
 ```
 
-> [!warning] The host-native Alloy has no container limit
-> On the Podman host `alloy` and `node_exporter` are system services, so they appear in none of the
-> `basetool_container_*` series and `ContainerMemoryHigh` does not watch them. The role sets neither a
-> `MemoryMax=` nor a `GOMEMLIMIT` for Alloy; the 512M / 360MiB in `docker-compose.monitoring.yml`
-> apply to the Docker shape only. Read Alloy from `go_memstats_*{job="alloy"}` and
-> `systemctl status alloy` (its cgroup memory line).
+> [!note] The host-native Alloy and node_exporter — limited and watched since 2026-09-22
+> On the Podman host `alloy` and `node_exporter` are system services, not containers. Until
+> 2026-09-22 they had no limit at all (`MemoryMax=infinity`, no `GOMEMLIMIT`, measured on
+> production) and no alert watched their memory, because the container alerts only saw containers.
+> The Ansible role now writes a `20-resources.conf` drop-in for each — Alloy **512M /
+> `GOMEMLIMIT=360MiB`**, the budget `docker-compose.monitoring.yml` carried; node_exporter **64M /
+> 48MiB**, double the container's 32M because the host service also runs the systemd collector —
+> and `scripts/cgroup-container-metrics.py` reads their unit cgroups under the names `alloy` and
+> `node-exporter`, so `ContainerMemoryHigh`, `ContainerOomKilled` and `ContainerPidsHigh` and
+> dashboard `02` cover them as before the cutover. `HostServiceMetricsMissing` says so if that
+> coverage disappears. Read them with `systemctl show alloy prometheus-node-exporter -p MemoryMax
+> -p MemoryCurrent` and `go_memstats_*{job="alloy"}`. Measured before the change: alloy anon
+> 105 MiB (plus 208 MiB file pages, 170 MiB of them its mapped binary), node_exporter anon 15 MiB.
 
 ### Go services (Prometheus, Alloy, Loki, Tempo, the exporters)
 

@@ -17,6 +17,11 @@
 ; maintain, for work that takes well under a second. node_exporter serves the result on its next
 ; scrape either way.
 ;
+; It also reads the cgroups of the two monitoring HOST services, alloy.service and
+; prometheus-node-exporter.service, and publishes them under their old container names (alloy,
+; node-exporter), so the container memory, OOM and pids alerts watch them as they did before the
+; cutover (added 2026-09-22; DEFAULT_HOST_SERVICES in the script).
+;
 ; Installation is by the Ansible role (tasks/27-observability.yml), not by hand.
 
 [Unit]

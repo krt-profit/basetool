@@ -1072,8 +1072,9 @@ next free number.)
 > API allow-list lived in Nginx Proxy Manager's SQLite database and in a runbook block pasted into a
 > web form. The edge is now native nginx configured entirely from `docker/edge/` in this repository,
 > validated by `nginx -t` in CI (`scripts/check-edge-nginx.sh`) and applied by the deploy reconcile.
-> The values below are unchanged and were carried across verbatim. `docker/maintenance/nginx/` still
-> exists, but it is no longer the live edge configuration.
+> The values below are unchanged and were carried across verbatim. `docker/maintenance/nginx/`, the
+> two NPM snippets that held them before, was deleted on 2026-09-22; nothing had read it since the
+> native edge replaced NPM.
 
 Every public vhost at the edge carries a **version-controlled** per-IP safety
 net: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500

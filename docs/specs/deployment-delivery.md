@@ -206,8 +206,8 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   `networks:`-unchanged config bump keeps the in-place `up`.
 - [ ] Under Quadlet, a config change renders `env.d/` before any unit reloads, installs changed
   units, restarts exactly the application services whose unit or pin changed, stops a retired unit
-  before removing it, and leaves every `.container.d/` drop-in in place. (A changed monitoring unit
-  is not restarted yet — see the known gap under REQ-OPS-013.)
+  before removing it, and leaves every `.container.d/` drop-in in place. A changed monitoring or
+  `acme` unit is restarted too (since 2026-09-22 — see REQ-OPS-013).
 - [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
 
 **Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
@@ -373,20 +373,24 @@ the recreate is `systemctl --user restart <svc>.service` for the containers and 
 exactly that one sudo grant). Before that
 per-service config diff the reconcile additionally applies the monitoring **definitions** — a plain
 `docker compose -p iri-monitoring … up -d` (no `--force-recreate`) under Compose, a
-`daemon-reload` plus `systemctl --user start` of the nine monitoring units under Quadlet — so a
-monitoring definition drift — a service's memory limit, `environment`, `volumes`, or image pin, none of
-which the config-subtree diff can see — is applied per service (a fast no-op otherwise).
+`daemon-reload` plus, under Quadlet, a `systemctl --user restart` of each monitoring unit this
+release re-defined and a `start` of the others — so a monitoring definition drift — a service's
+memory limit, `environment`, `volumes`, or image pin, none of which the config-subtree diff can see —
+is applied per service (a fast no-op otherwise).
 
-> [!warning] Known gap under Quadlet — found 2026-09-22, not yet fixed
-> `systemctl --user start` on an **active** unit re-reads nothing, and `rt_apply_stack` restarts
-> changed units only for the eight application services it iterates. A release that changes a
-> **monitoring** `.container` unit (a memory limit, an image pin, an environment line) therefore
-> installs the new unit and leaves the running container on the old definition until something
-> restarts it — the 2026-07-17 shape below, reached by another road. `acme` is in neither list
-> (`RT_STACK_SERVICES`, `RT_MONITORING_SERVICES`), so a changed `acme` unit is not even started.
-> Until `rt_monitoring_up` honours `RT_CHANGED_SERVICES` the way `rt_apply_stack` does, and `acme`
-> belongs to one of the lists, restart such a unit by hand after the deploy (`docs/deployment.md` →
-> *Host-config and unit changes*).
+> [!note] Closed 2026-09-22 — a changed monitoring or `acme` unit is restarted
+> Found by the documentation audit the same morning and recorded here as a known gap:
+> `systemctl --user start` on an **active** unit re-reads nothing, the monitoring apply said only
+> `start`, and `acme` was in neither `RT_STACK_SERVICES` nor `RT_MONITORING_SERVICES` — so a
+> release that changed a monitoring or `acme` unit installed it and left the old container running,
+> the 2026-07-17 shape below reached by another road. `rt_monitoring_up` now honours
+> `RT_CHANGED_SERVICES` exactly as `rt_apply_stack` does, and forgets a service once its restart
+> succeeded, because the success path calls it twice (the monitoring apply, then
+> `reconcile_monitoring_reloads`); a failed restart stays pending, so the second call is its retry.
+> `acme` is the last entry of `RT_STACK_SERVICES` and is gated like the rest of the stack, as it was
+> under Compose. Locked by `scripts/deploy.test.sh`
+> (`scenario_podman_changed_monitoring_and_acme_units_are_restarted`,
+> `scenario_podman_acme_is_part_of_the_stack`) and `scripts/container-runtime.test.sh`.
 
 Without the definition apply a compose-definition change
 reached the running container only on a full app deploy, so on a quiet host it silently never landed —
@@ -650,6 +654,18 @@ The deploy path is hardened at the host layer, beyond running as an unprivileged
   `user:iri:r` so the backup helper, which runs as the service user, can read it. The private-key
   material is never readable by `other`; the Docker host's `root:10001` + `u:1000` is the same rule
   before translation.
+- **The pre-flight checks the keystore the stack will actually mount** (since 2026-09-22). Under
+  Compose that is `IRI_KEYSTORE_HOST_PATH` from `.env`; under Quadlet it is the source of the units'
+  `Volume=…:/run/secrets/keystore.p12`, which `generate-quadlet.py` fixes at
+  `/var/iri/secrets/keystore.p12` and which never reads `.env` again. `deploy.sh` checked `.env` on
+  both runtimes until then, so on the Podman host it could certify a file the units do not mount; it
+  now reads the path out of the installed units and falls back to `.env` only while no unit names a
+  keystore mount (a host before its first bundle).
+- **The deployer runs from `/`.** `sudo -u <service user>` keeps the caller's working directory and
+  the service user cannot enter `/root`, so `deploy.sh` started by hand from there failed every
+  rootless call with `cannot chdir to /root`, which runtime detection reported as "no lingering user
+  could be found". It changes to `/` right after resolving its own directory (since 2026-09-22), as
+  `container-cleanup.sh` already did. The timer was never affected: systemd starts a service in `/`.
 - **Token expiry is monitored (opt-in).** When the pull token **expires**, `deploy.sh` emits
   `basetool_ghcr_token_expiry_timestamp` from an operator-recorded `${TOKEN_FILE}.expiry` on every
   tick (incl. the no-op); `GhcrPullTokenExpiring` (warning, <14 d) and `GhcrPullTokenExpired`
