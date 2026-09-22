@@ -61,7 +61,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -108,12 +107,34 @@ class MissionControllerLifecycleTest {
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
   // Real redactor (not a mock) so the peer-redaction assertions exercise the actual
-  // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
-  @org.mockito.Spy
-  private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
-      new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
+  // MissionPeerRedactor logic.
+  private final de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor
+      missionPeerRedactor = new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
-  @InjectMocks private MissionController controller;
+  private MissionController controller;
+
+  /**
+   * Built through the constructor rather than by {@code @InjectMocks}: the name resolver is REAL
+   * (over the mocked {@link UserService}), so the party-lead cases below exercise the actual
+   * resolution rule, and Mockito does not construct a non-mock collaborator for its target.
+   * Argument order is the controller's field-declaration order; the ship mapper is a dependency no
+   * case here reaches, exactly the {@code null} {@code @InjectMocks} passed before.
+   */
+  @BeforeEach
+  void buildController() {
+    controller =
+        new MissionController(
+            missionService,
+            userService,
+            missionMapper,
+            userMapper,
+            null, // shipMapper
+            missionSecurityService,
+            authHelperService,
+            missionPeerRedactor,
+            new de.greluc.krt.profit.basetool.backend.service.ParticipantTargetResolver(
+                userService));
+  }
 
   /**
    * Every mission response now runs through the peer pass on its way out (REQ-SEC-007), so a test
@@ -230,6 +251,7 @@ class MissionControllerLifecycleTest {
         0L, // stepsVersion
         List.of(), // objectives
         0L, // objectivesVersion
+        null,
         null); // meetingPoint
   }
 
@@ -720,31 +742,6 @@ class MissionControllerLifecycleTest {
 
     assertThat(result).isSameAs(dto);
     verify(missionService).updateMissionOwner(id, newOwnerId, 42L);
-  }
-
-  // ── PUT /api/v1/missions/{id}/owner/{userId} (legacy) ────────────────
-
-  // Deliberately invokes the deprecated-for-removal MissionController.setMissionOwnerLegacy to pin
-  // its no-version behaviour; the [removal] warning is expected and unavoidable here.
-  @Test
-  @SuppressWarnings("removal")
-  void setMissionOwnerLegacy_doesNotForwardAnyVersion() {
-    UUID id = UUID.randomUUID();
-    UUID newOwnerId = UUID.randomUUID();
-    Mission persisted = new Mission();
-    MissionDto dto = fullMissionDto(id);
-    when(missionService.setMissionOwner(id, newOwnerId)).thenReturn(persisted);
-    when(missionMapper.toDto(persisted)).thenReturn(dto);
-
-    MissionDto result = controller.setMissionOwnerLegacy(id, newOwnerId);
-
-    // The legacy endpoint deliberately has NO version field — that is the exact reason the
-    // {@code /owner} version-checked endpoint exists alongside it. Pin the (mission-id,
-    // user-id) two-arg shape so a future "let's add a version param to be safe" change to the
-    // legacy endpoint surfaces here as a compile error.
-    assertThat(result).isSameAs(dto);
-    verify(missionService).setMissionOwner(id, newOwnerId);
-    verify(missionService, never()).updateMissionOwner(any(), any(), any());
   }
 
   // ── GET /api/v1/missions/{id}/participants/unassigned ────────────────

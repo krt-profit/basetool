@@ -103,7 +103,8 @@ class MissionUnitAttributeTest {
     mission = missionRepository.save(mission);
 
     // The ship owner must be a registered participant before the ship can be pinned to a unit.
-    missionService.addParticipant(mission.getId(), officerUser.getId());
+    missionService.addParticipant(
+        mission.getId(), officerUser.getId(), null, null, null, null, null);
   }
 
   @Test
@@ -116,7 +117,7 @@ class MissionUnitAttributeTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units")
+            post("/api/v1/missions/" + mission.getId() + "/units/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -129,6 +130,6 @@ class MissionUnitAttributeTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.assignedUnits[0].highValueUnit").value(true));
+        .andExpect(jsonPath("$[0].highValueUnit").value(true));
   }
 }

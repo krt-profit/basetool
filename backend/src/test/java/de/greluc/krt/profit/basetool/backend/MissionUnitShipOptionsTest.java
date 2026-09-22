@@ -115,8 +115,10 @@ class MissionUnitShipOptionsTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(mission.getId(), participantA.getId());
-    missionService.addParticipant(mission.getId(), participantB.getId());
+    missionService.addParticipant(
+        mission.getId(), participantA.getId(), null, null, null, null, null);
+    missionService.addParticipant(
+        mission.getId(), participantB.getId(), null, null, null, null, null);
     // nonParticipant is deliberately NOT registered.
   }
 
@@ -144,7 +146,8 @@ class MissionUnitShipOptionsTest {
     // owner-requested "a player's ships are always selectable regardless of org unit" guarantee.
     User orgUnitlessParticipant = saveUser("ship_opts_no_orgunit");
     Ship orgUnitlessShip = saveShip("E-Ship", orgUnitlessParticipant, null);
-    missionService.addParticipant(mission.getId(), orgUnitlessParticipant.getId());
+    missionService.addParticipant(
+        mission.getId(), orgUnitlessParticipant.getId(), null, null, null, null, null);
 
     List<UUID> shipIds =
         missionService.getSelectableUnitShips(mission.getId()).stream().map(Ship::getId).toList();

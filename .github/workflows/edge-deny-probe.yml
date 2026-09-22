@@ -324,7 +324,14 @@ jobs:
             probe PATCH "/api/v1/missions/$nil/$leaf" 401
           done
           probe PUT "/api/v1/missions/$nil/party-lead" 401
-          probe POST "/api/v1/missions/$nil/participants" 401
+          # The deprecated add-by-id endpoint was deleted on 2026-09-22 and its admission with it:
+          # the edge refuses it again, and this row keeps it refused.
+          probe POST "/api/v1/missions/$nil/participants" 404
+          # Its manager-only replacement (REQ-MISSION-020, ADR-0170 amended 2026-09-22) is admitted
+          # and refused anonymously by the backend's chain; the add-anybody `…/participants/slim`
+          # stays shut at the edge.
+          probe POST "/api/v1/missions/$nil/participants/by-id/slim" 401
+          probe POST "/api/v1/missions/$nil/participants/slim" 404
           probe POST "/api/v1/missions/$nil/units/slim" 401
           probe PUT "/api/v1/missions/$nil/units/$nil/slim" 401
           probe DELETE "/api/v1/missions/$nil/units/$nil/slim" 401

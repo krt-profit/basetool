@@ -47,6 +47,17 @@ value (§ 0.5) before acting on an "open" row.**
 | 13th  | Extractor's unused authorization-code flow    | **Open** — owner's choice      | `standardFlowEnabled: true`, loopback redirect wildcards, no PKCE (see step 6)                                                   |
 | After | Delete `basetool-provisioner`, re-export      | **Open**                       | the client is in the export (taken mid-procedure); it stays until step 11 is done                                                |
 
+**Another realm does not need these steps replayed for the client-side half.** Since 2026-09-22
+`scripts/provision-keycloak-realm.py` reproduces production's state for steps 5–9 — the cleared
+service-account lists, the frontend's PKCE `S256` and redirect list, the extractor's
+`fullScopeAllowed: false`, and the audience scopes only where production has them — along with the
+rest of the Basetool's clients
+([`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)).
+The realm-wide steps (1–4, 10–12) are **not** in it, and neither is 9a: it reports an audience scope
+that is a realm default instead of removing it. It also reproduces the open thirteenth finding
+as production has it, marked `PROD-AS-IS`; closing that finding is a production decision first and
+then a one-line change in the script.
+
 ---
 
 ## 0. Before you start

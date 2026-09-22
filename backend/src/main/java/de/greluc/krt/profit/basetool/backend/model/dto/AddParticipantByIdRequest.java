@@ -22,5 +22,17 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
-/** Inbound request payload for the Add Participant operation. */
-public record AddParticipantRequest(@NotNull UUID userId) {}
+/**
+ * Request body of the manager-only add-by-id endpoint ({@code POST
+ * /api/v1/missions/{id}/participants/by-id/slim}, REQ-MISSION-020): the registered member to put on
+ * the roster, and nothing else.
+ *
+ * <p>Deliberately narrower than {@link AddExternalParticipantRequest}: no free-text name, no
+ * org-unit affiliations, no comment, no sign-up answers. The endpoint exists for the Android app's
+ * manager action "Teilnehmer hinzufügen" on the public API vhost, where ADR-0170 keeps the
+ * add-anybody endpoints off the edge; a body that can only name one member by id is what makes this
+ * one admissible there.
+ *
+ * @param userId the {@code app_user} id of the member to add; required
+ */
+public record AddParticipantByIdRequest(@NotNull UUID userId) {}

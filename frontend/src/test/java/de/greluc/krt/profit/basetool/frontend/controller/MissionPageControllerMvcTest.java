@@ -107,6 +107,61 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
+  void createMission_parsesTheGoalAndStepCarriersIntoTheCreateRequest() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
+        .thenReturn(minimalMission(missionId));
+
+    mockMvc
+        .perform(
+            post("/missions")
+                .param("name", "Test Mission")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-02-10T10:00")
+                .param("plannedEndTime", "2026-02-10T12:00")
+                .param("objectivesJson", "[{\"title\":\"Erz\",\"kind\":\"PRIMARY\"}]")
+                .param("stepsJson", "[{\"title\":\"Sammeln\",\"meta\":\"20:00\"}]")
+                .with(csrf()))
+        .andExpect(redirectedUrl("/missions/" + missionId + "?tab=verw"));
+
+    org.mockito.ArgumentCaptor<
+            de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest>
+        sent =
+            org.mockito.ArgumentCaptor.forClass(
+                de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.class);
+    verify(backendApiClient).post(eq("/api/v1/missions"), sent.capture(), eq(MissionDto.class));
+    assertThat(sent.getValue().objectives())
+        .containsExactly(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.NewObjective(
+                "Erz", "PRIMARY"));
+    assertThat(sent.getValue().steps())
+        .containsExactly(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.NewStep(
+                "Sammeln", "20:00"));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void createMission_aCarrierWithAnUnknownKeyFailsInsteadOfDroppingTheValue() throws Exception {
+    // The carrier parser moved from Jackson 2 to Jackson 3 (FE-MOD-04). Jackson 3 ignores an
+    // unknown
+    // property by default; Jackson 2 refused it, and the create must keep refusing a misspelt key
+    // rather than create a goal with its title silently missing.
+    mockMvc
+        .perform(
+            post("/missions")
+                .param("name", "Test Mission")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-02-10T10:00")
+                .param("plannedEndTime", "2026-02-10T12:00")
+                .param("objectivesJson", "[{\"titel\":\"Erz\",\"kind\":\"PRIMARY\"}]")
+                .with(csrf()))
+        .andExpect(redirectedUrl("/missions/new"));
+    verify(backendApiClient, never()).post(eq("/api/v1/missions"), any(), eq(MissionDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
 
@@ -307,7 +362,8 @@ class MissionPageControllerMvcTest {
                 de.greluc.krt.profit.basetool.frontend.model.dto.MissionObjectiveKind.PRIMARY,
                 0)),
         0L,
-        "ARC-L1");
+        "ARC-L1",
+        null);
   }
 
   /**
@@ -370,6 +426,7 @@ class MissionPageControllerMvcTest {
         0L,
         java.util.List.of(),
         0L,
+        null,
         null);
   }
 
@@ -447,6 +504,7 @@ class MissionPageControllerMvcTest {
         0L,
         java.util.List.of(),
         0L,
+        null,
         null);
   }
 
@@ -686,6 +744,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
@@ -757,6 +816,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
@@ -869,6 +929,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
@@ -982,6 +1043,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
         .thenReturn(mission);
@@ -1000,24 +1062,107 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void setMissionOwner_WithValidIds_ShouldReturn200() throws Exception {
+  void setMissionOwner_forwardsTheUserAndTheOwnershipVersionToTheVersionedEndpoint()
+      throws Exception {
     UUID missionId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-
-    when(backendApiClient.put(
-            eq("/api/v1/missions/" + missionId + "/owner/" + userId), eq(null), eq(Void.class)))
-        .thenReturn(null);
+    MissionDto refreshed = minimalMission(missionId);
+    when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
+        .thenReturn(refreshed);
 
     mockMvc
-        .perform(put("/missions/" + missionId + "/owner/" + userId).with(csrf()))
+        .perform(
+            put("/missions/" + missionId + "/owner/ajax")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + userId + "\",\"version\":4}"))
         .andExpect(status().isOk());
+
+    // The versioned PUT /owner, body {userId, version} — never the deprecated PUT /owner/{userId}
+    // that carried no version and let the later of two concurrent changes win silently.
+    @SuppressWarnings("unchecked")
+    org.mockito.ArgumentCaptor<Map<String, Object>> sent =
+        org.mockito.ArgumentCaptor.forClass(Map.class);
+    verify(backendApiClient)
+        .put(eq("/api/v1/missions/" + missionId + "/owner"), sent.capture(), eq(Void.class));
+    org.assertj.core.api.Assertions.assertThat(sent.getValue())
+        .containsEntry("userId", userId)
+        .containsEntry("version", 4);
   }
 
   @Test
   @WithMockUser(roles = "OFFICER")
-  void setMissionOwner_WithInvalidMissionId_ShouldReturn400() throws Exception {
+  void setMissionOwner_staleOwnershipVersion_relaysTheConflictWithItsCode() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/missions/" + missionId + "/owner"), any(), eq(Void.class)))
+        .thenThrow(
+            new de.greluc.krt.profit.basetool.frontend.service.BackendServiceException(
+                "Conflict",
+                null,
+                409,
+                "OPTIMISTIC_LOCK",
+                null,
+                java.util.List.of(),
+                "Somebody changed it first"));
+
+    // The status AND the code survive the proxy: OPTIMISTIC_LOCK is what makes krtFetch offer the
+    // reload dialog rather than a generic error toast.
     mockMvc
-        .perform(put("/missions/not-a-uuid/owner/" + UUID.randomUUID()).with(csrf()))
+        .perform(
+            put("/missions/" + missionId + "/owner/ajax")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + userId + "\",\"version\":0}"))
+        .andExpect(status().isConflict())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+                .value("OPTIMISTIC_LOCK"));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void updatePayoutPreference_callsTheSlimEndpointAndAnswersWithTheParticipantRow()
+      throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    Map<String, Object> row = Map.of("id", participantId.toString(), "version", 7);
+    when(backendApiClient.put(
+            eq(
+                "/api/v1/missions/"
+                    + missionId
+                    + "/participants/"
+                    + participantId
+                    + "/payout-preference/slim"),
+            any(),
+            eq(Object.class)))
+        .thenReturn(row);
+
+    mockMvc
+        .perform(
+            post("/missions/" + missionId + "/participants/" + participantId + "/payout-preference")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"preference\":\"DONATE\"}"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.id")
+                .value(participantId.toString()))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.version")
+                .value(7));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void setMissionOwner_WithInvalidUserId_ShouldReturn400() throws Exception {
+    mockMvc
+        .perform(
+            put("/missions/" + UUID.randomUUID() + "/owner/ajax")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"not-a-uuid\",\"version\":0}"))
         .andExpect(status().isBadRequest());
   }
 
@@ -1089,6 +1234,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     MissionDto refreshed =
         new MissionDto(
@@ -1126,6 +1272,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current)
@@ -1187,6 +1334,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), eq(MissionDto.class)))
         .thenReturn(current);
@@ -1754,6 +1902,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -1869,6 +2018,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage2 =
@@ -2060,6 +2210,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2225,6 +2376,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2349,6 +2501,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2465,6 +2618,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2578,6 +2732,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     de.greluc.krt.profit.basetool.frontend.model.dto.PageResponse<Object> emptyPage =
@@ -2705,6 +2860,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
@@ -2790,6 +2946,7 @@ class MissionPageControllerMvcTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/missions/" + missionId), anyTypeRef()))
@@ -2843,6 +3000,7 @@ class MissionPageControllerMvcTest {
         0L,
         java.util.List.of(),
         0L,
+        null,
         null);
   }
 

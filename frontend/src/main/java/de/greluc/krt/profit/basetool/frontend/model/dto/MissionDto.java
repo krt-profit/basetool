@@ -45,6 +45,10 @@ import java.util.UUID;
  * the owning-org-unit reassignment control in the Verwaltung tab (REQ-ORG-018); the detail template
  * pins it into the reassignment form so a concurrent change surfaces a 409.
  *
+ * <p>{@code ownershipVersion} mirrors the backend's optimistic-lock counter for the owner change
+ * ({@code MissionOwnership.version}, {@code 0} before the first change); the detail template pins
+ * it onto the owner row so the owner change can echo it and a concurrent change surfaces a 409.
+ *
  * <p><strong>Slimmed detail payload (#1138).</strong> The formerly-embedded {@code subMissions}
  * (rendered nowhere), {@code inventoryEntries} and {@code refineryOrders} were removed from the
  * mission detail DTO. The Wirtschaft block fetches the mission economy on demand instead — refinery
@@ -86,4 +90,5 @@ public record MissionDto(
     Long stepsVersion,
     List<MissionObjectiveDto> objectives,
     Long objectivesVersion,
-    String meetingPoint) {}
+    String meetingPoint,
+    Long ownershipVersion) {}

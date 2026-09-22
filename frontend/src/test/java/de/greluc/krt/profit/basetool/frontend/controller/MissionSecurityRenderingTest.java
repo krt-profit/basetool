@@ -152,6 +152,7 @@ class MissionSecurityRenderingTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(
@@ -256,6 +257,7 @@ class MissionSecurityRenderingTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(
@@ -353,6 +355,7 @@ class MissionSecurityRenderingTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(
@@ -460,6 +463,7 @@ class MissionSecurityRenderingTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     when(backendApiClient.get(

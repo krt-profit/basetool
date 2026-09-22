@@ -194,6 +194,11 @@ before reporting a finding against it:
   regexp
   `^https://github\.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
   — an unanchored one also matches look-alike refs such as `main-x`.
+- **Who can create a release tag** — the identity above is only as strong as
+  the ability to create the ref it names. A repository ruleset restricts
+  creating, updating and deleting `v*` tags to two actors: the
+  `basetool-release` GitHub App, which the release workflow uses, and the
+  maintainer (ADR-0201).
 - **Provenance (in the registry)** — SLSA build provenance
   (`provenance: mode=max`) is attached as an OCI attestation to every
   published manifest.
