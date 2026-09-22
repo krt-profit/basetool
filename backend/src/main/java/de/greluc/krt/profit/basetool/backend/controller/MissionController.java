@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.model.MissionStep;
 import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantByIdRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
@@ -126,8 +127,8 @@ import org.springframework.web.bind.annotation.RestController;
  *       not collide on {@code Mission.version}.
  *   <li><b>Slim sub-resource endpoints</b> ({@code .../slim}) return only the affected sub-DTO (or
  *       204) instead of the full {@link MissionDto}. Their seventeen MissionDto-returning
- *       predecessors were deprecated with a sunset of 2026-10-20 and removed once no client called
- *       them any more (BE-SIMP-02).
+ *       predecessors were deprecated (announced sunset 2026-10-20) and removed early on 2026-09-22
+ *       by owner decision, once no client of this repository called them (BE-SIMP-02).
  * </ul>
  *
  * <p>Peer reads are redacted (REQ-SEC-007): for a caller below Logistician, {@link
@@ -1341,6 +1342,43 @@ public class MissionController {
     // full roster, but only the public callsign tuple (username, displayName, rank), never email or
     // real name. The ArchUnit rule {@code peerReadableMissionEndpointsMustRedactPii} statically
     // enforces this for any future endpoint returning a PII-carrying mission DTO.
+    return redactParticipantsForPeer(
+        mission.getParticipants().stream().map(missionMapper::toDto).toList());
+  }
+
+  /**
+   * Manager-only add-by-id (REQ-MISSION-020): puts one registered member on the roster, named by
+   * their {@code app_user} id, and returns the updated participant list (slim).
+   *
+   * <p>It replaces what the deleted {@code POST /missions/{id}/participants} did, with the same
+   * {@code canManageMission} gate and the same body, and exists for one caller: the Android app's
+   * manager action "Teilnehmer hinzufügen" on the public API vhost. {@link #addParticipantSlim}
+   * cannot serve it there — it also takes a free-text name, org units and a comment and admits
+   * every member who can see the Einsatz, which is the add-anybody surface ADR-0170 keeps off the
+   * edge. This one can name only a registered member, only by id, and only for a caller who may
+   * manage the Einsatz, which is why it alone is admitted (ADR-0170, amended 2026-09-22).
+   *
+   * <p>The path's literal {@code by-id} segment keeps it apart from the per-row {@code
+   * /participants/{participantId}/slim} (a participant id, PUT/DELETE) and from {@code
+   * /participants/slim} (the add-anybody POST), and says what the body carries.
+   *
+   * @param id mission id
+   * @param request the member to add
+   * @return the mission's participant list after the add, peer-redacted below Logistician
+   */
+  @PostMapping("/{id}/participants/by-id/slim")
+  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
+  @Operation(
+      summary = "Add a registered member by id (manager-only, slim response)",
+      description =
+          "Adds the registered member named by userId as a participant and returns the updated"
+              + " participant list as slim DTOs. Restricted to callers who may manage the mission;"
+              + " takes no free-text name. The member's org units and payout default are stamped"
+              + " exactly as on self-enrolment.")
+  public List<MissionParticipantDto> addParticipantByIdSlim(
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull AddParticipantByIdRequest request) {
+    var mission = missionService.addParticipant(id, request.userId(), null, null, null, null, null);
     return redactParticipantsForPeer(
         mission.getParticipants().stream().map(missionMapper::toDto).toList());
   }

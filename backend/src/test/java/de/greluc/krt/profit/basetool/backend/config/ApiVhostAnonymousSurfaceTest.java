@@ -961,9 +961,17 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":0}"))
         .andExpect(status().isUnauthorized());
-    // Einheiten, crew, Frequenzen and Verwalter — slim only: the full-DTO twins, and the
-    // `POST …/participants` add-by-id that stood above this line, were deleted on 2026-09-22
-    // (BE-SIMP-02) after their deprecation, and the app had been moved off them.
+    // The manager-only add-by-id (REQ-MISSION-020, ADR-0170 amendment) that replaced the deleted
+    // `POST …/participants` on 2026-09-22.
+    mockMvc
+        .perform(
+            post(mission + "/participants/by-id/slim")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
+        .andExpect(status().isUnauthorized());
+    // Einheiten, crew, Frequenzen and Verwalter — slim only: the full-DTO twins were deleted on
+    // 2026-09-22 (BE-SIMP-02) after their deprecation, and the app had been moved off them.
     for (String leaf :
         new String[] {
           "/units/slim",

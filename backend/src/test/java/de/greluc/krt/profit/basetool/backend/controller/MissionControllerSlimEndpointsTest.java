@@ -389,6 +389,69 @@ class MissionControllerSlimEndpointsTest {
         .andExpect(jsonPath("$[0].id").value(participantId.toString()));
   }
 
+  // --- REQ-MISSION-020: manager-only add-by-id -------------------------------------------------
+
+  @Test
+  void addParticipantByIdSlim_manager_addsTheMemberByIdAndAnswersWithTheList() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID memberId = UUID.randomUUID();
+    UUID participantId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+    when(missionService.addParticipant(missionId, memberId, null, null, null, null, null))
+        .thenReturn(missionWithParticipant(participantId, memberId));
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + memberId + "\"}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isArray())
+        .andExpect(jsonPath("$[0].id").value(participantId.toString()));
+    // Only the id reaches the service: no name, no org units, no comment, no sign-up answers.
+    org.mockito.Mockito.verify(missionService)
+        .addParticipant(missionId, memberId, null, null, null, null, null);
+  }
+
+  @Test
+  void addParticipantByIdSlim_nonManager_isForbiddenEvenForThemselves() throws Exception {
+    // Unlike /participants/slim there is no self-enrolment branch: a caller who may not manage the
+    // Einsatz is refused at the gate, whoever they name. Self-enrolment is /join's.
+    UUID missionId = UUID.randomUUID();
+    UUID callerId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(false);
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userId\":\"" + callerId + "\"}")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(callerId.toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isForbidden());
+    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+        .addParticipant(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void addParticipantByIdSlim_withoutAUserId_isRefused() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(missionSecurityService.canManageMission(any(UUID.class), any())).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/missions/{id}/participants/by-id/slim", missionId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"guestName\":\"Somebody\"}")
+                .with(jwt().authorities(officer())))
+        .andExpect(status().isBadRequest());
+    org.mockito.Mockito.verify(missionService, org.mockito.Mockito.never())
+        .addParticipant(any(), any(), any(), any(), any(), any(), any());
+  }
+
   @Test
   void addParticipantSlim_memberAddingOtherUser_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();

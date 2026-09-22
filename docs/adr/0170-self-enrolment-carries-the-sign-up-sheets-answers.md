@@ -105,3 +105,43 @@ change, not an implementation detail**, and reviewing it as one is what would ha
 `fieldMessage()` was null and the sheet fell back to its own sentence. That is correct behaviour for
 a 4xx with no problem body, but it means an edge refusal and a server-side validation failure read
 identically to a member. Distinguishing them is left open.
+
+## Amendment — 2026-09-22: a manager-only add-by-id is admitted, the add-anybody paths still are not
+
+**Decided by @greluc on 2026-09-22** (improvement audit BE-SIMP-02, follow-up to the deletion of the
+seventeen deprecated mission endpoints).
+
+The decision above kept the *add-anybody* endpoints off the public edge. It did not have to answer
+how a manager adds somebody else from the app, because the app then used the deprecated
+`POST …/missions/{id}/participants` — manager-gated (`canManageMission`), body `{userId}` only — which
+the API vhost admitted. On 2026-09-07 the app moved to `POST …/participants/slim` to get off the
+deprecated path; that is an add-anybody endpoint (free-text name, org units, comment, admits every
+member who can see the Einsatz), the edge never admitted it, and the manager's "Teilnehmer
+hinzufügen" has been refused at the edge since. With the deprecated endpoint deleted on 2026-09-22,
+there would have been no admitted path for it at all.
+
+**Decision.** A new, narrow endpoint takes the deleted one's place:
+`POST /api/v1/missions/{id}/participants/by-id/slim` (REQ-MISSION-020).
+
+1. **Manager-only**: `@PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")`
+   — no self-enrolment branch; self-enrolment stays `…/join`.
+2. **By user id only**: the body is `AddParticipantByIdRequest{userId}` (required). No free-text
+   name, no org units, no comment, no sign-up answers. It can only name a registered member.
+3. **Slim answer**: the participant list, peer-redacted below Logistician like every roster read.
+4. **Admitted at the edge** (`docker/edge/include/api-allowlist.conf`, POST carve-out out of the
+   read-only family) and **frozen** in REQ-API-009's contract set (`ExternalContractTest`, required
+   request field `userId`). The nightly probe asserts 401 for it anonymously and 404 for
+   `…/participants/slim`.
+
+**What does not change.** `…/participants/add` and `…/participants/slim` stay off the public edge,
+for the reasons given above: they can name anybody and the self-vs-manager check would be the only
+thing between a shipped client and adding other people. The new endpoint does not rely on that
+check at all — its gate already requires leadership of the Einsatz.
+
+**The path.** The literal `by-id` segment keeps it distinct from the per-row
+`/participants/{participantId}/slim` (a participant id, PUT/DELETE — and the edge rule for those
+matches only a UUID there) and from the add-anybody `/participants/slim`, and it says what the body
+carries.
+
+**Rollout order.** The app build that calls it must not be released before a backend carrying the
+endpoint — and the edge rule admitting it — is deployed.
