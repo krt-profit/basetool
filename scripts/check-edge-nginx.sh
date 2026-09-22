@@ -242,8 +242,20 @@ check_mode() {
   if [[ -n "${trusted}" ]]; then
     grep -qE 'listen .*proxy_protocol' "${dump}" \
       || { echo "FAIL: ${mode}: no listener speaks proxy_protocol"; exit 1; }
-    grep -qF "set_real_ip_from ${trusted};" "${dump}" \
-      || { echo "FAIL: ${mode}: the client address is not restored from the header"; exit 1; }
+    # ONE set_real_ip_from per address, and the value is a LIST since 2026-09-22 -- see
+    # render-and-run.sh for why the edge has six addresses rather than one. A loop rather than a
+    # single grep, because a gate that only checked the first entry would pass the exact shape
+    # that took the client address away: five of six addresses trusted, and the sixth is the one
+    # rootlessport happens to present after the next recreate.
+    local _tp
+    for _tp in ${trusted}; do
+      grep -qF "set_real_ip_from ${_tp};" "${dump}" \
+        || { echo "FAIL: ${mode}: ${_tp} is not trusted - the client address is not restored from the header"; exit 1; }
+    done
+    # And no address BEYOND the ones asked for. Counting is what catches a render that emits a
+    # wildcard alongside the list instead of in place of it.
+    [[ "$(grep -cF 'set_real_ip_from ' "${dump}")" == "$(wc -w <<<"${trusted}")" ]] \
+      || { echo "FAIL: ${mode}: the rendered set_real_ip_from count does not match EDGE_TRUSTED_PROXY"; exit 1; }
     grep -qF 'real_ip_header proxy_protocol;' "${dump}" \
       || { echo "FAIL: ${mode}: real_ip_header is not set to proxy_protocol"; exit 1; }
   else
@@ -271,14 +283,18 @@ check_mode() {
   admin="$(awk '/location \^~ \/auth\/admin/,/^[[:space:]]*}/' "${dump}")"
   grep -q 'allow 172.28.15.1;' <<<"${admin}" \
     || { echo "FAIL: ${mode}: the ingress-gateway grant is missing from /auth/admin"; exit 1; }
-  if [[ "${mode}" == "frontend" ]]; then
+  # Keyed on WHETHER a front end is trusted, not on the mode's name. render-and-run.sh derives the
+  # loopback grant from EDGE_LISTEN_OPTS, which is exactly "is a header trusted" -- so a check that
+  # matched the literal name `frontend` reported a plain-mode violation against the rootless shape
+  # the moment a third mode existed, naming a mode that was not running.
+  if [[ -n "${trusted}" ]]; then
     grep -q 'allow 127.0.0.1;' <<<"${admin}" \
-      || { echo "FAIL: frontend: /auth/admin does not admit the tunnel's loopback address - this is the #1885 lockout, reintroduced"; exit 1; }
+      || { echo "FAIL: ${mode}: /auth/admin does not admit the tunnel's loopback address - this is the #1885 lockout, reintroduced"; exit 1; }
     grep -q 'allow ::1;' <<<"${admin}" \
-      || { echo "FAIL: frontend: /auth/admin admits 127.0.0.1 but not ::1 - one word of the ssh command would decide whether the console opens"; exit 1; }
+      || { echo "FAIL: ${mode}: /auth/admin admits 127.0.0.1 but not ::1 - one word of the ssh command would decide whether the console opens"; exit 1; }
   else
     grep -q 'allow 127.0.0.1;' <<<"${admin}" \
-      && { echo "FAIL: plain: /auth/admin grants loopback on a listener where it is not the tunnel"; exit 1; }
+      && { echo "FAIL: ${mode}: /auth/admin grants loopback on a listener where it is not the tunnel"; exit 1; }
   fi
   grep -q 'deny all;' <<<"${admin}" \
     || { echo "FAIL: ${mode}: /auth/admin lost its load-bearing 'deny all'"; exit 1; }
@@ -303,10 +319,22 @@ refuses() {
 
 check_mode plain ''
 check_mode frontend '172.28.15.10'
+# The rootless shape. There the PROXY header arrives from the edge's OWN address, and podman picks
+# WHICH of the container's networks to present that address on -- measured moving across three
+# recreations with nothing else changed. So every network the edge is on is pinned and every one of
+# those addresses is named; this list is exactly what generate-quadlet.py emits. Six literals are no
+# more a range than one is, and a prefix is still refused below.
+check_mode frontend-rootless '172.28.15.10 172.28.3.250 172.28.4.250 172.28.7.250 172.28.11.250 172.28.13.250'
 
-refuses 'an IPv4 wildcard' '0.0.0.0/0'
-refuses 'an IPv6 wildcard' '::/0'
-refuses 'a prefix'         '172.28.15.0/24'
+refuses 'an IPv4 wildcard'         '0.0.0.0/0'
+refuses 'an IPv6 wildcard'         '::/0'
+refuses 'a prefix'                 '172.28.15.0/24'
+refuses 'a bare IPv4 wildcard'     '0.0.0.0'
+refuses 'a bare IPv6 wildcard'     '::'
+# Every entry is validated on its own. Appending to a value that already works is how a prefix gets
+# in now that a list is legal, and a check that only read the first entry would never see it.
+refuses 'a prefix in a list'       '172.28.3.250 172.28.15.0/24'
+refuses 'a wildcard in a list'     '172.28.3.250 0.0.0.0'
 
 # EDGE_ADMIN_ALLOW widens the Keycloak admin console, so it is held to the same rule as the trust
 # above: literal addresses, never a range. A prefix there would hand the console to a whole subnet.
@@ -327,4 +355,4 @@ refuses_admin 'a prefix'        '10.0.0.0/8'
 refuses_admin 'an IPv4 wildcard' '0.0.0.0'
 refuses_admin 'one good and one bad address' '10.9.0.7 192.168.0.0/16'
 
-echo "==> edge configuration is valid in BOTH shapes"
+echo "==> edge configuration is valid in ALL THREE shapes"

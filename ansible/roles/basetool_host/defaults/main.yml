@@ -341,18 +341,33 @@ basetool_host_hardening_tailoring_time: "2026-09-20T00:00:00Z"
 # haproxy binds the public ports and hands the edge the client address with PROXY protocol, because
 # rootless port forwarding replaces it. The edge itself publishes on loopback only.
 #
-# basetool_host_edge_trusted_proxy is the edge container's PINNED address on the network
-# rootlessport presents the peer on, and it must match the `ip=` the generated unit gives that
-# network. Without a pin the address moves between recreations, which breaks set_real_ip_from at
-# the first restart.
+# basetool_host_edge_trusted_proxies is EVERY address the edge can present the PROXY header from,
+# and it must match the `ip=` the generated unit gives each of the edge's networks one for one.
+# Under rootless Podman the header arrives from the edge's OWN address -- rootlessport dials the
+# container's published port from inside its netns -- and podman chooses WHICH of the container's
+# networks that address comes from. Without a pin the address also moves between recreations, so
+# both halves are needed: pinned so it cannot drift, and all of them named because the choice
+# between them is not ours to make.
 #
-# It is net-proxy-frontend, NOT net-edge-ingress, and the difference cost a live regression on
-# 2026-09-22: the peer is the edge's address on net-proxy-frontend, that network is shared with the
-# frontend container and drifts (.10 -> .11 across one recreate), so nginx stopped matching, threw
-# the PROXY header away and logged EVERY request from one bridge address -- 2340 in ten minutes,
-# one rate-limit bucket for the whole internet. generate-quadlet.py's FRONT_END now pins both
-# addresses and this value names the second one.
-basetool_host_edge_trusted_proxy: "172.28.3.250"
+# Naming one was tried first and is not enough. Measured on the production host 2026-09-22, three
+# recreations with nothing else changed: the peer appeared on net-proxy-frontend, then
+# net-proxy-grafana, then net-proxy-api. Pinning one network only moves the choice to the next.
+#
+# What the gap cost while only net-edge-ingress was pinned: set_real_ip_from never matched, nginx
+# threw the PROXY header away and fell back to the TCP peer, and the edge logged EVERY request from
+# one bridge address -- 2340 in ten minutes. One rate-limit bucket for the whole internet and every
+# allow-list keyed on it, which is the 2026-07-20 outage's shape by another road.
+#
+# A LIST is not a relaxation of ADR-0187. Its rule is "name the address, never a prefix", and six
+# named addresses are no more a range than one is -- each is the edge itself, none is reachable by
+# anybody else. The assert below still refuses a prefix, per entry.
+basetool_host_edge_trusted_proxies:
+  - "172.28.15.10"   # net-edge-ingress
+  - "172.28.3.250"   # net-proxy-frontend
+  - "172.28.4.250"   # net-proxy-keycloak
+  - "172.28.7.250"   # net-proxy-ingest
+  - "172.28.11.250"  # net-proxy-grafana
+  - "172.28.13.250"  # net-proxy-api
 basetool_host_edge_loopback_ports: [8080, 8443]
 basetool_host_frontend_ports:
   - {public: 80, backend: 8080}

@@ -34,17 +34,34 @@
     state: present
   when: basetool_host_manage_selinux | bool
 
+# The variable became a LIST on 2026-09-22 and the singular is gone. An inventory that still
+# carries the old name would otherwise fall back to the default silently and pin the trust to
+# whatever the default happens to say, which is the failure this whole change exists to remove.
+- name: Refuse the retired singular front-end address variable
+  ansible.builtin.assert:
+    that:
+      - basetool_host_edge_trusted_proxy is not defined
+    fail_msg: >-
+      basetool_host_edge_trusted_proxy was replaced by basetool_host_edge_trusted_proxies, a LIST
+      of every address the edge can present the PROXY header from. Under rootless Podman podman
+      chooses which of the container's networks the header comes from, so one address is not a
+      complete answer. Rename it in the inventory and list all of them.
+
 - name: Refuse a front-end address that trusts too much
   ansible.builtin.assert:
     that:
-      - basetool_host_edge_trusted_proxy is match('^[0-9a-fA-F:.]+$')
-      - "'/' not in basetool_host_edge_trusted_proxy"
+      - basetool_host_edge_trusted_proxies | length > 0
+      - basetool_host_edge_trusted_proxies | reject('match', '^[0-9a-fA-F:.]+$') | list | length == 0
+      - basetool_host_edge_trusted_proxies | select('search', '/') | list | length == 0
+      - "'0.0.0.0' not in basetool_host_edge_trusted_proxies"
+      - "'::' not in basetool_host_edge_trusted_proxies"
     fail_msg: >-
-      basetool_host_edge_trusted_proxy must be ONE address, never a prefix and never a wildcard.
-      PROXY protocol asserts a source address rather than proving one, so a range wide enough to
-      contain an attacker turns this front end into a source-address forgery tool aimed at the rate
-      limiter and the admin allow-list it exists to preserve (ADR-0187). The edge's own
-      render-and-run.sh refuses the same values; this is the earlier of the two gates.
+      Every entry of basetool_host_edge_trusted_proxies must be a literal address, never a prefix
+      and never a wildcard. PROXY protocol asserts a source address rather than proving one, so a
+      range wide enough to contain an attacker turns this front end into a source-address forgery
+      tool aimed at the rate limiter and the admin allow-list it exists to preserve (ADR-0187). A
+      list of literals is the opposite of a range, not a step toward one -- each entry is checked on
+      its own here, and the edge's own render-and-run.sh checks them again at start.
 
 # One gather, read twice: the reload handler needs to know whether haproxy is already running, and
 # the firewall block below needs to know whether firewalld is. This used to shell out to
@@ -83,9 +100,9 @@
     msg: >-
       haproxy is installed, configured and enabled but NOT started: there is no edge behind it yet.
       It comes up with the first boot after deploy.sh, or start it by hand once the stack is
-      healthy. The edge must carry EDGE_TRUSTED_PROXY={{ basetool_host_edge_trusted_proxy }} in its
-      environment, or its listeners stay plain and the PROXY header this front end sends will be
-      rejected.
+      healthy. The edge must carry
+      EDGE_TRUSTED_PROXY={{ basetool_host_edge_trusted_proxies | join(' ') }} in its environment,
+      or its listeners stay plain and the PROXY header this front end sends will be rejected.
 
 # --- the firewall the hardening profile brings with it ---------------------------------------------
 #

@@ -163,11 +163,44 @@ only reason to be on a development stream was the pasta forwarder, and this ADR 
 
 Two things are deliberately **not** settled yet, and neither may be guessed at deployment time:
 
-1. ~~**The exact address `set_real_ip_from` names.**~~ **Answered on 2026-09-16** — see the note
-   under *Decision*: measured on Rocky against the real `net-edge-ingress`, the pinned
-   `IP=172.28.15.10` produced `peer=172.28.15.10` across three recreations, and without the pin the
-   address moved. `EDGE_TRUSTED_PROXY` therefore names that single address, not the subnet the
-   first probe trusted.
+1. ~~**The exact address `set_real_ip_from` names.**~~ **Answered on 2026-09-16, and the answer was
+   wrong — corrected 2026-09-22 after it cost a live regression.** What was measured in September
+   held: pinning `net-edge-ingress` to `172.28.15.10` produced `peer=172.28.15.10` across three
+   recreations, and without a pin the address moved. What it did **not** establish is that the
+   ingress network is the one the peer comes from. On the production host it is not, and it is not
+   consistently any single network either.
+
+   The peer is the edge's **own** address — `rootlessport` dials the container's published port
+   from inside its netns — and podman chooses **which** of the container's networks that address
+   belongs to. Measured on `rocky-16gb-nbg1-1` on 2026-09-22, three recreations with nothing else
+   changed: the peer appeared on `net-proxy-frontend`, then `net-proxy-grafana`, then
+   `net-proxy-api`. Pinning one network only moves the choice to the next, which is exactly what
+   happened when `net-proxy-frontend` was pinned in response to the first finding.
+
+   **What it cost.** nginx does not reject a `set_real_ip_from` that never matches: it discards the
+   PROXY header and falls back to the TCP peer. So the edge started clean, served traffic, and
+   logged **every** request from one bridge address — 2340 in ten minutes, a probe issued over the
+   public internet among them. One rate-limit bucket for the whole internet and every
+   `$remote_addr` allow-list keyed on it: the 2026-07-20 outage's shape, reached by a different
+   road, with a valid configuration and a green build throughout. It was not a recreate that caused
+   it — the first deploy after the cutover happened to produce a matching peer, so the next release
+   would have done it unattended.
+
+   **The correction, and why it is not a weakening.** Every network the edge joins is pinned, and
+   `EDGE_TRUSTED_PROXY` names **all six** of those addresses. The rule this ADR set is *name the
+   address, never a prefix* — and six named addresses are no more a range than one is. Each is the
+   edge itself, on a network nothing else can reach it from, and the set is finite precisely
+   because every membership is pinned. `render-and-run.sh` validates each entry separately and
+   still refuses a prefix or a wildcard, including one appended to a list that otherwise works.
+   What would be a weakening is `172.28.0.0/16`, and that is still refused.
+
+   **The guard is now structural.** Three files have to agree on the set — the generator's
+   `FRONT_END["edge"]["pins"]`, the emitted `edge.container`, and the Ansible
+   `basetool_host_edge_trusted_proxies` — and `.github/scripts/check_edge_trust_pins.py` fails the
+   build when they do not, including when the edge gains a network without a pin. That last check
+   is what keeps the candidate set finite; the behavioural one
+   (`check-conformance.py`'s `client-address-visible`, which is how this was found) stays as the
+   backstop that reads the running system.
 2. **Unreachability from a third machine.** The probe above established that the port is closed on
    the host's own global addresses. The stronger test — a direct connection from somewhere else —
    runs on Rocky before this is built for real, and the note above is why it carries the whole

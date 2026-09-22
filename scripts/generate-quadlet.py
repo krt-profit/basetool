@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import io
+import ipaddress
 import math
 import os
 import re
@@ -78,45 +79,51 @@ ENV_DIR_ON_HOST = "/var/iri/code/env.d"
 # pin produced the same peer every time. `IP=` also requires a user-defined bridge
 # network, which net-edge-ingress is.
 #
-# TWO pins, since 2026-09-22, and the second one is the one that matters. The
-# sentence above is right about the mechanism and was wrong about WHICH of the
-# container's own addresses rootlessport presents. Measured on the production host:
-# the peer is the edge's address on `net-proxy-frontend`, not on the pinned
-# `net-edge-ingress` -- and that network is shared with the frontend container and
-# hands out addresses by drift, so the peer moved .10 -> .11 across a single
-# recreate and `set_real_ip_from 172.28.15.10` stopped matching. nginx then discards
-# the PROXY header and falls back to the TCP peer, so the edge logged EVERY request
-# from one bridge address: 2340 of them in ten minutes, including a probe issued
-# from another continent's IPv6. That is the 2026-07-20 outage's shape -- one
-# rate-limit bucket for the whole internet, and every $remote_addr allow-list
-# keyed on it -- reached by a different road.
+# EVERY network the edge is on is pinned, since 2026-09-22, and the sentence above is right about
+# the mechanism while being wrong about WHICH of the container's own addresses rootlessport
+# presents. It is not always the ingress one, and it is not always the same one.
 #
-# It was not the recreate that broke it. The first deploy after the cutover
-# happened to produce a peer that matched; every recreate since would not have,
-# so the next release would have done it unattended.
+# Measured on the production host across three recreations with nothing else changed: the peer
+# appeared on net-proxy-frontend, then net-proxy-grafana, then net-proxy-api. Pinning one network
+# only moves the choice to another -- pinning net-proxy-frontend made the next peer show up on
+# net-proxy-grafana, and pinning that would have moved it again.
 #
-# The peer pin is high on purpose. netavark allocates from the low end of the
-# subnet and both containers on net-proxy-frontend drift upward with each
-# recreate (frontend held .9, the edge .10 then .11), so a low pin is a collision
-# waiting to happen while .250 is one no allocator reaches.
+# What it cost while only the ingress address was pinned: `set_real_ip_from` never matched, nginx
+# discarded the PROXY header and fell back to the TCP peer, and the edge logged EVERY request from
+# one bridge address -- 2340 in ten minutes, a probe issued over the public internet among them.
+# One rate-limit bucket for the whole internet, and every $remote_addr allow-list keyed on it: the
+# 2026-07-20 outage's shape, reached by a different road. It was not a recreate that caused it --
+# the first deploy after the cutover happened to produce a matching peer, and every recreate since
+# would not have, so the next release would have done it unattended.
 #
-# WHAT IS NOT SOLVED HERE, stated because the next reader will ask: nothing makes
-# podman's choice of network deterministic, so a future version could present the
-# peer on one of the other four. `EDGE_TRUSTED_PROXY` names ONE address by
-# ADR-0187's design -- a list is rejected by render-and-run.sh as "trusts every
-# client" -- so the guard is behavioural rather than structural:
-# check-conformance.py's client-address-visible fails on exactly this, which is
-# how it was found.
+# So the candidate set is made FINITE AND FIXED rather than guessed at: six pins, and
+# EDGE_TRUSTED_PROXY names all six. That is not a relaxation of ADR-0187, whose rule is "never a
+# prefix, name the address" -- six named addresses are no more a range than one is, and each is the
+# edge itself. render-and-run.sh validates each entry separately and still refuses a prefix or a
+# wildcard.
+#
+# The pins are .250 on purpose. netavark allocates from the low end and these networks are shared
+# with the upstream each one fronts, which drift upward on every recreate (the frontend container
+# held .9 while the edge went .10 -> .11 -> .12), so a low pin is a collision waiting to happen.
+# net-edge-ingress keeps .10: the edge is its only member and the address is already in the .env of
+# a running deployment.
 FRONT_END = {
     "edge": {
         "publish": ["127.0.0.1:8080:8080", "[::1]:8080:8080",
                     "127.0.0.1:8443:8443", "[::1]:8443:8443"],
-        "network": "net-edge-ingress",
-        "ip": "172.28.15.10",
-        # The network rootlessport actually presents the peer on, and the address
-        # EDGE_TRUSTED_PROXY has to name.
-        "peer_network": "net-proxy-frontend",
-        "peer_ip": "172.28.3.250",
+        # network -> the address the edge is pinned to on it. Every one of these is a candidate for
+        # the peer rootlessport presents, so every one of them belongs in EDGE_TRUSTED_PROXY.
+        # The role variable that becomes EDGE_TRUSTED_PROXY. It must name exactly the addresses
+        # below, and _verify_front_end refuses the build when it does not.
+        "role_var": "basetool_host_edge_trusted_proxies",
+        "pins": {
+            "net-edge-ingress": "172.28.15.10",
+            "net-proxy-frontend": "172.28.3.250",
+            "net-proxy-keycloak": "172.28.4.250",
+            "net-proxy-ingest": "172.28.7.250",
+            "net-proxy-grafana": "172.28.11.250",
+            "net-proxy-api": "172.28.13.250",
+        },
     }
 }
 
@@ -1087,14 +1094,11 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     networks = spec.get("networks")
     names = list(networks.keys()) if isinstance(networks, dict) else list(networks or [])
     for net in names:
-        if front and net == front["network"]:
-            # Quadlet takes the address as an option on the Network= line.
-            container.append(f"Network={net}.network:ip={front['ip']}")
-        elif front and net == front.get("peer_network"):
-            # The address rootlessport presents to the front end. See FRONT_END: this is the one
-            # EDGE_TRUSTED_PROXY has to name, and it is pinned because the network is shared and
-            # its allocator drifts.
-            container.append(f"Network={net}.network:ip={front['peer_ip']}")
+        pinned = (front or {}).get("pins", {}).get(net)
+        if pinned:
+            # Quadlet takes the address as an option on the Network= line. See FRONT_END for why
+            # every one of the edge's networks carries one.
+            container.append(f"Network={net}.network:ip={pinned}")
         else:
             container.append(f"Network={net}.network")
 
@@ -1359,6 +1363,113 @@ def _verify_run_as_against_role() -> None:
             )
 
 
+def _verify_front_end(
+    service_networks: dict[str, list[str]], net_defs: dict[str, dict[str, Any]]
+) -> None:
+    """Refuse if the front end's pinned addresses and its trusted ones are not the same set.
+
+    Under rootless Podman the PROXY header the edge receives comes from the edge's *own* address:
+    ``rootlessport`` dials the container's published port from inside its netns, so the peer nginx
+    sees is whichever of the container's addresses podman chose. Two facts follow.
+
+    **The address moves unless it is pinned** -- netavark allocates from the low end and these
+    networks are shared with the upstream they front. **And which network it comes from is not ours
+    to choose**: measured on the production host 2026-09-22, three recreations with nothing else
+    changed, the peer appeared on ``net-proxy-frontend``, then ``net-proxy-grafana``, then
+    ``net-proxy-api``. Pinning one only moves the choice to the next.
+
+    So every network the front end joins is pinned -- which is what keeps the candidate set finite
+    -- and the role's trusted list names all of those addresses. Three things have to agree and
+    nothing compared them: this table, the emitted unit (which ``--check`` covers) and
+    ``basetool_host_edge_trusted_proxies``.
+
+    The failure this prevents is silent in the worst way. nginx does not reject a
+    ``set_real_ip_from`` that never matches -- it discards the PROXY header and falls back to the
+    TCP peer, so the edge starts clean, serves traffic, and logs **every** request from one bridge
+    address. That happened: 2340 requests in ten minutes attributed to a single address, with the
+    per-IP rate limiter and the admin allow-list collapsed onto it the whole time, a valid
+    configuration and a green build (ADR-0187).
+
+    Args:
+        service_networks: for each front-end service, the networks it actually joins.
+        net_defs: the compose network definitions, for the subnet each pin must fall inside.
+
+    Raises:
+        Refusal: when a joined network carries no pin, when a pin names a network the service does
+            not join, when a pin falls outside that network's subnet, or when the role's trusted
+            list is not exactly the set of pinned addresses.
+    """
+    doc = yaml.safe_load(io.open(ROLE_DEFAULTS, encoding="utf-8"))
+
+    for service, front in sorted(FRONT_END.items()):
+        pins: dict[str, str] = front.get("pins") or {}
+        joined = service_networks.get(service, [])
+
+        unpinned = [net for net in joined if net not in pins]
+        if unpinned:
+            raise Refusal(
+                f"{service}: joins {', '.join(unpinned)} with no pinned address. Podman may present"
+                " the PROXY header from its address there, and nothing would name it -- nginx then"
+                " discards the header and every client address collapses to the bridge. Add the"
+                " network to FRONT_END['" + service + "']['pins'] and to the role's trusted list."
+            )
+        stray = [net for net in pins if net not in joined]
+        if stray:
+            raise Refusal(
+                f"{service}: pins an address on {', '.join(stray)}, which it does not join. The pin"
+                " has no effect and the address it names is trusted for nothing."
+            )
+
+        for net, address in sorted(pins.items()):
+            subnets = [
+                entry["subnet"]
+                for entry in ((net_defs.get(net) or {}).get("ipam") or {}).get("config", []) or []
+                if "subnet" in entry
+            ]
+            if not subnets:
+                raise Refusal(
+                    f"{service}: pinned to {address} on {net}, which declares no subnet. netavark"
+                    " cannot honour a static address on an unmanaged range."
+                )
+            try:
+                ip = ipaddress.ip_address(address)
+            except ValueError as exc:
+                raise Refusal(f"{service}: {address!r} on {net} is not an address") from exc
+            if not any(ip in ipaddress.ip_network(sub) for sub in subnets):
+                raise Refusal(
+                    f"{service}: {address} is outside {', '.join(subnets)} on {net}. netavark"
+                    " refuses this when the container starts, which is a failed deploy rather than"
+                    " a failed build."
+                )
+
+        role_var = front.get("role_var")
+        if not role_var:
+            continue
+        trusted = [str(value) for value in (doc.get(role_var) or [])]
+        if not trusted:
+            raise Refusal(
+                f"{role_var} is missing or empty in the bootstrap role. It is what becomes"
+                " EDGE_TRUSTED_PROXY; without it the edge trusts nothing, its listeners stay plain"
+                " and the front end's PROXY header is rejected."
+            )
+        if len(set(trusted)) != len(trusted):
+            raise Refusal(f"{role_var} lists an address twice.")
+        only_pinned = sorted(set(pins.values()) - set(trusted))
+        only_trusted = sorted(set(trusted) - set(pins.values()))
+        if only_pinned:
+            raise Refusal(
+                f"{', '.join(only_pinned)}: pinned for {service} but missing from {role_var}. When"
+                " podman presents the header from one of these, nginx discards it and every client"
+                " address collapses to the bridge -- silently, with a valid configuration."
+            )
+        if only_trusted:
+            raise Refusal(
+                f"{', '.join(only_trusted)}: named in {role_var} but pinned to nothing. An address"
+                " nothing reserves can be handed to another container, which could then assert any"
+                " client address it likes."
+            )
+
+
 def generate() -> tuple[dict[str, str], list[str]]:
     """Build every unit and allow-list.
 
@@ -1375,6 +1486,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
     files: dict[str, str] = {}
     notes: list[str] = []
     net_defs: dict[str, dict[str, Any]] = {}
+    front_networks: dict[str, list[str]] = {}
     used_networks: set[str] = set()
     used_volumes: set[str] = set()
 
@@ -1412,7 +1524,10 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 files[f"quadlet/env.d/{service}.env.tmpl"] = render_vars(service, spec)
 
             nets = spec.get("networks")
-            used_networks.update(nets.keys() if isinstance(nets, dict) else (nets or []))
+            names = list(nets.keys() if isinstance(nets, dict) else (nets or []))
+            used_networks.update(names)
+            if service in FRONT_END:
+                front_networks[service] = names
             for vol in spec.get("volumes", []) or []:
                 source = str(vol).split(":")[0]
                 if not source.startswith(("/", "./", "$")):
@@ -1433,6 +1548,8 @@ def generate() -> tuple[dict[str, str], list[str]]:
     unused = sorted(set(net_defs) - used_networks)
     if unused:
         notes.append("networks with no translated member, omitted: " + ", ".join(unused))
+
+    _verify_front_end(front_networks, net_defs)
 
     return files, notes
 
