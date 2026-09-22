@@ -21,13 +21,19 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import de.greluc.krt.profit.basetool.frontend.support.SessionIdFingerprint;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
 import tools.jackson.databind.json.JsonMapper;
@@ -250,5 +256,34 @@ class SsoReAuthenticationEntryPointTest {
     assertNotNull(
         response.getCookie(SsoReAuthenticationEntryPoint.SSO_ATTEMPTED_COOKIE),
         "Navigation still sets the SSO_ATTEMPTED loop-guard cookie");
+  }
+
+  @Test
+  void commence_logsASessionFingerprintAndNeverTheRawSessionId() throws Exception {
+    // APPSEC-12: the silent-SSO INFO line used to carry the raw session id, a bearer credential,
+    // into every log file and Loki.
+    Logger logger = (Logger) LoggerFactory.getLogger(SsoReAuthenticationEntryPoint.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    logger.addAppender(appender);
+    try {
+      String rawId = "5e2f8a1c-9b4d-4f7e-a6c3-1d0b9e8f7a65";
+      MockHttpServletRequest request = new MockHttpServletRequest();
+      request.setRequestURI("/dashboard");
+      request.setSession(new MockHttpSession(null, rawId));
+
+      entryPoint.commence(request, new MockHttpServletResponse(), authException);
+
+      assertFalse(appender.list.isEmpty(), "the silent-SSO attempt must have been logged");
+      assertTrue(
+          appender.list.stream().noneMatch(e -> e.getFormattedMessage().contains(rawId)),
+          "the raw session id must not be logged");
+      assertTrue(
+          appender.list.stream()
+              .anyMatch(e -> e.getFormattedMessage().contains(SessionIdFingerprint.of(rawId))),
+          "the fingerprint is logged instead");
+    } finally {
+      logger.detachAppender(appender);
+    }
   }
 }

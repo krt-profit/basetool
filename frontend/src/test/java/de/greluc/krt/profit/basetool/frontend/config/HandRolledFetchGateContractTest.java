@@ -81,12 +81,13 @@ class HandRolledFetchGateContractTest {
   private static final Pattern P4K_HEADERS_VALUE = Pattern.compile("headers:\\s*([^,\\n]+)");
 
   /**
-   * The two spellings that carry the marker in {@code p4k-import.js}. Anything else — an inline
-   * object literal above all — silently drops the module back onto the redirect branch of both
-   * gates.
+   * The spelling that carries the marker in {@code p4k-import.js}. Anything else — an inline object
+   * literal above all — silently drops the module back onto the redirect branch of both gates. The
+   * module's writes (upload, apply) left this list on 2026-09-22 when they moved onto {@code
+   * krtFetch} (FE-SEC-03), which sends the marker itself; the one hand-rolled {@code fetch} left is
+   * the job poll.
    */
-  private static final List<String> P4K_HEADERS_WITH_MARKER =
-      List.of("ajaxHeaders()", "csrfHeaders(ajaxHeaders())");
+  private static final List<String> P4K_HEADERS_WITH_MARKER = List.of("ajaxHeaders()");
 
   /** The request-init helper every {@code notifications.js} read must pass. */
   private static final Pattern NOTIFICATIONS_MARKED_CALL =

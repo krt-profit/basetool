@@ -43,31 +43,6 @@
         return window.krtBlueprintsEndpoints || {};
     }
 
-    // Escape HTML meta-characters before any value is written via innerHTML. Implemented as a
-    // self-contained replace chain (not a delegate to window.escapeHtml) so it is an unconditional,
-    // statically-recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
-    function esc(v) {
-        return String(v == null ? '' : v)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // CSRF headers via the shared krtCsrf seam (REQ-FE-002), replacing the hand-rolled meta-tag
-    // read. For the multipart preview upload the browser must set its own multipart boundary, so
-    // the JSON Content-Type krtCsrf adds by default is removed when `multipart` is set.
-    function csrfHeaders(base, multipart) {
-        const headers = window.krtCsrf
-            ? window.krtCsrf.headers(base || {})
-            : Object.assign({}, base || {});
-        if (multipart) {
-            delete headers['Content-Type'];
-        }
-        return headers;
-    }
-
     function init() {
         fileInput = /** @type {HTMLInputElement | null} */ ($('krt-bp-import-file'));
         modal = $('krt-bp-import-modal');
@@ -81,6 +56,24 @@
         loadHandoff();
     }
 
+    /**
+     * Opens the preview modal for a krtFetch outcome whose body is the parsed import preview, or runs
+     * onFailure when it is not (a non-2xx already reported through the caller's hooks resolves here
+     * with ok=false and is left alone).
+     *
+     * @param {KrtWriteResult} result the krtFetch outcome
+     * @param {() => void} onFailure shows the caller's error toast
+     */
+    function showPreviewResult(result, onFailure) {
+        if (result.ok && result.body && typeof result.body === 'object') {
+            renderPreview(result.body);
+            openModal();
+        } else if (result.ok) {
+            // A 2xx that is not the preview JSON (e.g. a followed redirect to an HTML page).
+            onFailure();
+        }
+    }
+
     /* --------------------------------------------------------------- handoff */
 
     // One-click ingest (epic #639): the desktop extractor opened this page with a `?handoff=<id>`.
@@ -91,6 +84,7 @@
     // not ride a cacheable/prefetchable GET — the navigational page GET already never consumes, and
     // keeping the consume off any GET means a speculative prefetch / duplicate load cannot burn the
     // token before the real pickup (the 2026-07-19 double-GET incident on the refinery surface).
+    // It goes through krtFetch.write (REQ-FE-002): CSRF, the 403 retry and the re-auth redirect.
     function loadHandoff() {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('handoff');
@@ -101,28 +95,27 @@
         if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', cleaned);
         }
+        if (!window.krtFetch) return;
         const url =
             (endpoints().importStaged || '/personal-inventory/blueprints/import/staged') +
             '?handoff=' +
             encodeURIComponent(id);
-        fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders({ Accept: 'application/json' }),
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (preview) {
-                if (!preview) {
+        window.krtFetch
+            .write({
+                method: 'POST',
+                url: url,
+                toast: false,
+                onError: function () {
                     handoffNotFound();
-                    return;
-                }
-                renderPreview(preview);
-                openModal();
+                    return true;
+                },
+                onNetworkError: function () {
+                    handoffNotFound();
+                    return true;
+                },
             })
-            .catch(function () {
-                handoffNotFound();
+            .then(function (result) {
+                showPreviewResult(result, handoffNotFound);
             });
     }
 
@@ -147,28 +140,29 @@
 
     /* ----------------------------------------------------------------- preview */
 
+    // The preview upload goes through krtFetch.submitForm (REQ-FE-002): CSRF, the 403 retry and the
+    // re-auth redirect, with Content-Type left to the browser so the multipart boundary is written.
     function uploadPreview(file) {
+        if (!window.krtFetch) return;
         const fd = new FormData();
         fd.append('file', file);
-        fetch(endpoints().importPreview || '/personal-inventory/blueprints/import/preview', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: csrfHeaders({ Accept: 'application/json' }, true),
-            body: fd,
-        })
-            .then(function (resp) {
-                return resp.ok ? resp.json() : null;
-            })
-            .then(function (preview) {
-                if (!preview) {
+        window.krtFetch
+            .submitForm({
+                url: endpoints().importPreview || '/personal-inventory/blueprints/import/preview',
+                method: 'POST',
+                formData: fd,
+                toast: false,
+                onError: function () {
                     toastError();
-                    return;
-                }
-                renderPreview(preview);
-                openModal();
+                    return true;
+                },
+                onNetworkError: function () {
+                    toastError();
+                    return true;
+                },
             })
-            .catch(function () {
-                toastError();
+            .then(function (result) {
+                showPreviewResult(result, toastError);
             });
     }
 
@@ -210,131 +204,137 @@
             return e.status === 'ALREADY_OWNED';
         });
 
+        // The preview markup accumulator: every write — here and in the nested append* helpers — is
+        // a literal or an escapeHtml / escapeAttr call, so the one innerHTML sink it feeds provably
+        // sees escaped values only (FE-SEC-05). The helpers are nested so it stays a local here.
         let html = '';
-        html += renderGroup(i18n().groupMatched, matched, 'matched');
-        html += renderGroup(i18n().groupSuggested, suggested, 'suggested');
-        html += renderGroup(i18n().groupUnmatched, unmatched, 'unmatched');
-        html += renderGroup(i18n().groupOwned, owned, 'owned');
+
+        function appendGroup(title, groupEntries, kind) {
+            if (!groupEntries || groupEntries.length === 0) return;
+            html +=
+                '<section class="krt-bp-imp-group">' +
+                '<h3 class="krt-bp-imp-group-title">' +
+                escapeHtml(title || '') +
+                ' (' +
+                escapeHtml(groupEntries.length) +
+                ')</h3>' +
+                '<div class="krt-bp-imp-rows">';
+            groupEntries.forEach(function (e) {
+                appendRow(e, kind);
+            });
+            html += '</div>' + '</section>';
+        }
+
+        function appendRow(entry, kind) {
+            const isOwned = kind === 'owned';
+            const suggestions = entry.suggestions || [];
+            // Auto-select the top suggestion for a SUGGESTED row so the pre-checked box is honest:
+            // a checked row ALWAYS carries a resolved product key, which is what apply() submits
+            // (issue #824). MATCHED rows already carry their own productKey; UNMATCHED rows resolve
+            // nothing until the user picks one. The user can still pick a different suggestion /
+            // search hit (setRowProduct) or untick the row to skip it.
+            let resolved = entry.productKey || '';
+            if (!resolved && kind === 'suggested' && suggestions.length > 0) {
+                resolved = suggestions[0].productKey || '';
+            }
+            const acquired = entry.suggestedAcquiredAt || '';
+            // Pre-check matched rows and any suggested row that resolved to a product (never
+            // owned). Keeping "checked ⇔ data-key set" is the whole fix: a SUGGESTED row with no
+            // resolvable suggestion stays unchecked instead of looking importable when it is not.
+            let includeState = '';
+            if (isOwned) {
+                includeState = ' disabled';
+            } else if (kind === 'matched' || (kind === 'suggested' && resolved)) {
+                includeState = ' checked';
+            }
+            html +=
+                '<div class="krt-bp-imp-row" data-external="' +
+                escapeAttr(entry.externalName) +
+                '"' +
+                ' data-key="' +
+                escapeAttr(resolved) +
+                '" data-acquired="' +
+                escapeAttr(acquired) +
+                '">' +
+                '<label class="krt-bp-imp-include-cell">' +
+                '<input type="checkbox" class="krt-bp-imp-include"' +
+                includeState +
+                '>' +
+                '</label>' +
+                '<span class="krt-bp-imp-external">' +
+                escapeHtml(entry.externalName || '') +
+                '</span>' +
+                '<span class="krt-bp-imp-resolution">';
+            if (kind === 'matched') {
+                html +=
+                    '<span class="krt-bp-imp-product">' +
+                    escapeHtml(entry.productName || '') +
+                    '</span>';
+            } else if (isOwned) {
+                html +=
+                    '<span class="krt-bp-imp-owned">' +
+                    escapeHtml(i18n().ownedLabel || 'Already owned') +
+                    '</span>';
+            } else {
+                appendSearchControl(entry);
+            }
+            if (acquired) {
+                html +=
+                    '<span class="krt-bp-imp-date">' +
+                    escapeHtml(String(acquired).substring(0, 10)) +
+                    '</span>';
+            }
+            html += '</span>';
+            if (!isOwned) {
+                html +=
+                    '<input type="text" class="krt-bp-imp-note" maxlength="2000"' +
+                    ' placeholder="' +
+                    escapeAttr(i18n().notePlaceholder || '') +
+                    '">';
+            }
+            html += '</div>';
+        }
+
+        function appendSearchControl(entry) {
+            const suggestions = entry.suggestions || [];
+            html +=
+                '<span class="krt-bp-imp-search-wrap">' +
+                '<input type="text" class="krt-bp-imp-search" autocomplete="off"' +
+                ' value="' +
+                escapeAttr(suggestions.length > 0 ? suggestions[0].productName : '') +
+                '" placeholder="' +
+                escapeAttr(i18n().searchPlaceholder || 'Search...') +
+                '">' +
+                '<div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>';
+            if (suggestions.length > 0) {
+                html += '<span class="krt-bp-imp-suggestions">';
+                suggestions.forEach(function (s) {
+                    html +=
+                        '<button type="button" class="krt-bp-imp-suggestion" data-key="' +
+                        escapeAttr(s.productKey) +
+                        '"' +
+                        ' data-name="' +
+                        escapeAttr(s.productName) +
+                        '">' +
+                        escapeHtml(s.productName) +
+                        '</button>';
+                });
+                html += '</span>';
+            }
+            html += '</span>';
+        }
+
+        appendGroup(i18n().groupMatched, matched, 'matched');
+        appendGroup(i18n().groupSuggested, suggested, 'suggested');
+        appendGroup(i18n().groupUnmatched, unmatched, 'unmatched');
+        appendGroup(i18n().groupOwned, owned, 'owned');
         if (!html)
             html =
                 '<p class="krt-bp-staging-empty">' +
-                esc(i18n().nothing || 'Nothing to import.') +
+                escapeHtml(i18n().nothing || 'Nothing to import.') +
                 '</p>';
         bodyEl.innerHTML = html;
         bindRowSearch();
-    }
-
-    function renderGroup(title, entries, kind) {
-        if (!entries || entries.length === 0) return '';
-        let rows = '';
-        entries.forEach(function (e) {
-            rows += renderRow(e, kind);
-        });
-        return (
-            '<section class="krt-bp-imp-group">' +
-            '<h3 class="krt-bp-imp-group-title">' +
-            esc(title || '') +
-            ' (' +
-            entries.length +
-            ')</h3>' +
-            '<div class="krt-bp-imp-rows">' +
-            rows +
-            '</div>' +
-            '</section>'
-        );
-    }
-
-    function renderRow(entry, kind) {
-        const owned = kind === 'owned';
-        const suggestions = entry.suggestions || [];
-        // Auto-select the top suggestion for a SUGGESTED row so the pre-checked box is honest:
-        // a checked row ALWAYS carries a resolved product key, which is what apply() submits
-        // (issue #824). MATCHED rows already carry their own productKey; UNMATCHED rows resolve
-        // nothing until the user picks one. The user can still pick a different suggestion / search
-        // hit (setRowProduct) or untick the row to skip it.
-        let resolved = entry.productKey || '';
-        if (!resolved && kind === 'suggested' && suggestions.length > 0) {
-            resolved = suggestions[0].productKey || '';
-        }
-        const acquired = entry.suggestedAcquiredAt || '';
-        // Pre-check matched rows and any suggested row that resolved to a product (never owned).
-        // Keeping "checked ⇔ data-key set" is the whole fix: a SUGGESTED row with no resolvable
-        // suggestion stays unchecked instead of looking importable when it is not.
-        const checked =
-            !owned && (kind === 'matched' || (kind === 'suggested' && resolved)) ? ' checked' : '';
-        let resolution;
-        if (kind === 'matched') {
-            resolution =
-                '<span class="krt-bp-imp-product">' + esc(entry.productName || '') + '</span>';
-        } else if (owned) {
-            resolution =
-                '<span class="krt-bp-imp-owned">' +
-                esc(i18n().ownedLabel || 'Already owned') +
-                '</span>';
-        } else {
-            resolution = renderSearchControl(entry);
-        }
-        const acquiredHint = acquired
-            ? '<span class="krt-bp-imp-date">' + esc(String(acquired).substring(0, 10)) + '</span>'
-            : '';
-        return (
-            '<div class="krt-bp-imp-row" data-external="' +
-            esc(entry.externalName) +
-            '"' +
-            ' data-key="' +
-            esc(resolved) +
-            '" data-acquired="' +
-            esc(acquired) +
-            '">' +
-            '<label class="krt-bp-imp-include-cell">' +
-            '<input type="checkbox" class="krt-bp-imp-include"' +
-            (owned ? ' disabled' : checked) +
-            '>' +
-            '</label>' +
-            '<span class="krt-bp-imp-external">' +
-            esc(entry.externalName || '') +
-            '</span>' +
-            '<span class="krt-bp-imp-resolution">' +
-            resolution +
-            acquiredHint +
-            '</span>' +
-            (owned
-                ? ''
-                : '<input type="text" class="krt-bp-imp-note" maxlength="2000"' +
-                  ' placeholder="' +
-                  esc(i18n().notePlaceholder || '') +
-                  '">') +
-            '</div>'
-        );
-    }
-
-    function renderSearchControl(entry) {
-        const suggestions = entry.suggestions || [];
-        let chips = '';
-        suggestions.forEach(function (s) {
-            chips +=
-                '<button type="button" class="krt-bp-imp-suggestion" data-key="' +
-                esc(s.productKey) +
-                '"' +
-                ' data-name="' +
-                esc(s.productName) +
-                '">' +
-                esc(s.productName) +
-                '</button>';
-        });
-        const seed = suggestions.length > 0 ? esc(suggestions[0].productName) : '';
-        return (
-            '<span class="krt-bp-imp-search-wrap">' +
-            '<input type="text" class="krt-bp-imp-search" autocomplete="off"' +
-            ' value="' +
-            seed +
-            '" placeholder="' +
-            esc(i18n().searchPlaceholder || 'Search...') +
-            '">' +
-            '<div class="krt-bp-imp-results krt-pi-typeahead-results" hidden></div>' +
-            (chips ? '<span class="krt-bp-imp-suggestions">' + chips + '</span>' : '') +
-            '</span>'
-        );
     }
 
     /* --------------------------------------------------------- per-row search */
@@ -394,7 +394,7 @@
         if (!items || items.length === 0) {
             results.innerHTML =
                 '<div class="krt-pi-typeahead-empty">' +
-                esc(i18n().noResults || 'No matches') +
+                escapeHtml(i18n().noResults || 'No matches') +
                 '</div>';
             results.hidden = false;
             return;
@@ -404,12 +404,12 @@
             html +=
                 '<button type="button" class="krt-pi-typeahead-item krt-bp-imp-hit"' +
                 ' data-key="' +
-                esc(it.productKey) +
+                escapeAttr(it.productKey) +
                 '" data-name="' +
-                esc(it.name) +
+                escapeAttr(it.name) +
                 '">' +
                 '<span class="krt-pi-typeahead-name">' +
-                esc(it.name || '') +
+                escapeHtml(it.name || '') +
                 '</span>' +
                 '</button>';
         });

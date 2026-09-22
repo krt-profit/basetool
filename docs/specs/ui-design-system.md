@@ -888,6 +888,10 @@ Binding details:
 - [ ] `<head>` links the SVG favicon, both PNG rasters and the touch icon.
 - [ ] No app page references `logos/krt.webp` or `logos/krt-favicon.webp`.
 - [ ] Every referenced brand asset actually ships under `META-INF/resources/logos/`.
+- [ ] `META-INF/resources/logos/` ships the `basetool-*` family and nothing else. FE-PERF-04
+  (2026-09-22) deleted seven unreferenced public files there — `krt.webp`, `krt-favicon.webp`,
+  `sc.png` (515 KB), `gplv3.svg`, `java.svg`, `postgres.svg`, `spring.svg`, about 570 KB in all;
+  the org-branded PDF exports read the backend's own `krt.png`, not these.
 
 **Enforced by:** `BrandMarkRenderMvcTest` · **Code:** `fragments/head.html`, the `.brand` link in
 every page template, `META-INF/resources/logos/basetool-*`,

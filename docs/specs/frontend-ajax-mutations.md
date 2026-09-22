@@ -70,8 +70,8 @@ its back/forward cache.
 - [ ] The submit control is disabled for the duration of the in-flight write and re-enabled when it
   settles, so a double-click cannot fire a duplicate create or a stale-version delete. Enforced
   centrally: `krtFetch.write` auto-captures the triggering form's submit button and toggles it
-  (raw-`fetch` write paths — order/refinery create, the mission-data helper, the Lager allocation
-  popover — guard it explicitly). A raw-`fetch` path that wraps its send in `krtFetch.serialize`
+  (a write that is not a form submit passes its button as `submitter` — since FE-SEC-03 there is no
+  raw-`fetch` write path left to guard by hand). A raw-`fetch` path that wraps its send in `krtFetch.serialize`
   must disable **before** the wrap, synchronously: serialization defers the send but not the second
   click, so a guard placed inside the serialized task queues a write that still carries the *first*
   click's target and re-sends what the first one just consumed. Only the values a queued task must
@@ -145,8 +145,54 @@ MUST pass an explicit `submitter` (e.g. the operation-detail delete form).
 - [ ] A double-click on a submit button driving a `krtFetch.write` / `submitForm` fires exactly one
   request; the button is disabled synchronously on first submit and re-enabled when it settles.
 
-**Enforced by:** code review + grep guard in review, per-area double-submit e2e · **Code:**
-`krt-fetch.js` (`write`, `submitForm`, `send`, `resolveSubmitter`) · **Issues:** #572, #916, #1133
+**Lint-enforced since 2026-09-22 (FE-SEC-03).** Twenty-three `fetch` writes in fifteen files had
+drifted back past the review guard — each with its own CSRF read and, mostly, no retry-on-403, no
+`X-Reauthenticate` redirect and no double-submit guard — plus two whose init object was built in a
+helper (the order-detail assignee `oaSend` loop and the org-chart `doFetch`). All of them now go
+through `krtFetch.write` / `submitForm`, the page-local CSRF helpers are deleted, and
+`eslint.config.mjs` rejects a `fetch(…)` / `window.fetch(…)` whose init names a `method` other than a
+literal `GET` (`no-restricted-syntax`, an error in `:frontend:lintJs`). Only `krt-fetch.js` (the
+transport) and `krt-client-error.js` (the beacon, which must work when `krtFetch` did not load) are
+exempt. The rule cannot see an init built in another function, so that shape stays a review item.
+To make every former raw call expressible, `write` / `submitForm` gained three backwards-compatible
+options: `accept` (an endpoint that answers `text/html`, e.g. the operation markdown preview, which
+had been answered `406` for its `application/json` Accept), `responseType: 'blob'` (the order
+handover PDF preview) and, on `write`, `bodyOnDelete` (the Lager allocation removal, whose `DELETE`
+reads a body); a 2xx result also reports `redirected`, so a caller that swaps an HTML body can refuse
+a followed redirect.
+
+**Enforced by:** `:frontend:lintJs` (`no-restricted-syntax`), per-area double-submit e2e (incl.
+`AdminMaterialCreateInPlaceE2eTest`) · **Code:** `krt-fetch.js` (`write`, `submitForm`, `send`,
+`resolveSubmitter`), `eslint.config.mjs` · **Issues:** #572, #916, #1133
+
+### REQ-FE-022 — Every HTML sink is escaped or a trusted server fragment
+
+A value reaches `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write` only in one of
+two shapes: markup built in script with **every** interpolated value passed through the shared
+`escapeHtml` / `escapeAttr` (`escape-html.js`), or the text of a same-origin Thymeleaf fragment
+response — escaped server-side by the template engine — inserted through
+`krtFetch.setTrustedHtml(el, html)` or its `outerHTML` twin `krtFetch.replaceWithTrustedHtml(el,
+html)`. Everything else is built with DOM APIs and `textContent`. There is one escaper pair: seven
+pages carried a private copy, some of which did not escape `'`, and all seven now use the shared one
+(`escapeAttr` wherever the value sits in an attribute).
+
+Until 2026-09-22 (FE-SEC-05) this held by review alone across 96 sinks.
+`eslint-plugin-no-unsanitized` (`method` + `property`, with `escapeHtml` / `escapeAttr` as the
+accepted escapers) now fails `:frontend:lintJs` on any sink it cannot prove escaped; the trusted
+helper holds the codebase's single justified `eslint-disable-next-line`. The plugin trusts a markup
+variable only when it is declared in the function that assigns it, which is why a few render helpers
+are nested inside their render function.
+
+**Acceptance**
+
+- [ ] `:frontend:lintJs` reports no `no-unsanitized/*` finding.
+- [ ] No page defines its own HTML escaper.
+- [ ] `setTrustedHtml` / `replaceWithTrustedHtml` are called only with the body of a same-origin
+  fragment response, never with a string assembled in script.
+
+**Enforced by:** `:frontend:lintJs` (`no-unsanitized/method`, `no-unsanitized/property`) + review of
+the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`setTrustedHtml`,
+`replaceWithTrustedHtml`, `swap`), `eslint.config.mjs`
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 
@@ -321,7 +367,8 @@ OPTIMISTIC_LOCK reload-confirm.
 The refinery **screenshot-extract import** (#591) applies the same fragment-swap idea to a
 **multipart POST** rather than a GET: an `X-Requested-With` import twin
 (`RefineryOrderPageController.importExtractAjax`) returns the pre-filled create-form fragment
-(`refinery-orders-create :: refineryImportFormBody`), and a bespoke `fetch` swaps it into the stable
+(`refinery-orders-create :: refineryImportFormBody`), and a `krtFetch.submitForm` (a bespoke
+`fetch` until FE-SEC-03) swaps it into the stable
 `#refineryImportFormContainer` then dispatches `krt:swapped` (`krtFetch.swap` is GET-only and cannot
 carry the upload). Every branch — success and each error (invalid/oversized file, unparseable JSON,
 backend reject) — renders inline in the swapped region, never a redirect; the classic
@@ -339,7 +386,8 @@ delete and the bulk home-location set submit through `krtFetch.write` to header-
 table via the existing `GET /hangar?fragment=results` swap (the server multi-key sort makes a
 client-side row insert too fragile); the import + delete-all flows drop their post-action
 `location.reload()` for the same swap and their two hand-rolled CSRF reads move onto `krtCsrf` (the
-multipart import keeps a bespoke `fetch` minus the JSON `Content-Type`). Because the action + per-row
+multipart import goes through `krtFetch.submitForm` since FE-SEC-03, and refuses a file above
+`data-max-bytes` before uploading it). Because the action + per-row
 edit buttons live inside the swapped `#hangar-results` fragment they are bound through `krtEvents`
 `data-trigger` delegation (and the live ship-type filter is a delegated document listener) so they
 survive every re-swap. **Ship-data** flips each visibility toggle in place (button label + secondary
@@ -449,6 +497,14 @@ admin-only lead toggle still posts to `/admin/special-commands/{id}/members/{use
 `admin/notification-rules :: rules` table fragment (`?fragment=rules`) instead (REQ-NOTIF-007).
 Neither page takes part in the live multi-user sync — no admin catalogue page does, except the org
 structure.
+
+The **admin materials** create (2026-09-22, FE-PERF-06) dropped the `setTimeout(location.reload)`
+that followed a successful create: the page has no `?fragment=` render, so it re-reads itself and
+swaps the table body, the name datalist and the create modal's refined-material select in place,
+then re-applies the active name filter. The Lager allocation popovers (`inventory-admin.js` /
+`inventory-my.js`), the inventory note modal and the order-detail assignee notes likewise dropped
+their timed reload on a `409`: the conflict goes through `krtFetch`'s reload-confirm (REQ-FE-003),
+the only sanctioned reload.
 
 **Enforced by:** lists/pagination e2e (#573) plus the mission-detail (#574), order-detail (#575),
 refinery-import (#591), asset-management (#578), bank (#579), promotion (#580), org/members/profile
@@ -619,9 +675,24 @@ controller-local `@ExceptionHandler` is bypassed.
 - [ ] A multipart submission that exceeds the configured part-count or size limit returns a
   localized 413 (JSON `UPLOAD_TOO_LARGE` for XHR, the error page otherwise), not a 500.
 
+**The file relays cap below the multipart limit (APPSEC-03, 2026-09-22).** The multipart limit is
+64 MB because the admin P4K import needs it, and the edge proxy admits 2000 MB — so a relay that reads
+`file.getBytes()` before checking anything lets any member park 64 MB in the frontend heap per request,
+before the backend parser ever sees the upload and refuses it at its own cap. Every file relay
+therefore compares `MultipartFile#getSize()` against the backend parser's cap **before reading a
+byte**: the ship import (`HangarImportProxyController.MAX_IMPORT_BYTES`, 8 MiB — also published to the
+page as `data-max-bytes`, so `hangar.js` refuses an oversized file before uploading it), the blueprint
+import (`PersonalBlueprintImportProxyController.MAX_EXPORT_BYTES`, 8 MiB) and the refinery extract
+(`RefineryImportProxyController.MAX_EXTRACT_BYTES`, 2 MiB). A refused upload is a `413` JSON body
+(`code: UPLOAD_TOO_LARGE`, the localized text in `message` and `detail`), never a `500`. The ship
+import additionally streams an accepted file to the backend from the container's part storage
+instead of copying it into a `byte[]`.
+
 **Enforced by:** `GlobalExceptionHandlerTest` (the JSON + HTML branches of
-`handleMaxUploadSizeExceeded`) · **Config:** `frontend application.yml`
-`server.tomcat.max-part-count` · **Code:** `GlobalExceptionHandler.handleMaxUploadSizeExceeded`
+`handleMaxUploadSizeExceeded`), `HangarImportProxyControllerTest` (8 MiB + 1 refused with no backend
+request, exactly 8 MiB forwarded whole), `RelayedBackendStatusMvcTest` (the blueprint cap answers
+`413`) · **Config:** `frontend application.yml` `server.tomcat.max-part-count` · **Code:**
+`GlobalExceptionHandler.handleMaxUploadSizeExceeded`, the three relay caps
 
 ### REQ-FE-010 — Live multi-user mission updates over the presence WebSocket
 

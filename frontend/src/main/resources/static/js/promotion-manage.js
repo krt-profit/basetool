@@ -42,54 +42,45 @@
 
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
-// CSRF readers delegate to the shared krtCsrf module (epic #571); the meta-tag
-// fallback keeps the page working if krt-fetch.js failed to load.
-function getCsrfToken() {
-    return (
-        (window.krtCsrf && window.krtCsrf.token && window.krtCsrf.token()) ||
-        document.querySelector('meta[name="_csrf"]')?.content ||
-        ''
-    );
-}
-function getCsrfHeader() {
-    return (
-        (window.krtCsrf && window.krtCsrf.headerName && window.krtCsrf.headerName()) ||
-        document.querySelector('meta[name="_csrf_header"]')?.content ||
-        'X-CSRF-TOKEN'
-    );
-}
-
-function pmCsrfHeaders() {
-    if (window.krtCsrf && typeof window.krtCsrf.headers === 'function') {
-        return window.krtCsrf.headers();
-    }
-    const h = {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-    };
-    h[getCsrfHeader()] = getCsrfToken();
-    return h;
-}
-
-// PUT an evaluation through the shared CSRF reader, retrying once on a bare 403
-// (stale token) before surfacing the response to the caller.
+// PUT an evaluation through krtFetch.write (REQ-FE-002: CSRF, the bare-403 refresh-and-retry and the
+// re-auth redirect). Resolves to the updated evaluation, or to null once the failure was surfaced:
+// a 409 toasts MSG_CONFLICT, drops the pending jobs and re-renders the matrix in place from the
+// server's authoritative state (fresh @Version on every cell) — the in-place equivalent of the old
+// full-page reload; any other failure toasts MSG_ERROR.
 function pmPutEvaluation(url, payload) {
-    function run() {
-        return fetch(url, {
-            method: 'PUT',
-            headers: pmCsrfHeaders(),
-            body: JSON.stringify(payload),
-        });
+    if (!window.krtFetch) {
+        return Promise.resolve(null);
     }
-    return run().then(function (r) {
-        if (r.status === 403 && window.krtCsrf && typeof window.krtCsrf.refresh === 'function') {
-            return window.krtCsrf.refresh().then(function (ok) {
-                return ok ? run() : r;
-            });
+    function toastError(message) {
+        if (typeof window.showFrontendErrorToast === 'function') {
+            window.showFrontendErrorToast(message);
         }
-        return r;
-    });
+    }
+    return window.krtFetch
+        .write({
+            method: 'PUT',
+            url: url,
+            payload: payload,
+            toast: false,
+            onError: function (status) {
+                if (status === 409) {
+                    toastError(MSG_CONFLICT);
+                    pmSaveQueue = [];
+                    pmEligibilityDirty.clear();
+                    pmRefreshMatrix();
+                } else {
+                    toastError(MSG_ERROR);
+                }
+                return true;
+            },
+            onNetworkError: function () {
+                toastError(MSG_ERROR);
+                return true;
+            },
+        })
+        .then(function (result) {
+            return result.ok ? result.body : null;
+        });
 }
 
 // Members whose stored grades changed during the current save run. Their
@@ -218,27 +209,6 @@ function pmProcessNextSave() {
             encodeURIComponent(categoryId),
         { version: version, assignedLevel: assignedLevel },
     )
-        .then(function (response) {
-            if (response.status === 409) {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(MSG_CONFLICT);
-                }
-                // Drop pending jobs and re-render the matrix in place from the
-                // server's authoritative state (fresh @Version on every cell) —
-                // the in-place equivalent of the old full-page reload.
-                pmSaveQueue = [];
-                pmEligibilityDirty.clear();
-                pmRefreshMatrix();
-                return null;
-            }
-            if (!response.ok) {
-                if (typeof window.showFrontendErrorToast === 'function') {
-                    window.showFrontendErrorToast(MSG_ERROR);
-                }
-                return null;
-            }
-            return response.json();
-        })
         .then(function (data) {
             if (data) {
                 select.setAttribute('data-version', data.version);

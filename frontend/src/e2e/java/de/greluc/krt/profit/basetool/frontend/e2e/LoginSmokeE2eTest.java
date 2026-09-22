@@ -128,14 +128,16 @@ class LoginSmokeE2eTest {
 
         List<Cookie> cookies = context.cookies();
         boolean hasSessionCookie =
-            cookies.stream().anyMatch(cookie -> "SESSION".equalsIgnoreCase(cookie.name));
+            // `__Host-` prefixed since FE-SEC-06: the browser accepts it only as Secure, Path=/ and
+            // host-only, so its mere presence proves those three attributes held.
+            cookies.stream().anyMatch(cookie -> "__Host-SESSION".equals(cookie.name));
 
         Path storageState = Path.of("build", "e2e", "storageState.json");
         Files.createDirectories(storageState.getParent());
         context.storageState(new BrowserContext.StorageStateOptions().setPath(storageState));
 
         System.out.printf(
-            "[E2E] login OK in %d ms | landing=%s | SESSION cookie=%s | storageState=%s%n",
+            "[E2E] login OK in %d ms | landing=%s | __Host-SESSION cookie=%s | storageState=%s%n",
             elapsedMillis, page.url(), hasSessionCookie, storageState.toAbsolutePath());
 
         assertTrue(

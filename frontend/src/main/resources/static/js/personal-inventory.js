@@ -477,16 +477,17 @@
                 escapeAttr(it.name) +
                 '">' +
                 '<span class="krt-pi-location-marker ' +
-                typeClass +
+                escapeAttr(typeClass) +
                 '"></span>' +
                 '<span class="krt-pi-typeahead-name">' +
                 escapeHtml(it.name || '') +
                 '</span>' +
                 '<span class="krt-pi-typeahead-meta">' +
-                escapeHtml(it.parentName || '') +
-                (it.starSystemName ? ' / ' + escapeHtml(it.starSystemName) : '') +
-                '</span>' +
-                '</button>';
+                escapeHtml(it.parentName || '');
+            if (it.starSystemName) {
+                html += ' / ' + escapeHtml(it.starSystemName);
+            }
+            html += '</span></button>';
         });
         if (items.length >= SEARCH_LIMIT) {
             // The response filled the requested cap, so more locations likely exist beyond it —

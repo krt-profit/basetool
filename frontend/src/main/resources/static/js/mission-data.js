@@ -414,17 +414,8 @@ function setupDragAndDrop(containerId, reorderUrl) {
 
         // #582: persist via the existing AJAX endpoint, then re-swap the frequency-type
         // section in place instead of reloading. The swap refreshes every row's order/priority
-        // on success and reverts the optimistic drag move on failure. CSRF is sourced from the
-        // shared krtCsrf reader.
-        const reorderHeaders = {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-        };
-        const token = window.krtCsrf ? window.krtCsrf.token() : null;
-        const headerName = window.krtCsrf ? window.krtCsrf.headerName() : null;
-        if (token && headerName) {
-            reorderHeaders[headerName] = token;
-        }
+        // on success and reverts the optimistic drag move on failure. The write goes through
+        // krtFetch.write (REQ-FE-002: CSRF, the 403 retry, re-auth).
         const reswapFreqTypes = function () {
             if (window.krtFetch) {
                 window.krtFetch.swap({
@@ -435,23 +426,29 @@ function setupDragAndDrop(containerId, reorderUrl) {
                 });
             }
         };
-        fetch(reorderUrl, {
-            method: 'POST',
-            headers: reorderHeaders,
-            body: JSON.stringify(newOrderIds),
-        })
-            .then((response) => {
-                if (!response.ok && window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MISSION_MSG.error);
-                }
-                reswapFreqTypes();
-            })
-            .catch(() => {
-                if (window.showFrontendErrorToast) {
-                    window.showFrontendErrorToast(MISSION_MSG.error);
-                }
-                reswapFreqTypes();
-            });
+        if (window.krtFetch) {
+            window.krtFetch
+                .write({
+                    method: 'POST',
+                    url: reorderUrl,
+                    payload: newOrderIds,
+                    toast: false,
+                    errorMessage: MISSION_MSG.error,
+                    conflict: MISSION_CONFLICT,
+                    onError: function (status) {
+                        // A 409 gets krtFetch's conflict handling; every other failure keeps the
+                        // page's own generic error toast.
+                        if (status === 409) {
+                            return false;
+                        }
+                        if (window.showFrontendErrorToast) {
+                            window.showFrontendErrorToast(MISSION_MSG.error);
+                        }
+                        return true;
+                    },
+                })
+                .then(reswapFreqTypes);
+        }
 
         draggedRow = null;
     });

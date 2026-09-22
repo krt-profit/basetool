@@ -20,8 +20,8 @@
 /*
  * Shared inventory note-modal handler family (#906 Q12), deduplicated out of the former
  * per-page copies in inventory-my.js and inventory-admin.js. It owns the whole note-modal
- * flow — open/close, the live character counter, the toast helper, save/remove, the CSRF
- * PUT /inventory/{id}/note submit with retry-on-403 and DOM version sync — plus the single
+ * flow — open/close, the live character counter, the toast helper, save/remove, the
+ * PUT /inventory/{id}/note submit through krtFetch.write and DOM version sync — plus the single
  * `activeNoteButton` state cell that ties the modal to the row it edits.
  *
  * Consumed by BOTH the personal inventory ("Mein Lager", inventory-my.html + inventory-my.js)
@@ -34,7 +34,7 @@
  * these functions runs (it is read at call time, never at parse time).
  */
 
-/* global noteI18n */
+/* global noteI18n, inventoryConflictI18n */
 
 let activeNoteButton = null;
 
@@ -114,129 +114,90 @@ function submitNoteUpdate(noteValue) {
 }
 
 function runNoteUpdate(btn, id, noteValue) {
+    if (!window.krtFetch) return Promise.resolve();
     const version = btn.getAttribute('data-version');
-    // #577: CSRF via the shared krtCsrf single source of truth (REQ-FE-002) with a one-shot
-    // retry-on-403 (REQ-FE-004) instead of a hand-rolled meta read.
-    let headers = window.krtCsrf
-        ? window.krtCsrf.headers({ Accept: 'application/json' })
-        : { 'Content-Type': 'application/json', Accept: 'application/json' };
-    const noteBody = JSON.stringify({
-        note: noteValue,
-        version: version == null ? null : Number(version),
-    });
-
-    function sendNote() {
-        return fetch('/inventory/' + id + '/note', {
-            method: 'PUT',
-            headers: headers,
-            credentials: 'same-origin',
-            body: noteBody,
-        });
-    }
-
-    return sendNote()
-        .then(function (resp) {
-            // A bare 403 may be a stale CSRF token; refresh once and retry before treating it as a
-            // real authorization failure.
-            if (resp.status === 403 && window.krtCsrf && window.krtCsrf.refresh) {
-                return window.krtCsrf.refresh().then(function (ok) {
-                    if (ok) {
-                        headers = window.krtCsrf.headers({ Accept: 'application/json' });
-                        return sendNote();
-                    }
-                    return resp;
-                });
+    const trimmed = (noteValue || '').trim();
+    const isEmpty = trimmed.length === 0;
+    // krtFetch.write (REQ-FE-002): CSRF, the bare-403 refresh-and-retry and the re-auth redirect
+    // come from the shared seam. A 409 OPTIMISTIC_LOCK gets its reload-confirm — the one
+    // sanctioned reload — instead of the former unconditional timed reload (REQ-FE-001/003).
+    const conflict =
+        typeof inventoryConflictI18n !== 'undefined'
+            ? Object.assign({}, inventoryConflictI18n, { reloadDetailFallback: noteI18n.conflict })
+            : { reloadDetailFallback: noteI18n.conflict };
+    return window.krtFetch.write({
+        method: 'PUT',
+        url: '/inventory/' + encodeURIComponent(id) + '/note',
+        payload: {
+            note: noteValue,
+            version: version == null ? null : Number(version),
+        },
+        successMessage: isEmpty ? noteI18n.removed : noteI18n.saved,
+        errorMessage: noteI18n.generic,
+        conflict: conflict,
+        onSuccess: function (updated) {
+            closeNoteModal();
+            // FRONTEND DOM VERSION SYNC (CLAUDE.md): propagate the incremented version to every
+            // data-version control in the leaf row (note + book-out buttons, the two association
+            // selects) so a subsequent edit does not 409 — the shared syncVersion. The note preview
+            // is a sibling carrying data-note-for but no data-version, so it is left to the preview
+            // patch below.
+            if (updated && updated.version != null) {
+                window.krtFetch.syncVersion(btn.closest('.tree-row--leaf'), updated.version);
             }
-            return resp;
-        })
-        .then(function (resp) {
-            if (resp.ok) {
-                return resp
-                    .json()
-                    .then(function (updated) {
-                        const trimmed = (noteValue || '').trim();
-                        const isEmpty = trimmed.length === 0;
-                        showInventoryToast('success', isEmpty ? noteI18n.removed : noteI18n.saved);
-                        closeNoteModal();
-                        // FRONTEND DOM VERSION SYNC (CLAUDE.md): propagate the incremented version to
-                        // every data-version control in the leaf row (note + book-out buttons, the two
-                        // association selects) so a subsequent edit does not 409 — replaces the former
-                        // document-wide [data-id]/[data-note-for] loop with the shared syncVersion. The
-                        // note preview is a sibling carrying data-note-for but no data-version, so it is
-                        // left to the preview patch below.
-                        if (updated && updated.version != null && window.krtFetch) {
-                            window.krtFetch.syncVersion(
-                                btn.closest('.tree-row--leaf'),
-                                updated.version,
-                            );
-                        }
-                        const noteBtns = document.querySelectorAll(
-                            'button.inventory-note-btn[data-id="' + id + '"]',
-                        );
-                        noteBtns.forEach(function (b) {
-                            b.setAttribute(
-                                'data-note',
-                                isEmpty
-                                    ? ''
-                                    : updated && updated.note != null
-                                      ? updated.note
-                                      : trimmed,
-                            );
-                            // Icon button: keep the glyph; update only the accessible name, the
-                            // tooltip and the has-note/outline highlight (never overwrite textContent,
-                            // which would wipe the SVG icon).
-                            b.setAttribute('aria-label', isEmpty ? noteI18n.add : noteI18n.edit);
-                            b.title = isEmpty
-                                ? noteI18n.add
-                                : updated && updated.note
-                                  ? updated.note
-                                  : trimmed;
-                            b.classList.toggle('has-note', !isEmpty);
-                            b.classList.toggle('btn-outline', !isEmpty);
-                            b.classList.toggle('btn-ghost', isEmpty);
-                        });
-                        const previews = document.querySelectorAll('[data-note-for="' + id + '"]');
-                        previews.forEach(function (p) {
-                            if (isEmpty) {
-                                p.remove();
-                            } else {
-                                const txt = updated && updated.note ? updated.note : trimmed;
-                                const textEl = p.querySelector('.inventory-note-text');
-                                if (textEl) {
-                                    textEl.textContent = txt;
-                                } else {
-                                    p.textContent = txt;
-                                }
-                                p.title = txt;
-                            }
-                        });
-                        // A note is shown on the shared /all and personal /my Lager alike; tell other
-                        // viewers to refresh (REQ-FE-010). The page module sets this notifier.
-                        if (typeof window.krtNotifyInventoryChanged === 'function') {
-                            window.krtNotifyInventoryChanged();
-                        }
-                    })
-                    .catch(function () {
-                        // If the JSON parsing or DOM sync fails for any reason, reload the page
-                        // to guarantee consistent data-version attributes (AGENTS.md fallback).
-                        window.location.reload();
-                    });
-            } else if (resp.status === 403) {
+            const noteBtns = document.querySelectorAll(
+                'button.inventory-note-btn[data-id="' + id + '"]',
+            );
+            noteBtns.forEach(function (b) {
+                b.setAttribute(
+                    'data-note',
+                    isEmpty ? '' : updated && updated.note != null ? updated.note : trimmed,
+                );
+                // Icon button: keep the glyph; update only the accessible name, the tooltip and the
+                // has-note/outline highlight (never overwrite textContent, which would wipe the SVG
+                // icon).
+                b.setAttribute('aria-label', isEmpty ? noteI18n.add : noteI18n.edit);
+                b.title = isEmpty ? noteI18n.add : updated && updated.note ? updated.note : trimmed;
+                b.classList.toggle('has-note', !isEmpty);
+                b.classList.toggle('btn-outline', !isEmpty);
+                b.classList.toggle('btn-ghost', isEmpty);
+            });
+            const previews = document.querySelectorAll('[data-note-for="' + id + '"]');
+            previews.forEach(function (p) {
+                if (isEmpty) {
+                    p.remove();
+                } else {
+                    const txt = updated && updated.note ? updated.note : trimmed;
+                    const textEl = p.querySelector('.inventory-note-text');
+                    if (textEl) {
+                        textEl.textContent = txt;
+                    } else {
+                        p.textContent = txt;
+                    }
+                    p.title = txt;
+                }
+            });
+            // A note is shown on the shared /all and personal /my Lager alike; tell other viewers
+            // to refresh (REQ-FE-010). The page module sets this notifier.
+            if (typeof window.krtNotifyInventoryChanged === 'function') {
+                window.krtNotifyInventoryChanged();
+            }
+        },
+        onError: function (status) {
+            if (status === 409) {
+                // krtFetch: conflict confirm for OPTIMISTIC_LOCK, the domain detail otherwise.
+                return false;
+            }
+            if (status === 403) {
                 showInventoryToast('error', noteI18n.forbidden);
-            } else if (resp.status === 409) {
-                showInventoryToast('error', noteI18n.conflict);
-                setTimeout(function () {
-                    window.location.reload();
-                }, 1200);
-            } else if (resp.status === 400 || resp.status === 422) {
+            } else if (status === 400 || status === 422) {
                 showInventoryToast('error', noteI18n.tooLong);
             } else {
                 showInventoryToast('error', noteI18n.generic);
             }
-        })
-        .catch(function () {
-            showInventoryToast('error', noteI18n.generic);
-        });
+            return true;
+        },
+    });
 }
 
 // Cross-script exports — publish the shared note-modal API on `window`.

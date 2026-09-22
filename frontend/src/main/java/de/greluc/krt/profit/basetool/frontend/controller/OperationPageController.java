@@ -40,8 +40,8 @@ import de.greluc.krt.profit.basetool.frontend.service.MarkdownRenderer;
 import de.greluc.krt.profit.basetool.frontend.service.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -50,6 +50,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -122,10 +123,10 @@ public class OperationPageController {
    * fragment so the client-side AJAX filter can patch the list in place without a full page reload.
    *
    * @param search free-text query, may be {@code null}
-   * @param start inclusive lower bound (ISO-8601) on the earliest linked mission's planned start,
-   *     may be {@code null}/blank
-   * @param end inclusive upper bound (ISO-8601) on the latest linked mission's planned end, may be
-   *     {@code null}/blank
+   * @param start inclusive lower bound (ISO-8601 instant) on the earliest linked mission's planned
+   *     start, may be {@code null}; a value that is not an instant is a {@code 400}
+   * @param end inclusive upper bound (ISO-8601 instant) on the latest linked mission's planned end,
+   *     may be {@code null}; a value that is not an instant is a {@code 400}
    * @param showPast when {@code true} (and authenticated), include COMPLETED and CANCELED
    * @param page zero-based page index
    * @param size page size (default 20)
@@ -139,8 +140,10 @@ public class OperationPageController {
   @GetMapping
   public String listOperations(
       @RequestParam(required = false) String search,
-      @RequestParam(required = false) String start,
-      @RequestParam(required = false) String end,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant start,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+          Instant end,
       @RequestParam(required = false, defaultValue = "false") boolean showPast,
       @RequestParam(required = false, defaultValue = "0") Integer page,
       @RequestParam(required = false, defaultValue = "20") Integer size,
@@ -148,19 +151,23 @@ public class OperationPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    boolean hasSearch = search != null && !search.isBlank();
-    if (hasSearch) {
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop. URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches
-      // (see BackendApiClient#get(String, ParameterizedTypeReference, Object...)).
+    // Every caller-supplied value is a WebClient URI-template variable, so it is percent-encoded
+    // exactly once across the frontend->backend hop (REQ-SEC-051). The period bounds used to be
+    // URLEncoder-encoded INTO the template, which the WebClient then encoded a second time: the
+    // backend received `2026-01-01T00%3A00%3A00Z` literally, could not parse it as an Instant, and
+    // the date filter never worked (FE-SEC-01).
+    List<Object> uriVariables = new ArrayList<>();
+    if (search != null && !search.isBlank()) {
       uri.append("query={query}&");
+      uriVariables.add(search);
     }
-    if (start != null && !start.isBlank()) {
-      uri.append("start=").append(URLEncoder.encode(start, StandardCharsets.UTF_8)).append("&");
+    if (start != null) {
+      uri.append("start={start}&");
+      uriVariables.add(start);
     }
-    if (end != null && !end.isBlank()) {
-      uri.append("end=").append(URLEncoder.encode(end, StandardCharsets.UTF_8)).append("&");
+    if (end != null) {
+      uri.append("end={end}&");
+      uriVariables.add(end);
     }
     uri.append("page=").append(page).append("&");
     uri.append("size=").append(size).append("&");
@@ -176,9 +183,9 @@ public class OperationPageController {
 
     try {
       PageResponse<OperationDto> operationsPage =
-          hasSearch
-              ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, search)
-              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE);
+          uriVariables.isEmpty()
+              ? backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE)
+              : backendApiClient.get(uri.toString(), OPERATION_PAGE_TYPE, uriVariables.toArray());
       model.addAttribute("operations", operationsPage.content());
       model.addAttribute("operationsPage", operationsPage);
       model.addAttribute("search", search);

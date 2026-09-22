@@ -192,6 +192,18 @@ document.addEventListener('DOMContentLoaded', function () {
             statusEl.style.display = 'none';
         }
 
+        // Replaces list's content with one <p> per ship name. The names are set as textContent, so
+        // no markup string is ever built from the import result.
+        function fillParagraphs(list, names) {
+            list.replaceChildren(
+                ...names.map(function (n) {
+                    const p = document.createElement('p');
+                    p.textContent = n == null ? '' : String(n);
+                    return p;
+                }),
+            );
+        }
+
         function openResultModal(data) {
             document.getElementById('import-res-imported').textContent = data.importedCount;
             document.getElementById('import-res-skipped').textContent = data.skippedCount;
@@ -200,9 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const skipSection = document.getElementById('import-skip-section');
             const skipList = document.getElementById('import-skip-list');
             if (data.skippedShips && data.skippedShips.length > 0) {
-                skipList.innerHTML = data.skippedShips
-                    .map((n) => '<p>' + escapeHtml(n) + '</p>')
-                    .join('');
+                fillParagraphs(skipList, data.skippedShips);
                 skipSection.style.display = 'block';
             } else {
                 skipSection.style.display = 'none';
@@ -211,9 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const dupSection = document.getElementById('import-dup-section');
             const dupList = document.getElementById('import-dup-list');
             if (data.duplicateShips && data.duplicateShips.length > 0) {
-                dupList.innerHTML = data.duplicateShips
-                    .map((n) => '<p>' + escapeHtml(n) + '</p>')
-                    .join('');
+                fillParagraphs(dupList, data.duplicateShips);
                 dupSection.style.display = 'block';
             } else {
                 dupSection.style.display = 'none';
@@ -246,56 +254,57 @@ document.addEventListener('DOMContentLoaded', function () {
                     showStatus(importBtn.getAttribute('data-error-nofile'), 'var(--color-danger)');
                     return;
                 }
+                // Client half of the upload cap (APPSEC-03): refuse a file the server would reject
+                // with 413 before spending the upload. The server check stays authoritative.
+                const maxBytes = Number(importBtn.getAttribute('data-max-bytes'));
+                if (maxBytes > 0 && file.size > maxBytes) {
+                    showStatus(
+                        importBtn.getAttribute('data-error-toolarge'),
+                        'var(--color-danger)',
+                    );
+                    return;
+                }
+                if (!window.krtFetch) {
+                    return;
+                }
                 const formData = new FormData();
                 formData.append('file', file);
 
-                importBtn.disabled = true;
                 showStatus(importBtn.getAttribute('data-uploading'));
 
-                // CSRF via the shared krtCsrf seam (REQ-FE-002), replacing the hand-rolled
-                // meta-tag read. A multipart upload cannot go through krtFetch.write (JSON-only),
-                // so this keeps a bespoke fetch; the browser must set its own multipart boundary,
-                // so the JSON Content-Type krtCsrf adds by default is removed.
-                const reqHeaders = window.krtCsrf
-                    ? window.krtCsrf.headers({ Accept: 'application/json' })
-                    : { Accept: 'application/json' };
-                delete reqHeaders['Content-Type'];
+                function showFailure(detail) {
+                    showStatus(
+                        importBtn.getAttribute('data-error-failed') +
+                            (detail ? ' (' + detail + ')' : ''),
+                        'var(--color-danger)',
+                    );
+                }
 
-                fetch('/hangar/import/ships', {
+                // krtFetch.submitForm (REQ-FE-002): CSRF header, the bare-403 refresh-and-retry and
+                // the re-auth redirect; it leaves Content-Type unset so the browser writes the
+                // multipart boundary. The button is disabled for the in-flight upload.
+                window.krtFetch.submitForm({
+                    url: '/hangar/import/ships',
                     method: 'POST',
-                    body: formData,
-                    headers: reqHeaders,
-                })
-                    .then(function (resp) {
-                        if (!resp.ok) {
-                            return resp
-                                .json()
-                                .catch(function () {
-                                    return null;
-                                })
-                                .then(function (body) {
-                                    throw new Error(
-                                        body && body.detail ? body.detail : resp.status,
-                                    );
-                                });
-                        }
-                        return resp.json();
-                    })
-                    .then(function (data) {
+                    formData: formData,
+                    submitter: importBtn,
+                    toast: false,
+                    onSuccess: function (data) {
                         hideStatus();
                         fileInput.value = '';
                         openResultModal(data);
-                    })
-                    .catch(function (err) {
-                        showStatus(
-                            importBtn.getAttribute('data-error-failed') +
-                                (err.message ? ' (' + err.message + ')' : ''),
-                            'var(--color-danger)',
-                        );
-                    })
-                    .finally(function () {
-                        importBtn.disabled = false;
-                    });
+                    },
+                    // Every failure is reported in the status line under the button, with the
+                    // server's localized problem detail (e.g. the 413 size message) in brackets.
+                    onError: function (status, body) {
+                        showFailure(body && body.detail ? body.detail : String(status));
+                        return true;
+                    },
+                    onNetworkError: function () {
+                        showFailure('');
+                        return true;
+                    },
+                });
             });
         }
     })();

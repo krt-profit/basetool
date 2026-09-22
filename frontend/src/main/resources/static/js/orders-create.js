@@ -33,21 +33,39 @@
 
 /* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED, showFrontendErrorToast */
 
-// Inline "?" SCU-hint marker for JS-built rows (the Thymeleaf fragment cannot be used here).
-// The hint text is a trusted message constant with no HTML-special characters, so it is safe
-// to inline without escaping. Starts hidden via the runtime `krtm-hidden` class (mirroring the
-// scu-hint fragment's `th:classappend`); refreshMaterialUnit() toggles it for SCU materials. The
-// former inline `style="display:none;"` is blocked by the CSP style-src-attr 'none' pin (ADR-0093),
-// and a `style.display = ''` reveal cannot override a class, so visibility is class-based throughout.
-function scuHintMarkup() {
-    return (
-        '<span class="scu-hint krtm-hidden" data-role="scu-hint" tabindex="0" role="img" aria-label="' +
-        SCU_HINT_TEXT +
-        '"><span aria-hidden="true">?</span>' +
-        '<span class="scu-hint__bubble" aria-hidden="true">' +
-        SCU_HINT_TEXT +
-        '</span></span>'
-    );
+// Inline "?" SCU-hint marker for JS-built rows (the Thymeleaf fragment cannot be used here), built
+// through the DOM so the hint text is set as text, never parsed as markup. Starts hidden via the
+// runtime `krtm-hidden` class (mirroring the scu-hint fragment's `th:classappend`);
+// refreshMaterialUnit() toggles it for SCU materials. The former inline `style="display:none;"` is
+// blocked by the CSP style-src-attr 'none' pin (ADR-0093), and a `style.display = ''` reveal cannot
+// override a class, so visibility is class-based throughout.
+function buildScuHint() {
+    const hint = document.createElement('span');
+    hint.className = 'scu-hint krtm-hidden';
+    hint.setAttribute('data-role', 'scu-hint');
+    hint.setAttribute('tabindex', '0');
+    hint.setAttribute('role', 'img');
+    hint.setAttribute('aria-label', SCU_HINT_TEXT);
+    const mark = document.createElement('span');
+    mark.setAttribute('aria-hidden', 'true');
+    mark.textContent = '?';
+    const bubble = document.createElement('span');
+    bubble.className = 'scu-hint__bubble';
+    bubble.setAttribute('aria-hidden', 'true');
+    bubble.textContent = SCU_HINT_TEXT;
+    hint.appendChild(mark);
+    hint.appendChild(bubble);
+    return hint;
+}
+
+// Copies the <option>s of a hidden server-rendered template <select> (localized labels, rendered by
+// Thymeleaf) into target as DOM clones — no markup string is re-parsed.
+function copyTemplateOptions(templateId, target) {
+    const tpl = document.getElementById(templateId);
+    if (!tpl || !target) return;
+    Array.from(tpl.children).forEach(function (opt) {
+        target.appendChild(opt.cloneNode(true));
+    });
 }
 
 // Mirrors a material row's amount field to the selected material's quantity type: PIECE -> integer
@@ -215,25 +233,33 @@ function addMaterialRow() {
     const row = document.createElement('div');
     row.className = 'material-row';
 
-    const minQualityOptions = document.getElementById('minquality-options-template').innerHTML;
-
     // The material select is built EMPTY: the marker value opts it into the server-side-search
     // combobox (remote-materials-joborder, REQ-FE-016), which fetches its options on demand —
-    // no preloaded catalog options exist on this page anymore.
+    // no preloaded catalog options exist on this page anymore. Every interpolated value is escaped;
+    // the SCU hint and the min-quality options are added as DOM nodes below.
     row.innerHTML = `
         <div class="form-group flex-2 mb-0">
-            <label>${MSG_MATERIAL_LABEL}</label>
-            <select name="materials[${materialIndex}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
+            <label>${escapeHtml(MSG_MATERIAL_LABEL)}</label>
+            <select name="materials[${escapeAttr(materialIndex)}].materialId" data-role="material-select" data-krt-combobox="remote-materials-joborder" required></select>
         </div>
         <div class="form-group flex-1 mb-0">
-            <label>${MSG_AMOUNT_LABEL} <span data-role="amount-unit"></span>${scuHintMarkup()}</label>
-            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${materialIndex}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
+            <label data-role="amount-label">${escapeHtml(MSG_AMOUNT_LABEL)} <span data-role="amount-unit"></span></label>
+            <input type="text" inputmode="decimal" data-scu-decimal name="materials[${escapeAttr(materialIndex)}].amount" value="" data-role="material-amount" step="0.001" min="0" required>
         </div>
         <div class="form-group flex-1 mb-0">
-            <label>${MSG_MINQUALITY_LABEL}</label>
-            <select name="materials[${materialIndex}].minQuality">${minQualityOptions}</select>
+            <label>${escapeHtml(MSG_MINQUALITY_LABEL)}</label>
+            <select name="materials[${escapeAttr(materialIndex)}].minQuality"></select>
         </div>
     `;
+    const amountLabel = row.querySelector('[data-role="amount-label"]');
+    if (amountLabel) {
+        amountLabel.removeAttribute('data-role');
+        amountLabel.appendChild(buildScuHint());
+    }
+    copyTemplateOptions(
+        'minquality-options-template',
+        row.querySelector('select[name$=".minQuality"]'),
+    );
 
     container.appendChild(row);
     // Manually built DOM: the global DOMContentLoaded/krt:swapped enhancer does not see it, so
@@ -268,16 +294,6 @@ function fetchItemOptions(query) {
         });
 }
 
-function escapeName(s) {
-    if (window.escapeHtml) {
-        return window.escapeHtml(String(s));
-    }
-    return String(s).replace(
-        /[&<>"']/g,
-        (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
-    );
-}
-
 function setFormDisabled(containerId, disabled) {
     const c = document.getElementById(containerId);
     if (!c) return;
@@ -306,44 +322,49 @@ function addItemLine(prefill) {
     row.className = 'item-line';
     row.dataset.lineIndex = idx;
     row.style.cssText = 'border:1px solid var(--color-gray-3); padding:1rem; margin-bottom:1rem;';
-    const options = document.getElementById('item-options-template').innerHTML;
     // Units already produced on this line (edit mode only). A line with booked production may not
     // be removed and may not drop below what was made — the backend rejects both — so the editor
     // pins the minimum and hides the remove button instead of letting the save fail.
     const manufactured = Number(prefill.manufactured) || 0;
     const minAmount = manufactured > 0 ? manufactured : 1;
+    // Optional markup pieces are assigned through let + if (not a ternary) and every interpolated
+    // value is escaped, so the innerHTML sink below provably only sees escaped values.
+    let idInput = '';
+    if (prefill.id) {
+        idInput = `<input type="hidden" name="items[${escapeAttr(idx)}].id" value="${escapeAttr(prefill.id)}">`;
+    }
+    let removeButton = '';
+    let producedNote = '';
+    if (manufactured > 0) {
+        producedNote = `<p class="oc-note-block text-muted mb-0" data-role="produced-note">${escapeHtml(ITEM_I18N.producedLocked.replace('{0}', String(manufactured)))}</p>`;
+    } else {
+        removeButton = `<button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${escapeHtml(ITEM_I18N.remove)}</button>`;
+    }
     row.innerHTML = `
-        ${prefill.id ? `<input type="hidden" name="items[${idx}].id" value="${prefill.id}">` : ''}
-        <input type="hidden" name="items[${idx}].clientLineId" value="${idx}">
-        <input type="hidden" name="items[${idx}].parentClientLineId" value="${prefill.parentId != null ? prefill.parentId : ''}">
+        ${idInput}
+        <input type="hidden" name="items[${escapeAttr(idx)}].clientLineId" value="${escapeAttr(idx)}">
+        <input type="hidden" name="items[${escapeAttr(idx)}].parentClientLineId" value="${escapeAttr(prefill.parentId != null ? prefill.parentId : '')}">
         <div class="oc-line-fields">
             <div class="form-group flex-2 mb-0">
-                <label>${ITEM_I18N.item}</label>
-                <select name="items[${idx}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required>${options}</select>
+                <label>${escapeHtml(ITEM_I18N.item)}</label>
+                <select name="items[${escapeAttr(idx)}].gameItemId" data-role="item-select" data-testid="order-item-combobox" required></select>
             </div>
             <div class="form-group flex-1 mb-0" data-role="blueprint-wrap" hidden>
-                <label>${ITEM_I18N.blueprint}</label>
-                <select name="items[${idx}].blueprintId" data-role="blueprint-select"></select>
+                <label>${escapeHtml(ITEM_I18N.blueprint)}</label>
+                <select name="items[${escapeAttr(idx)}].blueprintId" data-role="blueprint-select"></select>
             </div>
             <div class="form-group flex-1 mb-0">
-                <label>${ITEM_I18N.amount}</label>
-                <input type="number" step="1" name="items[${idx}].amount" data-role="amount" min="${minAmount}" value="${prefill.amount || 1}" required>
+                <label>${escapeHtml(ITEM_I18N.amount)}</label>
+                <input type="number" step="1" name="items[${escapeAttr(idx)}].amount" data-role="amount" min="${escapeAttr(minAmount)}" value="${escapeAttr(prefill.amount || 1)}" required>
             </div>
-            ${
-                manufactured > 0
-                    ? ''
-                    : `<button type="button" class="btn btn-quiet-danger mb-0 nowrap" data-trigger="orders-remove-item">${ITEM_I18N.remove}</button>`
-            }
+            ${removeButton}
         </div>
-        ${
-            manufactured > 0
-                ? `<p class="oc-note-block text-muted mb-0" data-role="produced-note">${ITEM_I18N.producedLocked.replace('{0}', String(manufactured))}</p>`
-                : ''
-        }
+        ${producedNote}
         <div data-role="derived" class="oc-derived-block"></div>
         <div data-role="unresolved" class="hud-box hud-box-error oc-note-block krtm-hidden"></div>
         <div data-role="subassemblies" class="oc-note-block"></div>
     `;
+    copyTemplateOptions('item-options-template', row.querySelector('[data-role="item-select"]'));
     container.appendChild(row);
     // Seed the chosen item as a selected <option> BEFORE enhancing, so the combobox shows its
     // label even though the option list is now fetched on demand rather than preloaded. Built via
@@ -402,12 +423,15 @@ function loadBlueprints(row, preselectBpId, qualities) {
         .then((r) => (r.ok ? r.json() : []))
         .then((list) => {
             list = list || [];
-            bpSelect.innerHTML = list
-                .map(
-                    (b) =>
-                        `<option value="${b.id}">${escapeName(b.outputName || b.scwikiKey || b.id)}</option>`,
-                )
-                .join('');
+            // Built through the DOM: the backend-supplied blueprint name is set as text.
+            bpSelect.replaceChildren(
+                ...list.map((b) => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = String(b.outputName || b.scwikiKey || b.id);
+                    return opt;
+                }),
+            );
             wrap.hidden = list.length <= 1;
             if (list.length > 0) {
                 // Restore the previously-chosen blueprint in edit mode if it is still offered.
@@ -444,7 +468,8 @@ function loadDerivation(row, qualities) {
                 clearDerived(row);
                 return;
             }
-            let html = `<strong class="oc-label-strong">${ITEM_I18N.materialsTitle}</strong>`;
+            // Every interpolated value below is escaped (the sinks provably see escaped values only).
+            let html = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.materialsTitle)}</strong>`;
             (d.materials || []).forEach((m, mi) => {
                 const mat = m.material || {};
                 const unit = mat.quantityType === 'PIECE' ? 'Stk' : 'SCU';
@@ -455,34 +480,44 @@ function loadDerivation(row, qualities) {
                 // Edit mode: restore the stored quality for this material; else blueprint default.
                 const storedQ =
                     qualities && mat.id && qualities[mat.id] ? qualities[mat.id] : m.defaultQuality;
-                const goodSel = storedQ === 'GOOD' ? ' selected' : '';
-                const noneSel = storedQ !== 'GOOD' ? ' selected' : '';
+                let goodSel = '';
+                let noneSel = ' selected';
+                if (storedQ === 'GOOD') {
+                    goodSel = ' selected';
+                    noneSel = '';
+                }
                 html += `
                     <div class="oc-material-line">
-                        <input type="hidden" name="items[${idx}].materials[${mi}].materialId" value="${mat.id}">
-                        <span class="flex-2">${escapeName(mat.name || '')}</span>
-                        <span class="flex-1">${qty} ${unit}</span>
-                        <select name="items[${idx}].materials[${mi}].quality" class="flex-1">
-                            <option value="GOOD"${goodSel}>${ITEM_I18N.qualityGood}</option>
-                            <option value="NONE"${noneSel}>${ITEM_I18N.qualityNone}</option>
+                        <input type="hidden" name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].materialId" value="${escapeAttr(mat.id)}">
+                        <span class="flex-2">${escapeHtml(mat.name || '')}</span>
+                        <span class="flex-1">${escapeHtml(qty)} ${escapeHtml(unit)}</span>
+                        <select name="items[${escapeAttr(idx)}].materials[${escapeAttr(mi)}].quality" class="flex-1">
+                            <option value="GOOD"${goodSel}>${escapeHtml(ITEM_I18N.qualityGood)}</option>
+                            <option value="NONE"${noneSel}>${escapeHtml(ITEM_I18N.qualityNone)}</option>
                         </select>
                     </div>`;
             });
-            derived.innerHTML = (d.materials || []).length ? html : '';
+            derived.innerHTML = '';
+            if ((d.materials || []).length) {
+                derived.innerHTML = html;
+            }
             if ((d.unresolvedIngredients || []).length) {
                 unresolved.classList.remove('krtm-hidden');
-                unresolved.innerHTML = `<p>${ITEM_I18N.unresolved} ${d.unresolvedIngredients.map(escapeName).join(', ')}</p>`;
+                unresolved.innerHTML = `<p>${escapeHtml(ITEM_I18N.unresolved)} ${escapeHtml(d.unresolvedIngredients.map(String).join(', '))}</p>`;
             } else {
                 unresolved.classList.add('krtm-hidden');
                 unresolved.innerHTML = '';
             }
+            // Declared at function level (not inside the if): the lint rule only traces an
+            // accumulator declared in the same function scope as its innerHTML sink.
+            let s = '';
             if ((d.subAssemblies || []).length) {
-                let s = `<strong class="oc-label-strong">${ITEM_I18N.subTitle}</strong>`;
+                s = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.subTitle)}</strong>`;
                 d.subAssemblies.forEach((sa) => {
                     const gi = sa.gameItem || {};
                     s += `<div class="oc-material-line">
-                        <span class="flex-2">${escapeName(gi.name || '')} &times; ${sa.quantity}</span>
-                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${gi.id}" data-game-item-name="${escapeName(gi.name || '')}" data-amount="${sa.quantity}" data-parent="${idx}">${ITEM_I18N.subAdopt}</button>
+                        <span class="flex-2">${escapeHtml(gi.name || '')} &times; ${escapeHtml(sa.quantity)}</span>
+                        <button type="button" class="btn btn-ghost mb-0" data-trigger="orders-adopt-sub" data-game-item-id="${escapeAttr(gi.id)}" data-game-item-name="${escapeAttr(gi.name || '')}" data-amount="${escapeAttr(sa.quantity)}" data-parent="${escapeAttr(idx)}">${escapeHtml(ITEM_I18N.subAdopt)}</button>
                     </div>`;
                 });
                 subs.innerHTML = s;

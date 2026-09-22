@@ -371,6 +371,8 @@
                     th:text="#{hangar.import.btn}"
                     th:data-uploading="#{hangar.import.uploading}"
                     th:data-error-nofile="#{hangar.import.error.nofile}"
+                    th:data-error-toolarge="#{hangar.import.error.tooLarge}"
+                    th:data-max-bytes="${hangarImportMaxBytes}"
                     th:data-error-failed="#{hangar.import.error.failed}">Importieren</button>
         </div>
         <p id="fleetview-status" class="import-status-msg krtm-display-none-5790"></p>

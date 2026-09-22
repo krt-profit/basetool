@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.config;
 
+import de.greluc.krt.profit.basetool.frontend.support.SessionIdFingerprint;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -132,10 +133,11 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     log.info(
         "[SSO] No active session found, attempting silent Keycloak SSO re-authentication. URI={} |"
-            + " remoteAddr={} | sessionId={}",
+            + " remoteAddr={} | session={}",
         uri,
         request.getRemoteAddr(),
-        request.getSession(false) != null ? request.getSession(false).getId() : "none");
+        // A fingerprint, never the raw id: the session id is a bearer credential (APPSEC-12).
+        SessionIdFingerprint.of(request.getSession(false)));
 
     // Mark that a silent SSO attempt is in progress (prevents redirect loops)
     setSsoAttemptedCookie(response);

@@ -22,10 +22,10 @@
  * admin-settings.html (ADR-0069, follow-up to #924).
  *
  * Per-squadron promotion + profit-eligibility toggles and the per-SK profit toggle each PATCH the
- * proxy endpoint on change with optimistic UI (flip the label, revert on error). The multi-setting
- * form saves in place (#582) through window.krtFetch and writes the five bumped optimistic-lock
- * versions back into the hidden inputs; without krtFetch the native POST->redirect runs (no-JS
- * fallback). All CSRF comes from the shared window.krtCsrf reader.
+ * proxy endpoint through window.krtFetch on change with optimistic UI (flip the label, revert on
+ * error). The multi-setting form saves in place (#582) through window.krtFetch and writes the five
+ * bumped optimistic-lock versions back into the hidden inputs; without krtFetch the native
+ * POST->redirect runs (no-JS fallback). No write here hand-rolls CSRF (REQ-FE-002).
  *
  * The Thymeleaf-interpolated toast/label/conflict strings stay inline in the page bootstrap as the
  * MSG_* / SAVE_* / SAVE_CONFLICT globals this module reads.
@@ -34,173 +34,116 @@
 /* global MSG_ENABLED, MSG_DISABLED, MSG_ERROR, MSG_SAVED, MSG_PROFIT_ENABLED, MSG_PROFIT_DISABLED, MSG_PROFIT_ERROR, MSG_PROFIT_SAVED, SAVE_SUCCESS, SAVE_ERROR, SAVE_CONFLICT */
 
 /*
- * Per-squadron promotion-feature toggle: PATCH /api/proxy/squadrons/{id}/promotion-enabled
- * on every checkbox change. Optimistic UI — flips the label text immediately, reverts on
- * error. CSP-safe (no inline onclick attributes) so the strict script-src-attr policy
- * stays intact.
+ * Toggles: optimistic UI — flips the label text immediately, reverts on error. CSP-safe (no
+ * inline onclick attributes) so the strict script-src-attr policy stays intact.
  */
 
-// Sourced from the shared window.krtCsrf reader (the single source of truth over the meta
-// tags, epic #571) rather than re-reading the meta elements locally.
-function csrfToken() {
-    return (window.krtCsrf && window.krtCsrf.token()) || '';
-}
-function csrfHeader() {
-    return (window.krtCsrf && window.krtCsrf.headerName()) || 'X-CSRF-TOKEN';
-}
-
-function patchPromotionEnabled(squadronId, enabled) {
-    const headers = { 'Content-Type': 'application/json' };
-    headers[csrfHeader()] = csrfToken();
-    return fetch('/api/proxy/squadrons/' + encodeURIComponent(squadronId) + '/promotion-enabled', {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify({ enabled: enabled }),
-    });
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.squadron-promotion-toggle').forEach(function (checkbox) {
+/**
+ * Wires one family of optimistic boolean toggles: on every checkbox change the label flips
+ * immediately and a PATCH goes out through krtFetch.write (CSRF, the bare-403 retry, re-auth and
+ * the double-submit guard all come from krtFetch — REQ-FE-002). On an error response or a network
+ * failure the checkbox and its label are reverted and the page's own localized error toast is
+ * shown; a 409 is left to krtFetch so an optimistic-lock conflict gets the shared reload-confirm.
+ *
+ * @param {string} selector the checkbox selector (e.g. '.squadron-promotion-toggle')
+ * @param {string} idAttribute the attribute carrying the target id
+ * @param {(id: string) => string} urlFor builds the PATCH URL for an id
+ * @param {(checked: boolean) => object} bodyFor builds the JSON payload for the new state
+ * @param {{ on: string, off: string, saved: string, error: string }} labels localized strings
+ */
+function wireToggle(selector, idAttribute, urlFor, bodyFor, labels) {
+    document.querySelectorAll(selector).forEach(function (checkbox) {
         checkbox.addEventListener('change', function () {
-            const squadronId = checkbox.getAttribute('data-squadron-id');
-            const enabled = checkbox.checked;
+            if (!window.krtFetch) {
+                return;
+            }
+            const id = checkbox.getAttribute(idAttribute) || '';
+            const checked = checkbox.checked;
             const labelSpan = checkbox.parentElement
                 ? checkbox.parentElement.querySelector('.toggle-state-text')
                 : null;
             if (labelSpan) {
-                labelSpan.textContent = enabled ? MSG_ENABLED : MSG_DISABLED;
+                labelSpan.textContent = checked ? labels.on : labels.off;
             }
-            patchPromotionEnabled(squadronId, enabled)
-                .then(function (response) {
-                    if (!response.ok) {
-                        // Revert UI on error.
-                        checkbox.checked = !enabled;
-                        if (labelSpan) {
-                            labelSpan.textContent = !enabled ? MSG_ENABLED : MSG_DISABLED;
-                        }
-                        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_ERROR);
-                    } else if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(MSG_SAVED);
+            function revert() {
+                checkbox.checked = !checked;
+                if (labelSpan) {
+                    labelSpan.textContent = !checked ? labels.on : labels.off;
+                }
+            }
+            window.krtFetch.write({
+                method: 'PATCH',
+                url: urlFor(id),
+                payload: bodyFor(checked),
+                // The checkbox is disabled while its PATCH is in flight (double-submit guard).
+                submitter: checkbox,
+                successMessage: labels.saved,
+                errorMessage: labels.error,
+                conflict: SAVE_CONFLICT,
+                onError: function (status) {
+                    revert();
+                    if (status === 409) {
+                        return false;
                     }
-                })
-                .catch(function () {
-                    checkbox.checked = !enabled;
-                    if (labelSpan) {
-                        labelSpan.textContent = !enabled ? MSG_ENABLED : MSG_DISABLED;
-                    }
-                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_ERROR);
-                });
+                    if (window.showFrontendErrorToast) window.showFrontendErrorToast(labels.error);
+                    return true;
+                },
+                onNetworkError: function () {
+                    // krtFetch then shows labels.error as its default network-error toast.
+                    revert();
+                    return false;
+                },
+            });
         });
     });
-});
+}
 
 /*
- * Per-squadron profit-eligibility toggle: PATCH /api/proxy/squadrons/{id}/profit-eligible on
- * every checkbox change. Same optimistic-UI + CSP-safe pattern as the promotion toggle above.
+ * Per-squadron promotion-feature toggle: PATCH /api/proxy/squadrons/{id}/promotion-enabled.
+ * Per-squadron profit-eligibility toggle: PATCH /api/proxy/squadrons/{id}/profit-eligible.
+ * Per-SK profit-eligibility toggle: PATCH /api/proxy/special-commands/{id}/profit-eligible — reuses
+ * the MSG_PROFIT_* labels (generic "berechtigt"/"nicht berechtigt").
  */
-
-function patchProfitEligible(squadronId, eligible) {
-    const headers = { 'Content-Type': 'application/json' };
-    headers[csrfHeader()] = csrfToken();
-    return fetch('/api/proxy/squadrons/' + encodeURIComponent(squadronId) + '/profit-eligible', {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify({ eligible: eligible }),
-    });
-}
-
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.squadron-profit-toggle').forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () {
-            const squadronId = checkbox.getAttribute('data-squadron-id');
-            const eligible = checkbox.checked;
-            const labelSpan = checkbox.parentElement
-                ? checkbox.parentElement.querySelector('.toggle-state-text')
-                : null;
-            if (labelSpan) {
-                labelSpan.textContent = eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
-            }
-            patchProfitEligible(squadronId, eligible)
-                .then(function (response) {
-                    if (!response.ok) {
-                        checkbox.checked = !eligible;
-                        if (labelSpan) {
-                            labelSpan.textContent = !eligible
-                                ? MSG_PROFIT_ENABLED
-                                : MSG_PROFIT_DISABLED;
-                        }
-                        if (window.showFrontendErrorToast)
-                            window.showFrontendErrorToast(MSG_PROFIT_ERROR);
-                    } else if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(MSG_PROFIT_SAVED);
-                    }
-                })
-                .catch(function () {
-                    checkbox.checked = !eligible;
-                    if (labelSpan) {
-                        labelSpan.textContent = !eligible
-                            ? MSG_PROFIT_ENABLED
-                            : MSG_PROFIT_DISABLED;
-                    }
-                    if (window.showFrontendErrorToast)
-                        window.showFrontendErrorToast(MSG_PROFIT_ERROR);
-                });
-        });
-    });
-});
-
-/*
- * Per-SK profit-eligibility toggle: PATCH /api/proxy/special-commands/{id}/profit-eligible.
- * Reuses the MSG_PROFIT_* labels (generic "berechtigt"/"nicht berechtigt").
- */
-function patchSkProfitEligible(skId, eligible) {
-    const headers = { 'Content-Type': 'application/json' };
-    headers[csrfHeader()] = csrfToken();
-    return fetch('/api/proxy/special-commands/' + encodeURIComponent(skId) + '/profit-eligible', {
-        method: 'PATCH',
-        headers: headers,
-        body: JSON.stringify({ eligible: eligible }),
-    });
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.sk-profit-toggle').forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () {
-            const skId = checkbox.getAttribute('data-sk-id');
-            const eligible = checkbox.checked;
-            const labelSpan = checkbox.parentElement
-                ? checkbox.parentElement.querySelector('.toggle-state-text')
-                : null;
-            if (labelSpan) {
-                labelSpan.textContent = eligible ? MSG_PROFIT_ENABLED : MSG_PROFIT_DISABLED;
-            }
-            patchSkProfitEligible(skId, eligible)
-                .then(function (response) {
-                    if (!response.ok) {
-                        checkbox.checked = !eligible;
-                        if (labelSpan) {
-                            labelSpan.textContent = !eligible
-                                ? MSG_PROFIT_ENABLED
-                                : MSG_PROFIT_DISABLED;
-                        }
-                        if (window.showFrontendErrorToast)
-                            window.showFrontendErrorToast(MSG_PROFIT_ERROR);
-                    } else if (window.showFrontendSuccessToast) {
-                        window.showFrontendSuccessToast(MSG_PROFIT_SAVED);
-                    }
-                })
-                .catch(function () {
-                    checkbox.checked = !eligible;
-                    if (labelSpan) {
-                        labelSpan.textContent = !eligible
-                            ? MSG_PROFIT_ENABLED
-                            : MSG_PROFIT_DISABLED;
-                    }
-                    if (window.showFrontendErrorToast)
-                        window.showFrontendErrorToast(MSG_PROFIT_ERROR);
-                });
-        });
-    });
+    wireToggle(
+        '.squadron-promotion-toggle',
+        'data-squadron-id',
+        function (id) {
+            return '/api/proxy/squadrons/' + encodeURIComponent(id) + '/promotion-enabled';
+        },
+        function (checked) {
+            return { enabled: checked };
+        },
+        { on: MSG_ENABLED, off: MSG_DISABLED, saved: MSG_SAVED, error: MSG_ERROR },
+    );
+    const profitLabels = {
+        on: MSG_PROFIT_ENABLED,
+        off: MSG_PROFIT_DISABLED,
+        saved: MSG_PROFIT_SAVED,
+        error: MSG_PROFIT_ERROR,
+    };
+    wireToggle(
+        '.squadron-profit-toggle',
+        'data-squadron-id',
+        function (id) {
+            return '/api/proxy/squadrons/' + encodeURIComponent(id) + '/profit-eligible';
+        },
+        function (checked) {
+            return { eligible: checked };
+        },
+        profitLabels,
+    );
+    wireToggle(
+        '.sk-profit-toggle',
+        'data-sk-id',
+        function (id) {
+            return '/api/proxy/special-commands/' + encodeURIComponent(id) + '/profit-eligible';
+        },
+        function (checked) {
+            return { eligible: checked };
+        },
+        profitLabels,
+    );
 });
 
 /*
