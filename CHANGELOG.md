@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: die drei Host-Auslastungswarnungen können wieder auslösen.** Der Kernel dieses
+  Betriebssystems bringt die Auslastungsmessung mit, schaltet sie aber ab — seit dem Serverwechsel
+  fehlten damit alle Druckwerte, drei Warnungen waren tot und fünf Panels leer. Betroffen war
+  ausgerechnet das früheste Warnsignal vor einem Speicher-Engpass. Die Einrichtung setzt den
+  Kernel-Schalter jetzt selbst; wirksam wird er mit dem nächsten Neustart. Rein betriebsseitig.
+
 - **Betrieb: fünf leere Dashboard-Panels zeigen wieder Daten.** „Container Restarts", „Network
   RX/TX", die dritte Reihe der Speicheraufschlüsselung und die beiden Redis-Speicherpanels fragten
   Werte ab, die es nur unter der alten Container-Laufzeit gab — sie meldeten „No data" über

@@ -9,7 +9,17 @@
 > Accepted 2026-09-16 with choice 1 amended to CentOS Stream 10.
 > **Status:** draft. The testing host is built from this **first**; production is built from the
 > corrected version afterwards. That order is the point — see §11 of the plan.
-> **Last updated:** 2026-09-16.
+> **Last updated:** 2026-09-22.
+
+> [!warning] This document is behind the deployment it describes — noted 2026-09-22
+> Production has run on **Rocky Linux 10.2** with **podman 5.8.2** since the cutover on
+> 2026-09-22, so the title, the "not yet validated on a host" note above and §1's
+> *"expect 6.1.0 or newer"* are all stale, and §9 lists as unwritten several things that now
+> exist. The executable procedure is the **`basetool_host` Ansible role**
+> (`ansible/roles/basetool_host/`), which carries its reasoning in the task files; the cutover
+> itself is [`PODMAN_CUTOVER_RUNBOOK.md`](PODMAN_CUTOVER_RUNBOOK.md). Read those first and this
+> for background. Freezing it as a historical plan is the right end state and is a decision, not
+> a correction, so it is named here rather than taken in passing.
 
 ---
 
@@ -337,7 +347,19 @@ cat /sys/fs/cgroup/user.slice/user-$(id -u iri).slice/cgroup.controllers   # exp
 # the units generate, before they are started
 sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) \
   /usr/libexec/podman/quadlet -dryrun -user
+
+# pressure stall information really reached this boot, or three alerts cannot fire
+ls /proc/pressure                                    # expect cpu, io, memory
 ```
+
+> [!warning] `/proc/pressure` missing is a dead alert, not a quiet one
+> Rocky compiles PSI in and switches it **off** (`CONFIG_PSI=y` with
+> `CONFIG_PSI_DEFAULT_DISABLED=y`), so the directory exists only with `psi=1` on the kernel command
+> line. The role writes the parameter with `grubby` and deliberately does not reboot, so a host
+> provisioned and never rebooted since **passes every other check here** while
+> `HostMemoryPressureStalled`, `HostCpuPressure` and `HostIoPressure` silently cannot fire and five
+> panels on dashboard 01-host read *No data*. `grubby --info=DEFAULT` says what the next boot will
+> carry; this command says what **this** boot did.
 
 Then the real gate:
 

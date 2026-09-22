@@ -40,6 +40,11 @@
       # that does not know about this stack, and the edge times out from every other machine
       # while every check on the host stays green. Owning the decision is the difference.
       - firewalld
+      # The kernel command line is how pressure stall information is switched on, and Rocky ships
+      # PSI compiled in but disabled -- see 27-observability.yml. grubby is in a minimal Rocky
+      # install today; naming it here means a host that was built without it fails at install
+      # rather than at the task that needs it.
+      - grubby
     state: present
 
 # Everything from here to the Quadlet manual-page check reads the podman that the

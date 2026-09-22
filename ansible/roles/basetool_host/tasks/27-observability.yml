@@ -93,6 +93,59 @@
     state: present
   notify: Reload systemd for the observability units
 
+# --- the kernel switch node_exporter's pressure collector depends on ----------------------------
+#
+# node_exporter's `pressure` collector reads /proc/pressure, and Rocky builds its kernel with
+# CONFIG_PSI=y **and** CONFIG_PSI_DEFAULT_DISABLED=y -- so the file does not exist unless `psi=1`
+# is on the kernel command line. Measured on the production host 2026-09-22, hours after the
+# cutover: no /proc/pressure, and node_exporter emitting **zero** node_pressure_* series.
+#
+# What that costs is specific, and it is not cosmetic. Three alerts cannot fire --
+# HostMemoryPressureStalled, HostCpuPressure, HostIoPressure -- and five panels on dashboard
+# 01-host read "No data". The first of the three is the EARLIEST saturation signal this deployment
+# has: memory full-pressure rises while reclaim is still winning, before the OOM killer runs. On a
+# single host carrying both databases, Redis, Keycloak, three JVMs and the whole monitoring plane,
+# memory saturation is the DESIGNED failure mode -- the oom_score_adj sacrifice ordering exists
+# because it has already happened.
+#
+# The alert rule's own comment calls an absent /proc/pressure "safe", because the alert then stays
+# silent. That was written while the deployment ran on Ubuntu, where PSI is on by default. Silent
+# is not safe when the missing signal is the one that would have warned first, and an alert that
+# cannot fire reads as coverage -- the same defect REQ-OBS-014 names for the systemd collector
+# above.
+#
+# THIS DOES NOT REBOOT. The parameter takes effect at the next boot, and the role never takes a
+# serving host down on its own -- the same reasoning haproxy is enabled-but-not-started under in
+# 70-frontend.yml. The debug task below says so rather than leaving the operator to infer it from
+# a metric that is still missing.
+
+- name: Read the boot loader's kernel arguments
+  # grubby, not /proc/cmdline: the running kernel's command line does not show a parameter that has
+  # been written for the NEXT boot, so keying the update off it would re-run grubby on every play
+  # between the change and the reboot and report changed each time.
+  ansible.builtin.command: grubby --info=DEFAULT
+  register: basetool_host_grubby_default
+  changed_when: false
+  check_mode: false
+
+- name: Switch pressure stall information on at the next boot
+  ansible.builtin.command: grubby --update-kernel=ALL --args=psi=1
+  when:
+    - basetool_host_enable_psi | bool
+    - "'psi=1' not in basetool_host_grubby_default.stdout"
+  changed_when: true
+
+- name: Say that the parameter is waiting for a boot
+  ansible.builtin.debug:
+    msg: >-
+      psi=1 is configured for the next boot, but this kernel was started without it, so
+      /proc/pressure does not exist yet. node_pressure_* stays absent and
+      HostMemoryPressureStalled, HostCpuPressure and HostIoPressure cannot fire until this host is
+      rebooted. Reboot it when a window allows, then confirm with `ls /proc/pressure`.
+  when:
+    - basetool_host_enable_psi | bool
+    - ansible_facts.cmdline.psi is not defined
+
 # --- node_exporter ----------------------------------------------------------------------------
 
 - name: Configure node_exporter

@@ -186,6 +186,16 @@ until then the risk is bounded, named and watched, which is the most this layer 
   until it has taken that release. Both halves are needed and each is silent on its own; §7.3 has
   the measurement.
 
+- **The three host-pressure alerts cannot fire until the host is rebooted.** Rocky compiles PSI
+  in and switches it off (`CONFIG_PSI=y` with `CONFIG_PSI_DEFAULT_DISABLED=y`), so `/proc/pressure`
+  does not exist without `psi=1` on the kernel command line — measured on the production host
+  2026-09-22: no `/proc/pressure`, and node_exporter emitting **zero** `node_pressure_*` series.
+  `HostMemoryPressureStalled`, `HostCpuPressure` and `HostIoPressure` are therefore dead, and five
+  panels on dashboard 01-host read **No data**. The first of the three is the earliest saturation
+  signal this deployment has, on a host whose *designed* failure mode is memory pressure. The role
+  now sets the parameter and deliberately does **not** reboot; the entry closes when a window
+  allows one and `ls /proc/pressure` answers.
+
 ## 11.7 Smaller, known, and deliberately left
 
 - **A fifth certificate directory** (`keycloak.<domain>`) is carried and served by nothing, left
