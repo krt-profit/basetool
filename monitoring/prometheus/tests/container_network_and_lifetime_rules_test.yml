@@ -74,27 +74,3 @@ tests:
       - expr: basetool:container:network_receive_bytes_total
         eval_time: 5m
         exp_samples: []
-
-  # --- the Docker host: cAdvisor is present and wins the `or` ----------------------------------
-  - name: docker - cAdvisor's name-labelled families are used unchanged
-    interval: 1m
-    input_series:
-      - series: 'container_network_receive_bytes_total{name="edge",interface="eth0"}'
-        values: "0+600x10"
-      - series: 'container_network_receive_bytes_total{name="edge",interface="eth1"}'
-        values: "0+400x10"
-      - series: 'container_start_time_seconds{name="edge"}'
-        values: "2000x10"
-    promql_expr_test:
-      # SUM, not max: cAdvisor splits per interface, and a max would report the busier one as the
-      # container's whole traffic.
-      - expr: basetool:container:network_receive_bytes_total
-        eval_time: 5m
-        exp_samples:
-          - labels: 'basetool:container:network_receive_bytes_total{name="edge"}'
-            value: 5000
-      - expr: basetool:container:start_time_seconds
-        eval_time: 5m
-        exp_samples:
-          - labels: 'basetool:container:start_time_seconds{name="edge"}'
-            value: 2000

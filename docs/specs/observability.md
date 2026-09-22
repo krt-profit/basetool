@@ -1060,11 +1060,11 @@ recreation, which is unbounded cardinality by definition.
 **Consumers.** Nothing reads these names directly. `monitoring/prometheus/alerts/containers-runtime.yml`
 normalises them, the `prometheus-podman-exporter` families (`podman_container_started_seconds`,
 `podman_container_net_{input,output}_total`, joined to `podman_container_info` for the `name`) and
-the retired cAdvisor families into one `basetool:container:*` set of recording rules, and the alerts,
-`02-containers.json` and the Redis dashboard's memory panels read that. Since `prometheus.yml` no
-longer carries a cAdvisor job, the cAdvisor half of each `or` is inert everywhere (the `cadvisor`
-and `socket-proxy` services survive only in `docker-compose.monitoring.yml`, which the generator
-translates by deleting them). See REQ-OBS-014.
+into one `basetool:container:*` set of recording rules, and the alerts, `02-containers.json` and the
+Redis dashboard's memory panels read that. Each rule was an `or` with the cAdvisor family while the
+Docker host still ran; the `cadvisor` and `socket-proxy` services were removed from
+`docker-compose.monitoring.yml` on 2026-09-22 and the cAdvisor legs of the rules with them, so each
+rule reads its Podman source alone. See REQ-OBS-014.
 
 ##### `basetool_certificate_*` — expiry for certificates no listener serves
 
@@ -2540,11 +2540,12 @@ therefore alerts on:
   `basetool:container:{present,memory_anon_bytes,memory_limit_bytes,memory_working_set_bytes,memory_mapped_file_bytes,cpu_usage_seconds_total,cpu_periods_total,cpu_throttled_periods_total,cpu_throttled_seconds_total,pids,pids_max,oom_kills_total}`
   from the cgroup collector, and `basetool:container:{start_time_seconds,network_receive_bytes_total,network_transmit_bytes_total}`
   from `prometheus-podman-exporter` — defined in `monitoring/prometheus/alerts/containers-runtime.yml`,
-  not the source series directly. Each is `cAdvisor-family or Podman-family`, both reduced by `name`
-  so the two halves are substitutable and the ratio alerts divide without a runtime-specific
+  not the source series directly. Each was `cAdvisor-family or Podman-family`, both reduced by `name`
+  so the two halves were substitutable and the ratio alerts divide without a runtime-specific
   `on(...)` clause. The `or` existed so the cutover could be invisible downstream while production
-  (Docker + cAdvisor) and the testing host (rootless Podman) ran side by side; since the 2026-09-22
-  cutover only the right-hand side produces samples. Normalisation also **strips** cAdvisor's `id` /
+  (Docker + cAdvisor) and the testing host (rootless Podman) ran side by side; the cAdvisor legs were
+  removed on 2026-09-22 with cAdvisor itself (ADR-0202), and each rule now reads the Podman family
+  alone, still reduced by `name`. Normalisation also **strips** cAdvisor's `id` /
   `image` labels, so an alert kept its identity across the cutover. The dashboard panels that still
   read cAdvisor names directly were moved onto these rules on 2026-09-22 (CHANGELOG v1.9.2 — they had
   read "No data" since the cutover); `ContainerRestartLoop` was the one consumer left behind and was
@@ -2909,11 +2910,13 @@ and a query to it timed out. Three checks read Prometheus — `scrape-targets-up
 `log-streams` — so all three failed at the two cutover steps that exist to catch exactly this class
 of problem. The same boundary, in the same direction, as Alloy's push to Loki.
 
-**`container-metrics` accepts either container family.** It asked for the cAdvisor names alone and
+**`container-metrics` reads the collector's names.** It asked for the cAdvisor names alone and
 reported all six series missing on a host collecting every one of them as `basetool_container_*` —
 "every alert reading them is silently disarmed", about alerts that were armed. The alert rules had
 already been taught that normalisation (`basetool:container:present`); this check was the half left
-behind, which is the shape a runtime migration leaves when a signal is renamed in one place.
+behind, which is the shape a runtime migration leaves when a signal is renamed in one place. It
+accepted either family until 2026-09-22 and asks for the `basetool_container_*` names only since
+(ADR-0202).
 
 **Preconditions the host must satisfy, asserted rather than assumed.** `adm` membership is necessary
 and not sufficient: RHEL writes `/var/log/secure` and `/var/log/audit/audit.log` as `root:root`, so

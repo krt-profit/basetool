@@ -103,3 +103,17 @@ express safely, and fix the leak one of them was absorbing at its source.**
 - **Renaming the `ops-cleanup` log stream label to match** — rejected. The alert and the dashboard
   both send a reader to `{app="ops-cleanup"}`, and a label rename would break every historical
   query for a cosmetic gain. The label is deliberately shorter than the unit name already.
+
+## Amendment 2026-09-22 — Podman only, one name (OPS-SIMP-01, OPS-SIMP-02)
+
+The job stopped being runtime-aware the day after this ADR: every Docker arm left the operational
+scripts ([ADR-0202](0202-compose-stays-the-source-of-the-units-and-the-scripts-speak-podman-only.md)),
+so `container-cleanup.sh` now runs the three Podman steps and nothing else. The two Docker-only steps
+— `builder prune` and the anonymous-only `volume prune` — are gone from the script rather than
+skipped, together with `IRI_CLEANUP_BUILDER_UNTIL`, `IRI_CLEANUP_PRUNE_VOLUMES` and the unit's
+`DOCKER_CONFIG`. The decision above stands unchanged: **nothing prunes volumes**.
+
+The removal condition of the transitional double name was met — both Rocky hosts have run the role,
+and the retired Docker host never will again — so `basetool_docker_cleanup_*` left the alert
+expression and `iri-docker-cleanup.log` left Alloy's path list the same day (arc42 §11.1). The role
+still removes the old units wherever it finds them.

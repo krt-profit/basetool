@@ -142,8 +142,8 @@ groups:
       # firing CRITICAL anyway. It would have fired from the first minute the new production host
       # served, permanently, which is how a critical stops being read.
       #
-      # `basetool:container:present` is the same `or` normalisation the six value alerts below
-      # already use, so this works on either runtime and keeps working through the cutover.
+      # `basetool:container:present` is the same normalised series the six value alerts below read
+      # (its cAdvisor leg was removed with cAdvisor on 2026-09-22, ADR-0202).
       - alert: ContainerMetricsMissing
         expr: >-
           count(basetool:container:present) < 10
@@ -153,7 +153,7 @@ groups:
           severity: critical
         annotations:
           summary: "No container metrics: fewer than 10 named containers are reporting"
-          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. On Docker that is cAdvisor or the docker-socket-proxy; on Podman it is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer."
+          description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
 
       # The databases and the session store themselves (OPS-MON-03, added 2026-09-22). Until then
       # nothing alerted on either being DOWN: TargetDown watches the exporters, and an exporter that
@@ -520,9 +520,12 @@ groups:
       # migration renames every container family, and this alert has to keep working on both shapes
       # while the two run side by side. basetool:container:memory_anon_bytes is cgroup `anon` under
       # either runtime, so the 0.90 threshold keeps its meaning and is not re-derived.
+      # The `> 0` guard replaces the `name=~".+"` filter the cAdvisor leg carried (removed 2026-09-22):
+      # a zero limit divides to +Inf and would permafire. The cgroup collector writes +Inf for an
+      # unlimited memory.max, so this only ever meets a genuinely broken reading.
       - alert: ContainerMemoryHigh
         expr: >-
-          (basetool:container:memory_anon_bytes / basetool:container:memory_limit_bytes) > 0.90
+          (basetool:container:memory_anon_bytes / (basetool:container:memory_limit_bytes > 0)) > 0.90
         for: 10m
         labels:
           severity: warning
@@ -535,9 +538,8 @@ groups:
       # cAdvisor series (or all are gone), catching a single core container whose container-level
       # metrics vanished while the plane keeps ~20 total series. Warning (not critical) because a truly
       # down app container also pages TargetDown on its app scrape.
-      # cAdvisor-only, for the same reason as ContainerMetricsMissing above. The per-container
-      # half of this question survives the cutover through TargetDown and the app health gates.
-      # Same change, same reason — see ContainerMetricsMissing above.
+      # Reads the normalised series since 2026-09-20 -- same change, same reason as
+      # ContainerMetricsMissing above.
       - alert: CoreContainerMetricsMissing
         expr: >-
           count(basetool:container:present{name=~"backend|frontend|ingest|keycloak|db-backend|db-keycloak|redis"}) < 7

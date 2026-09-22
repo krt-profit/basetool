@@ -50,6 +50,9 @@
 *.timer text eol=lf
 *.logrotate text eol=lf
 *.tmpfiles text eol=lf
+# The drop-in the role copies beside four of those units (10-deploy-account-sandbox.conf,
+# OPS-SIMP-03) is read by systemd exactly like the units themselves.
+scripts/*.conf text eol=lf
 # The environment templates the generator emits beside the units. This line said `*.vars` until
 # 2026-09-18, an extension no file in the tree has ever used: the name list was replaced by
 # `.env.tmpl` templates on 2026-09-17 and the rule was never moved with it. So the block's stated

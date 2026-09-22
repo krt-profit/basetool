@@ -3,35 +3,17 @@
 Each item says what it costs and what closing it involves. Nothing here is a vague "could be
 cleaner" — an entry earns its place by naming a failure that can actually happen.
 
-## 11.1 The cleanup rename is carried by two names for a while — **transitional, with a removal condition**
+## 11.1 The cleanup rename — **closed 2026-09-22**
 
-The weekly cleanup job was `iri-docker-cleanup` and called `docker` directly; on a Podman host that
-fails at its first command while the timer stays enabled, and the alert fires on `absent()` with no
-way to satisfy it. Fixed in ADR-0194 — §7.4a has what did and did not translate, including the
-step that would have destroyed the edge's certificates if it had.
+The weekly cleanup job was `iri-docker-cleanup` and called `docker` directly; ADR-0194 renamed and
+fixed it (§7.4a). Because the alert rules ride the config bundle while the scripts come from the
+Ansible role, the alert accepted both metric names and Alloy watched both log paths for the length
+of the rename, with the stated removal condition *"once both Rocky hosts have run the role"*.
 
-What remains is the *shape of the rename*, and it is debt with a deadline. **The alert rules ride
-the config bundle; the scripts are installed by the Ansible role.** The two halves therefore reach a
-host independently and in either order, so for the length of that window the alert accepts **both**
-metric names and Alloy watches **both** log paths:
-
-- `basetool_container_cleanup_last_success_timestamp` **or** `basetool_docker_cleanup_last_success_timestamp`
-- `/hostlog/iri-container-cleanup.log` **and** `/hostlog/iri-docker-cleanup.log`
-
-`container_cleanup_rename_test.yml` locks all four combinations, including the one that matters
-most: old metric stale, new metric fresh, alert silent.
-
-The Ansible role **retires** the old unit rather than leaving it beside the new one — it stops and
-disables `iri-docker-cleanup.timer`, removes its units, its logrotate entry and the old script, and
-deliberately keeps the old **log file** so Alloy's `{app="ops-cleanup"}` stream has no gap. That
-had to be added: the role installs and has no general removal pass, so before it a renamed unit
-simply gained a sibling, and the old broken timer would have gone on failing every Saturday next to
-the new one that works.
-
-**Remove both halves once both Rocky hosts have run the role** (the retired Docker host never
-will, and no longer reports). A rule that accepts a name nothing writes is how a rename quietly
-never finishes — and while it stands, a host that somehow kept writing only the old name would look
-healthy forever, which is precisely the state the alert exists to report.
+Both have, and the retired Docker host never will, so the second name and the second path were
+removed on 2026-09-22 (OPS-SIMP-02). `container_cleanup_rename_test.yml` now locks the one name —
+fresh is silent, stale and absent fire, and the retired name alone no longer satisfies the alert.
+The role still stops and removes the old `iri-docker-cleanup` units wherever it finds them.
 
 ## 11.2 The frontend hand-mirrors the backend's DTOs
 

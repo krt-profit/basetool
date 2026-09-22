@@ -18,10 +18,11 @@ See ADR-0049 / ADR-0055 for the decision records behind the artifact delivery.
 **Runtime.** Since 2026-09-22 production runs **rootless Podman under Quadlet** on Rocky Linux 10
 (ADR-0163): every container is a systemd user unit of the service account, generated from the
 compose files by `scripts/generate-quadlet.py` into `quadlet/` and delivered inside the config
-bundle. `deploy.sh` drives both runtimes through `scripts/lib/container-runtime.sh`; the Docker
-Compose branches remain for the local and test stacks, which still run the compose files directly.
-Where a requirement below names a Compose mechanism (`up -d --wait`, a compose override, `docker
-compose run`), that is the **Compose** realisation; the Quadlet one is stated beside it. The host
+bundle. `deploy.sh` drives the runtime through `scripts/lib/container-runtime.sh`, which since
+2026-09-22 speaks rootless Podman only (OPS-SIMP-01, ADR-0194 amended); the local and test stacks run
+the compose files directly and never go through it. Where a requirement below still names a Compose
+mechanism (`up -d --wait`, a compose override, `docker compose run`), that is history from the Docker
+host; the Quadlet realisation is stated beside it. The host
 itself is provisioned by the Ansible role in `ansible/` (ADR-0188), which is not a delivery path.
 
 These requirements are the first numbered `REQ-OPS-*` ids; the deployment area previously
@@ -181,21 +182,13 @@ unit the bundle names into the service user's delivery directory
 its file, and never touches the `.container.d/` drop-ins beside them. A host with no units at all is
 treated as a config change, so the first deploy on a freshly provisioned host installs them.
 
-One apply mode is special **under Compose**: a change to the compose **`networks:` topology** (a
-re-pinned subnet, a network added/removed) **cannot** be applied by an in-place `up -d` — Docker can neither move a
-running container onto a differently-addressed bridge nor recreate a bridge that still has
-endpoints, so an in-place apply silently **strands** container name resolution (the 2026-07
-`keycloak`↔`backend` / `keycloak`↔`db-keycloak` incident, #974). `deploy.sh` detects it (the promoted
-compose's `networks:` block differs from the live one, comments ignored) and applies it via a **clean
-down+up**: the app project *and* the monitoring project that references the shared data nets as
-`external` are brought fully down, the stale bridges dropped, then recreated on the (pinned) subnets —
-on the forward apply **and** on the rollback. This is a brief full-stack outage, taken *only* on an
-actual `networks:` change; every ordinary config/app change keeps the fast rolling in-place `up`. It
-is **not** operator-gated (unlike the stateful-infra carve-out, REQ-OPS-006) — no data migration is
-involved, and the subnet pinning keeps the recreated gateways stable, so the edge's SSH-tunnel admin
-allow-list stays valid. Under Quadlet the networks are `.network` units and `deploy.sh` takes no
-clean-slate action for them; a topology change there is an operator maintenance step (see the
-runbook).
+**A network change is installed, not applied.** The networks are `.network` units, and Quadlet creates
+one with `podman network create --ignore`, so a changed unit leaves the existing network as it was.
+Recreating one means stopping its members — a brief full-stack outage — so it is an **operator
+maintenance** step with its exact commands in the runbook, never an automatic tick. (Under Compose,
+`deploy.sh` detected a changed `networks:` block and ran a gated clean-slate down+up for it — the
+2026-07 name-resolution incident, #974. That machinery was removed with the Docker runtime on
+2026-09-22, OPS-SIMP-01.)
 
 Pinning guarantees that an *existing* gateway keeps its address; it does not guarantee that the
 tunnel still arrives from one of the gateways the allow-list names. Adding or removing a bridge
@@ -228,7 +221,7 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
 - [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
 
 **Enforced by:** `scripts/deploy.sh` (config-delivery block, `EXPECTED_MARKER`, `apply_config_tree`,
-`install_quadlet_units`, `network_block` / `clean_slate_recreate`) · `scripts/render-env-d.py` ·
+`install_quadlet_units`) · `scripts/render-env-d.py` ·
 `scripts/generate-quadlet.py` (`repo-lint.yml` → `quadlet-drift`) · `docker/config/Dockerfile` ·
 `.github/workflows/release-images.yml` (`build-config`) · **Runbook:** `docs/deployment.md` →
 *Configuration changes that are not app releases*

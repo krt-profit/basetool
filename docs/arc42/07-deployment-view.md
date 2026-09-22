@@ -86,7 +86,7 @@ working as rootless containers, and two had no reason to exist any more:
 | **alloy** | **host service** | Reads `/var/log` and needs real supplementary groups (`adm`) for `root:adm` files such as `auth.log`. A rootless container's supplementary groups are *namespace* groups, not host groups. |
 | **podman-exporter** | **host service** (a *user* unit of the service user) | Has no compose counterpart at all. A system-level one would talk to the root podman and see nothing. |
 | **cadvisor** | **deleted** | Its rootless-Podman support is closed as not-planned upstream. Its series return from `prometheus-podman-exporter` plus `scripts/cgroup-container-metrics.py`, normalised by the `basetool:container:*` recording rules that dashboards and alerts read. The exporter labels by `id` alone, so the network and start-time rules join `podman_container_info` to recover the container name. |
-| **socket-proxy** | **deleted** | It existed only to hand cAdvisor and Alloy a read-only view of the Docker socket. There is no Docker socket. |
+| **socket-proxy** | **deleted** | It existed only to hand cAdvisor and Alloy a read-only view of the Docker socket. There is no Docker socket. Both services were removed from `docker-compose.monitoring.yml` on 2026-09-22 (OPS-SIMP-02), and the cAdvisor legs of the recording rules with them. |
 
 Becoming host services cost node-exporter and alloy two things the container shape gave them for
 free, and both came back on 2026-09-22: a **memory ceiling** (a role-written `20-resources.conf`
@@ -135,17 +135,19 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 | `iri-restore-drill` | Sunday 05:30 | `deploy` | Restore the latest snapshot into a throwaway Postgres and score seven artifacts |
 | `iri-cert-expiry` | daily 03:40, and at boot | `root` | Write `basetool_certificate_expiry_timestamp_seconds` for the certificate *files* |
 | `iri-container-metrics` | every 30 s | `root` | The cgroup textfile collector that replaces part of cAdvisor |
-| `iri-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — runtime-aware (§7.4a) |
+| `iri-container-cleanup` | Saturday 02:00 UTC | `deploy` | Weekly prune of stopped containers, unused images and networks — never volumes (§7.4a) |
 | `dnf-automatic` | daily 07:00 (+ up to 15 min) | `root` | Security advisories only, container runtime excluded, never reboots; each run records itself for `HostSecurityUpdates*` / `HostRebootRequired` (`REQ-OPS-032`) |
 
-### 7.4a The weekly cleanup is runtime-aware, and two of its steps are not portable
+### 7.4a The weekly cleanup never prunes volumes
 
 The job was `iri-docker-cleanup` until 2026-09-21 and called `docker` directly — the only
 operational script that did not go through `lib/container-runtime.sh`. On a Podman host there is no
 `docker` binary at all, so the weekly run would fail at its first command while the timer stayed
-enabled. ADR-0194 records the fix; §11.1 the transitional double name.
+enabled. ADR-0194 records the fix. The job ran runtime-aware for a day; since 2026-09-22 the seam is
+Podman-only (OPS-SIMP-01) and the two Docker-only steps are gone from the script.
 
-Three steps translate; **two do not**, and the difference is the part worth knowing:
+Of the Docker job's five steps three translate; **two did not**, and the difference is the part worth
+knowing:
 
 | step | Docker | Podman |
 | --- | --- | --- |
@@ -182,7 +184,9 @@ critical, and each stayed failed until its next scheduled run: the next night, o
 The catch-up `Persistent=true` exists for was the run that was lost.
 
 Two waits now live in `scripts/lib/container-runtime.sh`, not in the units, because only the script
-knows the service user's uid and only the script can see the signal that matters:
+knows the service user's uid and only the script can see the signal that matters. (The four units
+share one sandbox, the drop-in `10-deploy-account-sandbox.conf` the role installs beside each —
+OPS-SIMP-03.)
 
 | wait | who | on what | bound |
 | --- | --- | --- | --- |
@@ -241,6 +245,8 @@ both. Procedure: [`docs/backup.md`](../backup.md).
 The Docker Compose host that served production until 2026-09-22 is **shut down, not
 decommissioned**. Its deploy timer is disabled, so powering it back on would serve the configuration
 it had at the cutover and pull nothing newer — that is the way back the archived cutover runbook
-describes, and the only reason the machine still exists. It still holds a full copy of the
+describes, and the only reason the machine still exists. It runs **its own copy** of the operational
+scripts, which is why the repository's no longer carry a Docker branch (OPS-SIMP-01, 2026-09-22): a
+release never reaches that host, and a way back that depended on today's scripts would not be one. It still holds a full copy of the
 production data and secrets as of that day; §11.6 carries it as an open risk until it is wiped and
 deleted.

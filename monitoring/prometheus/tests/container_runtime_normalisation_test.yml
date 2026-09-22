@@ -5,9 +5,7 @@
 # `basetool:container:*` recording rules, and this file is what makes that a measurement rather
 # than a claim:
 #
-#   - each alert FIRES from the cgroup-collector series alone   (the post-cutover host);
-#   - each alert FIRES from the cAdvisor series alone           (production today);
-#   - a host serving BOTH does not double-alert                 (the cutover window itself);
+#   - each alert FIRES from the cgroup-collector series        (the Podman host);
 #   - the collector's own liveness alerts fire when it stops, matches nothing, or has never
 #     written at all (the absent() leg, 2026-09-22 -- the Docker host it used to stay silent for is
 #     retired).
@@ -102,47 +100,7 @@ tests:
               summary: "Container CPU throttled >25%: frontend"
               description: "Container frontend had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
 
-  # =============================================================================================
-  # The cutover window: both families present for the same container. The `or` must take the LEFT
-  # side and produce exactly one series, or every alert doubles for as long as the migration runs.
-  # =============================================================================================
-  - name: both shapes - one container, one alert, not two
-    interval: 1m
-    input_series:
-      - series: 'container_memory_rss{name="backend",id="/docker/abc",image="ghcr.io/x"}'
-        values: "966367641x30"
-      - series: 'container_spec_memory_limit_bytes{name="backend",id="/docker/abc",image="ghcr.io/x"}'
-        values: "1030792151x30"
-      - series: 'basetool_container_memory_anon_bytes{name="backend"}'
-        values: "966367641x30"
-      - series: 'basetool_container_memory_limit_bytes{name="backend"}'
-        values: "1030792151x30"
-    alert_rule_test:
-      - eval_time: 20m
-        alertname: ContainerMemoryHigh
-        exp_alerts:
-          - exp_labels:
-              severity: warning
-              name: backend
-            exp_annotations:
-              summary: "Container anonymous memory >90% of limit: backend"
-              description: "Container backend holds unreclaimable (anonymous) memory within 10% of its limit — OOM early warning. This deliberately excludes page cache and the mapped binary, which the kernel reclaims instead of OOM-killing; cross-check basetool:container:memory_working_set_bytes only to explain a gap, never to size."
 
-  # And the normalisation must strip cAdvisor's extra labels, or the alert identity changes at the
-  # cutover and every notification looks new.
-  - name: both shapes - the normalised series carries only the name label
-    interval: 1m
-    input_series:
-      - series: 'container_threads{name="ingest",id="/docker/def",image="ghcr.io/y"}'
-        values: "1700x30"
-      - series: 'container_threads_max{name="ingest",id="/docker/def",image="ghcr.io/y"}'
-        values: "2048x30"
-    promql_expr_test:
-      - expr: basetool:container:pids
-        eval_time: 10m
-        exp_samples:
-          - labels: 'basetool:container:pids{name="ingest"}'
-            value: 1700
 
   # =============================================================================================
   # The collector's own liveness.
