@@ -117,17 +117,62 @@
       # The FIRST entry must match IRI_KEYCLOAK_HOST_ALIAS in {{ basetool_host_root_dir }}/code/.env;
       # scripts/check-conformance.py fails the host when the two disagree.
       [Container]
-      AddHost={{ basetool_host_public_name_aliases | join('\nAddHost=') }}
+      {# A LOOP, not join('\nAddHost='), and the difference is an outage. Ansible does not process
+         the escape in that string literal: measured on ansible-core 2.16.3 with jinja2 3.1.2, the
+         join writes ONE line carrying the two characters backslash and n, so four aliases become
+         one AddHost whose value is nonsense. The same expression rendered through plain jinja2 in
+         python DOES produce newlines, which is how it passed review with a green check beside it.
+         A loop cannot depend on an escape at all. #}
+      {% for alias in basetool_host_public_name_aliases %}
+      AddHost={{ alias }}
+      {% endfor %}
       {% if item in basetool_host_public_name_alias_v6_services and basetool_host_public_name_aliases_v6 | length > 0 %}
       # The IPv6 half (ADR-0196 amendment 1). Only for a service on an IPv6-capable network, and
       # only useful because containers.conf gives the rootless netns pasta a v6 --map-guest-addr.
       # Without BOTH, the ip6-pinned probes fail locally with "no suitable address found" and
       # EdgeIpv6Unreachable fires about the monitoring instead of about the edge.
-      AddHost={{ basetool_host_public_name_aliases_v6 | join('\nAddHost=') }}
+      {% for alias in basetool_host_public_name_aliases_v6 %}
+      AddHost={{ alias }}
+      {% endfor %}
       {% endif %}
   loop: "{{ basetool_host_public_name_alias_services }}"
   when: basetool_host_public_name_aliases | length > 0
   notify: Reload the service user's units
+
+# Read back what was actually written, because the failure this guards against is SILENT: a drop-in
+# whose addresses did not become separate lines still parses, the units still generate, the
+# containers still start, and every one of them resolves the public names to nothing. That is the
+# cutover-day outage -- backend down, Grafana sign-in broken, every probe 0 -- arriving from a
+# successful play. Caught on 2026-09-22 by a --check --diff run against production, which is the
+# only reason it never landed.
+- name: Read the alias drop-ins back
+  ansible.builtin.slurp:
+    src: >-
+      /etc/containers/systemd/users/{{ basetool_host_service_uid }}/{{ item }}.container.d/10-host-alias.conf
+  loop: "{{ basetool_host_public_name_alias_services }}"
+  register: basetool_host_alias_dropins
+  when:
+    - basetool_host_public_name_aliases | length > 0
+    - not ansible_check_mode
+  check_mode: false
+
+- name: Refuse a drop-in whose addresses did not become separate lines
+  ansible.builtin.assert:
+    that:
+      - item.content | b64decode | regex_findall('(?m)^AddHost=') | length
+        >= basetool_host_public_name_aliases | length
+    fail_msg: >-
+      {{ item.item }}: its 10-host-alias.conf carries fewer AddHost lines than there are aliases,
+      so the addresses were written into one line instead of one each. The container will resolve
+      none of the public names -- which takes the backend's issuer lookup, Grafana's sign-in and
+      every blackbox probe with it, from a play that reported success.
+    quiet: true
+  loop: "{{ basetool_host_alias_dropins.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | default('') }}"
+  when:
+    - basetool_host_public_name_aliases | length > 0
+    - not ansible_check_mode
 
 # Clearing the variable has to clear the alias. Without this the drop-in outlives the decision that
 # put it there, and the next reader finds a unit whose effective configuration is not in the unit,
