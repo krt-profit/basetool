@@ -37,6 +37,7 @@ AddMissionObjectiveRequest.title=string!
 AddMissionStepRequest.meta=string
 AddMissionStepRequest.stepsVersion=integer/int64!
 AddMissionStepRequest.title=string!
+AddParticipantByIdRequest.userId=string/uuid!
 AddUnitRequest.frequency=number/double
 AddUnitRequest.highValueUnit=boolean
 AddUnitRequest.name=string!
@@ -1245,6 +1246,8 @@ POST /api/v1/missions/{id}/participants/{participantId}/check-in/slim response[2
 POST /api/v1/missions/{id}/participants/{participantId}/check-out/slim response[200][*/*]=$MissionParticipantDto
 POST /api/v1/missions/{id}/steps/slim request[application/json]=$AddMissionStepRequest
 POST /api/v1/missions/{id}/steps/slim response[200][*/*]=array<$MissionStepDto>
+POST /api/v1/missions/{id}/participants/by-id/slim request[application/json]=$AddParticipantByIdRequest
+POST /api/v1/missions/{id}/participants/by-id/slim response[200][*/*]=array<$MissionParticipantDto>
 POST /api/v1/missions/{id}/units/slim request[application/json]=$AddUnitRequest
 POST /api/v1/missions/{id}/units/slim response[200][*/*]=array<$MissionUnitDto>
 POST /api/v1/missions/{id}/units/{missionUnitId}/crew/slim request[application/json]=$AddCrewRequest
