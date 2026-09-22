@@ -28,6 +28,12 @@ RUN ./gradlew :ingest:dependencies --no-daemon
 
 # Build the bootable jar, skipping the static-analysis / format / test gates (run separately in CI).
 COPY ingest/src/ ingest/src/
+# The shared test-support MAIN sources too: `:ingest:build` still runs `compileTestJava`
+# even with `-x test`, because the disabled `checkstyleTest` and
+# `jacocoTestCoverageVerification` hang off `check` and depend on it. Since
+# IngestEndpointSurfaceTest references `EndpointEnumeration` from that module, the image
+# build fails to compile tests it will never run without these. Only `src/main`.
+COPY test-support/src/main/ test-support/src/main/
 RUN ./gradlew :ingest:build \
     -x test \
     -x checkstyleMain \
