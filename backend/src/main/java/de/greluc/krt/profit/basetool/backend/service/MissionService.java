@@ -775,16 +775,6 @@ public class MissionService {
   }
 
   /**
-   * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
-   * to the full-form {@link #addParticipant(UUID, ParticipantForm)} with default values for the
-   * optional fields.
-   */
-  @Transactional
-  public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
-    return missionParticipantService.addParticipant(missionId, userId);
-  }
-
-  /**
    * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
    * authenticated), an optional desired job type, and an optional comment. Convenience overload
    * that delegates to the full form with {@code orgUnitIds=null} and no explicit payout choice.
@@ -1449,28 +1439,6 @@ public class MissionService {
   }
 
   /**
-   * Transfers mission ownership to another user <b>without</b> an optimistic-lock check — the
-   * backing of the deprecated {@code PUT /api/v1/missions/{id}/owner/{userId}}, which carries no
-   * version. The previous owner is not added to the co-managers; they keep whatever access their
-   * roles and co-manager status already give them.
-   *
-   * <p>Versioning: bumps the dedicated {@code mission_ownership} version like {@link
-   * #updateMissionOwner}, NOT the mission's main version — so concurrent participant or finance
-   * edits don't race with the owner change, and a client holding the old ownership version gets a
-   * 409 on its next versioned change.
-   *
-   * @param missionId the mission to hand over
-   * @param userId the new owner
-   * @return the managed mission, carrying the new owner and the bumped {@link
-   *     Mission#getOwnershipVersion()}
-   * @throws NotFoundException when the mission or the user does not exist
-   */
-  @Transactional
-  public Mission setMissionOwner(@NotNull UUID missionId, @NotNull UUID userId) {
-    return changeOwner(missionId, userId, null);
-  }
-
-  /**
    * Version-checked owner change: {@code expectedOwnershipVersion} must equal the mission's current
    * {@link Mission#getOwnershipVersion()} (the {@code version} of its {@link MissionOwnership} row,
    * {@code 0} while the owner has never been changed); otherwise a 409 {@link
@@ -1478,7 +1446,8 @@ public class MissionService {
    *
    * <p>This method intentionally does NOT bump {@code Mission.version} (the owner association is
    * excluded from parent optimistic locking), so concurrent edits on other sections of the same
-   * mission remain unaffected — the ownership counter is a section of its own.
+   * mission remain unaffected — the ownership counter is a section of its own. The previous owner
+   * is not added to the co-managers; they keep whatever access their roles already give them.
    *
    * @param missionId the mission to hand over
    * @param userId the new owner
@@ -1491,20 +1460,6 @@ public class MissionService {
   @Transactional
   public Mission updateMissionOwner(
       @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
-    return changeOwner(missionId, userId, expectedOwnershipVersion);
-  }
-
-  /**
-   * The owner change both public entry points share.
-   *
-   * @param missionId the mission to hand over
-   * @param userId the new owner
-   * @param expectedOwnershipVersion the version to compare against, or {@code null} to skip the
-   *     check (the unversioned legacy path only)
-   * @return the managed mission with the new owner and ownership version applied
-   */
-  private Mission changeOwner(
-      @NotNull UUID missionId, @NotNull UUID userId, Long expectedOwnershipVersion) {
     Mission mission =
         missionRepository
             .findById(missionId)
@@ -1545,17 +1500,17 @@ public class MissionService {
    *
    * @param mission the managed mission, still carrying the owner being replaced
    * @param newOwner the owner the row moves to
-   * @param expectedVersion the caller's echo, or {@code null} to skip the check
+   * @param expectedVersion the caller's echo
    * @return the row's version after the change
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echo is stale
    */
   private long upsertMissionOwnership(
-      @NotNull Mission mission, @NotNull User newOwner, Long expectedVersion) {
+      @NotNull Mission mission, @NotNull User newOwner, long expectedVersion) {
     Optional<MissionOwnership> existing =
         missionOwnershipRepository.findByMissionId(mission.getId());
     long currentVersion =
         existing.map(MissionOwnership::getVersion).map(v -> v == null ? 0L : v).orElse(0L);
-    if (expectedVersion != null && expectedVersion != currentVersion) {
+    if (expectedVersion != currentVersion) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
           MissionOwnership.class, existing.map(MissionOwnership::getId).orElse(mission.getId()));
     }

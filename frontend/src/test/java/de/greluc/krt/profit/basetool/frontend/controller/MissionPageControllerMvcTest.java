@@ -107,6 +107,61 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "OFFICER")
+  void createMission_parsesTheGoalAndStepCarriersIntoTheCreateRequest() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    when(backendApiClient.post(any(String.class), any(), Mockito.eq(MissionDto.class)))
+        .thenReturn(minimalMission(missionId));
+
+    mockMvc
+        .perform(
+            post("/missions")
+                .param("name", "Test Mission")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-02-10T10:00")
+                .param("plannedEndTime", "2026-02-10T12:00")
+                .param("objectivesJson", "[{\"title\":\"Erz\",\"kind\":\"PRIMARY\"}]")
+                .param("stepsJson", "[{\"title\":\"Sammeln\",\"meta\":\"20:00\"}]")
+                .with(csrf()))
+        .andExpect(redirectedUrl("/missions/" + missionId + "?tab=verw"));
+
+    org.mockito.ArgumentCaptor<
+            de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest>
+        sent =
+            org.mockito.ArgumentCaptor.forClass(
+                de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.class);
+    verify(backendApiClient).post(eq("/api/v1/missions"), sent.capture(), eq(MissionDto.class));
+    assertThat(sent.getValue().objectives())
+        .containsExactly(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.NewObjective(
+                "Erz", "PRIMARY"));
+    assertThat(sent.getValue().steps())
+        .containsExactly(
+            new de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest.NewStep(
+                "Sammeln", "20:00"));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
+  void createMission_aCarrierWithAnUnknownKeyFailsInsteadOfDroppingTheValue() throws Exception {
+    // The carrier parser moved from Jackson 2 to Jackson 3 (FE-MOD-04). Jackson 3 ignores an
+    // unknown
+    // property by default; Jackson 2 refused it, and the create must keep refusing a misspelt key
+    // rather than create a goal with its title silently missing.
+    mockMvc
+        .perform(
+            post("/missions")
+                .param("name", "Test Mission")
+                .param("status", "PLANNED")
+                .param("plannedStartTime", "2026-02-10T10:00")
+                .param("plannedEndTime", "2026-02-10T12:00")
+                .param("objectivesJson", "[{\"titel\":\"Erz\",\"kind\":\"PRIMARY\"}]")
+                .with(csrf()))
+        .andExpect(redirectedUrl("/missions/new"));
+    verify(backendApiClient, never()).post(eq("/api/v1/missions"), any(), eq(MissionDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = "OFFICER")
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
 

@@ -21,13 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.propagateBackendError;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.logging.LogSafe;
 import de.greluc.krt.profit.basetool.frontend.model.dto.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MissionActualTimeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.UpdatePayoutPreferenceRequest;
@@ -39,8 +37,16 @@ import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.support.Roles;
 import de.greluc.krt.profit.basetool.frontend.websocket.LiveSyncLocalBus;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -51,7 +57,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -63,6 +73,7 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -71,6 +82,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Spring MVC controller for every state-mutating {@code /missions} endpoint: participant
@@ -167,8 +182,14 @@ public class MissionWriteController {
    * instance — the frontend application context registers no {@code ObjectMapper} bean, and
    * Jackson's mapper is thread-safe once configured — initialised at declaration so Lombok's {@code
    * RequiredArgsConstructor} keeps it out of the generated constructor signature.
+   *
+   * <p>Jackson 3, like every frontend class but the Thymeleaf JavaScript bridge (FE-MOD-04). It
+   * used to be a Jackson 2 {@code new ObjectMapper()}, which rejects an unknown property; Jackson
+   * 3's default ignores one. {@code FAIL_ON_UNKNOWN_PROPERTIES} is switched back on so a carrier
+   * row with a misspelt key still fails the create instead of silently dropping the value.
    */
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private final JsonMapper objectMapper =
+      JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
   /**
    * Web binder configuration scoped to this controller. Registers any custom property editors
@@ -226,7 +247,7 @@ public class MissionWriteController {
 
       backendApiClient.post("/api/v1/missions/" + id + "/participants/add", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
       // 409 Conflict = backend found more than one registered member matching the free-text name
       // -> show a dedicated, localized hint that the user should pick an entry from the
@@ -278,7 +299,7 @@ public class MissionWriteController {
       body.put("version", version != null ? version : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/party-lead", body, Void.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+    } catch (BackendServiceException e) {
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
       // 409 = either an ambiguous free-text name (matches more than one member) or a stale
       // partyLeadVersion (someone else changed it meanwhile); a single conflict toast covers both
@@ -307,11 +328,9 @@ public class MissionWriteController {
    *     empty {@code userId}+{@code guestName} clears the lead
    * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
    */
-  @PutMapping(
-      value = "/{id}/party-lead/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/party-lead/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> setPartyLeadAjax(
+  public ResponseEntity<Object> setPartyLeadAjax(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Map<String, Object> out = new HashMap<>();
@@ -326,13 +345,13 @@ public class MissionWriteController {
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/party-lead", out, Void.class);
       MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
-      return org.springframework.http.ResponseEntity.ok(mission);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(mission);
+    } catch (BackendServiceException e) {
       log.debug("Set party lead (AJAX) failed: status={}", e.getStatusCode());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in setPartyLeadAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -408,7 +427,7 @@ public class MissionWriteController {
    */
   @PostMapping("/{id}/participants/{participantId}/payout-preference")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updatePayoutPreference(
+  public ResponseEntity<Object> updatePayoutPreference(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @RequestBody UpdatePayoutPreferenceRequest request,
@@ -423,15 +442,13 @@ public class MissionWriteController {
                   + "/payout-preference/slim",
               request,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(updatedParticipant);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(updatedParticipant);
+    } catch (BackendServiceException e) {
       log.debug("Update payout preference failed with status {}", e.getStatusCode());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update payout preference failed", e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -447,22 +464,18 @@ public class MissionWriteController {
    */
   @PostMapping("/{id}/actual-time")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<MissionDto> updateActualTime(
-      @PathVariable @NotNull UUID id,
-      @Valid @RequestBody
-          de.greluc.krt.profit.basetool.frontend.model.dto.MissionActualTimeUpdateRequest request) {
+  public ResponseEntity<MissionDto> updateActualTime(
+      @PathVariable @NotNull UUID id, @Valid @RequestBody MissionActualTimeUpdateRequest request) {
     if (request == null
         || request.version() == null
         || (!"actualStartTime".equals(request.field())
             && !"actualEndTime".equals(request.field()))) {
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       MissionDto current = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
       if (current == null) {
-        return org.springframework.http.ResponseEntity.status(
-                org.springframework.http.HttpStatus.NOT_FOUND)
-            .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       }
 
       Instant newStart =
@@ -470,7 +483,7 @@ public class MissionWriteController {
       Instant newEnd =
           "actualEndTime".equals(request.field()) ? request.value() : current.actualEndTime();
 
-      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+      Map<String, Object> schedulePatch = new LinkedHashMap<>();
       schedulePatch.put("meetingTime", current.meetingTime());
       schedulePatch.put("plannedStartTime", current.plannedStartTime());
       schedulePatch.put("plannedEndTime", current.plannedEndTime());
@@ -480,22 +493,20 @@ public class MissionWriteController {
 
       backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
-      return org.springframework.http.ResponseEntity.ok(refreshed);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(refreshed);
+    } catch (BackendServiceException e) {
       log.debug("Update actual time failed with status {}: {}", e.getStatusCode(), e.getMessage());
-      org.springframework.http.HttpStatus status;
+      HttpStatus status;
       switch (e.getStatusCode()) {
-        case 409 -> status = org.springframework.http.HttpStatus.CONFLICT;
-        case 403, 401 -> status = org.springframework.http.HttpStatus.FORBIDDEN;
-        case 404 -> status = org.springframework.http.HttpStatus.NOT_FOUND;
-        default -> status = org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+        case 409 -> status = HttpStatus.CONFLICT;
+        case 403, 401 -> status = HttpStatus.FORBIDDEN;
+        case 404 -> status = HttpStatus.NOT_FOUND;
+        default -> status = HttpStatus.INTERNAL_SERVER_ERROR;
       }
-      return org.springframework.http.ResponseEntity.status(status).build();
+      return ResponseEntity.status(status).build();
     } catch (Exception e) {
       log.error("Update actual time failed", e);
-      return org.springframework.http.ResponseEntity.status(
-              org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
-          .build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
   }
 
@@ -558,13 +569,13 @@ public class MissionWriteController {
       }
       body.put("comment", form.comment());
       if (form.startTime() != null && !form.startTime().isBlank()) {
-        java.time.Instant parsed = parseToInstant(form.startTime());
+        Instant parsed = parseToInstant(form.startTime());
         if (parsed != null) {
           body.put("startTime", parsed.toString());
         }
       }
       if (form.endTime() != null && !form.endTime().isBlank()) {
-        java.time.Instant parsed = parseToInstant(form.endTime());
+        Instant parsed = parseToInstant(form.endTime());
         if (parsed != null) {
           body.put("endTime", parsed.toString());
         }
@@ -879,18 +890,18 @@ public class MissionWriteController {
    * Parses one of the create form's JSON row carriers ({@code objectivesJson} / {@code stepsJson})
    * into a nested create-request list. A blank carrier — the common case, no goals/steps entered —
    * yields {@code null}, as does an empty array, so the backend seeds nothing. A malformed body
-   * propagates the {@link JsonProcessingException} to the create handler's catch, which surfaces
-   * the generic create error and re-flashes the form (the carriers ride along, so nothing is lost).
+   * propagates the (unchecked) {@link JacksonException} to the create handler's catch, which
+   * surfaces the generic create error and re-flashes the form (the carriers ride along, so nothing
+   * is lost).
    *
    * @param json the hidden carrier's raw JSON, or {@code null}/blank when the section is empty
    * @param typeRef the target list element type
    * @param <T> the nested create-request element type ({@code NewObjective} / {@code NewStep})
    * @return the parsed list, or {@code null} when the carrier is blank or the array is empty
-   * @throws JsonProcessingException when the carrier holds malformed JSON
+   * @throws JacksonException when the carrier holds malformed JSON or an unknown property
    */
   @Nullable
-  private <T> List<T> parseCreateList(String json, TypeReference<List<T>> typeRef)
-      throws JsonProcessingException {
+  private <T> List<T> parseCreateList(String json, TypeReference<List<T>> typeRef) {
     if (json == null || json.isBlank()) {
       return null;
     }
@@ -985,7 +996,7 @@ public class MissionWriteController {
               ? parseToInstant(form.actualEndTime())
               : null;
 
-      Map<String, Object> schedulePatch = new java.util.LinkedHashMap<>();
+      Map<String, Object> schedulePatch = new LinkedHashMap<>();
       schedulePatch.put("meetingTime", meetingTime);
       schedulePatch.put("plannedStartTime", plannedStartTime);
       schedulePatch.put("plannedEndTime", plannedEndTime);
@@ -1000,7 +1011,7 @@ public class MissionWriteController {
           (form.operationId() != null && !form.operationId().isBlank())
               ? UUID.fromString(form.operationId())
               : null;
-      Map<String, Object> corePatch = new java.util.LinkedHashMap<>();
+      Map<String, Object> corePatch = new LinkedHashMap<>();
       corePatch.put("name", form.name());
       corePatch.put("description", form.description());
       corePatch.put("calendarLink", form.calendarLink());
@@ -1012,7 +1023,7 @@ public class MissionWriteController {
     }
 
     if (saveFlags) {
-      Map<String, Object> flagsPatch = new java.util.LinkedHashMap<>();
+      Map<String, Object> flagsPatch = new LinkedHashMap<>();
       flagsPatch.put("isInternal", form.isInternal() != null && form.isInternal());
       flagsPatch.put("version", form.flagsVersion());
       backendApiClient.patch("/api/v1/missions/" + id + "/flags", flagsPatch, Void.class);
@@ -1039,13 +1050,13 @@ public class MissionWriteController {
    */
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateMissionAjax(
+  public ResponseEntity<Object> updateMissionAjax(
       @PathVariable @NotNull UUID id,
       @Valid @ModelAttribute("missionForm") MissionForm form,
       BindingResult bindingResult,
       Locale locale) {
     if (bindingResult.hasErrors()) {
-      Map<String, String> fieldErrors = new java.util.LinkedHashMap<>();
+      Map<String, String> fieldErrors = new LinkedHashMap<>();
       for (FieldError fe : bindingResult.getFieldErrors()) {
         // First error per field wins (the form's fields carry one constraint each); the message is
         // resolved exactly as th:errors does so the inline text matches the classic re-render. A
@@ -1054,30 +1065,30 @@ public class MissionWriteController {
         String message;
         try {
           message = messageSource.getMessage(fe, locale);
-        } catch (org.springframework.context.NoSuchMessageException ex) {
+        } catch (NoSuchMessageException ex) {
           message = fe.getDefaultMessage();
         }
         fieldErrors.putIfAbsent(fe.getField(), message);
       }
-      return org.springframework.http.ResponseEntity.unprocessableContent().body(fieldErrors);
+      return ResponseEntity.unprocessableContent().body(fieldErrors);
     }
     try {
       applyMissionUpdate(id, form);
       // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
-      Map<String, Object> versions = new java.util.LinkedHashMap<>();
+      Map<String, Object> versions = new LinkedHashMap<>();
       versions.put("version", refreshed.version());
       versions.put("coreVersion", refreshed.coreVersion());
       versions.put("scheduleVersion", refreshed.scheduleVersion());
       versions.put("flagsVersion", refreshed.flagsVersion());
-      return org.springframework.http.ResponseEntity.ok(versions);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(versions);
+    } catch (BackendServiceException e) {
       log.debug("Update mission (ajax) failed for {}: {}", id, e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("Update mission (ajax) failed for {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1114,27 +1125,26 @@ public class MissionWriteController {
    */
   @PostMapping("/{id}/managers/{userId}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addManager(
-      @PathVariable String id, @PathVariable String userId) {
+  public ResponseEntity<Object> addManager(@PathVariable String id, @PathVariable String userId) {
     log.debug("START addManager - id: '{}', userId: '{}'", id, userId);
     try {
       if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
         log.debug("MISSING PARAMETERS - id: '{}', userId: '{}'", id, userId);
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
-      java.util.UUID missionUuid;
-      java.util.UUID userUuid;
+      UUID missionUuid;
+      UUID userUuid;
       try {
-        missionUuid = java.util.UUID.fromString(id.trim());
+        missionUuid = UUID.fromString(id.trim());
       } catch (IllegalArgumentException e) {
         log.debug("INVALID MISSION ID FORMAT - id: '{}', Error: {}", id, e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
       try {
-        userUuid = java.util.UUID.fromString(userId.trim());
+        userUuid = UUID.fromString(userId.trim());
       } catch (IllegalArgumentException e) {
         log.debug("INVALID USER ID FORMAT - userId: '{}', Error: {}", userId, e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
 
       log.debug("CALLING BACKEND - Mission: {}, User: {}", missionUuid, userUuid);
@@ -1144,8 +1154,8 @@ public class MissionWriteController {
             null,
             String.class);
         log.debug("SUCCESS - Manager {} added to mission {}", userUuid, missionUuid);
-        return org.springframework.http.ResponseEntity.ok().build();
-      } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+        return ResponseEntity.ok().build();
+      } catch (BackendServiceException e) {
         log.debug(
             "BACKEND ERROR adding manager for mission {} and user {}: Status={}, Message={},"
                 + " Readable={}",
@@ -1163,7 +1173,7 @@ public class MissionWriteController {
           userId,
           e.getMessage(),
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1175,39 +1185,39 @@ public class MissionWriteController {
    */
   @DeleteMapping("/{id}/managers/{userId}")
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> removeManager(
+  public ResponseEntity<Object> removeManager(
       @PathVariable String id, @PathVariable String userId) {
     log.debug("START removeManager - id: '{}', userId: '{}'", id, userId);
     try {
       if (id == null || id.isBlank() || userId == null || userId.isBlank()) {
         log.debug("MISSING PARAMETERS in removeManager - id: '{}', userId: '{}'", id, userId);
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
-      java.util.UUID missionUuid;
-      java.util.UUID userUuid;
+      UUID missionUuid;
+      UUID userUuid;
       try {
-        missionUuid = java.util.UUID.fromString(id.trim());
+        missionUuid = UUID.fromString(id.trim());
       } catch (IllegalArgumentException e) {
         log.debug(
             "INVALID MISSION ID FORMAT in removeManager - id: '{}', Error: {}", id, e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
       try {
-        userUuid = java.util.UUID.fromString(userId.trim());
+        userUuid = UUID.fromString(userId.trim());
       } catch (IllegalArgumentException e) {
         log.debug(
             "INVALID USER ID FORMAT in removeManager - userId: '{}', Error: {}",
             userId,
             e.getMessage());
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
 
       log.debug("CALLING BACKEND DELETE - Mission: {}, User: {}", missionUuid, userUuid);
       backendApiClient.delete(
           "/api/v1/missions/" + missionUuid + "/managers/" + userUuid + "/slim", Object.class);
       log.debug("SUCCESS DELETE - Manager {} removed from mission {}", userUuid, missionUuid);
-      return org.springframework.http.ResponseEntity.ok().build();
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok().build();
+    } catch (BackendServiceException e) {
       log.debug(
           "BACKEND ERROR removing manager: Status={}, Message={}, Readable={}",
           e.getStatusCode(),
@@ -1221,7 +1231,7 @@ public class MissionWriteController {
           userId,
           e.getMessage(),
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1244,22 +1254,20 @@ public class MissionWriteController {
    * @return {@code 200} with the refreshed mission, {@code 400} for a missing or malformed {@code
    *     userId}, or the upstream RFC 7807 error passed through
    */
-  @PutMapping(
-      value = "/{id}/owner/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/owner/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> setMissionOwner(
+  public ResponseEntity<Object> setMissionOwner(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     UUID userId;
     try {
       Object raw = body.get("userId");
       if (raw == null || String.valueOf(raw).isBlank()) {
-        return org.springframework.http.ResponseEntity.badRequest().build();
+        return ResponseEntity.badRequest().build();
       }
       userId = UUID.fromString(String.valueOf(raw).trim());
     } catch (IllegalArgumentException e) {
       log.debug("Owner change refused: userId is not a UUID");
-      return org.springframework.http.ResponseEntity.badRequest().build();
+      return ResponseEntity.badRequest().build();
     }
     try {
       Map<String, Object> out = new HashMap<>();
@@ -1267,8 +1275,8 @@ public class MissionWriteController {
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/owner", out, Void.class);
       MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
-      return org.springframework.http.ResponseEntity.ok(mission);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(mission);
+    } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
         // Somebody else changed the owner since this page read its ownershipVersion. Relayed as-is:
         // the OPTIMISTIC_LOCK code in the body is what makes krtFetch offer the reload.
@@ -1279,7 +1287,7 @@ public class MissionWriteController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in setMissionOwner for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1296,11 +1304,9 @@ public class MissionWriteController {
    *     ownerless) plus {@code version}
    * @return {@code 200} on success, or the upstream RFC 7807 error passed through
    */
-  @PutMapping(
-      value = "/{id}/owning-org-unit/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/owning-org-unit/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> setMissionOwningOrgUnit(
+  public ResponseEntity<Object> setMissionOwningOrgUnit(
       @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Map<String, Object> out = new HashMap<>();
@@ -1314,13 +1320,13 @@ public class MissionWriteController {
       out.put("version", body.get("version") != null ? body.get("version") : 0L);
       backendApiClient.put("/api/v1/missions/" + id + "/owning-org-unit", out, Void.class);
       MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
-      return org.springframework.http.ResponseEntity.ok(mission);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(mission);
+    } catch (BackendServiceException e) {
       log.debug("Reassign owning org unit (AJAX) failed: status={}", e.getStatusCode());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in setMissionOwningOrgUnit for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1336,7 +1342,7 @@ public class MissionWriteController {
   public String addOrUpdateFrequency(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull UUID frequencyTypeId,
-      @RequestParam @NotNull java.math.BigDecimal value,
+      @RequestParam @NotNull BigDecimal value,
       RedirectAttributes redirectAttributes) {
     try {
       Map<String, Object> body = new HashMap<>();
@@ -1381,19 +1387,16 @@ public class MissionWriteController {
    * place without a full reload. Enables concurrent editing of the frequencies sub-panel without
    * forcing other users to re-enter their pending changes (Option A).
    */
-  @org.springframework.web.bind.annotation.PutMapping(
-      value = "/{id}/frequencies/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/frequencies/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
-  public org.springframework.http.ResponseEntity<Object> addOrUpdateFrequencyAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> addOrUpdateFrequencyAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post("/api/v1/missions/" + id + "/frequencies/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Add/update frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -1401,7 +1404,7 @@ public class MissionWriteController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addOrUpdateFrequencyAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1411,24 +1414,24 @@ public class MissionWriteController {
    */
   @DeleteMapping(
       value = "/{id}/frequencies/{frequencyId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
-  public org.springframework.http.ResponseEntity<Object> deleteFrequencyAjax(
+  public ResponseEntity<Object> deleteFrequencyAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
     try {
       Object result =
           backendApiClient.delete(
               "/api/v1/missions/" + id + "/frequencies/" + frequencyId + "/slim", Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Delete frequency (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug(
           "UNEXPECTED ERROR in deleteFrequencyAjax for mission {} freq {}", id, frequencyId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1441,20 +1444,17 @@ public class MissionWriteController {
    * @param body the JSON payload ({@code name} + {@code value})
    * @return the updated frequency list, or the propagated backend error
    */
-  @PostMapping(
-      value = "/{id}/frequencies/custom/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/frequencies/custom/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
-  public org.springframework.http.ResponseEntity<Object> addCustomFrequencyAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> addCustomFrequencyAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/frequencies/custom/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Add custom frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -1462,7 +1462,7 @@ public class MissionWriteController {
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in addCustomFrequencyAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1476,23 +1476,23 @@ public class MissionWriteController {
    * @param body the JSON payload ({@code name} + {@code value} + {@code version})
    * @return the updated frequency list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PutMapping(
+  @PutMapping(
       value = "/{id}/frequencies/custom/{frequencyId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
   @PreAuthorize("hasRole('" + Roles.MISSION_MANAGER + "')")
-  public org.springframework.http.ResponseEntity<Object> updateCustomFrequencyAjax(
+  public ResponseEntity<Object> updateCustomFrequencyAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/frequencies/custom/" + frequencyId + "/slim",
               body,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Update custom frequency (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -1504,7 +1504,7 @@ public class MissionWriteController {
           id,
           frequencyId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1513,23 +1513,20 @@ public class MissionWriteController {
    * slim unit list so the mission detail page can refresh without losing pending input in other
    * sub-panels (Option A).
    */
-  @PostMapping(
-      value = "/{id}/units/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/units/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addUnitAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> addUnitAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post("/api/v1/missions/" + id + "/units/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Add unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addUnitAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1537,44 +1534,40 @@ public class MissionWriteController {
    * AJAX endpoint for Paket 3C: updates a unit via the Slim backend endpoint and returns the
    * updated slim unit as JSON.
    */
-  @org.springframework.web.bind.annotation.PutMapping(
-      value = "/{id}/units/{unitId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/units/{unitId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateUnitAjax(
+  public ResponseEntity<Object> updateUnitAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/units/" + unitId + "/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Update unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in updateUnitAjax for mission {} unit {}", id, unitId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
   /** AJAX endpoint for Paket 3C: deletes a unit via the Slim backend endpoint. */
-  @DeleteMapping(
-      value = "/{id}/units/{unitId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @DeleteMapping(value = "/{id}/units/{unitId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteUnitAjax(
+  public ResponseEntity<Object> deleteUnitAjax(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
     try {
       backendApiClient.delete("/api/v1/missions/" + id + "/units/" + unitId + "/slim", Void.class);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
       log.debug("Delete unit (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteUnitAjax for mission {} unit {}", id, unitId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1589,23 +1582,20 @@ public class MissionWriteController {
    * @param body the step payload (title, optional meta, expected stepsVersion)
    * @return the ordered step list, or the propagated backend error
    */
-  @PostMapping(
-      value = "/{id}/steps/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/steps/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addStepAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> addStepAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post("/api/v1/missions/" + id + "/steps/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Add step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addStepAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1617,25 +1607,23 @@ public class MissionWriteController {
    * @param body the step payload (title, optional meta, expected stepsVersion)
    * @return the ordered step list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PutMapping(
-      value = "/{id}/steps/{stepId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/steps/{stepId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateStepAjax(
+  public ResponseEntity<Object> updateStepAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/steps/" + stepId + "/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Update step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in updateStepAjax for mission {} step {}", id, stepId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1648,11 +1636,9 @@ public class MissionWriteController {
    * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
    * @return the ordered step list, or the propagated backend error
    */
-  @DeleteMapping(
-      value = "/{id}/steps/{stepId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @DeleteMapping(value = "/{id}/steps/{stepId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteStepAjax(
+  public ResponseEntity<Object> deleteStepAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
       @RequestParam @NotNull Long stepsVersion) {
@@ -1661,13 +1647,13 @@ public class MissionWriteController {
           backendApiClient.delete(
               "/api/v1/missions/" + id + "/steps/" + stepId + "/slim?stepsVersion=" + stepsVersion,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Delete step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in deleteStepAjax for mission {} step {}", id, stepId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1678,25 +1664,22 @@ public class MissionWriteController {
    * @param body the desired step-id order + expected stepsVersion
    * @return the ordered step list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PutMapping(
-      value = "/{id}/steps/reorder/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/steps/reorder/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> reorderStepsAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> reorderStepsAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/steps/reorder/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Reorder steps (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in reorderStepsAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1710,25 +1693,25 @@ public class MissionWriteController {
    * @param body the new done state + expected stepsVersion
    * @return the ordered step list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PatchMapping(
+  @PatchMapping(
       value = "/{id}/steps/{stepId}/done/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> toggleStepDoneAjax(
+  public ResponseEntity<Object> toggleStepDoneAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.patch(
               "/api/v1/missions/" + id + "/steps/" + stepId + "/done/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Toggle step (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in toggleStepDoneAjax for mission {} step {}", id, stepId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1743,24 +1726,21 @@ public class MissionWriteController {
    * @param body the goal payload (title, kind, expected objectivesVersion)
    * @return the ordered goal list, or the propagated backend error
    */
-  @PostMapping(
-      value = "/{id}/objectives/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/objectives/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addObjectiveAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> addObjectiveAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post("/api/v1/missions/" + id + "/objectives/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Add objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addObjectiveAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1772,22 +1752,22 @@ public class MissionWriteController {
    * @param body the goal payload (title, kind, expected objectivesVersion)
    * @return the ordered goal list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PutMapping(
+  @PutMapping(
       value = "/{id}/objectives/{objectiveId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateObjectiveAjax(
+  public ResponseEntity<Object> updateObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/objectives/" + objectiveId + "/slim",
               body,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Update objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -1797,7 +1777,7 @@ public class MissionWriteController {
           id,
           objectiveId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1812,9 +1792,9 @@ public class MissionWriteController {
    */
   @DeleteMapping(
       value = "/{id}/objectives/{objectiveId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteObjectiveAjax(
+  public ResponseEntity<Object> deleteObjectiveAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
       @RequestParam @NotNull Long objectivesVersion) {
@@ -1828,8 +1808,8 @@ public class MissionWriteController {
                   + "/slim?objectivesVersion="
                   + objectivesVersion,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Delete objective (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -1839,7 +1819,7 @@ public class MissionWriteController {
           id,
           objectiveId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1850,25 +1830,22 @@ public class MissionWriteController {
    * @param body the desired goal-id order + expected objectivesVersion
    * @return the ordered goal list, or the propagated backend error
    */
-  @org.springframework.web.bind.annotation.PutMapping(
-      value = "/{id}/objectives/reorder/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PutMapping(value = "/{id}/objectives/reorder/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> reorderObjectivesAjax(
-      @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+  public ResponseEntity<Object> reorderObjectivesAjax(
+      @PathVariable @NotNull UUID id, @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/objectives/reorder/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Reorder objectives (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.debug("UNEXPECTED ERROR in reorderObjectivesAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1878,13 +1855,11 @@ public class MissionWriteController {
    * without losing pending input in other sub-panels (Option A: sub-section writes must not bump
    * Mission.version).
    */
-  @PostMapping(
-      value = "/{id}/participants/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+  @PostMapping(value = "/{id}/participants/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addParticipantAjax(
+  public ResponseEntity<Object> addParticipantAjax(
       @PathVariable @NotNull UUID id,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body,
+      @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
     try {
       // Relayed with the caller's token, like every other write. It used to go out on the
@@ -1894,14 +1869,14 @@ public class MissionWriteController {
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Add participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addParticipantAjax for mission {}", id, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1909,14 +1884,14 @@ public class MissionWriteController {
    * AJAX endpoint for Paket 3C (Option b - Participants): updates a participant via the Slim
    * backend endpoint and returns the updated slim participant as JSON.
    */
-  @org.springframework.web.bind.annotation.PutMapping(
+  @PutMapping(
       value = "/{id}/participants/{participantId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateParticipantAjax(
+  public ResponseEntity<Object> updateParticipantAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body,
+      @RequestBody Map<String, Object> body,
       @AuthenticationPrincipal OidcUser principal) {
     try {
       // Anonymous guests are allowed to edit their own guest participant entries
@@ -1928,8 +1903,8 @@ public class MissionWriteController {
               "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
               body,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Update participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -1939,7 +1914,7 @@ public class MissionWriteController {
           id,
           participantId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1949,17 +1924,17 @@ public class MissionWriteController {
    */
   @DeleteMapping(
       value = "/{id}/participants/{participantId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteParticipantAjax(
+  public ResponseEntity<Object> deleteParticipantAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
     try {
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/participants/" + participantId + "/slim", Void.class);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
       log.debug(
           "Delete participant (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
@@ -1969,7 +1944,7 @@ public class MissionWriteController {
           id,
           participantId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -1979,9 +1954,9 @@ public class MissionWriteController {
    */
   @PostMapping(
       value = "/{id}/participants/{participantId}/check-in/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> checkInParticipantAjax(
+  public ResponseEntity<Object> checkInParticipantAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
@@ -1991,8 +1966,8 @@ public class MissionWriteController {
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-in/slim",
               null,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Check-in participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -2004,7 +1979,7 @@ public class MissionWriteController {
           id,
           participantId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -2014,9 +1989,9 @@ public class MissionWriteController {
    */
   @PostMapping(
       value = "/{id}/participants/{participantId}/check-out/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> checkOutParticipantAjax(
+  public ResponseEntity<Object> checkOutParticipantAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
       @AuthenticationPrincipal OidcUser principal) {
@@ -2026,8 +2001,8 @@ public class MissionWriteController {
               "/api/v1/missions/" + id + "/participants/" + participantId + "/check-out/slim",
               null,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug(
           "Check-out participant (AJAX) failed: status={}, msg={}",
           e.getStatusCode(),
@@ -2039,7 +2014,7 @@ public class MissionWriteController {
           id,
           participantId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -2049,23 +2024,23 @@ public class MissionWriteController {
    */
   @PostMapping(
       value = "/{id}/units/{unitId}/crew/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> addCrewAjax(
+  public ResponseEntity<Object> addCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.post(
               "/api/v1/missions/" + id + "/units/" + unitId + "/crew/slim", body, Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Add crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
       log.error("UNEXPECTED ERROR in addCrewAjax for mission {} unit {}", id, unitId, e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -2073,23 +2048,23 @@ public class MissionWriteController {
    * AJAX endpoint for Paket 3C (Option c - Crew): updates a crew member via the Slim backend
    * endpoint and returns the updated slim crew entry.
    */
-  @org.springframework.web.bind.annotation.PutMapping(
+  @PutMapping(
       value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> updateCrewAjax(
+  public ResponseEntity<Object> updateCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @PathVariable @NotNull UUID crewId,
-      @org.springframework.web.bind.annotation.RequestBody Map<String, Object> body) {
+      @RequestBody Map<String, Object> body) {
     try {
       Object result =
           backendApiClient.put(
               "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim",
               body,
               Object.class);
-      return org.springframework.http.ResponseEntity.ok(result);
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.ok(result);
+    } catch (BackendServiceException e) {
       log.debug("Update crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -2099,7 +2074,7 @@ public class MissionWriteController {
           unitId,
           crewId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -2109,17 +2084,17 @@ public class MissionWriteController {
    */
   @DeleteMapping(
       value = "/{id}/units/{unitId}/crew/{crewId}/ajax",
-      produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+      produces = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody
-  public org.springframework.http.ResponseEntity<Object> deleteCrewAjax(
+  public ResponseEntity<Object> deleteCrewAjax(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
       @PathVariable @NotNull UUID crewId) {
     try {
       backendApiClient.delete(
           "/api/v1/missions/" + id + "/units/" + unitId + "/crew/" + crewId + "/slim", Void.class);
-      return org.springframework.http.ResponseEntity.noContent().build();
-    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      return ResponseEntity.noContent().build();
+    } catch (BackendServiceException e) {
       log.debug("Delete crew (AJAX) failed: status={}, msg={}", e.getStatusCode(), e.getMessage());
       return propagateBackendError(e);
     } catch (Exception e) {
@@ -2129,7 +2104,7 @@ public class MissionWriteController {
           unitId,
           crewId,
           e);
-      return org.springframework.http.ResponseEntity.internalServerError().build();
+      return ResponseEntity.internalServerError().build();
     }
   }
 
@@ -2141,27 +2116,27 @@ public class MissionWriteController {
    * (#924, L5), kept because {@link #parseToInstant} moved here with the write handlers while
    * {@code formatInstant} stayed read-side.
    */
-  private static final java.time.ZoneId MISSION_TIME_ZONE = java.time.ZoneId.of("Europe/Berlin");
+  private static final ZoneId MISSION_TIME_ZONE = ZoneId.of("Europe/Berlin");
 
   /**
-   * Parses a hidden datetime-input value back into an {@link java.time.Instant}, accepting every
-   * shape the datetime-splitter or {@link #formatInstant} can produce: a zone-bearing value (the
-   * splitter writes a UTC {@code toISOString()} with {@code Z} on edit, an explicit offset is
-   * equally absolute), a zoneless local datetime of <em>any</em> fractional-second precision (what
-   * {@link #formatInstant} renders for a field that was displayed but never re-edited, e.g. {@code
+   * Parses a hidden datetime-input value back into an {@link Instant}, accepting every shape the
+   * datetime-splitter or {@link #formatInstant} can produce: a zone-bearing value (the splitter
+   * writes a UTC {@code toISOString()} with {@code Z} on edit, an explicit offset is equally
+   * absolute), a zoneless local datetime of <em>any</em> fractional-second precision (what {@link
+   * #formatInstant} renders for a field that was displayed but never re-edited, e.g. {@code
    * 2026-06-21T11:59:58.222717}), or a bare date. A zoneless value is interpreted in {@link
    * #MISSION_TIME_ZONE}.
    *
    * <p>The earlier fixed-length (16/19) checks rejected the microsecond local form and fell through
-   * to {@link java.time.Instant#parse}, which threw — silently nulling {@code
-   * plannedStartTime}/{@code meetingTime}/{@code plannedEndTime} on every save that did not
-   * re-touch the field (the #589 e2e regression).
+   * to {@link Instant#parse}, which threw — silently nulling {@code plannedStartTime}/{@code
+   * meetingTime}/{@code plannedEndTime} on every save that did not re-touch the field (the #589 e2e
+   * regression).
    *
    * @param dateTimeStr the hidden input value; {@code null}/blank yields {@code null}
    * @return the parsed instant, or {@code null} if the value is blank or unparseable
    */
   @Nullable
-  private java.time.Instant parseToInstant(String dateTimeStr) {
+  private Instant parseToInstant(String dateTimeStr) {
     if (dateTimeStr == null || dateTimeStr.isBlank()) {
       return null;
     }
@@ -2170,17 +2145,17 @@ public class MissionWriteController {
       // A date-only value (the splitter submits a bare date when no time was entered) maps to the
       // start of that day in the display zone.
       if (value.length() == 10) {
-        return java.time.LocalDate.parse(value).atStartOfDay(MISSION_TIME_ZONE).toInstant();
+        return LocalDate.parse(value).atStartOfDay(MISSION_TIME_ZONE).toInstant();
       }
       // ISO_DATE_TIME parses both a zone-bearing value (absolute instant) and a zoneless local
       // datetime of any fractional precision; parseBest picks OffsetDateTime when a zone is present
       // and LocalDateTime otherwise.
-      java.time.temporal.TemporalAccessor parsed =
-          java.time.format.DateTimeFormatter.ISO_DATE_TIME.parseBest(
-              value, java.time.OffsetDateTime::from, java.time.LocalDateTime::from);
-      return parsed instanceof java.time.OffsetDateTime odt
+      TemporalAccessor parsed =
+          DateTimeFormatter.ISO_DATE_TIME.parseBest(
+              value, OffsetDateTime::from, LocalDateTime::from);
+      return parsed instanceof OffsetDateTime odt
           ? odt.toInstant()
-          : ((java.time.LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
+          : ((LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
     } catch (Exception e) {
       // The raw form value is client-supplied free text; sanitise it before it reaches the
       // logger so an embedded newline cannot forge a second log line (CWE-117).

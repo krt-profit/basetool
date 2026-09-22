@@ -165,8 +165,9 @@ class UserDeletionForeignKeyIntegrityTest {
     mission.setIsInternal(false);
     mission = missionRepository.save(mission);
     UUID missionId = mission.getId();
-    // setMissionOwner mirrors production: it sets mission.owner AND upserts the companion row.
-    missionService.setMissionOwner(missionId, exMember.getId());
+    // updateMissionOwner mirrors production: it sets mission.owner AND upserts the companion row.
+    // 0 is the ownership version of a mission whose owner was never changed.
+    missionService.updateMissionOwner(missionId, exMember.getId(), 0L);
 
     SpecialCommand sk = new SpecialCommand();
     sk.setName("FK-SK-" + tag);

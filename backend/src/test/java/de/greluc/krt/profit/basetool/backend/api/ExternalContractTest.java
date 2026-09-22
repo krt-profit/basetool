@@ -2318,8 +2318,10 @@ class ExternalContractTest {
           // own counter, and a counter that disappears turns a concurrent edit into a silent
           // overwrite instead of the 409 it exists to raise.
           //
-          // The five that still answer with the whole Einsatz do so because their endpoints have
-          // no slim twin.
+          // The four that still answer with the whole Einsatz do so because their endpoints have
+          // no slim twin. A fifth, `POST …/participants`, was retired on 2026-09-22 (BE-SIMP-02):
+          // it had been deprecated with a sunset of 2026-10-20, and the app moved off it on
+          // 2026-09-07 (basetool-android, `MissionRepository.addParticipant`).
           new ContractOperation(
               "/api/v1/missions/{id}/core", "patch", MISSION_DETAIL, Set.of("name", "version")),
           new ContractOperation(
@@ -2331,8 +2333,6 @@ class ExternalContractTest {
               Set.of("isInternal", "version")),
           new ContractOperation(
               "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
-          new ContractOperation(
-              "/api/v1/missions/{id}/participants", "post", MISSION_DETAIL, Set.of("userId")),
           // The only read in the phase, and the only one that is not 401: `GET /missions/**` is
           // permitAll, so it is dispatched and refused at the method seam with a 403. A ship
           // without an id is dropped, and the type is what tells two Carracks apart.

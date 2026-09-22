@@ -113,7 +113,8 @@ class MissionParticipantOrgUnitTest {
   void registeredUserWithNoMembership_getsNoOrgUnit() {
     User user = newUser("nomember");
 
-    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+    Mission updated =
+        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
 
     assertTrue(
         onlyParticipant(updated).getOrgUnits().isEmpty(),
@@ -125,7 +126,8 @@ class MissionParticipantOrgUnitTest {
     User user = newUser("staffelonly");
     addMembership(user, testStaffel, OrgUnitKind.SQUADRON);
 
-    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+    Mission updated =
+        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertEquals(List.of(testStaffel.getId()), ids);
@@ -136,7 +138,8 @@ class MissionParticipantOrgUnitTest {
     User user = newUser("skonly");
     addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
 
-    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+    Mission updated =
+        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertEquals(List.of(testSk.getId()), ids);
@@ -148,7 +151,8 @@ class MissionParticipantOrgUnitTest {
     addMembership(user, testStaffel, OrgUnitKind.SQUADRON);
     addMembership(user, testSk, OrgUnitKind.SPECIAL_COMMAND);
 
-    Mission updated = missionService.addParticipant(mission.getId(), user.getId());
+    Mission updated =
+        missionService.addParticipant(mission.getId(), user.getId(), null, null, null, null, null);
 
     List<UUID> ids = onlyParticipant(updated).getOrgUnits().stream().map(OrgUnit::getId).toList();
     assertTrue(ids.contains(testStaffel.getId()), "Staffel affiliation must be present");

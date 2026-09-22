@@ -103,7 +103,8 @@ class MissionUnitDecimalPlaceTest {
     mission = missionRepository.save(mission);
 
     // The ship owner must be a registered participant before the ship can be pinned to a unit.
-    missionService.addParticipant(mission.getId(), officerUser.getId());
+    missionService.addParticipant(
+        mission.getId(), officerUser.getId(), null, null, null, null, null);
   }
 
   @Test
@@ -118,7 +119,7 @@ class MissionUnitDecimalPlaceTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units")
+            post("/api/v1/missions/" + mission.getId() + "/units/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -131,7 +132,7 @@ class MissionUnitDecimalPlaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.assignedUnits[0].frequency").value(100.13));
+        .andExpect(jsonPath("$[0].frequency").value(100.13));
   }
 
   @Test
@@ -146,7 +147,7 @@ class MissionUnitDecimalPlaceTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units")
+            post("/api/v1/missions/" + mission.getId() + "/units/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -159,6 +160,6 @@ class MissionUnitDecimalPlaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.assignedUnits[0].frequency").value(100.12));
+        .andExpect(jsonPath("$[0].frequency").value(100.12));
   }
 }
