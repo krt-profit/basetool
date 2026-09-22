@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Der Edge sieht wieder die echte Client-Adresse.** Die gepinnte Adresse, der er den
+  PROXY-Header glaubt, lag am falschen Netz: die Verbindung kommt über ein anderes, geteiltes
+  Netz herein, dessen Adressen bei jedem Neuanlegen wandern. Der Edge verwarf den Header deshalb
+  und protokollierte **jede** Anfrage als dieselbe Bridge-Adresse — der Per-IP-Rate-Limiter und
+  jede Adress-Allowlist griffen damit auf einen einzigen Topf für das gesamte Internet. Beide
+  Adressen sind jetzt gepinnt.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed
