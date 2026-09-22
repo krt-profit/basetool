@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
+
 ### Added
 
 - **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
@@ -41,6 +43,7 @@
 - **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
   Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
   Auftrag" in der Auftragsliste waren nicht übersetzbar.
+
 - **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
   mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
   Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
@@ -79,7 +82,6 @@
 - **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
   neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
   Podman. Rein betriebsseitig.
-
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

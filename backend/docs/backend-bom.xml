@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:aaf487b4-8591-49ee-895d-9c6e741732e9" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:1c56d1e3-4ae3-4259-8b62-1b95f1f5a5e5" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-09-22T16:17:06Z</timestamp>
+    <timestamp>2026-09-22T19:54:34Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/35752988520</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/35775681189</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -2808,37 +2808,6 @@
       </licenses>
       <purl>pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.25?type=jar</purl>
       <modified>false</modified>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
-    <component type="library" bom-ref="pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar">
-      <group>org.aspectj</group>
-      <name>aspectjweaver</name>
-      <version>1.9.25.1</version>
-      <description>The AspectJ weaver applies aspects to Java classes. It can be used as a Java agent in order to apply load-time weaving (LTW) during class-loading and also contains the AspectJ runtime classes.</description>
-      <hashes>
-        <hash alg="MD5">7a88f606f52185a15a1527c968f55dfb</hash>
-        <hash alg="SHA-1">a713c790da4d794c7dfb542b550d4e44898d5e23</hash>
-        <hash alg="SHA-256">4fe86fdc18faea571f29129c70eaad5d121363504a06d7907be88f6c60ba3116</hash>
-        <hash alg="SHA-512">c3b99289f305795c7ed662a0e86219ce8458e7797e38f6222198c74dcd5bcf9c2a026a83584ebe2d514d17da2ca382c897acb940e55c471bad0154719cb4ba46</hash>
-        <hash alg="SHA3-256">689afe66772cae896d23ffe63ab938a26fbdd55fb06361b694cfb3aa2900a63d</hash>
-        <hash alg="SHA3-512">141f70786de40250b7fc4caac8f88362bd6316de02bcb4d746b3d7d2f46518521e363696db9dd7dd696d639c6afc9fa98868d05f7da662371293746f4cc0a437</hash>
-        <hash alg="SHA-384">7bc5761d491b67ae952a063c94102c58b902bc7aa0b5c3995d7dd8727ddde74dbb33e6312db6512fa5f7817c350e303f</hash>
-        <hash alg="SHA3-384">37b2304bb12db621c350c0231f77f1afd41246dfc488128eeb02bb9ff6ab9c5eeab086fcc47815c20da338a043c986bb</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>EPL-2.0</id>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="vcs">
-          <url>https://github.com/eclipse/org.aspectj</url>
-        </reference>
-      </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
@@ -6138,44 +6107,6 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/org.springframework/spring-aspects@7.0.9?type=jar">
-      <publisher>Spring IO</publisher>
-      <group>org.springframework</group>
-      <name>spring-aspects</name>
-      <version>7.0.9</version>
-      <description>Spring Aspects</description>
-      <hashes>
-        <hash alg="MD5">ffce6dbf248e91eea1a0fb876ef864fe</hash>
-        <hash alg="SHA-1">c1a59e3288b75d061034da5a9af4e254d9cd4c82</hash>
-        <hash alg="SHA-256">68247ea5d8cc7c2d06fb36b80b9e9692bddab72fffeac5e68f974d547fb28875</hash>
-        <hash alg="SHA-512">b9c294bfdb07d2c3728ee9ffe44b6d3dc18632ffd7dfb743b1c2885b5a95b6e0dac29c25108ce59766520d552abb1c2132810b1356e71f9482ad461a57c39111</hash>
-        <hash alg="SHA3-256">adc5b8676aff9d9730bc8d2ecd498a13f846423f37f5eb8be41d3d22b36fae9c</hash>
-        <hash alg="SHA3-512">d9b6e9292e48fc2c8fe23966078cff4d704972a93c9c5a311cc070f4d776f05cb18f7ee1e4186f76bb2c55dd6a217e0c2594c8f87f44fefd54360b9527096c1d</hash>
-        <hash alg="SHA-384">7b29637f485a31c809d0b52d22d26e7645b4549112d2e575a2978e1b8fa3fd4e77255b6dd5dcf3aa2afc85c8d1bb2c18</hash>
-        <hash alg="SHA3-384">c35f2ab92e5503df897eef6316c8e3a71ecd46ebfa13416ae9fd2b37f5215a021f907d99c331c77ea56d368606bf8e2e</hash>
-      </hashes>
-      <licenses>
-        <license>
-          <id>Apache-2.0</id>
-        </license>
-      </licenses>
-      <purl>pkg:maven/org.springframework/spring-aspects@7.0.9?type=jar</purl>
-      <modified>false</modified>
-      <externalReferences>
-        <reference type="website">
-          <url>https://spring.io/projects/spring-framework</url>
-        </reference>
-        <reference type="issue-tracker">
-          <url>https://github.com/spring-projects/spring-framework/issues</url>
-        </reference>
-        <reference type="vcs">
-          <url>https://github.com/spring-projects/spring-framework</url>
-        </reference>
-      </externalReferences>
-      <properties>
-        <property name="cdx:maven:package:test">false</property>
-      </properties>
-    </component>
     <component type="library" bom-ref="pkg:maven/org.springframework/spring-beans@7.0.9?type=jar">
       <publisher>Spring IO</publisher>
       <group>org.springframework</group>
@@ -7270,7 +7201,6 @@
     <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@11.0.25?type=jar">
       <dependency ref="pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@11.0.25?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar"/>
     <dependency ref="pkg:maven/org.checkerframework/checker-qual@3.55.1?type=jar"/>
     <dependency ref="pkg:maven/org.eclipse.angus/angus-activation@2.0.3?type=jar">
       <dependency ref="pkg:maven/jakarta.activation/jakarta.activation-api@2.1.4?type=jar"/>
@@ -7376,7 +7306,6 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-data-commons@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot-hibernate@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.data/spring-data-jpa@4.1.1?type=jar"/>
-      <dependency ref="pkg:maven/org.springframework/spring-aspects@7.0.9?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-data-redis@4.1.1?type=jar">
       <dependency ref="pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar"/>
@@ -7706,9 +7635,6 @@
     <dependency ref="pkg:maven/org.springframework/spring-aop@7.0.9?type=jar">
       <dependency ref="pkg:maven/org.springframework/spring-beans@7.0.9?type=jar"/>
       <dependency ref="pkg:maven/org.springframework/spring-core@7.0.9?type=jar"/>
-    </dependency>
-    <dependency ref="pkg:maven/org.springframework/spring-aspects@7.0.9?type=jar">
-      <dependency ref="pkg:maven/org.aspectj/aspectjweaver@1.9.25.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework/spring-beans@7.0.9?type=jar">
       <dependency ref="pkg:maven/org.springframework/spring-core@7.0.9?type=jar"/>
