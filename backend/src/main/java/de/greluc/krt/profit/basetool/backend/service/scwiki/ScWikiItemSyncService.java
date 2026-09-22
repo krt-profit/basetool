@@ -85,9 +85,10 @@ import org.springframework.util.StringUtils;
  * <p>Mode B scope note: §8.4 frames Mode B as "iterate the 7 kind endpoints"; this implementation
  * also runs the §6.3.1 catch-all ({@code /api/items everything else → GENERIC}) as a final residual
  * pass so the backfill actually covers the full pool the §11 R5 target describes (paints, cargo,
- * misc UEX never catalogued). The cross-kind orphan sweep (§8.4 / §8.7) fires only when
- * <b>every</b> pass — kind passes and the residual — returned data, so a transient outage, a 304,
- * or a sanity-cap trip never wipes the Wiki-side merge state.
+ * misc UEX never catalogued). The cross-kind orphan sweep (§8.4 / §8.7) fires only on a census
+ * nothing can hide a row from, so a transient outage, a 304, or a sanity-cap trip never wipes the
+ * Wiki-side merge state: either every pass returned a complete census, or the residual {@code
+ * /api/items} pass alone did and it enumerated every row the kind passes saw (ADR-0195).
  */
 @Slf4j
 @Service
@@ -282,9 +283,11 @@ public class ScWikiItemSyncService {
   /**
    * Mode B (full backfill): runs every per-kind endpoint pass (most-specific kind first so a
    * cross-listed UUID is claimed by its more-specific kind) then the residual {@code /api/items}
-   * {@code GENERIC} catch-all, accumulating one cross-kind seen set. The orphan sweep runs only
-   * when every pass succeeded (returned non-empty, non-capped data) and the seen set is non-empty —
-   * mirroring the {@code clearStalePrices} non-empty gate so an outage never wipes local data.
+   * {@code GENERIC} catch-all, accumulating one cross-kind seen set. The orphan sweep runs when the
+   * seen set is non-empty — mirroring the {@code clearStalePrices} non-empty gate so an outage
+   * never wipes local data — and the census is vouched for, which is true in either of two ways:
+   * every pass succeeded, or the residual pass alone did and {@link #residualVouchesForPool}
+   * confirms it enumerated everything the kind passes saw (ADR-0195).
    *
    * <p><b>All-304 carve-out (#1182):</b> a {@code 304 Not Modified} pass ingests nothing (the pool
    * is unchanged), so an all-cached healthy run would write {@code 0} rows — indistinguishable from
@@ -321,15 +324,16 @@ public class ScWikiItemSyncService {
     boolean allPassesSucceeded = true;
 
     for (KindPass pass : kindPasses()) {
-      allPassesSucceeded &= runKindPass(pass, ctx);
+      allPassesSucceeded &= runKindPass(pass, ctx).succeeded();
     }
     // §6.3.1 catch-all: everything not claimed by a kind endpoint becomes GENERIC. Exempt from the
     // sanity cap — it legitimately returns the whole pool.
-    allPassesSucceeded &=
+    KindPassResult residual =
         runKindPass(
             new KindPass(properties.getItemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
+    allPassesSucceeded &= residual.succeeded();
 
-    if (allPassesSucceeded && !ctx.seen.isEmpty()) {
+    if ((allPassesSucceeded || residualVouchesForPool(residual, ctx)) && !ctx.seen.isEmpty()) {
       int marked = self.getObject().markBackfillOrphansWithinTransaction(ctx.seen, ctx.now);
       if (marked > 0) {
         log.info(
@@ -449,11 +453,14 @@ public class ScWikiItemSyncService {
    *
    * @param pass the endpoint / kind / filter tuple to run
    * @param ctx the shared backfill state (seen set, counters, manufacturer cache)
-   * @return {@code true} only if the pass fetched a complete, usable pool and ingested it; {@code
-   *     false} if the response was empty / 304, the sanity cap tripped, or the page walk came back
-   *     incomplete — in all of which cases the caller suppresses the orphan sweep
+   * @return the pass outcome: {@link KindPassResult#succeeded()} is {@code true} only if the pass
+   *     fetched a complete, usable pool and ingested it, and {@code false} if the response was
+   *     empty / 304, the sanity cap tripped, or the page walk came back incomplete; {@link
+   *     KindPassResult#enumerated()} holds every UUID this pass was served, including the ones an
+   *     earlier, more-specific pass had already claimed
    */
-  private boolean runKindPass(@NotNull KindPass pass, BackfillContext ctx) {
+  @NotNull
+  private KindPassResult runKindPass(@NotNull KindPass pass, BackfillContext ctx) {
     Map<String, String> filters =
         StringUtils.hasText(pass.classificationFilter())
             ? Map.of("classification", pass.classificationFilter())
@@ -476,7 +483,7 @@ public class ScWikiItemSyncService {
           pass.kind());
       ctx.notModifiedPasses++;
       ctx.failedPasses++;
-      return false;
+      return KindPassResult.notEnumerated();
     }
     List<ScWikiItemDto> fetched = result.data();
     if (fetched.isEmpty()) {
@@ -486,7 +493,7 @@ public class ScWikiItemSyncService {
           pass.endpoint(),
           pass.kind());
       ctx.failedPasses++;
-      return false;
+      return KindPassResult.notEnumerated();
     }
     if (pass.applySanityCap() && fetched.size() > properties.getBackfillKindSanityCap()) {
       log.error(
@@ -499,7 +506,7 @@ public class ScWikiItemSyncService {
           properties.getBackfillKindSanityCap(),
           pass.kind());
       ctx.failedPasses++;
-      return false;
+      return KindPassResult.notEnumerated();
     }
     // An INCOMPLETE walk (a page failed, the pagination metadata went missing on a full page, or
     // meta.total disagreed with the merged rows) still yields real rows, so the ingest loop below
@@ -516,9 +523,17 @@ public class ScWikiItemSyncService {
       ctx.failedPasses++;
     }
 
+    // Every UUID this pass was served, kept apart from ctx.seen: the shared set records which pass
+    // CLAIMED a row, while the residual-census check needs to know which rows a pass actually
+    // enumerated — including the ones a more-specific kind pass had already taken.
+    Set<UUID> enumerated = HashSet.newHashSet(fetched.size());
     for (ScWikiItemDto dto : fetched) {
-      if (dto.uuid() == null || !ctx.seen.add(dto.uuid())) {
-        continue; // no UUID, or already claimed by an earlier (more-specific) pass
+      if (dto.uuid() == null) {
+        continue; // an id-less row identifies nothing and can vouch for nothing
+      }
+      enumerated.add(dto.uuid());
+      if (!ctx.seen.add(dto.uuid())) {
+        continue; // already claimed by an earlier (more-specific) pass
       }
       try {
         // Resolve the manufacturer and the Weg-2 reconciliation candidate from the in-memory caches
@@ -552,7 +567,57 @@ public class ScWikiItemSyncService {
         log.error("Failed to upsert SC Wiki item {} ({})", dto.uuid(), pass.kind(), e);
       }
     }
-    return complete;
+    return new KindPassResult(complete, enumerated);
+  }
+
+  /**
+   * Decides whether the residual {@code /api/items} catch-all pass on its own vouches for the
+   * cross-kind census, which lets the orphan sweep run even though a kind pass failed (ADR-0195).
+   *
+   * <p>The sweep is safe exactly when {@code ctx.seen} holds every item the Wiki currently serves,
+   * because it tombstones the rows that are missing from it. The kind endpoints are filtered views
+   * over the same pool the residual {@code /api/items} pass enumerates unfiltered, so a kind pass
+   * that could not vouch for its own census cannot hide a row from a residual pass that did: the
+   * rows it missed are in the pool, and the residual pass walked the pool. That is what makes the
+   * strict "every pass succeeded" gate too strong — {@code /api/vehicle-items} is INCOMPLETE on
+   * every single run for an upstream reason with no client-side remedy (its paginator orders on a
+   * non-unique key, so rows tie across a page boundary), which stood the item sweep down
+   * permanently rather than for a bad night.
+   *
+   * <p>The subset relation is <b>verified here, not assumed</b>. If any pass was served a UUID the
+   * residual pass never enumerated, that pool is not a superset after all, the relaxation does not
+   * apply, and the caller falls back to the strict gate. Being wrong in the other direction —
+   * tombstoning a row that is merely absent from a feed nobody walked — is the unrecoverable one.
+   *
+   * @param residual the outcome of the residual {@code /api/items} catch-all pass
+   * @param ctx the finished run's context, whose {@code seen} set is the union of every pass
+   * @return {@code true} when the residual pass returned a complete census that contains every UUID
+   *     the run saw; {@code false} whenever the strict gate must decide instead
+   */
+  private static boolean residualVouchesForPool(
+      @NotNull KindPassResult residual, @NotNull BackfillContext ctx) {
+    if (!residual.succeeded()) {
+      return false;
+    }
+    if (!residual.enumerated().containsAll(ctx.seen)) {
+      Set<UUID> outsidePool = new HashSet<>(ctx.seen);
+      outsidePool.removeAll(residual.enumerated());
+      log.warn(
+          "The residual /api/items pass enumerated a complete census of {} row(s), but {} row(s)"
+              + " seen by the kind passes are not in it — the kind endpoints are not a subset of"
+              + " the item pool after all, so the census is NOT vouched for and the orphan sweep"
+              + " stands down.",
+          residual.enumerated().size(),
+          outsidePool.size());
+      return false;
+    }
+    log.info(
+        "{} kind pass(es) could not vouch for their own census, but the residual /api/items pass"
+            + " enumerated a complete one of {} row(s) that contains every row they saw — the"
+            + " cross-kind census stands and the orphan sweep runs (ADR-0195).",
+        ctx.failedPasses,
+        residual.enumerated().size());
+    return true;
   }
 
   /**
@@ -804,6 +869,35 @@ public class ScWikiItemSyncService {
    */
   private record KindPass(
       String endpoint, GameItemKind kind, String classificationFilter, boolean applySanityCap) {}
+
+  /**
+   * What one Mode-B pass achieved: whether it can vouch for its own census, and which row
+   * identities it was served.
+   *
+   * <p>The two are separate questions and the second one is why this is a record rather than a
+   * {@code boolean}. {@code BackfillContext.seen} records which pass <em>claimed</em> a row — a
+   * more-specific kind pass wins, so a later pass adds nothing for a row it also served — whereas
+   * {@link #residualVouchesForPool} has to compare pools, and for that it needs everything a pass
+   * enumerated regardless of who claimed it.
+   *
+   * @param succeeded whether the pass fetched a complete, usable pool and ingested it
+   * @param enumerated every UUID the pass was served this run; empty when it never enumerated
+   *     anything (304, empty-200, or the sanity cap tripping), and never {@code null}
+   */
+  private record KindPassResult(boolean succeeded, @NotNull Set<UUID> enumerated) {
+
+    /**
+     * The outcome of a pass that never enumerated the feed at all — a {@code 304 Not Modified}, an
+     * empty-200, or a fetch the sanity cap rejected. It failed and it vouches for nothing, so it
+     * can neither satisfy the strict gate nor contribute a pool to the residual-census check.
+     *
+     * @return a failed result carrying no row identities
+     */
+    @Contract(value = " -> new", pure = true)
+    private static @NotNull KindPassResult notEnumerated() {
+      return new KindPassResult(false, Set.of());
+    }
+  }
 
   /**
    * Mutable per-run state threaded through the Mode-B passes: the sync-report run id, the shared

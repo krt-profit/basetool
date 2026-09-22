@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Gelöschte Wiki-Gegenstände werden wieder als entfernt markiert.** Der Abgleich mit dem SC-Wiki
+  hat seine Aufräumstufe seit Wochen auf jedem Lauf übersprungen, weil ein einziger Teilabruf
+  (`/api/vehicle-items`) beim Anbieter dauerhaft unvollständig zurückkommt — dadurch blieb im
+  Gegenstandskatalog alles stehen, was es im Wiki längst nicht mehr gibt. Der vollständige
+  Gesamtabruf deckt diesen Teilabruf ab und bürgt jetzt für ihn; ist er selbst unvollständig,
+  bleibt die Aufräumstufe wie bisher aus (ADR-0195). Der erste Lauf nach dem Update markiert den
+  gesamten aufgelaufenen Rückstand auf einmal.
+
 ## [v1.9.0](https://github.com/krt-profit/basetool/releases/tag/v1.9.0) - 2026-09-22
 
 ### Added

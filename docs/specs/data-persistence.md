@@ -660,7 +660,7 @@ de-N+1-ing the sort comparator), `JobOrderHandoverService` / `JobOrderItemHandov
 Covered by `StaffelMembershipResolverTest`, `OwnerScopeServiceTest`,
 `OrgUnitMembershipQueryServiceTest`, `PromotionFeatureFlagServiceGateTest`.
 
-### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147)
+### REQ-DATA-014 — an external-catalogue tombstone sweep runs only on an identity-verified census (ADR-0147, ADR-0195)
 
 A sweep that soft-deletes every local row **missing from** a fetched upstream list (the SC-Wiki
 `scwiki_deleted` sweeps, and any future sweep of that shape) may run only when the page walk that
@@ -683,6 +683,25 @@ thing counted is **distinct row identities** — never the merged row count:
 - Row-count baselines come from **page 1**; the page count is re-read from every page. On a
   shrinking feed a fresher, lower total would hide exactly the rows a mid-walk deletion pushed out
   of the pagination window before the walk reached them.
+
+**A list assembled from several walks is complete when *it* is, not when every walk is** (ADR-0195).
+The SC-Wiki item sweep accumulates one cross-kind `seen` set from seven per-kind passes plus the
+residual `/api/items` catch-all, and requiring every pass to vouch for itself is stricter than the
+sweep's own safety condition — which is only that `seen` holds every item the upstream serves. The
+kind endpoints are filtered views over the pool the residual pass enumerates unfiltered, so a kind
+pass that could not vouch for its own census cannot hide a row from a residual pass that did. The
+sweep therefore runs when `seen` is non-empty and **either** every pass returned a complete census
+**or** the residual pass returned one *and* enumerated every UUID the run saw.
+
+This matters because the strict form was not merely conservative, it was unsatisfiable:
+`/api/vehicle-items` orders on a non-unique key, ties straddle a page boundary, and the pass is
+INCOMPLETE on **every** run with no client-side remedy — so the item sweep stood down permanently
+and nothing removed from the Wiki was ever tombstoned. The relaxation is **verified per run, never
+assumed**: each pass reports the UUIDs it was served (kept apart from `seen`, which records which
+pass *claimed* a row and so under-reports what a later pass saw), and a pass served a row the
+residual census does not contain withdraws the relaxation with a `WARN` and hands the decision back
+to the strict gate. A residual pass that stops being complete withdraws it by itself — which is what
+a per-endpoint carve-out could not have done.
 
 **The same refusal applies to a fetch that is not a page walk.** `UexClient.FetchResult` carries a
 `complete()` flag for the same reason: its item sync makes one call per category, every failure mode
@@ -727,12 +746,19 @@ cleared, no statement is issued when nothing is stale, and the ids arrive in bou
 duplicates; and a walk exhibiting two symptoms of one break still increments the fetch-error counter
 once.
 
+**Acceptance** (`ScWikiItemSyncServiceBackfillTest`): a run in which one kind pass is INCOMPLETE but
+the residual `/api/items` pass returns a complete census containing every row that pass saw **does**
+sweep and registers no stand-down counter; the same run with one of those rows absent from the
+residual census does **not** sweep and counts `reason="incomplete"`; and a run whose kind passes are
+all clean but whose residual pass is INCOMPLETE does not sweep either.
+
 **Enforced by:** `ScWikiClient.fetchAllPagesResult` (`countDistinctRows`, `FetchResult.complete()`)
+and `ScWikiItemSyncService.residualVouchesForPool` (the cross-pass clause)
 · **Callers:** `ScWikiItemSyncService` (Mode-B cross-kind orphan sweep),
 `ScWikiCommoditySyncService` / `ScWikiBlueprintSyncService` / `ScWikiVehicleSyncService` /
 `ScWikiManufacturerSyncService` (inline sweeps) · **Repository:**
 `GameItemRepository.markScwikiDeletedExcept` (gated on `scwiki_synced_at IS NOT NULL`, so UEX-only
-rows are never stamped) · See ADR-0147.
+rows are never stamped) · See ADR-0147 and ADR-0195.
 
 ### REQ-DATA-015 — an inbound catalogue mapping binds only fields the upstream serves (ADR-0148)
 
