@@ -19,7 +19,10 @@ name: Refresh Versions
 # and `contents: write`.
 on:
   schedule:
-    - cron: '0 5 * * 1'
+    # Monday, scheduled 04:11 UTC (off the full hour). GitHub starts it hours late -- the September
+    # 2026 runs of the old 05:00 began 09:51-11:15 UTC -- so the PR appears on Monday, at no
+    # particular time (audit item CI-16).
+    - cron: '11 4 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -46,17 +49,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+          cache-read-only: 'false'
 
       - name: Run refreshVersions
         run: ./gradlew refreshVersions --stacktrace

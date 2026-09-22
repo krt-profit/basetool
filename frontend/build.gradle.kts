@@ -757,17 +757,33 @@ tasks.matching { it.name == "checkstyleE2e" }.configureEach { enabled = false }
 // launch with a DriverException. That path uses apt + passwordless sudo, so it is gated to CI
 // Linux;
 // local runs on any OS just download the browser binaries (a Linux dev installs deps manually).
+//
+// `-Pe2e.browser=<engine>` narrows the install to that one engine (audit item CI-06): every CI
+// matrix cell runs exactly one, and installing all three -- plus, on CI, all three engines' OS
+// libraries through apt -- in each of fifteen cells was pure waste. Without the property (a local
+// run) all three are installed, as before. An unknown value fails here rather than being handed to
+// the Playwright CLI, which would otherwise download nothing and leave the suite to fail later.
 val playwrightInstall =
   tasks.register<JavaExec>("playwrightInstall") {
     group = "verification"
     description =
-      "Installs the Playwright browsers (Chromium, Firefox, WebKit) for e2eTest/smokeTest."
+      "Installs the Playwright browsers for e2eTest/smokeTest (all three, or -Pe2e.browser only)."
     classpath = sourceSets["e2e"].runtimeClasspath
     mainClass.set("com.microsoft.playwright.CLI")
     val withDeps =
       System.getenv("CI") == "true" &&
         System.getProperty("os.name").orEmpty().lowercase().contains("linux")
-    val browsers = listOf("chromium", "firefox", "webkit")
+    val allBrowsers = listOf("chromium", "firefox", "webkit")
+    val requested = (findProperty("e2e.browser") as String?)?.trim()?.lowercase()
+    val browsers =
+      when {
+        requested.isNullOrEmpty() -> allBrowsers
+        requested in allBrowsers -> listOf(requested)
+        else ->
+          throw GradleException(
+            "-Pe2e.browser=$requested is not one of $allBrowsers; nothing would be installed for it"
+          )
+      }
     setArgs(
       if (withDeps) listOf("install", "--with-deps") + browsers else listOf("install") + browsers
     )
@@ -801,6 +817,10 @@ val playwrightSuiteConfig: Test.() -> Unit = {
   mapOf("E2E_USERNAME" to "e2e.username", "E2E_PASSWORD" to "e2e.password").forEach { (env, prop) ->
     System.getenv(env)?.takeIf { it.isNotBlank() }?.let { systemProperty(prop, it) }
   }
+  // `e2e.prebuilt=true` tells E2eStackExtension the application images are already in the local
+  // Docker store (e2e.yml's `build-stack` job builds them once and every matrix cell loads them),
+  // so
+  // it boots them with `--no-build` instead of building them again.
   listOf(
       "e2e.baseUrl",
       "e2e.browser",
@@ -808,6 +828,7 @@ val playwrightSuiteConfig: Test.() -> Unit = {
       "e2e.username",
       "e2e.password",
       "e2e.hostResolverRules",
+      "e2e.prebuilt",
     )
     .forEach { key -> (findProperty(key) as String?)?.let { systemProperty(key, it) } }
 }

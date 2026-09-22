@@ -23,12 +23,22 @@ on:
     paths:
       - "scripts/deploy.sh"
       - "scripts/deploy.test.sh"
+      # deploy.sh sources scripts/lib/ (the container-runtime seam) and runs render-env-d.py, so
+      # a change to either changes what deploy.sh does and has to re-run its self-tests (audit
+      # item OPS-CI-02); until 2026-09-22 such a PR ran none of them.
+      - "scripts/lib/**"
+      - "scripts/render-env-d.py"
       - ".github/workflows/deploy-script.yml"
   push:
     branches: [main]
     paths:
       - "scripts/deploy.sh"
       - "scripts/deploy.test.sh"
+      # deploy.sh sources scripts/lib/ (the container-runtime seam) and runs render-env-d.py, so
+      # a change to either changes what deploy.sh does and has to re-run its self-tests (audit
+      # item OPS-CI-02); until 2026-09-22 such a PR ran none of them.
+      - "scripts/lib/**"
+      - "scripts/render-env-d.py"
       - ".github/workflows/deploy-script.yml"
   workflow_dispatch:
 

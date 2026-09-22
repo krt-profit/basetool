@@ -455,7 +455,7 @@ echoing them (e.g. `read -rs SMTP_AUTH_PASSWORD; export SMTP_AUTH_PASSWORD`), th
 
 ```bash
 envsubst < /var/iri/code/monitoring/alertmanager/alertmanager.yml.tmpl > /var/iri/monitoring/secrets/alertmanager.yml.new
-grep -n '\${' /var/iri/monitoring/secrets/alertmanager.yml.new      # expect no output: nothing left unrendered
+grep -n '\${' /var/iri/monitoring/secrets/alertmanager.yml.new | grep -v '^[0-9]*:[[:space:]]*#'   # expect no output: nothing left unrendered
 chown "$(own 65534):$(own 65534)" /var/iri/monitoring/secrets/alertmanager.yml.new
 chmod 600 /var/iri/monitoring/secrets/alertmanager.yml.new
 ${PODMAN} run --rm -v /var/iri/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
@@ -763,10 +763,21 @@ Lint the configs with ephemeral containers before committing (from the repo root
 workstation). CI runs the structural gates in `repo-lint.yml`:
 
 ```bash
-# Prometheus scrape config + alert rules. The --entrypoint is required: the image's entrypoint is
+# All four configuration files at once -- Prometheus (+ the rule files it loads), Alertmanager
+# (rendered with dummy values the way the runbook renders it), Alloy (fmt, and validate gated on
+# EMPTY OUTPUT) and Loki -- in the digest-pinned images docker-compose.monitoring.yml names. This is
+# the CI gate (repo-lint, since 2026-09-22); the .test.sh breaks each file once and must see it fail.
+scripts/check-monitoring-configs.sh
+scripts/check-monitoring-configs.test.sh
+
+# Prometheus scrape config by hand. The --entrypoint is required: the image's entrypoint is
 # /bin/prometheus, so passing `promtool` as the first argument fails with "unexpected promtool".
-docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
-  check config /cfg/prometheus.yml
+# Mount where the unit mounts: `rule_files: /etc/prometheus/alerts/*.yml` is an absolute glob, and
+# with the directory elsewhere it matches nothing and promtool silently checks no rule file at all.
+docker run --rm --entrypoint promtool \
+  -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.14.0 \
+  check config /etc/prometheus/prometheus.yml
 # The glob'd commands go through `sh -c` so the pattern is expanded INSIDE the container.
 docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
   -c 'promtool check rules /cfg/alerts/*.yml'

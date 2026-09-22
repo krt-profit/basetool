@@ -617,7 +617,7 @@ rules, because the masks broke both ways:
 **Both rules are gate-enforced.** `scripts/check-alloy-log-masking.py` fails the build when any
 `stage.replace` in `monitoring/alloy/config.alloy` carries a `${` in its `replace` or more than one
 capturing group in its `expression` (`(?:…)` and `(?i)` do not count, named groups do, and no group
-at all is fine — Alloy then replaces the whole match). It runs as the `alloy-log-masking` job of
+at all is fine — Alloy then replaces the whole match). It runs as the `alloy-log-masking` check of
 [`repo-lint.yml`](../../.github/workflows/repo-lint.yml), with its self-test first so the gate
 cannot pass vacuously. It has to be a gate rather than a convention: neither broken form fails on
 its own — the config is valid, `alloy fmt` accepts it, the shipper stays healthy and the stream is
@@ -2541,7 +2541,15 @@ therefore alerts on:
   `deploy.sh`'s reconcile: a merged template change reaches the running process only when an operator
   re-renders the file and restarts `alertmanager.service` (verify `AlertmanagerConfigReloadFailed == 0`
   afterwards). The 2026-09-10 mails spaced exactly `4h + 5m` apart were this gap — the 720 h cadence
-  below had been in git for weeks and not in the process.
+  below had been in git for weeks and not in the process. Since 2026-09-22 CI renders the template
+  the same way (plain `envsubst`, dummy values) and runs `amtool check-config` over the result, and
+  it fails when the template gains a placeholder the documented render does not set — which the
+  host render would fill with an empty string. The same check runs `promtool check config` over
+  `prometheus.yml` (following its `rule_files`), `alloy fmt --test` and `alloy validate` (gated on
+  **empty output**, because `validate` exits 0 on failure) over `config.alloy`, and
+  `loki -verify-config` over `loki-config.yml`, each in the digest-pinned image
+  `docker-compose.monitoring.yml` names (`scripts/check-monitoring-configs.sh`, audit item
+  OPS-CI-01); its self-test breaks each file once and must see the matching check fail.
 - **Notification cadence — one mail per event.** Alertmanager has no acknowledged state, so a
   still-firing alert is re-notified every `repeat_interval` indefinitely. At the original 4 h
   (warnings) / 1 h (criticals) that is six respectively twenty-four identical mails a day for as long
@@ -2608,6 +2616,8 @@ groups, incl. `MonitoringReconcileDisabled`) · `monitoring/prometheus/alerts/in
 `monitoring/prometheus/tests/` (`promtool test rules` units, incl. `monitoring_reconcile_disabled_test.yml`
 and `containerrestartloop_changes_test.yml`) · `scripts/check-loki-rules.sh` (every Loki rule
 file parses and every LogQL expression is valid — a group the ruler skips alerts on nothing) ·
+`scripts/check-monitoring-configs.sh` + `.test.sh` (repo-lint `Container checks`: the Prometheus,
+Alertmanager, Alloy and Loki configuration files, each validated by its own tool in the pinned image) ·
 `monitoring/prometheus/alerts/containers-runtime.yml` (the `basetool:container:*` normalisation and
 the two collector-liveness alerts) · `scripts/cgroup-container-metrics.py` +
 `iri-container-metrics.timer` and `ansible/roles/basetool_host/tasks/27-observability.yml` (the

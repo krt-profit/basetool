@@ -93,19 +93,10 @@ jobs:
             exit 1
           fi
 
-      - name: Set up JDK 25 (Temurin)
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      - name: Set up JDK 25 and Gradle
+        uses: ./.github/actions/setup-jdk-gradle
         with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
-        with:
-          cache-read-only: true
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+          cache-read-only: 'true'
 
       - name: Tidy historical CHANGELOG drift
         run: python3 .claude/skills/release-notes/scripts/reconcile_changelog.py --write
@@ -163,7 +154,8 @@ jobs:
         run: |
           set -euo pipefail
           # Commit only the known release artifacts -- never an incidental change
-          # such as the gradlew mode bit flipped by `chmod +x` in an earlier step.
+          # an earlier step left in the working tree (a `chmod +x ./gradlew` used to
+          # flip the mode bit here; it is gone, and this list still stands guard).
           paths=(CHANGELOG.md backend/docs frontend/docs ingest/docs keycloak-spi/docs)
           mapfile -t files < <(git diff --name-only HEAD -- "${paths[@]}")
           if [ "${#files[@]}" -eq 0 ]; then

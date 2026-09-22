@@ -440,7 +440,7 @@ IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
 > frontend token carries it — the check would pass for tokens this interface must refuse. Since
-> 2026-09-22 the repo-lint job `ingest-audience` (`scripts/check-ingest-audience.py`) fails a PR
+> 2026-09-22 the repo-lint check `ingest-audience` (job *Repository gates*) (`scripts/check-ingest-audience.py`) fails a PR
 > that pairs the gateway's audience with that value in any config, env template or runbook.
 >
 > **Reading the result without the host** (2026-09-22): the gauge

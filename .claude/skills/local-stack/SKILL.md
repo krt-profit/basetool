@@ -26,7 +26,7 @@ seeded data stays put). Each file's header carries its exact command line.
 Production does **not** run Compose: it runs rootless Podman + Quadlet units generated from these
 files (`scripts/generate-quadlet.py` → `quadlet/`). A change to a service in `docker-compose*.yml`
 therefore needs the units regenerated in the same change (`python3 scripts/generate-quadlet.py`;
-the `quadlet-drift` job in `repo-lint.yml` runs `--check`).
+the `quadlet-drift` check in `repo-lint.yml` runs `--check`).
 
 Host ports (dev profile only, bound to `127.0.0.1`): backend `11261`, frontend `18081`, ingest `11262`, Keycloak `18080`, backend DB `15432`, Keycloak DB `15433`, Redis `6379`. A `.env` at repo root is required for the regular dev/prod profiles (see README for keys). The isolated test stack instead reads `.env.test` and a stripped `realm-export.json`; its TLS material is the **committed** throwaway keystore under `docker/test-tls/` (password `basetool-test`, ADR-0139), bound by a hardcoded path — nothing to generate. See the README's *Running the local test stack* section for setup, and never substitute production artifacts for those.
 
