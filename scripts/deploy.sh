@@ -555,6 +555,15 @@ apply_config_tree() {
     install -d "${dst}/docker"
     mirror_dir "${src}/docker/edge" "${dst}/docker/edge"
   fi
+  # The ACME renewal loop — the warning above, collected. docker/acme/publish-loop.sh moved out of
+  # the compose file on 2026-09-16 and neither the bundle's COPY allowlist nor this list gained an
+  # entry, so for six days a release shipped a compose service and a Quadlet unit that both mount a
+  # directory nothing delivers. A host that already had the container never noticed; the Podman
+  # cutover host, which did not, refused to start it at all and renewed no certificates.
+  if [[ -d "${src}/docker/acme" ]]; then
+    install -d "${dst}/docker"
+    mirror_dir "${src}/docker/acme" "${dst}/docker/acme"
+  fi
   if [[ -d "${src}/keycloak-theme" ]]; then
     mirror_dir "${src}/keycloak-theme" "${dst}/keycloak-theme"
   fi

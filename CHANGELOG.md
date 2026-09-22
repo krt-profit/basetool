@@ -11,6 +11,19 @@
   sowie die externen Sonden stehen mit darin; ohne sie schlugen die Keycloak-Anmeldung in Grafana
   und jede externe Prüfung fehl. Rein betriebsseitig.
 
+- **Die Zertifikatserneuerung fehlte im Auslieferungspaket.** Die ACME-Schleife ist am 16.09. aus
+  der Compose-Datei in eine eigene Skriptdatei gewandert, ohne dass das Paket sie mitnimmt: auf
+  einem frisch aufgesetzten Host startet der Dienst dadurch gar nicht und erneuert keine
+  Zertifikate. Bestehende Hosts merkten davon nichts, weil ihr Container das alte Kommando noch in
+  sich trug. Paket und Auslieferung tragen die Datei jetzt beide, und ein Test prüft künftig jeden
+  Teilbaum statt nur den, der zuerst gefehlt hat.
+
+- **Die wöchentliche Wiederherstellungsprobe läuft wieder durch.** Auf dem Podman-Host brach sie
+  beim zweiten Datenbank-Dump ab und meldete vier Artefakte als nicht wiederherstellbar, die sie
+  gar nicht erst geprüft hatte: `podman cp` gab einen Fehler zurück, obwohl die Datei vollständig
+  im Container angekommen war. Die Dumps wandern jetzt auf einem anderen Weg hinein, und die
+  übertragene Größe wird nachgezählt, statt dem Rückgabewert zu glauben.
+
 ## [v1.9.1](https://github.com/krt-profit/basetool/releases/tag/v1.9.1) - 2026-09-22
 
 ### Fixed
