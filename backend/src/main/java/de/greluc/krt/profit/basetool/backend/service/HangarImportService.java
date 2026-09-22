@@ -187,7 +187,9 @@ public class HangarImportService {
     List<FleetExportParser.FleetImportEntry> entries = FleetExportParser.parse(objectMapper, file);
 
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
 
     // Phase 0: one query to build the tolerant lookup index covering all four match stages.
     ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(shipTypeRepository.findAll());

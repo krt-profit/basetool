@@ -200,8 +200,7 @@ class DatabaseIndexMigrationTest {
         jdbc, "material_exchange_offer", "idx_material_exchange_offer_owning_org_unit_id");
     assertIndexExists(
         jdbc, "material_exchange_request", "idx_material_exchange_request_owning_org_unit_id");
-    assertIndexExists(
-        jdbc, "job_order_handover", "idx_job_order_handover_executing_user_id");
+    assertIndexExists(jdbc, "job_order_handover", "idx_job_order_handover_executing_user_id");
     assertIndexExists(jdbc, "bank_account_grant", "idx_bank_account_grant_granted_by");
     assertIndexExists(jdbc, "bank_booking_request", "idx_bank_booking_request_decided_by");
     assertIndexExists(

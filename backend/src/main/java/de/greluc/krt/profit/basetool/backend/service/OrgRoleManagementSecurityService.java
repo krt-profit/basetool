@@ -271,13 +271,13 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * The calling principal's membership rows, read once per HTTP request (REQ-DATA-003,
-   * BE-PERF-15). Every verdict here is a question about the caller's own ranks, and the Leitung
-   * view asks it for every Bereich, Staffel and Spezialkommando in turn — one {@code
-   * findAllByIdUserId} per request instead of a lookup per unit and verdict. Keyed by caller id, so
-   * a request cannot read another principal's rows. Outside an HTTP request there is no memo and
-   * the rows are read directly. Like the other request memos, it assumes the caller's own ranks do
-   * not change within the request that asks.
+   * The calling principal's membership rows, read once per HTTP request (REQ-DATA-003, BE-PERF-15).
+   * Every verdict here is a question about the caller's own ranks, and the Leitung view asks it for
+   * every Bereich, Staffel and Spezialkommando in turn — one {@code findAllByIdUserId} per request
+   * instead of a lookup per unit and verdict. Keyed by caller id, so a request cannot read another
+   * principal's rows. Outside an HTTP request there is no memo and the rows are read directly. Like
+   * the other request memos, it assumes the caller's own ranks do not change within the request
+   * that asks.
    *
    * @return the caller's membership rows; empty for an anonymous caller. Never {@code null}.
    */

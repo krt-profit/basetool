@@ -60,8 +60,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * hibernate.query.fail_on_pagination_over_collection_fetch=true} the in-memory case throws instead.
  * The first test proves the flag is live on a shape Hibernate cannot push down (a green run of the
  * others would otherwise prove nothing). The second loads a page from every finder that used to
- * graph a collection and asserts the collection arrives <em>uninitialised</em> — the direct evidence
- * that no graph fetched it. The third proves the cached role page still arrives with its
+ * graph a collection and asserts the collection arrives <em>uninitialised</em> — the direct
+ * evidence that no graph fetched it. The third proves the cached role page still arrives with its
  * permissions initialised after its transaction has closed.
  */
 @SpringBootTest

@@ -57,8 +57,7 @@ public abstract class JobOrderMapper {
    * injected under its own name so {@link #mapAndSortAssignees(Set)} can seed its request memo for
    * the whole Bearbeiter list first.
    */
-  @org.springframework.beans.factory.annotation.Autowired
-  protected UserMapper assigneeUserMapper;
+  @org.springframework.beans.factory.annotation.Autowired protected UserMapper assigneeUserMapper;
 
   /**
    * Resolves the caller-dependent {@code canEdit} projection of one job order.

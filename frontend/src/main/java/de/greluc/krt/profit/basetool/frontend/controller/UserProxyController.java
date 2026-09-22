@@ -96,11 +96,11 @@ public class UserProxyController {
 
   /**
    * Bank-audience twin of {@link #searchUsers}: forwards to the backend {@code
-   * /api/v1/users/search-bank/references}, which mirrors {@code /search} but widens the role gate to bank
-   * staff (ADR-0089, #1193). Backs the bank pickers' {@code remote-bank-users} combobox source
-   * (register holder, grant the Bank-Employee role, approval limits) so a bank employee/manager who
-   * holds no org role can still resolve candidates. The real authorization is enforced by the
-   * backend; this proxy only requires an authenticated session.
+   * /api/v1/users/search-bank/references}, which mirrors {@code /search} but widens the role gate
+   * to bank staff (ADR-0089, #1193). Backs the bank pickers' {@code remote-bank-users} combobox
+   * source (register holder, grant the Bank-Employee role, approval limits) so a bank
+   * employee/manager who holds no org role can still resolve candidates. The real authorization is
+   * enforced by the backend; this proxy only requires an authenticated session.
    *
    * @param query free-text query to forward to the backend, or {@code null}/blank to match all
    * @return matching user records (raw JSON maps), never {@code null}
@@ -125,11 +125,11 @@ public class UserProxyController {
    * failing.
    *
    * <p><b>Why the page size stays 1000.</b> The combobox renders {@code PickerSearch.RENDER_CAP}
-   * rows and would be served by {@code PickerSearch.PAGE_SIZE}, but the two free-text
-   * autocompletes on the mission page (participant and party lead, {@code mission-detail.js}) read
-   * the same proxy and render every row they receive with no overflow hint, so a smaller page would
-   * cap them silently — what REQ-FE-016 forbids. The slim projection already removes almost all of
-   * the cost; lowering the page size waits for those two autocompletes to announce an overflow.
+   * rows and would be served by {@code PickerSearch.PAGE_SIZE}, but the two free-text autocompletes
+   * on the mission page (participant and party lead, {@code mission-detail.js}) read the same proxy
+   * and render every row they receive with no overflow hint, so a smaller page would cap them
+   * silently — what REQ-FE-016 forbids. The slim projection already removes almost all of the cost;
+   * lowering the page size waits for those two autocompletes to announce an overflow.
    *
    * @param backendPath the backend search endpoint path to forward to
    * @param query the free-text query to forward, or {@code null}/blank to match all

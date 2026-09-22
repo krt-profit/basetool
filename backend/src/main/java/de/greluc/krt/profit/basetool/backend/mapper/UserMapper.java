@@ -97,8 +97,8 @@ public abstract class UserMapper {
    * name-sorted Staffel references per user. {@link #toDto(User)} reads the squadrons twice ({@code
    * squadrons} and the primary {@code squadron}), and each read resolved the Staffel entities with
    * its own {@code findAllById}; the memo makes the second read free. The values are immutable
-   * reference records, so they are safe to reuse across transactions within the request. Seeded
-   * for a whole page at once by {@link #primeStaffelMemberships(Collection)}.
+   * reference records, so they are safe to reuse across transactions within the request. Seeded for
+   * a whole page at once by {@link #primeStaffelMemberships(Collection)}.
    */
   private static final String SQUADRONS_CACHE_ATTR =
       UserMapper.class.getName() + ".squadronReferencesByUserId";
@@ -194,9 +194,9 @@ public abstract class UserMapper {
    * then populated for <em>every</em> given user — a user with no Staffel is seeded with an empty
    * list, which is exactly what the single-user path would have computed.
    *
-   * <p>Users already memoised are skipped, so priming twice in one request costs nothing. Outside an
-   * HTTP request there is no memo to seed and the call is a no-op: the per-user fallback of {@link
-   * #toDto(User)} still produces the same values. The same immutability assumption as {@link
+   * <p>Users already memoised are skipped, so priming twice in one request costs nothing. Outside
+   * an HTTP request there is no memo to seed and the call is a no-op: the per-user fallback of
+   * {@link #toDto(User)} still produces the same values. The same immutability assumption as {@link
    * #loadStaffelMemberships(User)} applies — prime right before mapping, never before a membership
    * write in the same request.
    *
@@ -247,8 +247,7 @@ public abstract class UserMapper {
    * @param staffeln the name-sorted squadrons; never {@code null}.
    * @return the reference DTOs in the same order; never {@code null}.
    */
-  private static List<SquadronReferenceDto> toSquadronReferences(
-      @NotNull List<Squadron> staffeln) {
+  private static List<SquadronReferenceDto> toSquadronReferences(@NotNull List<Squadron> staffeln) {
     return staffeln.stream()
         .map(s -> new SquadronReferenceDto(s.getId(), s.getName(), s.getShorthand()))
         .toList();
@@ -269,7 +268,8 @@ public abstract class UserMapper {
       return null;
     }
     @SuppressWarnings("unchecked") // only this class writes the attribute, always with this shape
-    Map<UUID, V> cache = (Map<UUID, V>) attrs.getAttribute(attribute, RequestAttributes.SCOPE_REQUEST);
+    Map<UUID, V> cache =
+        (Map<UUID, V>) attrs.getAttribute(attribute, RequestAttributes.SCOPE_REQUEST);
     if (cache == null) {
       cache = new HashMap<>();
       attrs.setAttribute(attribute, cache, RequestAttributes.SCOPE_REQUEST);

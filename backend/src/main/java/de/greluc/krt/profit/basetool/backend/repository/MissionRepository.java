@@ -188,25 +188,26 @@ public interface MissionRepository
    * sorting is delegated to {@link Pageable} so the caller can pick the column.
    *
    * <p>Multi-tenant access control via the org-unit scope-predicate triple ({@code isAdminAllScope}
-   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a pinned
-   * {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the membership
-   * union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public escape).
-   * Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same public/internal
-   * split — public to all; internal only to organisation members-or-above (the {@code
-   * viewerIsMemberOrAbove} flag).
+   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a
+   * pinned {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the
+   * membership union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public
+   * escape). Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same
+   * public/internal split — public to all; internal only to organisation members-or-above (the
+   * {@code viewerIsMemberOrAbove} flag).
    *
    * <p>The unpaged {@code List} sibling, which fetch-joined both {@code participants} and {@code
    * assignedUnits} into a cartesian product, had no caller and was deleted on 2026-09-22
    * (BE-PERF-02, REQ-DATA-003).
    *
-   * <p><strong>No collection graph, on purpose.</strong> The controller maps the page result through {@code MissionMapper.toListDto}, which reads only
-   * scalar columns plus the two {@code @ManyToOne} associations {@code operation} and {@code
-   * owningSquadron} — it never touches {@code participants} or {@code assignedUnits}. Eager-loading
-   * those collections via {@code @EntityGraph} forces Hibernate into in-memory pagination ({@code
-   * HHH000104: firstResult/maxResults specified with collection fetch; applying in memory}) because
-   * SQL-level {@code OFFSET}/{@code LIMIT} cannot be combined with a collection join. The resulting
-   * cartesian {@code mission x participant x unit} fetch + JVM-side slicing was the dominant cost
-   * of the missions list page after the multi-squadron rollout. Eager-loading only the two
+   * <p><strong>No collection graph, on purpose.</strong> The controller maps the page result
+   * through {@code MissionMapper.toListDto}, which reads only scalar columns plus the two
+   * {@code @ManyToOne} associations {@code operation} and {@code owningSquadron} — it never touches
+   * {@code participants} or {@code assignedUnits}. Eager-loading those collections via
+   * {@code @EntityGraph} forces Hibernate into in-memory pagination ({@code HHH000104:
+   * firstResult/maxResults specified with collection fetch; applying in memory}) because SQL-level
+   * {@code OFFSET}/{@code LIMIT} cannot be combined with a collection join. The resulting cartesian
+   * {@code mission x participant x unit} fetch + JVM-side slicing was the dominant cost of the
+   * missions list page after the multi-squadron rollout. Eager-loading only the two
    * {@code @ManyToOne} associations here keeps Hibernate on SQL pagination and resolves the per-row
    * mapping in a single query.
    */

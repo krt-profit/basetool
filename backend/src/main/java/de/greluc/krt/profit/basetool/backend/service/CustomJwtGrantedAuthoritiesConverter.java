@@ -109,12 +109,12 @@ public class CustomJwtGrantedAuthoritiesConverter
    * pays {@link UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus a
    * handful of SELECTs (user load, {@code user_roles}, the role catalogue read once with its
    * permissions, and the membership read) — since {@code 9ab1bb135} the roles are no longer looked
-   * up one realm role at a time (corrected 2026-09-22). Keying on the token's {@code issuedAt} means a fresh login always misses and
-   * re-reads, so a re-authentication picks up new authorities immediately; within one token's life
-   * the configured {@link AuthoritiesCacheProperties#getTtl() TTL} bounds staleness. Only
-   * successful results are cached (an exception propagates uncached), the cached value is an
-   * immutable copy so a downstream mutation cannot corrupt it, and a token missing {@code sub} or
-   * {@code issuedAt} bypasses the cache entirely (always recomputed).
+   * up one realm role at a time (corrected 2026-09-22). Keying on the token's {@code issuedAt}
+   * means a fresh login always misses and re-reads, so a re-authentication picks up new authorities
+   * immediately; within one token's life the configured {@link AuthoritiesCacheProperties#getTtl()
+   * TTL} bounds staleness. Only successful results are cached (an exception propagates uncached),
+   * the cached value is an immutable copy so a downstream mutation cannot corrupt it, and a token
+   * missing {@code sub} or {@code issuedAt} bypasses the cache entirely (always recomputed).
    */
   private final Cache<String, Collection<GrantedAuthority>> authoritiesCache;
 

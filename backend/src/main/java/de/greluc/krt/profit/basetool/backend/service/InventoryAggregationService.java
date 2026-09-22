@@ -218,7 +218,9 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     return inventoryItemRepository
         .findMaterialRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -235,7 +237,9 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getUserItemInventory(UUID userId, Pageable pageable) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     return inventoryItemRepository
         .findItemRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -322,7 +326,9 @@ public class InventoryAggregationService {
           boolean personalOnly,
           boolean nonPersonalOnly) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -429,7 +435,9 @@ public class InventoryAggregationService {
           boolean personalOnly,
           boolean nonPersonalOnly) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -480,7 +488,9 @@ public class InventoryAggregationService {
       boolean personalOnly,
       boolean nonPersonalOnly) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -525,7 +535,9 @@ public class InventoryAggregationService {
       boolean personalOnly,
       boolean nonPersonalOnly) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -784,7 +796,9 @@ public class InventoryAggregationService {
       UUID owningOrgUnitId,
       Pageable pageable) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     return inventoryItemRepository
         .findUserStackEntries(
             user.getId(),
@@ -859,7 +873,9 @@ public class InventoryAggregationService {
       UUID owningOrgUnitId,
       Pageable pageable) {
     User user =
-        userRepository.findPlainById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     return inventoryItemRepository
         .findUserItemStackEntries(
             user.getId(),

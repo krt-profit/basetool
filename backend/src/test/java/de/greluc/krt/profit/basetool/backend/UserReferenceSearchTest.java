@@ -76,9 +76,7 @@ class UserReferenceSearchTest {
   void gatesMatchTheFullDtoTwins(String path, String role, int expected) throws Exception {
     mockMvc
         .perform(
-            get(path)
-                .param("query", "x")
-                .with(jwt().authorities(new SimpleGrantedAuthority(role))))
+            get(path).param("query", "x").with(jwt().authorities(new SimpleGrantedAuthority(role))))
         .andExpect(status().is(expected));
   }
 

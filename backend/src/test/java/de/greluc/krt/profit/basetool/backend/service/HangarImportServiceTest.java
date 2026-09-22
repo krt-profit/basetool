@@ -232,7 +232,8 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId)).thenReturn(List.of(typeCount(type.getId(), 1L)));
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 1L)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When
@@ -269,7 +270,8 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId)).thenReturn(List.of(typeCount(type.getId(), 3L)));
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 3L)));
 
     // When
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -305,7 +307,8 @@ class HangarImportServiceTest {
 
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(shipTypeRepository.findAll()).thenReturn(List.of(type));
-    when(shipRepository.countShipsPerTypeByOwnerId(userId)).thenReturn(List.of(typeCount(type.getId(), 5L)));
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(type.getId(), 5L)));
 
     // When
     FleetviewImportResponseDto result = hangarImportService.importShips(userId, file);
@@ -348,7 +351,8 @@ class HangarImportServiceTest {
     when(shipTypeRepository.findAll()).thenReturn(List.of(typeA, typeB));
     // Hangar: 2× vulture (JSON only has 1 → surplus, no creation), 1× aurora mr (JSON has 3 → 2
     // more)
-    when(shipRepository.countShipsPerTypeByOwnerId(userId)).thenReturn(List.of(typeCount(typeA.getId(), 2L), typeCount(typeB.getId(), 1L)));
+    when(shipRepository.countShipsPerTypeByOwnerId(userId))
+        .thenReturn(List.of(typeCount(typeA.getId(), 2L), typeCount(typeB.getId(), 1L)));
     when(shipRepository.save(any(Ship.class))).thenAnswer(inv -> inv.getArgument(0));
 
     // When

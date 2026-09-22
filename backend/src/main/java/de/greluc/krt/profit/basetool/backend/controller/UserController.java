@@ -89,8 +89,8 @@ public class UserController {
   private static final Set<String> ALLOWED_SORT = Set.of("username", "email", "rank", "id");
 
   /**
-   * Sort whitelist of the reference searches: the projected columns only ({@code email} is not
-   * part of the reference projection, so it is not offered).
+   * Sort whitelist of the reference searches: the projected columns only ({@code email} is not part
+   * of the reference projection, so it is not offered).
    */
   private static final Set<String> REFERENCE_SORT = Set.of("username", "rank", "id");
 
@@ -238,14 +238,14 @@ public class UserController {
    * membership load behind it (BE-PERF-06). Backs every {@code remote-users} combobox, which reads
    * only the id and the name; {@code /search} keeps the full DTO for member management.
    *
-   * <p>No peer redaction is applied because there is nothing to redact: the reference projection
-   * is exactly the field set {@code UserDtoRedaction.toPeerShape} keeps.
+   * <p>No peer redaction is applied because there is nothing to redact: the reference projection is
+   * exactly the field set {@code UserDtoRedaction.toPeerShape} keeps.
    *
    * @param query free-text username/displayName filter, or {@code null}/blank to match all
    * @param page requested page index, or {@code null} for the first page
    * @param size requested page size, or {@code null} for the default
-   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or
-   *     {@code null} for the username default
+   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or {@code
+   *     null} for the username default
    * @return one page of matching user references
    */
   @GetMapping("/search/references")
@@ -270,8 +270,8 @@ public class UserController {
    * @param query free-text username/displayName filter, or {@code null}/blank to match all
    * @param page requested page index, or {@code null} for the first page
    * @param size requested page size, or {@code null} for the default
-   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or
-   *     {@code null} for the username default
+   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or {@code
+   *     null} for the username default
    * @return one page of matching user references
    */
   @GetMapping("/search-bank/references")

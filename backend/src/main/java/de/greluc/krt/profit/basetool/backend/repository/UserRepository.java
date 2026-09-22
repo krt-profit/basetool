@@ -199,9 +199,9 @@ public interface UserRepository
    * without a Staffel membership (admins, members of no Staffel) are always visible so the focused
    * admin can manage them.
    *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
-   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
-   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
   @Query(
       """
@@ -257,10 +257,9 @@ public interface UserRepository
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
    * @return paged ordinary squadron members that an Officer / Admin may evaluate.
-   *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
-   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
-   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   *     <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   *     would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The
+   *     page's roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
   @Query(
       """
@@ -279,9 +278,9 @@ public interface UserRepository
    * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
    * but adds the squadron-membership predicate.
    *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
-   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
-   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
   @Query(
       """
@@ -321,12 +320,11 @@ public interface UserRepository
 
   /**
    * Squadron-scoped substring search projected straight to {@link UserReferenceDto} (id, username,
-   * display name, effective name, rank), one page at a time — the backing query of the user
-   * pickers (BE-PERF-06). Same predicate as {@link #searchScoped(String, java.util.Collection,
-   * Pageable)}, but no entity, no role collection and no membership lookup is loaded: a picker
-   * keystroke used to hydrate up to a thousand full {@code UserDto}s (three membership queries
-   * each) to read two fields. The projection is exactly the fields the peer view keeps, so it
-   * needs no redaction.
+   * display name, effective name, rank), one page at a time — the backing query of the user pickers
+   * (BE-PERF-06). Same predicate as {@link #searchScoped(String, java.util.Collection, Pageable)},
+   * but no entity, no role collection and no membership lookup is loaded: a picker keystroke used
+   * to hydrate up to a thousand full {@code UserDto}s (three membership queries each) to read two
+   * fields. The projection is exactly the fields the peer view keeps, so it needs no redaction.
    *
    * @param query the already LIKE-escaped substring to match against username or display name
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
@@ -520,9 +518,9 @@ public interface UserRepository
    * Derived Spring-Data query - returns entities matching {@code
    * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}, one page at a time.
    *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
-   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
-   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
   Page<User> findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
       String username, String displayName, Pageable pageable);

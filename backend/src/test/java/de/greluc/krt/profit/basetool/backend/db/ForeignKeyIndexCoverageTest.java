@@ -33,22 +33,22 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * Turns REQ-DATA-017 ("every foreign key has a covering index") from a review rule into a gate: it
  * reads every foreign key of the Flyway-built schema from {@code pg_constraint} and fails for any
- * whose columns are not the <em>leading</em> columns of a non-partial index on the referencing
- * table.
+ * whose columns are not the <em>leading</em> columns of a usable index on the referencing table.
  *
  * <p>Why the leading columns: Postgres can only use a b-tree index for an equality lookup on its
  * leading key columns. An FK without one makes every {@code DELETE} / key {@code UPDATE} of the
  * referenced row scan the whole referencing table to check or cascade the constraint, and every
  * "children of this parent" read a sequential scan. A composite index whose first column is a
- * different one does not help — which is exactly how {@code job_order_assignees.user_id} and
- * {@code bank_posting.holder_id} escaped the earlier sweeps (V175). A partial index counts only
- * when its predicate is exactly {@code <fk column> IS NOT NULL} on a single-column key: every lookup
- * the constraint or a "children of" read makes is {@code fk = ?}, which implies that predicate, so
+ * different one does not help — which is exactly how {@code job_order_assignees.user_id} and {@code
+ * bank_posting.holder_id} escaped the earlier sweeps (V175). A partial index counts only when its
+ * predicate is exactly {@code <fk column> IS NOT NULL} on a single-column key: every lookup the
+ * constraint or a "children of" read makes is {@code fk = ?}, which implies that predicate, so
  * Postgres can use it (the V244 pattern). Any other predicate hides rows the check has to see.
  *
- * <p>Found on 2026-09-22 (BE-PERF-10): eleven uncovered foreign keys, indexed by V245. A new
- * uncovered FK now fails this test in the same PR that introduces it. An entry in {@link
- * #ALLOWED_UNCOVERED} needs a written justification next to it.
+ * <p>Found on 2026-09-22 (BE-PERF-10): 38 uncovered foreign keys (the audit, reading the
+ * migrations, had listed eleven), all indexed by V245. A new uncovered FK now fails this test in
+ * the same PR that introduces it. An entry in {@link #ALLOWED_UNCOVERED} needs a written
+ * justification next to it.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -104,7 +104,7 @@ class ForeignKeyIndexCoverageTest {
 
     assertThat(uncovered)
         .as(
-            "foreign keys without a covering (leading, non-partial) index — add one in a Flyway"
+            "foreign keys without a covering (leading) index — add one in a Flyway"
                 + " migration (REQ-DATA-017)")
         .isEmpty();
   }

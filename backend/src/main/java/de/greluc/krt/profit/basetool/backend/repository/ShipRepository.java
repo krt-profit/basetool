@@ -118,10 +118,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   boolean existsByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
 
   /**
-   * Counts one owner's ships per ship type in a single grouped statement — the hangar import's
-   * "how many of this type does the member already have" check for every type in the upload at
-   * once, instead of one {@code COUNT} per distinct type (REQ-DATA-003, BE-PERF-15). Types the
-   * owner has no ship of are absent from the result.
+   * Counts one owner's ships per ship type in a single grouped statement — the hangar import's "how
+   * many of this type does the member already have" check for every type in the upload at once,
+   * instead of one {@code COUNT} per distinct type (REQ-DATA-003, BE-PERF-15). Types the owner has
+   * no ship of are absent from the result.
    *
    * @param ownerId the hangar owner
    * @return one row per ship type the owner holds, with its ship count

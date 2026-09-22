@@ -112,13 +112,13 @@ public class StaffelMembershipResolver {
   }
 
   /**
-   * Batch variant of {@link #resolveNameSortedStaffeln(List)} for many users at once: every
-   * Staffel referenced by any of the given membership rows is loaded in <em>one</em> polymorphic
-   * {@code findAllById}, then each user's rows are resolved against that map and name-sorted with
-   * the same primary-first order. Backs the {@code UserMapper} batch primer, which seeds its
-   * request memo for a whole page or aggregate before the per-user projection runs, so mapping
-   * {@code n} users costs two queries instead of up to {@code 3n} (REQ-DATA-003). A row whose
-   * squadron no longer resolves is dropped, exactly as the single-user variant drops it.
+   * Batch variant of {@link #resolveNameSortedStaffeln(List)} for many users at once: every Staffel
+   * referenced by any of the given membership rows is loaded in <em>one</em> polymorphic {@code
+   * findAllById}, then each user's rows are resolved against that map and name-sorted with the same
+   * primary-first order. Backs the {@code UserMapper} batch primer, which seeds its request memo
+   * for a whole page or aggregate before the per-user projection runs, so mapping {@code n} users
+   * costs two queries instead of up to {@code 3n} (REQ-DATA-003). A row whose squadron no longer
+   * resolves is dropped, exactly as the single-user variant drops it.
    *
    * @param squadronRowsByUser each user's {@code SQUADRON}-kind membership rows, keyed by user id;
    *     never {@code null}. A user mapped to an empty list resolves to an empty list.
@@ -151,10 +151,10 @@ public class StaffelMembershipResolver {
 
   /**
    * Loads the given org-unit ids polymorphically and keeps only the ones that are a {@link
-   * Squadron}, keyed by id. Polymorphic batch load + unproxy instead of a Squadron-typed query: this
-   * resolver runs for every embedded {@code UserDto}, frequently inside a transaction that already
-   * tracks one of the Staffel ids as a base-typed {@link OrgUnit} proxy (e.g. a mission's {@code
-   * owningOrgUnit}) — a subclass-typed query would force Hibernate to narrow that proxy
+   * Squadron}, keyed by id. Polymorphic batch load + unproxy instead of a Squadron-typed query:
+   * this resolver runs for every embedded {@code UserDto}, frequently inside a transaction that
+   * already tracks one of the Staffel ids as a base-typed {@link OrgUnit} proxy (e.g. a mission's
+   * {@code owningOrgUnit}) — a subclass-typed query would force Hibernate to narrow that proxy
    * (HHH000179, breaks {@code ==}). The {@code instanceof} filter replaces the SQL discriminator
    * filter 1:1 and still drops dangling ids (absent from the batch result).
    *

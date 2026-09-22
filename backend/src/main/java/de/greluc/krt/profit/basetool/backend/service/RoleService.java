@@ -85,10 +85,10 @@ public class RoleService {
    *
    * <p>The page is cached and outlives this transaction, and the caller maps each role's
    * permissions after it has committed, so the collections are initialised here: the first {@link
-   * Hibernate#initialize(Object)} batch-loads the whole page's permissions in one query under {@code
-   * default_batch_fetch_size}. The repository's former {@code @EntityGraph} on the paged {@code
-   * findAll} did the same by fetch-joining a collection into a paged query, which forces Hibernate
-   * to paginate in memory (HHH90003004) and fails outright under {@code
+   * Hibernate#initialize(Object)} batch-loads the whole page's permissions in one query under
+   * {@code default_batch_fetch_size}. The repository's former {@code @EntityGraph} on the paged
+   * {@code findAll} did the same by fetch-joining a collection into a paged query, which forces
+   * Hibernate to paginate in memory (HHH90003004) and fails outright under {@code
    * fail_on_pagination_over_collection_fetch} (REQ-DATA-003).
    *
    * @param pageable page request

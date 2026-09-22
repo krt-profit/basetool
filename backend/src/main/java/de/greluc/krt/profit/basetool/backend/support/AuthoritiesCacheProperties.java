@@ -37,8 +37,8 @@ import org.springframework.validation.annotation.Validated;
  * scoping tables. A production measurement on 2026-09-13 attributed 84 million sequential scans
  * across six tables to that miss traffic, and it was the dominant driver of CFS throttling on the
  * {@code db-backend} container. The per-realm-role lookup this paragraph used to list among a
- * miss's costs is gone since {@code 9ab1bb135} (2026-09-06, released in v1.7.1): the role
- * catalogue is read once per miss, with its permissions (corrected 2026-09-22).
+ * miss's costs is gone since {@code 9ab1bb135} (2026-09-06, released in v1.7.1): the role catalogue
+ * is read once per miss, with its permissions (corrected 2026-09-22).
  *
  * <p>Lives in {@code support} rather than {@code config} deliberately: {@code config} already
  * depends on {@code service} (the security configuration wires the converter), so a properties

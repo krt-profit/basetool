@@ -126,8 +126,7 @@ class UserPlainLookupIntegrationTest {
     // LazyInitializationException and a 500.
     ShipRequestDto request =
         new ShipRequestDto("Plain lookup ship", shipTypeId, "LTI", null, false, null, null);
-    MockMvc mockMvc =
-        MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
     mockMvc
         .perform(

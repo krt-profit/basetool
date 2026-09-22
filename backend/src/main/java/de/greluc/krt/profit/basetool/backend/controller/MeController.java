@@ -200,13 +200,13 @@ public class MeController {
    *
    * <p>The four answers are the same ones the individual endpoints give — this method calls the
    * same resolvers — so a client may switch between them freely. What it saves is the fan-out: the
-   * web layout used to issue three or four backend calls before every page handler, each in its
-   * own transaction, re-resolving the caller's memberships each time; here they share one
-   * transaction and the request-scoped membership memos.
+   * web layout used to issue three or four backend calls before every page handler, each in its own
+   * transaction, re-resolving the caller's memberships each time; here they share one transaction
+   * and the request-scoped membership memos.
    *
-   * <p>ADR-0151's fail-closed rule is unchanged and stays the client's: the endpoint either
-   * answers all four parts or fails as a whole, and a client that gets no answer treats every
-   * capability as {@code false}, exactly as it does when {@code /capabilities} fails.
+   * <p>ADR-0151's fail-closed rule is unchanged and stays the client's: the endpoint either answers
+   * all four parts or fails as a whole, and a client that gets no answer treats every capability as
+   * {@code false}, exactly as it does when {@code /capabilities} fails.
    *
    * @param jwt the caller's JWT; never {@code null} thanks to the class-level {@code @PreAuthorize}
    * @param callerId the caller's id as the notification endpoints resolve it
@@ -226,8 +226,7 @@ public class MeController {
         @ApiResponse(responseCode = "200", description = "The caller's layout context"),
         @ApiResponse(responseCode = "401", description = "Authentication required")
       })
-  public LayoutResponse getLayout(
-      @AuthenticationPrincipal Jwt jwt, @CurrentUserId UUID callerId) {
+  public LayoutResponse getLayout(@AuthenticationPrincipal Jwt jwt, @CurrentUserId UUID callerId) {
     return new LayoutResponse(
         getActiveOrgUnit().orgUnitId(),
         getPinnableOrgUnits(jwt),
@@ -284,8 +283,8 @@ public class MeController {
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.
    *
-   * @param activeOrgUnitId the effective org-unit context, as {@link ActiveOrgUnitResponse}
-   *     carries it; {@code null} for admin "all org units" or no home Staffel.
+   * @param activeOrgUnitId the effective org-unit context, as {@link ActiveOrgUnitResponse} carries
+   *     it; {@code null} for admin "all org units" or no home Staffel.
    * @param orgUnits the org units the caller may pin, as {@code GET /api/v1/me/org-units} returns
    *     them; never {@code null}, possibly empty.
    * @param capabilities the caller's capability flags, as {@code GET /api/v1/me/capabilities}
