@@ -39,8 +39,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -67,10 +67,10 @@ class BackendImportClientTest {
         .thenReturn("gateway-token");
     backend = new MockWebServer();
     backend.start();
-    WebClient webClient = WebClient.builder().baseUrl(backend.url("/").toString()).build();
+    RestClient restClient = RestClient.builder().baseUrl(backend.url("/").toString()).build();
     client =
         new BackendImportClient(
-            webClient,
+            restClient,
             serviceAccountTokenProvider,
             CircuitBreakerRegistry.ofDefaults(),
             TestLoggingProperties.defaults());
@@ -106,9 +106,10 @@ class BackendImportClientTest {
 
   /**
    * ING-SEC-02, end to end over real HTTP: the backend refuses the gateway's cached token with a
-   * {@code 401}; the relay surfaces that as a {@link WebClientResponseException} (never swallowed),
-   * the exception handler turns it into a {@code 502} and invalidates the cache, and the very next
-   * relay therefore carries a <em>freshly minted</em> token instead of replaying the refused one.
+   * {@code 401}; the relay surfaces that as a {@link RestClientResponseException} (never
+   * swallowed), the exception handler turns it into a {@code 502} and invalidates the cache, and
+   * the very next relay therefore carries a <em>freshly minted</em> token instead of replaying the
+   * refused one.
    */
   @Test
   void aBackendAuthRefusalInvalidatesTheTokenSoTheNextRelayCarriesAFreshOne() throws Exception {
@@ -125,11 +126,11 @@ class BackendImportClientTest {
                   "basetool-ingest-gateway",
                   "client-secret",
                   "s3cret"),
-              WebClient.builder().build(),
+              RestClient.create(),
               new SimpleMeterRegistry());
       BackendImportClient relay =
           new BackendImportClient(
-              WebClient.builder().baseUrl(backend.url("/").toString()).build(),
+              RestClient.builder().baseUrl(backend.url("/").toString()).build(),
               realProvider,
               CircuitBreakerRegistry.ofDefaults(),
               TestLoggingProperties.defaults());
@@ -146,9 +147,9 @@ class BackendImportClientTest {
               .addHeader("Content-Type", "application/json")
               .setBody("{\"goodsMatched\":1}"));
 
-      WebClientResponseException refused =
+      RestClientResponseException refused =
           org.junit.jupiter.api.Assertions.assertThrows(
-              WebClientResponseException.class,
+              RestClientResponseException.class,
               () -> relay.forwardRefineryExtract("user-1", null, sampleExtract()));
       assertThat(handler.handleBackendResponse(refused).getStatus()).isEqualTo(502);
       relay.forwardRefineryExtract("user-1", null, sampleExtract());

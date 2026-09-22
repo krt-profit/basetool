@@ -172,7 +172,7 @@ resilience4j:
         failure-rate-threshold: 60
         wait-duration-in-open-state: 10s
         ignore-exceptions:
-          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - org.springframework.web.client.RestClientResponseException
 
 logging:
   level:

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.integration;
 
+import de.greluc.krt.profit.basetool.backend.config.ResponseSizeLimitInterceptor;
 import de.greluc.krt.profit.basetool.backend.config.UexProperties;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCategoryDto;
 import de.greluc.krt.profit.basetool.backend.dto.uex.UexCityDto;
@@ -45,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.LogSafe;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -56,19 +56,18 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 
 /**
  * Read-only HTTP client for the UEX (uexcorp.space) catalog API.
  *
  * <p>Every public {@code get…()} method delegates to the shared {@link #fetchListWithOutcome}
  * helper which adds {@code If-None-Match} to the request when a previous ETag is known for the same
- * endpoint (M-5 from the performance audit), unwraps the {@code UexResponseDto<T>} envelope,
- * applies a 30-second per-call timeout, and on ANY error or {@code 304 Not Modified} returns an
- * empty list — the calling sync services treat an empty payload as "skip this run" and explicitly
- * never wipe local tables based on it, so a transient outage or a feed that has not changed since
- * the last sync both result in the same no-op behaviour.
+ * endpoint (M-5 from the performance audit), unwraps the {@code UexResponseDto<T>} envelope, is
+ * bounded by the 30-second read timeout of {@code RestClientConfig}, and on ANY error or {@code 304
+ * Not Modified} returns an empty list — the calling sync services treat an empty payload as "skip
+ * this run" and explicitly never wipe local tables based on it, so a transient outage or a feed
+ * that has not changed since the last sync both result in the same no-op behaviour.
  *
  * <p><b>Empty is not one thing (H6).</b> Because that empty list used to be the <em>only</em> thing
  * a caller saw, every sync service greeted an unchanged (304) feed with the same alarming {@code
@@ -102,22 +101,26 @@ import reactor.core.publisher.Mono;
  * the cost of one full sync per endpoint to repopulate them, which is the desired "fresh start"
  * behaviour and avoids stale ETags surviving across a UEX-side cache flush).
  *
- * <p>The reactive {@code Mono} chain is collapsed with {@code blockOptional()} because all callers
- * are scheduled background tasks that have nothing else to do while waiting — synchronous code here
- * is simpler than threading the reactive type through every service method.
+ * <p>The client is a blocking {@link RestClient} (ADR-0204): every caller is a scheduled background
+ * task with nothing else to do while it waits, so the reactive chain the class used to build and
+ * then {@code block()} bought nothing.
  *
- * <p>The WebClient is built once in {@link #initClient()} after dependency injection so the
- * underlying Reactor-Netty connection pool is actually shared across requests. {@code
- * maxInMemorySize(16 MB)} raises Spring's default 256 KB ceiling because the {@code
- * commodities_prices_all} response routinely exceeds 1 MB.
+ * <p>The client is built once in {@link #initClient()} after dependency injection so the JDK
+ * client's connection pool is actually shared across requests. A {@link
+ * ResponseSizeLimitInterceptor} caps one response body at {@value #MAX_RESPONSE_BYTES} bytes — the
+ * ceiling the reactive codec used to enforce — because the {@code commodities_prices_all} response
+ * routinely exceeds 1 MB and a runaway one must still fail loudly instead of exhausting the heap.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UexClient {
 
-  /** Per-call timeout for the underlying reactive request. */
-  private static final Duration CALL_TIMEOUT = Duration.ofSeconds(30);
+  /**
+   * Largest response body one UEX call may deliver (16 MiB). An oversized body fails the fetch into
+   * the counted empty-result fallback rather than being truncated.
+   */
+  static final long MAX_RESPONSE_BYTES = 16L * 1024 * 1024;
 
   /**
    * The only {@code status} value a UEX envelope is documented to carry on success. Compared
@@ -134,7 +137,13 @@ public class UexClient {
    */
   private static final int MAX_STATUS_LOG_LENGTH = 32;
 
-  private final WebClient.Builder webClientBuilder;
+  /**
+   * A fresh, observed builder from {@code RestClientConfig} (prototype-scoped), so the base URL set
+   * here does not leak into any other client.
+   */
+  private final RestClient.Builder restClientBuilder;
+
+  /** The {@code app.uex.*} configuration: base URL and one path per endpoint. */
   private final UexProperties uexProperties;
 
   /**
@@ -145,12 +154,12 @@ public class UexClient {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Reusable WebClient bound to the UEX base URL. Built once after dependency injection completes
-   * (instead of per call) so the underlying connection pool is actually shared across requests. The
-   * Reactor-Netty HttpClient already carries the connect / read / write timeouts configured in
-   * WebClientConfig.
+   * Reusable client bound to the UEX base URL. Built once after dependency injection completes
+   * (instead of per call) so the underlying connection pool is actually shared across requests. Its
+   * JDK request factory carries the connect and read timeouts configured in {@code
+   * RestClientConfig}.
    */
-  private WebClient client;
+  private RestClient client;
 
   /**
    * Last-seen {@code ETag} response header value, keyed by UEX endpoint path. Populated from the
@@ -161,17 +170,17 @@ public class UexClient {
   private final Map<String, String> etagByEndpoint = new ConcurrentHashMap<>();
 
   /**
-   * Builds the {@link WebClient} after dependency injection. Done once in {@code @PostConstruct}
-   * instead of lazily per call so the Reactor-Netty connection pool from {@link
-   * de.greluc.krt.profit.basetool.backend.config.WebClientConfig} is reused across all UEX requests
-   * for the lifetime of the application.
+   * Builds the {@link RestClient} after dependency injection. Done once in {@code @PostConstruct}
+   * instead of lazily per call so the JDK connection pool behind {@link
+   * de.greluc.krt.profit.basetool.backend.config.RestClientConfig} is reused across all UEX
+   * requests for the lifetime of the application.
    */
   @PostConstruct
   void initClient() {
     this.client =
-        webClientBuilder
+        restClientBuilder
             .baseUrl(uexProperties.getApiUrl())
-            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
+            .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
             .build();
   }
 
@@ -190,8 +199,7 @@ public class UexClient {
 
   /**
    * Fetches the full UEX commodity-price matrix (every commodity × every terminal). This is the
-   * largest UEX payload by far ({@literal >}1 MB) — see the {@code maxInMemorySize} in {@link
-   * #initClient()}.
+   * largest UEX payload by far ({@literal >}1 MB) — see {@link #MAX_RESPONSE_BYTES}.
    *
    * @return the commodity prices plus the {@code 304 Not Modified} outcome; {@code data} is empty
    *     on error / 304 / empty-200
@@ -205,8 +213,8 @@ public class UexClient {
 
   /**
    * Fetches the full UEX item-price matrix ({@code /items_prices_all}, ~24 000 rows, {@literal >}1
-   * MB — covered by the {@code maxInMemorySize} in {@link #initClient()}). Drives the R7 {@code
-   * UexItemPriceSyncService}, which is feature-flagged off by default.
+   * MB — covered by {@link #MAX_RESPONSE_BYTES}). Drives the R7 {@code UexItemPriceSyncService},
+   * which is feature-flagged off by default.
    *
    * @return the item prices plus the {@code 304 Not Modified} outcome; {@code data} is empty on
    *     error / 304 / empty-200
@@ -476,10 +484,12 @@ public class UexClient {
    *   <li>On {@code 2xx}, store the response's ETag (if any) keyed by endpoint URL for the next
    *       call, then deserialise the body into {@code UexResponseDto<T>} and hand it to {@link
    *       #unwrapEnvelope} for the row count / status audit ({@code notModified = false}).
-   *   <li>On non-2xx (and non-304) responses, propagate the {@link
-   *       org.springframework.web.reactive.function.client.WebClientResponseException} through
-   *       {@code .createError()} into the unified {@code onErrorResume} fallback.
-   *   <li>On any error (timeout, decoding failure, server error), log at WARN, count it on {@link
+   *   <li>On non-2xx (and non-304) responses, throw the {@link
+   *       org.springframework.web.client.RestClientResponseException} built by {@code
+   *       createException()} into the unified fallback below.
+   *   <li>On any error (timeout, oversized body, decoding failure, server error — all of which
+   *       {@code RestClient} raises as a {@link org.springframework.web.client.RestClientException}
+   *       or a sibling {@link RuntimeException}), log at WARN, count it on {@link
    *       MetricNames#EXTERNAL_FETCH_ERRORS} and return an empty list flagged {@code notModified =
    *       false} — the caller MUST treat the result as "skip this run", not as "the table is
    *       empty".
@@ -497,39 +507,40 @@ public class UexClient {
       ParameterizedTypeReference<UexResponseDto<T>> typeRef,
       String resourceLabel) {
     log.info("Fetching all {} from UEX API", resourceLabel);
-    WebClient.RequestHeadersSpec<?> request = client.get().uri(endpoint);
+    RestClient.RequestHeadersSpec<?> request = client.get().uri(endpoint);
     String previousEtag = etagByEndpoint.get(endpoint);
     if (previousEtag != null) {
       request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
     }
-    return request
-        .exchangeToMono(
-            response -> {
-              if (response.statusCode().value() == 304) {
-                log.info(
-                    "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
-                        + " nothing to re-import.",
-                    resourceLabel);
-                return Mono.just(FetchResult.<T>unchanged());
-              }
-              if (!response.statusCode().is2xxSuccessful()) {
-                return response.createError();
-              }
-              String etag = response.headers().asHttpHeaders().getETag();
-              if (etag != null && !etag.isBlank()) {
-                etagByEndpoint.put(endpoint, etag);
-              }
-              return response.bodyToMono(typeRef).map(body -> unwrapEnvelope(body, resourceLabel));
-            })
-        .timeout(CALL_TIMEOUT)
-        .onErrorResume(
-            e -> {
-              log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
-              recordFetchError();
-              return Mono.just(FetchResult.<T>partial(Collections.emptyList()));
-            })
-        .blockOptional()
-        .orElse(FetchResult.partial(Collections.emptyList()));
+    try {
+      return request.exchangeForRequiredValue(
+          (clientRequest, response) -> {
+            if (response.getStatusCode().value() == 304) {
+              log.info(
+                  "Fetched 0 {} from UEX API: unchanged since the last sync (304 Not Modified) —"
+                      + " nothing to re-import.",
+                  resourceLabel);
+              return FetchResult.<T>unchanged();
+            }
+            if (!response.getStatusCode().is2xxSuccessful()) {
+              throw response.createException();
+            }
+            String etag = response.getHeaders().getETag();
+            if (etag != null && !etag.isBlank()) {
+              etagByEndpoint.put(endpoint, etag);
+            }
+            UexResponseDto<T> body = response.bodyTo(typeRef);
+            // An empty 2xx body decodes to null; the reactive pipeline completed empty there and
+            // fell through to the same uncounted empty result.
+            return body == null
+                ? FetchResult.<T>partial(Collections.emptyList())
+                : unwrapEnvelope(body, resourceLabel);
+          });
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch {} from UEX API", resourceLabel, e);
+      recordFetchError();
+      return FetchResult.partial(Collections.emptyList());
+    }
   }
 
   /**
@@ -547,13 +558,13 @@ public class UexClient {
    * <p><b>An absent {@code data} is not an anomaly</b>, because UEX uses exactly that to express an
    * empty result set ({@code {"status":"ok","http_code":200,"data":null}}) while expressing a
    * genuine rejection as an empty <em>array</em> under a non-2xx code — which never reaches this
-   * method, since {@link #fetchListWithOutcome} routes every non-2xx into {@code createError()} and
-   * the counting fallback. Counting {@code null} data as a fetch error therefore only ever booked
-   * false positives: see the class Javadoc for the two permanently empty item categories that made
-   * {@code ExternalFetchErrors} fire on 2026-08-03. The catalogue-wide failure this branch was
-   * meant to catch — upstream renaming or dropping the field on every endpoint — is covered by
-   * {@code SyncZeroItems}, which trips when successful runs process zero items, and unlike this
-   * branch it cannot be fooled by a single legitimately empty category.
+   * method, since {@link #fetchListWithOutcome} routes every non-2xx into {@code createException()}
+   * and the counting fallback. Counting {@code null} data as a fetch error therefore only ever
+   * booked false positives: see the class Javadoc for the two permanently empty item categories
+   * that made {@code ExternalFetchErrors} fire on 2026-08-03. The catalogue-wide failure this
+   * branch was meant to catch — upstream renaming or dropping the field on every endpoint — is
+   * covered by {@code SyncZeroItems}, which trips when successful runs process zero items, and
+   * unlike this branch it cannot be fooled by a single legitimately empty category.
    *
    * <p>A {@code null} / blank status is likewise deliberately <em>not</em> an anomaly. No code read
    * the field before, so we cannot claim to know that every one of the ~20 endpoints populates it;

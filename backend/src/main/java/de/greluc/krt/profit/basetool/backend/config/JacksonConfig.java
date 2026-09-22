@@ -44,11 +44,11 @@ import tools.jackson.databind.module.SimpleModule;
  * </ol>
  *
  * <p><b>Why a customizer and not a {@code @Primary ObjectMapper} bean.</b> Spring Boot 4 /
- * Framework 7 drive the REST message converters (and the reactive WebClient codec) with their own
- * Jackson 3 {@code JsonMapper}. A hand-rolled {@code @Primary} mapper — especially a Jackson 2 one
- * — is not the instance Spring actually uses, so configuring it would silently leave the REST layer
- * on the framework's bare defaults. {@link JsonMapperBuilderCustomizer} is the supported hook:
- * Spring Boot applies it to the very builder it constructs the primary {@code JsonMapper} from.
+ * Framework 7 drive the REST message converters with their own Jackson 3 {@code JsonMapper}. A
+ * hand-rolled {@code @Primary} mapper — especially a Jackson 2 one — is not the instance Spring
+ * actually uses, so configuring it would silently leave the REST layer on the framework's bare
+ * defaults. {@link JsonMapperBuilderCustomizer} is the supported hook: Spring Boot applies it to
+ * the very builder it constructs the primary {@code JsonMapper} from.
  */
 @Configuration
 public class JacksonConfig {

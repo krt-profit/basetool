@@ -4,10 +4,10 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
-  # SSL bundle that exposes the bind-mounted keystore.p12 as a TRUSTSTORE for the backend WebClient
+  # SSL bundle that exposes the bind-mounted keystore.p12 as a TRUSTSTORE for the backend RestClient
   # (the same keystore also backs the gateway's own HTTPS connector — see application.yml — but as a
   # trust anchor it must validate the backend's self-signed https://backend:11261 cert).
-  # WebClientConfig consumes this via SslBundles.getBundle("backend-trust")
+  # RestClientConfig consumes this via SslBundles.getBundle("backend-trust")
   # on the prod path; if absent it falls back to the default JVM trust store. Same env vars the other
   # modules already use — no new compose secret. Mirrors the frontend's backend-trust bundle.
   ssl:
@@ -59,7 +59,7 @@ management:
     # REQ-OBS-016, prod only: the exposure list (application.yml) includes `loggers`, and its POST
     # variant MUTATES a live log level. On the management port above there is no authentication to
     # gate that on — every container on net-monitoring-scrape reaches 11272 unauthenticated — and a
-    # ROOT logger flipped to TRACE makes Spring Security / WebClient / Netty write bearer tokens and
+    # ROOT logger flipped to TRACE makes Spring Security / the HTTP clients write bearer tokens and
     # request bodies into a Loki stream retained for 744 h. So the write is not merely gated here,
     # it does not exist: `read-only` keeps GET /actuator/loggers (the whole diagnostic value during
     # an incident) and leaves the write operation unregistered.

@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -44,13 +43,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -72,13 +71,14 @@ class GlobalExceptionHandlerTest {
           TestLoggingProperties.defaults(),
           tokenProvider);
 
-  private static WebClientResponseException backendError(
+  private static RestClientResponseException backendError(
       int status, MediaType contentType, String body) {
     HttpHeaders headers = new HttpHeaders();
     if (contentType != null) {
       headers.setContentType(contentType);
     }
-    return WebClientResponseException.create(
+    return new RestClientResponseException(
+        status + " status",
         status,
         "status",
         headers,
@@ -88,7 +88,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxProblemJson_relaysOnlyTheDetail() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(
             400,
             MediaType.APPLICATION_PROBLEM_JSON,
@@ -119,7 +119,7 @@ class GlobalExceptionHandlerTest {
   @ParameterizedTest
   @ValueSource(ints = {401, 403})
   void backendAuthRefusal_becomesA502AndInvalidatesTheGatewayToken(int status) {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(
             status,
             MediaType.APPLICATION_PROBLEM_JSON,
@@ -158,7 +158,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxNonProblemJson_doesNotRelayRawBody() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(
             400, MediaType.TEXT_HTML, "<html><body>nginx internal 400 — /admin</body></html>");
 
@@ -172,7 +172,7 @@ class GlobalExceptionHandlerTest {
   @Test
   void backend4xxOversizedDetail_isCappedAt500() {
     String longDetail = "x".repeat(2000);
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(
             422, MediaType.APPLICATION_PROBLEM_JSON, "{\"detail\":\"" + longDetail + "\"}");
 
@@ -183,7 +183,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend5xx_collapsesToGeneric502() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(
             500, MediaType.APPLICATION_PROBLEM_JSON, "{\"detail\":\"backend stacktrace boom\"}");
 
@@ -196,7 +196,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxWithoutContentType_fallsBackToTheGenericDetail() {
-    WebClientResponseException ex = backendError(400, null, "{\"detail\":\"leaky\"}");
+    RestClientResponseException ex = backendError(400, null, "{\"detail\":\"leaky\"}");
 
     ProblemDetail problem = handler.handleBackendResponse(ex);
 
@@ -205,7 +205,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxWithBlankProblemBody_fallsBackToTheGenericDetail() {
-    WebClientResponseException ex = backendError(400, MediaType.APPLICATION_PROBLEM_JSON, "   ");
+    RestClientResponseException ex = backendError(400, MediaType.APPLICATION_PROBLEM_JSON, "   ");
 
     ProblemDetail problem = handler.handleBackendResponse(ex);
 
@@ -214,7 +214,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxWithUnparseableProblemBody_fallsBackToTheGenericDetail() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(400, MediaType.APPLICATION_PROBLEM_JSON, "{not json at all");
 
     ProblemDetail problem = handler.handleBackendResponse(ex);
@@ -224,7 +224,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxWithoutDetail_fallsBackToTheProblemTitle() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(409, MediaType.APPLICATION_PROBLEM_JSON, "{\"title\":\"Conflict\"}");
 
     ProblemDetail problem = handler.handleBackendResponse(ex);
@@ -235,7 +235,7 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void backend4xxWithNeitherDetailNorTitle_fallsBackToTheGenericDetail() {
-    WebClientResponseException ex =
+    RestClientResponseException ex =
         backendError(400, MediaType.APPLICATION_PROBLEM_JSON, "{\"status\":400}");
 
     ProblemDetail problem = handler.handleBackendResponse(ex);
@@ -271,17 +271,33 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void transportFailure_becomesA502AndCountsBackendUnavailable() {
-    WebClientRequestException ex =
-        new WebClientRequestException(
-            new java.net.ConnectException("connection refused"),
-            HttpMethod.POST,
-            URI.create("https://backend:11261/api/v1/refinery-orders/import-extract"),
-            HttpHeaders.EMPTY);
+    ResourceAccessException ex =
+        new ResourceAccessException(
+            "I/O error on POST request", new java.net.ConnectException("connection refused"));
 
     ProblemDetail problem = handler.handleBackendTransportFailure(ex);
 
     assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY.value());
     assertThat(problem.getProperties()).containsEntry("code", "BACKEND_RELAY_FAILED");
+    assertThat(relayFailures(MetricNames.REASON_BACKEND_UNAVAILABLE)).isEqualTo(1.0d);
+  }
+
+  /**
+   * A relay whose response body could not be read — the connection torn down mid-body, or a body
+   * past the payload cap — surfaces from {@code RestClient} as a plain {@link RestClientException}.
+   * It is a relay that did not complete, so it is a 502 like a refused connection, not a 500 that
+   * would read as a gateway defect.
+   */
+  @Test
+  void unreadableBackendBody_becomesA502AndCountsBackendUnavailable() {
+    RestClientException ex =
+        new RestClientException(
+            "Error while extracting response",
+            new java.io.IOException("Response body exceeds the limit of 2097152 bytes"));
+
+    ProblemDetail problem = handler.handleBackendTransportFailure(ex);
+
+    assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY.value());
     assertThat(relayFailures(MetricNames.REASON_BACKEND_UNAVAILABLE)).isEqualTo(1.0d);
   }
 

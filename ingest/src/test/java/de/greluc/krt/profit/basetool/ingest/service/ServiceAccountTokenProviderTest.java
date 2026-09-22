@@ -46,7 +46,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestClient;
 
 /**
  * Behaviour of the gateway's own identity for the backend hop (ADR-0129).
@@ -75,7 +75,7 @@ class ServiceAccountTokenProviderTest {
 
   private ServiceAccountTokenProvider provider(boolean configured) {
     return new ServiceAccountTokenProvider(
-        properties(configured), WebClient.builder().build(), meterRegistry);
+        properties(configured), RestClient.create(), meterRegistry);
   }
 
   /**
@@ -87,7 +87,7 @@ class ServiceAccountTokenProviderTest {
    */
   private ServiceAccountTokenProvider provider(MutableClock clock) {
     return new ServiceAccountTokenProvider(
-        properties(true), WebClient.builder().build(), meterRegistry, clock);
+        properties(true), RestClient.create(), meterRegistry, clock);
   }
 
   private ServiceAccountProperties properties(boolean configured) {
@@ -213,7 +213,7 @@ class ServiceAccountTokenProviderTest {
         TestProperties.serviceAccount(
             "token-uri", keycloak.url("/token").toString(), "client-id", "basetool-ingest-gateway");
     ServiceAccountTokenProvider provider =
-        new ServiceAccountTokenProvider(properties, WebClient.builder().build(), meterRegistry);
+        new ServiceAccountTokenProvider(properties, RestClient.create(), meterRegistry);
 
     assertThat(provider.isConfigured()).isFalse();
   }

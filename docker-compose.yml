@@ -775,7 +775,7 @@ x-backend: &backend-template
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
     # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
-    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # trust store — NOT an SSL bundle, which only the app's own named clients consult. Where the
     # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
     # and the health gate rolls the deploy back.
     # Unset, this resolves to the SAME file as the keystore mount above, and with
@@ -1247,7 +1247,7 @@ x-ingest: &ingest-template
     - ${IRI_KEYSTORE_HOST_PATH:-./keystore.p12}:/run/secrets/keystore.p12:ro
     # Trust anchors for OUTBOUND TLS (REQ-OPS-022). Spring Security fetches the OIDC metadata
     # from KEYCLOAK_ISSUER_URI at startup with a plain RestTemplate, which uses the JVM DEFAULT
-    # trust store — NOT the SSL bundle above, which only covers the backend WebClient. Where the
+    # trust store — NOT the SSL bundle above, which only covers the backend relay client. Where the
     # issuer sits behind a self-signed certificate, startup dies with "PKIX path building failed"
     # and the health gate rolls the deploy back.
     # Unset, this resolves to the SAME file as the keystore mount above, and with

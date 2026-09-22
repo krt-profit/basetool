@@ -34,10 +34,11 @@ configurations { compileOnly { extendsFrom(configurations.annotationProcessor.ge
 repositories { mavenCentral() }
 
 dependencies {
-  // Web MVC controllers (the two ingest endpoints) + WebFlux for the reactive
-  // WebClient that relays to the internal backend.
+  // Web MVC controllers (the two ingest endpoints). The relay to the internal backend and the
+  // token grant against Keycloak are blocking `RestClient` calls on the JDK HttpClient
+  // (config.RestClientConfig) -- no WebFlux, no Reactor Netty on the internet-facing module
+  // (ADR-0204).
   implementation("org.springframework.boot:spring-boot-starter-web")
-  implementation("org.springframework.boot:spring-boot-starter-webflux")
   implementation("org.springframework.boot:spring-boot-starter-security")
   // JWT resource server only — the gateway validates the caller's Keycloak token
   // and forwards it. It is NOT an OAuth2 login client (no session, no cookies).
@@ -60,13 +61,10 @@ dependencies {
   }
   // Redis for the short-lived single-use handoff staging (no DB, no JPA).
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
-  // Resilience4j around the backend WebClient relay (timeout, retry, circuit
-  // breaker), mirroring the frontend's resilience posture.
+  // Resilience4j circuit breaker (instance `backend`) around the backend relay, applied with
+  // CircuitBreaker#executeSupplier -- so no resilience4j-reactor. The relay runs on the request
+  // thread, so the correlation id and trace context need no Reactor context propagation either.
   implementation(libs.resilience4j.spring.boot3)
-  implementation(libs.resilience4j.reactor)
-  // Reactor context propagation so the correlation id survives the hop onto the
-  // WebClient worker thread. Version resolved by the Spring Boot BOM.
-  implementation(libs.micrometer.context.propagation)
   // Per-IP rate limiting on the new ingress (same library the backend uses).
   implementation(libs.bucket4j.core)
   // springdoc -api (NOT -ui): serves /v3/api-docs in non-prod profiles; no Swagger UI webjar.
@@ -104,6 +102,9 @@ dependencies {
   testImplementation("org.springframework.security:spring-security-test")
   // MockWebServer to assert the backend relay forwards bearer + headers correctly.
   testImplementation(libs.okhttp3.mockwebserver)
+  // Throwaway certificates for the TLS trust tests of RestClientConfig (HTTPS MockWebServer with a
+  // deliberately misnamed certificate). Test-only; generated in memory, never written to disk.
+  testImplementation(libs.okhttp3.tls)
   // Testcontainers (generic Redis container) for the handoff staging integration test.
   testImplementation(libs.testcontainers.junit)
   // ArchUnit core (no archunit-junit5: it drags a clashing JUnit Platform version;
