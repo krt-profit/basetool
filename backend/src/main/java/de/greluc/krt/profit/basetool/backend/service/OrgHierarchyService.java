@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Bereich;
 import de.greluc.krt.profit.basetool.backend.model.Department;
@@ -174,10 +175,7 @@ public class OrgHierarchyService {
   @Transactional
   public OrgUnit setParent(
       @NotNull UUID orgUnitId, @Nullable UUID parentOrgUnitId, @Nullable Long version) {
-    OrgUnit child =
-        orgUnitRepository
-            .findById(orgUnitId)
-            .orElseThrow(() -> new NotFoundException("Org unit not found"));
+    OrgUnit child = Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     if (parentOrgUnitId == null) {
       child.setParent(null);
@@ -187,9 +185,7 @@ public class OrgHierarchyService {
       return orgUnitRepository.saveAndFlush(child);
     }
     OrgUnit parent =
-        orgUnitRepository
-            .findById(parentOrgUnitId)
-            .orElseThrow(() -> new NotFoundException("Parent org unit not found"));
+        Entities.require(orgUnitRepository.findById(parentOrgUnitId), "Parent org unit not found");
     validateParentKind(child, parent);
     child.setParent(parent);
     return orgUnitRepository.saveAndFlush(child);
@@ -206,9 +202,7 @@ public class OrgHierarchyService {
    */
   private OrgUnit requireKind(UUID orgUnitId, OrgUnitKind expected) {
     OrgUnit unit =
-        orgUnitRepository
-            .findById(orgUnitId)
-            .orElseThrow(() -> new NotFoundException("Parent org unit not found"));
+        Entities.require(orgUnitRepository.findById(orgUnitId), "Parent org unit not found");
     if (unit.getKind() != expected) {
       throw new BadRequestException(
           "Parent org unit must be of kind " + expected + " but was " + unit.getKind());

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.NotificationRuleMapper;
 import de.greluc.krt.profit.basetool.backend.model.NotificationRule;
@@ -254,8 +255,8 @@ public class NotificationRuleService {
 
   @NotNull
   private NotificationRule load(@NotNull UUID id) {
-    return notificationRuleRepository
-        .findByIdWithSelectors(id)
-        .orElseThrow(() -> new NotFoundException("Notification rule not found: " + id));
+    return Entities.require(
+        notificationRuleRepository.findByIdWithSelectors(id),
+        () -> "Notification rule not found: " + id);
   }
 }

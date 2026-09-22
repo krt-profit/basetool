@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.backend.util.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
 import de.greluc.krt.profit.basetool.backend.model.BankAccountStatus;
@@ -630,9 +631,8 @@ public class BankLedgerService {
   @Transactional
   public BankTransactionDto reverseTransaction(@NotNull UUID transactionId, @Nullable String note) {
     final BankTransaction original =
-        transactionRepository
-            .findById(transactionId)
-            .orElseThrow(() -> new NotFoundException("Bank transaction not found"));
+        Entities.require(
+            transactionRepository.findById(transactionId), "Bank transaction not found");
     if (original.getType() == BankTransactionType.WIPE_RESET
         || original.getType() == BankTransactionType.REVERSAL) {
       throw new BankConflictException(
@@ -831,10 +831,7 @@ public class BankLedgerService {
       return null;
     }
     if (userId != null) {
-      User user =
-          userRepository
-              .findById(userId)
-              .orElseThrow(() -> new NotFoundException("Counterparty user not found"));
+      User user = Entities.require(userRepository.findById(userId), "Counterparty user not found");
       if (orgUnitId == null) {
         return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
       }

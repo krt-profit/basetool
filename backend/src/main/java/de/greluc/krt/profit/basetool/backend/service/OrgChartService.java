@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.OrgChartPositionMapper;
 import de.greluc.krt.profit.basetool.backend.model.KommandoGroup;
@@ -211,9 +212,8 @@ public class OrgChartService {
   public OrgChartPositionDto updatePosition(
       @NotNull UUID id, @NotNull OrgChartPositionUpdateRequest request) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     OptimisticLock.check(position.getVersion(), request.version(), OrgChartPosition.class, id);
     // The chart editor may not assign an account, nor touch a seat the rank mirror manages — an
     // account-held or kommando_group-linked position reflects the functional ranks and is edited
@@ -239,9 +239,9 @@ public class OrgChartService {
       User current = position.getUser();
       if (current == null || !request.userId().equals(current.getId())) {
         User newUser =
-            userRepository
-                .findById(request.userId())
-                .orElseThrow(() -> new NotFoundException("User not found: " + request.userId()));
+            Entities.require(
+                userRepository.findById(request.userId()),
+                () -> "User not found: " + request.userId());
         validateUserUnique(
             position.getPositionType().scope(), position.getOrgUnit(), request.userId());
         position.setUser(newUser);
@@ -287,9 +287,8 @@ public class OrgChartService {
   @Transactional
   public OrgChartPositionDto vacateCommandLeader(@NotNull UUID id, long version) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_VACATE_NOT_COMMAND);
     }
@@ -317,9 +316,8 @@ public class OrgChartService {
   @Transactional
   public void deletePosition(@NotNull UUID id) {
     OrgChartPosition position =
-        positionRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("OrgChartPosition not found: " + id));
+        Entities.require(
+            positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     // A mirror-managed seat (account-held, or a kommando_group-linked Kommando) reflects a
     // functional rank — it is removed by clearing the rank / deleting the Kommandogruppe under
     // Organisation -> Leitung (epic #800, REQ-ROLE-006), not from the chart. Free-text holders and
@@ -818,9 +816,7 @@ public class OrgChartService {
       }
       throw new BadRequestException(ERR_USER_REQUIRED);
     }
-    return userRepository
-        .findById(userId)
-        .orElseThrow(() -> new NotFoundException("User not found: " + userId));
+    return Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
   }
 
   private String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
@@ -843,9 +839,8 @@ public class OrgChartService {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
     OrgUnit unit =
-        orgUnitRepository
-            .findById(orgUnitId)
-            .orElseThrow(() -> new NotFoundException("OrgUnit not found: " + orgUnitId));
+        Entities.require(
+            orgUnitRepository.findById(orgUnitId), () -> "OrgUnit not found: " + orgUnitId);
     OrgUnitKind expectedKind =
         switch (scope) {
           case SQUADRON -> OrgUnitKind.SQUADRON;
@@ -895,9 +890,8 @@ public class OrgChartService {
 
   private OrgChartPosition loadCommandLeadParent(UUID parentId, OrgUnit orgUnit) {
     OrgChartPosition parent =
-        positionRepository
-            .findById(parentId)
-            .orElseThrow(() -> new NotFoundException("Parent position not found: " + parentId));
+        Entities.require(
+            positionRepository.findById(parentId), () -> "Parent position not found: " + parentId);
     if (parent.getPositionType() != OrgChartPositionType.COMMAND_LEAD
         || parent.getOrgUnit() == null
         || !parent.getOrgUnit().getId().equals(orgUnit.getId())) {

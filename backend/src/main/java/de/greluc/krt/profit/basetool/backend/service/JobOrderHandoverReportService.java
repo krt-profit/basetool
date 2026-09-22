@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.model.dto.HandoverReportPreviewRequestDto;
@@ -85,9 +86,7 @@ public class JobOrderHandoverReportService {
         userZone);
 
     JobOrderHandover handover =
-        jobOrderHandoverRepository
-            .findById(handoverId)
-            .orElseThrow(() -> new NotFoundException("Handover not found"));
+        Entities.require(jobOrderHandoverRepository.findById(handoverId), "Handover not found");
 
     if (!handover.getJobOrder().getId().equals(jobOrderId)) {
       throw new NotFoundException("Handover does not belong to this job order");

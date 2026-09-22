@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.config.EvictAllMaterialCaches;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.MaterialCategory;
@@ -305,17 +306,15 @@ public class MaterialService {
 
     if (dto.refinedMaterialId() != null) {
       Material refined =
-          materialRepository
-              .findById(dto.refinedMaterialId())
-              .orElseThrow(() -> new NotFoundException("Refined material not found"));
+          Entities.require(
+              materialRepository.findById(dto.refinedMaterialId()), "Refined material not found");
       material.setRefinedMaterial(refined);
     }
 
     if (dto.categoryId() != null) {
       MaterialCategory category =
-          materialCategoryRepository
-              .findById(dto.categoryId())
-              .orElseThrow(() -> new NotFoundException("Material category not found"));
+          Entities.require(
+              materialCategoryRepository.findById(dto.categoryId()), "Material category not found");
       material.setCategory(category);
     }
 

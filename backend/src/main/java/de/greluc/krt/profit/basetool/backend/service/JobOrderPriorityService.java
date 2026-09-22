@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobOrderDto;
@@ -77,9 +77,7 @@ public class JobOrderPriorityService {
   @Transactional
   public JobOrderDto updateJobOrderPriority(UUID id, Integer newPriority) {
     JobOrder targetOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     Integer oldPriority = targetOrder.getPriority();
     if (oldPriority == null) {

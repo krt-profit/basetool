@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.event.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.event.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.event.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -132,10 +133,9 @@ public class JobOrderService {
 
     for (CreateJobOrderMaterialDto matDto : createDto.materials()) {
       Material material =
-          materialRepository
-              .findById(matDto.materialId())
-              .orElseThrow(
-                  () -> new NotFoundException("Material not found: " + matDto.materialId()));
+          Entities.require(
+              materialRepository.findById(matDto.materialId()),
+              () -> "Material not found: " + matDto.materialId());
 
       JobOrderMaterial jobOrderMaterial =
           JobOrderMaterial.builder()
@@ -291,9 +291,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     OptimisticLock.checkOptionalClient(jobOrder.getVersion(), dto.version(), JobOrder.class, id);
 
@@ -395,9 +393,7 @@ public class JobOrderService {
   public JobOrderDto updateBlueprintVariantCounting(
       UUID id, boolean countWithVariants, Long version) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Blueprint variant counting applies only to item orders");
@@ -441,9 +437,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     OptimisticLock.checkOptionalClient(
         jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
@@ -515,10 +509,9 @@ public class JobOrderService {
     managed.getMaterials().clear();
     for (CreateJobOrderMaterialDto matDto : materials) {
       Material material =
-          materialRepository
-              .findById(matDto.materialId())
-              .orElseThrow(
-                  () -> new NotFoundException("Material not found: " + matDto.materialId()));
+          Entities.require(
+              materialRepository.findById(matDto.materialId()),
+              () -> "Material not found: " + matDto.materialId());
       managed.addMaterial(
           JobOrderMaterial.builder()
               .material(material)
@@ -539,9 +532,7 @@ public class JobOrderService {
 
     // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
     JobOrder refreshed =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
     return new MaterialReplaceOutcome(
@@ -589,9 +580,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateItemJobOrder(UUID id, CreateJobOrderItemRequestDto updateDto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(
@@ -802,9 +791,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     if (jobOrder.getType() != JobOrderType.MATERIAL) {
       throw new BadRequestException(
           "Order " + id + " is not a material order; use the requester item-update endpoint.");
@@ -860,9 +847,7 @@ public class JobOrderService {
   public JobOrderDto updateItemJobOrderAsRequester(
       UUID id, CreateJobOrderItemRequestDto updateDto) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(
           "Order " + id + " is not an item order; use the requester material-update endpoint.");
@@ -906,9 +891,7 @@ public class JobOrderService {
 
     // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
     JobOrder refreshed =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(refreshed);
     auditService.record(
@@ -956,9 +939,7 @@ public class JobOrderService {
   public void deleteJobOrder(UUID id) {
     jobOrderRepository.lockAllJobOrders();
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     final Integer priority = jobOrder.getPriority();
     // Snapshot the order's identity BEFORE the hard delete so the audit row stays readable
@@ -1005,9 +986,8 @@ public class JobOrderService {
   @Transactional
   public void unlinkMaterial(UUID jobOrderId, UUID materialId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
 
     boolean exists =
         jobOrder.getMaterials().stream().anyMatch(m -> m.getMaterial().getId().equals(materialId));
@@ -1041,15 +1021,13 @@ public class JobOrderService {
   @Transactional
   public void unlinkInventoryItem(UUID jobOrderId, UUID inventoryItemId) {
     final JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
 
     InventoryItem item =
-        inventoryItemRepository
-            .findById(inventoryItemId)
-            .orElseThrow(
-                () -> new NotFoundException("InventoryItem not found: " + inventoryItemId));
+        Entities.require(
+            inventoryItemRepository.findById(inventoryItemId),
+            () -> "InventoryItem not found: " + inventoryItemId);
 
     if (item.getJobOrderAllocations().stream()
         .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
@@ -1187,9 +1165,7 @@ public class JobOrderService {
   @Transactional
   public JobOrderDto reassignResponsibleOrgUnit(UUID id, UUID newResponsibleOrgUnitId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     OrgUnit target =
         orgUnitRepository

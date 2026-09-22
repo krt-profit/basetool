@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankHolderMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAuditEventType;
@@ -228,9 +229,7 @@ public class BankHolderService {
    * @return the holder entity
    */
   private BankHolder requireHolder(@NotNull UUID holderId) {
-    return holderRepository
-        .findById(holderId)
-        .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+    return Entities.require(holderRepository.findById(holderId), "Bank holder not found");
   }
 
   /**
@@ -244,10 +243,7 @@ public class BankHolderService {
    */
   @Transactional
   public BankHolderDto registerHolder(@NotNull RegisterBankHolderRequest request) {
-    User user =
-        userRepository
-            .findById(request.userId())
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(request.userId()), "User not found");
     if (holderRepository.existsByUserId(user.getId())) {
       throw new DuplicateEntityException("The user is already registered as a bank holder");
     }
@@ -276,9 +272,7 @@ public class BankHolderService {
   public BankHolderDto updateHolder(
       @NotNull UUID holderId, @NotNull UpdateBankHolderRequest request) {
     BankHolder holder =
-        holderRepository
-            .findById(holderId)
-            .orElseThrow(() -> new NotFoundException("Bank holder not found"));
+        Entities.require(holderRepository.findById(holderId), "Bank holder not found");
     OptimisticLock.check(holder.getVersion(), request.version(), BankHolder.class, holderId);
     boolean wasActive = holder.isActive();
     holder.setActive(request.active());

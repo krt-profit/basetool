@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.MaterialRequestFulfillmentSignalledEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -135,14 +136,11 @@ public class MaterialRequestService {
   public MaterialRequestDto createMaterialRequest(MaterialRequestCreateRequest request) {
     UUID viewerId = requireViewerId();
     User owner =
-        userRepository
-            .findById(viewerId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+        Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
     Material material =
-        materialRepository
-            .findById(request.materialId())
-            .orElseThrow(
-                () -> new NotFoundException("Material not found: " + request.materialId()));
+        Entities.require(
+            materialRepository.findById(request.materialId()),
+            () -> "Material not found: " + request.materialId());
     double amount = requirePositiveAmount(request.requestedAmount());
 
     MaterialExchangeRequest entity = new MaterialExchangeRequest();
@@ -189,16 +187,11 @@ public class MaterialRequestService {
   public MaterialRequestDto createItemRequest(MaterialItemRequestCreateRequest request) {
     UUID viewerId = requireViewerId();
     User owner =
-        userRepository
-            .findById(viewerId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+        Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
     ResolvedProduct product =
-        blueprintProductService
-            .resolveByProductKey(request.productKey())
-            .orElseThrow(
-                () ->
-                    new NotFoundException(
-                        "No craftable item (blueprint product) for key: " + request.productKey()));
+        Entities.require(
+            blueprintProductService.resolveByProductKey(request.productKey()),
+            () -> "No craftable item (blueprint product) for key: " + request.productKey());
 
     MaterialExchangeRequest entity = new MaterialExchangeRequest();
     entity.setKind(MaterialExchangeRequestKind.ITEM);
@@ -247,9 +240,8 @@ public class MaterialRequestService {
   public MaterialRequestDto updateRequest(UUID requestId, MaterialRequestUpdateRequest request) {
     UUID viewerId = requireViewerId();
     MaterialExchangeRequest entity =
-        requestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
+        Entities.require(
+            requestRepository.findById(requestId), () -> "Request not found: " + requestId);
     requireOwner(entity, viewerId);
     OptimisticLock.check(
         entity.getVersion(), request.version(), MaterialExchangeRequest.class, requestId);
@@ -291,9 +283,8 @@ public class MaterialRequestService {
   public MaterialRequestDto deactivate(UUID requestId) {
     UUID viewerId = requireViewerId();
     MaterialExchangeRequest entity =
-        requestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
+        Entities.require(
+            requestRepository.findById(requestId), () -> "Request not found: " + requestId);
     requireOwner(entity, viewerId);
     if (entity.getStatus() == MaterialExchangeRequestStatus.ACTIVE) {
       entity.setStatus(MaterialExchangeRequestStatus.DEACTIVATED);
@@ -345,9 +336,8 @@ public class MaterialRequestService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void signalFulfillmentInNewTransaction(UUID requestId, UUID viewerId) {
     MaterialExchangeRequest request =
-        requestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
+        Entities.require(
+            requestRepository.findById(requestId), () -> "Request not found: " + requestId);
     if (request.getStatus() != MaterialExchangeRequestStatus.ACTIVE) {
       throw new NotFoundException("Request is not active: " + requestId);
     }
@@ -358,9 +348,7 @@ public class MaterialRequestService {
       return;
     }
     User viewer =
-        userRepository
-            .findById(viewerId)
-            .orElseThrow(() -> new NotFoundException("User not found: " + viewerId));
+        Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
     MaterialExchangeRequestInterest interest = new MaterialExchangeRequestInterest();
     interest.setRequest(request);
     interest.setInterestedUser(viewer);
@@ -397,9 +385,8 @@ public class MaterialRequestService {
   public MaterialRequestDto withdrawFulfillment(UUID requestId) {
     UUID viewerId = requireViewerId();
     MaterialExchangeRequest request =
-        requestRepository
-            .findById(requestId)
-            .orElseThrow(() -> new NotFoundException("Request not found: " + requestId));
+        Entities.require(
+            requestRepository.findById(requestId), () -> "Request not found: " + requestId);
     long removed = interestRepository.deleteByRequestIdAndInterestedUserId(requestId, viewerId);
     if (removed > 0) {
       auditService.record(

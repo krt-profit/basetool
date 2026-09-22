@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
 import de.greluc.krt.profit.basetool.backend.model.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
@@ -85,9 +85,8 @@ public class MissionSecurityService {
   public boolean canAccessParticipant(
       UUID missionId, UUID participantId, Authentication authentication) {
     MissionParticipant p =
-        missionParticipantRepository
-            .findById(participantId)
-            .orElseThrow(() -> new NotFoundException("Participant not found"));
+        Entities.require(
+            missionParticipantRepository.findById(participantId), "Participant not found");
 
     if (!p.getMission().getId().equals(missionId)) {
       log.warn("Mission ID mismatch: {} != {}", p.getMission().getId(), missionId);

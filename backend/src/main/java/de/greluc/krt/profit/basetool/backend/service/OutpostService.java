@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Outpost;
 import de.greluc.krt.profit.basetool.backend.repository.OutpostRepository;
@@ -68,9 +69,7 @@ public class OutpostService {
    */
   @Cacheable(cacheNames = CacheConfig.OUTPOSTS_CACHE)
   public Outpost getOutpost(UUID id) {
-    return outpostRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Outpost not found"));
+    return Entities.require(outpostRepository.findById(id), "Outpost not found");
   }
 
   /**

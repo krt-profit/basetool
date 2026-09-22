@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.BankGrantMapper;
 import de.greluc.krt.profit.basetool.backend.model.BankAccount;
@@ -111,14 +112,9 @@ public class BankGrantService {
    */
   @Transactional
   public BankGrantDto createGrant(@NotNull CreateBankGrantRequest request) {
-    User grantee =
-        userRepository
-            .findById(request.userId())
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User grantee = Entities.require(userRepository.findById(request.userId()), "User not found");
     BankAccount account =
-        accountRepository
-            .findById(request.accountId())
-            .orElseThrow(() -> new NotFoundException("Bank account not found"));
+        Entities.require(accountRepository.findById(request.accountId()), "Bank account not found");
     if (!hasBankRole(grantee)) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_GRANTEE_MISSING_ROLE,
@@ -205,9 +201,9 @@ public class BankGrantService {
    * @return the grant entity
    */
   private BankAccountGrant requireGrant(@NotNull UUID userId, @NotNull UUID accountId) {
-    return grantRepository
-        .findById(new BankAccountGrantId(userId, accountId))
-        .orElseThrow(() -> new NotFoundException("Bank grant not found"));
+    return Entities.require(
+        grantRepository.findById(new BankAccountGrantId(userId, accountId)),
+        "Bank grant not found");
   }
 
   /**

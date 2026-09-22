@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.FrequencyType;
 import de.greluc.krt.profit.basetool.backend.repository.FrequencyTypeRepository;
@@ -71,9 +72,7 @@ public class FrequencyTypeService {
    */
   @Cacheable(cacheNames = CacheConfig.FREQUENCY_TYPES_CACHE)
   public FrequencyType getFrequencyType(@NotNull UUID id) {
-    return frequencyTypeRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("FrequencyType not found"));
+    return Entities.require(frequencyTypeRepository.findById(id), "FrequencyType not found");
   }
 
   /**

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.model.Location;
@@ -106,10 +107,7 @@ public class HangarService {
    */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     Ship ship = new Ship();
     ship.setName(dto.name());
     ship.setInsurance(dto.insurance());
@@ -259,8 +257,7 @@ public class HangarService {
    */
   @Transactional
   public Ship updateShip(@NotNull UUID userId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
-    Ship ship =
-        shipRepository.findById(shipId).orElseThrow(() -> new NotFoundException("Ship not found"));
+    Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
 
@@ -303,8 +300,7 @@ public class HangarService {
    */
   @Transactional
   public void deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
-    Ship ship =
-        shipRepository.findById(shipId).orElseThrow(() -> new NotFoundException("Ship not found"));
+    Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
 
     if (ship.getOwner() == null
         || ship.getOwner().getId() == null

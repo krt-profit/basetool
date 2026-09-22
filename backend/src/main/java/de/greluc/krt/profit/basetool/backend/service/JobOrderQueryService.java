@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.JobOrderMapper;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -372,9 +373,7 @@ public class JobOrderQueryService {
    */
   public JobOrderDto getJobOrderById(UUID id) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + id));
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     JobOrderDto dto = jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
     // Stamp the per-order redaction decision here, computed from the ALREADY-LOADED entity via the
     // managed-entity gate overload — so the controller no longer re-evaluates canSeeJobOrder(id)
@@ -400,12 +399,10 @@ public class JobOrderQueryService {
       getInventoryItemsForJobOrderMaterial(UUID jobOrderId, UUID materialId) {
     // Existence guards: load only to surface a 404 for an unknown order / material; the query below
     // filters by the ids directly, so the entities themselves are not needed (#1256 review).
-    jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
-    materialRepository
-        .findById(materialId)
-        .orElseThrow(() -> new NotFoundException("Material not found: " + materialId));
+    Entities.require(
+        jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    Entities.require(
+        materialRepository.findById(materialId), () -> "Material not found: " + materialId);
 
     return inventoryItemRepository.findByJobOrderIdAndMaterialId(jobOrderId, materialId).stream()
         .map(inventoryItemMapper::toDto)
@@ -453,9 +450,8 @@ public class JobOrderQueryService {
   public List<de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto>
       getOrphanedLinkedInventory(UUID jobOrderId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("JobOrder not found: " + jobOrderId));
+        Entities.require(
+            jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     Set<UUID> requiredMaterials = jobOrderItemService.requiredMaterialIds(jobOrder);
     Set<UUID> requiredGameItems = jobOrderItemService.requiredGameItemIds(jobOrder);
     return java.util.stream.Stream.concat(

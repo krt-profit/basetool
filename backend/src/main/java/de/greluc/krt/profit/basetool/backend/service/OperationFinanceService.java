@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.RefineryOrderMapper;
@@ -185,9 +186,7 @@ public class OperationFinanceService {
   @NotNull
   public OperationFinanceSummaryDto getOperationFinanceSummary(UUID operationId) {
     Operation operation =
-        operationRepository
-            .findById(operationId)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+        Entities.require(operationRepository.findById(operationId), "Operation not found");
 
     List<Mission> orderedMissions =
         operation.getMissions().stream()
@@ -248,15 +247,12 @@ public class OperationFinanceService {
   @NotNull
   public MissionFinanceSummaryDto getMissionFinanceDetail(UUID operationId, UUID missionId) {
     Operation operation =
-        operationRepository
-            .findById(operationId)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+        Entities.require(operationRepository.findById(operationId), "Operation not found");
 
     Mission mission =
-        operation.getMissions().stream()
-            .filter(m -> m.getId().equals(missionId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Mission is not part of this operation"));
+        Entities.require(
+            operation.getMissions().stream().filter(m -> m.getId().equals(missionId)).findFirst(),
+            "Mission is not part of this operation");
 
     List<MissionFinanceEntry> entries = financeEntryRepository.findAllByMissionId(missionId);
     List<RefineryOrder> orders = refineryOrderRepository.findByMissionId(missionId);

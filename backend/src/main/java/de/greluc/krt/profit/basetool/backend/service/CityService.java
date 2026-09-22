@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.repository.CityRepository;
@@ -69,7 +70,7 @@ public class CityService {
    */
   @Cacheable(cacheNames = CacheConfig.CITIES_CACHE)
   public City getCity(UUID id) {
-    return cityRepository.findById(id).orElseThrow(() -> new NotFoundException("City not found"));
+    return Entities.require(cityRepository.findById(id), "City not found");
   }
 
   /**

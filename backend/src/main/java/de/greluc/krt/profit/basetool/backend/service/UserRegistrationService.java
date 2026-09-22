@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.event.UserApprovalDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.model.ApprovalStatus;
@@ -239,8 +240,7 @@ public class UserRegistrationService {
       @Nullable String reason,
       @Nullable Long version,
       @NotNull UUID adminId) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(userId), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
     if (user.getApprovalStatus() != ApprovalStatus.REJECTED) {
       throw new BusinessConflictException(
@@ -400,9 +400,7 @@ public class UserRegistrationService {
       @Nullable Long version,
       @NotNull UUID adminId) {
     User pending =
-        userRepository
-            .findById(pendingId)
-            .orElseThrow(() -> new NotFoundException("Pending registration not found"));
+        Entities.require(userRepository.findById(pendingId), "Pending registration not found");
     OptimisticLock.checkOptionalClient(pending.getVersion(), version, User.class, pendingId);
     if (pending.getApprovalStatus() != ApprovalStatus.PENDING) {
       throw new BusinessConflictException(
@@ -413,9 +411,7 @@ public class UserRegistrationService {
       throw new BusinessConflictException("A registration cannot be linked to itself");
     }
     User target =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("Target account not found"));
+        Entities.require(userRepository.findById(targetUserId), "Target account not found");
     if (target.getApprovalStatus() != ApprovalStatus.ACTIVE) {
       throw new BusinessConflictException("The target account must be an active account");
     }
@@ -558,9 +554,7 @@ public class UserRegistrationService {
             });
 
     User target =
-        userRepository
-            .findById(targetUserId)
-            .orElseThrow(() -> new NotFoundException("Target account not found"));
+        Entities.require(userRepository.findById(targetUserId), "Target account not found");
     target.setDiscordUserId(snowflake);
     if (guildNickname != null && !guildNickname.isBlank()) {
       target.setDiscordGuildNickname(guildNickname);

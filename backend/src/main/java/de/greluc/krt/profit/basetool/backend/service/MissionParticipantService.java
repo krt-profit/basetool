@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.enforceSectionVersion;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
@@ -147,10 +148,7 @@ public class MissionParticipantService {
       String comment,
       java.util.List<UUID> orgUnitIds,
       PayoutPreference payoutPreference) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     // Audit finding M-4: hard cap of {@value MissionService#MAX_PARTICIPANTS_PER_MISSION} per
     // mission. Closes the DoS vector where a caller scripts thousands of external sign-ups
@@ -205,10 +203,7 @@ public class MissionParticipantService {
     participant.setMission(mission);
 
     if (effectiveUserId != null) {
-      User user =
-          userRepository
-              .findPlainById(effectiveUserId)
-              .orElseThrow(() -> new NotFoundException("User not found"));
+      User user = Entities.require(userRepository.findPlainById(effectiveUserId), "User not found");
       participant.setUser(user);
       // Registered users carry every org unit they belong to at participate-time (their Staffel
       // and/or any Spezialkommandos). Auto-derived from org_unit_membership — empty when the user
@@ -292,10 +287,11 @@ public class MissionParticipantService {
    *     does not exist on this mission
    */
   public MissionParticipant getParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    return missionParticipantRepository
-        .findById(participantId)
-        .filter(p -> p.getMission().getId().equals(missionId))
-        .orElseThrow(() -> new NotFoundException("Participant not found in mission"));
+    return Entities.require(
+        missionParticipantRepository
+            .findById(participantId)
+            .filter(p -> p.getMission().getId().equals(missionId)),
+        "Participant not found in mission");
   }
 
   /**
@@ -306,10 +302,7 @@ public class MissionParticipantService {
    * @return list of unassigned participants
    */
   public List<MissionParticipant> getUnassignedParticipants(@NotNull UUID missionId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     Set<UUID> assignedParticipantIds =
         mission.getAssignedUnits().stream()
             .flatMap(unit -> unit.getCrew().stream())
@@ -327,10 +320,7 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission removeParticipant(@NotNull UUID missionId, @NotNull UUID participantId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     boolean removed = mission.getParticipants().removeIf(p -> p.getId().equals(participantId));
 
@@ -388,16 +378,14 @@ public class MissionParticipantService {
       String guestName,
       Long version,
       org.springframework.security.core.Authentication authentication) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
     MissionParticipant participant =
-        mission.getParticipants().stream()
-            .filter(p -> p.getId().equals(participantId))
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("Participant not found in this mission"));
+        Entities.require(
+            mission.getParticipants().stream()
+                .filter(p -> p.getId().equals(participantId))
+                .findFirst(),
+            "Participant not found in this mission");
 
     if (version != null && !version.equals(participant.getVersion())) {
       throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
@@ -431,9 +419,8 @@ public class MissionParticipantService {
 
     if (desiredMissionJobTypeId != null) {
       JobType jt =
-          jobTypeRepository
-              .findById(desiredMissionJobTypeId)
-              .orElseThrow(() -> new NotFoundException("Desired JobType not found"));
+          Entities.require(
+              jobTypeRepository.findById(desiredMissionJobTypeId), "Desired JobType not found");
       if (jt.getArchetype() != JobTypeArchetype.MISSION) {
         throw new IllegalArgumentException(
             "Desired JobType " + jt.getName() + " is not of archetype MISSION");
@@ -516,9 +503,8 @@ public class MissionParticipantService {
       }
     } else if (plannedMissionJobTypeId != null) {
       JobType jt =
-          jobTypeRepository
-              .findById(plannedMissionJobTypeId)
-              .orElseThrow(() -> new NotFoundException("Planned JobType not found"));
+          Entities.require(
+              jobTypeRepository.findById(plannedMissionJobTypeId), "Planned JobType not found");
       if (jt.getArchetype() != JobTypeArchetype.MISSION) {
         throw new IllegalArgumentException(
             "Planned JobType " + jt.getName() + " is not of archetype MISSION");
@@ -707,18 +693,12 @@ public class MissionParticipantService {
       UUID userId,
       String guestName,
       @NotNull Long expectedPartyLeadVersion) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     enforceSectionVersion(
         missionRepository, mission, MissionSection.PARTY_LEAD, expectedPartyLeadVersion, missionId);
 
     if (userId != null) {
-      User user =
-          userRepository
-              .findPlainById(userId)
-              .orElseThrow(() -> new NotFoundException("User not found"));
+      User user = Entities.require(userRepository.findPlainById(userId), "User not found");
       mission.setPartyLeadUser(user);
       mission.setPartyLeadGuestName(null);
     } else if (guestName != null && !guestName.isBlank()) {
@@ -751,14 +731,8 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission addManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     mission.getManagers().add(user);
     auditService.record(
         AuditEventType.MISSION_MANAGER_ADDED, mission.getId(), mission.getName(), userId, null);
@@ -771,10 +745,7 @@ public class MissionParticipantService {
    */
   @Transactional
   public Mission removeManager(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
+    Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     mission.getManagers().removeIf(u -> u.getId().equals(userId));
     auditService.record(
         AuditEventType.MISSION_MANAGER_REMOVED, mission.getId(), mission.getName(), userId, null);

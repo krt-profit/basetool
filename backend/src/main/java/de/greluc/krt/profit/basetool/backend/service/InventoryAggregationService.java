@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.MaterialMapper;
@@ -167,9 +168,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getInventoryByMaterial(UUID materialId, Pageable pageable) {
     Material material =
-        materialRepository
-            .findById(materialId)
-            .orElseThrow(() -> new NotFoundException("Material not found"));
+        Entities.require(materialRepository.findById(materialId), "Material not found");
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findByMaterialAndPersonalFalseScoped(
@@ -193,9 +192,7 @@ public class InventoryAggregationService {
    */
   public Page<InventoryItemDto> getInventoryByGameItem(UUID gameItemId, Pageable pageable) {
     GameItem gameItem =
-        gameItemRepository
-            .findById(gameItemId)
-            .orElseThrow(() -> new NotFoundException("Game item not found"));
+        Entities.require(gameItemRepository.findById(gameItemId), "Game item not found");
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return inventoryItemRepository
         .findByGameItemAndPersonalFalseScoped(
@@ -217,10 +214,7 @@ public class InventoryAggregationService {
    * @return paged material inventory rows owned by the user
    */
   public Page<InventoryItemDto> getUserInventory(UUID userId, Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findMaterialRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -236,10 +230,7 @@ public class InventoryAggregationService {
    * @throws NotFoundException when the user id is unknown
    */
   public Page<InventoryItemDto> getUserItemInventory(UUID userId, Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findItemRowsByUser(user, pageable)
         .map(inventoryItemMapper::toDto);
@@ -325,10 +316,7 @@ public class InventoryAggregationService {
           List<UUID> missionIds,
           boolean personalOnly,
           boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -434,10 +422,7 @@ public class InventoryAggregationService {
           List<UUID> jobOrderIds,
           boolean personalOnly,
           boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -487,10 +472,7 @@ public class InventoryAggregationService {
       List<UUID> missionIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasMaterials = materialIds != null && !materialIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -534,10 +516,7 @@ public class InventoryAggregationService {
       List<UUID> jobOrderIds,
       boolean personalOnly,
       boolean nonPersonalOnly) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     boolean hasGameItems = gameItemIds != null && !gameItemIds.isEmpty();
     boolean hasLocations = locationIds != null && !locationIds.isEmpty();
     boolean hasJobOrders = jobOrderIds != null && !jobOrderIds.isEmpty();
@@ -795,10 +774,7 @@ public class InventoryAggregationService {
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findUserStackEntries(
             user.getId(),
@@ -872,10 +848,7 @@ public class InventoryAggregationService {
       Boolean personal,
       UUID owningOrgUnitId,
       Pageable pageable) {
-    User user =
-        userRepository
-            .findPlainById(userId)
-            .orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findPlainById(userId), "User not found");
     return inventoryItemRepository
         .findUserItemStackEntries(
             user.getId(),
@@ -1015,9 +988,7 @@ public class InventoryAggregationService {
    * @throws NotFoundException when the job order is unknown
    */
   public List<MaterialCollectionEntryDto> getMaterialCollection(UUID jobOrderId) {
-    jobOrderRepository
-        .findById(jobOrderId)
-        .orElseThrow(() -> new NotFoundException("Job order not found"));
+    Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
     return inventoryItemRepository.findByJobOrderIdOrdered(jobOrderId).stream()
         .map(
             item -> {
@@ -1079,9 +1050,7 @@ public class InventoryAggregationService {
   @NotNull
   public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
     JobOrder jobOrder =
-        jobOrderRepository
-            .findById(jobOrderId)
-            .orElseThrow(() -> new NotFoundException("Job order not found"));
+        Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
 
     // Per-gameItem ordered/manufactured context from the order's own item lines (REQ-ORDERS-025).
     // getId() on the lazy GameItem proxy resolves from the FK without initialising it, so this

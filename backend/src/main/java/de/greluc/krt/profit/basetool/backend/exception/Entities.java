@@ -27,11 +27,12 @@ import org.jetbrains.annotations.NotNull;
  * Fetch-or-throw helper for the repository-lookup idiom that pervades the service layer (S1, part
  * of #905).
  *
- * <p>Replaces the ~240 hand-written {@code repository.find*(id).orElseThrow(() -> new
+ * <p>Replaced the 250 hand-written {@code repository.find*(id).orElseThrow(() -> new
  * NotFoundException("…"))} sites — the single largest duplication surface in the services — with
- * {@link #require(Optional, String) Entities.require(repository.findById(id), "…")}. The value is
- * returned when present; otherwise a {@link NotFoundException} carrying the caller-supplied message
- * is thrown, which {@code GlobalExceptionHandler} maps to an HTTP 404 RFC&nbsp;7807 problem.
+ * {@link #require(Optional, String) Entities.require(repository.findById(id), "…")} (BE-SIMP-01);
+ * {@code EntitiesRequireRatchetTest} keeps the hand-written count at zero. The value is returned
+ * when present; otherwise a {@link NotFoundException} carrying the caller-supplied message is
+ * thrown, which {@code GlobalExceptionHandler} maps to an HTTP 404 RFC&nbsp;7807 problem.
  *
  * <p>The message is <b>always caller-supplied, never auto-derived from the type</b>: {@code
  * GlobalExceptionHandler.resolveDetail} treats a not-found message as a translation key (guarded by

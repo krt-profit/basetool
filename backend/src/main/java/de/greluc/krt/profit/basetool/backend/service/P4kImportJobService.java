@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.model.P4kImportJob;
@@ -124,10 +125,9 @@ public class P4kImportJobService {
   public P4kImportJob createApplyJob(
       @NotNull UUID previewJobId, boolean seedNew, @NotNull UUID createdBy) {
     P4kImportJob preview =
-        jobRepository
-            .findById(previewJobId)
-            .orElseThrow(
-                () -> new NotFoundException("P4K import job " + previewJobId + " was not found."));
+        Entities.require(
+            jobRepository.findById(previewJobId),
+            () -> "P4K import job " + previewJobId + " was not found.");
     if (preview.getKind() != P4kImportJobKind.PREVIEW) {
       throw new BadRequestException("Only a preview job can be applied.");
     }
@@ -173,9 +173,8 @@ public class P4kImportJobService {
   @Transactional(readOnly = true)
   @NotNull
   public P4kImportJob getJob(@NotNull UUID jobId) {
-    return jobRepository
-        .findById(jobId)
-        .orElseThrow(() -> new NotFoundException("P4K import job " + jobId + " was not found."));
+    return Entities.require(
+        jobRepository.findById(jobId), () -> "P4K import job " + jobId + " was not found.");
   }
 
   /**
