@@ -1,0 +1,18 @@
+# Hash-pinned zizmor for the `zizmor` job in .github/workflows/repo-lint.yml (audit item CI-SEC-15).
+#
+# Why pip and not the release tarball, the way actionlint/hadolint/gitleaks are installed: zizmor's
+# GitHub release publishes no checksums file, so a tarball digest would be one taken from a first
+# download that nobody upstream asserts. PyPI publishes sha256 as first-class metadata and
+# `pip install --require-hashes` enforces it. Same reasoning, same file shape as basetool-android's
+# .github/requirements/zizmor.txt.
+#
+# zizmor declares no Python dependencies (PyPI `requires_dist: null`) -- it is a Rust binary shipped
+# as a py3-none wheel -- so this file is complete as written. Both glibc Linux wheels are listed;
+# ubuntu-latest selects the x86_64 one.
+#
+# NO DEPENDABOT ECOSYSTEM MAINTAINS THIS FILE. Version and hashes are bumped by hand, together
+# (https://pypi.org/pypi/zizmor/<version>/json lists the digests). A `pip` Dependabot entry would not
+# help: it rewrites hashes only for pip-compile output, so its bump PR would carry stale hashes.
+zizmor==1.30.1 \
+    --hash=sha256:eee12266b793cb87ad4a7e3af2e72404f8a63e3de5eb099b80bf7b1cfd232a8e \
+    --hash=sha256:92906f448365672ebb657fb50d36f997290a3aaba8cac723214741ea9054845d

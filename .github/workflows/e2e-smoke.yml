@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 25 (Temurin)
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -70,6 +72,28 @@ jobs:
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
         run: ./gradlew :frontend:smokeTest -Pe2e.browser=${{ matrix.browser }} --stacktrace
 
+      # Never the session. Against staging the smoke tests log in as a REAL account, and three files
+      # under build/e2e carry that login in replayable form: `auth-state.json` (E2eSupport's
+      # storageState), `storageState.json` (LoginSmokeE2eTest) and `trace.zip` (a Playwright trace
+      # records every request and response, cookies included). An artifact is downloadable by
+      # anyone with read access to this public repository's Actions for as long as it is retained,
+      # so each of the three is excluded here rather than trusted to expire (audit item
+      # CI-SEC-17). Screenshots, page dumps and the JUnit reports still upload. e2e.yml does not
+      # need this: its stack is ephemeral and its accounts are throwaway.
+      #
+      # Deleted first AND excluded below: the exclusion alone rests on the upload action's glob
+      # semantics, the deletion on nothing, and a staging session is not something to be clever
+      # with.
+      - name: Remove session material before upload
+        if: always()
+        run: |
+          set -eu
+          if [ -d frontend/build/e2e ]; then
+            find frontend/build/e2e -type f \
+              \( -name 'auth-state.json' -o -name 'storageState.json' -o -name '*.zip' \) \
+              -print -delete
+          fi
+
       - name: Upload smoke artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -77,6 +101,9 @@ jobs:
           name: smoke-artifacts-${{ matrix.browser }}
           path: |
             frontend/build/e2e/**
+            !frontend/build/e2e/**/auth-state.json
+            !frontend/build/e2e/**/storageState.json
+            !frontend/build/e2e/**/*.zip
             frontend/build/test-results/smokeTest/**
             frontend/build/reports/tests/smokeTest/**
           retention-days: 14

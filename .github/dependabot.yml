@@ -76,6 +76,22 @@ updates:
     commit-message:
       prefix: "chore(docker)"
 
+  # The BuildKit image every release build boots, pinned by digest in a carrier Dockerfile that
+  # nothing builds (.github/actions/setup-buildx/Dockerfile, audit item CI-SEC-13). The composite
+  # action reads the reference from that file, so this entry is what keeps the pin moving with
+  # the `buildx-stable-1` channel instead of freezing it.
+  - package-ecosystem: docker
+    directory: /.github/actions/setup-buildx
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
+
   # Infra image pins (redis/postgres/keycloak/npm) in docker-compose.yml. Once a
   # bump PR is merged and a release is cut + promoted, the new compose ships to
   # prod automatically as part of the `basetool-config` artifact (no manual
