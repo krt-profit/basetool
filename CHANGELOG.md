@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
+
 ### Fixed
 
 - **Betrieb: die Host-Einrichtung hätte allen Containern die Namensauflösung genommen.** Die
