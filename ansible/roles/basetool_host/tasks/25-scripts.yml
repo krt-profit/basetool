@@ -47,6 +47,9 @@
     - restore-drill.sh
     - container-cleanup.sh
     - lib/container-runtime.sh
+    # log, fail, read_env and the atomic textfile write the four scripts share (OPS-SIMP-04). Every
+    # one of them sources it, so a host with the new scripts and without this file cannot run any.
+    - lib/common.sh
     # The renderer deploy.sh calls when the config bundle carries env.d templates. It belongs
     # here and not in the bundle for the same reason deploy.sh does: it is tooling the deployer
     # invokes, and a release that could replace the tool running it is a self-update hazard.
@@ -64,9 +67,9 @@
 # has run this role before keeps the OLD timer enabled and failing every Saturday, next to the new
 # one that works -- which is the half-finished rename the ADR itself warns about.
 #
-# The log file is deliberately NOT removed: Alloy still watches /hostlog/iri-docker-cleanup.log for
-# the length of the transition so the `{app="ops-cleanup"}` stream has no gap, and deleting an
-# operator's logs is not this role's business in any case. Logrotate will age it out.
+# The old log file is deliberately NOT removed: deleting an operator's logs is not this role's
+# business, and logrotate ages it out. (Alloy watched it beside the new one during the transition;
+# that second path was dropped on 2026-09-22 once both hosts had run this role.)
 - name: Find out whether the retired cleanup units are present
   ansible.builtin.stat:
     path: "/etc/systemd/system/{{ item }}"
@@ -129,6 +132,32 @@
     - iri-container-cleanup.timer
   notify: Reload systemd for the operational units
 
+- name: Make room for the shared sandbox drop-in
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ basetool_host_deploy_account_units }}"
+
+- name: Install the sandbox the deploy-account units share
+  # ONE file, installed beside each of the four units (OPS-SIMP-03). The hardening they share --
+  # ProtectSystem=strict, ProtectHome=read-only, PrivateTmp and the kernel protections, with the
+  # measured reasons NoNewPrivileges and RestrictNamespaces are absent -- was copied into each unit
+  # and had begun to drift. A drop-in per unit rather than a prefix drop-in (`iri-.service.d`)
+  # because the prefix would also reach the three ROOT units (iri-container-metrics,
+  # iri-cert-expiry, iri-host-updates-metrics), and `ProtectHome=read-only` from a drop-in would
+  # WEAKEN their own `ProtectHome=true`.
+  ansible.builtin.copy:
+    src: "{{ basetool_host_scripts_src }}/iri-deploy-account-sandbox.conf"
+    dest: "/etc/systemd/system/{{ item }}.d/10-deploy-account-sandbox.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ basetool_host_deploy_account_units }}"
+  notify: Reload systemd for the operational units
+
 - name: Install the log rotation the units write for
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/{{ item.src }}"
@@ -171,6 +200,7 @@
   # directive, a missing User=, a group that does not exist. Installing four units
   # and discovering at the first timer firing that one of them refuses to start is
   # exactly the failure this whole file exists to prevent.
+  # The drop-in above is read with the unit, so this also proves the shared sandbox parses.
   ansible.builtin.command: "systemd-analyze verify /etc/systemd/system/{{ item }}"
   register: basetool_host_unit_verify
   changed_when: false

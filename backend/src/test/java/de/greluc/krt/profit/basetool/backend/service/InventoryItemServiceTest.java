@@ -218,7 +218,7 @@ class InventoryItemServiceTest {
   @Test
   void getUserInventory_shouldReturnPage() {
     UUID userId = UUID.randomUUID();
-    when(userRepository.findById(userId)).thenReturn(Optional.of(new User()));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(new User()));
     when(inventoryItemRepository.findMaterialRowsByUser(any(), any()))
         .thenReturn(new PageImpl<>(List.of(new InventoryItem())));
     when(inventoryItemMapper.toDto(any())).thenReturn(null);
@@ -321,7 +321,7 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(inventoryItemRepository.findUserStacks(
             eq(userId),
             eq(false),
@@ -364,7 +364,7 @@ class InventoryItemServiceTest {
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(inventoryItemRepository.findUserStacks(
             eq(userId),
             eq(false),
@@ -409,7 +409,7 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(inventoryItemRepository.findUserStacks(
             eq(userId),
             eq(true),
@@ -454,7 +454,7 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(inventoryItemRepository.findUserStacks(
             eq(userId),
             eq(false),
@@ -500,7 +500,7 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(inventoryItemRepository.findUserStacks(
             eq(userId),
             eq(false),

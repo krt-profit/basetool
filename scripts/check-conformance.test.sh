@@ -4,7 +4,7 @@
 #
 # The conformance suite's acceptance has two halves, and this is the second one:
 #
-#   1. it goes green against the current Docker stack   (run it against the host)
+#   1. it goes green against the running host           (run it against the host)
 #   2. EVERY check has been shown red at least once     (this file)
 #
 # A green check that cannot go red is decoration. That lesson cost a day on 2026-09-12, and it is
@@ -18,7 +18,7 @@
 # No host, no daemon, no network beyond loopback: the external checks run against a local TLS
 # fixture (throwaway self-signed certificates generated here, never committed) and the host-side
 # checks run against a stub that prints what the host would have printed. Same principle as
-# deploy.test.sh stubbing docker, cosign and flock on PATH.
+# deploy.test.sh stubbing podman, cosign and flock on PATH.
 #
 # Requires: bash, python3, openssl. Runs on Git-Bash on Windows and on a CI runner.
 #
@@ -241,11 +241,9 @@ emit_prom() { printf '{"status":"success","data":{"resultType":"vector","result"
 sample() { printf '{"metric":{%s},"value":[0,"%s"]}' "$1" "$2"; }
 
 case "$cmd" in
-  *"command -v docker"*)
-    # The runtime probe. The stub answers for a Docker-era host by default, which is what the
-    # existing arms below are written against; STUB_RUNTIME=podman exercises the other branch,
-    # where the log reads move off `<cli> logs` and onto journalctl.
-    echo "${STUB_RUNTIME:-docker}"
+  *"command -v podman"*)
+    # The runtime probe. Podman only since 2026-09-22; the arms below match on `podman …`.
+    echo "${STUB_RUNTIME:-podman}"
     ;;
   *"SSH_CONNECTION"*)
     # Deliberately empty: the address-equality branch is an extra assertion when an SSH source is
@@ -259,7 +257,7 @@ case "$cmd" in
     # form for the whole life of the host. STUB_LOG_DRIVER drives both paths.
     echo "${STUB_LOG_DRIVER:-journald}"
     ;;
-  *"docker logs edge"*"--since 60m"*|*"podman logs edge"*"--since 60m"*|*"journalctl CONTAINER_NAME=edge"*"60 min ago"*)
+  *"podman logs edge"*"--since 60m"*|*"journalctl CONTAINER_NAME=edge"*"60 min ago"*)
     # Access-log LINES now, not a pre-counted number: the check counts distinct addresses itself,
     # in python, so that a first field which is not an address cannot be counted as a client.
     case "$scenario" in
@@ -278,7 +276,7 @@ case "$cmd" in
         ;;
     esac
     ;;
-  *"docker logs edge"*|*"podman logs edge"*|*"journalctl CONTAINER_NAME=edge"*)
+  *"podman logs edge"*|*"journalctl CONTAINER_NAME=edge"*)
     case "$scenario" in
       no-log-line)  printf '' ;;
       private-addr) echo "172.28.15.1 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
@@ -288,7 +286,7 @@ case "$cmd" in
       *)            echo "203.0.113.42 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
     esac
     ;;
-    *"docker inspect edge --format '{{json .NetworkSettings.Ports}}'"*)
+    *"podman inspect edge --format '{{json .NetworkSettings.Ports}}'"*)
       case "$scenario" in
         # The pre-ADR-0187 shape: published to the world, so there is nothing to assert yet.
         edge-world) echo '{"8080/tcp":[{"HostIp":"0.0.0.0","HostPort":"80"}]}' ;;
@@ -327,7 +325,7 @@ case "$cmd" in
       *)              echo "-NOAUTH Authentication required." ;;
     esac
     ;;
-  *"docker inspect acme"*)
+  *"podman inspect acme"*)
     case "$scenario" in
       no-acme) echo "" ;;
       *)       echo "example.test ingest.example.test" ;;
@@ -397,7 +395,7 @@ case "$cmd" in
     fi
     ;;&
   *"ReadonlyRootfs"*)
-    # one invocation for every app container at once; docker prints names with a leading slash
+    # one invocation for every app container at once; the check strips a leading slash either way
     for n in edge acme keycloak backend frontend ingest db-backend db-keycloak redis; do
       ro=true
       case "$scenario" in
@@ -434,7 +432,7 @@ case "$cmd" in
         ;;
     esac
     ;;
-  *"docker ps -a"*)
+  *"podman ps -a"*)
     printf 'edge|Up 15 hours (healthy)\nacme|Up 2 days\nkeycloak|Up 15 hours (healthy)\n'
     printf 'backend|Up 9 hours (healthy)\nfrontend|Up 9 hours (healthy)\ningest|Up 9 hours (healthy)\n'
     printf 'db-keycloak|Up 3 days (healthy)\nredis|Up 2 days (healthy)\n'
@@ -459,14 +457,14 @@ case "$cmd" in
   # inside the container rather than to curl's --data-urlencode on the host. `count(x)` arrives as
   # `count%28x%29`, and the ` or ` between the two container families as `%20or%20`. Matching the
   # readable spelling silently stopped matching anything, which showed up as "unhandled command".
-  *"query=count%28container_threads%29"*)
+  *"query=count%28basetool_container_pids%29"*)
     case "$scenario" in
       series-missing) emit_prom "" ;;
       series-empty)   emit_prom "$(sample '' 0)" ;;
       *)              emit_prom "$(sample '' 22)" ;;
     esac
     ;;
-  *"query=count%28container_"*)
+  *"query=count%28basetool_container_"*)
     emit_prom "$(sample '' 22)"
     ;;
   *"loki_distributor_lines_received_total"*)
@@ -818,10 +816,10 @@ STUB_SCENARIO=target-absent assert_status \
 
 STUB_SCENARIO=series-missing assert_status \
   "container-metrics fails on an absent series" \
-  container-metrics fail "container_threads" -- "${STUB_ARGS[@]}"
+  container-metrics fail "basetool_container_pids" -- "${STUB_ARGS[@]}"
 STUB_SCENARIO=series-empty assert_status \
   "container-metrics fails on a series with no samples" \
-  container-metrics fail "container_threads" -- "${STUB_ARGS[@]}"
+  container-metrics fail "basetool_container_pids" -- "${STUB_ARGS[@]}"
 
 STUB_SCENARIO=logs-stopped assert_status \
   "log-streams fails when ingestion has stopped" log-streams fail "has stopped" -- "${STUB_ARGS[@]}"

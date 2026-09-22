@@ -5,9 +5,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Reclaims unused container resources on the production host: stopped containers, unused images,
-# the build cache, unused networks and - on Docker only - anonymous volumes. Anything still in use,
-# and anything inside its step's `until=` window, is left alone.
+# Reclaims unused container resources on the production host: stopped containers, unused images
+# and unused networks. Anything still in use, and anything inside its step's `until=` window, is
+# left alone. Volumes are never pruned (ADR-0194).
 #
 # Scheduled by iri-container-cleanup.timer (Saturday 02:00 UTC).
 #
@@ -36,6 +36,9 @@
 #     images"). Running both would be the same step twice, not a build-cache sweep. Podman builds
 #     nothing on this host anyway; the images arrive pre-built and signed.
 #
+# Both Docker-only steps were removed outright on 2026-09-22 with the Docker runtime
+# (OPS-SIMP-01, ADR-0194 amended): the job now runs the three steps Podman has.
+#
 # USAGE
 #   scripts/container-cleanup.sh              # reclaim
 #   scripts/container-cleanup.sh --dry-run    # show the plan and the current usage, remove nothing
@@ -51,24 +54,24 @@ cd /
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
-# shellcheck source=lib/container-runtime.sh
+# shellcheck source=lib/common.sh
 # shellcheck disable=SC1091  # repo-lint runs shellcheck without -x, so it cannot follow this
+. "${SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=lib/container-runtime.sh
+# shellcheck disable=SC1091
 . "${SCRIPT_DIR}/lib/container-runtime.sh"
 
 # --- Configuration (every value overridable by environment) -----------------
 # `until=` values take Go duration strings: 24h, 168h, 336h, 720h ...
 IMAGE_UNTIL="${IRI_CLEANUP_IMAGE_UNTIL:-336h}"       # 14 days - the rollback buffer
-BUILDER_UNTIL="${IRI_CLEANUP_BUILDER_UNTIL:-168h}"   # 7 days
 CONTAINER_UNTIL="${IRI_CLEANUP_CONTAINER_UNTIL:-24h}"
 NETWORK_UNTIL="${IRI_CLEANUP_NETWORK_UNTIL:-24h}"
-PRUNE_VOLUMES="${IRI_CLEANUP_PRUNE_VOLUMES:-true}"
 LOCKFILE="${IRI_CLEANUP_LOCKFILE:-/var/lock/iri-container-cleanup.lock}"
 
 # Monitoring textfile metrics (epic #936). The textfile carries richer per-outcome detail (last
 # success, duration, reclaimed bytes) than the systemd collector's unit-level success, and is what
 # the "container-cleanup stale >8d or absent" warning reads via
 # basetool_container_cleanup_last_success_timestamp.
-TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 START_EPOCH="$(date +%s)"
 
 DRY_RUN=false
@@ -84,9 +87,9 @@ while [[ $# -gt 0 ]]; do
       cat <<'USAGE'
 Usage: container-cleanup.sh [--dry-run]
 
-Removes unused container resources: stopped containers, unused images, the build cache (Docker
-only), unused networks and - on Docker only - anonymous volumes. Resources still in use, and
-anything inside its step's until= window, are left untouched.
+Removes unused container resources: stopped containers, unused images and unused networks.
+Volumes are never pruned (ADR-0194). Resources still in use, and anything inside its step's
+until= window, are left untouched.
 
 Options:
   --dry-run    Remove nothing; print the current disk usage and the steps that would run.
@@ -94,10 +97,8 @@ Options:
 
 Environment (defaults in brackets):
   IRI_CLEANUP_IMAGE_UNTIL=336h       minimum age of an unused image
-  IRI_CLEANUP_BUILDER_UNTIL=168h     minimum age of build cache (Docker only)
   IRI_CLEANUP_CONTAINER_UNTIL=24h    minimum age of a stopped container
   IRI_CLEANUP_NETWORK_UNTIL=24h      minimum age of an unused network
-  IRI_CLEANUP_PRUNE_VOLUMES=true     prune anonymous volumes (Docker only; ignored on Podman)
   IRI_CLEANUP_LOCKFILE=/var/lock/iri-container-cleanup.lock
   IRI_MONITORING_TEXTFILE_DIR=/var/iri/monitoring/textfile
 USAGE
@@ -111,9 +112,7 @@ USAGE
 done
 
 # --- Helpers ----------------------------------------------------------------
-log() {
-  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
+# log and write_textfile are lib/common.sh's.
 
 # Runs one prune step, or prints it under --dry-run. A failing step must NOT abort the run: a
 # briefly-held reference can block a single prune without the other steps needing to be skipped.
@@ -165,12 +164,10 @@ df_total_bytes() {
 # Writes the textfile metric atomically (.tmp then mv) so the collector never reads a half-written
 # file.
 write_cleanup_metrics() {
-  local reclaimed="$1" now dur tmp
+  local reclaimed="$1" now dur
   now="$(date +%s)"
   dur=$(( now - START_EPOCH ))
-  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
-  tmp="${TEXTFILE_DIR}/container_cleanup.prom.$$"
-  if {
+  {
     echo "# HELP basetool_container_cleanup_last_success_timestamp Unix time of the last successful container cleanup."
     echo "# TYPE basetool_container_cleanup_last_success_timestamp gauge"
     echo "basetool_container_cleanup_last_success_timestamp ${now}"
@@ -180,13 +177,7 @@ write_cleanup_metrics() {
     echo "# HELP basetool_container_cleanup_reclaimed_bytes Bytes reclaimed by the last container cleanup."
     echo "# TYPE basetool_container_cleanup_reclaimed_bytes gauge"
     echo "basetool_container_cleanup_reclaimed_bytes ${reclaimed}"
-  } > "${tmp}" 2>/dev/null; then
-    mv -f "${tmp}" "${TEXTFILE_DIR}/container_cleanup.prom" 2>/dev/null \
-      || log "[WARN] could not move the textfile metric into place (${TEXTFILE_DIR})"
-  else
-    log "[WARN] could not write the textfile metric (${TEXTFILE_DIR})"
-    rm -f "${tmp}" 2>/dev/null || true
-  fi
+  } | write_textfile container_cleanup.prom || true
 }
 
 # --- Lock: one cleanup run at a time ----------------------------------------
@@ -210,7 +201,7 @@ read -r -a RT_CLI_ARGV <<< "${RT_CLI}"
 
 echo "================================================================"
 log "starting container cleanup${DRY_RUN:+ (dry run)}"
-log "windows: images>${IMAGE_UNTIL}, cache>${BUILDER_UNTIL}, containers>${CONTAINER_UNTIL}, networks>${NETWORK_UNTIL}, volumes=${PRUNE_VOLUMES}"
+log "windows: images>${IMAGE_UNTIL}, containers>${CONTAINER_UNTIL}, networks>${NETWORK_UNTIL}; volumes are never pruned (ADR-0194)"
 echo "================================================================"
 
 log "disk usage BEFORE:"
@@ -218,37 +209,20 @@ ${RT_CLI} system df || true
 BEFORE_BYTES="$(df_total_bytes)"
 
 # --- Steps ------------------------------------------------------------------
-# Order: containers first (it releases image references), then images, the build cache, networks,
-# and last - Docker only - anonymous volumes.
+# Order: containers first (it releases image references), then images, then networks.
 run_prune "stopped containers" \
   "${RT_CLI_ARGV[@]}" container prune --force --filter "until=${CONTAINER_UNTIL}"
 
 run_prune "unused images" \
   "${RT_CLI_ARGV[@]}" image prune --all --force --filter "until=${IMAGE_UNTIL}"
 
-if [[ "${RT_BACKEND}" == "docker" ]]; then
-  run_prune "build cache" \
-    "${RT_CLI_ARGV[@]}" builder prune --force --filter "until=${BUILDER_UNTIL}"
-else
-  log "build cache: skipped - on Podman 'builder prune' is an alias for 'image prune', already run"
-fi
-
 run_prune "unused networks" \
   "${RT_CLI_ARGV[@]}" network prune --force --filter "until=${NETWORK_UNTIL}"
 
-if [[ "${PRUNE_VOLUMES}" != "true" ]]; then
-  log "volumes: skipped by IRI_CLEANUP_PRUNE_VOLUMES=false"
-elif [[ "${RT_BACKEND}" == "docker" ]]; then
-  # Without --all this removes ONLY anonymous unused volumes. Named volumes, and the /var/iri bind
-  # mounts (which are not volumes at all), are untouched.
-  run_prune "anonymous unused volumes" \
-    "${RT_CLI_ARGV[@]}" volume prune --force
-else
-  # See the header. podman volume prune would take edge-certs and edge-acme-state with it whenever
-  # the stack is down, and offers no way to say "anonymous only". The leak this step used to absorb
-  # is fixed where it is made: rt_rm_force removes a container's anonymous volume with it.
-  log "volumes: skipped - podman volume prune has no anonymous-only mode and would destroy named volumes (ADR-0194)"
-fi
+# No volume step, on purpose -- see the header. podman volume prune would take edge-certs and
+# edge-acme-state with it whenever the stack is down, and offers no way to say "anonymous only". The
+# leak such a step used to absorb is fixed where it is made: rt_rm_force removes a container's
+# anonymous volume with it.
 
 echo "----------------------------------------------------------------"
 log "disk usage AFTER:"

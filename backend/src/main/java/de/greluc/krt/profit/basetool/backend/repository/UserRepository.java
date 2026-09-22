@@ -52,7 +52,8 @@ import org.springframework.stereotype.Repository;
  * {@code IN} clause never degenerates to {@code IN ()}.
  */
 @Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+public interface UserRepository
+    extends JpaRepository<User, UUID>, UserRepositoryPlainLookupFragment {
 
   /**
    * Counts users in the given approval status, backing the {@code basetool_registration_pending_*}
@@ -197,8 +198,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * org_unit_membership} against the caller's scope set (REQ-ORG-017: up to two Staffeln) — users
    * without a Staffel membership (admins, members of no Staffel) are always visible so the focused
    * admin can manage them.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
@@ -253,8 +257,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
    * @return paged ordinary squadron members that an Officer / Admin may evaluate.
+   *     <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   *     would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The
+   *     page's roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id =
@@ -271,8 +277,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Squadron-scoped substring search. Mirrors {@link
    * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
    * but adds the squadron-membership predicate.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
@@ -310,8 +319,54 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           java.util.Collection<UUID> scopeSquadronIds);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code Id}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
+   * Squadron-scoped substring search projected straight to {@link UserReferenceDto} (id, username,
+   * display name, effective name, rank), one page at a time — the backing query of the user pickers
+   * (BE-PERF-06). Same predicate as {@link #searchScoped(String, java.util.Collection, Pageable)},
+   * but no entity, no role collection and no membership lookup is loaded: a picker keystroke used
+   * to hydrate up to a thousand full {@code UserDto}s (three membership queries each) to read two
+   * fields. The projection is exactly the fields the peer view keeps, so it needs no redaction.
+   *
+   * @param query the already LIKE-escaped substring to match against username or display name
+   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
+   * @param pageable page request; its sort is applied to the {@code u} alias
+   * @return one page of matching user references
+   */
+  @Query(
+      value =
+          """
+          SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,
+          u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+          '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
+          (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
+          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+          NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
+          ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
+          (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+          IN :scopeSquadronIds))
+          """,
+      countQuery =
+          """
+          SELECT COUNT(u) FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query,
+          '%')) OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND
+          (:scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
+          ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
+          FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+          IN :scopeSquadronIds))
+          """)
+  Page<UserReferenceDto> searchScopedReferences(
+      @org.springframework.data.repository.query.Param("query") String query,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
+      Pageable pageable);
+
+  /**
+   * Loads a user by id with {@code roles} and {@code roles.permissions} fetched in the same query —
+   * for the authentication path and the caller's own {@code /users/me}, which assemble authorities
+   * from both. A caller that only needs the user as a foreign-key target or reads a scalar uses the
+   * graph-free {@link #findPlainById(UUID)} instead (BE-PERF-12).
    */
   @Override
   @NotNull
@@ -452,20 +507,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /**
    * Derived Spring-Data query - returns entities matching {@code
-   * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}. Eagerly fetches the configured
-   * relations via {@code @EntityGraph}.
+   * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}, one page at a time.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
+   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
+   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   Page<User> findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
       String username, String displayName, Pageable pageable);
-
-  /**
-   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
-   */
-  @Override
-  @EntityGraph(attributePaths = {"roles"})
-  Page<User> findAll(Pageable pageable);
 
   /**
    * Sets {@code inKeycloak = false} on every user whose id is not in the freshly-synced Keycloak id

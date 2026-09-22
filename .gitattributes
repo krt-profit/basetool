@@ -45,11 +45,19 @@
 # iri-backup, iri-restore-drill, iri-container-cleanup and iri-container-metrics onto the host
 # verbatim. A CRLF checkout puts a carriage return inside `ExecStart=`, so systemd looks for an
 # executable whose name ends in one and reports 203/EXEC for a path that is plainly right. The same
-# failure this migration has already spent a session on, for a different reason.
+# failure this migration has already spent a session on, for a different reason. The runbooks
+# (`docs/backup.md`, `docs/deployment.md`) copy some of them verbatim too, and a CRLF logrotate file
+# is worse still: logrotate rejects the whole file with "lines must begin with a keyword or a
+# filename" and skips it in silence. Both failures were observed on the rootless-podman host, which
+# received four timers and four logrotate configs with CRLF. (This block was stated twice until
+# 2026-09-22; the second copy's reasons are folded in here.)
 *.service text eol=lf
 *.timer text eol=lf
 *.logrotate text eol=lf
 *.tmpfiles text eol=lf
+# The drop-in the role copies beside four of those units (10-deploy-account-sandbox.conf,
+# OPS-SIMP-03) is read by systemd exactly like the units themselves.
+scripts/*.conf text eol=lf
 # The environment templates the generator emits beside the units. This line said `*.vars` until
 # 2026-09-18, an extension no file in the tree has ever used: the name list was replaced by
 # `.env.tmpl` templates on 2026-09-17 and the rule was never moved with it. So the block's stated
@@ -124,23 +132,6 @@ docker/maintenance/** text eol=lf
 # (MONITORING_ROLLOUT_RUNBOOK §3.5). `*.yml` carries the rule; `*.yml.tmpl` matches `*.tmpl` and
 # nothing covered it.
 *.tmpl text eol=lf
-
-# The systemd units and their log rotation. `docs/backup.md` and `docs/deployment.md` copy these
-# onto the production host verbatim (`sudo cp /var/iri/code/scripts/iri-backup.service …`), and a
-# CRLF copy is not cosmetic there: logrotate rejects the whole file with "lines must begin with a
-# keyword or a filename" and skips it in silence, and a carriage return inside `ExecStart=` makes
-# systemd report 203/EXEC for a path that is plainly right. Both were observed on the
-# rootless-podman host, which received four timers and four logrotate configs with CRLF.
-*.service text eol=lf
-*.timer text eol=lf
-*.logrotate text eol=lf
-
-# `*.py` for the same reason as `*.sh`: the scripts under `scripts/` and `.github/scripts/` carry
-# a `#!/usr/bin/env python3` shebang and three of them are marked executable, so a CRLF working
-# copy makes the kernel look for an interpreter whose name ends in a carriage return, and report
-# 203/EXEC for one that is plainly installed. The blobs are LF and Linux CI checks out LF, so this
-# can only ever bite a Windows working tree — which is the case this whole file exists for.
-*.py text eol=lf
 
 # `gradle/libs.versions.toml` is rewritten in place by `./gradlew refreshVersions`, which appends
 # `## ⬆ = "…"` markers line by line. On a CRLF working copy that turns an annotate-only run

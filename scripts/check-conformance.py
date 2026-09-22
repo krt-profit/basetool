@@ -6,8 +6,8 @@ migration is gated on. It asserts invariants against a **running host** rather t
 configuration files, because the whole class of defect this project keeps hitting is a config
 that is correct on disk and not in force in the process.
 
-It has to go green against the current Docker stack **first**. A suite that has never passed
-proves nothing when it passes later, and a check that has never been red is decoration -
+It had to go green against the Docker stack **first**, before the cutover. A suite that has
+never passed proves nothing when it passes later, and a check that has never been red is decoration -
 ``check-conformance.test.sh`` is what keeps that honest by breaking every check on purpose.
 
 What this does NOT cover, deliberately
@@ -113,29 +113,21 @@ EXPECTED_APP_CONTAINERS = (
     "redis",
 )
 
-#: The cAdvisor series the alert rules in monitoring/prometheus/alerts/ actually read. This list
-#: is the reason PODMAN_MIGRATION_PLAN.md §3.6 is a rebuild rather than a rename: a runtime swap
-#: has to reproduce these, or the alerts that read them stop having data and stop firing - which
-#: looks exactly like a healthy system.
+#: The container series the alert rules in monitoring/prometheus/alerts/ actually read, as
+#: `scripts/cgroup-container-metrics.py` publishes them through node_exporter's textfile collector.
+#: An alert whose input silently disappears does not fire, which looks exactly like a healthy
+#: system.
 #:
-#: Each entry is the cAdvisor name and the name the cgroup collector publishes under, because the
-#: SIGNAL is what has to survive a runtime swap, not the spelling. cAdvisor is deleted on rootless
-#: Podman (its upstream issue is closed as not planned), and `scripts/cgroup-container-metrics.py`
-#: reads the same numbers straight out of the kernel's cgroup files and publishes them as
-#: `basetool_container_*` through node_exporter's textfile collector.
-#:
-#: Asked for the cAdvisor name alone, this check reported all six series missing on a host where
-#: every one of them was being collected under the other name -- "every alert reading them is
-#: silently disarmed" about alerts that were armed. The alert rules themselves were taught the same
-#: `or` normalisation earlier (`basetool:container:present` in containers-runtime.yml); this check
-#: was the half that was left behind.
+#: These were pairs -- the cAdvisor name and this one -- while the Docker host and cAdvisor still
+#: existed. Both were retired at the 2026-09-22 cutover, so the cAdvisor half, which nothing on the
+#: remaining host can produce, went with them (OPS-SIMP-01/02).
 REQUIRED_CONTAINER_SERIES = (
-    ("container_memory_working_set_bytes", "basetool_container_memory_working_set_bytes"),
-    ("container_spec_memory_limit_bytes", "basetool_container_memory_limit_bytes"),
-    ("container_threads", "basetool_container_pids"),
-    ("container_threads_max", "basetool_container_pids_max"),
-    ("container_oom_events_total", "basetool_container_oom_kills_total"),
-    ("container_cpu_usage_seconds_total", "basetool_container_cpu_usage_seconds_total"),
+    "basetool_container_memory_working_set_bytes",
+    "basetool_container_memory_limit_bytes",
+    "basetool_container_pids",
+    "basetool_container_pids_max",
+    "basetool_container_oom_kills_total",
+    "basetool_container_cpu_usage_seconds_total",
 )
 
 #: Ranges an edge must never report as a client address. If our own probe comes back wearing one,
@@ -160,7 +152,7 @@ PROBE_HEADER = "X-Basetool-Conformance"
 # checks at a local fixture instead of the internet. They are unset in every real invocation,
 # and the suite says so in its report when they are not - so a run that silently probed a
 # fixture cannot be mistaken for a run that probed production. Same principle as deploy.test.sh
-# stubbing docker and cosign on PATH.
+# stubbing podman and cosign on PATH.
 # --------------------------------------------------------------------------------------------
 HTTPS_PORT = int(os.environ.get("BASETOOL_CONFORMANCE_HTTPS_PORT", "443"))
 HTTP_PORT = int(os.environ.get("BASETOOL_CONFORMANCE_HTTP_PORT", "80"))
@@ -346,17 +338,17 @@ class HostRunner:
         :meth:`container_log_cmd`.
 
         Returns:
-            ``docker``, ``podman``, or a ``sudo -n -u <user> XDG_RUNTIME_DIR=… podman`` prefix for
-            a rootless deployment the runner does not itself own.
+            ``podman``, or a ``sudo -n -u <user> XDG_RUNTIME_DIR=… podman`` prefix for a rootless
+            deployment the runner does not itself own.
 
         Raises:
             Skip: when no host access is configured, or the host has neither runtime.
         """
         if self._container_cli is None:
+            # Podman only since 2026-09-22 (OPS-SIMP-01): the probe's Docker branch went with the
+            # retired Docker host.
             probe = (
-                "if command -v docker >/dev/null 2>&1 && docker ps >/dev/null 2>&1; then "
-                "  echo docker; "
-                "elif command -v podman >/dev/null 2>&1; then "
+                "if command -v podman >/dev/null 2>&1; then "
                 "  if podman ps --format '{{.Names}}' 2>/dev/null | grep -q .; then echo podman; "
                 "  else "
                 "    found=; "
@@ -373,7 +365,7 @@ class HostRunner:
             )
             answer = self.run(probe).strip().splitlines()[-1].strip()
             if answer == "NONE" or not answer:
-                raise Skip("this host has neither a docker nor a podman binary")
+                raise Skip("this host has no podman binary")
             self._container_cli = answer
         return self._container_cli
 
@@ -408,8 +400,6 @@ class HostRunner:
             A shell command line printing the log, one line per entry, stdout only.
         """
         cli = self.container_cli
-        if cli.endswith("docker"):
-            return f"{cli} logs {name} --since {minutes}m 2>/dev/null"
 
         # ASK which driver this container has; do not assume one. `journalctl CONTAINER_NAME=` only
         # ever sees a container whose log driver is `journald`, and that is not podman's default
@@ -1390,7 +1380,7 @@ def check_containers_read_only(ctx: Context) -> str:
 def check_container_metrics(ctx: Context) -> str:
     """The container metric series the alert rules read are present and populated.
 
-    Not "cAdvisor is up" - the specific series. ``ContainerOomKilled``, ``ContainerRestartLoop``,
+    Not "the collector is up" - the specific series. ``ContainerOomKilled``, ``ContainerRestartLoop``,
     ``ContainerMemoryHigh``, ``ContainerPidsHigh`` and both ``*MetricsMissing`` guards all read
     from this family, and an alert whose series has silently gone away does not fire. It looks
     identical to a healthy system, which is the whole reason this check exists.
@@ -1406,16 +1396,11 @@ def check_container_metrics(ctx: Context) -> str:
         CheckFailed: when a required series is absent or empty.
     """
     missing = []
-    for names in REQUIRED_CONTAINER_SERIES:
-        # `count(a) or count(b)`: the first family that has samples answers, and a host is healthy
-        # if EITHER does. `or` and not a sum, because the two never coexist -- one runtime emits
-        # one of them -- and a sum would hide a half-populated family behind the other.
-        query = " or ".join(f"count({name})" for name in names)
-        series = names[0]
-        payload = _promql(ctx, query)
+    for series in REQUIRED_CONTAINER_SERIES:
+        payload = _promql(ctx, f"count({series})")
         results = payload.get("data", {}).get("result", [])
         if not results:
-            missing.append("/".join(names))
+            missing.append(series)
             continue
         try:
             value = float(results[0]["value"][1])

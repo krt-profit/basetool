@@ -274,6 +274,10 @@ VALUE_VARS = {
 
 #: What becomes of each service. Every service in either compose file must appear here, or the tool
 #: fails -- adding one to compose then blocks the build until somebody decides, which is the point.
+#:
+#: `cadvisor` and `socket-proxy` were listed as "deleted" until 2026-09-22, when they were removed
+#: from docker-compose.monitoring.yml itself (OPS-SIMP-02): a disposition for a service that no
+#: longer exists would be a line that decides nothing.
 DISPOSITION: dict[str, tuple[str, str]] = {
     # --- the application stack ---------------------------------------------------------------
     "edge": ("container", ""),
@@ -309,11 +313,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
         "read stops working. Running it on the host restores it and removes the last consumer of "
         "the container socket.",
     ),
-    "cadvisor": (
-        "deleted",
-        "its rootless-Podman support is closed as not planned upstream. Its series come back from "
-        "prometheus-podman-exporter plus scripts/cgroup-container-metrics.py -- see the plan's §10.",
-    ),
     # Not a compose service at all: it exists only on the Podman side, installed as a host service
     # by ansible/roles/basetool_host (tasks/27-observability.yml) and scraped through the alias
     # below. Recorded here so PODMAN_HOST_ALIASES can be cross-checked against one table.
@@ -321,11 +320,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
         "host-service",
         "a Podman-only exporter with no Compose counterpart; the role installs it as a user unit "
         "of the service user, because a system-level one would talk to the root podman.",
-    ),
-    "socket-proxy": (
-        "deleted",
-        "it exists only to hand cAdvisor and Alloy a GET-only view of the Docker socket. There is "
-        "no Docker socket.",
     ),
 }
 
@@ -1679,9 +1673,9 @@ def generate() -> tuple[dict[str, str], list[str]]:
                     used_volumes.add(source)
 
     # Networks and volumes are derived from the containers that were actually emitted, never from
-    # the compose top-level blocks. Otherwise a dev-only volume and `net-docker-proxy` -- whose only
-    # members were the two deleted services -- follow the stack onto a production host, and nothing
-    # would ever notice a bridge that exists for nobody.
+    # the compose top-level blocks. Otherwise a dev-only volume -- or a network whose only members
+    # were deleted services, as `net-docker-proxy` was -- follows the stack onto a production host,
+    # and nothing would ever notice a bridge that exists for nobody.
     for name in sorted(used_networks):
         if name in net_defs:
             files[f"quadlet/systemd/{name}.network"] = render_network(name, net_defs[name])

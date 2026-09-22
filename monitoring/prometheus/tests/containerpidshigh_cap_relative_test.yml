@@ -30,9 +30,9 @@ tests:
   - name: fires - 512-capped container at its cap (grafana zombie exhaustion)
     interval: 1m
     input_series:
-      - series: 'container_threads{name="grafana"}'
+      - series: 'basetool_container_pids{name="grafana"}'
         values: "512x30"
-      - series: 'container_threads_max{name="grafana"}'
+      - series: 'basetool_container_pids_max{name="grafana"}'
         values: "512x30"
     alert_rule_test:
       - eval_time: 20m
@@ -49,9 +49,9 @@ tests:
   - name: fires - 2048-capped JVM container above 80 percent
     interval: 1m
     input_series:
-      - series: 'container_threads{name="ingest"}'
+      - series: 'basetool_container_pids{name="ingest"}'
         values: "1700x30"
-      - series: 'container_threads_max{name="ingest"}'
+      - series: 'basetool_container_pids_max{name="ingest"}'
         values: "2048x30"
     alert_rule_test:
       - eval_time: 20m
@@ -68,13 +68,13 @@ tests:
   - name: silent - normal load on 512-capped and 2048-capped containers
     interval: 1m
     input_series:
-      - series: 'container_threads{name="tempo"}'
+      - series: 'basetool_container_pids{name="tempo"}'
         values: "64x30"
-      - series: 'container_threads_max{name="tempo"}'
+      - series: 'basetool_container_pids_max{name="tempo"}'
         values: "512x30"
-      - series: 'container_threads{name="backend"}'
+      - series: 'basetool_container_pids{name="backend"}'
         values: "56x30"
-      - series: 'container_threads_max{name="backend"}'
+      - series: 'basetool_container_pids_max{name="backend"}'
         values: "2048x30"
     alert_rule_test:
       - eval_time: 20m
@@ -86,9 +86,9 @@ tests:
   - name: silent - zero pids.max must not divide to +Inf
     interval: 1m
     input_series:
-      - series: 'container_threads{name="edgecase"}'
+      - series: 'basetool_container_pids{name="edgecase"}'
         values: "10x30"
-      - series: 'container_threads_max{name="edgecase"}'
+      - series: 'basetool_container_pids_max{name="edgecase"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 20m

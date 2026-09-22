@@ -1465,7 +1465,9 @@ public class MissionService {
             .findById(missionId)
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     // Before mission.setOwner: a first change materialises the companion row with the owner it is
     // replacing, which is read off the mission.
     long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);

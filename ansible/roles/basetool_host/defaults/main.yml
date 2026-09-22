@@ -20,6 +20,14 @@ basetool_host_service_group: iri
 # which is the gap 22-deploy-user.yml closes.
 basetool_host_deploy_user: deploy
 
+# The units that run as that account and share one sandbox drop-in (OPS-SIMP-03,
+# scripts/iri-deploy-account-sandbox.conf, installed by tasks/25-scripts.yml).
+basetool_host_deploy_account_units:
+  - iri-deploy.service
+  - iri-backup.service
+  - iri-restore-drill.service
+  - iri-container-cleanup.service
+
 # Where the operational scripts are copied FROM. Relative to the playbook, so the role works from a
 # checkout without anything being installed into the role's own files/ directory -- and so a
 # reviewer can see that what lands on the host is exactly what is in the repository.

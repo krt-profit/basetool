@@ -187,6 +187,7 @@ public class MemberEvaluationController {
             java.util.Set.of("id", "username", "displayName", "userRank"),
             "username");
     var result = userService.findEvaluatableMembers(pageable);
+    userMapper.primeStaffelMemberships(result.getContent());
     return PageResponse.of(result.map(userMapper::toDto));
   }
 

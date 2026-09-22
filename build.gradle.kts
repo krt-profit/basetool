@@ -337,9 +337,24 @@ subprojects {
     // This block previously carried two further overrides — PostgreSQL 42.7.13 (CVE-2026-54291
     // SCRAM channel-binding downgrade) and Netty 4.2.17.Final (CVE-2026-56820 OCSP CertificateID,
     // CVE-2026-56819 HTTP/2 leak, CVE-2026-55833 SPDY decode DoS) — dropped with the 4.1.0 ->
-    // 4.1.1 bump because the 4.1.1 BOM manages exactly those versions itself. It still does, so
-    // they stay gone; only Tomcat needs pinning again.
+    // 4.1.1 bump because the 4.1.1 BOM manages exactly those versions itself. It still does, so the
+    // PostgreSQL override stays gone; netty needs pinning again below, for a later CVE.
     extra["tomcat.version"] = "11.0.25"
+
+    // Netty is pinned again, on the same mechanism and for the same reason as Tomcat above. The
+    // Boot 4.1.1 BOM manages 4.2.17.Final, and CVE-2026-89044 (CVSS 6.5, CWE-444, published
+    // 2026-09-10) affects 4.2.13.Final through 4.2.17.Final: `HttpObjectDecoder` does not validate
+    // the FINAL transfer coding, so `Transfer-Encoding: chunked, xchunked` or a header split across
+    // lines is decoded as chunked and a request can be smuggled. Fixed in 4.2.18.Final (NVD CPE
+    // range `versionEndExcluding 4.2.18`, GHSA-hcvj-94mj-jp5c), a patch release on the line the
+    // Boot
+    // 4.1 BOM expects. It is under the 7.0 gate, so the scan reported it without failing - but
+    // netty
+    // is on the backend, frontend AND ingest runtime classpaths (Reactor Netty under WebClient), so
+    // it ships and is upgraded rather than suppressed. The property moves the whole `netty-bom`
+    // family at once, which is what the finding spans (39 jars, native classifiers included).
+    // Remove once the Boot BOM manages >= 4.2.18.Final.
+    extra["netty.version"] = "4.2.18.Final"
   }
 
   // JaCoCo coverage. Both modules want the same setup: emit XML + CSV + HTML

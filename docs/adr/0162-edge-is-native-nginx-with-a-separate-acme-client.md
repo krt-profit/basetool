@@ -192,7 +192,8 @@ has, and name resolution is unaffected because aardvark-dns answers on an intern
 the five `net-proxy-*` networks have relied on since this ADR.
 
 **It is expressed in the Quadlet units, not in compose**, and that is the one difference from
-decision 4. The compose file also runs the local stacks, where the `-dev` twins of these three
+decision 4 — accepted as such by @greluc on 2026-09-22, so the compose file stays non-internal for
+these five on purpose. The compose file also runs the local stacks, where the `-dev` twins of these three
 services publish `127.0.0.1:15432`, `:15433` and `:6379` on these very networks for a developer's
 `bootRun`. An internal network carries no DNAT — the lesson this ADR learned the hard way with the
 edge — so `internal: true` in compose would have broken every local database connection silently.

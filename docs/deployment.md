@@ -260,8 +260,8 @@ python scripts/generate-quadlet.py --list     # each service's disposition and w
 
 `repo-lint.yml`'s `quadlet-drift` check runs `--check` and the translation self-test
 (`generate-quadlet.test.sh`). Dispositions: `node-exporter` and `alloy` become host services, the
-podman exporter is a user unit the role installs, `cadvisor` and `socket-proxy` are deleted; every
-other service is a container. The edge's six network addresses are pinned by the generator and must
+podman exporter is a user unit the role installs; every other service is a container. (`cadvisor`
+and `socket-proxy` were deleted by the translation and removed from the compose file on 2026-09-22.) The edge's six network addresses are pinned by the generator and must
 equal the role's `basetool_host_edge_trusted_proxies`; the generator refuses the build otherwise.
 
 What Quadlet cannot interpolate is resolved at generation time: every `*_HOST_PATH`,
@@ -285,10 +285,10 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 directory, so a unit of the same name there silently shadows every release.
 
 **Networks** are 18 `.network` units with pinned `/24` subnets under `172.28.0.0/16` (IPv6 on the
-ingress and proxy networks). `deploy.sh` takes no special action for a changed `.network` unit under
-Quadlet — the Compose-only clean-slate recreate does not apply. Whether an existing network picks up
-a changed subnet without being removed has not been demonstrated; treat a network-topology change as
-a maintenance action and verify with `${UPOD} network inspect <name>` afterwards.
+ingress and proxy networks; `Internal=true` on the proxy, database and Redis networks). `deploy.sh`
+installs a changed `.network` unit and does not apply it: Quadlet creates networks with `--ignore`, so
+an existing one keeps its settings until it is removed and recreated — see *Network changes are
+installed, not applied* below, and verify with `${UPOD} network inspect <name>` afterwards.
 
 ### The runtime seam
 
@@ -299,8 +299,11 @@ the containers and reaches it through the sudoers bridge. Under Podman: tags res
 `skopeo inspect`, images are pulled as `iri`, "apply and wait" is `systemctl --user start` or
 `restart` (restart for every service whose pin or unit this run changed — `start` on an active unit
 re-reads nothing), and the wait is structural: `Notify=healthy` makes each unit `Type=notify`,
-bounded by the unit's own `TimeoutStartSec=`. The Docker branches remain for the test stack and a
-Docker host; they are not the production path.
+bounded by the unit's own `TimeoutStartSec=`. The seam carried a Docker branch beside each
+Podman one until 2026-09-22; they were removed with the retired Docker host (OPS-SIMP-01), which keeps
+its own copy of the old scripts on its own disk for the way back. [`lib/common.sh`](../scripts/lib/common.sh)
+holds the `log`, `fail`, `read_env` and atomic textfile write the four scripts share, and the
+monitoring units are derived from the unit directory rather than listed.
 
 ---
 
@@ -896,11 +899,11 @@ seam: stopped containers older than 24 h, unused images older than 14 days (outl
 rollback anchor), unused networks older than 24 h. Each is overridable with `IRI_CLEANUP_*`
 (`--help`).
 
-**Two steps are Docker-only, deliberately (ADR-0194).** `podman builder prune` is only an alias for
-`image prune`, so it is skipped. And **`podman volume prune` is never run**: unlike Docker's, it
-removes every volume not currently attached — `edge-certs` and `edge-acme-state` included whenever
-the stack is down. The anonymous-volume leak Docker's prune used to absorb is fixed at its source
-(`rt_rm_force` removes a container with its anonymous volume). Never run `podman volume prune` by
+**Two steps the Docker job had are gone, deliberately (ADR-0194).** `podman builder prune` is only an
+alias for `image prune`. And **`podman volume prune` is never run**: unlike Docker's, it removes every
+volume not currently attached — `edge-certs` and `edge-acme-state` included whenever the stack is
+down. The anonymous-volume leak Docker's prune used to absorb is fixed at its source (`rt_rm_force`
+removes a container with its anonymous volume). Never run `podman volume prune` by
 hand on this host either. Data under `/var/iri` is bind-mounted and out of every prune's reach.
 
 ```bash

@@ -284,7 +284,7 @@ groups:
           severity: warning
         annotations:
           summary: "ACME certificate renewal is failing"
-          description: "Two consecutive passes of the acme loop failed to obtain a certificate. The edge keeps serving the current one, which is still valid, but every vhost expires together — check `docker compose --profile prod logs acme` for lego's own error, and that the HTTP-01 challenge path through the edge still answers."
+          description: "Two consecutive passes of the acme loop failed to obtain a certificate. The edge keeps serving the current one, which is still valid, but every vhost expires together — check `journalctl CONTAINER_NAME=acme --since -2h` for lego's own error, and that the HTTP-01 challenge path through the edge still answers."
 
       # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
       # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)

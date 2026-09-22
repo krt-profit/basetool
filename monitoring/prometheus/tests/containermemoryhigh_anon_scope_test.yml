@@ -34,9 +34,9 @@ tests:
   - name: fires - anonymous memory over the line (blackbox-exporter)
     interval: 1m
     input_series:
-      - series: 'container_memory_rss{name="blackbox-exporter"}'
+      - series: 'basetool_container_memory_anon_bytes{name="blackbox-exporter"}'
         values: "31932416x30"
-      - series: 'container_spec_memory_limit_bytes{name="blackbox-exporter"}'
+      - series: 'basetool_container_memory_limit_bytes{name="blackbox-exporter"}'
         values: "33554432x30"
     alert_rule_test:
       - eval_time: 20m
@@ -56,13 +56,13 @@ tests:
   - name: silent - limit filled by the mapped binary, not anonymous memory (alloy)
     interval: 1m
     input_series:
-      - series: 'container_memory_rss{name="alloy"}'
+      - series: 'basetool_container_memory_anon_bytes{name="alloy"}'
         values: "217399296x30"
-      - series: 'container_memory_working_set_bytes{name="alloy"}'
+      - series: 'basetool_container_memory_working_set_bytes{name="alloy"}'
         values: "509206528x30"
-      - series: 'container_memory_mapped_file{name="alloy"}'
+      - series: 'basetool_container_memory_mapped_file_bytes{name="alloy"}'
         values: "192868352x30"
-      - series: 'container_spec_memory_limit_bytes{name="alloy"}'
+      - series: 'basetool_container_memory_limit_bytes{name="alloy"}'
         values: "536870912x30"
     alert_rule_test:
       - eval_time: 20m
@@ -75,13 +75,13 @@ tests:
   - name: silent - small exporter whose binary is half its working set (alertmanager)
     interval: 1m
     input_series:
-      - series: 'container_memory_rss{name="alertmanager"}'
+      - series: 'basetool_container_memory_anon_bytes{name="alertmanager"}'
         values: "24322048x30"
-      - series: 'container_memory_working_set_bytes{name="alertmanager"}'
+      - series: 'basetool_container_memory_working_set_bytes{name="alertmanager"}'
         values: "47775744x30"
-      - series: 'container_memory_mapped_file{name="alertmanager"}'
+      - series: 'basetool_container_memory_mapped_file_bytes{name="alertmanager"}'
         values: "25698304x30"
-      - series: 'container_spec_memory_limit_bytes{name="alertmanager"}'
+      - series: 'basetool_container_memory_limit_bytes{name="alertmanager"}'
         values: "50331648x30"
     alert_rule_test:
       - eval_time: 20m
@@ -93,23 +93,24 @@ tests:
   - name: silent - JVM app at its measured steady state (frontend)
     interval: 1m
     input_series:
-      - series: 'container_memory_rss{name="frontend"}'
+      - series: 'basetool_container_memory_anon_bytes{name="frontend"}'
         values: "931581952x30"
-      - series: 'container_spec_memory_limit_bytes{name="frontend"}'
+      - series: 'basetool_container_memory_limit_bytes{name="frontend"}'
         values: "1342177280x30"
     alert_rule_test:
       - eval_time: 20m
         alertname: ContainerMemoryHigh
         exp_alerts: []
 
-  # cAdvisor exports unnamed cgroup roots with a 0 limit; dividing by it yields +Inf, which is > 0.9 and
-  # would permafire. The `name=~".+"` selector keeps them out — same guard ContainerPidsHigh carries.
-  - name: silent - zero-limit cgroup root does not permafire
+  # A zero limit divides to +Inf, which is > 0.9 and would permafire. cAdvisor exported unnamed cgroup
+  # roots that way and a `name=~".+"` selector kept them out; with cAdvisor gone the rule carries a
+  # `> 0` guard on the limit instead -- the same guard ContainerPidsHigh carries.
+  - name: silent - a zero limit does not permafire
     interval: 1m
     input_series:
-      - series: 'container_memory_rss{name=""}'
+      - series: 'basetool_container_memory_anon_bytes{name="edgecase"}'
         values: "104857600x30"
-      - series: 'container_spec_memory_limit_bytes{name=""}'
+      - series: 'basetool_container_memory_limit_bytes{name="edgecase"}'
         values: "0x30"
     alert_rule_test:
       - eval_time: 20m

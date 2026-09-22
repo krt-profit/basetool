@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 
 import de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.dto.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -94,6 +95,7 @@ public class HangarController {
   private final HangarImportService hangarImportService;
   private final UserService userService;
   private final ShipMapper shipMapper;
+  private final UserMapper userMapper;
 
   /**
    * One server-side page of the calling user's own ships (REQ-HANGAR-002). The page is ordered by
@@ -138,6 +140,8 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getAllShips(pageable);
+    // Every row may have a different owner: seed the owners' Staffel memo in two queries.
+    userMapper.primeStaffelMemberships(p.getContent().stream().map(Ship::getOwner).toList());
     return PageResponse.of(p.map(shipMapper::toDto));
   }
 

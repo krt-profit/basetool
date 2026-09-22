@@ -192,6 +192,17 @@ lombok = "1.18.46"
 # it and reported it as a dependency "that might have hardcoded versions" on every sweep. Moved here
 # at the same version, so the next sweep annotates it like everything else.
 mockito = "5.23.0"
+# netty 4.1.x floor for the keycloak-spi module ONLY, imported there as a platform on the compileOnly
+# and test classpaths. Keycloak 26.7.4 -> Quarkus 3.33.3.2 drags netty 4.1.136.Final onto them, and
+# that version carries CVE-2026-75595 (critical, SNI-mTLS bypass) and CVE-2026-75596 (high, ClientHello
+# CPU DoS), both fixed in 4.1.137.Final, plus CVE-2026-89044 (Transfer-Encoding smuggling, 4.1.133 to
+# 4.1.137, fixed in 4.1.138.Final). The jars ship nowhere: the provider JAR bundles no dependencies and
+# the Keycloak container supplies its own netty, so this floor changes no deployed byte - it keeps the
+# dependency-check scan of the SPI's compile classpath pointed at CVEs that are still open, instead of
+# re-reporting fixed ones. A BOM floor, not a strict pin: a Keycloak bump that brings a newer 4.1.x wins.
+# Drop it once the catalog's `keycloak` resolves netty >= this version on its own (Quarkus 3.33.3.3
+# manages 4.1.138.Final; no Keycloak release uses it yet as of 2026-09-22).
+netty41 = "4.1.138.Final"
 
 [libraries]
 
@@ -230,6 +241,7 @@ keycloak-server-spi = { module = "org.keycloak:keycloak-server-spi", version.ref
 keycloak-server-spi-private = { module = "org.keycloak:keycloak-server-spi-private", version.ref = "keycloak" }
 keycloak-services = { module = "org.keycloak:keycloak-services", version.ref = "keycloak" }
 keycloak-core = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
+netty41-bom = { module = "io.netty:netty-bom", version.ref = "netty41" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }

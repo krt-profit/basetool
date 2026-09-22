@@ -106,7 +106,9 @@ public class HangarService {
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
     User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+        userRepository
+            .findPlainById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found"));
     Ship ship = new Ship();
     ship.setName(dto.name());
     ship.setInsurance(dto.insurance());

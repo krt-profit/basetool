@@ -11,11 +11,9 @@
 # version directive), and every one of them is DIGEST-pinned as required by ADR-0072. This file used
 # to say Dependabot "adds @sha256 digests afterwards"; it does not and structurally cannot -
 # Dependabot MAINTAINS a digest that is already there and never introduces one, so all thirteen
-# references sat on mutable tags while the comment claimed otherwise. That gap mattered most for
-# docker-socket-proxy, whose POST/EXEC deny-list is enforced by the image itself: a substituted
-# image talks straight to the mounted /var/run/docker.sock, which is root-equivalent. Resolve a new
-# digest with `docker buildx imagetools inspect <repo>:<tag> --format '{{.Manifest.Digest}}'` and
-# move it in the same commit as the tag. Contains ZERO secrets — every credential is a host-side file
+# references sat on mutable tags while the comment claimed otherwise. Resolve a new digest with
+# `skopeo inspect --no-tags docker://<repo>:<tag>` (or `docker buildx imagetools inspect`) and move it
+# in the same commit as the tag. Contains ZERO secrets — every credential is a host-side file
 # under /var/iri/monitoring/secrets/ or an .env value, provisioned by
 # docs/archive/MONITORING_ROLLOUT_RUNBOOK.md.
 #
@@ -32,7 +30,7 @@ x-mon-logging: &mon-logging
 # Shared hardening (epic #936): drop privilege escalation, cap the pid table, and set a POSITIVE
 # oom_score_adj so the kernel sacrifices monitoring BEFORE the apps/DBs under memory pressure.
 # read_only rootfs is deferred to Phase-3 per-image tuning (verified on the test stack) to avoid
-# startup regressions here. cap_drop is applied per-service (cAdvisor/socket-proxy need more access).
+# startup regressions here. cap_drop is applied per-service.
 x-mon-base: &mon-base
   restart: unless-stopped
   logging: *mon-logging
@@ -61,7 +59,7 @@ x-mon-base: &mon-base
 # =============================================================================================
 # GO SERVICE MEMORY SIZING — why every Go service below carries GOMEMLIMIT
 # =============================================================================================
-# Every service in this file except `socket-proxy` (HAProxy, C) is a Go program. GOMEMLIMIT makes the
+# Every service in this file is a Go program. GOMEMLIMIT makes the
 # runtime aware of its cgroup ceiling: without it the GC sizes the heap off GOGC alone (target 2x live
 # heap) and the scavenger returns arena pages only lazily, so a concurrency spike can RATCHET the
 # anonymous footprint up and leave it there until the container is recreated. `blackbox-exporter` hit
@@ -455,7 +453,8 @@ services:
 
   # ------------------------------------------------------------------------------------------
   # Alloy — log shipper + OTLP collector. Receives app/Keycloak spans on the scrape net, forwards
-  # to Tempo on the core net; ships logs to Loki. Reads container logs via the socket proxy only.
+  # to Tempo on the core net; ships logs to Loki. On the production host it is a HOST service reading
+  # the journal (generate-quadlet.py); this service definition serves the local stacks.
   # ------------------------------------------------------------------------------------------
   alloy:
     <<: *mon-base
@@ -563,7 +562,6 @@ services:
     networks:
       - net-monitoring-core
       - net-monitoring-scrape
-      - net-docker-proxy
 
   # ------------------------------------------------------------------------------------------
   # Alertmanager — SMTP routing + the Watchdog heartbeat to healthchecks.io. The config is rendered
@@ -658,107 +656,11 @@ services:
     networks:
       - net-monitoring-scrape
 
-  # ------------------------------------------------------------------------------------------
-  # cAdvisor — per-container metrics via the GET-only docker socket proxy (never the raw socket).
-  # No cap_drop: ALL — it reads host cgroup/sys state and needs broader access than the exporters.
-  # The Docker container factory ALSO opens a direct containerd client (Docker delegates runtime
-  # state to containerd), so it needs the containerd socket mounted (as the /run/containerd directory,
-  # see the volumes note for why the directory and not the single socket file): without it the
-  # factory fails to register and, under --docker_only, cAdvisor emits ZERO name-labelled series —
-  # every Container-dashboard panel then reads "No data". The socket-proxy speaks only the Docker
-  # REST API, not containerd's gRPC, so it cannot cover this. The containerd socket is
-  # root-equivalent; the security trade-off is recorded in ADR-0072 §6 (owner-approved, PR #982).
-  # ------------------------------------------------------------------------------------------
-  cadvisor:
-    <<: *mon-base
-    container_name: cadvisor
-    image: ghcr.io/google/cadvisor:v0.60.6@sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a
-    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 96MiB = 75% of the 128M limit;
-    # measured live heap 21.9 MiB, so the ceiling is ~4.4x actual demand. cAdvisor had ample headroom
-    # either way (working-set peak 55.6%, anon 30.6%); this is purely preventive, so its per-container
-    # series churn on every deploy can never grow the arena into the limit.
-    environment:
-      GOMEMLIMIT: "96MiB"
-    command:
-      - --docker=tcp://socket-proxy:2375
-      - --docker_only
-      - --housekeeping_interval=30s
-      - --listen_ip=0.0.0.0
-      - --port=8080
-      # Enable the `process` metric group so container_processes / container_threads /
-      # container_threads_max (the cgroup pids.current / pids.max task counts) are scraped — the
-      # cgroup-pids signal ContainerPidsHigh (infrastructure.yml) alerts on. cAdvisor disables
-      # `process` by default; the JVM's own jvm_threads_live_threads gauge cannot see non-JVM pids or
-      # the OS carrier threads behind virtual threads, so the 2026-07-12 ingest native-thread OOM
-      # (unreaped ssl_client zombies from the wget-https healthcheck exhausting the 2048 pids cap) hit
-      # the cgroup cap while jvm_threads_live_threads stayed flat (~36) and JvmThreadsHigh never fired
-      # — only post-crash TargetDown paged (REQ-OBS-014). This is the default --disable_metrics set
-      # with `process` REMOVED — do NOT switch to --enable_metrics=process: that flag REPLACES the
-      # whole set (help: "If set, overrides 'disable_metrics'"), which would drop cpu/memory/network
-      # and blind ContainerMemoryHigh / ContainerCpuThrottledHigh / ContainerMetricsMissing.
-      # Verified on cadvisor v0.60.5: container_threads{name=...} appears while container_last_seen /
-      # container_memory_working_set_bytes stay present.
-      #
-      # `disk` is ALSO disabled (added on top of the default set). The prod host's Docker 29 uses the
-      # containerd image store / `overlayfs` snapshotter, whose per-container layer paths cAdvisor's
-      # fsHandler cannot stat (`could not stat "/var/lib/docker/rootfs/overlayfs/<id>": no such file`),
-      # so it emitted no usable container_fs_* series and logged one error PER container PER 30s
-      # housekeeping tick. Per-container filesystem metrics are unused by any alert or dashboard (host
-      # filesystem usage comes from node-exporter's node_filesystem_*), so disabling the `disk` group
-      # is zero-loss and silences the noise (REQ-OBS-014). Keep `diskIO`/blkio enabled (it reads cgroup
-      # counters, not host paths, so it does not hit the snapshotter and is not affected).
-      - --disable_metrics=advtcp,cpu_topology,cpuset,disk,hugetlb,memory_numa,referenced_memory,resctrl,sched,tcp,udp
-    volumes:
-      - /:/rootfs:ro
-      - /sys:/sys:ro
-      # containerd runtime socket (dockerd's `--containerd=/run/containerd/containerd.sock`). Mount the
-      # DIRECTORY, not the single socket file: a single-file bind mount pins the create-time inode, so
-      # when containerd restarts and re-creates the socket (a new inode) cAdvisor keeps dialing the old
-      # dead inode -> `dial unix /run/containerd/containerd.sock: connect: connection refused` every
-      # housekeeping tick, and a core container recreated after that point loses its handler ->
-      # CoreContainerMetricsMissing (2026-07-17: the socket-inode change stranded the running cAdvisor
-      # and blanked a core container_last_seen series). A directory mount always resolves the live
-      # socket. Same inode-pin class as the prometheus.yml single-file mount reconcile (ADR-0072 §6).
-      - /run/containerd:/run/containerd:ro
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          pids: 512
-    networks:
-      - net-monitoring-scrape
-      - net-docker-proxy
-
-  # ------------------------------------------------------------------------------------------
-  # docker-socket-proxy — GET-only Docker API for cAdvisor + Alloy. POST/EXEC/AUTH/SECRETS stay
-  # denied (defaults); CONTAINERS/IMAGES/INFO/NETWORKS enabled for container discovery + log
-  # streaming (Alloy's discovery.docker reads /networks to compute per-container network labels).
-  # ------------------------------------------------------------------------------------------
-  socket-proxy:
-    <<: *mon-base
-    container_name: socket-proxy
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
-    environment:
-      CONTAINERS: "1"
-      NETWORKS: "1"
-      IMAGES: "1"
-      INFO: "1"
-      EVENTS: "1"
-      PING: "1"
-      VERSION: "1"
-      POST: "0"
-      EXEC: "0"
-      AUTH: "0"
-      SECRETS: "0"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      resources:
-        limits:
-          memory: 32M
-          pids: 512
-    networks:
-      - net-docker-proxy
+  # cAdvisor and the docker-socket-proxy were removed on 2026-09-22 (OPS-SIMP-02). Neither could
+  # run on the rootless Podman host -- cAdvisor's rootless support is closed upstream as not planned,
+  # and there is no Docker socket to proxy -- so generate-quadlet.py had deleted them from every unit
+  # set since the cutover, and here they only described a Docker host that is retired. Their series
+  # come from prometheus-podman-exporter and scripts/cgroup-container-metrics.py (arc42 §7.3).
 
   # ------------------------------------------------------------------------------------------
   # postgres_exporter ×2 — one per DB, dedicated pg_monitor-only user. Each bridges into the app
@@ -943,11 +845,6 @@ networks:
   net-monitoring-core:
     name: net-monitoring-core
     driver: bridge
-  # cAdvisor/Alloy ↔ socket-proxy only. Internal: no internet path is needed here.
-  net-docker-proxy:
-    name: net-docker-proxy
-    driver: bridge
-    internal: true
   # Dedicated IPv6 egress net for blackbox-exporter ONLY (issue #1252). The two nets it otherwise
   # joins — net-monitoring-core (here) and the external net-monitoring-scrape — are both IPv4-only, so
   # the container had NO v6 route: every ip6-pinned probe (http_2xx_ipv6 / http_2xx_or_401_ipv6, no v4

@@ -55,36 +55,6 @@ tests:
         alertname: CoreContainerMetricsMissing
         exp_alerts: []
 
-  # --- a healthy Docker host: the case that must not regress ------------------------------------
-  # The same ten, reported by cAdvisor instead. The normalisation has to keep working on the
-  # runtime that is still live until the cutover.
-  - name: silent - a healthy Docker host reporting through cAdvisor
-    interval: 1m
-    input_series:
-      - series: 'container_memory_usage_bytes{name="backend"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="frontend"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="ingest"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="keycloak"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="db-backend"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="db-keycloak"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="redis"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="edge"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="prometheus"}'
-        values: "100+0x20"
-      - series: 'container_memory_usage_bytes{name="grafana"}'
-        values: "100+0x20"
-    alert_rule_test:
-      - eval_time: 15m
-        alertname: ContainerMetricsMissing
-        exp_alerts: []
 
   # --- the alert still has to work ---------------------------------------------------------------
   # Nothing reports at all. This is what the alert is FOR, and the whole risk of the change is
@@ -103,7 +73,7 @@ tests:
               severity: critical
             exp_annotations:
               summary: "No container metrics: fewer than 10 named containers are reporting"
-              description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. On Docker that is cAdvisor or the docker-socket-proxy; on Podman it is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer."
+              description: "Fewer than 10 name-labelled containers report metrics (or none at all) while the scrape succeeds — the container-level alerts (restart loop, working-set, OOM, CPU throttle) are silently blind. The source is scripts/cgroup-container-metrics.py and its iri-container-metrics.timer (`systemctl status iri-container-metrics.timer`, /var/iri/monitoring/textfile/containers.prom)."
 
   # --- one core container drops out --------------------------------------------------------------
   # Six of the seven, on a Podman host. The warning has to notice, or a stopped database is
