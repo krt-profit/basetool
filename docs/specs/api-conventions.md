@@ -141,7 +141,7 @@ treats the message as a translation key (sentinel-guarded), so an auto-derived m
 the wire `detail` and break the future i18n-key migration seam. A constant message uses the
 `String` overload; a message that interpolates a value uses the `Supplier<String>` overload, so it
 is still only built on a miss. **Enforced by `EntitiesRequireRatchetTest`**, a source scan of
-`backend/src/main/java` whose ceiling on hand-written sites is **zero** since the 250 remaining ones
+`backend/src/main/java` whose ceiling on hand-written sites is **zero** since the 287 remaining ones
 were migrated message by message (BE-SIMP-01, 2026-09-23); `Entities` itself is the only exemption.
 
 **Domain exceptions carry their own error-code contract (S4, #910).** `BadRequestException`,

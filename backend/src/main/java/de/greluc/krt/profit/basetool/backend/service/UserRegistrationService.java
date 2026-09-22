@@ -331,8 +331,7 @@ public class UserRegistrationService {
    * @return the persisted user
    */
   private User decide(UUID userId, @Nullable Long version, ApprovalStatus newStatus, UUID adminId) {
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(userId), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
     // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
     // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap

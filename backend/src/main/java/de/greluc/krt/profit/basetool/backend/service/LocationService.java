@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.EntityInUseException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.Location;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.LocationReferenceDto;
@@ -113,9 +113,7 @@ public class LocationService {
    */
   @Cacheable(cacheNames = CacheConfig.LOCATIONS_CACHE)
   public Location getLocation(@NotNull UUID id) {
-    return locationRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Location not found"));
+    return Entities.require(locationRepository.findById(id), "Location not found");
   }
 
   /**

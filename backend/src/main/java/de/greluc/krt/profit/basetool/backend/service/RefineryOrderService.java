@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.MissionParticipantRequiredException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.model.JobOrder;
@@ -290,9 +290,7 @@ public class RefineryOrderService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public RefineryOrder getRefineryOrder(@NotNull UUID id) {
-    return refineryOrderRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("error.refinery_order.not_found"));
+    return Entities.require(refineryOrderRepository.findById(id), "error.refinery_order.not_found");
   }
 
   /**
@@ -334,10 +332,7 @@ public class RefineryOrderService {
     order.setId(null);
     order.setVersion(null);
 
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new NotFoundException("error.user.not_found"));
+    User user = Entities.require(userRepository.findById(userId), "error.user.not_found");
 
     order.setOwner(user);
     order.setOwningOrgUnit(
@@ -345,9 +340,9 @@ public class RefineryOrderService {
 
     if (order.getLocation() != null && order.getLocation().getId() != null) {
       order.setLocation(
-          locationRepository
-              .findById(order.getLocation().getId())
-              .orElseThrow(() -> new NotFoundException("error.location.not_found")));
+          Entities.require(
+              locationRepository.findById(order.getLocation().getId()),
+              "error.location.not_found"));
       validateLocationHasRefinery(order.getLocation());
     } else {
       throw new BadRequestException("error.refinery_order.location_required");
@@ -361,9 +356,9 @@ public class RefineryOrderService {
 
     if (order.getRefiningMethod() != null && order.getRefiningMethod().getId() != null) {
       order.setRefiningMethod(
-          refiningMethodRepository
-              .findById(order.getRefiningMethod().getId())
-              .orElseThrow(() -> new NotFoundException("error.refining_method.not_found")));
+          Entities.require(
+              refiningMethodRepository.findById(order.getRefiningMethod().getId()),
+              "error.refining_method.not_found"));
     } else {
       order.setRefiningMethod(null);
     }
@@ -422,9 +417,7 @@ public class RefineryOrderService {
    */
   private Mission resolveMissionForOwner(@NotNull UUID missionId, @Nullable User owner) {
     Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("error.mission.not_found"));
+        Entities.require(missionRepository.findById(missionId), "error.mission.not_found");
     if (owner == null
         || owner.getId() == null
         || missionParticipantRepository
@@ -476,9 +469,9 @@ public class RefineryOrderService {
 
     if (details.getLocation() != null && details.getLocation().getId() != null) {
       order.setLocation(
-          locationRepository
-              .findById(details.getLocation().getId())
-              .orElseThrow(() -> new NotFoundException("error.location.not_found")));
+          Entities.require(
+              locationRepository.findById(details.getLocation().getId()),
+              "error.location.not_found"));
       validateLocationHasRefinery(order.getLocation());
     }
 
@@ -498,9 +491,9 @@ public class RefineryOrderService {
 
     if (details.getRefiningMethod() != null && details.getRefiningMethod().getId() != null) {
       order.setRefiningMethod(
-          refiningMethodRepository
-              .findById(details.getRefiningMethod().getId())
-              .orElseThrow(() -> new NotFoundException("error.refining_method.not_found")));
+          Entities.require(
+              refiningMethodRepository.findById(details.getRefiningMethod().getId()),
+              "error.refining_method.not_found"));
     } else if (details.getRefiningMethod() == null) {
       order.setRefiningMethod(null);
     }
@@ -556,9 +549,9 @@ public class RefineryOrderService {
   private void resolveGood(RefineryGood good, RefineryOrder order) {
     if (good.getInputMaterial() != null && good.getInputMaterial().getId() != null) {
       Material inMat =
-          materialRepository
-              .findById(good.getInputMaterial().getId())
-              .orElseThrow(() -> new NotFoundException("error.material.input.not_found"));
+          Entities.require(
+              materialRepository.findById(good.getInputMaterial().getId()),
+              "error.material.input.not_found");
 
       if (inMat.getType() != MaterialType.RAW
           && !Boolean.TRUE.equals(inMat.getIsManualRawMaterial())) {
@@ -572,9 +565,9 @@ public class RefineryOrderService {
 
       if (good.getOutputMaterial() != null && good.getOutputMaterial().getId() != null) {
         Material outMat =
-            materialRepository
-                .findById(good.getOutputMaterial().getId())
-                .orElseThrow(() -> new NotFoundException("error.material.output.not_found"));
+            Entities.require(
+                materialRepository.findById(good.getOutputMaterial().getId()),
+                "error.material.output.not_found");
 
         if (inMat.getRefinedMaterial() != null
             && !outMat.getId().equals(inMat.getRefinedMaterial().getId())) {
@@ -677,16 +670,14 @@ public class RefineryOrderService {
 
     for (RefineryOrderStoreItemDto itemDto : dto.items()) {
       final Material mat =
-          materialRepository
-              .findById(itemDto.materialId())
-              .orElseThrow(
-                  () -> new NotFoundException("Material not found: " + itemDto.materialId()));
+          Entities.require(
+              materialRepository.findById(itemDto.materialId()),
+              () -> "Material not found: " + itemDto.materialId());
 
       final Location loc =
-          locationRepository
-              .findById(itemDto.locationId())
-              .orElseThrow(
-                  () -> new NotFoundException("Location not found: " + itemDto.locationId()));
+          Entities.require(
+              locationRepository.findById(itemDto.locationId()),
+              () -> "Location not found: " + itemDto.locationId());
 
       // REQ-SEC-039: the per-item userId names the RECEIVING inventory owner, so it decides whose
       // ledger the output lands in. The order-ownership check above does not cover that — it
@@ -724,9 +715,9 @@ public class RefineryOrderService {
       User assignee;
       if (itemDto.userId() != null) {
         assignee =
-            userRepository
-                .findById(itemDto.userId())
-                .orElseThrow(() -> new NotFoundException("User not found: " + itemDto.userId()));
+            Entities.require(
+                userRepository.findById(itemDto.userId()),
+                () -> "User not found: " + itemDto.userId());
       } else {
         assignee = order.getOwner();
       }
@@ -745,10 +736,9 @@ public class RefineryOrderService {
       JobOrder jobOrder = null;
       if (itemDto.jobOrderId() != null) {
         jobOrder =
-            jobOrderRepository
-                .findById(itemDto.jobOrderId())
-                .orElseThrow(
-                    () -> new NotFoundException("JobOrder not found: " + itemDto.jobOrderId()));
+            Entities.require(
+                jobOrderRepository.findById(itemDto.jobOrderId()),
+                () -> "JobOrder not found: " + itemDto.jobOrderId());
       }
 
       // Resolve the assignee's owning org-unit pool up front — the eighth identity dimension — so

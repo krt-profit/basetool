@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.Terminal;
 import de.greluc.krt.profit.basetool.backend.repository.TerminalRepository;
 import java.util.UUID;
@@ -69,9 +69,7 @@ public class TerminalService {
    */
   @Cacheable(cacheNames = CacheConfig.TERMINALS_CACHE)
   public Terminal getTerminal(UUID id) {
-    return terminalRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Terminal not found"));
+    return Entities.require(terminalRepository.findById(id), "Terminal not found");
   }
 
   /**

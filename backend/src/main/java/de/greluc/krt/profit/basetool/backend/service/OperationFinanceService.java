@@ -99,9 +99,7 @@ public class OperationFinanceService {
   @NotNull
   public OperationFinanceDto getOperationFinances(UUID operationId) {
     Operation operation =
-        operationRepository
-            .findById(operationId)
-            .orElseThrow(() -> new NotFoundException("Operation not found"));
+        Entities.require(operationRepository.findById(operationId), "Operation not found");
 
     List<UUID> missionIds = operation.getMissions().stream().map(Mission::getId).toList();
 

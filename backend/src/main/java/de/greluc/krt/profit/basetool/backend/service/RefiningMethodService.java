@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.repository.RefiningMethodRepository;
@@ -70,9 +70,7 @@ public class RefiningMethodService {
    */
   @Cacheable(cacheNames = CacheConfig.REFINING_METHODS_CACHE)
   public RefiningMethod getRefiningMethod(@NotNull UUID id) {
-    return refiningMethodRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("RefiningMethod not found"));
+    return Entities.require(refiningMethodRepository.findById(id), "RefiningMethod not found");
   }
 
   /**

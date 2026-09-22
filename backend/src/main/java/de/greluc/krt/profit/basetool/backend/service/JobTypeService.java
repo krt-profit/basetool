@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.config.CacheConfig;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.JobType;
 import de.greluc.krt.profit.basetool.backend.model.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.model.dto.JobTypeDto;
@@ -117,9 +117,8 @@ public class JobTypeService {
     }
     if (jobType.getParent() != null && jobType.getParent().getId() != null) {
       JobType parent =
-          jobTypeRepository
-              .findById(jobType.getParent().getId())
-              .orElseThrow(() -> new NotFoundException("Parent JobType not found"));
+          Entities.require(
+              jobTypeRepository.findById(jobType.getParent().getId()), "Parent JobType not found");
       jobType.setParent(parent);
     } else {
       jobType.setParent(null);
@@ -145,10 +144,7 @@ public class JobTypeService {
       throw new DuplicateEntityException(
           "A Job Type with the name '" + jobTypeDto.name() + "' already exists.");
     }
-    JobType jobType =
-        jobTypeRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobType not found"));
+    JobType jobType = Entities.require(jobTypeRepository.findById(id), "JobType not found");
 
     OptimisticLock.check(jobType.getVersion(), jobTypeDto.version(), JobType.class, id);
 
@@ -160,9 +156,8 @@ public class JobTypeService {
 
     if (jobTypeDto.parentId() != null) {
       JobType parent =
-          jobTypeRepository
-              .findById(jobTypeDto.parentId())
-              .orElseThrow(() -> new NotFoundException("Parent JobType not found"));
+          Entities.require(
+              jobTypeRepository.findById(jobTypeDto.parentId()), "Parent JobType not found");
       jobType.setParent(parent);
     } else {
       jobType.setParent(null);
@@ -181,9 +176,7 @@ public class JobTypeService {
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public void deleteJobType(@NotNull UUID id) {
     JobType jobTypeToDeactivate =
-        jobTypeRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobType not found"));
+        Entities.require(jobTypeRepository.findById(id), "JobType not found");
 
     jobTypeToDeactivate.setActive(false);
     jobTypeRepository.save(jobTypeToDeactivate);
@@ -198,9 +191,7 @@ public class JobTypeService {
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
   public void activateJobType(@NotNull UUID id) {
     JobType jobTypeToActivate =
-        jobTypeRepository
-            .findById(id)
-            .orElseThrow(() -> new NotFoundException("JobType not found"));
+        Entities.require(jobTypeRepository.findById(id), "JobType not found");
 
     jobTypeToActivate.setActive(true);
     jobTypeRepository.save(jobTypeToActivate);

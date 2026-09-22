@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  * its 404 through {@link Entities#require}, never through a hand-written {@code
  * optional.orElseThrow(() -> new NotFoundException(…))}.
  *
- * <p>The 250 hand-written sites were migrated on 2026-09-23, message by message, so the ceiling is
+ * <p>The 287 hand-written sites were migrated on 2026-09-23, message by message, so the ceiling is
  * zero. It may only ever go down: a new hand-written site fails the build here and names its file
  * and line. {@link Entities} itself is the one place the idiom is allowed — it is the
  * implementation.
@@ -55,9 +55,14 @@ class EntitiesRequireRatchetTest {
    */
   private static final int CEILING = 0;
 
-  /** The idiom, tolerant of the line breaks google-java-format puts into a long chain. */
+  /**
+   * The idiom, tolerant of the line breaks google-java-format puts into a long chain and of a
+   * fully-qualified {@code NotFoundException} — 37 sites were written that way and only surfaced
+   * once their names were shortened to imports.
+   */
   private static final Pattern HAND_WRITTEN =
-      Pattern.compile("\\.\\s*orElseThrow\\(\\s*\\(\\)\\s*->\\s*new\\s+NotFoundException\\(");
+      Pattern.compile(
+          "\\.\\s*orElseThrow\\(\\s*\\(\\)\\s*->\\s*new\\s+(?:[\\w.]+\\.)?NotFoundException\\(");
 
   @Test
   void noServiceLookupHandWritesTheNotFoundIdiom() throws IOException {
@@ -101,7 +106,15 @@ class EntitiesRequireRatchetTest {
                     + "    .orElseThrow(\n"
                     + "        () -> new NotFoundException(m))"))
         .matches(Matcher::find);
+    assertThat(
+            HAND_WRITTEN.matcher(
+                "repo.findById(id).orElseThrow(() -> new"
+                    + " de.greluc.krt.profit.basetool.backend.exception.NotFoundException(m))"))
+        .matches(Matcher::find);
     assertThat(HAND_WRITTEN.matcher("Entities.require(repo.findById(id), \"x\")"))
+        .matches(m -> !m.find());
+    // A different exception type is a different contract, not this idiom.
+    assertThat(HAND_WRITTEN.matcher("o.orElseThrow(() -> new EntityNotFoundException(\"x\"))"))
         .matches(m -> !m.find());
   }
 

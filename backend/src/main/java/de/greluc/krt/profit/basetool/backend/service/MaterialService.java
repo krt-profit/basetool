@@ -169,9 +169,7 @@ public class MaterialService {
    */
   @Cacheable(cacheNames = CacheConfig.MATERIAL_BY_ID_CACHE)
   public Material getMaterial(@NotNull UUID id) {
-    return materialRepository
-        .findById(id)
-        .orElseThrow(() -> new NotFoundException("Material not found"));
+    return Entities.require(materialRepository.findById(id), "Material not found");
   }
 
   /**

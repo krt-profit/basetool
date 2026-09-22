@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
-import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -183,8 +183,7 @@ public class UserService {
       @Nullable String displayName,
       @Nullable Long version,
       @Nullable LocalDate joinDate) {
-    User user =
-        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(id), "User not found");
 
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
 
@@ -232,8 +231,7 @@ public class UserService {
       @Nullable String description,
       @Nullable String displayName,
       @Nullable Long version) {
-    User user =
-        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     if (description != null) {
       user.setDescription(description);
@@ -270,8 +268,7 @@ public class UserService {
   @Transactional
   public User updateUserDefaultPayoutPreference(
       @NotNull UUID id, @NotNull PayoutPreference preference, @Nullable Long version) {
-    User user =
-        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setDefaultPayoutPreference(preference);
     // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
@@ -301,8 +298,7 @@ public class UserService {
   @Transactional
   public User updateUserShareBlueprintsGlobally(
       @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
-    User user =
-        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
     // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
@@ -323,8 +319,7 @@ public class UserService {
    */
   @Transactional
   public User updateReadAnnouncement(@NotNull UUID id, @NotNull UUID announcementId) {
-    User user =
-        userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    User user = Entities.require(userRepository.findById(id), "User not found");
     user.setLastReadAnnouncementId(announcementId);
     return userRepository.save(user);
   }
@@ -436,7 +431,7 @@ public class UserService {
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    */
   public User findById(@NotNull UUID id) {
-    return userRepository.findById(id).orElseThrow(() -> new NotFoundException("User not found"));
+    return Entities.require(userRepository.findById(id), "User not found");
   }
 
   /**
