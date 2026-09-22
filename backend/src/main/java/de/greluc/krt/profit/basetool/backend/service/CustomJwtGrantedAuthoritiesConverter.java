@@ -106,9 +106,10 @@ public class CustomJwtGrantedAuthoritiesConverter
    * Per-{@code (sub, token issued-at)} memoisation of the fully-assembled authority collection
    * (#1141). The resource-server authorities converter runs on <em>every</em> authenticated API
    * call — every fragment refetch, every live-sync coalesce burst, every check-in — and each miss
-   * pays {@link UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus
-   * ~5&ndash;8 SELECTs (user load, {@code user_roles}, one role lookup per realm role, and the
-   * membership read). Keying on the token's {@code issuedAt} means a fresh login always misses and
+   * pays {@link UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus a
+   * handful of SELECTs (user load, {@code user_roles}, the role catalogue read once with its
+   * permissions, and the membership read) — since {@code 9ab1bb135} the roles are no longer looked
+   * up one realm role at a time (corrected 2026-09-22). Keying on the token's {@code issuedAt} means a fresh login always misses and
    * re-reads, so a re-authentication picks up new authorities immediately; within one token's life
    * the configured {@link AuthoritiesCacheProperties#getTtl() TTL} bounds staleness. Only
    * successful results are cached (an exception propagates uncached), the cached value is an
