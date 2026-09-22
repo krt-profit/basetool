@@ -88,6 +88,12 @@ public class UserController {
 
   private static final Set<String> ALLOWED_SORT = Set.of("username", "email", "rank", "id");
 
+  /**
+   * Sort whitelist of the reference searches: the projected columns only ({@code email} is not
+   * part of the reference projection, so it is not offered).
+   */
+  private static final Set<String> REFERENCE_SORT = Set.of("username", "rank", "id");
+
   private final UserService userService;
   private final UserDeletionService userDeletionService;
   private final UserMapper userMapper;
@@ -223,6 +229,89 @@ public class UserController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort) {
     return runSearch(query, page, size, sort);
+  }
+
+  /**
+   * Slim, paged picker search: the same query, scope and role gate as {@link #searchUsers}, but
+   * each hit is a {@link de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto} (id,
+   * username, display name, effective name, rank) projected in SQL, with no entity, role or
+   * membership load behind it (BE-PERF-06). Backs every {@code remote-users} combobox, which reads
+   * only the id and the name; {@code /search} keeps the full DTO for member management.
+   *
+   * <p>No peer redaction is applied because there is nothing to redact: the reference projection
+   * is exactly the field set {@code UserDtoRedaction.toPeerShape} keeps.
+   *
+   * @param query free-text username/displayName filter, or {@code null}/blank to match all
+   * @param page requested page index, or {@code null} for the first page
+   * @param size requested page size, or {@code null} for the default
+   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or
+   *     {@code null} for the username default
+   * @return one page of matching user references
+   */
+  @GetMapping("/search/references")
+  @PreAuthorize(
+      "hasAnyRole('" + Roles.ADMIN + "', '" + Roles.OFFICER + "', '" + Roles.KRT_MEMBER + "')")
+  @Transactional(readOnly = true)
+  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
+      searchUserReferences(
+          @RequestParam(required = false) String query,
+          @RequestParam(required = false) Integer page,
+          @RequestParam(required = false) Integer size,
+          @RequestParam(required = false) String sort) {
+    return runReferenceSearch(query, page, size, sort);
+  }
+
+  /**
+   * Bank-audience twin of {@link #searchUserReferences}: identical projection and scope, with the
+   * widened role gate of {@link #searchUsersForBank} (adds {@code BANK_EMPLOYEE}, which covers
+   * {@code BANK_MANAGEMENT} through the role hierarchy) for the {@code remote-bank-users} pickers
+   * (REQ-BANK-008/009/044, BE-PERF-06).
+   *
+   * @param query free-text username/displayName filter, or {@code null}/blank to match all
+   * @param page requested page index, or {@code null} for the first page
+   * @param size requested page size, or {@code null} for the default
+   * @param sort requested sort expression ({@code username}, {@code rank} or {@code id}), or
+   *     {@code null} for the username default
+   * @return one page of matching user references
+   */
+  @GetMapping("/search-bank/references")
+  @PreAuthorize(
+      "hasAnyRole('"
+          + Roles.ADMIN
+          + "', '"
+          + Roles.OFFICER
+          + "', '"
+          + Roles.KRT_MEMBER
+          + "', '"
+          + Roles.BANK_EMPLOYEE
+          + "')")
+  @Transactional(readOnly = true)
+  public PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
+      searchUserReferencesForBank(
+          @RequestParam(required = false) String query,
+          @RequestParam(required = false) Integer page,
+          @RequestParam(required = false) Integer size,
+          @RequestParam(required = false) String sort) {
+    return runReferenceSearch(query, page, size, sort);
+  }
+
+  /**
+   * Shared body of the two reference-search endpoints: resolves the page request against {@link
+   * #REFERENCE_SORT} and runs the squadron-scoped projection. A {@code null} query (the browse-mode
+   * empty {@code ?query=}) is normalised to the match-all empty string, as in {@link #runSearch}.
+   *
+   * @param query free-text filter, or {@code null}/blank to match all
+   * @param page requested page index, or {@code null}
+   * @param size requested page size, or {@code null}
+   * @param sort requested sort expression, or {@code null}
+   * @return one page of matching user references
+   */
+  private PageResponse<de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto>
+      runReferenceSearch(String query, Integer page, Integer size, String sort) {
+    Pageable pageable =
+        PaginationUtil.createPageRequest(page, size, sort, REFERENCE_SORT, "username");
+    return PageResponse.of(
+        userService.searchReferencesByUsername(query == null ? "" : query, pageable));
   }
 
   /**

@@ -48,7 +48,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query")))
         .thenReturn(mockPageResponse);
@@ -60,7 +60,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query"));
   }
@@ -77,7 +77,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("John Doe")))
         .thenReturn(mockPageResponse);
@@ -87,7 +87,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("John Doe"));
   }
@@ -104,7 +104,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("")))
         .thenReturn(mockPageResponse);
@@ -114,7 +114,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq(""));
   }
@@ -129,7 +129,7 @@ class UserProxyControllerTest {
     PageResponse<Map<String, Object>> mockPageResponse =
         new PageResponse<>(Collections.emptyList(), 0, 1000, 0, 0, Collections.emptyList());
     when(backendApiClient.get(
-            eq("/api/v1/users/search-bank?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search-bank/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query")))
         .thenReturn(mockPageResponse);
@@ -139,7 +139,7 @@ class UserProxyControllerTest {
     assertNotNull(result);
     verify(backendApiClient)
         .get(
-            eq("/api/v1/users/search-bank?size=1000&sort=username,asc&query={query}"),
+            eq("/api/v1/users/search-bank/references?size=1000&sort=username,asc&query={query}"),
             anyTypeRef(),
             eq("query"));
   }

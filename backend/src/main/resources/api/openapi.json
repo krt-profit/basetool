@@ -35764,6 +35764,132 @@
         }
       }
     },
+    "/api/v1/users/search/references" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "searchUserReferences",
+        "parameters" : [ {
+          "name" : "query",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseUserReferenceDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/search-bank" : {
       "get" : {
         "tags" : [ "user-controller" ],
@@ -35820,6 +35946,132 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/PageResponseUserDto"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/search-bank/references" : {
+      "get" : {
+        "tags" : [ "user-controller" ],
+        "operationId" : "searchUserReferencesForBank",
+        "parameters" : [ {
+          "name" : "query",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "page",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "size",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "sort",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseUserReferenceDto"
                 }
               }
             }
@@ -45707,6 +45959,103 @@
           },
           "401" : {
             "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "Conflict",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Internal Server Error",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/layout" : {
+      "get" : {
+        "tags" : [ "me-controller" ],
+        "summary" : "The caller's layout context in one read",
+        "description" : "Active org unit, pinnable org units, capability flags and unread-notification count - the same answers as /me/active-org-unit, /me/org-units, /me/capabilities and /notifications/unread-count, in one read-only transaction.",
+        "operationId" : "getLayout",
+        "responses" : {
+          "200" : {
+            "description" : "The caller's layout context",
+            "headers" : {
+              "ETag" : {
+                "description" : "Entity Tag for conditional requests",
+                "schema" : {
+                  "type" : "string"
+                }
+              },
+              "Cache-Control" : {
+                "description" : "Caching policy (e.g. no-cache for API responses)",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LayoutResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthorized",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not Modified (ETag/If-None-Match)"
+          },
+          "400" : {
+            "description" : "Bad Request",
             "content" : {
               "application/problem+json" : {
                 "schema" : {
@@ -62805,6 +63154,39 @@
           }
         }
       },
+      "PageResponseUserReferenceDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/UserReferenceDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "RegistrationStatusDto" : {
         "type" : "object",
         "properties" : {
@@ -65505,6 +65887,28 @@
           },
           "isAdmin" : {
             "type" : "boolean"
+          }
+        }
+      },
+      "LayoutResponse" : {
+        "type" : "object",
+        "properties" : {
+          "activeOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "orgUnits" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/OrgUnitMembershipOptionDto"
+            }
+          },
+          "capabilities" : {
+            "$ref" : "#/components/schemas/CapabilitiesResponse"
+          },
+          "unreadNotifications" : {
+            "type" : "integer",
+            "format" : "int64"
           }
         }
       },

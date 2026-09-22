@@ -320,6 +320,51 @@ public interface UserRepository
           java.util.Collection<UUID> scopeSquadronIds);
 
   /**
+   * Squadron-scoped substring search projected straight to {@link UserReferenceDto} (id, username,
+   * display name, effective name, rank), one page at a time — the backing query of the user
+   * pickers (BE-PERF-06). Same predicate as {@link #searchScoped(String, java.util.Collection,
+   * Pageable)}, but no entity, no role collection and no membership lookup is loaded: a picker
+   * keystroke used to hydrate up to a thousand full {@code UserDto}s (three membership queries
+   * each) to read two fields. The projection is exactly the fields the peer view keeps, so it
+   * needs no redaction.
+   *
+   * @param query the already LIKE-escaped substring to match against username or display name
+   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
+   * @param pageable page request; its sort is applied to the {@code u} alias
+   * @return one page of matching user references
+   */
+  @Query(
+      value =
+          """
+          SELECT new de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto(u.id,
+          u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
+          '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
+          (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
+          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND (:scopeSquadronIds IS
+          NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
+          ms.kind = de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS
+          (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+          IN :scopeSquadronIds))
+          """,
+      countQuery =
+          """
+          SELECT COUNT(u) FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query,
+          '%')) OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))) AND
+          (:scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
+          ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
+          FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
+          de.greluc.krt.profit.basetool.backend.model.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
+          IN :scopeSquadronIds))
+          """)
+  Page<UserReferenceDto> searchScopedReferences(
+      @org.springframework.data.repository.query.Param("query") String query,
+      @org.springframework.data.repository.query.Param("scopeSquadronIds")
+          java.util.Collection<UUID> scopeSquadronIds,
+      Pageable pageable);
+
+  /**
    * Loads a user by id with {@code roles} and {@code roles.permissions} fetched in the same query —
    * for the authentication path and the caller's own {@code /users/me}, which assemble authorities
    * from both. A caller that only needs the user as a foreign-key target or reads a scalar uses the
