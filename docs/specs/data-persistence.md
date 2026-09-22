@@ -64,14 +64,49 @@ A **request-constant verdict or lookup** consulted more than once per request (e
 memoised on the `HttpServletRequest` so it resolves once: `OwnerScopeService.canViewJobOrders()` and
 `currentMemberOrgUnitIds()` cache on a request attribute, and `UserMapper` memoises the per-user
 Staffel-membership lookup so its three derived-field resolvers share one query (falling back to a
-direct query outside an HTTP request).
+direct query outside an HTTP request). The delegated appointment verdicts
+(`OrgRoleManagementSecurityService`) read the caller's membership rows once per request the same way,
+because the Leitung view asks them for every Bereich, Staffel and Spezialkommando (BE-PERF-15).
+
+**Every embedded `UserDto` of a list or aggregate is primed in two queries** (BE-PERF-01, 2026-09-22).
+Mapping one user costs up to three statements — its Staffel memberships and the Staffel entities for
+`squadrons` and again for the primary `squadron` — so the membership memo alone still left a
+30-participant mission detail at ~70 statements. `UserMapper` therefore also memoises the resolved
+Staffel references per user, and `primeStaffelMemberships(users)` seeds both memos for a whole page
+with one `findAllByIdUserIdInAndKindIn` and one `findAllById`. Every surface that maps many users
+primes first: the full mission DTO (a `@BeforeMapping` in `MissionMapper` over participants and unit
+ship owners), the job-order Bearbeiter lists (per page in `JobOrderStockProjectionService`, per order
+in `JobOrderMapper`), the user lists and searches, the member-evaluation list and the all-ships list.
+
+**A foreign-key target is resolved without its graph.** `UserRepository.findById` graphs `roles` and
+`roles.permissions` for the authentication path and `/users/me`; a service that needs the user only
+as a foreign-key target or for a scalar uses `findPlainById` (an `EntityManager.find` fragment, the
+same shape as `findByIdForAuthorization` below) and lets `roles` stay lazy (BE-PERF-12).
 
 A **by-id aggregate load must never fetch-join two sibling collections.** `@EntityGraph` on a `findBy`
 that graphs two `@OneToMany`s produces a `|childA| × |childB|` cartesian result — every parent scalar
 (including any TEXT column) repeated across the row product. Graph at most one collection and let the
 other batch-load under `hibernate.default_batch_fetch_size` (`MissionRepository.findById` graphs only
-`participants`; `assignedUnits` batch-loads — #1138). The **paged** list variant graphs neither (it
-maps only scalars + `@ManyToOne`s, and a collection fetch-join forces in-memory pagination, `HHH000104`).
+`participants`; `assignedUnits` batch-loads — #1138). The full-replace load
+(`findByIdForFullReplace`) follows the same rule since 2026-09-22 (BE-PERF-03).
+
+**A paged query fetches no collection** (BE-PERF-02, 2026-09-22). Its rows are the page; any
+`@OneToMany` / `@ManyToMany` the mapper reads batch-loads under `default_batch_fetch_size`. The paged
+`User`, `Role`, `Mission` and `JobOrder` finders were brought into line (the job-order list fetch-joined
+four collections), a paged result that is cached past its transaction initialises its collections
+before it leaves (`RoleService.getAllRoles`), and `hibernate.query.fail_on_pagination_over_collection_fetch`
+is on in the base configuration, so a paged collection fetch that Hibernate would page in memory
+fails instead of warning.
+
+> **Corrected 2026-09-22:** this section said a collection fetch-join on a paged query *forces*
+> in-memory pagination (`HHH000104` / `HHH90003004`). Under Hibernate 7.4 on PostgreSQL that is no
+> longer the general case: Hibernate pushes the `OFFSET`/`LIMIT` into a derived table whenever the
+> query shape allows it, and falls back to paging in memory only for the shapes it cannot push down
+> (e.g. ordering by the fetched collection before its owner). The rule stands for the other reason
+> — every page row is multiplied by the collection's size, and by the product of the sizes when
+> several are fetched — and the fail flag catches the fallback. `PagedFindersNoCollectionFetchTest`
+> proves the flag live on a shape that cannot be pushed down, because a plain collection fetch
+> passes it silently.
 
 An **authorization gate must not load the aggregate its decision does not read.** A `@PreAuthorize`
 gate that inspects only a couple of `@ManyToOne`s / a small association (mission `owningOrgUnit` /
@@ -91,7 +126,16 @@ real Postgres schema, returns only order-linked rows, and its floor sum equals t
 `sumAmountByMaterialAndJobOrderAndMinQuality` aggregate), `OwnerScopeServiceTest` (profit-eligibility
 count runs once across repeated `canViewJobOrders()`), `UserMapperTest` (one membership lookup per
 user within a request, direct-query fallback without one), `MissionServicePayoutTest` (check-in/out/
-payout resolve the participant without an aggregate load).
+payout resolve the participant without an aggregate load), `UserMappingNoNPlusOneTest` (a
+30-participant mission detail and a 50-user page map in the same statement count as a 5-participant
+mission and a 10-user page), `UserMapperTest` (the primer seeds a page in two queries and the
+Staffel entities load once per user), `PagedFindersNoCollectionFetchTest` (every formerly graphed
+paged finder leaves its collection uninitialised; the fail flag is live; the cached role page arrives
+initialised), `UserPlainLookupIntegrationTest` (`findPlainById` leaves `roles` lazy and a request
+path using it still returns the roles, without a test transaction), `HangarImportServiceTest` (one
+grouped per-type count per import), `OrgRoleManagementSecurityServiceTest` (one membership read per
+request across verdicts), `OrgUnitBankResponsibilityServiceTest` (one statement for every Profit
+Bereich).
 
 ### REQ-DATA-004 — UEX duplicate companies of one brand merge onto a single manufacturer; the sync is per-company resilient
 
@@ -205,6 +249,20 @@ test schema, and the two partial indexes additionally have their `WHERE` predica
 pinned (via `pg_indexes.indexdef`) so a later migration cannot silently narrow the predicate or flip
 a sort while keeping the index name.
 
+**The foreign-key half is a gate since 2026-09-22** (BE-PERF-10). `ForeignKeyIndexCoverageTest` reads
+every foreign key of the Flyway-built schema from `pg_constraint` and fails for any whose columns are
+not the **leading** columns of a valid index on the referencing table — non-partial, or partial on
+exactly `<column> IS NOT NULL` (every constraint and "children of" lookup is `column = ?`, which
+implies that predicate). A composite index led by another column does not count, and neither does a
+partial index with a business predicate: those two shapes are how 38 foreign keys escaped the
+migration-reading sweeps (V34 / V92 / V122 / V175). `V245` indexes all 38 — a partial `IS NOT NULL`
+index for a nullable key, a plain one otherwise. An exception goes into the test's allow-list with a
+written reason; it is empty.
+
+**Acceptance** (`ForeignKeyIndexCoverageTest`, `DatabaseIndexMigrationTest`): the sweep reports no
+uncovered foreign key, its canary proves it reads the schema (more than a hundred foreign keys,
+`ship.owner_id` among them), and one `V245` index per shape is pinned by name and definition.
+
 ### REQ-DATA-007 — Slow-changing global catalogues are served from the frontend per-domain caches
 
 A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
@@ -292,7 +350,7 @@ Invariants that must hold:
   a concurrent read could re-cache pre-apply data is bounded by the domain TTL and the action is rare and
   admin-only.
 - **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`,
-  `/api/v1/me/active-org-unit` and `/api/v1/me/org-units` share a URI across users; a URI-keyed cache would cross-contaminate
+  `/api/v1/me/active-org-unit`, `/api/v1/me/org-units` and `/api/v1/me/layout` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
 - **The eviction guarantee holds only under single-instance deployment (CACHE-DIST-01).** Caffeine is
   per-JVM: both the frontend catalogue caches and the backend master-data caches evict only the local

@@ -861,3 +861,49 @@ body would skip `NormalizedStringDeserializer` entirely: no trim, no NFC normali
 **Related:** REQ-API-004, REQ-API-007, REQ-API-009, REQ-SEC-031, ADR-0161
 
 ---
+
+### REQ-API-012 — A consumer that reads a slice gets a slice-shaped read
+
+A read that a hot consumer calls often, and of which it uses a small part, has a shape sized to that
+consumer instead of reusing the heaviest projection that happens to contain the part. Two exist
+(2026-09-22, BE-PERF-06 / BE-PERF-07):
+
+- **The user pickers search references, not users.** `GET /api/v1/users/search/references` and
+  `GET /api/v1/users/search-bank/references` run the same squadron-scoped username / display-name
+  search as `/search` and `/search-bank`, but project each hit in SQL to `UserReferenceDto` (`id`,
+  `username`, `displayName`, `effectiveName`, `rank`) — one statement plus its count, no entity, no
+  role collection, no membership lookup. The full-DTO search hydrated every match with its roles and
+  three membership queries, on every keystroke of every `remote-users` combobox, to read two fields.
+  **The gates are the twins' gates**, URL matcher and `@PreAuthorize` alike (`/references` of
+  `/search`: `ADMIN`/`OFFICER`/`KRT_MEMBER`; of `/search-bank`: those plus `BANK_EMPLOYEE` /
+  `BANK_MANAGEMENT`). The projection is exactly the field set the peer view keeps
+  (`UserDtoRedaction.toPeerShape`), so there is nothing to redact and no caller learns more than from
+  the twin. `/search` keeps the full DTO for member management. The frontend `/users/search` and
+  `/users/search-bank` proxies forward to the reference endpoints.
+- **The page layout reads the caller once.** `GET /api/v1/me/layout` returns the effective org unit,
+  the pinnable org units, the capability flags and the unread-notification count in one read-only
+  transaction, through the same resolvers as `/me/active-org-unit`, `/me/org-units`,
+  `/me/capabilities` and `/notifications/unread-count` — so a client may use either shape and gets
+  the same answers. It answers all four parts or fails as a whole; ADR-0151's fail-closed handling of
+  the capabilities stays the client's.
+
+Neither endpoint is on the API vhost: both serve the web frontend over the internal hop. Offering them
+to the Android app is an allow-list change (REQ-SEC-037) in the same change as the app starts using
+them, per REQ-API-009.
+
+**Acceptance**
+
+- [x] The reference searches carry their twins' gates, anonymous is `401`, and a hit carries no
+  e-mail, role or Staffel field (`UserReferenceSearchTest`).
+- [x] The frontend proxies forward to them (`UserProxyControllerTest`).
+- [x] `/me/layout` answers the four parts from the same resolvers (`MeControllerTest`) in exactly one
+  transaction, where the separate calls open several (`MeLayoutSingleTransactionTest`).
+- [ ] The web layout uses `/me/layout` instead of the separate calls — the frontend half of
+  BE-PERF-07 / FE-PERF-01, a separate change.
+
+**Enforced by:** `UserReferenceSearchTest`, `MeLayoutSingleTransactionTest`, `MeControllerTest` ·
+`UserProxyControllerTest` (frontend) ·
+**Related:** REQ-API-005, REQ-API-009, REQ-DATA-003, REQ-FE-016, REQ-SEC-037, REQ-SEC-047, ADR-0089,
+ADR-0151
+
+---

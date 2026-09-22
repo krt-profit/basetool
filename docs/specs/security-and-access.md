@@ -2904,6 +2904,9 @@ The API answers "may this caller do this" itself. Two shapes carry it:
 - **`GET /api/v1/me/capabilities`** reports the caller's standing resolved **through the role
   hierarchy** — `isLogisticianOrAbove`, `isMissionManagerOrAbove`, `isAdmin` alongside the existing
   bank and blueprint flags.
+  `GET /api/v1/me/layout` carries the identical `capabilities` object, from the same resolver, beside
+  the other layout reads (REQ-API-012); a client that gets no answer from either treats every flag as
+  `false`.
 - **`canEdit` on the row** — `MissionDto`, `InventoryItemDto` and `JobOrderDto` each carry the
   server's own answer for that row, computed by the same `AccessGateService` the endpoint's
   `@PreAuthorize` reaches.
