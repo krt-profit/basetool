@@ -129,15 +129,28 @@ app:
       audit-only: ${APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY:false}
   rate-limit:
     enabled: true
+    # Per authenticated subject (SubjectRateLimiter) - the enforceable budget.
     capacity: 30
     refill-tokens: 30
     refill-period: PT1M
+    # Per source IP (RateLimitingFilter) - deliberately looser: several members can share one public
+    # address behind a CGNAT or an office NAT, and the IP bucket used to hand all of them the 30/min
+    # a single member gets. Same refill period as the subject bucket (REQ-INGEST-005).
+    ip-capacity: ${APP_RATE_LIMIT_IP_CAPACITY:120}
+    ip-refill-tokens: ${APP_RATE_LIMIT_IP_REFILL_TOKENS:120}
   security:
     jwt:
-      # Opt-in audience check. Empty by default; set to `basetool-backend` ONLY after both the
-      # extractor and frontend tokens carry that audience (docs/INGEST_KEYCLOAK_SETUP.md). The
-      # gateway is not part of the E2E stack, so unlike the backend this path has no end-to-end
-      # rehearsal — SecurityConfigTest is its only coverage.
+      # Opt-in audience check, empty by default. The gateway's value is `basetool-ingest`, stamped by
+      # the extractor-only `extractor-ingest-only` client scope (docs/INGEST_KEYCLOAK_SETUP.md step 7a,
+      # ADR-0018 amendment 1). It is NOT the backend's audience: every frontend session token carries
+      # that one, so an audience check set to it would admit exactly the web-session tokens this
+      # interface exists to refuse. Set it LAST, after the audit-only pass of the client-identity
+      # gate, and only once a live extractor token carries aud=basetool-ingest - this check answers
+      # 401 and is never softened by audit-only. basetool_ingest_gate_enforcing{gate="audience"}
+      # reports whether it is on. The gateway is not part of the E2E stack, so unlike the backend
+      # this path has no end-to-end rehearsal - SecurityConfigTest is its only coverage.
+      # scripts/check-ingest-audience.py (repo-lint) fails the build if this file pairs the key with
+      # the backend's audience again.
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
   monitoring:
     scrape:

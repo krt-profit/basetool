@@ -21,12 +21,16 @@ package de.greluc.krt.profit.basetool.ingest.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link IngestProperties} defaults. Guards the handoff TTL default so a future edit
- * cannot silently revert it below the value the one-click ingest flow needs (REQ-INGEST-003).
+ * Unit tests for the defaults of the gateway's four configuration records, bound through the real
+ * {@code Binder} so the {@code @DefaultValue} annotations — not a hand-kept copy — are what is
+ * asserted. Guards the handoff TTL default so a future edit cannot silently revert it below the
+ * value the one-click ingest flow needs (REQ-INGEST-003), and the property names, which the records
+ * migration (ING-MOD-02) had to keep byte-identical for every existing environment.
  */
 class IngestPropertiesTest {
 
@@ -39,10 +43,85 @@ class IngestPropertiesTest {
    */
   @Test
   void handoffTtlDefaultsToThirtyMinutes() {
-    // Given a freshly constructed properties holder (no external property binding)
-    IngestProperties properties = new IngestProperties();
+    IngestProperties properties = TestProperties.ingest();
 
-    // When / Then the code default is the widened 30-minute window
-    assertThat(properties.getHandoffTtl()).isEqualTo(Duration.ofMinutes(30));
+    assertThat(properties.handoffTtl()).isEqualTo(Duration.ofMinutes(30));
+  }
+
+  /** Every other {@code app.ingest} default survives the move from a mutable bean to a record. */
+  @Test
+  void ingestDefaultsMatchTheDocumentedValues() {
+    IngestProperties properties = TestProperties.ingest();
+
+    assertThat(properties.publicBaseUrl()).isEmpty();
+    assertThat(properties.refineryPath()).isEqualTo("/refinery-orders/create");
+    assertThat(properties.blueprintPath()).isEqualTo("/personal-inventory/blueprints");
+    assertThat(properties.maxPayloadBytes()).isEqualTo(2L * 1024 * 1024);
+    assertThat(properties.maxHandoffBytes()).isEqualTo(256L * 1024);
+    assertThat(properties.maxHandoffsPerSubject()).isEqualTo(10);
+  }
+
+  /**
+   * The per-IP budget defaults to four times the per-subject one, so a household or office sharing
+   * one public address is not throttled at the budget of a single member (REQ-INGEST-005).
+   */
+  @Test
+  void rateLimitDefaultsGiveTheIpBucketItsOwnLooserBudget() {
+    RateLimitProperties properties = TestProperties.rateLimit();
+
+    assertThat(properties.enabled()).isTrue();
+    assertThat(properties.capacity()).isEqualTo(30);
+    assertThat(properties.refillTokens()).isEqualTo(30);
+    assertThat(properties.refillPeriod()).isEqualTo(Duration.ofMinutes(1));
+    assertThat(properties.ipCapacity()).isEqualTo(120);
+    assertThat(properties.ipRefillTokens()).isEqualTo(120);
+  }
+
+  /** The IP budget is overridable on its own, under the documented property name. */
+  @Test
+  void ipBudgetBindsFromItsOwnPropertyNames() {
+    RateLimitProperties properties =
+        TestProperties.rateLimit("ip-capacity", "300", "ip-refill-tokens", "240");
+
+    assertThat(properties.ipCapacity()).isEqualTo(300);
+    assertThat(properties.ipRefillTokens()).isEqualTo(240);
+    assertThat(properties.capacity()).as("the subject budget is untouched").isEqualTo(30);
+  }
+
+  /** Every client-identity gate is inert by default; nothing ships pre-enabled (REQ-INGEST-011). */
+  @Test
+  void clientIdentityDefaultsAreInert() {
+    ClientIdentityProperties properties = TestProperties.clientIdentity();
+
+    assertThat(properties.allowedClientIds()).isEmpty();
+    assertThat(properties.requiredScope()).isEmpty();
+    assertThat(properties.allowedTools()).isEmpty();
+    assertThat(properties.auditOnly()).isFalse();
+  }
+
+  /** A comma-separated environment value binds to the allowlist exactly as it did before. */
+  @Test
+  void clientIdentityListsBindFromACommaSeparatedValue() {
+    ClientIdentityProperties properties =
+        TestProperties.clientIdentity(
+            "allowed-client-ids", "basetool-sc-extractor,other-client", "audit-only", "true");
+
+    assertThat(properties.allowedClientIds())
+        .containsExactly("basetool-sc-extractor", "other-client");
+    assertThat(properties.auditOnly()).isTrue();
+  }
+
+  /** The service account is off by default, and its secret never appears in the string form. */
+  @Test
+  void serviceAccountDefaultsAreEmptyAndTheSecretIsNeverRendered() {
+    assertThat(TestProperties.serviceAccount().tokenUri()).isEmpty();
+    assertThat(TestProperties.serviceAccount().refreshSkew()).isEqualTo(Duration.ofSeconds(30));
+    assertThat(TestProperties.serviceAccount().timeoutMillis()).isEqualTo(5_000L);
+
+    ServiceAccountProperties configured =
+        TestProperties.serviceAccount(
+            "token-uri", "https://kc/token", "client-id", "gw", "client-secret", "s3cret-value");
+
+    assertThat(configured.toString()).doesNotContain("s3cret-value").contains("<set>");
   }
 }

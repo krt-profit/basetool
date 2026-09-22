@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import de.greluc.krt.profit.basetool.ingest.config.ClientIdentityProperties;
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.web.ProblemResponseWriter;
@@ -35,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -92,9 +94,20 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   /** Cap on a logged client id, so an unexpected {@code azp} cannot bloat the line. */
   private static final int MAX_LOGGED_CLIENT_ID = 80;
 
+  /** Cap on a logged request path. */
+  private static final int MAX_LOGGED_PATH = 256;
+
+  /** The configured allowlists and the audit-only switch. */
   private final ClientIdentityProperties properties;
+
+  /** Counts accepted clients and every rejection under a bounded reason. */
   private final MeterRegistry meterRegistry;
+
+  /** Serializes the 403 problem body. */
   private final ObjectMapper objectMapper;
+
+  /** Supplies the MDC key the problem body's {@code correlationId} is read from. */
+  private final LoggingProperties loggingProperties;
 
   /**
    * Evaluates the configured client-identity checks and either rejects the request with a {@code
@@ -112,14 +125,26 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    Jwt jwt = authenticatedJwt();
-    if (jwt == null) {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (!isAuthenticated(authentication)) {
       // Unauthenticated: the resource-server chain owns that answer (401 + WWW-Authenticate). This
       // filter must not turn a missing token into a 403, which would tell a client to stop retrying
       // when re-authenticating is exactly what it should do.
       filterChain.doFilter(request, response);
       return;
     }
+    if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
+      // Fail CLOSED. Every check below reads the token's claims, so an authenticated principal
+      // that is not a JWT would have skipped all of them — and passed `.authenticated()` anyway.
+      // No such principal exists on this chain today (both the bearer and the DPoP provider yield
+      // a JwtAuthenticationToken); this is what keeps a future authentication mechanism from
+      // silently bypassing the REQ-INGEST-011 allowlist, the way the DPoP filter-ordering bug once
+      // almost did. Never softened by audit-only: there is no client population to measure here,
+      // only a gate that would otherwise not run.
+      refuseNonJwtPrincipal(request, response, authentication);
+      return;
+    }
+    Jwt jwt = jwtAuthentication.getToken();
     String authorizedParty = claimText(jwt, AUTHORIZED_PARTY_CLAIM);
     String clientLabel = boundedClientLabel(authorizedParty);
     Rejection rejection = evaluate(request, authorizedParty);
@@ -128,7 +153,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
       meterRegistry
           .counter(MetricNames.INGEST_CLIENT_REJECTED, MetricNames.TAG_REASON, rejection.reason())
           .increment();
-      if (!properties.isAuditOnly()) {
+      if (!properties.auditOnly()) {
         // WARN, not DEBUG: unlike the pre-auth bot/rate-limit rejects, reaching this point required
         // a VALID realm token, so this cannot be flooded by an anonymous scanner and every
         // occurrence is worth a human look (REQ-OBS-001).
@@ -145,6 +170,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
         ProblemResponseWriter.write(
             response,
             objectMapper,
+            loggingProperties,
             HttpStatus.FORBIDDEN,
             "Client not allowed",
             MetricNames.CODE_CLIENT_NOT_ALLOWED,
@@ -185,19 +211,19 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
    */
   private @Nullable Rejection evaluate(
       @NotNull HttpServletRequest request, @Nullable String authorizedParty) {
-    if (!properties.getAllowedClientIds().isEmpty()) {
+    if (!properties.allowedClientIds().isEmpty()) {
       if (authorizedParty == null) {
         // Fail-closed on an ABSENT claim. Treating "no azp" as "nothing to check" would silently
         // disable the gate the moment a realm change stopped stamping the claim.
         return new Rejection(
             MetricNames.REASON_MISSING_AZP, notApprovedDetail("no client identity in the token"));
       }
-      if (!properties.getAllowedClientIds().contains(authorizedParty)) {
+      if (!properties.allowedClientIds().contains(authorizedParty)) {
         return new Rejection(
             MetricNames.REASON_UNKNOWN_CLIENT, notApprovedDetail("client identity"));
       }
     }
-    if (!properties.getRequiredScope().isBlank() && !hasRequiredScope()) {
+    if (!properties.requiredScope().isBlank() && !hasRequiredScope()) {
       return new Rejection(
           MetricNames.REASON_MISSING_SCOPE, notApprovedDetail("missing ingest scope"));
     }
@@ -291,7 +317,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
     if (authentication == null) {
       return false;
     }
-    String required = SCOPE_AUTHORITY_PREFIX + properties.getRequiredScope();
+    String required = SCOPE_AUTHORITY_PREFIX + properties.requiredScope();
     return authentication.getAuthorities().stream()
         .map(GrantedAuthority::getAuthority)
         .anyMatch(required::equals);
@@ -306,7 +332,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
    * @return a bounded, safe metric tag value
    */
   private @NotNull String boundedClientLabel(@Nullable String authorizedParty) {
-    if (authorizedParty != null && properties.getAllowedClientIds().contains(authorizedParty)) {
+    if (authorizedParty != null && properties.allowedClientIds().contains(authorizedParty)) {
       return authorizedParty;
     }
     return MetricNames.CLIENT_ID_OTHER;
@@ -325,17 +351,57 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Extracts the authenticated caller's JWT from the security context.
+   * Whether the security context holds a real, authenticated caller — anything else (no
+   * authentication, an anonymous token, an unauthenticated token) is left to the resource-server
+   * chain, which answers it with a {@code 401}.
    *
-   * @return the token, or {@code null} when the request is unauthenticated or was authenticated by
-   *     something other than a bearer/DPoP token
+   * @param authentication the current authentication, possibly {@code null}
+   * @return {@code true} for an authenticated, non-anonymous principal
    */
-  private static @Nullable Jwt authenticatedJwt() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
-      return jwtAuthentication.getToken();
-    }
-    return null;
+  private static boolean isAuthenticated(@Nullable Authentication authentication) {
+    return authentication != null
+        && authentication.isAuthenticated()
+        && !(authentication instanceof AnonymousAuthenticationToken);
+  }
+
+  /**
+   * Refuses an authenticated principal that is not a JWT with a {@code 403 CLIENT_NOT_ALLOWED},
+   * counted under its own {@code non_jwt_principal} reason and logged at {@code WARN} with the
+   * authentication <em>type</em> only — never its name or credentials.
+   *
+   * @param request the current request
+   * @param response the response the problem body is written to
+   * @param authentication the non-JWT authentication that reached the gate
+   * @throws IOException if writing the problem body fails
+   */
+  private void refuseNonJwtPrincipal(
+      @NotNull HttpServletRequest request,
+      @NotNull HttpServletResponse response,
+      @NotNull Authentication authentication)
+      throws IOException {
+    meterRegistry
+        .counter(
+            MetricNames.INGEST_CLIENT_REJECTED,
+            MetricNames.TAG_REASON,
+            MetricNames.REASON_NON_JWT_PRINCIPAL)
+        .increment();
+    meterRegistry
+        .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, MetricNames.CODE_CLIENT_NOT_ALLOWED)
+        .increment();
+    log.warn(
+        "Ingest client rejected: reason={}, authentication={}, path={} {}",
+        MetricNames.REASON_NON_JWT_PRINCIPAL,
+        authentication.getClass().getSimpleName(),
+        request.getMethod(),
+        LogSafe.text(request.getRequestURI(), MAX_LOGGED_PATH));
+    ProblemResponseWriter.write(
+        response,
+        objectMapper,
+        loggingProperties,
+        HttpStatus.FORBIDDEN,
+        "Client not allowed",
+        MetricNames.CODE_CLIENT_NOT_ALLOWED,
+        notApprovedDetail("no client identity token"));
   }
 
   /**

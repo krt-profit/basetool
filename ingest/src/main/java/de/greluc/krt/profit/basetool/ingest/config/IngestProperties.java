@@ -23,100 +23,67 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
-import lombok.Data;
 import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe, fail-fast configuration for the ingest gateway (prefix {@code app.ingest}). Validated
- * at startup ({@code @Validated}) so a missing backend URL or a nonsensical handoff TTL aborts the
- * boot instead of surfacing as a runtime 500 on the first call (REQ-INGEST-001/-003/-005).
+ * Type-safe, fail-fast configuration for the ingest gateway (prefix {@code app.ingest}). Bound once
+ * through the canonical record constructor and validated at startup ({@code @Validated}), so a
+ * missing backend URL or a nonsensical handoff TTL aborts the boot instead of surfacing as a
+ * runtime 500 on the first call (REQ-INGEST-001/-003/-005).
+ *
+ * @param backendBaseUrl internal base URL of the backend resource server the gateway forwards to
+ *     (e.g. {@code https://backend:11261}); reached over the internal network only — the backend
+ *     stays internet-unreachable (REQ-INGEST-001)
+ * @param frontendBaseUrl public base URL of the frontend the browser is sent to after a successful
+ *     ingest (e.g. {@code https://app.profit-base.online}); used to build the {@code frontendUrl}
+ *     returned to the extractor
+ * @param publicBaseUrl the gateway's own externally reachable origin, e.g. {@code
+ *     https://ingest.profit-base.online}. Used only to build the DPoP {@code htu} comparison
+ *     target, so the comparison does not depend on the reverse proxy's forwarded headers (ADR-0129,
+ *     {@link PublicUriDpopAuthenticationConverter}). Blank keeps Spring's stock request-derived
+ *     target
+ * @param refineryPath frontend path that renders the pre-filled refinery create form; the handoff
+ *     id is appended as {@code ?handoff=<id>} (REQ-INGEST-004)
+ * @param blueprintPath frontend path that renders the pre-filled personal-blueprint import preview;
+ *     the handoff id is appended as {@code ?handoff=<id>} (REQ-INGEST-004)
+ * @param handoffTtl lifetime of a staged handoff entry in Redis (REQ-INGEST-003). 30 minutes rather
+ *     than the original 5: staging happens the moment the user clicks Send, whereas opening the
+ *     pre-filled page is a <em>separate</em> manual click (plus a possible full browser login), so
+ *     a 5-minute window expired before pickup for slower users. The entry stays single-use and
+ *     per-subject scoped. Overridable via {@code APP_INGEST_HANDOFF_TTL}
+ * @param maxPayloadBytes hard upper bound on an accepted ingest payload, in bytes; mirrors the
+ *     frontend proxy's 2&nbsp;MB cap (REQ-INGEST-005)
+ * @param maxHandoffBytes hard upper bound on a single <em>staged</em> handoff document, in bytes.
+ *     Deliberately far below {@code maxPayloadBytes}: the staging store shares the Redis that holds
+ *     the frontend's Spring Session store under {@code --maxmemory-policy noeviction}, where
+ *     reaching the ceiling refuses writes, i.e. nobody can log in any more. Overridable via {@code
+ *     APP_INGEST_MAX_HANDOFF_BYTES}
+ * @param maxHandoffsPerSubject maximum number of live staged handoffs per subject; the oldest are
+ *     evicted beyond it, turning an unbounded per-subject footprint into {@code
+ *     maxHandoffsPerSubject × maxHandoffBytes}. Overridable via {@code
+ *     APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}
  */
-@Data
 @Validated
 @ConfigurationProperties(prefix = "app.ingest")
-public class IngestProperties {
+public record IngestProperties(
+    @NotBlank @URL String backendBaseUrl,
+    @NotBlank @URL String frontendBaseUrl,
+    @DefaultValue("") String publicBaseUrl,
+    @NotBlank @DefaultValue("/refinery-orders/create") String refineryPath,
+    @NotBlank @DefaultValue("/personal-inventory/blueprints") String blueprintPath,
+    @NotNull @DefaultValue("PT30M") Duration handoffTtl,
+    @Min(1024) @DefaultValue("2097152") long maxPayloadBytes,
+    @Min(1024) @DefaultValue("262144") long maxHandoffBytes,
+    @Min(1) @DefaultValue("10") int maxHandoffsPerSubject) {
 
   /**
-   * Internal base URL of the backend resource server the gateway forwards to (e.g. {@code
-   * https://backend:11261}). Reached over the internal Docker network only — the backend stays
-   * internet-unreachable (REQ-INGEST-001).
+   * Normalises an absent public origin to empty, the documented "not configured" value, so {@link
+   * PublicUriDpopAuthenticationConverter} can test it with {@code isBlank()} alone.
    */
-  @NotBlank @URL private String backendBaseUrl;
-
-  /**
-   * Public base URL of the frontend the browser is sent to after a successful ingest (e.g. {@code
-   * https://app.profit-base.online}); used to build the {@code frontendUrl} returned to the
-   * extractor.
-   */
-  @NotBlank @URL private String frontendBaseUrl;
-
-  /**
-   * The gateway's own externally reachable origin, e.g. {@code https://ingest.profit-base.online}.
-   *
-   * <p>Used only to build the DPoP {@code htu} comparison target, so the comparison does not depend
-   * on the reverse proxy's forwarded headers (ADR-0129, {@link
-   * PublicUriDpopAuthenticationConverter}). Scheme and host, plus the port only when it is not the
-   * scheme default — exactly the shape the extractor signs. Blank keeps Spring's stock
-   * request-derived target, so an unconfigured deployment behaves as before rather than half-way.
-   */
-  private String publicBaseUrl = "";
-
-  /**
-   * Frontend path that renders the pre-filled refinery create form; the handoff id is appended as
-   * {@code ?handoff=<id>} (REQ-INGEST-004).
-   */
-  @NotBlank private String refineryPath = "/refinery-orders/create";
-
-  /**
-   * Frontend path that renders the pre-filled personal-blueprint import preview; the handoff id is
-   * appended as {@code ?handoff=<id>} (REQ-INGEST-004).
-   */
-  @NotBlank private String blueprintPath = "/personal-inventory/blueprints";
-
-  /**
-   * Lifetime of a staged handoff entry in Redis (REQ-INGEST-003). Kept short by design, but 30
-   * minutes rather than the original 5: staging happens the moment the user clicks Send in the
-   * extractor, whereas opening the pre-filled basetool page is a <em>separate</em> manual click
-   * (plus a possible full browser login), so a 5-minute window could expire before pickup for a
-   * slower user and surfaced as "Import-Link abgelaufen oder ungültig" on every send. The entry
-   * stays single-use and per-subject scoped, so the longer window does not relax the replay / IDOR
-   * guarantees. Overridable via the {@code APP_INGEST_HANDOFF_TTL} environment variable.
-   */
-  @NotNull private Duration handoffTtl = Duration.ofMinutes(30);
-
-  /**
-   * Hard upper bound on an accepted ingest payload, in bytes. Mirrors the frontend proxy's
-   * 2&nbsp;MB cap — a real extract is a few KB; anything larger is rejected before forwarding
-   * (REQ-INGEST-005).
-   */
-  @Min(1024)
-  private long maxPayloadBytes = 2L * 1024 * 1024;
-
-  /**
-   * Hard upper bound on a single <em>staged</em> handoff document, in bytes.
-   *
-   * <p>Deliberately far below {@link #maxPayloadBytes}: that one is an ingress guard on what the
-   * gateway will forward, and reusing it as the staging budget was the mistake. A real draft is a
-   * few KB, while the 2&nbsp;MB ingress cap let one caller park up to 2&nbsp;MB per stage in the
-   * <em>shared</em> Redis - the same instance that holds the frontend's Spring Session store, run
-   * with {@code --maxmemory-policy noeviction}, where reaching the ceiling does not evict but
-   * refuses writes, i.e. nobody can log in any more. Overridable via {@code
-   * APP_INGEST_MAX_HANDOFF_BYTES}.
-   */
-  @Min(1024)
-  private long maxHandoffBytes = 256L * 1024;
-
-  /**
-   * Maximum number of live staged handoffs per subject; the oldest are evicted beyond it.
-   *
-   * <p>The rate limiter bounds requests per minute, not live entries: at 30 requests/minute against
-   * a 30-minute TTL a single caller could hold 900 of them at once. A member legitimately has one
-   * or two in flight - they stage a draft and open it - so a small cap costs nothing and turns an
-   * unbounded per-subject footprint into {@code maxHandoffsPerSubject × maxHandoffBytes}.
-   * Overridable via {@code APP_INGEST_MAX_HANDOFFS_PER_SUBJECT}.
-   */
-  @Min(1)
-  private int maxHandoffsPerSubject = 10;
+  public IngestProperties {
+    publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl;
+  }
 }

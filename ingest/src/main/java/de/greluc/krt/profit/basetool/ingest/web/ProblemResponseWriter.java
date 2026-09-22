@@ -19,21 +19,21 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Writes an RFC 7807 {@code application/problem+json} body directly to the servlet response. Used
- * by the pre-security filters (size cap, rate limit) which run before Spring MVC, so {@link
- * GlobalExceptionHandler} cannot serialize them. Keeps the same {@code code} + {@code
- * correlationId} extension shape as the controller-level problems.
+ * by the pre-security filters (size cap, rate limit) and the security-chain handlers, which run
+ * before Spring MVC, so {@link GlobalExceptionHandler} cannot serialize them. The body itself comes
+ * from {@link Problems#of}, the same builder the controller-level problems use, so both carry the
+ * identical {@code code} + {@code correlationId} extension shape.
  */
 public final class ProblemResponseWriter {
 
@@ -45,6 +45,7 @@ public final class ProblemResponseWriter {
    *
    * @param response the servlet response to write to
    * @param objectMapper the JSON serializer
+   * @param logging supplies the MDC key the correlation id is read from
    * @param status the HTTP status
    * @param title a short, stable title
    * @param code the stable machine-readable code
@@ -54,21 +55,17 @@ public final class ProblemResponseWriter {
   public static void write(
       @NotNull HttpServletResponse response,
       @NotNull ObjectMapper objectMapper,
+      @NotNull LoggingProperties logging,
       @NotNull HttpStatus status,
       @NotNull String title,
       @NotNull String code,
       @NotNull String detail)
       throws IOException {
-    ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-    problem.setTitle(title);
-    problem.setProperty("code", code);
-    String correlationId = MDC.get("correlationId");
-    if (correlationId != null) {
-      problem.setProperty("correlationId", correlationId);
-    }
     response.setStatus(status.value());
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    response.getWriter().write(objectMapper.writeValueAsString(problem));
+    response
+        .getWriter()
+        .write(objectMapper.writeValueAsString(Problems.of(logging, status, title, code, detail)));
   }
 }

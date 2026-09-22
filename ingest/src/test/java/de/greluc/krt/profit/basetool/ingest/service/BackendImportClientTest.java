@@ -26,7 +26,10 @@ import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractGoodDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractImageDto;
 import de.greluc.krt.profit.basetool.ingest.model.dto.RefineryExtractOrderDto;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
+import de.greluc.krt.profit.basetool.ingest.web.GlobalExceptionHandler;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import okhttp3.mockwebserver.MockResponse;
@@ -37,6 +40,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Verifies the backend relay calls the correct backend paths as the gateway itself — its own bearer
@@ -97,6 +102,69 @@ class BackendImportClientTest {
             List.of(image),
             List.of(good));
     return new RefineryExtractDto(1, "extractor", "1.0", "model", null, "de", List.of(order));
+  }
+
+  /**
+   * ING-SEC-02, end to end over real HTTP: the backend refuses the gateway's cached token with a
+   * {@code 401}; the relay surfaces that as a {@link WebClientResponseException} (never swallowed),
+   * the exception handler turns it into a {@code 502} and invalidates the cache, and the very next
+   * relay therefore carries a <em>freshly minted</em> token instead of replaying the refused one.
+   */
+  @Test
+  void aBackendAuthRefusalInvalidatesTheTokenSoTheNextRelayCarriesAFreshOne() throws Exception {
+    try (MockWebServer keycloak = new MockWebServer()) {
+      keycloak.enqueue(tokenAnswer("refused-token"));
+      keycloak.enqueue(tokenAnswer("fresh-token"));
+      keycloak.start();
+      ServiceAccountTokenProvider realProvider =
+          new ServiceAccountTokenProvider(
+              TestProperties.serviceAccount(
+                  "token-uri",
+                  keycloak.url("/token").toString(),
+                  "client-id",
+                  "basetool-ingest-gateway",
+                  "client-secret",
+                  "s3cret"),
+              WebClient.builder().build(),
+              new SimpleMeterRegistry());
+      BackendImportClient relay =
+          new BackendImportClient(
+              WebClient.builder().baseUrl(backend.url("/").toString()).build(),
+              realProvider,
+              CircuitBreakerRegistry.ofDefaults(),
+              TestLoggingProperties.defaults());
+      GlobalExceptionHandler handler =
+          new GlobalExceptionHandler(
+              JsonMapper.builder().build(),
+              new SimpleMeterRegistry(),
+              TestLoggingProperties.defaults(),
+              realProvider);
+      backend.enqueue(new MockResponse().setResponseCode(401));
+      backend.enqueue(
+          new MockResponse()
+              .setResponseCode(200)
+              .addHeader("Content-Type", "application/json")
+              .setBody("{\"goodsMatched\":1}"));
+
+      WebClientResponseException refused =
+          org.junit.jupiter.api.Assertions.assertThrows(
+              WebClientResponseException.class,
+              () -> relay.forwardRefineryExtract("user-1", null, sampleExtract()));
+      assertThat(handler.handleBackendResponse(refused).getStatus()).isEqualTo(502);
+      relay.forwardRefineryExtract("user-1", null, sampleExtract());
+
+      assertThat(backend.takeRequest().getHeader("Authorization"))
+          .isEqualTo("Bearer refused-token");
+      assertThat(backend.takeRequest().getHeader("Authorization")).isEqualTo("Bearer fresh-token");
+      assertThat(keycloak.getRequestCount()).isEqualTo(2);
+    }
+  }
+
+  private static MockResponse tokenAnswer(String accessToken) {
+    return new MockResponse()
+        .setResponseCode(200)
+        .setHeader("Content-Type", "application/json")
+        .setBody("{\"access_token\":\"" + accessToken + "\",\"expires_in\":300}");
   }
 
   @Test

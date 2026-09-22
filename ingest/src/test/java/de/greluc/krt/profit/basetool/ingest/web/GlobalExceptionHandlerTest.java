@@ -20,12 +20,18 @@
 package de.greluc.krt.profit.basetool.ingest.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
+import de.greluc.krt.profit.basetool.ingest.service.ServiceAccountTokenProvider;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -33,6 +39,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.MDC;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
@@ -55,8 +63,14 @@ class GlobalExceptionHandlerTest {
 
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
+  private final ServiceAccountTokenProvider tokenProvider = mock(ServiceAccountTokenProvider.class);
+
   private final GlobalExceptionHandler handler =
-      new GlobalExceptionHandler(JsonMapper.builder().build(), meterRegistry);
+      new GlobalExceptionHandler(
+          JsonMapper.builder().build(),
+          meterRegistry,
+          TestLoggingProperties.defaults(),
+          tokenProvider);
 
   private static WebClientResponseException backendError(
       int status, MediaType contentType, String body) {
@@ -93,6 +107,53 @@ class GlobalExceptionHandlerTest {
                 .counter()
                 .count())
         .isEqualTo(1.0d);
+  }
+
+  /**
+   * A backend {@code 401}/{@code 403} refuses the gateway's <em>own</em> service-account token, not
+   * the member's (ADR-0129). It must reach the extractor as the server-side relay failure it is — a
+   * 502 with {@code BACKEND_RELAY_FAILED}, never the backend's auth status, which would tell the
+   * member to sign in again — and it must drop the cached token so the next upload mints a fresh
+   * one (ING-SEC-02).
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {401, 403})
+  void backendAuthRefusal_becomesA502AndInvalidatesTheGatewayToken(int status) {
+    WebClientResponseException ex =
+        backendError(
+            status,
+            MediaType.APPLICATION_PROBLEM_JSON,
+            "{\"title\":\"Unauthorized\",\"detail\":\"Full authentication is required\"}");
+
+    List<ILoggingEvent> events =
+        LogCapture.capture(
+            GlobalExceptionHandler.class, Level.DEBUG, () -> handler.handleBackendResponse(ex));
+    ProblemDetail problem = handler.handleBackendResponse(ex);
+
+    assertThat(problem.getStatus()).isEqualTo(502);
+    assertThat(problem.getProperties()).containsEntry("code", "BACKEND_RELAY_FAILED");
+    assertThat(problem.getDetail())
+        .as("the backend's own auth wording is not relayed to the member")
+        .doesNotContain("authentication is required");
+    verify(tokenProvider, times(2)).invalidate();
+    assertThat(
+            meterRegistry
+                .get(MetricNames.INGEST_HANDOFF_ERRORS)
+                .tag(MetricNames.TAG_REASON, MetricNames.REASON_BACKEND_AUTH)
+                .counter()
+                .count())
+        .isEqualTo(2.0d);
+    assertThat(events)
+        .singleElement()
+        .satisfies(event -> assertThat(event.getLevel()).isEqualTo(Level.WARN));
+  }
+
+  /** Any other backend 4xx is the member's input and keeps its status; the token stays cached. */
+  @Test
+  void backendClientReject_keepsItsStatusAndLeavesTheTokenAlone() {
+    handler.handleBackendResponse(backendError(422, MediaType.APPLICATION_PROBLEM_JSON, "{}"));
+
+    verify(tokenProvider, never()).invalidate();
   }
 
   @Test

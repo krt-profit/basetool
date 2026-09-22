@@ -28,7 +28,7 @@ import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
 import de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind;
 import de.greluc.krt.profit.basetool.ingest.model.dto.StagedHandoff;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
-import java.time.Duration;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +39,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -52,8 +53,17 @@ class HandoffStagingServiceTest {
   static final GenericContainer<?> REDIS =
       new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
 
+  /**
+   * The Redis key schema the frontend's {@code IngestHandoffService} consumes, spelled out as a
+   * literal rather than borrowed from {@link HandoffStagingService#KEY_PREFIX}: the point of the
+   * consume helper below is to read what the <em>frontend</em> reads, so a rename on the gateway
+   * side alone fails here instead of silently orphaning every staged draft.
+   */
+  private static final String FRONTEND_KEY_PREFIX = "ingest:handoff:";
+
+  private final ObjectMapper objectMapper = JsonMapper.builder().build();
+  private StringRedisTemplate redisTemplate;
   private HandoffStagingService service;
-  private IngestProperties properties;
 
   @BeforeEach
   void setUp() {
@@ -61,11 +71,36 @@ class HandoffStagingServiceTest {
         new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
     connectionFactory.afterPropertiesSet();
     connectionFactory.start();
-    StringRedisTemplate redisTemplate = new StringRedisTemplate(connectionFactory);
+    redisTemplate = new StringRedisTemplate(connectionFactory);
     redisTemplate.afterPropertiesSet();
-    properties = new IngestProperties();
-    properties.setHandoffTtl(Duration.ofMinutes(5));
-    service = new HandoffStagingService(redisTemplate, JsonMapper.builder().build(), properties);
+    service = service(TestProperties.ingest("handoff-ttl", "PT5M"));
+  }
+
+  /**
+   * Builds the service over the shared Redis with the given configuration.
+   *
+   * @param properties the ingest configuration under test
+   * @return a staging service writing to the Testcontainers Redis
+   */
+  private HandoffStagingService service(IngestProperties properties) {
+    return new HandoffStagingService(redisTemplate, objectMapper, properties);
+  }
+
+  /**
+   * The single-use consume, as the frontend performs it: an atomic {@code GETDEL} on {@code
+   * ingest:handoff:<sub>:<id>}. It lived on the gateway's service although only these tests called
+   * it; it now lives here, reading the frontend's key schema (ING-PERF-02).
+   *
+   * @param sub the subject to consume under
+   * @param handoffId the handoff id
+   * @return the staged handoff, or empty when there is none for that subject
+   */
+  private Optional<StagedHandoff> consume(String sub, String handoffId) {
+    String value =
+        redisTemplate.opsForValue().getAndDelete(FRONTEND_KEY_PREFIX + sub + ":" + handoffId);
+    return value == null
+        ? Optional.empty()
+        : Optional.of(objectMapper.readValue(value, StagedHandoff.class));
   }
 
   @Test
@@ -74,8 +109,8 @@ class HandoffStagingServiceTest {
     String handoffId = service.stage("user-1", HandoffKind.REFINERY, "{\"goodsMatched\":2}");
 
     // When
-    Optional<StagedHandoff> first = service.consume("user-1", handoffId);
-    Optional<StagedHandoff> second = service.consume("user-1", handoffId);
+    Optional<StagedHandoff> first = consume("user-1", handoffId);
+    Optional<StagedHandoff> second = consume("user-1", handoffId);
 
     // Then
     assertThat(first).isPresent();
@@ -107,14 +142,14 @@ class HandoffStagingServiceTest {
     String handoffId = service.stage("owner", HandoffKind.BLUEPRINT, "{\"total\":1}");
 
     // When / Then
-    assertThat(service.consume("intruder", handoffId)).isEmpty();
+    assertThat(consume("intruder", handoffId)).isEmpty();
     // The rightful owner can still consume it (the foreign read did not delete it).
-    assertThat(service.consume("owner", handoffId)).isPresent();
+    assertThat(consume("owner", handoffId)).isPresent();
   }
 
   @Test
   void shouldReturnEmptyForUnknownId() {
-    assertThat(service.consume("user-1", "does-not-exist")).isEmpty();
+    assertThat(consume("user-1", "does-not-exist")).isEmpty();
   }
 
   /**
@@ -126,25 +161,41 @@ class HandoffStagingServiceTest {
    */
   @Test
   void shouldEvictTheOldestHandoffsBeyondThePerSubjectCap() {
-    properties.setMaxHandoffsPerSubject(3);
+    HandoffStagingService service = service(TestProperties.ingest("max-handoffs-per-subject", "3"));
 
     String first = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":1}");
     String second = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":2}");
     String third = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":3}");
     String fourth = service.stage("user-cap", HandoffKind.REFINERY, "{\"n\":4}");
 
-    assertThat(service.consume("user-cap", first))
+    assertThat(consume("user-cap", first))
         .describedAs("the oldest entry is evicted once the cap is exceeded")
         .isEmpty();
-    assertThat(service.consume("user-cap", second)).isPresent();
-    assertThat(service.consume("user-cap", third)).isPresent();
-    assertThat(service.consume("user-cap", fourth)).isPresent();
+    assertThat(consume("user-cap", second)).isPresent();
+    assertThat(consume("user-cap", third)).isPresent();
+    assertThat(consume("user-cap", fourth)).isPresent();
+  }
+
+  /**
+   * The eviction reads the index length from the RPUSH answer instead of a separate LLEN
+   * (ING-PERF-02); the index therefore has to hold exactly the cap after an overflow, never one
+   * more or one fewer.
+   */
+  @Test
+  void shouldKeepTheSubjectIndexAtExactlyTheCap() {
+    HandoffStagingService service = service(TestProperties.ingest("max-handoffs-per-subject", "2"));
+    for (int i = 0; i < 5; i++) {
+      service.stage("user-index", HandoffKind.REFINERY, "{\"n\":" + i + "}");
+    }
+
+    assertThat(redisTemplate.opsForList().size(HandoffStagingService.INDEX_PREFIX + "user-index"))
+        .isEqualTo(2L);
   }
 
   /** A draft above the staging budget is refused rather than parked in the shared Redis. */
   @Test
   void shouldRefuseADraftAboveTheStagingBudget() {
-    properties.setMaxHandoffBytes(1024);
+    HandoffStagingService service = service(TestProperties.ingest("max-handoff-bytes", "1024"));
     String oversized = "{\"pad\":\"" + "x".repeat(4096) + "\"}";
 
     assertThatThrownBy(() -> service.stage("user-big", HandoffKind.BLUEPRINT, oversized))
@@ -154,12 +205,12 @@ class HandoffStagingServiceTest {
   /** The cap is per subject, so one caller's flood cannot evict another caller's handoff. */
   @Test
   void shouldNotEvictAnotherSubjectsHandoff() {
-    properties.setMaxHandoffsPerSubject(2);
+    HandoffStagingService service = service(TestProperties.ingest("max-handoffs-per-subject", "2"));
     String mine = service.stage("user-a", HandoffKind.REFINERY, "{\"n\":1}");
     for (int i = 0; i < 5; i++) {
       service.stage("user-b", HandoffKind.REFINERY, "{\"n\":" + i + "}");
     }
 
-    assertThat(service.consume("user-a", mine)).isPresent();
+    assertThat(consume("user-a", mine)).isPresent();
   }
 }

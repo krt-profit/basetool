@@ -63,9 +63,8 @@ class ProvenanceGuardTest {
    * @return the guard under test
    */
   private ProvenanceGuard guard(List<String> allowedTools, boolean auditOnly) {
-    ClientIdentityProperties properties = new ClientIdentityProperties();
-    properties.setAllowedTools(allowedTools);
-    properties.setAuditOnly(auditOnly);
+    ClientIdentityProperties properties =
+        new ClientIdentityProperties(List.of(), "", allowedTools, auditOnly);
     return new ProvenanceGuard(properties, registry);
   }
 

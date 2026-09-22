@@ -161,7 +161,9 @@ public class IngestController {
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
         responseCode = "502",
-        description = "Backend relay failed.",
+        description =
+            "Backend relay failed: backend unreachable or 5xx, or the backend refused the"
+                + " gateway's own identity (a server-side fault, never the caller's login).",
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
         responseCode = "503",
@@ -253,7 +255,9 @@ public class IngestController {
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
         responseCode = "502",
-        description = "Backend relay failed.",
+        description =
+            "Backend relay failed: backend unreachable or 5xx, or the backend refused the"
+                + " gateway's own identity (a server-side fault, never the caller's login).",
         content = @Content(mediaType = PROBLEM_JSON)),
     @ApiResponse(
         responseCode = "503",

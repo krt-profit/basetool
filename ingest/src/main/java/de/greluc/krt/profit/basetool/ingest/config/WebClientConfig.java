@@ -94,9 +94,9 @@ public class WebClientConfig {
    */
   @Bean
   public WebClient backendWebClient() {
-    int maxInMemory = (int) Math.min(Integer.MAX_VALUE, ingestProperties.getMaxPayloadBytes());
+    int maxInMemory = (int) Math.min(Integer.MAX_VALUE, ingestProperties.maxPayloadBytes());
     return WebClient.builder()
-        .baseUrl(ingestProperties.getBackendBaseUrl())
+        .baseUrl(ingestProperties.backendBaseUrl())
         .clientConnector(new ReactorClientHttpConnector(buildHttpClient()))
         .observationRegistry(observationRegistry)
         .filter(webClientLoggingFilter.callLogging())

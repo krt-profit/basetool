@@ -28,6 +28,8 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.ssl.SslBundles;
@@ -75,21 +77,19 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
   /**
-   * Expected JWT {@code aud} values for the opt-in audience check. Empty by default → no audience
-   * enforcement (signature/issuer/expiry still apply). Set {@code
-   * app.security.jwt.expected-audiences=basetool-ingest} to require it — but only once the realm's
-   * {@code extractor-ingest-only} scope actually stamps that audience (see {@code
-   * docs/INGEST_KEYCLOAK_SETUP.md} step 7a).
+   * Reduces the configured {@code app.security.jwt.expected-audiences} to its non-blank entries —
+   * the list the audience validator enforces, and the one the gate-posture gauge reports on. An
+   * empty result means the audience check is off.
    *
-   * <p><strong>Deliberately NOT the backend's {@code basetool-backend}.</strong> Every {@code
-   * basetool-frontend} session token carries that audience, so checking it here would admit exactly
-   * the tokens this interface exists to refuse (ADR-0018 amendment 1, REQ-INGEST-011). The two
-   * modules checking different values is the point; it is not a copy-paste omission. Nor does the
-   * gateway inherit the backend's value by forwarding anything: since ADR-0129 the caller's token
-   * stops here and the backend is called with the gateway's own.
+   * @param configured the raw bound list, possibly {@code null} or holding blank entries
+   * @return the effective audiences, never {@code null}
    */
-  @Value("${app.security.jwt.expected-audiences:}")
-  private List<String> expectedAudiences;
+  public static @NotNull @Unmodifiable List<String> effectiveAudiences(
+      @Nullable List<String> configured) {
+    return configured == null
+        ? List.of()
+        : configured.stream().filter(StringUtils::hasText).map(String::trim).toList();
+  }
 
   /**
    * Custom resource-server {@link JwtDecoder}, created ONLY when at least one hardening knob is
@@ -105,8 +105,20 @@ public class SecurityConfig {
    * tokens, so split-horizon JWKS (public {@code iss}, internal key fetch) is transparent — and the
    * {@code aud} validator only when non-blank audiences are configured.
    *
+   * <p><strong>The audience is {@code basetool-ingest}, deliberately NOT the backend's {@code
+   * basetool-backend}.</strong> Every {@code basetool-frontend} session token carries {@code
+   * basetool-backend}, so checking it here would admit exactly the tokens this interface exists to
+   * refuse (ADR-0018 amendment 1, REQ-INGEST-011). Set it only once the realm's {@code
+   * extractor-ingest-only} scope actually stamps {@code basetool-ingest} (see {@code
+   * docs/INGEST_KEYCLOAK_SETUP.md} step 7a). The two modules checking different values is the
+   * point; it is not a copy-paste omission. Nor does the gateway inherit the backend's value by
+   * forwarding anything: since ADR-0129 the caller's token stops here and the backend is called
+   * with the gateway's own.
+   *
    * @param issuerUri the configured Keycloak issuer location (used for {@code iss} validation)
    * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer location
+   * @param expectedAudiences the configured {@code app.security.jwt.expected-audiences}; blank
+   *     entries are ignored and an empty list leaves the audience unchecked
    * @param sslBundles the registered SSL bundles, consulted for the {@code keycloak-trust} pin when
    *     an internal {@code jwkSetUri} is used
    * @return a Nimbus decoder wired for the configured hardening knobs
@@ -118,11 +130,12 @@ public class SecurityConfig {
   JwtDecoder resourceServerJwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri,
       @Value("${app.security.jwt.jwk-set-uri:}") String jwkSetUri,
+      @Value("${app.security.jwt.expected-audiences:}") List<String> expectedAudiences,
       SslBundles sslBundles) {
     NimbusJwtDecoder decoder = buildDecoder(issuerUri, jwkSetUri, sslBundles);
     List<OAuth2TokenValidator<Jwt>> validators = new ArrayList<>();
     validators.add(JwtValidators.createDefaultWithIssuer(issuerUri));
-    List<String> audiences = expectedAudiences.stream().filter(StringUtils::hasText).toList();
+    List<String> audiences = effectiveAudiences(expectedAudiences);
     if (!audiences.isEmpty()) {
       validators.add(audienceValidator(audiences));
     }
@@ -217,7 +230,7 @@ public class SecurityConfig {
     // session, and no other state-changing browser endpoint exists, so the CSRF machinery is inert
     // here while keeping the static-analysis posture clean.
     SecurityProblemResponseHandler securityProblems =
-        new SecurityProblemResponseHandler(objectMapper, meterRegistry);
+        new SecurityProblemResponseHandler(objectMapper, meterRegistry, loggingProperties);
     CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
     csrfRepo.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(true));
     http.csrf(
@@ -295,7 +308,7 @@ public class SecurityConfig {
                                 // test stays green.
                                 .authenticationConverter(
                                     new PublicUriDpopAuthenticationConverter(
-                                        ingestProperties.getPublicBaseUrl()))
+                                        ingestProperties.publicBaseUrl()))
                                 // The stock DPoPAuthenticationEntryPoint answers a bodyless 401
                                 // and bypasses SecurityProblemResponseHandler — so a rejected
                                 // proof would carry no problem body AND increment no
@@ -314,7 +327,7 @@ public class SecurityConfig {
         // before the bearer-token filter so its try/catch wraps that filter; a genuine 401 never
         // reaches it.
         .addFilterBefore(
-            new IdentityProviderUnavailableFilter(objectMapper, meterRegistry),
+            new IdentityProviderUnavailableFilter(objectMapper, meterRegistry, loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
         // REQ-OBS-001/-002: refine the `userId` MDC field from `anonymous` to the caller's JWT
@@ -341,7 +354,8 @@ public class SecurityConfig {
         // (REQ-OBS-002/-004). Every check inside is inert until configured, so this is a no-op on a
         // deployment that has not run the Keycloak setup yet.
         .addFilterAfter(
-            new ClientIdentityFilter(clientIdentityProperties, meterRegistry, objectMapper),
+            new ClientIdentityFilter(
+                clientIdentityProperties, meterRegistry, objectMapper, loggingProperties),
             UserIdMdcFilter.class)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     return http.build();

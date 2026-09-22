@@ -15,6 +15,10 @@ name: Repo Lint
 #   - probe-vs-allowlist -> the nightly edge probe and the vhost allow-list runbook
 #                   describe one surface from two sides; a refusal row for a path the
 #                   allow-list admits is a contradiction provable without production.
+#   - ingest-audience -> no ingest config, env template or runbook assigns the
+#                   backend's audience (basetool-backend) to the gateway, whose
+#                   value is basetool-ingest; the pairing would admit frontend
+#                   session tokens and still read as a passing audience check.
 #   - sbom-coverage -> every shipped Gradle module is wired for a CycloneDX
 #                   SBOM end to end: plugin, committed file, regenerated at
 #                   release time, attested and attached to the Release.
@@ -593,6 +597,26 @@ jobs:
       # files in this repository.
       - name: Check the edge probe against the vhost allow-list
         run: python3 .github/scripts/check_probe_against_allowlist.py
+
+  ingest-audience:
+    name: ingest-audience
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The gateway's audience is basetool-ingest; every frontend session token carries
+      # basetool-backend, so a gateway configured with the backend's value admits the very tokens
+      # its client gate exists to refuse -- and the check still passes, so nothing notices. It went
+      # wrong twice (a runbook on 2026-08-18, the ingest application.yml comment until 2026-09-22).
+      - name: Self-test the ingest audience checker
+        run: python3 scripts/check-ingest-audience.py --selftest
+
+      - name: Check no ingest config pairs expected-audiences with basetool-backend
+        run: python3 scripts/check-ingest-audience.py
 
   frontend-image-lint-exclusions:
     name: frontend-image-lint-exclusions

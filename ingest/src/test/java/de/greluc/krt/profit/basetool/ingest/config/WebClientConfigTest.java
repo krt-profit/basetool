@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.ingest.logging.WebClientLoggingFilter;
 import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import de.greluc.krt.profit.basetool.ingest.support.TestSslBundles;
 import io.micrometer.observation.ObservationRegistry;
 import java.security.KeyStore;
@@ -44,11 +45,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 class WebClientConfigTest {
 
   private static IngestProperties properties(String backendBaseUrl) {
-    IngestProperties properties = new IngestProperties();
-    properties.setBackendBaseUrl(backendBaseUrl);
-    properties.setFrontendBaseUrl("http://localhost:18081");
-    properties.setMaxPayloadBytes(1024L * 1024L);
-    return properties;
+    return TestProperties.ingest(
+        "backend-base-url", backendBaseUrl, "max-payload-bytes", String.valueOf(1024L * 1024L));
   }
 
   private static WebClientConfig config(String[] activeProfiles, SslBundles sslBundles) {

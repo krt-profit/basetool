@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.ingest.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -49,6 +51,7 @@ class ProblemResponseWriterTest {
     ProblemResponseWriter.write(
         response,
         objectMapper,
+        TestLoggingProperties.defaults(),
         HttpStatus.TOO_MANY_REQUESTS,
         "Rate limit exceeded",
         "RATE_LIMITED",
@@ -74,6 +77,30 @@ class ProblemResponseWriterTest {
     MDC.put("correlationId", "cid-42");
 
     assertThat(write().getContentAsString()).contains("\"correlationId\":\"cid-42\"");
+  }
+
+  /**
+   * The MDC key is read from {@code LoggingProperties}, not hard-coded (ING-SEC-03 / ING-SIMP-03):
+   * with a renamed key the id is still found, and the public member keeps its stable name.
+   */
+  @Test
+  void readsTheCorrelationIdUnderTheConfiguredMdcKey() throws Exception {
+    MDC.put("traceKey", "cid-77");
+    try {
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      ProblemResponseWriter.write(
+          response,
+          objectMapper,
+          new LoggingProperties("X-Correlation-Id", "traceKey", "userId", 2000L, 1500L, false),
+          HttpStatus.TOO_MANY_REQUESTS,
+          "Rate limit exceeded",
+          "RATE_LIMITED",
+          "Too many ingest requests. Please retry later.");
+
+      assertThat(response.getContentAsString()).contains("\"correlationId\":\"cid-77\"");
+    } finally {
+      MDC.remove("traceKey");
+    }
   }
 
   @Test
