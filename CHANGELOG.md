@@ -15,6 +15,13 @@
 
 ### Changed
 
+- **CI/Lieferkette: Signaturprüfung und Workflows gehärtet.** Die cosign-Signaturidentität in
+  `promote*.yml`, `release-images.yml` und `deploy.sh` ist jetzt verankert (`^…$`) – Refs wie
+  `main-x` oder `vfoo` gelten nicht mehr als vertrauenswürdig –, und signiert wird nur noch von
+  `main` oder einem Release-Tag auf `main`, von Jobs ohne eigenen Build. Dazu keine gespeicherten
+  Checkout-Credentials, Prüfsummen für CI-Werkzeuge, BuildKit per Digest, ein zizmor-Job und die
+  Gradle-Abhängigkeiten im Dependency Graph; der neue `deploy.sh` kommt über die Ansible-Rolle.
+
 - **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
   GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
   AspectJ im Backend auf (EPL-2.0 ohne GPL-Zusatz); es wurde nicht genutzt und ist entfernt.
