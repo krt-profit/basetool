@@ -4,6 +4,18 @@
 
 ### Fixed
 
+- **Betrieb: die Container-Ausgaben landen wieder in Loki.** Auf dem Podman-Host schrieben die
+  Container in Podmans eigenen Speicher statt ins Journal, und das Journal selbst lag nur im
+  Arbeitsspeicher — der Sammler las also einen Pfad, den es nicht gab. Dadurch fehlten sämtliche
+  Container-Ströme, darunter das Zugriffsprotokoll des Edge; die Gesamt-Sammelrate blieb trotzdem
+  grün, weil die Dateiströme allein sie erzeugen. Beide Hälften sind jetzt festgelegt statt
+  geerbt. Rein betriebsseitig.
+
+- **Betrieb: die Konformanzprüfung liest Container-Logs jetzt über den tatsächlichen Treiber.**
+  Sie nahm einen an, und auf dem Produktionshost war es der andere — die Prüfung des
+  Client-Adressen-Durchgriffs meldete daraufhin „die Anfrage hat diesen Edge nie erreicht" über
+  einen Edge, der jede Anfrage der Maschine bediente. Rein betriebsseitig.
+
 - **Betrieb: die Container erreichen den eigenen öffentlichen Namen wieder.** Auf einem
   Rootless-Host kommt ein Container über die öffentliche Adresse gar nicht an die eigene Maschine
   heran. Die Rolle konnte dafür bisher genau einen Namen umbiegen und tat es für die Produktion

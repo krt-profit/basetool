@@ -252,7 +252,14 @@ case "$cmd" in
     # available, never a requirement, and the harness must exercise the path that does without it.
     echo ""
     ;;
-  *"docker logs edge"*"--since 60m"*|*"journalctl CONTAINER_NAME=edge"*"60 min ago"*)
+  *"inspect edge --format"*"LogConfig.Type"*)
+    # The check ASKS which log driver the container has rather than assuming one. Both
+    # answers are real: the testing host resolved journald (2026-09-18), production
+    # resolved k8s-file (2026-09-22) and returned nothing at all to the journalctl
+    # form for the whole life of the host. STUB_LOG_DRIVER drives both paths.
+    echo "${STUB_LOG_DRIVER:-journald}"
+    ;;
+  *"docker logs edge"*"--since 60m"*|*"podman logs edge"*"--since 60m"*|*"journalctl CONTAINER_NAME=edge"*"60 min ago"*)
     # Access-log LINES now, not a pre-counted number: the check counts distinct addresses itself,
     # in python, so that a first field which is not an address cannot be counted as a client.
     case "$scenario" in
@@ -271,7 +278,7 @@ case "$cmd" in
         ;;
     esac
     ;;
-  *"docker logs edge"*|*"journalctl CONTAINER_NAME=edge"*)
+  *"docker logs edge"*|*"podman logs edge"*|*"journalctl CONTAINER_NAME=edge"*)
     case "$scenario" in
       no-log-line)  printf '' ;;
       private-addr) echo "172.28.15.1 - - [16/Sep/2026:13:00:00 +0000] \"GET /healthz HTTP/1.1\" 200" ;;
@@ -716,6 +723,15 @@ STUB_SCENARIO=single-bucket assert_status \
 # nothing and the read has to go to journalctl. Measured on the testing host 2026-09-18.
 STUB_RUNTIME=podman STUB_SCENARIO=private-addr assert_status \
   "client-address-visible reads the log under podman too" \
+  client-address-visible fail "private/bridge address" \
+  -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
+# ...and under the OTHER podman log driver, which is the one that was assumed away. A
+# host on `k8s-file` returns nothing to `journalctl CONTAINER_NAME=`, ever -- so the
+# check read an empty log and reported "the request did not reach this edge" about an
+# edge serving every request on the machine. Measured on production 2026-09-22. The
+# verdict has to come from the log's CONTENT here, exactly as it does under journald.
+STUB_RUNTIME=podman STUB_LOG_DRIVER=k8s-file STUB_SCENARIO=private-addr assert_status \
+  "client-address-visible reads the log under podman k8s-file too" \
   client-address-visible fail "private/bridge address" \
   -- "${STUB_ARGS[@]}" "${ALL_LOCAL[@]}"
 STUB_SCENARIO=no-log-line assert_status \

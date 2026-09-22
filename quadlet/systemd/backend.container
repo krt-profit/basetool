@@ -7,6 +7,7 @@ StartLimitIntervalSec=0
 [Container]
 Image=ghcr.io/krt-profit/basetool-backend:stable
 ContainerName=backend
+LogDriver=journald
 ReadOnly=true
 DropCapability=ALL
 NoNewPrivileges=true
