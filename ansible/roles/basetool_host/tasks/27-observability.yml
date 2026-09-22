@@ -176,6 +176,32 @@
       ARGS="{{ basetool_host_node_exporter_flags | join(' ') }}"
   notify: Restart node_exporter
 
+- name: Make room for the node_exporter drop-ins
+  ansible.builtin.file:
+    path: /etc/systemd/system/prometheus-node-exporter.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Give node_exporter the memory ceiling it had as a container
+  # Same pairing and the same reason as alloy's below; values in defaults/main.yml. node_exporter is
+  # the one process every host-level alert and the textfile collectors depend on, so an unbounded
+  # leak in it is the failure most worth capping -- and ContainerMemoryHigh now warns before it.
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus-node-exporter.service.d/20-resources.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      [Service]
+      MemoryMax={{ basetool_host_node_exporter_memory_max }}
+      Environment=GOMEMLIMIT={{ basetool_host_node_exporter_gomemlimit }}
+  notify:
+    - Reload systemd for the observability units
+    - Restart node_exporter
+
 - name: Enable node_exporter
   ansible.builtin.systemd_service:
     name: prometheus-node-exporter.service
@@ -299,6 +325,26 @@
     owner: root
     group: root
     mode: "0644"
+  notify:
+    - Reload systemd for the observability units
+    - Restart alloy
+
+- name: Give alloy the memory ceiling it had as a container
+  # MemoryMax is the hard cgroup ceiling; GOMEMLIMIT is the Go runtime's soft target below it, which
+  # makes the collector reclaim and return memory BEFORE the kernel has to kill anything. The two go
+  # together or not at all: a MemoryMax without GOMEMLIMIT lets the heap grow to the ceiling and get
+  # OOM-killed, a GOMEMLIMIT without MemoryMax bounds nothing the kernel enforces. Values and the
+  # measurement behind them: defaults/main.yml.
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/alloy.service.d/20-resources.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by the basetool_host Ansible role. Do not edit by hand.
+      [Service]
+      MemoryMax={{ basetool_host_alloy_memory_max }}
+      Environment=GOMEMLIMIT={{ basetool_host_alloy_gomemlimit }}
   notify:
     - Reload systemd for the observability units
     - Restart alloy
@@ -485,7 +531,10 @@
   # the families scripts/cgroup-container-metrics.py cannot produce --
   # podman_container_started_seconds (for container_start_time_seconds) and the
   # podman_container_net_* family (for container_network_*). container_memory_mapped_file has no
-  # equivalent here either and stays retired; saying "all three come back" would be wrong.
+  # equivalent HERE -- it comes back from the cgroup collector instead, as
+  # basetool_container_memory_mapped_file_bytes (memory.stat file_mapped), which the
+  # basetool:container:memory_mapped_file_bytes recording rule reads. (Corrected 2026-09-22: this
+  # comment used to say the series stayed retired.)
   #
   # It also covers what node_exporter's systemd collector cannot see: podman_container_health and
   # podman_container_state for the eight application units.

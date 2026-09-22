@@ -172,9 +172,10 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
 
   /**
    * Deletes every promotion grade of the given member as part of the hard account deletion
-   * (REQ-DATA-008). {@code member_evaluation.user_id} is a plain {@code VARCHAR} holding the JWT
-   * sub with no foreign key to {@code app_user}, so nothing cascades and the grades — an assessment
-   * of a named person — would otherwise outlive the account indefinitely.
+   * (REQ-DATA-008). Since V235 {@code member_evaluation.user_id} carries a foreign key to {@code
+   * app_user} with {@code ON DELETE CASCADE}, so the database would remove the grades too; the
+   * explicit delete stays so the purge is counted and audited inside the deletion transaction, and
+   * so the grades — an assessment of a named person — never depend on the cascade alone.
    *
    * <p>Set-based and without {@code clearAutomatically}, because it runs inside the user-deletion
    * transaction where evicting the persistence context would detach the {@code User} being deleted.

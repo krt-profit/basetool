@@ -97,9 +97,11 @@ public class DataInitializer {
    * Seeds the canonical IRIDIUM squadron with the fixed {@link Squadron#IRIDIUM_ID} UUID so that
    * Flyway backfills, application-level lookups and tests refer to a deterministic id
    * (MULTI_SQUADRON_PLAN.md section 3). Idempotent — no-op when a row already exists at the
-   * canonical id. Flyway migration V80 seeds the same row at boot in {@code dev}/{@code prod}; this
-   * fallback only matters in the test profile (Flyway disabled, Hibernate {@code ddl-auto}
-   * generates the schema) where V80 never runs and DataInitializer is the only seeder.
+   * canonical id. Flyway migration V80 seeds the same row at boot in every profile — the {@code
+   * test} profile included, which runs Flyway against PostgreSQL with {@code ddl-auto: validate}
+   * (application-test.yml) — so on a migrated schema this is a defensive no-op. It only inserts
+   * when the canonical row is absent and no {@code IRI} row exists either, i.e. on a schema whose
+   * squadron rows were removed after migration.
    */
   private void seedIridiumIfMissing() {
     if (squadronRepository.existsById(Squadron.IRIDIUM_ID)) {
@@ -107,8 +109,8 @@ public class DataInitializer {
     }
     if (squadronRepository.findByShorthand("IRI").isPresent()) {
       // Pre-V80 install: a row with shorthand "IRI" exists at a non-canonical UUID. We do not
-      // rewrite it here — V80 covers that case in dev/prod. In the test profile we simply skip
-      // to keep the seeder side-effect-free.
+      // rewrite it here — V80 covers that case in every profile. We simply skip to keep the
+      // seeder side-effect-free.
       return;
     }
     Squadron iridium = new Squadron();

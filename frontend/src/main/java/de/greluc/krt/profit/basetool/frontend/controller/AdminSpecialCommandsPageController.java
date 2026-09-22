@@ -540,14 +540,14 @@ public class AdminSpecialCommandsPageController {
   }
 
   /**
-   * Evicts {@code STATIC_DATA_CACHE} after an SK <b>lifecycle</b> change (create / update /
-   * soft-delete / re-activate / profit-eligible flip). The SK name, shorthand, active flag and
-   * {@code isProfitEligible} feed the cached org-units owner-pickers ({@code GET
-   * /api/v1/org-units/active…}) and the admin switcher's SK catalogue that {@code
-   * OrgUnitContextAdvice} reads, so every catalogue-changing mutation must drop the shared cache or
-   * those surfaces stay stale up to the 10-minute TTL. This is the eviction that REQ-DATA-007 gates
-   * SK-catalogue cacheability on. Member-roster mutations (add / remove / flags / lead) do not
-   * touch the catalogue fields, so they deliberately do not evict.
+   * Evicts the {@link CacheDomain#SQUADRON} and {@link CacheDomain#ORG_UNIT} caches after an SK
+   * <b>lifecycle</b> change (create / update / soft-delete / re-activate / profit-eligible flip).
+   * The SK name, shorthand, active flag and {@code isProfitEligible} feed the cached org-units
+   * owner-pickers ({@code GET /api/v1/org-units/active…}) and the admin switcher's SK catalogue
+   * that {@code OrgUnitContextAdvice} reads, so every catalogue-changing mutation must drop both
+   * caches or those surfaces stay stale up to their 2-hour backstop TTL. This is the eviction that
+   * REQ-DATA-007 gates SK-catalogue cacheability on. Member-roster mutations (add / remove / flags
+   * / lead) do not touch the catalogue fields, so they deliberately do not evict.
    */
   private void evictOrgUnitCatalogueCache() {
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);

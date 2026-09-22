@@ -5,7 +5,7 @@
 > payout chain), [ADR-0135](0135-public-api-vhost-not-a-gateway.md),
 > [ADR-0136](0136-external-contract-set-for-shipped-clients.md),
 > `MissionController#joinMission`, `JoinMissionRequest`,
-> [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md)
+> [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
 
 ## Renumbered from ADR-0154 — 2026-09-13
 

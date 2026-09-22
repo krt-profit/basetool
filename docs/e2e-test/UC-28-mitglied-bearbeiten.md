@@ -26,9 +26,15 @@ Der Admin öffnet die Editseite des Mitglieds und speichert einen geänderten Ra
 2. Rang im Select `select[name="rank"]` auf einen Zielwert setzen.
 3. **Speichern:** `#member-edit-form`-Submit → `POST /members/{id}/edit` mit `X-Requested-With` (`krtFetch`) → Backend `PUT /api/v1/users/{id}/attributes`. Kein Reload.
 
+### Zweite Staffel hinzufügen (clientseitig)
+
+4. Als Zielmitglied dient `test-member`, der ohne Staffel-Mitgliedschaft geseedet ist: der Button „Zweite Staffel hinzufügen" ist sichtbar, Slot 2 versteckt. Klick auf den Button.
+
 ## Erwartetes Ergebnis
 
 Der Save landet: kein Fehler-Toast, kein Optimistic-Lock-Reload-Dialog (`.krt-confirm-overlay`), der Marker `window.__krtNoReload` überlebt, und der per Backend gelesene Rang (`GET /api/v1/users/{id}`) entspricht dem gesetzten Wert.
+
+Nach dem Klick auf „Zweite Staffel hinzufügen" ist der zweite Staffel-Slot tatsächlich sichtbar (REQ-ORG-017). Das ist ein reiner Client-Toggle ohne Schreibzugriff. Regressionsschutz für die Falle Klasse vs. Inline-Stil (ADR-0093): Slot 2 startet über die Klasse `krtm-hidden` verborgen; ein früherer Versuch, das per Inline-`style.display` zu überschreiben, ließ den Button verschwinden, während der Slot versteckt blieb.
 
 ## Sonderfälle & Lehren
 

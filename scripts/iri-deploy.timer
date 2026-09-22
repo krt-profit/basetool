@@ -4,7 +4,11 @@
 ; `:stable` match the last successfully deployed pair, it exits 0 without
 ; restarting anything. So in steady state the timer costs one HEAD request
 ; against GHCR per tick. Only when promote.yml has flipped `:stable` to a new
-; digest does an actual `docker compose up -d --wait` happen.
+; digest does an actual apply happen (the changed services' Quadlet units are
+; restarted and waited on until healthy -- scripts/lib/container-runtime.sh).
+;
+; Installed and enabled (not started) by the Ansible role
+; (ansible/roles/basetool_host/tasks/25-scripts.yml); see iri-deploy.service.
 ;
 ; If you prefer a maintenance-window-only roll-out instead of continuous
 ; polling, replace the `OnUnitActiveSec` line with one or more `OnCalendar`
@@ -19,7 +23,7 @@ Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.m
 Requires=iri-deploy.service
 
 [Timer]
-; First run 5 minutes after boot — gives Docker + the network stack time to
+; First run 5 minutes after boot — gives the container units + the network stack time to
 ; settle before we hit GHCR.
 OnBootSec=5min
 

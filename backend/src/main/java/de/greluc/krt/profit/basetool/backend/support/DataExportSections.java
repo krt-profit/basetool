@@ -418,10 +418,12 @@ public final class DataExportSections {
    *
    * <p>Most of these carry free text the <em>member</em> wrote — a note, a remark, a description.
    * That is their own data and belongs in the export, and it may name somebody else mid-sentence
-   * where no {@code SELECT} list can reach. Five are listed for the mirror-image reason: the text
-   * names a thing rather than being prose, and somebody may have named that thing after a person.
-   * Each of those is registered as a person-name surface in {@link PersonSearchTargets}, which is
-   * the registry that settles the question.
+   * where no {@code SELECT} list can reach. Six database columns are listed for the mirror-image
+   * reason: the text names a thing rather than being prose, and somebody may have named that thing
+   * after a person — {@code ship.name}, {@code personal_inventory_item.name}, {@code mission.name}
+   * (selected by three sections), {@code bank_account.name}, and {@code org_chart_position.name}
+   * and {@code display_name}. Each of those is registered as a person-name surface in {@link
+   * PersonSearchTargets}, which is the registry that settles the question.
    *
    * <p><b>This list cannot be the answer for every column.</b> It only reaches handles the scrubber
    * knows, which is registered members in all three of their spellings — never an external contact

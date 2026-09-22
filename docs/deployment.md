@@ -1,724 +1,389 @@
 # Profit Basetool — Deployment Runbook
 
+> **Doc type:** Operator runbook — living, kept in sync with `main`. Last reviewed: 2026-09-22.
+>
+> **Written for the post-cutover host.** Since 2026-09-22 production is `rocky-16gb-nbg1-1`: Rocky
+> Linux 10, rootless Podman, every container a Quadlet-generated systemd user unit of the service
+> account `iri`. The retired root-Docker-Compose host and its procedures (apt bootstrap, `docker
+> compose` restarts, Nginx Proxy Manager, the Docker-bridge admin tunnel) are recorded in
+> [`docs/archive/`](archive/README.md) — above all
+> [`PODMAN_CUTOVER_RUNBOOK.md`](archive/PODMAN_CUTOVER_RUNBOOK.md) — and nowhere here.
+
+Binding requirements behind this runbook: [`specs/deployment-delivery.md`](specs/deployment-delivery.md)
+(`REQ-OPS-*`). The architecture view is [arc42 §7](arc42/07-deployment-view.md). Backups and
+disaster recovery: [`backup.md`](backup.md). The monitoring plane:
+[`monitoring/README.md`](../monitoring/README.md). Host provisioning:
+[`ansible/README.md`](../ansible/README.md). Decisions:
+[ADR-0049](adr/0049-config-as-promotable-oci-artifact.md) (config bundle),
+[ADR-0055](adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md) (provider JAR),
+[ADR-0075](adr/0075-host-side-cosign-signature-verification.md) (host cosign gate),
+[ADR-0162](adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (edge),
+[ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman),
+[ADR-0187](adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md) (PROXY-protocol front end),
+[ADR-0188](adr/0188-the-host-bootstrap-is-an-ansible-role.md) (Ansible bootstrap),
+[ADR-0189](adr/0189-stateful-containers-run-as-their-own-uid.md) /
+[ADR-0190](adr/0190-every-container-but-keycloak-runs-read-only.md) (container posture),
+[ADR-0194](adr/0194-the-weekly-cleanup-is-runtime-aware-and-drops-volume-pruning-on-podman.md) (cleanup),
+[ADR-0196](adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md) (host aliases).
+
+> [!danger] For AI agents: reading the production host is free, writing to it is gated
+> Every command below that changes the host — a restart, a file edit, a role run, a deploy — is a
+> **write** under the production-host access rule in the repository `CLAUDE.md`, and needs an
+> explicit per-action yes from @greluc first. A recipe in this file is documentation, never approval.
+
+---
+
 ## Overview
 
-Production deployment runs as a closed loop between three actors:
-
 ```
-┌──────────────────────────────┐       ┌────────────────────────────┐
-│  GitHub Actions              │       │  GitHub Container Registry │
-│                              │       │                            │
-│  .github/workflows/          │  push │  ghcr.io/krt-profit/          │
-│    release-images.yml ───────┼──────►│    basetool-backend:1.4.2  │
-│      plan   (build or reuse) │       │    basetool-frontend:1.4.2 │
-│      build  + push           │       │    basetool-ingest:1.4.2   │
-│      scan   (Trivy SARIF)    │       │    basetool-config:1.4.2   │
-│      sign   (cosign keyless) │       │      ... :latest, :edge,   │
-│                              │       │      :sha-abc1234, :stable │
-│                              │       │                            │
-│  .github/workflows/          │       │                            │
-│    promote.yml      ─────────┼──────►│    (re-tags app images +   │
-│      manual dispatch         │       │     config to :stable)     │
-└──────────────────────────────┘       └────────────────────┬───────┘
-                                                            │
-                                                            │ docker pull
-                                                            │
-                                       ┌────────────────────▼───────┐
-                                       │  Production host           │
-                                       │                            │
-                                       │  /var/iri/code/            │
-                                       │    docker-compose.yml      │
-                                       │    .env                    │
-                                       │    scripts/deploy.sh ──┐   │
-                                       │                        │   │
-                                       │  /var/iri/secrets/     │   │
-                                       │    keystore.p12        │   │
-                                       │                        │   │
-                                       │  /etc/iri/             │   │
-                                       │    ghcr-pull-token     │   │
-                                       │                        │   │
-                                       │  /var/lib/iri/         │   │
-                                       │    current-digest-pin.yml  │
-                                       │    previous-digest-pin.yml │
-                                       │    last-deployed.digests   │
-                                       │                            │
-                                       │  systemd: iri-deploy.timer │
-                                       │    OnUnitActiveSec=5min    │
-                                       └────────────────────────────┘
+┌──────────────────────────────┐        ┌─────────────────────────────┐
+│ GitHub Actions               │  push  │ GHCR  ghcr.io/krt-profit/   │
+│  release-images.yml          ├───────►│  basetool-backend           │
+│   build · scan · sign        │        │  basetool-frontend          │
+│  promote.yml (approved)      ├───────►│  basetool-ingest            │
+│   re-tag digest → :stable    │        │  basetool-config            │
+└──────────────────────────────┘        │  basetool-keycloak-spi      │
+                                        └──────────────┬──────────────┘
+                                                       │ pull (read-only token)
+┌──────────────────────────────────────────────────────▼──────────────┐
+│ Production host  rocky-16gb-nbg1-1  (Rocky 10, SELinux enforcing)   │
+│                                                                     │
+│  iri-deploy.timer (5 min) → deploy.sh  as user `deploy`             │
+│     resolve :stable → digests · cosign verify · stage config bundle │
+│     install units → /etc/containers/systemd/users/<iri-uid>/        │
+│     render env.d  → /var/iri/code/env.d/<svc>.env                   │
+│     pin digests   → <svc>.container.d/10-digest-pin.conf            │
+│     systemctl --user (as iri) start/restart → wait for healthy      │
+│                                                                     │
+│  :80/:443 haproxy (host) ──PROXY v2──► edge 127.0.0.1:8080/8443     │
+│  18 containers + 18 networks + 3 volumes, all systemd user units    │
+│  of `iri`; alloy, node_exporter, podman-exporter on the host        │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**What gets pushed to GHCR carries no secrets.** The keystore, `.env`,
-`realm-export.json`, and the keycloak theme directory all live on the host
-filesystem and are bind-mounted into the containers at runtime. The
-`.dockerignore` at the repo root is a belt-and-suspenders guard against ever
-including them in a build context.
-
-**The host pulls; nothing pushes to the host from GitHub.** The deploy timer
-holds a read-only GHCR token. There is no inbound SSH **for the deploy**, no webhook, no
-GitHub-issued credential capable of running shell commands on the box.
-
-**Tag promotion is deliberate.** `release-images.yml` publishes versioned
-tags (`:1.4.2`, `:latest`, `:edge`, `:sha-abc1234`) on every main push and
-git tag. None of those flips the `:stable` pointer that the server polls.
-That happens only when an operator runs the `promote.yml` workflow with an
-explicit version.
-
-**Host config travels the same channel as the images.** The compose file and
-its bind-mounted asset trees (the NPM maintenance page under `docker/maintenance/`,
-the Keycloak login theme under `keycloak-theme/`) are packaged as the
-`basetool-config` OCI image (`docker/config/Dockerfile`, a `FROM scratch` bundle),
-signed, and promoted to `:stable` **in lock-step** with the app images. So a
-promoted compose change — e.g. a bumped redis/npm image pin — reaches the host
-and is applied automatically, with no manual `cp docker-compose.yml` and no
-hand-run `docker compose up -d`. The one carve-out is a **postgres/Keycloak**
-image change, which stays operator-gated (see *Stateful-infra upgrades* below).
-`deploy.sh` and the systemd units are **not** in the bundle (self-update hazard)
-— they remain the manual bootstrap concern below. Full rationale: [ADR-0049](adr/0049-config-as-promotable-oci-artifact.md),
-binding requirements: [REQ-OPS-*](specs/deployment-delivery.md).
+- **Pull, never push, for delivery (REQ-OPS-001).** The host holds one read-only GHCR token. There
+  is no webhook and no GitHub-issued credential that can run anything on the box. The operator's
+  key-only SSH is the administrative entrance, not a delivery path.
+- **Promotion is deliberate (REQ-OPS-002).** A `main` merge or a release publishes images; nothing
+  moves `:stable` except an approved `promote.yml` run. `:stable` is the only tag production reads.
+- **Configuration rides the image channel (REQ-OPS-004, ADR-0049).** The signed `basetool-config`
+  bundle (`docker/config/Dockerfile`, `FROM scratch`) carries `docker-compose.yml`,
+  `docker-compose.monitoring.yml`, `docker/maintenance`, `docker/edge`, `docker/acme`,
+  `keycloak-theme`, `monitoring` and **`quadlet/`** — the unit files and their `env.d` templates.
+  It is promoted in lock-step with the app images and the `basetool-keycloak-spi` JAR bundle
+  (ADR-0055), so a promoted unit change reaches the host by the next tick.
+- **Provisioning is separate from delivery (ADR-0188).** Packages, users, directories, SELinux,
+  firewall, haproxy, the host monitoring services and the operational scripts and timers come from
+  the Ansible role in [`ansible/`](../ansible/README.md), run by an operator. It never deploys a
+  release.
+- **Secrets never travel.** `.env`, the keystore, the realm export, the Redis ACL and the monitoring
+  secrets exist only on the host (REQ-OPS-005); the bundle is asserted secret-free in CI and again
+  by `deploy.sh` before it is applied.
 
 ---
 
-## Initial server bootstrap (one-time)
+## The host
 
-The current "copy the whole `basetool` folder to the server" workflow becomes
-a small, deliberate set of files that live on the host. After bootstrap, no
-further file sync between developer machines and the server is needed —
-updates arrive only as GHCR image pulls.
+### Accounts and what runs where
 
-### 1. System packages
+| Who | What it is | What it owns |
+|---|---|---|
+| `root` | the operator's SSH login | haproxy, alloy, node_exporter, fail2ban, firewalld, the `iri-*` system units |
+| `deploy` | system account, `/sbin/nologin`, home `/var/lib/iri` | runs `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`; owns `/var/lib/iri`, `/etc/iri`, `/var/iri/code`, the unit directory |
+| `iri` | the rootless service user (lingering, subuid base 100000) | the container store and all 39 Quadlet units; the podman-exporter user unit |
 
-```bash
-sudo apt update
-sudo apt install --no-install-recommends \
-    docker.io docker-compose-v2 \
-    logrotate \
-    acl \
-    curl ca-certificates
-```
+`deploy` reaches `iri`'s containers only through `/etc/sudoers.d/basetool-deploy`: `podman *` and
+`systemctl --user *` as `iri`, plus `systemctl restart alloy.service` as root, nothing else
+(`ansible/roles/basetool_host/tasks/22-deploy-user.yml`). That is strictly narrower than the
+`docker` group of the retired host, which was root-equivalent.
 
-`acl` provides `setfacl`, used below to grant the keystore to two container uids
-without making it world-readable.
+**Container uids are translated.** Container uid *N* is host uid `100000 + N − 1`: 10001 → 110000
+(backend, frontend, ingest, loki, tempo), 1000 → 100999 (keycloak), 999 → 100998 (redis),
+70 → 100069 (postgres), 101 → 100100 (edge), 472 → 100471 (grafana), 65534 → 165533 (prometheus,
+alertmanager, exporters). Derive, never transcribe:
+`B=$(grep '^iri:' /etc/subuid | cut -d: -f2); echo $((B + 10001 - 1))`.
 
-Docker Engine ≥ 23.x is required for `docker compose up --wait`.
+**The timers** (all system units, installed by the role; logs in `/var/log/iri-*.log`, in Loki as
+`{app="ops-*"}`):
 
-> **On Debian the package names differ, and one of them is a trap.** Verified on Debian 13
-> (trixie) while bootstrapping the testing host:
->
-> |               |         Ubuntu         |                                   Debian 13                                   |
-> |---------------|------------------------|-------------------------------------------------------------------------------|
-> | Compose v2    | `docker-compose-v2`    | **`docker-compose`** (2.26.1 — the same Go binary, installed as a CLI plugin) |
-> | Docker client | comes with `docker.io` | **`docker-cli`, a separate package**                                          |
->
-> The second one bites: `docker-cli` is only a *Recommends* of `docker.io`, so the
-> `--no-install-recommends` above silently leaves it out. `docker.io` reports as installed,
-> `docker.service` starts — and `docker` is not on `$PATH`. Add `docker-cli` explicitly.
+| Timer | When | Runs |
+|---|---|---|
+| `iri-deploy.timer` | 5 min after boot, then every 5 min | `deploy.sh` as `deploy` |
+| `iri-backup.timer` | daily 04:15 | `backup.sh` — see [`backup.md`](backup.md) |
+| `iri-restore-drill.timer` | Sun 05:30 | `restore-drill.sh` — see [`backup.md`](backup.md) |
+| `iri-container-cleanup.timer` | Sat 02:00 UTC | `container-cleanup.sh` — see [Weekly cleanup](#weekly-container-cleanup) |
+| `iri-cert-expiry.timer` | daily 03:40 | `cert-expiry-metrics.py` as root |
+| `iri-container-metrics.timer` | every 30 s | `cgroup-container-metrics.py` as root |
 
-**buildx must be ≥ 0.14.** `deploy.sh` resolves every tag to a digest with
-`docker buildx imagetools inspect --format '{{.Manifest.Digest}}'`. Older buildx — including the
-**0.13.1 that Debian 13 ships** — ignores `--format` and prints the full human-readable manifest
-instead. `deploy.sh` then appends that entire blob after `image@`, and the failure surfaces as
+**Management access** is key-only SSH as `root`; `cloud-init/hetzner-rocky10.yaml` also creates a
+key-only `sysadm`. There is **no VPN**: a read-only check on 2026-09-22 found no WireGuard interface
+and no `/etc/wireguard` on the production host. fail2ban guards SSH; firewalld is default-deny and
+opens SSH, 80 and 443 only; the provider's cloud firewall sits in front of it, deliberately
+([`PODMAN_HOST_BOOTSTRAP.md` §10](archive/PODMAN_HOST_BOOTSTRAP.md)).
 
-```
-FATAL: … SIGNATURE VERIFICATION FAILED for one or more artifacts
-```
+### Shell conventions used below
 
-which points at cosign and the registry when nothing is wrong with either. Check with
-`docker buildx version`; if it is below 0.14, install a current binary as a CLI plugin — it takes
-precedence over the distribution package without removing it:
-
-```bash
-BX=v0.36.1
-arch=$(dpkg --print-architecture)
-cd /tmp
-curl -fsSLo "buildx-${BX}.linux-${arch}" "https://github.com/docker/buildx/releases/download/${BX}/buildx-${BX}.linux-${arch}"
-curl -fsSLo buildx-checksums.txt "https://github.com/docker/buildx/releases/download/${BX}/checksums.txt"
-# Note the `*` — the checksum file uses binary-mode notation, so a `grep " buildx-…"` finds nothing.
-grep " \*buildx-${BX}.linux-${arch}\$" buildx-checksums.txt | sha256sum -c -
-sudo install -d /usr/local/lib/docker/cli-plugins
-sudo install -m 0755 "buildx-${BX}.linux-${arch}" /usr/local/lib/docker/cli-plugins/docker-buildx
-rm -f "buildx-${BX}.linux-${arch}" buildx-checksums.txt
-docker buildx version
-```
-
-**cosign** is required for the host-side signature gate (REQ-OPS-015 — `deploy.sh`
-verifies every image before it runs it). It is not in Ubuntu's default repos, so
-install the pinned release binary and verify its checksum before installing:
+Run from `/`, as root. `sudo -u <user>` keeps the caller's working directory, and neither `deploy`
+nor `iri` can enter `/root` — from there every rootless call fails with `cannot chdir to /root:
+Permission denied`, which the runtime detection reports as "no lingering user could be found".
+`deploy.sh` and `container-cleanup.sh` change to `/` themselves (deploy.sh since 2026-09-22), so for
+them the `cd /` below is belt and braces; for the ad-hoc `${UCTL}` / `${UPOD}` commands it is not.
 
 ```bash
-COSIGN_VERSION=v3.1.3
-arch=$(dpkg --print-architecture)          # amd64 or arm64
-cd /tmp
-# Download under the SAME name the checksum file lists — `sha256sum -c` resolves
-# the name from its input line against the cwd, so saving it as /tmp/cosign makes
-# the check fail with "No such file or directory" instead of verifying anything.
-curl -fsSLo "cosign-linux-${arch}" "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
-curl -fsSLo cosign_checksums.txt   "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
-# Verify the download against the published checksum, then install:
-grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c -
-sudo install -m 0755 "cosign-linux-${arch}" /usr/local/bin/cosign
-rm -f "cosign-linux-${arch}" cosign_checksums.txt
-cosign version
+cd /
+IRI_UID=$(id -u iri)                                                   # 994 on production
+UCTL="sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} systemctl --user"
+UPOD="sudo -u iri podman"
 ```
 
-Expect `cosign-linux-<arch>: OK` from the checksum line and the new version from
-`cosign version`. Chain the steps with `&&` if you paste them as a one-liner, so a
-failed checksum cannot fall through to `install`.
+### Bootstrapping a host
 
-> **Use cosign 3.x, and never a lower major than the CI signs with.** The CI signs
-> images with the cosign that `sigstore/cosign-installer@v4.1.2` pins — currently
-> **cosign 3.0.6** — and **cosign 2.x cannot verify cosign 3.x keyless signatures**
-> (3.x verifies 3.x and 2.x; 2.x does not verify 3.x). A host on cosign 2.x would
-> therefore fail this gate on every deploy (fail-closed). Keep the host on the
-> current 3.x release (3.1.3 verifies the CI's 3.0.6 signatures), and when the CI's
-> `cosign-installer` pin is bumped, keep the host **≥** that cosign version. Already
-> installed an older cosign? See [Updating cosign](#updating-cosign).
->
-> **Why 3.1.3 and not 3.1.2.** cosign ≤ 3.1.2 (and ≤ 2.6.4) carries
-> [GHSA-fx35-mq7g-6g98](https://github.com/sigstore/cosign/security/advisories/GHSA-fx35-mq7g-6g98)
-> (High, CVSS 7.4): when a legacy JSON bundle's `cert` field fails X.509 parsing,
-> cosign silently falls back to treating it as a raw public key, which skips
-> certificate-chain validation and makes `--certificate-identity` /
-> `--certificate-oidc-issuer` no-ops. **This gate was never exposed** — the flaw
-> reaches only `verify-blob` / `verify-blob-attestation` with legacy bundles, while
-> `deploy.sh` and `promote.yml` verify OCI images, which upstream states is not
-> affected. Take 3.1.3 anyway: a host binary that ignores identity pinning under
-> *any* input shape is not something to keep around for the sake of it.
+1. **Create the machine** with [`ansible/cloud-init/hetzner-rocky10.yaml`](../ansible/cloud-init/hetzner-rocky10.yaml)
+   and decide the disk layout at creation time.
+2. **Run the role, without a tag limit**, from WSL or a Linux controller:
+   [`ansible/README.md`](../ansible/README.md). Expect `failed=0`, then `changed=0` on a second run.
+   The inventory must list the host's own public names in `basetool_host_public_name_aliases`
+   (ADR-0196): a rootless container cannot reach the host through its public address, so without
+   them the apps cannot load the OIDC issuer and never become healthy.
+3. **Place the operator-provided files** in the next section. Podman refuses a missing bind-mount
+   source outright (`statfs …: no such file or directory`), so every file in the table has to exist
+   before the first deploy.
+4. **First deploy:**
 
-`deploy.sh` fails its pre-flight if `cosign` is missing while the gate is enabled
-(`IRI_COSIGN_VERIFY=true`, the default) — see *Signature verification (cosign)*.
+   ```bash
+   systemctl start iri-deploy.service
+   systemctl show iri-deploy.service -p Result --value      # success
+   tail -40 /var/log/iri-deploy.log
+   ```
 
-### 2. Dedicated `deploy` user
+   Expect `container runtime: podman`, five `signature OK`, the config bundle staged,
+   `quadlet units: 39 installed/updated, 0 retired`, `applying`, `deploy successful`.
 
-A non-root user with no shell and group membership only in `docker`:
+   > [!note] The first deploy has no rollback anchor
+   > A health failure on a fresh host ends with `no previous pin available — manual intervention
+   > required`: there is nothing to roll back to. Fix the cause and re-run with `--force` — the
+   > failed attempt recorded a backoff for that target:
+   > `cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --force`.
+
+5. **Start the front end.** The role installs, configures and **enables** haproxy but does not start
+   it; nothing answers on 80/443 until it runs (it starts by itself on every later boot):
+
+   ```bash
+   systemctl start haproxy && systemctl is-active haproxy
+   ss -tlnp | grep -E ':80 |:443 '          # haproxy on both, IPv4 and IPv6
+   ```
+
+   A `wrong version number` from `curl` means the edge's `EDGE_TRUSTED_PROXY` is empty or wrong —
+   see [The edge](#the-edge).
+6. **Start the timers** (the role enables them for the next boot, it does not start them):
+   `systemctl start iri-deploy.timer iri-backup.timer iri-restore-drill.timer iri-container-cleanup.timer`.
+
+   > [!danger] On a host rebuilt for disaster recovery, not the backup timer — not yet
+   > Every host writes to the same restic repository and the restore takes `latest`. A backup from
+   > a host whose data has not been restored yet becomes `latest` and is what the next restore
+   > would bring back. Restore first ([`backup.md` → *Restoring*](backup.md#restoring-disaster-recovery)),
+   > compare, then start `iri-backup.timer`.
+7. **Accept the host** with the conformance suite, from a checkout on the workstation — as `root`,
+   or the container checks see an empty store:
+
+   ```bash
+   python scripts/check-conformance.py --ssh root@<host>
+   ```
+
+   `client-address-visible` and the other external checks only mean something once DNS points at
+   the host. `rate-limit-active` is opt-in (`--include-load`).
+
+A unit a release adds later is enabled but not started until the next boot; `containers-running`
+reports it as absent. Start it with `${UCTL} start <svc>.service`.
+
+### Secrets and host-only files
+
+Shapes and locations only. Values live on the host and in the off-site backup, never here.
+
+| Path | Owner / mode | What | Notes |
+|---|---|---|---|
+| `/var/iri/code/.env` | `deploy:deploy 0640` | every environment value the stack reads | the role repairs owner/mode; `deploy.sh` reads it, `render-env-d.py` renders `env.d/` from it. Keep it **LF**: a CRLF file hands the pre-flight a path ending in `\r` (`required file missing` for a file that exists). |
+| `/var/iri/code/env.d/<svc>.env` | `deploy:iri 0640`, dir `2750` | per-service environment, one closed allow-list each | **generated** on every config change; never edit — edit `.env` |
+| `/var/iri/secrets/keystore.p12` | `root:110000 0640` + ACL `u:100999:r`, `u:iri:r` | the shared internal TLS keystore (backend, frontend, ingest, keycloak) | ACL for keycloak and for the backup helper; see [rotation](#internal-keystore-and-certificate-rotation) |
+| `/var/iri/code/realm-export.json` | `root:100999` + ACL `u:iri:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
+| `/var/iri/redis/users.acl` | `root:root 0644` | Redis ACL, **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 |
+| `/etc/iri/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
+| `/etc/iri/backup.env`, `/etc/iri/rclone.conf` | `deploy`-readable | restic repository, password, rclone remote | [`backup.md`](backup.md) |
+| `/var/iri/monitoring/secrets/*`, `/var/iri/monitoring/certs/*` | translated uids | Prometheus web auth, scrape password, Alertmanager routes, `basetool-ca.crt`, Grafana's own cert | [`monitoring/README.md`](../monitoring/README.md) |
+| `/var/iri/code/keycloak/providers/keycloak-spi.jar` | `deploy`, `0644` | Discord SPI | delivered by `deploy.sh`; manual fallback [below](#keycloak-provider-jar) |
+| volumes `edge-certs`, `edge-acme-state` | `iri`'s store, files uid 100100 | public TLS certificates, the ACME account | **in no volume prune, ever** — see [Weekly cleanup](#weekly-container-cleanup) |
+| `/var/lib/iri/.docker/config.json` | `deploy 0700` | registry credential for `skopeo` and `cosign` | written by `deploy.sh`'s login every tick |
+
+#### The Redis ACL
+
+`/var/iri/redis/users.acl` is the **only** authentication Redis has: `--requirepass` was removed on
+2026-09-16, and once `--aclfile` is in play a file without a `default` entry makes Redis reset
+`default` to `nopass ~* &* +@all` — the whole session store, OAuth2 refresh tokens included, open on
+the internal network (the 2026-07-10 defect). Two entries: `default`, carrying exactly
+`REDIS_PASSWORD` from `.env`, and a read-only `monitoring` user for `redis-exporter` that can run
+introspection commands but cannot list or read keys.
 
 ```bash
-sudo useradd --system --no-create-home --shell /sbin/nologin --groups docker deploy
+# default first, its password read straight out of .env (not typed, not in history)
+printf 'user default on >%s ~* &* +@all\n' \
+  "$(sed -n 's/^REDIS_PASSWORD=//p' /var/iri/code/.env | tail -1)" > /var/iri/redis/users.acl
+printf 'user monitoring on >%s -@all +@connection +@read +client +config|get +info +latency +slowlog +memory +cluster|info +cluster|slots +cluster|nodes +xinfo +pfcount -keys sanitize-payload\n' \
+  "$(openssl rand -base64 30 | tr -d '/+=\n')" >> /var/iri/redis/users.acl
+chown root:root /var/iri/redis/users.acl && chmod 0644 /var/iri/redis/users.acl
+restorecon -F /var/iri/redis/users.acl
+grep -c '^user default ' /var/iri/redis/users.acl        # must be 1
 ```
 
-The systemd unit runs as this user. It has no sudo, no SSH access, and
-cannot escape the docker-group blast radius.
-
-### 3. Directory layout
-
-```bash
-sudo mkdir -p /var/iri/code            # compose file, scripts
-sudo mkdir -p /var/iri/secrets         # keystore.p12 lives here
-sudo mkdir -p /var/iri/backend/log     # backend log dir (uid 10001)
-sudo mkdir -p /var/iri/frontend/log    # frontend log dir (uid 10001)
-sudo mkdir -p /var/iri/ingest/log      # ingest log dir (uid 10001)
-sudo mkdir -p /var/iri/db-backend      # postgres data
-sudo mkdir -p /var/iri/db-keycloak     # keycloak postgres data
-sudo mkdir -p /var/iri/keycloak/log    # keycloak file log
-sudo mkdir -p /var/iri/redis           # redis AOF
-sudo mkdir -p /var/iri/npm/data        # nginx-proxy-manager state
-sudo mkdir -p /var/iri/npm/letsencrypt
-sudo mkdir -p /var/lib/iri             # deploy state
-sudo mkdir -p /etc/iri                 # token
-
-# Log dirs need to be writable by the in-container uid 10001 (set in the
-# backend / frontend / ingest Dockerfiles).
-sudo chown -R 10001:10001 /var/iri/backend/log /var/iri/frontend/log /var/iri/ingest/log
-sudo chown -R deploy:docker /var/lib/iri /var/iri/code
-
-# deploy.sh stages the promoted keycloak-spi JAR into this directory, so the deploy user
-# must own it. Left out, docker creates it root-owned on the first `up` (it is a bind-mount
-# source) and the deploy fails at the very last step with
-# "install: cannot create regular file '.../keycloak-spi.jar': Permission denied" —
-# after every container is already healthy, which makes it look like a post-success glitch.
-sudo install -d -o deploy -g docker /var/iri/code/keycloak/providers
-
-# Keycloak (Quarkus image) runs as uid 1000 and is started with
-# `--log-file=/var/log/keycloak/keycloak.log`. Without this it logs
-# "LogManager error of type OPEN_FAILURE ... Permission denied" at boot, keeps running
-# on console logging only, and the file log everyone expects is silently absent.
-sudo chown -R 1000:1000 /var/iri/keycloak/log
-
-# Redis runs as uid 999 inside the official image and writes its AOF + snapshot into
-# this bind mount. Its entrypoint would normally chown /data itself, but the service
-# also mounts users.acl read-only from the same directory, and a `:ro` mount cannot be
-# chowned — so the fix-up does not happen and redis dies at startup with
-# "Can't open or create append-only dir appendonlydir: Permission denied".
-# The health gate then rolls the whole deploy back, which reads like an app problem.
-sudo chown -R 999:999 /var/iri/redis
-
-# Docker config dir for the deploy user. `docker login` writes its
-# credentials.json into $DOCKER_CONFIG (default $HOME/.docker), and the
-# deploy user has no $HOME because it was created with --no-create-home in
-# step 2. deploy.sh sets DOCKER_CONFIG=/var/lib/iri/.docker explicitly; we
-# pre-create the dir here with 0700 so the credentials file is exclusive
-# to the deploy user.
-sudo install -d -m 0700 -o deploy -g docker /var/lib/iri/.docker
-```
-
-### 4. Compose file + scripts
-
-Copy from the repository — only these trees, never the rest:
-
-```bash
-sudo cp docker-compose.yml      /var/iri/code/
-sudo cp -r scripts/             /var/iri/code/
-sudo cp -r keycloak-theme/      /var/iri/code/
-sudo cp -r docker/              /var/iri/code/   # maintenance page assets
-sudo chown -R deploy:docker     /var/iri/code
-# 0750 (rwx owner deploy, rx group docker, none for other) — consistent with
-# container-cleanup.sh below. systemd and the manual `sudo -u deploy` invocations run
-# as the owner, so world-exec is unnecessary.
-sudo chmod 0750                 /var/iri/code/scripts/deploy.sh
-```
-
-This is a **one-time bootstrap**. After the first `:stable` promotion, the
-compose file, the maintenance page (`docker/maintenance/`) and the Keycloak theme
-(`keycloak-theme/`) are kept in sync automatically: `deploy.sh` pulls the promoted
-`basetool-config` bundle and applies them (see *Infra / host-config bumps* below).
-You only re-copy by hand if you change **`scripts/`** (`deploy.sh` or the systemd
-units) — those are deliberately excluded from the bundle so a promotion can never
-overwrite the running deployer.
-
-`docker-compose.build.yml` does **not** belong on the production host. It
-has no purpose there and removing it eliminates any risk of an accidental
-`docker compose ... --build` that would attempt to rebuild from a
-non-existent source tree.
-
-### 5. Production secrets
-
-#### 5.1 `.env`
-
-```bash
-sudo cp .env.example /var/iri/code/.env
-sudo chmod 0640 /var/iri/code/.env
-sudo chown deploy:docker /var/iri/code/.env
-sudo nano /var/iri/code/.env
-```
-
-Fill in every `CHANGE_ME`. `IRI_KEYSTORE_HOST_PATH` should point at
-`/var/iri/secrets/keystore.p12`. Leave `IRI_BASETOOL_VERSION` unset (the
-default `stable` is what the deploy script wants).
-
-> **If you copied `.env.example` off a Windows machine, check the line endings.**
-> `deploy.sh` reads `IRI_KEYSTORE_HOST_PATH` back out of this file with `grep`/`cut`, so a
-> CRLF file hands it a path with a trailing carriage return and the pre-flight aborts with
-> `required file missing: /var/iri/secrets/keystore.p12` — for a file that is sitting right
-> there with correct ownership. `.gitattributes` pins the file to LF since 2026-08-20, but an
-> older clone still has CRLF in its working tree:
->
-> ```bash
-> file /var/iri/code/.env          # must NOT say "with CRLF line terminators"
-> sudo sed -i "s/$(printf '
-> ')\$//" /var/iri/code/.env
-> ```
-
-#### 5.2 PKCS12 keystore
-
-Place the production `keystore.p12` at the canonical path. It is
-read-only-mounted as `/run/secrets/keystore.p12` into every service that
-serves or trusts the internal cert — backend, frontend, ingest **and**
-Keycloak:
-
-```bash
-sudo install -m 0640 -o root -g 10001 /path/to/keystore.p12 /var/iri/secrets/keystore.p12
-# The backend/frontend/ingest images run as uid 10001 (covered by the group), but
-# the Keycloak (Quarkus) image runs as uid 1000, which no single owner/group can
-# also cover. Grant uid 1000 read via a POSIX ACL instead of widening the mode to
-# world-readable 0644 — so the private-key material is NOT readable by `other`:
-sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12
-# Verify: user::rw-, group::r--, user:1000:r--, other::--- (no world read).
-getfacl /var/iri/secrets/keystore.p12
-```
-
-The two container uids read it (10001 via the group, 1000 via the ACL entry); the
-bind mount preserves the host inode's ACL, and the images run at those literal
-host uids (no userns-remap). A plain `0640` without the ACL makes Keycloak fail to
-start with `AccessDeniedException /run/secrets/keystore.p12`; the old `0644` made
-it readable by every account on the box. Owner root keeps the deploy user from
-rewriting it; rotation is a deliberate sudo action. (The cert here is a self-signed
-*internal* cert on a single-purpose host — the public Let's Encrypt cert lives in
-NPM, not here — but not being world-readable is cheap defence-in-depth.)
-
-#### 5.3 Keycloak realm export
-
-```bash
-sudo install -m 0640 -o deploy -g docker /path/to/realm-export.json /var/iri/code/realm-export.json
-```
-
-#### 5.4 GHCR pull token
-
-**This has to be a classic PAT.** GitHub Packages — the Container registry included —
-[supports only classic personal access tokens](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry):
-*"GitHub Packages only supports authentication using a personal access token (classic)."*
-A fine-grained token carries no scope that grants `ghcr.io` pull access, so `docker login`
-fails with `denied` however its permissions are set. (An earlier revision of this runbook
-said fine-grained — it was wrong, and the production host has always run a classic token.)
-
-Generate at *Settings → Developer settings → Personal access tokens → **Tokens (classic)***:
-- Scope: **`read:packages`** and nothing else — not `write:packages`, not `repo`
-- Expiration: 90 days. A classic PAT *can* be set to never expire; don't. A token that
-never expires is valid forever once leaked, and `deploy.sh` can warn ahead of a known
-expiry (see the `.expiry` sidecar below) but cannot warn about a leak.
-- If the organisation enforces SAML SSO, authorise the token for the org after creating it
-(*Configure SSO* next to the token), or every pull fails with `denied`.
-
-> A classic token's `read:packages` is **account-wide** — it can read every package the
-> account can see, not only this repository's. That is genuinely broader than a
-> repository-scoped fine-grained token would be, and there is no way around it while GHCR
-> refuses fine-grained tokens. Compensate with the short expiry above, and keep the file
-> `0600 deploy:deploy` so only the deploy user can read it.
-
-```bash
-# Classic PATs are prefixed `ghp_`. A fine-grained `github_pat_` token cannot pull from ghcr.io.
-sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token <<< 'ghp_xxxxxxxx'
-
-# OPTIONAL, only if the token EXPIRES: record its expiry date so the deploy loop
-# warns ~2 weeks ahead instead of failing on expiry day (deploy.sh emits
-# basetool_ghcr_token_expiry_timestamp; the GhcrPullTokenExpiring alert reads it).
-# A NON-expiring token skips this file entirely — no metric, no alert.
-sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry <<< '2026-10-01'
-```
-
-The token file is owner-only readable. The deploy user uses `cat` against
-it (via the systemd unit), nothing else touches it. The optional `.expiry`
-sidecar holds only the (non-secret) rotation date.
-
-#### 5.5 Files that must exist before the first deploy
-
-Three paths are bind-mounted **as files**. Docker does not fail on a missing source — it
-silently creates a **directory** at that path, and the container then dies in a way that
-does not mention the mount at all:
-
-|               Path                |                        Consequence if missing                        |
-|-----------------------------------|----------------------------------------------------------------------|
-| `/var/iri/redis/users.acl`        | redis exits at startup; the health gate rolls the whole deploy back  |
-| `/var/iri/code/realm-export.json` | Keycloak fails to read the import path                               |
-| `/var/iri/secrets/keystore.p12`   | caught by the pre-flight (`require_file`), so this one fails cleanly |
-
-Create the first two before the first deploy — `users.acl` per
-[`MONITORING_ROLLOUT_RUNBOOK.md` §4.2](MONITORING_ROLLOUT_RUNBOOK.md) (**with** its `default`
-line), the realm export per §5.3 above. If a run already created directories, remove them
-before retrying:
-
-```bash
-for f in /var/iri/redis/users.acl /var/iri/code/realm-export.json; do
-  [ -d "$f" ] && sudo rmdir "$f" && echo "removed stray directory: $f"
-done
-```
-
-> Note that `--aclfile` is unconditional in the `prod` profile — `users.acl` is required even
-> when the monitoring stack is **not** deployed. In that case the file holds the `default`
-> line alone; the `monitoring` user is only needed once `redis-exporter` runs.
-
-### 6. Install the systemd timer
-
-```bash
-sudo cp /var/iri/code/scripts/iri-deploy.service /etc/systemd/system/
-sudo cp /var/iri/code/scripts/iri-deploy.timer   /etc/systemd/system/
-sudo cp /var/iri/code/scripts/iri-deploy.logrotate /etc/logrotate.d/iri-deploy
-
-sudo touch /var/log/iri-deploy.log
-sudo chown deploy:adm /var/log/iri-deploy.log
-sudo chmod 0640        /var/log/iri-deploy.log
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now iri-deploy.timer
-```
-
-Verify:
-
-```bash
-systemctl status iri-deploy.timer
-systemctl list-timers iri-deploy.timer
-```
-
-### 7. First deploy
-
-> **The very first deploy has no rollback anchor.** `deploy.sh` restores the *previous* digest
-> pin when the health gate trips — and on a fresh host there is none, so a failed first run ends
-> with
->
-> ```
-> health check failed within 180s — rolling back
-> no previous pin available — manual intervention required
-> ```
->
-> That is not a second fault: it means the rollback had nothing to roll back to. Fix the cause,
-> then re-run. The failed attempt also records a backoff for that target, so the retry needs
-> `--force`:
->
-> ```bash
-> sudo -u deploy /var/iri/code/scripts/deploy.sh --tag <tag> --force
-> ```
->
-> A `WARN: could not write deploy textfile metric` on a host without the monitoring stack is
-> cosmetic — `deploy.sh` writes a Prometheus textfile that nothing collects here. Silence it with
-> `sudo install -d -o deploy -g docker /var/iri/monitoring/textfile`.
-
-The timer's first firing is `OnBootSec=5min` after install. To not wait:
-
-```bash
-sudo systemctl start iri-deploy.service
-tail -f /var/log/iri-deploy.log
-```
-
-This pulls `:stable`, applies, waits for health, then exits. The stack is
-live.
-
-> **Not `journalctl`.** The unit redirects stdout **and** stderr with
-> `StandardOutput=append:` / `StandardError=append:`, and `append:` *replaces*
-> journald for those streams instead of teeing to it. `journalctl -u
-> iri-deploy.service` therefore shows only systemd's own unit records (Starting /
-> Succeeded / Failed / the exit code) — never a line the script printed. The same
-> applies to `iri-backup`, `iri-container-cleanup` and `iri-restore-drill`. Once the
-> monitoring plane is up, the off-host equivalent is Grafana → Explore → Loki with
-> `{app="ops-deploy"}` (`ops-backup` / `ops-cleanup` / `ops-restore-drill`).
-
-### 8. Weekly container housekeeping (optional)
-
-Every `deploy.sh` run already does a best-effort prune of dangling images, but over time unused
-image layers, build cache and stopped containers still accumulate and can fill the disk.
-[`scripts/container-cleanup.sh`](../scripts/container-cleanup.sh) is a stand-alone janitor. It
-detects the runtime through [`lib/container-runtime.sh`](../scripts/lib/container-runtime.sh) rather
-than calling a binary by name, and prunes stopped containers, unused images (`-a`) and unused
-networks on both — each only when nothing references it, and each gated by an age window so freshly
-pulled images survive (image default: 14 days, comfortably outliving the `deploy.sh` rollback
-anchor).
-
-**Two steps are Docker-only, and that asymmetry is deliberate (ADR-0194):**
-
-| step | Docker | Podman |
-| --- | --- | --- |
-| build cache | pruned | skipped — `podman builder prune` is an alias for `image prune`, already run |
-| anonymous volumes | pruned | **skipped** — see below |
-
-> [!warning] `podman volume prune` is not the same command as `docker volume prune`
-> Docker's, without `--all`, removes **only anonymous** volumes. Podman has no such distinction:
-> *"Volumes that are not currently owned by a container will be removed. Note all data will be
-> destroyed"*, and its only filter is `label=`. Measured on the migration target 2026-09-21,
-> `podman volume ls --filter dangling=true` listed **`edge-certs` and `edge-acme-state`** — the
-> edge's TLS material and the ACME account, which are in no snapshot. They count as "dangling"
-> whenever the stack is down, which is exactly when a maintenance job runs.
->
-> So the step is skipped on Podman, and the reason it existed was fixed at the source instead: the
-> restore drill's throwaway Postgres used to leave its anonymous data volume behind on every run
-> (156 MB, measured), and `rt_rm_force` now removes a container's anonymous volume with the
-> container. On Docker the weekly prune had been quietly absorbing that leak for as long as it
-> existed.
-
-Persistent production data is unaffected on either runtime: it lives in `/var/iri/...` **bind
-mounts**, which are not volumes at all and which no prune command can reach.
-
-The job runs as the **`deploy`** user (not root), consistent with `deploy.sh` and the
-`iri-deploy.timer` pipeline. How `deploy` reaches the containers differs by runtime and is not this
-script's concern: on Docker through the `docker` group, on the rootless Podman host through a
-sudoers rule naming two commands against the service user — which is strictly narrower, the
-`docker` group being root-equivalent by design. The unit sets `DOCKER_CONFIG=/var/lib/iri/.docker`
-because `deploy` has no usable `$HOME` (`--no-create-home`), the same reason `deploy.sh` pins it;
-it is inert under Podman.
-
-Preview what it would reclaim, then install the weekly systemd timer (Saturday
-02:00 UTC):
-
-```bash
-sudo -u deploy /var/iri/code/scripts/container-cleanup.sh --dry-run   # show plan + disk usage
-
-sudo chown deploy:deploy /var/iri/code/scripts/container-cleanup.sh   # owner = deploy
-sudo chmod 0750          /var/iri/code/scripts/container-cleanup.sh   # rwx for deploy, none for others
-
-sudo touch /var/log/iri-container-cleanup.log
-sudo chown deploy:adm /var/log/iri-container-cleanup.log
-sudo chmod 0640       /var/log/iri-container-cleanup.log
-sudo cp /var/iri/code/scripts/iri-container-cleanup.logrotate /etc/logrotate.d/iri-container-cleanup
-
-sudo cp /var/iri/code/scripts/iri-container-cleanup.service /etc/systemd/system/
-sudo cp /var/iri/code/scripts/iri-container-cleanup.timer   /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now iri-container-cleanup.timer     # arm the weekly tick
-```
-
-Force an immediate run with `sudo systemctl start iri-container-cleanup.service`;
-follow it with `tail -f /var/log/iri-container-cleanup.log` (not `journalctl` — see the
-note under *First deploy*), or in Loki with `{app="ops-cleanup"}`. The `UTC` suffix on
-the timer's `OnCalendar` pins the schedule to UTC regardless of the host's local
-timezone. Retention windows and the volume-prune toggle are overridable via
-`IRI_CLEANUP_*` environment variables — see the script header or
-`container-cleanup.sh --help`.
-
-> **Migrating from the old cron drop-in?** This job used to run from
-> `/etc/cron.d/iri-container-cleanup`. Remove it once the timer is armed so the
-> cleanup does not run twice: `sudo rm -f /etc/cron.d/iri-container-cleanup`.
+Put the monitoring user's password into `.env` as `REDIS_EXPORTER_PASSWORD` (read it back with
+`grep -oP '(?<=^user monitoring on >)[^ ]+' /var/iri/redis/users.acl`). **Rotating `REDIS_PASSWORD`
+means changing both places** — the `default` line and `.env` — then restarting redis and every
+client (`${UCTL} restart redis.service backend.service frontend.service ingest.service
+redis-exporter.service`); one without the other locks the apps out of their sessions.
+`check-conformance.py --only redis-requires-auth` proves an unauthenticated `PING` is refused.
 
 ---
 
-## Normal deploy flow
+## How the stack is laid out
+
+### The units are generated, and CI keeps them honest
+
+`docker-compose.yml` and `docker-compose.monitoring.yml` remain the **source**: the local and test
+stacks run them directly, and [`scripts/generate-quadlet.py`](../scripts/generate-quadlet.py)
+translates them into `quadlet/systemd/` (18 `.container`, 18 `.network`, 3 `.volume`) and
+`quadlet/env.d/<svc>.env.tmpl`. Both are committed.
+
+```bash
+python scripts/generate-quadlet.py            # regenerate after any compose edit, commit the result
+python scripts/generate-quadlet.py --check    # what CI runs: fail on drift
+python scripts/generate-quadlet.py --list     # each service's disposition and why
+```
+
+`repo-lint.yml`'s `quadlet-drift` job runs `--check` and the translation self-test
+(`generate-quadlet.test.sh`). Dispositions: `node-exporter` and `alloy` become host services, the
+podman exporter is a user unit the role installs, `cadvisor` and `socket-proxy` are deleted; every
+other service is a container. The edge's six network addresses are pinned by the generator and must
+equal the role's `basetool_host_edge_trusted_proxies`; the generator refuses the build otherwise.
+
+What Quadlet cannot interpolate is resolved at generation time: every `*_HOST_PATH`,
+`IRI_IMAGE_NAMESPACE` and `IRI_KEYCLOAK_HOST_ALIAS` is baked in at its default. Setting one of them
+in the host `.env` changes a Compose stack only; a Quadlet host needs a drop-in, which is what the
+role writes for the public-name aliases (`<svc>.container.d/10-host-alias.conf`) and, on a host with
+a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-conformance.py`'s
+`env-reaches-the-units` fails when `.env` and the units disagree without a drop-in to explain it.
+
+### On the host
+
+| Path | Written by | Content |
+|---|---|---|
+| `/var/iri/code/` | `deploy.sh` (bundle) | compose files, `docker/{edge,acme,maintenance}`, `keycloak-theme/`, `monitoring/`, `quadlet/` |
+| `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
+| `/etc/containers/systemd/users/<iri-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
+| `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
+| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `edge/` and `monitoring-reload/` snapshots |
+
+`~iri/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
+directory, so a unit of the same name there silently shadows every release.
+
+**Networks** are 18 `.network` units with pinned `/24` subnets under `172.28.0.0/16` (IPv6 on the
+ingress and proxy networks). `deploy.sh` takes no special action for a changed `.network` unit under
+Quadlet — the Compose-only clean-slate recreate does not apply. Whether an existing network picks up
+a changed subnet without being removed has not been demonstrated; treat a network-topology change as
+a maintenance action and verify with `${UPOD} network inspect <name>` afterwards.
+
+### The runtime seam
+
+Every container operation in `deploy.sh`, `backup.sh`, `restore-drill.sh` and
+`container-cleanup.sh` goes through [`scripts/lib/container-runtime.sh`](../scripts/lib/container-runtime.sh)
+(`rt_*`, ADR-0163), which detects the runtime by trying it: it finds the lingering user that owns
+the containers and reaches it through the sudoers bridge. Under Podman: tags resolve with
+`skopeo inspect`, images are pulled as `iri`, "apply and wait" is `systemctl --user start` or
+`restart` (restart for every service whose pin or unit this run changed — `start` on an active unit
+re-reads nothing), and the wait is structural: `Notify=healthy` makes each unit `Type=notify`,
+bounded by the unit's own `TimeoutStartSec=`. The Docker branches remain for the test stack and a
+Docker host; they are not the production path.
+
+---
+
+## Releases and promotion
 
 ### Cutting a release
 
-Releases are cut through a two-phase, PR-based GitHub Actions flow — there is
-**no** hand-pushed git tag and no tag is ever force-moved. Tidying the CHANGELOG
-and regenerating the CycloneDX SBOMs happens automatically as part of the run.
-The SBOMs are a **release-only** artefact: an ordinary `./gradlew build` (local
-or CI) never regenerates them, so the committed `*/docs/*-bom.{json,xml}` only
-ever change through this flow (or a deliberate `./gradlew :<module>:cyclonedxBom`).
+Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
-**Phase 1 — prepare.** Trigger *Actions → Release · Prepare → Run workflow* and
-enter the version **without** the leading `v` (e.g. `1.4.3`). Off `main` the
-workflow:
-- reconciles any historical `[Unreleased]` CHANGELOG drift and **cuts**
-`[Unreleased]` into a dated `## [v1.4.3]` section;
-- regenerates `*/docs/*-bom.{json,xml}` (pure serial-number / timestamp churn is
-discarded — only a real dependency change is kept);
-- commits the result on a `release/v1.4.3` branch and opens a
-`chore(release): v1.4.3` PR carrying a preview of the release notes.
+1. **Prepare.** *Actions → Release · Prepare → Run workflow*, version without the `v` (e.g.
+   `1.9.3`). It cuts `[Unreleased]` into a dated CHANGELOG section, regenerates the CycloneDX SBOMs
+   (`*/docs/*-bom.{json,xml}` — release-only artefacts), and opens a `chore(release): vX.Y.Z` PR.
+2. **Merge that PR.** `release-publish.yml` creates the tag once, at the merge commit, publishes the
+   GitHub Release with the eight SBOM files (backend, frontend, ingest, keycloak-spi — REQ-OPS-025),
+   attests them (REQ-OPS-023), and the tag push fires `release-images.yml`.
 
-**Phase 2 — merge.** Review and **merge** that PR. The merge *is* the release:
-`release-publish.yml` then
-- creates the `v1.4.3` tag **once**, at the merge commit (which already carries
-the refreshed CHANGELOG + SBOM, so the tag is never moved afterwards);
-- publishes the GitHub Release (notes + image links + the eight SBOM files as
-assets — one JSON + one XML per shipped module: backend, frontend, ingest and
-keycloak-spi, REQ-OPS-025);
-- and the tag push fires `release-images.yml`.
+The tag run **does not rebuild**: it cosign-verifies and re-tags the `:sha-<short>` digest `main`
+already built, so `:X.Y.Z` and `:sha-<short>` are the same bytes (REQ-OPS-021, ADR-0137). Any doubt
+falls back to a full build. The tag is created with the `RELEASE_TOKEN` secret so that it triggers
+`release-images.yml`; without it the publish job warns and the images have to be started by hand
+(*Actions → Release Images → Run workflow*), which always does a full build.
 
-**The tag run does not rebuild.** The tag sits on the merge commit that `main`
-already built, so `release-images.yml` re-tags that commit's `:sha-<short>`
-digest with the semver tags instead of producing a second set of images
-(REQ-OPS-021, [ADR-0137](adr/0137-one-image-build-per-commit-and-no-buildkit-layer-cache.md)).
-It does so only after cosign-verifying each digest against the workflow's own
-main-branch identity and confirming both architectures are present; any doubt —
-a missing tag, a bad signature, a single-arch index — falls back to a full
-build. Two operational consequences: a release takes ~5 minutes instead of
-~12:45, and `:1.4.3` and `:sha-<short>` are now the **same digest**, so a
-rollback to either lands on identical bytes.
-
-Closing the prep PR without merging cancels the release cleanly — no tag, no
-orphan commit on `main`.
-
-> **`RELEASE_TOKEN` is required for the images to build automatically.** A tag
-> created by CI with the default `GITHUB_TOKEN` does not trigger other workflows
-> (GitHub's anti-recursion rule), so `release-publish.yml` creates the tag with
-> the `RELEASE_TOKEN` secret (a fine-grained PAT or GitHub App with `contents:
-> write`) so that `release-images.yml` fires. If the secret is absent the tag and
-> the GitHub Release are still produced, but you must start the image build by
-> hand (*Actions → Release Images → Run workflow → `v1.4.3`*); the publish job
-> logs a warning saying exactly this. A `workflow_dispatch` run always performs
-> a **full build**, never the tag-run re-tag — it is the escape hatch for a
-> release whose images are missing or suspect, so it must not reuse them. `RELEASE_TOKEN` is a CI secret, separate
-> from the server's GHCR-pull PAT under [Token rotation](#token-rotation).
-
-Within ~10 minutes the images are built, scanned, signed, and available in GHCR
-as:
-
-```
-ghcr.io/krt-profit/basetool-backend:1.4.3   (also :1.4, :1, :latest)
-ghcr.io/krt-profit/basetool-frontend:1.4.3
-ghcr.io/krt-profit/basetool-ingest:1.4.3
-```
-
-At this point **nothing is deployed yet**. `:stable` still points at the
-previously promoted version. Production is unaffected.
+Nothing is deployed yet: `:stable` still names the previous release.
 
 ### Promoting to production
 
 ```bash
-gh workflow run promote.yml -f version=1.4.3
+gh workflow run promote.yml -f version=1.9.3
 ```
 
-(or use the GitHub Actions UI: *Actions → Promote to stable → Run
-workflow → version `1.4.3`*)
+Three gates, in order (REQ-OPS-002, REQ-OPS-024):
 
-The promotion passes two gates before it flips `:stable` (REQ-OPS-002):
+1. **Vulnerability scan** of the three app images at the digest the tag resolves to, both
+   architectures, failing on a fixed HIGH/CRITICAL finding. Break-glass: `-f allow_vulnerable=true`,
+   which is announced in the approval record.
+2. **Approval** by the required reviewer on the `production` GitHub Environment (one `approve` job).
+3. **Signature** — cosign-verify against the `release-images.yml@refs/(heads/main|tags/v.+)`
+   identity, then re-tag all five artifacts to `:stable` in lock-step, `fail-fast`.
 
-1. **Approval.** The `promote` job is bound to the `production` GitHub
-   Environment. A configured **required reviewer** must approve the run in the
-   Actions UI before any `:stable` flip happens — so workflow_dispatch alone does
-   not reach prod. *One-time setup:* **Settings → Environments → `production` →
-   Required reviewers** (add the operator[s]). Until that is configured the
-   environment reference is a harmless no-op.
-2. **Signature.** cosign-verify of the exact digest against the release-images
-   identity (the same identity the host re-verifies — REQ-OPS-015).
+A production promotion also carries `:testing` forward whenever testing would otherwise fall behind
+(`sync-testing`, decided by commit ancestry, never by timestamp).
 
-`release-images.yml` still scans every built image with Trivy and uploads the
-findings to the repository's Security tab, but the scan does not gate the
-promotion. Coverage is per **digest**, not per run: a tag run that re-tags the
-main run's digest (REQ-OPS-021) publishes no new SARIF, because that digest was
-already scanned under the same categories.
+### What happens on the host
 
-This re-tags the existing 1.4.3 image digest as `:stable` in GHCR. No
-rebuild. Same digest, two tags.
+Within about five minutes the timer fires `deploy.sh`, which:
 
-### What happens on the server
+1. logs in to GHCR (as `iri` for the pull, as `deploy` for `skopeo`/`cosign`), resolves `:stable`
+   for all five artifacts and compares the five-field marker
+   `backend|frontend|ingest|config|keycloak-spi` with `/var/lib/iri/last-deployed.digests`;
+2. on a match, **verifies the running stack** (REQ-OPS-013): each app service has a container that
+   is running and healthy (or still starting) from the target digest. A converged stack is a no-op
+   — plus the edge and monitoring reconciles below. A structural divergence (missing container,
+   wrong image) is logged as `drift: …` and re-applied. A sick container on the **right** image gets
+   a targeted restart of that service only, never a release rollback (ADR-0083);
+3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
+   pulled or staged — and writes the digest-pin record and the per-service pin drop-ins;
+4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
+   stateful-infra gate (below), snapshots the live tree to `config-previous/`, mirrors the new tree
+   into `/var/iri/code`, **renders `env.d/`**, installs changed units and stops-then-removes units
+   the release no longer names;
+5. pulls the three app images, restarts every application service whose pin or unit changed,
+   starts the rest of the application stack, and waits for health; then stages a moved provider
+   JAR and restarts keycloak alone;
+6. on success writes the marker, clears the failure records, reconciles the monitoring units and
+   the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
+   than 30 days;
+7. on a health failure restores the previous config tree, the previous units **and** the previous
+   pin drop-ins, restarts, records an exponential backoff for that target (600 s doubling, capped
+   at 6 h; `--force` bypasses it) and exits non-zero — `DeployRolledBack` / `DeployFailed`.
 
-Within at most 5 minutes (timer interval + RandomizedDelaySec):
-1. `iri-deploy.service` fires.
-2. `deploy.sh` resolves `:stable` → digests for backend + frontend + ingest
-**and** the `basetool-config` + `basetool-keycloak-spi` bundles, and compares
-the five-field marker with `/var/lib/iri/last-deployed.digests`. When the
-marker matches, it additionally verifies the **running** stack before trusting
-the no-op: every app service must have a container that is running, healthy
-(one still inside its healthcheck start period counts as converged for the
-tick; one-off `compose run` containers are ignored) and created from an image
-whose RepoDigest equals the target digest. A converged stack exits 0
-("no change"); any divergence — a manually-started outdated build, a crash
-loop, a half-down stack — is logged as `drift: <service>: <reason>` and
-re-applied (REQ-OPS-013).
-3. If different (or the running stack drifted): **cosign-verifies every resolved
-digest** against the release-images signature (REQ-OPS-015) — a verification
-failure aborts here, before anything is pulled or applied — then writes
-`current-digest-pin.yml` with the new app digest set.
-If the **config** digest moved, it also extracts the promoted bundle, asserts it
-carries no secrets, snapshots the live config tree into `config-previous/`, and
-copies the new `docker-compose.yml` + maintenance/theme trees into
-`/var/iri/code`. Then runs `docker compose pull && docker compose up -d --wait`,
-which recreates only the services whose effective spec changed.
-4. On all-healthy: updates `last-deployed.digests`, clears the failed/blocked
-markers, logs success.
-5. On any-unhealthy within 180 s: restores `previous-digest-pin.yml` **and**
-the previous config tree, re-ups, logs failure, exits non-zero (the non-zero exit
-is what journald and `OnFailure=` hooks see — the *reason* is in the log file, not
-in journald).
-6. If the promoted config changes a **postgres/Keycloak** image pin, step 3 does
-**not** apply it — the run records `config-blocked.marker`, alerts once, then
-skips quietly until a new promotion or a `--force` (see *Stateful-infra upgrades*).
-
-You see the result in `/var/log/iri-deploy.log` (`tail -n 100`), or off-host in
-Grafana → Explore → Loki with `{app="ops-deploy"}`. `journalctl -u
-iri-deploy.service` will **not** show it — see the note under *First deploy*.
+Read the result in `/var/log/iri-deploy.log`, or off-host in Grafana → Explore → Loki with
+`{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit's `StandardOutput=append:`
+replaces journald for the script's output, so the journal holds only systemd's start/stop records.
 
 ### Promoting to testing
-
-The PVE testing stack (`basetool.greluc.me`) is fed by its own tag and its own
-workflow (REQ-OPS-022). Nothing reaches it on a `main` merge either.
-
-> **You usually do not need this.** Since 2026-09-15 a production promotion carries
-> `:testing` forward whenever it would otherwise fall behind, so `testing >= stable`
-> holds without anyone remembering to run anything. What is left for this workflow
-> is the case that invariant cannot produce: putting testing **ahead** of
-> production, to try a version out without touching prod.
->
-> The decision is an ancestry question, not a timestamp one — the job compares the
-> `org.opencontainers.image.revision` labels with `git merge-base --is-ancestor`,
-> because the full-rebuild escape hatch below gives *old* code a *new* timestamp. A
-> testing tag it cannot place in history (a squashed or deleted branch build) is
-> left alone and reported, never moved on a guess.
 
 ```bash
 gh workflow run promote-testing.yml -f version=sha-abc1234
 ```
 
-(or *Actions → Promote to testing → Run workflow*)
-
-It accepts any tag `release-images.yml` produced — a `sha-<short>` from a main
-merge, a semver from a release, or `stable` when you want the testing stack to
-mirror what production currently runs in order to reproduce something.
-
-Same signature gate, same lock-step matrix, same re-tag-not-rebuild mechanics as
-the production path. **One difference:** the `testing` environment carries no
-required reviewer, so the run does not stop for approval. That is deliberate — the
-reviewer on `production` separates *may fire a workflow* from *may change
-production*, and a stack with no production data and no users has nothing for that
-seam to protect. The environment reference stays because it still records one
-deployment per promotion, which is how you answer "which version has been on
-testing since when".
-
-The testing host runs the identical `deploy.sh` on the identical timer, with one
-line of override:
+Only needed to put testing **ahead** of production. Same signature gate and lock-step as
+production, no required reviewer and no vulnerability gate (REQ-OPS-022). The testing host runs the
+identical `deploy.sh` and timer with one override:
 
 ```ini
 # /etc/systemd/system/iri-deploy.service.d/override.conf
@@ -727,854 +392,372 @@ ExecStart=
 ExecStart=/var/iri/code/scripts/deploy.sh --tag testing
 ```
 
-Signature verification, digest pinning, the health gate and auto-rollback all
-behave exactly as they do in production — the only thing that changed is which tag
-is resolved.
+It serves its own domain from the same bundle: `IRI_KEYCLOAK_HOSTNAME` in its `.env` (with the
+`/auth` path) moves Keycloak's hostname and the issuer the apps validate together (ADR-0167).
 
-> A testing environment serves the app under its own domain from the **same**
-> promoted config bundle. That works because `IRI_KEYCLOAK_HOSTNAME` overrides the
-> public identity baked into `docker-compose.yml` — **set that one value**, with its
-> `/auth` path, and the issuer the three apps validate is derived from it
-> (ADR-0167). It used to be a second variable, `IRI_KEYCLOAK_ISSUER_URI`, that you
-> had to keep in agreement by hand: a half-set pair failed every request with
-> `issuer does not match`, which reads like a token bug and was in fact a
-> configuration one. That variable still exists as an override for a deployment
-> whose advertised issuer genuinely differs, and is otherwise left unset.
-> Production sets neither and is unaffected.
+### Manual deploy, rollback and checks
 
-### Forcing an immediate run
+All as `deploy`, from `/`:
 
 ```bash
-sudo systemctl start iri-deploy.service
+cd /
+sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only     # resolve + cosign-verify, apply nothing
+sudo -u deploy /var/iri/code/scripts/deploy.sh                  # one tick now (or: systemctl start iri-deploy.service)
+sudo -u deploy /var/iri/code/scripts/deploy.sh --tag 1.9.2      # pin a version for THIS run only
+sudo -u deploy /var/iri/code/scripts/deploy.sh --force          # bypass the backoff and the stateful-infra gate
 ```
 
-This is also the runbook step you take after a manual `:stable` promotion
-if you do not want to wait for the next tick.
+`--tag` is not sticky: the next tick resolves `:stable` again. A durable rollback is a promotion:
+`gh workflow run promote.yml -f version=1.9.2`. To force a full re-apply of the current target,
+delete `/var/lib/iri/last-deployed.digests` and start `iri-deploy.service`; a missing marker also
+re-stages the config bundle.
+
+`--check-only` doubles as the signature preflight in the real `deploy` context and writes no metric.
 
 ---
 
-## Infra / host-config bumps (redis, npm, compose edits)
+## Driving the stack
 
-A change to the **general** containers (`redis`, `npm`) or to any other part of
-`docker-compose.yml` / the maintenance page / the Keycloak theme reaches prod
-through the **same** promote-and-pull flow as an app release — no manual file
-copy, no hand-run `docker compose up -d`. Worked example, bumping the pinned
-redis image:
-
-1. Edit the `redis` image pin in `docker-compose.yml` (Dependabot opens this PR
-   for you on its weekly run), get it reviewed, and merge to `main`.
-2. **Cut a release** (`Release · Prepare` → merge the prep PR) — `release-images.yml`
-   then builds `basetool-config:<version>` carrying the new compose, signs it, and
-   pushes it alongside the app images.
-3. **Promote** (`gh workflow run promote.yml -f version=<version>`) — flips the app
-   images **and** `basetool-config` to `:stable` together.
-4. Within ~5 minutes the timer fires: `deploy.sh` sees the config digest moved,
-   stages the new bundle, swaps `docker-compose.yml` into `/var/iri/code`, and
-   `docker compose up -d --wait` recreates **redis** (and any other changed
-   service). A health failure rolls back the compose file *and* the image pin.
-
-You see it in `/var/log/iri-deploy.log` — or in Loki, `{app="ops-deploy"}` — as
-`config changed → staging …` followed by `config applied` and `deploy successful`.
-The bundle is content-addressed and signed, so what ran is exactly what was
-promoted.
-
-> A config-only bump still rides a release **promotion** — that is the deliberate
-> human gate (REQ-OPS-002). If you want the redis bump out without waiting for the
-> next feature release, cut+promote a patch release containing just that change.
-
-The state files `deploy.sh` adds for this flow live under `/var/lib/iri/`:
-`config-stage/` (extraction scratch), `config-previous/` (rollback snapshot of the
-config tree) and `config-blocked.marker` (the stateful-infra gate, below).
-
-**A compose `networks:` edit forces a clean recreate.** A change to the network
-topology (a re-pinned subnet, a net added/removed) cannot be rolled onto a running
-stack — Docker can't move a live container onto a differently-addressed bridge, so
-an in-place `up` silently strands `keycloak`<->`backend` / `keycloak`<->`db-keycloak`
-name resolution (the 2026-07 incident, #974). When `deploy.sh` sees the promoted
-`networks:` block differ from the live one, it logs `network topology changed ->
-clean recreate` and takes the whole stack **fully down** — the app project *and* the
-monitoring project (which holds the shared data nets as `external`) — prunes the
-stale bridges, then `up`s, on both apply and rollback. That is a brief full-stack
-outage, taken **only** on an actual `networks:` change; ordinary bumps keep the fast
-in-place `up`. The pinning keeps the recreated gateways stable, so the NPM `/admin`
-allow-list stays valid.
-
-**A Postgres `command:` flag edit recreates the database containers — and is _not_
-operator-gated.** The stateful-infra carve-out below matches only `image:` lines
-(`infra_image_pins()` greps `postgres:` / `quay.io/keycloak/keycloak:`), so a change to a
-`-c shared_buffers=…` / `-c work_mem=…` / `-c max_connections=…` flag looks like any other
-compose edit and **auto-applies on the next 5-minute tick**, recreating `db-backend` and/or
-`db-keycloak` in place. That is safe — the flags are runtime settings, `PGDATA` is untouched,
-and no migration is involved — but it is still a database restart, so treat it as a
-maintenance moment rather than letting it land unattended:
-
-1. **Pause the timer** before promoting, so the apply happens when you are watching:
-
-   ```bash
-   sudo systemctl stop iri-deploy.timer
-   ```
-2. Promote the release as usual (`gh workflow run promote.yml -f version=<version>`).
-3. **Apply deliberately** and watch it through the health gate:
-
-   ```bash
-   sudo -u deploy /var/iri/code/scripts/deploy.sh --force
-   ```
-4. Confirm the flags actually reached the running server — a compose edit that never got
-   applied has bitten this stack before:
-
-   ```bash
-   docker exec db-backend psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432 \
-     -c "SHOW shared_buffers; SHOW effective_cache_size; SHOW work_mem; SHOW max_connections;"
-   ```
-5. **Restart the timer:**
-
-   ```bash
-   sudo systemctl start iri-deploy.timer
-   ```
-
-Expect a short connection blip: `backend` and `keycloak` are **not** recreated, so their
-pools reconnect against the new server (HikariCP retries within `connection-timeout: 5000`,
-Keycloak's Agroal likewise). `depends_on: service_healthy` only orders a *fresh* `up`, it
-does not restart dependents when only the DB is recreated. The blip is why this belongs in a
-maintenance moment even though nothing is destructive.
-
-**Rollback** is the ordinary config rollback — promote the previous version, or pin the
-config bundle back — because the flags live in `docker-compose.yml`. A health failure during
-step 3 already rolls the compose file back automatically. Lowering `shared_buffers` needs no
-data migration in either direction, so there is no one-way door here.
-
-**Manual recovery, if a stack is ever stranded** (a hand-run `docker compose up`
-after a networks edit, or an older `deploy.sh` without the recreate). Symptoms:
-`UnresolvedAddressException` / `UnknownHostException` for `keycloak` / `db-keycloak`
-in the backend/keycloak logs, a `Http5xxRateHigh` alert, and 500s on authenticated
-endpoints. Recreate from a clean slate:
+A restart **is** a recreate: the generated `ExecStart` carries `--replace`, and every unit applies
+its digest-pin drop-in, so a hand-started service always runs the digest the last deploy pinned — the
+2026-07-02 "outdated build from the local cache" failure cannot happen through `systemctl`.
 
 ```bash
-cd /var/iri/code
-# Release the shared data nets the monitoring project holds as external:
-docker compose -p iri-monitoring -f docker-compose.monitoring.yml down --remove-orphans
-# App project: remove its containers AND the pinned bridges:
-docker compose --profile prod down --remove-orphans
-# Drop any stale-subnet bridge a stray endpoint kept alive:
-docker network prune -f
-# Redeploy from the clean slate (bypasses the bad-digest backoff):
-sudo -u deploy /var/iri/code/scripts/deploy.sh --force
+${UCTL} list-units --all '*.service' --no-pager      # the stack as systemd sees it
+${UPOD} ps --format '{{.Names}}\t{{.Status}}'        # the containers, with health
+${UCTL} status backend.service
+${UCTL} restart backend.service                      # blocks until healthy (Notify=healthy)
+${UCTL} stop frontend.service
+${UCTL} start frontend.service
+${UPOD} exec -it db-backend sh                       # a shell in a running container
 ```
 
-## Stateful-infra upgrades (operator-gated: postgres, Keycloak)
+The application stack, in dependency order, is `db-backend db-keycloak redis keycloak backend ingest
+frontend edge`, plus `acme`. The monitoring units are `prometheus loki tempo grafana alertmanager
+blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter`; `alloy` and
+`prometheus-node-exporter` are system services (`systemctl restart alloy.service`).
 
-A **postgres** or **Keycloak** image **tag** change is the one carve-out that does
-**not** auto-apply. A Postgres major recreated against the existing `PGDATA` bind mount
-won't start without `pg_upgrade`; a Keycloak major needs host-staged provider JARs
-and a keystore whose SAN carries `dns:keycloak` (see *Keycloak behind NPM* and
-*Keycloak custom providers* above). A blind `up -d` would fail these and the health
-gate would then roll back on a 5-minute loop.
+**Planned downtime.** Stop the timer first — the drift check otherwise brings the stack back on the
+next tick — and wait for an in-flight run, which holds the lock for its whole lifetime:
 
-> [!important] A same-tag **digest** refresh is NOT gated — it auto-applies
-> `infra_image_pins()` strips the digest and compares the tag, so
-> `26.7@sha256:aaa…` → `26.7@sha256:bbb…` goes through on the next 5-minute tick like any
-> other compose edit, restarting the Keycloak container. That is deliberate: a rebuilt
-> base image is usually a security fix, and blocking it does the opposite of what this
-> gate is for.
->
-> **Corrected 2026-09-17.** This section previously said any `postgres:` or
-> `quay.io/keycloak/keycloak:` *pin* change is refused. It has compared only the tag since
-> `031e75fed` (2026-09-12), which was written after the full-reference comparison froze the
-> testing host for seven days — 1901 skipped ticks over a Keycloak rebuild. The runbook,
-> not the code, was wrong.
+```bash
+systemctl stop iri-deploy.timer
+flock /var/lock/iri-deploy.lock true               # returns once no deploy is running
+for s in edge frontend ingest backend keycloak redis db-keycloak db-backend; do ${UCTL} stop "${s}.service"; done
+# … maintenance …
+systemctl start iri-deploy.service                 # brings everything back to the pinned state
+systemctl start iri-deploy.timer
+```
 
-So when a promoted bundle changes a `postgres:` or `quay.io/keycloak/keycloak:`
-tag, `deploy.sh` refuses to apply it: it logs a `CARVE-OUT: …` line, writes
-`/var/lib/iri/config-blocked.marker`, exits non-zero **once** (so journald /
-`OnFailure=` alert you), and then skips that target quietly on subsequent ticks
-until you either promote a different version or force it. To take the upgrade:
+**Reboot.** `iri` lingers and every unit is `WantedBy=default.target`, so the stack starts at boot
+without a login; haproxy and the timers are enabled. The first deploy tick follows five minutes
+later.
 
-1. Perform the documented manual upgrade for that component (the Postgres major
-   `pg_upgrade` runbook, or the Keycloak keystore/provider steps above).
-2. Force the gated deploy through:
+### Logs
 
-   ```bash
-   sudo -u deploy /var/iri/code/scripts/deploy.sh --force
-   ```
+| What | Where |
+|---|---|
+| container stdout/stderr | `${UPOD} logs --since 10m backend`, or as root `journalctl CONTAINER_NAME=backend --since -10m` (the units use `LogDriver=journald`); Loki `{app="backend-stdout"}` etc. |
+| application file logs | `/var/iri/{backend,frontend,ingest}/log/`, `/var/iri/keycloak/log/keycloak.log`; Loki `{app="backend"}` etc. |
+| unit lifecycle | `journalctl --user-unit=backend.service` as root |
+| edge access and error log | the edge's stdout: `${UPOD} logs edge`; Loki `{app="edge"}` |
+| operational scripts | `/var/log/iri-{deploy,backup,restore-drill,container-cleanup}.log`; Loki `{app="ops-deploy"}`, `ops-backup`, `ops-restore-drill`, `ops-cleanup` |
+| haproxy | `journalctl -u haproxy` (it logs to `/dev/log`) |
 
-   `--force` bypasses the carve-out (and the bad-digest backoff) for the current
-   target; the app images in the same promotion are applied along with it.
-
-redis and npm image bumps are **not** gated — they auto-apply as in the previous
-section. Every `prod` service runs the hardened runtime baseline (REQ-OPS-014:
-`no-new-privileges` + `cap_drop: [ALL]` + a minimal `cap_add` + a `pids` ceiling),
-and the third-party images (`postgres`, `redis`, `npm`) do not officially document a
-reduced capability set — so when you bump one of them, **re-verify its `cap_add` set
-against the new image before merging the bump PR**: boot the new image once with the
-`security_opt`/`cap_drop`/`cap_add`/`pids` values from that service in
-`docker-compose.yml` and confirm a clean boot and a passing healthcheck (for **npm**
-additionally the s6 `/data/nginx` sed pass, `/usr/bin/check-health`, a working
-`nginx -s reload`, and a clean restart). An upstream change (e.g. a new s6 prepare
-step, or a changed privilege-drop path in the postgres/redis entrypoint) can silently
-require an additional capability. The deploy health-gate is the backstop — a wrong cap
-set fails the container at start and rolls back — but catching it in review is cheaper
-than a rolled-back deploy.
+The GHCR account name is masked in Loki (REQ-OBS-004); only the on-host log file carries it.
 
 ---
 
-## Maintenance page
+## Configuration changes that are not app releases
 
-While `deploy.sh` cycles `backend`, `frontend` and `ingest` out and the new
-images are booting, the upstream behind `nginx-proxy-manager` (NPM) momentarily returns
-`502 Bad Gateway`. NPM intercepts those failures and serves a branded
-maintenance page in their place, so a user hitting the site mid-deploy sees a
-deliberate "we'll be right back" screen instead of nginx's default error page.
+### Host-config and unit changes
 
-### How it works
+A change to either compose file, `docker/edge`, `docker/acme`, the maintenance page, the Keycloak
+theme, `monitoring/` or `quadlet/` rides the same path as an app release: regenerate the units if
+compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next tick stages the
+bundle, installs the changed units and restarts exactly the application services whose definition
+moved. Dependabot's image-pin bumps take this path too.
 
-NPM's per-server hook (`/data/nginx/custom/server_proxy.conf`, included in
-every proxy host's `server { }` block) wires up:
+> [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
+> Every unit a release re-defines is **restarted**, every other one merely **started**: the nine
+> application services (`db-backend db-keycloak redis keycloak backend ingest frontend edge acme`)
+> in the gated apply, the nine monitoring units in the non-gating monitoring apply after it. A
+> restarted monitoring unit is restarted once per release, not once per apply pass. Until
+> 2026-09-22 this was a known gap (REQ-OPS-013): the monitoring apply only ever said
+> `systemctl --user start`, a no-op on an active unit, and `acme` was in neither list, so a changed
+> unit was installed and left running its old definition. Prometheus, Alloy and the blackbox
+> exporter are additionally recreated when their *config files* change. To confirm a unit change
+> landed: `${UPOD} container inspect <svc> --format '{{.ImageName}}'`.
 
-```nginx
-error_page 502 503 504 =503 @maintenance;
+A config-only change still needs a promotion — the
+human gate is deliberate (REQ-OPS-002); cut a patch release if it cannot wait.
 
-location @maintenance {
-    internal;
-    root /usr/share/nginx/html;
-    rewrite ^.*$ $maintenance_target break;
-
-    types {
-        application/problem+json json;
-        text/html                html;
-    }
-
-    add_header Retry-After   "60"       always;
-    add_header Cache-Control "no-store" always;
-}
-```
-
-`$maintenance_target` is set by a small `map` in `/data/nginx/custom/http.conf`
-that branches on the request's `Accept` header:
-
-|                    `Accept`                    |      Response      |               Content-Type                |
-|------------------------------------------------|--------------------|-------------------------------------------|
-| `text/html`, `*/*`, missing                    | `maintenance.html` | `text/html; charset=utf-8`                |
-| `application/json`, `application/problem+json` | `maintenance.json` | `application/problem+json; charset=utf-8` |
-
-Both responses are returned with HTTP `503 Service Unavailable` and
-`Retry-After: 60`. The HTML page auto-refreshes every 30 seconds, so a user
-who lands on it during a deploy is back on the real app as soon as the new
-containers pass their healthcheck. AJAX/fetch calls from the live frontend
-receive an RFC 7807 `application/problem+json` document and can render their
-existing "backend unreachable" toast cleanly.
-
-### Where the files live
-
-All assets are part of the repo and mounted into the NPM container via
-`docker-compose.yml`. The static assets directory is mounted read-only;
-the two nginx snippets are mounted read-write because NPM's startup
-script `s6-rc.d/prepare/50-ipv6.sh` runs `sed -i` against every `*.conf`
-under `/data/nginx/` to add IPv6 listeners — with `:ro` the write fails
-with `EROFS` and the container refuses to boot. Our snippets contain no
-`listen` directives, so `sed` produces byte-identical content; the file
-is touched but unchanged.
-
-```
-docker/maintenance/
-├── nginx/
-│   ├── http.conf            -> /data/nginx/custom/http.conf
-│   └── server_proxy.conf    -> /data/nginx/custom/server_proxy.conf
-└── static/
-    ├── maintenance.html     -> /usr/share/nginx/html/maintenance/maintenance.html
-    └── maintenance.json     -> /usr/share/nginx/html/maintenance/maintenance.json
-```
-
-Nothing in `scripts/deploy.sh` touches these files. They are static, the
-trigger is purely an upstream `5xx`, so the page appears for the exact window
-between "old container gone" and "new container healthy" — the same window
-`docker compose up -d --wait` is already gating on.
-
-### Verifying after a config change
-
-After editing any file under `docker/maintenance/`, restart the NPM container
-so the new bind-mounts take effect and ask nginx to re-parse its config:
+**A Postgres `-c` flag change auto-applies** and restarts `db-backend` / `db-keycloak` on the next
+tick — the stateful-infra gate compares image tags, not command lines. It is safe (runtime settings,
+no migration) but it is a database restart, so land it while watching:
 
 ```bash
-sudo -u deploy /usr/bin/docker compose \
-    -f /var/iri/code/docker-compose.yml --profile prod \
-    up -d npm
-
-sudo -u deploy /usr/bin/docker compose \
-    -f /var/iri/code/docker-compose.yml --profile prod \
-    exec npm nginx -t          # must report "syntax is ok"
+systemctl stop iri-deploy.timer
+gh workflow run promote.yml -f version=<version>          # after approval …
+cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --force
+${UPOD} exec db-backend sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432 -c "SHOW shared_buffers; SHOW max_connections;"'
+systemctl start iri-deploy.timer
 ```
 
-Then simulate an upstream failure to confirm the page is wired up:
+`backend` and `keycloak` are not restarted with it; their pools reconnect.
+
+### Stateful-infra upgrades
+
+A changed **`postgres:` or `quay.io/keycloak/keycloak:` tag** is operator-gated (REQ-OPS-006).
+`deploy.sh` compares the tags in both the compose file and the `.container` units, logs
+`CARVE-OUT: postgres/Keycloak image pin changed`, writes `/var/lib/iri/config-blocked.marker`, exits
+3 once (`DeployConfigBlocked`) and then skips that target quietly. A same-tag **digest** refresh is
+not gated and applies on the next tick.
+
+To take a gated upgrade: do the component's upgrade work first, then
+`cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --force`. For Keycloak that is checking the
+provider JAR against the new version and that the keystore still carries `dns:keycloak`. For a
+**Postgres major** no procedure is written yet — the running cluster will not start on a newer
+major, so plan it as its own change (a dump and restore into a fresh data directory, the mechanism
+[`backup.md`](backup.md) already restores with) before promoting it.
+
+When bumping a third-party image, re-check the container still starts under its unit's hardening
+(`ReadOnly=true`, `DropCapability=ALL`, its own `User=`, REQ-OPS-014); the health gate rolls a
+failure back, but catching it in review is cheaper.
+
+### Keycloak provider JAR
+
+Delivered automatically (REQ-OPS-007, ADR-0055): when `basetool-keycloak-spi:stable` moves,
+`deploy.sh` stages `keycloak-spi.jar` into `/var/iri/code/keycloak/providers/` after the stack is
+healthy and restarts keycloak alone; a failure restores the previous JAR. The JAR is Java-21
+bytecode for Keycloak's JVM. The Discord realm setup is a one-time step in
+[`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
+
+Manual fallback only:
 
 ```bash
-sudo -u deploy /usr/bin/docker compose \
-    -f /var/iri/code/docker-compose.yml --profile prod \
-    stop frontend
-
-curl -i https://profit-base.online/                  # expect HTTP/1.1 503 + HTML
-curl -i -H 'Accept: application/json' \
-        https://profit-base.online/api/v1/missions   # expect HTTP/1.1 503 + JSON
-
-sudo -u deploy /usr/bin/docker compose \
-    -f /var/iri/code/docker-compose.yml --profile prod \
-    start frontend
+./gradlew :keycloak-spi:jar                                   # on a build machine
+install -o deploy -g deploy -m 0644 keycloak-spi-<version>.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
+restorecon -F /var/iri/code/keycloak/providers/keycloak-spi.jar
+${UCTL} restart keycloak.service
+${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 ```
 
-The page is intentionally not scoped per virtual host — every vhost includes
-`maintenance.conf`, so any of them falls back to the same screen if its upstream
-ever serves a `5xx`. **Identity included:** since ADR-0166 Keycloak is a set of
-locations on the web vhost rather than a host of its own, so a maintenance window
-covers the login too — which is correct, since there is nothing to log in to. The
-wording is kept generic ("System maintenance") so it reads correctly for all of
-them.
+### Updating the operational scripts and units
+
+`deploy.sh`, the other scripts and the `iri-*` units are **not** in the config bundle — a deployer
+that replaces itself mid-run is a self-update hazard. They change only through the role, as a
+deliberate host change:
+
+```bash
+ansible-playbook site.yml --limit production --tags deploy,scripts --check --diff
+ansible-playbook site.yml --limit production --tags deploy,scripts
+ansible-playbook site.yml --limit production --tags observability   # the two collectors and their timers
+```
+
+Confirm by content, never by mtime:
+`sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.
 
 ---
 
-## Edge rate limiting
+## The edge
 
-The same two custom snippets carry a version-controlled per-IP safety net
-(REQ-SEC-023) that applies to **every** proxy host:
+```
+client ──► haproxy :80/:443 (host, v4+v6) ──send-proxy-v2──► edge 127.0.0.1|[::1]:8080/8443
+                                                              nginx, uid 101, read-only
+```
 
-- `docker/maintenance/nginx/http.conf` defines the shared-memory zones
-  (`krt_req_perip`, `krt_conn_perip`) and the `$krt_limit_key` map: the limiter
-  keys on the full IPv4 address, or an IPv6 client's `/64` network prefix.
-- `docker/maintenance/nginx/server_proxy.conf` applies them in each proxy
-  host's `server { }` block: **20 r/s** sustained with **burst 80** (`nodelay`)
-  and at most **500 concurrent connections** per client IP.
+- **haproxy** (ADR-0187, `ansible/roles/basetool_host/templates/haproxy.cfg.j2`) binds the public
+  ports and hands the client address to the edge in a PROXY-protocol header. The edge publishes on
+  loopback only, which is what makes that header unforgeable.
+- **The edge** is native nginx (ADR-0162). Its configuration is `docker/edge/` in the repository:
+  `nginx.conf`, `conf.d/*.conf.template` (one per vhost, rendered at start by `render-and-run.sh`
+  from `EDGE_HOST_FRONTEND`, `EDGE_HOST_INGEST`, `EDGE_HOST_GRAFANA`, `EDGE_HOST_API` — it refuses to
+  start with one unset) and `include/`.
+- **`EDGE_TRUSTED_PROXY`** in `.env` must name the edge's six pinned addresses, space-separated —
+  the edge's own address on each of its networks, because rootless port forwarding presents the
+  peer from whichever network it chooses. Empty, the listeners stay plain and every request fails
+  with `wrong version number`; incomplete, nginx silently discards the header and the whole internet
+  shares one rate-limit bucket. Check it against the unit:
 
-These are flood/brute-force ceilings, not fairness limits — a worst-case page
-load (~40 uncached asset requests at once) fits inside the burst, while
-hammering the Keycloak login form or an API endpoint does not. Rejections use
-status **429** on purpose: the nginx default (503) would be intercepted by the
-maintenance-page `error_page` wiring above and a flooding client would receive
-the maintenance page with the wrong semantics. Rejected requests appear in the
-per-host access logs (and via `limit_req_log_level warn` in the error log), so
-a sustained flood raises the `EdgeRateLimitSpike` Loki alert.
+  ```bash
+  UD=/etc/containers/systemd/users/${IRI_UID}
+  diff <(sed -n 's/^EDGE_TRUSTED_PROXY=//p' /var/iri/code/.env | tr ' ' '\n' | sort) \
+       <(sed -n 's/^Network=.*:ip=//p' "${UD}/edge.container" | sort) && echo "trusted == pinned"
+  ```
 
-> **Note — real client IP restored (ADR-0112).** The IPv6-specific masking is
-> fixed for every vhost: `net-proxy-frontend` is dual-stack (`fd00:28:3::/64`) so
-> the kernel `ip6tables` DNAT preserves the client IPv6, and — because all vhosts
-> share the one published `:443` ingress on NPM's `net-proxy-frontend` leg — both
-> v4 and v6 clients reach nginx with their real IP on keycloak/ingest/grafana too,
-> not just `profit-base.online`. `limit_conn` is tightened from the 10000 stopgap
-> to **500** per client, and IPv6 is keyed on its `/64` (the `$krt_limit_key` map).
-> The bridge-gateway addresses (`172.28.3.1` / `fd00:28:3::1`) that dominate those
-> hosts' logs are internal hairpin traffic (blackbox probes + OIDC hairpins), not
-> masked external clients — so those bridges need no IPv6 subnet. Do **not**
-> disable userland-proxy. See REQ-SEC-023 / ADR-0112.
+- **Changes** are made in the repository and arrive with a promotion; `deploy.sh`'s `reconcile_edge`
+  recreates the edge whenever its on-disk config differs from the last applied snapshot. Validate
+  locally before merging with `scripts/check-edge-nginx.sh` (renders every vhost through
+  `render-and-run.sh` and runs `nginx -t`; CI runs it in `repo-lint.yml`).
+- **The API vhost's allow-list** is `docker/edge/include/api-allowlist.conf`, the source of truth
+  (ADR-0135). `edge-deny-probe.yml` probes the public deny rules from outside every day.
 
-Stricter per-endpoint limits (e.g. on the Keycloak token/login paths) remain
-possible per proxy host in the NPM UI's Advanced tab, referencing the same
-zones — those are unversioned host state and deliberately not part of the
-baseline.
+### Maintenance page
 
-Verification after changing the limits (same flow as the maintenance page —
-restart NPM, `nginx -t`, then exercise it):
+`include/maintenance.conf` turns an upstream 502/503/504 into a `503` with `Retry-After: 60` — the
+branded `maintenance.html` (auto-refreshes every 30 s) or, for an `Accept: application/json` caller,
+RFC 7807 `maintenance.json`. The static files are `docker/maintenance/static/`, mounted into the
+edge. It covers every vhost, including `/auth`: during a restart there is nothing to log in to.
+
+### Edge rate limiting
+
+`include/limits.conf` applies, on every vhost, **20 r/s with burst 80** (`nodelay`) and at most
+**500 concurrent connections** per client, keyed by `$krt_limit_key` from `conf.d/00-maps.conf` —
+the full IPv4 address or the IPv6 `/64` (REQ-SEC-023). The token endpoint has a tighter
+`burst=10`. Rejections are **429**, never 503, or the maintenance intercept would answer a flood.
+Rejections land in the edge log at `warn`; a sustained flood raises `EdgeRateLimitSpike`.
+
+The limiter is only as good as the client address: it keys on what the PROXY header asserts, so an
+`EDGE_TRUSTED_PROXY` mismatch collapses it onto one bucket. `check-conformance.py`'s
+`client-address-visible` is the check. To exercise the limit (a load test — decide deliberately):
 
 ```bash
-# a burst above rate+burst must yield 429s, not the maintenance page
-for i in $(seq 1 120); do
-  curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/ &
-done | sort | uniq -c        # expect a mix of 200s and 429s, no 503
+for i in $(seq 1 120); do curl -s -o /dev/null -w '%{http_code}\n' https://profit-base.online/ & done | sort | uniq -c
+# expect 200s and 429s, no 503
 ```
 
----
+### Public certificates and ACME renewal
 
-## Keycloak behind NPM over HTTPS
-
-> **Historical, on two counts — read it as a record, not as instructions.** NPM was replaced by
-> native nginx on 2026-09-12 (ADR-0162), and `keycloak.profit-base.online` was retired on
-> 2026-09-13 (ADR-0166) when identity moved to `/auth` on the web host. What still holds unchanged
-> is the part this section exists for: Keycloak serves **HTTPS only** in production, both edges
-> that reach it are TLS, and the management interface stays plain HTTP because the image ships no
-> TLS-capable CLI client. The current addresses are in *Identity cutover* above.
-
-Keycloak no longer serves plain HTTP in production. The `keycloak` service starts with
-`--http-enabled=false --https-port=18443`, so **both** edges that reach it are now TLS:
-
-- **NPM → Keycloak** — `nginx-proxy-manager` terminates the public Let's Encrypt cert for
-  `keycloak.profit-base.online` and **re-encrypts** to `https://keycloak:18443` on the internal
-  `net-proxy-keycloak` network.
-- **backend → Keycloak** — the scheduled user sync (`KeycloakService`) reaches the same connector
-  directly over the isolated `net-backend-keycloak` network via `KEYCLOAK_ADMIN_URL=https://keycloak:18443`,
-  pinning the shared self-signed cert through the `keycloak-trust` SSL bundle.
-
-The management/health interface (port 9000) is deliberately kept on **HTTP**
-(`--http-management-scheme=http`): the Quarkus image ships no TLS-capable CLI client (only `java`),
-and the container `HEALTHCHECK` opens a plain-HTTP socket to `/health/ready` via bash `/dev/tcp`.
-That port is container-loopback only — it is never published nor placed on a proxy network.
-
-### Prerequisite — the shared keystore must carry `dns:keycloak`
-
-The backend keeps **hostname verification on** for the admin call (the synchronous JDK `HttpClient`
-cannot disable it reliably per-client), so the cert presented on `https://keycloak:18443` must list
-`keycloak` in its SAN. The shared `keystore.p12` historically did **not**. Regenerate it (this is
-the only cert the internal services present to each other; NPM's public Let's Encrypt cert is
-separate and untouched):
-
-The prod host has **no JDK** (containers only), so there is no host `keytool`.
-Don't install one — the backend image is `eclipse-temurin:25-jre-alpine`, which
-bundles `keytool`; run it as a throwaway container with the secrets dir mounted
-read-write:
+The `acme` container (lego, `docker/acme/publish-loop.sh`) runs every 12 hours: it renews the one
+multi-SAN certificate for `ACME_HOSTS` (HTTP-01 through the edge's webroot) once it is within 30
+days of expiry, and publishes it into the `edge-certs` volume for each host, readable by the edge's
+uid (REQ-OPS-026). It needs `ACME_EMAIL` and `ACME_HOSTS` in `.env`; with `ACME_HOSTS` empty it
+idles. The edge cannot be signalled by `acme`; `deploy.sh` fingerprints the served certificates
+through the edge every tick and recreates it when they change, so a renewal is live within one tick.
+`AcmeRenewalFailing` and `CertificateExpiringSoon` watch both halves.
 
 ```bash
-cd /var/iri/code
-
-# Keystore password (= the value in /var/iri/code/.env) and the backend image
-# already on the host. Falls back to the upstream base if the stack image can't
-# be resolved.
-PW=$(sudo grep -E '^SERVER_SSL_KEY_STORE_PASSWORD=' .env | cut -d= -f2-)
-IMG=$(sudo docker compose --profile prod config --images | grep basetool-backend | head -1)
-IMG=${IMG:-eclipse-temurin:25-jre-alpine}
-
-# Back up + remove the old keystore so keytool creates a fresh one (it refuses
-# otherwise: alias 'basetool' already exists).
-sudo cp /var/iri/secrets/keystore.p12 /var/iri/secrets/keystore.p12.bak
-sudo rm -f /var/iri/secrets/keystore.p12
-
-# Generate via the JRE inside the image: --user 0 so it can write into the
-# root-owned secrets dir; --entrypoint keytool overrides the app entrypoint.
-sudo docker run --rm --user 0 --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
-  -genkeypair -alias basetool -storetype PKCS12 -keystore /work/keystore.p12 \
-  -storepass "$PW" -keypass "$PW" \
-  -keyalg RSA -keysize 2048 -validity 3650 \
-  -dname "CN=basetool, OU=IRIDIUM, O=DAS KARTELL, C=DE" \
-  -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
-
-# Readable by BOTH the uid-10001 JVM services (via the group) AND the uid-1000
-# Keycloak image (via a POSIX ACL), WITHOUT world-read (see "5.2 PKCS12 keystore").
-# A plain 0640 with no ACL makes Keycloak crash with AccessDeniedException.
-sudo chown root:10001 /var/iri/secrets/keystore.p12
-sudo chmod 0640        /var/iri/secrets/keystore.p12
-sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12
-
-# Confirm the SAN carries dns:keycloak before restarting anything.
-sudo docker run --rm --entrypoint keytool -v /var/iri/secrets:/work "$IMG" \
-  -list -v -keystore /work/keystore.p12 -storepass "$PW" | grep -i keycloak
+${UPOD} logs --since 24h acme                     # the last renewal pass
+${UCTL} restart acme.service                      # run a pass now
+echo | openssl s_client -connect profit-base.online:443 -servername profit-base.online 2>/dev/null \
+  | openssl x509 -noout -enddate                   # what the edge is serving right now
 ```
 
-### Host steps
+Let's Encrypt allows five duplicate certificates per week for one SAN set; do not re-issue
+casually. `edge-certs` and `edge-acme-state` exist only in `iri`'s volume store and in the backup.
 
-1. **Ship the release that contains this change.** Cut + promote a version whose `basetool-backend`
-   image carries the `keycloak-trust` bundle and the `KeycloakService` TLS wiring (see
-   [Normal deploy flow](#normal-deploy-flow)). An *old* backend image pointed at the HTTPS admin URL
-   would fail the handshake.
-2. **Update the compose file on the host** — the new `keycloak` command/volumes and the backend
-   `KEYCLOAK_ADMIN_URL` live in `docker-compose.yml`, which is copied manually:
+### Keycloak Admin Console via SSH tunnel
 
-   ```bash
-   sudo cp docker-compose.yml /var/iri/code/docker-compose.yml
-   sudo chown deploy:docker   /var/iri/code/docker-compose.yml
-   ```
-3. **Regenerate the keystore** with `dns:keycloak` (previous section).
-4. **Reconfigure the NPM proxy host** for `keycloak.profit-base.online` (NPM admin UI on
-   `127.0.0.1:10081`): set **Forward Scheme = `https`** and **Forward Port = `18443`** (Forward
-   Hostname stays `keycloak`). nginx does **not** verify the upstream certificate by default, so the
-   self-signed cert is accepted with no extra toggle. The public SSL tab (Let's Encrypt) is unchanged.
-5. **Apply.** First re-create the services whose compose definition / image changed (`keycloak`
-   recreates for the new command + keystore mount; `backend` for the new image + `KEYCLOAK_ADMIN_URL`):
-
-   ```bash
-   sudo -u deploy /usr/bin/docker compose \
-       -f /var/iri/code/docker-compose.yml --profile prod \
-       up -d keycloak backend
-   ```
-
-   Then **restart `frontend` and `ingest`** so they reload the regenerated `keystore.p12`. This is
-   easy to miss: the keystore is a bind mount, so `up -d` does **not** recreate these two — but the
-   shared cert is loaded once at JVM start, both as each service's own HTTPS server cert *and* as its
-   `backend-trust` truststore. Without the restart they keep pinning the **old** cert and every
-   frontend/ingest → backend call fails with `PKIX path building failed` once the backend presents the
-   new one:
-
-   ```bash
-   sudo -u deploy /usr/bin/docker compose \
-       -f /var/iri/code/docker-compose.yml --profile prod \
-       restart frontend ingest
-   ```
-
-   The NPM proxy-host change (step 4) is applied live by nginx on save; restarting the `npm` container
-   is not required.
-
-### Verify
+The console, `https://profit-base.online/auth/admin`, is on the public vhost but locked to the host
+itself: `location ^~ /auth/admin` in `docker/edge/conf.d/10-frontend.conf.template` allows only
+the container-bridge gateways and — rendered by `render-and-run.sh` whenever the listeners speak
+PROXY protocol — `127.0.0.1` and `::1`, then `deny all`. Behind haproxy, a connection that
+originates on the host arrives as loopback, and loopback can only be produced by a process already
+on the host. `EDGE_ADMIN_ALLOW` can add literal addresses, never a prefix.
 
 ```bash
-# Keycloak is healthy (proves the HTTP management healthcheck still works after the HTTPS flip).
-sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod ps keycloak
-
-# Public OIDC discovery still resolves through the edge (re-encryption to keycloak:18443 works).
-# The address is post-ADR-0166; before that it was https://keycloak.profit-base.online/realms/iri/…
-curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
-
-# Backend user sync succeeds over TLS — no recurring "Failed to fetch users from Keycloak".
-sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
-    logs --since 5m backend | grep -i "fetch users from keycloak" || echo "no sync errors"
+ssh -N -L 443:127.0.0.1:443 root@<production host>
 ```
 
-A `PKIX path building failed` or `No subject alternative DNS name matching keycloak` in the backend
-log means the keystore was not regenerated with `dns:keycloak` — redo the prerequisite. As an
-emergency fallback only, revert `KEYCLOAK_ADMIN_URL` to `http://keycloak:18080` **and** drop
-`--http-enabled=false` from the `keycloak` command, then re-`up`; fix the cert and switch back.
-
----
-
-## Identity cutover: Keycloak moves to /auth on the web host (ADR-0166, one-off)
-
-This is a **cutover, not a rolling change.** The issuer string changes, so every token minted under
-the old one stops validating the moment it does — which is the intended end state (the owner ruled
-out a dual path: the Android app is with testers only, who install the matching build).
-
-Nothing stored is lost. Sessions end, and members sign in again.
-
-**Order matters, because the certificate and the DNS are what break loudly.**
-
-1. **Add the new Discord redirect URI first — this one is outside our infrastructure.** Keycloak's
-   Discord broker endpoint moves with the path, to
-   `https://profit-base.online/auth/realms/iri/broker/discord/endpoint`, and **Discord validates the
-   redirect URI against the list in its developer portal**. An unchanged registration fails every
-   Discord login with `Invalid OAuth2 redirect_uri` — raised by Discord, before Keycloak is reached,
-   so nothing in this repository or its CI can catch it. Discord accepts several redirect URIs per
-   application: **add** the new one alongside the old rather than replacing it, and the switch is
-   seamless in both directions. Remove the old entry once step 8 is done.
-   See [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
-2. **Ship the matching Android build, and raise the version floor with it** — or accept that the
-   app is dead between step 5 and that build reaching its testers. `OIDC_ISSUER` moves with the
-   server; a build pinned to `https://keycloak.profit-base.online/realms/iri` cannot authenticate
-   afterwards. Two things follow, and the second decides what a member actually sees:
-   - The new build must carry a **new `versionCode`**. Shipping the new issuer under the old code
-     leaves the server unable to tell the two builds apart, which disarms the wall below.
-   - **Raise `APP_ANDROID_MINIMUM_VERSION_CODE` to that code in the host `.env`**, and
-     `APP_ANDROID_LATEST_VERSION_CODE` with it. This is the difference between „install the new
-     version" and an unexplained login failure, and it keeps working *during* an auth outage on
-     purpose: the app's update wall reads `GET /api/v1/app/version-policy`, which is `permitAll()`,
-     and it is mounted **in front of** the auth flow rather than behind it — see the comment above
-     `UpdateGate(` in the app's `MainActivity`. Left at the old floor the wall never appears, for
-     exactly the case it was built for.
-
-   Neither number lives in the promoted bundle: `docker-compose.yml` passes
-   `${APP_ANDROID_MINIMUM_VERSION_CODE:-0}`, so a recreate cannot supply them and the host `.env`
-   is their only live value — the same trap as `IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI` in step 4.
-
-3. **Pull the new bundle** and check the edge before it serves anything:
-
-   ```bash
-   scripts/check-edge-nginx.sh
-   ```
-
-   It renders every vhost template and runs `nginx -t` with throwaway certificates. Four vhosts is
-   the expected count now, not five.
-
-4. **Update the host `.env`.** Three edits, and the third is the one a recreate cannot do for you:
-
-   - delete `EDGE_HOST_KEYCLOAK` and drop the Keycloak name from `ACME_HOSTS` — leaving them costs
-     nothing at run-time (the edge ignores an unused variable) but the certificate keeps a SAN for a
-     name nothing serves;
-   - **repoint `IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI`** to
-     `https://profit-base.online/auth/realms/iri/protocol/openid-connect/token`. It has **no default
-     anywhere** — `docker-compose.yml` passes `${IRI_INGEST_SERVICE_ACCOUNT_TOKEN_URI:-}` and the
-     ingest binding is empty-by-default — so the host `.env` is its only live value, and recreating a
-     container does not rewrite `.env`. Miss this and the ingest gateway keeps asking the retired
-     host for its token, which none of the verification steps below would notice;
-   - if `IRI_KEYCLOAK_HOSTNAME` is set (it is an optional override), move it and **include the
-     `/auth` path** — the issuer follows from it (ADR-0167), so there is no second value to keep in
-     step with. See step 5. If this host also sets `IRI_KEYCLOAK_ISSUER_URI` — which it should not
-     need to — that value overrides the derivation and has to be moved by hand as well;
-   - **and if `IRI_KEYCLOAK_HOST_ALIAS` is set, repoint it at the WEB host.** It exists for a host
-     whose NAT does not hairpin (REQ-OPS-022): the apps load their OIDC metadata from the issuer at
-     start-up, so the issuer's hostname has to resolve to something that answers from inside. After
-     ADR-0166 that name is `profit-base.online`, not a Keycloak host — an alias left on the old name
-     resolves nothing, backend, frontend and ingest time out fetching metadata, all three fail the
-     health gate and `docker compose up -d --wait` rolls the deploy back. Steps 7-9 would not catch
-     it earlier because they run after that.
-5. **Recreate `keycloak` and the edge together.** Keycloak comes up serving `/auth`
-   (`KC_HTTP_RELATIVE_PATH`) **and advertising `https://profit-base.online/auth`** — the path belongs
-   in `KC_HOSTNAME` as well, and the two must agree. Its management interface stays at the root
-   (`KC_HTTP_MANAGEMENT_RELATIVE_PATH`), so the container healthcheck's `/health/ready` and
-   Prometheus's `/metrics` are unaffected. The shipped compose already carries all three; you only
-   have to touch them if the host `.env` overrides `IRI_KEYCLOAK_HOSTNAME`.
-
-   > **The failure this invites is silent, and it is the one to watch for.** Setting only the
-   > relative path — leaving `KC_HOSTNAME` at the bare origin — produces a Keycloak that ANSWERS on
-   > `/auth` and ADVERTISES root issuer links. It reports **healthy**, its discovery document parses,
-   > and `backend`, `frontend` and `ingest` then die at start-up on
-   > `The Issuer "…/realms/iri" did not match the requested issuer "…/auth/realms/iri"` — which reads
-   > as a backend fault. ADR-0166 carries the measurement of all three combinations.
-
-6. **Recreate `backend`, `frontend` and `ingest`** so they pick up the new `KEYCLOAK_ISSUER_URI`.
-   A service left on the old issuer rejects every token with a signature/issuer mismatch, which
-   reads in the log as a Keycloak outage rather than as a stale container.
-7. **Verify, from outside:**
-
-   ```bash
-   curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration      | grep -o '"issuer":"[^"]*"'
-   ```
-
-   It must read `https://profit-base.online/auth/realms/iri`. **A root issuer** — `https://profit-base.online/realms/iri`,
-   with no `/auth` — is the misconfiguration this arrangement invites, and it means `KC_HOSTNAME` is
-   missing the path while `KC_HTTP_RELATIVE_PATH` has it (step 5). The doubled `/auth/auth` shape is
-   *not* what happens when the two agree; ADR-0166 has the measured table.
-
-8. **Sign in through the web app**, then **sign out**, and do it **once through Discord** as well:
-   the end-session redirect is the navigation that used to leave the origin, and the Discord broker
-   round trip is the one that depends on step 1 having been done. Neither half is covered by an
-   automated test — the e2e suite signs in with a local realm user against a stack that has no
-   Discord provider.
-
-9. **Retire `keycloak.profit-base.online` in DNS** once the above passes. Until then it resolves to
-   an edge with no vhost for it, which answers from the default server block rather than serving
-   Keycloak — harmless, but it will not work as a fallback and is not meant to.
-
-Grafana's own OIDC login (`docker-compose.monitoring.yml`) and the blackbox discovery probes move
-with the issuer and are already in the bundle; no separate step.
-
-## Keycloak Admin Console via SSH tunnel
-
-> **Address changed 2026-09-13 (ADR-0166).** The console is now
-> `https://profit-base.online/auth/admin`. Keycloak moved onto the web origin so the installed web
-> app's sign-in stays inside its manifest scope, and `keycloak.profit-base.online` **no longer
-> exists** — no vhost, no certificate SAN, no DNS purpose. The lock-down itself is unchanged: the
-> same four bridge gateways, the same closing `deny all`, now on the `/auth/admin` location of the
-> web vhost (`docker/edge/conf.d/10-frontend.conf.template`). Substitute the new host in the tunnel
-> steps below; everything else about them still holds.
-
-The Keycloak Admin Console (`https://profit-base.online/auth/admin`) is served on the public
-vhost but must never be reachable from the open internet. It is locked to an operator SSH tunnel:
-the edge allows the console **only** for connections that originate from the host itself, and the
-operator reaches the host over SSH.
-
-### How the lock-down works
-
-The operator opens a local port-forward to the edge's published `443` through the host loopback:
-
-```bash
-ssh -N -L 443:127.0.0.1:443 root@178.104.94.14
-```
-
-**The local port must be `443`.** Keycloak runs hostname-strict and the edge forwards `Host $host`
-with the port stripped, so Keycloak emits portless URLs; a tunnel on `:8443` or anything else ends
-in redirect loops and `Invalid parameter: redirect_uri`, which reads as a broken client and is not
-one. `PermitOpen` on the host admits `127.0.0.1:443` only, so the forward cannot be pointed
-anywhere else either.
-
-Then map the vhost to the tunnel so SNI and certificate still match. Either a hosts entry:
-
-```
-127.0.0.1  profit-base.online
-```
-
-Then `https://profit-base.online/auth/admin` reaches the console through the tunnel.
-
-> While that hosts entry is in place the **whole web app** resolves to the tunnel, not just the
-> console — which is new since ADR-0166 and worth knowing before you wonder why the app is slow or
-> logged out. Remove the line when you are done.
-
-The access control is an nginx `allow … / deny all` on the `/auth/admin` location of the web vhost,
-in `docker/edge/conf.d/10-frontend.conf.template` — in git, reviewable, and rendered at container
-start. (Until 2026-09-12 it was a *custom location* clicked into the NPM admin UI on the retired
-`keycloak.profit-base.online` proxy host; ADR-0162 moved it into the repository and ADR-0166 moved
-it to this address. The directives themselves are unchanged, which is the point:)
-
-or — no elevation, and it leaves the machine's name resolution alone — a throwaway Chrome profile:
+**The local port must be 443**: Keycloak is hostname-strict and emits portless URLs, so any other
+port ends in redirect loops and `Invalid parameter: redirect_uri`. If the host's sshd restricts
+forwarding with `PermitOpen`, `127.0.0.1:443` has to be in it. Then map the name to the tunnel —
+preferably in a throwaway browser profile, because since ADR-0166 the console shares its name with
+the whole app:
 
 ```bash
 chrome --host-resolver-rules="MAP profit-base.online 127.0.0.1:443" --user-data-dir=/tmp/kc-admin "https://profit-base.online/auth/admin"
 ```
 
-Since ADR-0166 this is the **better** of the two: the override lives in one browser profile, so the
-rest of the web app keeps resolving normally while the console is open — which the `hosts` entry
-above cannot do, because the console now shares its name with the app.
-
-```nginx
-allow 172.28.15.1;   # net-edge-ingress gateway — where the SSH tunnel arrives
-allow fd00:28:15::1; # net-edge-ingress gateway, IPv6
-allow 172.28.3.1;    # net-proxy-frontend gateway
-allow 172.28.4.1;    # net-proxy-keycloak gateway
-allow 172.28.7.1;    # net-proxy-ingest gateway
-allow 172.28.13.1;   # net-proxy-api gateway
-deny all;
-```
-
-Host-origin traffic — the tunnel hitting the published `443` via `127.0.0.1` — is DNATed in by
-Docker, so nginx sees a **bridge gateway**, not the operator's real IP. External clients keep their
-real public IP and hit `deny all`. `$remote_addr` is the real TCP peer, so an inbound
-`X-Forwarded-For` cannot influence the decision.
-
-**Which gateway is the load-bearing detail.** It is whichever bridge the published ports DNAT over,
-and that is `net-edge-ingress` alone since the five `net-proxy-*` bridges became `internal: true`
-(ADR-0162) — an internal network carries no DNAT. Both address families are listed because
-`-L 443:localhost:443` resolves to `::1` on a dual-stack host and then arrives on `fd00:28:15::1`.
-The four upstream gateways are kept for an in-container caller.
-
-> [!WARNING]
-> Adding `net-edge-ingress` on 2026-09-12 without adding its gateway here locked the console out
-> completely: every tunnelled request answered **403**, with the edge logging
-> `access forbidden by rule, client: 172.28.15.1`. Subnet pinning did not prevent it — no gateway
-> moved; the traffic simply started arriving on a different one. Any change to the edge's
-> `networks:` attachments has to be checked against this block.
-
-### Why the allowed IP used to change — and no longer does
-
-Before the subnets were pinned, Docker drew each bridge's subnet from its dynamic address pool, so
-a `docker compose down` / restart reassigned `net-proxy-*` a fresh subnet and moved its gateway
-(e.g. `172.24.0.1` → something else). The `/admin` allow-list then matched nothing and silently
-locked the console out until the new gateway was looked up by hand. The `ipam` blocks in
-`docker-compose.yml` now pin every bridge to a fixed `/24` under `172.28.0.0/16`, so the gateway
-the allow-list depends on is constant across restarts. **If you ever change those pinned subnets,
-or attach the edge to a different bridge, update this `/admin` block to match** — they move
-together.
-
-> This is an operator convenience, not a security boundary on its own: the console is still behind
-> Keycloak's own admin login. The IP lock-down is defence-in-depth so the admin login form is not
-> even reachable from the public internet.
+A `127.0.0.1 profit-base.online` hosts entry works too, and sends the entire web app through the
+tunnel while it is in place. A **403** means the allow-list and the arrival address disagree — read
+the edge log for `access forbidden by rule, client: …`. The console still requires Keycloak's own
+admin login; the lock-down keeps the login form off the internet. `edge-deny-probe.yml` checks
+daily that it answers 403/404 from outside.
 
 ---
 
-## Keycloak custom providers — Discord login SPI (epic #720)
+## Internal keystore and certificate rotation
 
-Discord login ships as a Keycloak provider JAR built from the `keycloak-spi` module
-(`DiscordIdentityProvider`, the fail-closed first-login membership gate, and the fail-open
-account-existence gate). Keycloak loads it from `/opt/keycloak/providers`, bind-mounted from the host
-at `/var/iri/code/keycloak/providers`.
+The shared `/var/iri/secrets/keystore.p12` is the internal TLS identity of backend, frontend,
+ingest and Keycloak, **and** their truststore: frontend and ingest pin it to call the backend, the
+backend pins it to call Keycloak, the edge verifies every upstream against its public half
+(`/var/iri/monitoring/certs/basetool-ca.crt`), and so do Prometheus and the blackbox exporter. So a
+rotation is one coordinated change, and **every consumer has to restart**: a JVM left on the old
+certificate fails with `PKIX path building failed`, and an edge left on the old CA answers every
+request with the maintenance page.
 
-**It is delivered automatically** (REQ-OPS-007,
-[ADR-0055](adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md)). The JAR rides the same
-pull-only, digest-pinned, deliberately-promoted GHCR channel as the app images and the config bundle,
-as its own cosign-signed `basetool-keycloak-spi` artifact (a `FROM scratch` image carrying only
-`keycloak-spi.jar`). It is a **separate** artifact from `basetool-config` because REQ-OPS-005 bars
-provider JARs from the config bundle. On promotion (`promote.yml`, in lock-step with the app images +
-config), the next `deploy.sh` tick resolves the `basetool-keycloak-spi:stable` digest,
-cosign-verifies it, stages the JAR into `/var/iri/code/keycloak/providers/keycloak-spi.jar`, and
-recreates **only** keycloak (`up -d --no-deps --force-recreate keycloak`, health-gated) so its
-`start` re-runs the provider build and loads the new JAR. On a health failure the previous JAR is
-restored and keycloak brought back, and the bad target backs off. A combined Keycloak-**image** +
-provider-JAR change stays operator-gated by the postgres/Keycloak carve-out above (the image change
-blocks the tick until `--force`).
+Its SAN must carry every name a peer dials: `backend`, `frontend`, `ingest`, `keycloak`, plus
+`localhost` and `127.0.0.1`. The backend keeps hostname verification on for the Keycloak admin
+call, so a keystore without `dns:keycloak` breaks the user sync. Keycloak serves HTTPS only
+(`--http-enabled=false`); its management port 9000 stays plain HTTP on container loopback for the
+healthcheck.
 
-The JAR is compiled to **Java-21 bytecode** to match the Keycloak runtime JVM; a mismatch surfaces as
-`UnsupportedClassVersionError` at provider load (caught by the deploy health gate, which then rolls
-the JAR back). The Discord OAuth application, the realm identity provider, the `discord_user_id`
-mappers, the membership-gate flow config and the account-existence precheck env vars are one-time
-operator steps in [`docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md). An
-empty or missing providers dir is harmless (Keycloak simply finds no extra providers).
+**When:** before `SelfSignedCertificateExpiring` (90 days out; `iri-cert-expiry` reads
+`basetool-ca.crt` daily), or at once after a suspected key compromise. It is a short outage of the
+whole app — schedule it.
 
-**Manual staging** (fallback, or first bootstrap before the `basetool-keycloak-spi` artifact has been
-promoted):
+The host has no JDK; `keytool` runs from the backend image, rootless, with the password taken from
+`.env` through the environment rather than the command line:
 
 ```bash
-# 1. Build the provider JAR (on a build host with the JDK 25 toolchain).
-./gradlew :keycloak-spi:jar      # -> keycloak-spi/build/libs/keycloak-spi-<version>.jar
+cd /
+IRI_UID=$(id -u iri); B=$(grep '^iri:' /etc/subuid | cut -d: -f2)
+UCTL="sudo -u iri XDG_RUNTIME_DIR=/run/user/${IRI_UID} systemctl --user"; UPOD="sudo -u iri podman"
 
-# 2. Stage it on the Keycloak host, world-readable (0644) so the uid-1000 Keycloak image can read it
-#    — the same lesson as the shared keystore.p12; 0640 makes Keycloak ignore (or fail to read) it.
-sudo install -D -m 0644 keycloak-spi-*.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
+# 1. No deploy tick in between.
+systemctl stop iri-deploy.timer && flock /var/lock/iri-deploy.lock true
 
-# 3. Recreate Keycloak so the `start` command re-runs the provider build and discovers the JAR.
-sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
-    up -d --no-deps --force-recreate keycloak
+# 2. Keep the old keystore as the rollback, and clear the name (keytool refuses an existing alias).
+install -m 0600 -o root -g root /var/iri/secrets/keystore.p12 /var/iri/secrets/keystore.p12.bak
+rm -f /var/iri/secrets/keystore.p12
 
-# 4. Verify the provider registered (no SPI load error in the log; "Discord" selectable as a Social IdP).
-sudo -u deploy /usr/bin/docker compose -f /var/iri/code/docker-compose.yml --profile prod \
-    logs --since 2m keycloak | grep -iE "error|exception|providers" | head
+# 3. Generate. --user 0 in a rootless container is `iri` on the host, which owns /var/iri/secrets.
+IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
+export KS_PW="$(sed -n 's/^SERVER_SSL_KEY_STORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+sudo --preserve-env=KS_PW -u iri podman run --rm --user 0 -e KS_PW --entrypoint keytool \
+  -v /var/iri/secrets:/work "${IMG}" \
+  -genkeypair -alias basetool -storetype PKCS12 -keystore /work/keystore.p12 \
+  -storepass:env KS_PW -keyalg RSA -keysize 2048 -validity 3650 \
+  -dname "CN=basetool, OU=IRIDIUM, O=DAS KARTELL, C=DE" \
+  -ext "san=dns:localhost,ip:127.0.0.1,dns:backend,dns:frontend,dns:ingest,dns:keycloak"
+unset KS_PW
+
+# 4. Ownership for the containers (app group 10001, keycloak 1000 by ACL) and the backup helper (iri).
+chown root:$((B + 10001 - 1)) /var/iri/secrets/keystore.p12
+chmod 0640 /var/iri/secrets/keystore.p12
+setfacl -m u:$((B + 1000 - 1)):r -m u:iri:r /var/iri/secrets/keystore.p12
+restorecon -F /var/iri/secrets/keystore.p12
+getfacl -p /var/iri/secrets/keystore.p12          # group::r--, user:100999:r--, user:iri:r--, mask::r--
+
+# 5. Re-export the public half (openssl prompts for the password; add -legacy after `pkcs12`
+#    if OpenSSL 3 rejects the keytool-made file). Confirm the SAN.
+openssl pkcs12 -in /var/iri/secrets/keystore.p12 -clcerts -nokeys \
+  | openssl x509 -out /var/iri/monitoring/certs/basetool-ca.crt
+chmod 0644 /var/iri/monitoring/certs/basetool-ca.crt
+restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
+openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -enddate -ext subjectAltName
+
+# 6. Restart every consumer; each blocks until healthy.
+${UCTL} restart keycloak.service backend.service ingest.service frontend.service edge.service
+${UCTL} restart prometheus.service blackbox-exporter.service
+systemctl start iri-cert-expiry.service          # re-read the certificate files now, not at 03:40
+
+# 7. Verify, then resume.
+curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
+${UPOD} logs --since 5m backend | grep -iE 'PKIX|subject alternative|fetch users from keycloak' || echo "no TLS errors"
+systemctl start iri-deploy.timer
 ```
 
----
+Then run `check-conformance.py --ssh root@<host> --only scrape-targets-up --only
+containers-running` from the workstation. The monitoring-side follow-ups — Grafana's own
+certificate, the `blackbox-internal-tls` probes, what to check in the meta-monitoring dashboard —
+are in [`monitoring/README.md`](../monitoring/README.md). If Keycloak's Discord precheck uses a
+backend truststore (`KRT_BACKEND_TRUSTSTORE_PATH` in `.env`), rebuild it from the new certificate
+per [`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
 
-## Manual deploy / rollback
-
-### Pin to a specific version (forward or backward)
-
-```bash
-sudo -u deploy /var/iri/code/scripts/deploy.sh --tag 1.4.2
-```
-
-Any tag the registry resolves works: `latest`, `edge`, `1.4.2`, `1.4`,
-`sha-abc1234`. The script then continues to poll `:stable` on the next
-timer tick — so a manual `--tag 1.4.2` is **not** persistent. If you want
-a sticky rollback, also flip `:stable` itself:
-
-```bash
-gh workflow run promote.yml -f version=1.4.2
-```
-
-Now subsequent timer ticks pick up `1.4.2` as `:stable` and the rollback is
-durable.
-
-### Dry-run check
-
-```bash
-sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only
-```
-
-Resolves the digest the next deploy would target **and cosign-verifies every
-resolved digest** against the release-images identity (REQ-OPS-015), reporting
-per artifact. No restarts, no metric written. Exits non-zero if any signature
-does not verify — so this doubles as the repeatable signature preflight (it runs
-cosign as the `deploy` user, exactly as a real deploy would).
-
-### Force a fresh pull regardless of digest match
-
-```bash
-sudo rm /var/lib/iri/last-deployed.digests
-sudo systemctl start iri-deploy.service
-```
-
-Useful after restoring `/var/lib/iri/` from a backup or for re-applying
-after a host migration.
-
-### Restarting the stack manually
-
-If you ever bring the stack up by hand (after a `docker compose down`, a host
-reboot with auto-start disabled, …), **always include the digest-pin overlay**:
-
-```bash
-sudo -u deploy docker compose \
-    -f /var/iri/code/docker-compose.yml \
-    -f /var/lib/iri/current-digest-pin.yml \
-    --profile prod up -d
-```
-
-A plain `docker compose --profile prod up -d` resolves `:stable` from the
-**local image cache**, which `deploy.sh` never refreshes (it always pulls by
-digest) — so it can silently start an outdated build against a newer database
-(schema-validation crash loop; this is exactly the 2026-07-02 incident). The
-pin overlay starts the digests the last successful deploy applied. The simplest
-safe restart is usually just:
-
-```bash
-sudo systemctl start iri-deploy.service
-```
-
-Since the drift verification (REQ-OPS-013), a stack started off the wrong
-image — or left down or unhealthy — self-heals on the next timer tick: the
-matching marker no longer short-circuits the run when the running containers
-do not match the pinned digests. Corollary: for **planned downtime**, stop the
-timer first, or the next tick will bring the stack back up. Stopping the timer
-does **not** stop an already-running deploy — wait for the in-flight run (the
-`flock` barrier blocks on the same lock `deploy.sh` holds for its whole
-lifetime, covering a manual invocation too) before taking the stack down:
-
-```bash
-sudo systemctl stop iri-deploy.timer      # before the maintenance window
-sudo flock /var/lock/iri-deploy.lock true # wait for an in-flight deploy run
-sudo systemctl start iri-deploy.timer     # after the maintenance window
-```
+**Rollback:** move `keystore.p12.bak` back, repeat steps 4–6. The next nightly backup captures the
+new keystore; restic does not carry POSIX ACLs, so a restore re-applies step 4 by hand.
 
 ---
 
 ## Signature verification (cosign)
 
-Every image the host is about to run is cosign-verified on the box before it is
-pulled, extracted or applied (REQ-OPS-015, [ADR-0075](adr/0075-host-side-cosign-signature-verification.md)).
-This is the **host half** of the supply-chain seam; `promote.yml`'s pre-flight
-verify is the CI half. The host re-resolves `:stable` independently on every
-timer tick, so the CI verify alone does not bind what `:stable` points at when
-the host later pulls it — a `:stable` tag moved out-of-band (a leaked
-`packages:write` credential retagging an arbitrary digest, bypassing
-`promote.yml`) would otherwise be pulled and run unverified.
-
-What `deploy.sh` does, once a tick is committed to applying (past the idempotence
-no-op, `--check-only` and the bad-digest backoff) and **before** the first
-`pull` / `docker create` / `docker cp` / `up`:
+Every artifact the host is about to run is cosign-verified on the host before it is pulled,
+extracted or applied (REQ-OPS-015, ADR-0075) — the host half of the supply-chain seam whose CI half
+is `promote.yml`. The host re-resolves `:stable` on every tick, so without this a `:stable` moved
+out-of-band would be pulled unverified.
 
 ```
 verifying image signatures (cosign keyless)
@@ -1585,253 +768,132 @@ verifying image signatures (cosign keyless)
   keycloak-spi: signature OK
 ```
 
-Each `image@digest` is verified against the **release-images** workflow identity
-`…/release-images.yml@refs/(heads/main|tags/v.+)` and the GitHub OIDC issuer —
-the same identity `promote.yml` uses. The `@refs/` pin accepts only main-branch
-and tagged builds, so an image built by a `workflow_dispatch` run of
-`release-images` off an arbitrary feature branch is **not** trusted for prod.
+- Identity `https://github.com/krt-profit/basetool/.github/workflows/release-images.yml@refs/(heads/main|tags/v.+)`,
+  issuer `https://token.actions.githubusercontent.com` — the same as `promote.yml`. A
+  `workflow_dispatch` build off a feature branch is not trusted.
+- **Fail-closed**, with three attempts and doubling delay first (`IRI_COSIGN_VERIFY_ATTEMPTS`,
+  `IRI_COSIGN_VERIFY_DELAY`), so a registry blip is not a security alarm; the abort quotes cosign's
+  own error and records `DeployFailed`.
+- **Break-glass**, only for a Sigstore outage that blocks every deploy, logged on every skip:
+  `cd / && sudo -u deploy IRI_COSIGN_VERIFY=false /var/iri/code/scripts/deploy.sh --force`.
+- `IRI_COSIGN_REPO`, `IRI_COSIGN_IDENTITY_REGEXP`, `IRI_COSIGN_OIDC_ISSUER` override the identity
+  for a fork; `deploy.sh --help` lists every variable.
 
-- **Fail-closed.** A verification failure aborts the tick non-zero, records a
-  deploy-failure metric (so the `DeployFailed` alert fires), and applies nothing.
-  A moved `:stable` is a supply-chain incident, not a silent skip.
-- cosign reads the registry credential from the same `DOCKER_CONFIG` the
-  `docker login` writes; keyless verify additionally reaches the Sigstore
-  public-good Fulcio/Rekor roots over the outbound HTTPS the host already uses.
-- **Break-glass.** `IRI_COSIGN_VERIFY=false` disables the gate for a run — use it
-  **only** to ride out a Sigstore public-good outage that is blocking every
-  deploy; every skipped verification is logged as a `WARNING`. Re-enable it the
-  moment Sigstore recovers:
+**The host cosign** is installed by the role (`15-cosign.yml`) from the upstream release, verified
+against the sha256 pinned in `ansible/roles/basetool_host/defaults/main.yml`
+(`basetool_host_cosign_version`, currently v3.1.3) — it is in no Rocky or EPEL repository. It must
+never be an older major than the cosign CI signs with (`sigstore/cosign-installer`, v4.1.2 →
+cosign 3.x): cosign 2.x cannot verify 3.x signatures, and the fail-closed gate would stop every
+deploy. To upgrade: change the version and the checksum in `defaults/main.yml` in a reviewed commit,
+then `ansible-playbook site.yml --limit production --tags cosign`, then
+`cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only` as the proof.
 
-  ```bash
-  # emergency only — Sigstore outage
-  sudo -u deploy IRI_COSIGN_VERIFY=false /var/iri/code/scripts/deploy.sh --force
-  ```
-
-The trusted identity is overridable for a fork via `IRI_COSIGN_REPO` /
-`IRI_COSIGN_IDENTITY_REGEXP` / `IRI_COSIGN_OIDC_ISSUER` (see `deploy.sh --help`);
-the defaults match this repository's `release-images.yml`.
-
-### Updating cosign
-
-cosign is a single static binary, so an update is an in-place replace with the
-**same download + checksum-verify pattern** used at bootstrap, pointing at the new
-version. No service restart is needed — the next `iri-deploy.timer` tick picks up
-the new `/usr/local/bin/cosign`. Back the old binary up first so a rollback is a
-single `mv`, then replace it:
-
-```bash
-sudo cp -a /usr/local/bin/cosign /usr/local/bin/cosign.bak
-
-COSIGN_VERSION=v3.1.3
-arch=$(dpkg --print-architecture)
-cd /tmp
-rm -f "cosign-linux-${arch}" cosign_checksums.txt        # clear any earlier attempt
-curl -fsSLo "cosign-linux-${arch}" "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-${arch}"
-curl -fsSLo cosign_checksums.txt   "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
-grep " cosign-linux-${arch}\$" cosign_checksums.txt | sha256sum -c -   # expect: cosign-linux-<arch>: OK
-sudo install -m 0755 "cosign-linux-${arch}" /usr/local/bin/cosign     # overwrites the old binary
-rm -f "cosign-linux-${arch}" cosign_checksums.txt
-cosign version                                                        # expect v3.1.3
-```
-
-Chain the steps with `&&` when pasting them as a one-liner, so a failed checksum
-aborts instead of falling through to `install`. Rolling back is
-`sudo mv /usr/local/bin/cosign.bak /usr/local/bin/cosign`.
-
-**Do not check the download against a differently-named file.** `sha256sum -c`
-takes the filename from the checksum line (`cosign-linux-amd64`) and resolves it
-against the working directory, so downloading to `/tmp/cosign` makes the check
-report `No such file or directory` — a *skipped* verification, not a passed one.
-That bug sat in both blocks of this runbook until 2026-08-06. It never installed
-anything unverified: the skipped check still exits non-zero, so it fails the same
-way a real checksum mismatch does — but only if the steps are `&&`-chained or run
-one at a time with the output actually read.
-
-Then **prove the host can verify a real CI-signed image** before relying on the
-gate — verify the live `:stable` against the release-images identity (any artifact;
-backend shown). cosign reads the registry credential from your docker login:
-
-```bash
-# Authenticate to GHCR (reuse the deploy pull token, or your own read:packages PAT):
-sudo cat /etc/iri/ghcr-pull-token | docker login ghcr.io -u deploy-bot --password-stdin
-
-cosign verify ghcr.io/krt-profit/basetool-backend:stable \
-  --certificate-identity-regexp 'https://github.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v.+)' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
-
-A clean verify (the certificate + Rekor details print, exit 0) confirms the host
-cosign validates the CI's signatures — this is exactly the check `deploy.sh` runs
-internally (REQ-OPS-015). If it instead errors with a bundle/format complaint, the
-host cosign is **older** than the version the CI signed with — bump it further.
-Run `sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only` as a final smoke
-test — it cosign-verifies the current `:stable` as the `deploy` user without
-applying anything, and exits non-zero if verification fails.
-
-## Docker access hardening
-
-`iri-deploy.service` runs as the unprivileged `deploy` user, but that user is in
-the `docker` group so it can drive `docker compose`. Be clear-eyed about what that
-bounds: **docker-group membership is effectively root on the host** — the group
-can `docker run -v /:/host …` and read or overwrite anything. So the `deploy`
-user is not a hard privilege boundary against a *fully compromised* `deploy.sh`.
-
-What actually contains the risk today:
-
-- **The host-side signature gate (REQ-OPS-015).** `deploy.sh` refuses to run any
-  image not signed by our `release-images` identity, so a moved `:stable` tag or a
-  stolen GHCR pull token cannot get attacker-controlled code onto the box in the
-  first place — which is the realistic threat, not the operator's own script
-  turning malicious.
-- **The systemd sandbox** on the unit (`NoNewPrivileges`, `ProtectSystem=strict`,
-  the seccomp `SystemCallFilter=@system-service`, an empty `CapabilityBoundingSet`,
-  a narrow `ReadWritePaths`, restricted address families) confines the `deploy.sh`
-  *process* itself.
-
-**Deferred, would shrink the docker-group surface itself** (a larger change, not
-yet done): put a **read-restricted docker-socket-proxy**
-(`tecnativa/docker-socket-proxy`) in front of the daemon and point `deploy.sh` at
-it via `DOCKER_HOST`, exposing only the API verbs the deploy needs; or move to
-**rootless Docker**. Both re-architect how `deploy.sh` reaches the daemon and need
-host validation, so they are tracked separately rather than bundled here.
+---
 
 ## Token rotation
 
-GHCR pull tokens are scoped to the basetool repo with `Packages: Read`
-only. Rotate every 90 days, or immediately on any suspicion of leak. If the token
-**expires**, you do not have to watch the calendar: `deploy.sh` publishes the
-recorded expiry as `basetool_ghcr_token_expiry_timestamp`, and the
-**GhcrPullTokenExpiring** alert warns ~2 weeks out (**GhcrPullTokenExpired** is
-critical). The expiry alerts are **opt-in** — they only fire when a `.expiry`
-sidecar records a date; a deliberately **non-expiring** token has no `.expiry`
-file and is not alerted on (rotate it on your own schedule instead). Rotate:
+The GHCR pull token has to be a **classic** PAT: GitHub Packages does not accept fine-grained
+tokens. Scope `read:packages` only, 90-day expiry, authorised for the organisation's SSO if
+enforced. Its scope is account-wide, which the short expiry compensates for. `RELEASE_TOKEN` is a
+separate CI secret and unrelated.
+
+If the token expires, record the date in the sidecar: `deploy.sh` publishes it every tick as
+`basetool_ghcr_token_expiry_timestamp`, and `GhcrPullTokenExpiring` (under 14 days) /
+`GhcrPullTokenExpired` fire from it. No sidecar, no metric, no alert — deleting the sidecar removes
+the metric on the next tick.
 
 ```bash
-# 1. Generate a new fine-grained PAT in GitHub (same scopes as before).
-
-# 2. Replace the token file atomically.
-sudo install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.new <<< 'github_pat_new_token'
-sudo mv /etc/iri/ghcr-pull-token.new /etc/iri/ghcr-pull-token
-# ...and update the expiry sidecar IF the token expires (skip for a non-expiring token):
-echo '2027-01-01' | sudo install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry
-
-# 3. Force a deploy run to verify the new token works (and refresh the metric).
-sudo systemctl start iri-deploy.service
-tail -n 50 /var/log/iri-deploy.log      # NOT journalctl — the unit appends here instead
-
-# 4. Revoke the old token in GitHub's PAT page only AFTER step 3 succeeded.
+# 1. Create the new classic PAT in GitHub.
+# 2. Install it without putting it in shell history or the process list.
+read -rs TOKEN
+printf '%s\n' "${TOKEN}" | install -m 0600 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.new
+unset TOKEN
+mv /etc/iri/ghcr-pull-token.new /etc/iri/ghcr-pull-token
+echo '2026-12-21' | install -m 0640 -o deploy -g deploy /dev/stdin /etc/iri/ghcr-pull-token.expiry   # only if it expires
+# 3. Prove it before revoking the old one.
+cd / && sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only && tail -n 20 /var/log/iri-deploy.log
+# 4. Revoke the old token in GitHub.
 ```
 
-> A GitHub App installation token (auto-refreshing, no 90-day cliff) could replace
-> the PAT entirely, but a pull-only host has no clean way to run the App-token
-> exchange without adding a credential-refresh service — deferred as a larger
-> change. The expiry alert makes the PAT's cliff non-silent in the meantime.
+---
+
+## Weekly container cleanup
+
+`iri-container-cleanup.timer` (Saturday 02:00 UTC) runs
+[`scripts/container-cleanup.sh`](../scripts/container-cleanup.sh) as `deploy` through the runtime
+seam: stopped containers older than 24 h, unused images older than 14 days (outliving the deploy
+rollback anchor), unused networks older than 24 h. Each is overridable with `IRI_CLEANUP_*`
+(`--help`).
+
+**Two steps are Docker-only, deliberately (ADR-0194).** `podman builder prune` is only an alias for
+`image prune`, so it is skipped. And **`podman volume prune` is never run**: unlike Docker's, it
+removes every volume not currently attached — `edge-certs` and `edge-acme-state` included whenever
+the stack is down. The anonymous-volume leak Docker's prune used to absorb is fixed at its source
+(`rt_rm_force` removes a container with its anonymous volume). Never run `podman volume prune` by
+hand on this host either. Data under `/var/iri` is bind-mounted and out of every prune's reach.
+
+```bash
+cd / && sudo -u deploy /var/iri/code/scripts/container-cleanup.sh --dry-run   # the plan and current usage
+systemctl start iri-container-cleanup.service && tail -f /var/log/iri-container-cleanup.log
+```
+
+`ContainerCleanupStaleOrMissing` fires when the last success is over eight days old.
+
+---
+
+## Open follow-up: decommission the retired Docker host
+
+`ubuntu-8gb-nbg1-1` was shut down after the cutover on 2026-09-22, with its `iri-deploy.timer`
+**disabled** so that bringing it back cannot pull anything promoted since. Until the owner decides
+to delete it, [`PODMAN_CUTOVER_RUNBOOK.md` §2](archive/PODMAN_CUTOVER_RUNBOOK.md) is the way back:
+shut the new host down, bring the old one up on the configuration it has, revert DNS — losing any
+writes made on the new host since. Once it is deleted, that section stops applying and this entry
+goes.
 
 ---
 
 ## Troubleshooting
 
-**"Where to look" means Loki, not journald.** `deploy.sh`'s output goes to
-`/var/log/iri-deploy.log` via `StandardOutput=append:`, which *replaces* journald
-for that stream — `journalctl -u iri-deploy.service` shows the unit's start/exit
-records and nothing the script wrote. Alloy tails that file into Loki as
-`{app="ops-deploy"}` (Grafana → Explore → Loki), which is reachable without an SSH
-session to the production host and is where the deploy alert annotations point.
-`/var/log/iri-deploy.log` remains the on-host equivalent, and is the only place the
-GHCR account name is unmasked.
-
-|                              Symptom                              |                               Where to look                               |                                                                                                                                  Common cause                                                                                                                                   |
-|-------------------------------------------------------------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Timer fires but image never updates                               | Loki `{app="ops-deploy"}` (or `/var/log/iri-deploy.log`)                  | `:stable` not yet promoted. Run `gh workflow run promote.yml -f version=...`.                                                                                                                                                                                                   |
-| `docker login` fails                                              | Loki `{app="ops-deploy"} \|~ "logging in to\|docker login"`               | Expired or revoked PAT. See *Token rotation*. The GHCR account name is masked in Loki (REQ-OBS-004); the unmasked line is in `/var/log/iri-deploy.log`.                                                                                                                         |
-| Health check times out                                            | `docker compose ps`, `docker logs <service>`                              | New version broken; the script auto-rolls back. Inspect the rolled-back container's logs for the root cause.                                                                                                                                                                    |
-| Service stays "unhealthy" after rollback                          | `docker logs db-backend` etc.                                             | Infrastructure-side problem (disk full, DB corruption). Not caused by the deploy.                                                                                                                                                                                               |
-| Keystore mount fails / Keycloak `AccessDeniedException`           | `docker compose logs keycloak`, `getfacl /var/iri/secrets/keystore.p12`   | Keystore missing, or the uid-1000 ACL entry is gone. The file is `0640 root:10001` (JVM services read via the group) plus `user:1000:r--` for Keycloak. Re-add it: `sudo setfacl -m u:1000:r /var/iri/secrets/keystore.p12`. A rewrite that dropped the ACL is the usual cause. |
-| `IRI_KEYSTORE_HOST_PATH` referenced but file not present          | `.env`                                                                    | Sync `.env` and `/var/iri/secrets/keystore.p12` between path and contents.                                                                                                                                                                                                      |
-| Compose pulls but does not restart                                | Loki `{app="ops-deploy"}`                                                 | All target digests match the last-deployed digests **and** the running stack was verified against them — that is the idempotent no-op path. Force-clear `/var/lib/iri/last-deployed.digests` if you want a forced restart.                                                      |
-| Stack comes back up on its own after a manual `down`              | Loki `{app="ops-deploy"} \|~ "drift:"` (`drift: <service>: no container`) | The drift verification (REQ-OPS-013) self-heals a down/drifted stack on the next tick. For planned downtime, `systemctl stop iri-deploy.timer` first and wait for an in-flight run. See *Restarting the stack manually*.                                                        |
-| `CARVE-OUT: postgres/Keycloak image pin changed`                  | Loki `{app="ops-deploy"} \|~ "CARVE-OUT"`, `config-blocked.marker`        | A promoted bundle bumps a Postgres/Keycloak image. Auto-apply is gated by design. Do the manual upgrade (see *Stateful-infra upgrades*), then `deploy.sh --force`.                                                                                                              |
-| Redis pin bump on `main` never reaches prod                       | Loki `{app="ops-deploy"}`                                                 | Not yet promoted. Cut a release and run `promote.yml` — the new compose ships as `basetool-config` and applies on the next tick. See *Infra / host-config bumps*.                                                                                                               |
-| `WARN volume "code_edge-certs" ... not created by Docker Compose` | every deploy                                                              | Expected and harmless. **Do not "fix" it** — see below.                                                                                                                                                                                                                         |
-
-### The `code_edge-certs` warning is expected — leave it alone
-
-Every `deploy.sh` run prints:
-
-```
-WARN[0000] volume "code_edge-certs" already exists but was not created by Docker Compose.
-Use `external: true` to use an existing volume
-```
-
-The volume carries no `com.docker.compose.*` labels because it was created by hand at 12:29:42 on
-2026-09-12 — eleven minutes before `edge-acme-webroot` and `edge-acme-state`, which the first
-`compose up` created and labelled. It was pre-seeded during the ADR-0162 edge migration so the edge
-had a certificate to start with. Compose cannot label an existing volume and Docker offers no way to
-add labels afterwards, so the warning is permanent.
-
-**The unlabelled state protects the certificates rather than endangering them.** `docker compose
-down --volumes` removes volumes by *project label*, not by the names declared in the file —
-reproduced locally on 2026-09-14 with a throwaway two-volume project: `down --volumes` deleted the
-compose-created volume and left the hand-made one untouched. So on this host a `down --volumes`
-would destroy `edge-acme-state` (the **ACME account key**) and `edge-acme-webroot` while the
-certificates survive. That is the opposite of what the warning suggests, and it is the part worth
-remembering.
-
-Both fixes the warning invites are worse than the warning:
-
-- **`external: true`** makes compose refuse to *create* the volume, so a fresh host — the
-  disaster-recovery path — fails its first `compose up` until somebody runs `docker volume create`
-  by hand.
-- **Adopting it** means deleting the volume and letting compose recreate it, with the certificates
-  copied out and back across a window in which the edge has no TLS material.
-
-Nothing in `deploy.sh`, this runbook or any workflow runs `down --volumes`; it takes a human typing
-`-v`. Leave it, and do not touch it during an incident.
+| Symptom | Where to look | Common cause |
+|---|---|---|
+| Timer fires, nothing updates | `/var/log/iri-deploy.log`, Loki `{app="ops-deploy"}` | `:stable` not promoted yet; or the target is in its backoff window (`in backoff window` in the log) |
+| `login to ghcr.io failed` / `cannot resolve …:stable` | the same log | expired or revoked token, or `deploy` cannot read it — see [Token rotation](#token-rotation) |
+| `SECURITY: cosign signature verification failed` | the same log, it quotes cosign | Sigstore/GHCR outage (it retried three times), or a genuinely untrusted digest — treat as a supply-chain incident until disproved |
+| `no lingering user could be found` / `cannot chdir to /root` | the command's own output | run from `/`; `iri` must linger (`ls /var/lib/systemd/linger`) |
+| Health check fails, rollback | `${UPOD} ps`, `${UPOD} logs <svc>`, `${UCTL} status <svc>.service` | a broken release — inspect the rolled-back container's logs |
+| Container never starts, `statfs …: no such file or directory` | `${UCTL} status <svc>.service` | a missing bind-mount source — see [Secrets and host-only files](#secrets-and-host-only-files) |
+| keycloak cannot read `/run/secrets/keystore.p12` | `${UPOD} logs keycloak`, `getfacl -p /var/iri/secrets/keystore.p12` | the ACL for uid 100999 is missing — re-apply step 4 of the [rotation](#internal-keystore-and-certificate-rotation) |
+| backend/frontend/ingest die on the OIDC issuer (`Connect timed out`, `did not match`) | `${UPOD} logs backend` | missing public-name alias drop-in (ADR-0196), or `IRI_KEYCLOAK_HOSTNAME` without its `/auth` path (ADR-0167) |
+| every request logged from one internal address | `${UPOD} logs edge` | `EDGE_TRUSTED_PROXY` does not name all six pinned addresses — see [The edge](#the-edge) |
+| `curl: … wrong version number` on 443 | `journalctl -u haproxy`, `${UPOD} logs edge` | `EDGE_TRUSTED_PROXY` empty: the edge's listeners are plain while haproxy sends a PROXY header |
+| nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
+| Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
+| `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
+| A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
+| Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |
 
 ---
 
 ## Why this design
 
-A few decisions worth keeping in mind when you touch any of the pieces:
-
-- **Pull, not push.** The server never accepts inbound connections from
-  GitHub. A compromised Actions workflow or stolen `GITHUB_TOKEN` cannot
-  drive code execution on the production host. The PAT on the server can
-  only *read* images that were already published.
-- **Digest pin between resolution and apply.** `deploy.sh` resolves
-  `:stable` to concrete digests (backend + frontend + ingest), writes them
-  into a compose override, and applies *that*. A `:stable` flip in GHCR mid-deploy cannot
-  partially apply a half-promoted release; it would only be picked up by
-  the next timer tick.
-- **Verify before apply (host-side signature gate).** Resolving `:stable` to a
-  digest is not the same as trusting it. `deploy.sh` cosign-verifies every
-  resolved digest against the `release-images` keyless signature before it pulls
-  or applies anything ([REQ-OPS-015](specs/deployment-delivery.md), [ADR-0075](adr/0075-host-side-cosign-signature-verification.md)) —
-  so a `:stable` tag moved out-of-band to an untrusted digest (a leaked
-  `packages:write` credential, not the operator running `promote.yml`) is
-  rejected on the box, not deployed. `promote.yml`'s CI verify and this host
-  verify are the two halves of one seam; the host half closes the TOCTOU between
-  "verified at promote time" and "re-resolved on the next tick". See *Signature
-  verification (cosign)*.
-- **Health gate + auto-rollback.** `docker compose up --wait
-  --wait-timeout 180` exits non-zero if any service is not healthy in
-  three minutes. The script holds the previous digest pin **and** a snapshot of
-  the previous config tree, and restores both before exiting non-zero, so a bad
-  release self-heals to the last known-good revision within roughly five minutes.
-- **Config rides the image channel, not a side channel.** The compose file and
-  its asset trees ship as the signed, digest-pinned `basetool-config` artifact
-  promoted in lock-step with the images ([ADR-0049](adr/0049-config-as-promotable-oci-artifact.md)).
-  This keeps the host on a single read-only GHCR credential (no git key, no SSH,
-  no new tool), makes the running config content-addressed instead of an untracked
-  manual copy, and folds the config digest into the idempotence marker so a
-  config-only change (a redis pin bump) is detected — closing the gap where the
-  app-only marker silently skipped it. The stateful-infra carve-out keeps a
-  Postgres/Keycloak major from being applied by a blind `up -d`.
-- **No image holds the keystore.** This is checked twice — by
-  `.gitignore` (CI's checkout never has the file) and by `.dockerignore`
-  (no local `docker build` accidentally bakes it in). The production
-  keystore lives only on the server, in a root-owned `0640` file with a POSIX
-  ACL granting read to the two container uids (10001 via the group, 1000 via
-  `setfacl -m u:1000:r`) — so both the JVM services and the Keycloak image read
-  the shared self-signed cert without it being world-readable; root ownership
-  still blocks the deploy user from rewriting it.
+- **Pull, not push.** The host accepts no connection from GitHub. A compromised workflow or a stolen
+  `GITHUB_TOKEN` cannot run code on it; the token on the host can only read what was published.
+- **Digest pin between resolution and apply.** `:stable` is resolved once per tick and written as
+  per-service drop-ins; a tag flip mid-deploy is picked up on the next tick, never half-applied,
+  and a hand-started unit runs the pinned digest too.
+- **Verify before apply.** The host verifies every digest itself; `promote.yml`'s verify alone would
+  leave a window between "verified at promotion" and "re-resolved on the host".
+- **Health gate with auto-rollback.** `Notify=healthy` makes a unit's start the health check; the
+  deployer keeps the previous pin, units and config tree and restores all three together.
+- **Config rides the image channel.** One read-only credential delivers images, units, edge and
+  monitoring configuration alike, content-addressed and signed; the config digest is part of the
+  idempotence marker, so a config-only change is never skipped.
+- **Rootless, with one narrow bridge.** The workload runs as an unprivileged user with no privileged
+  group; the deployer reaches it through two named sudo commands instead of a root-equivalent
+  socket, and every container runs read-only, capability-less and, for the stateful ones, as its
+  own uid (ADR-0189, ADR-0190).
+- **Provisioning stays out of the delivery path.** The role builds and changes the host on an
+  operator's decision; it never ships a release, so the pull-only property cannot erode by
+  convenience (ADR-0188).
+- **No image holds a secret.** `.gitignore`, `.dockerignore`, the bundle's COPY allowlist, a CI
+  assertion and `deploy.sh`'s own check keep keys, `.env` and realm exports out of every artifact.

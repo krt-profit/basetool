@@ -1,9 +1,13 @@
+> **Archived 2026-09-22.** Doc type: Historical design plan — frozen, kept as a record and no longer updated. Every part shipped, including the frontend item views (PR 3), PR 4 and the Börse phase; the header below that still calls PR 3 pending predates this.
+>
+> **Current truth:** [`inventory-items.md`](../specs/inventory-items.md), [`materialboerse.md`](../specs/materialboerse.md) (REQ-MARKET-014), [ADR-0101](../adr/0101-inventory-game-item-rows.md), [ADR-0108](../adr/0108-materialboerse-stock-backed-item-offers.md). Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Design spec (partially shipped) — the agreed blueprint for the item-stock
 > feature. The backend/API scope (PR 2) has shipped: REQ-INV-029…032 live in
-> [`docs/specs/inventory-items.md`](specs/inventory-items.md) and ADR-0101 is accepted —
+> [`docs/specs/inventory-items.md`](../specs/inventory-items.md) and ADR-0101 is accepted —
 > those are the living truth for the shipped parts. The **Börse phase (§8) has shipped** as
 > REQ-MARKET-014 / ADR-0108 (stock-backed item offers, see
-> [`docs/specs/materialboerse.md`](specs/materialboerse.md)) — that is now the living truth for
+> [`docs/specs/materialboerse.md`](../specs/materialboerse.md)) — that is now the living truth for
 > it, and the §8 text below is a historical plan. The frontend item views/flows (PR 3) still
 > implement against this document; it freezes as a historical plan once they ship.
 > **Owner area:** INV / ORDERS / MARKET / UI / FE · **Related ADRs:** ADR-0053, ADR-0087,
@@ -370,7 +374,7 @@ mechanism, not a feature.
 
 **Binding: all UI/UX work in this feature follows the latest version of the KRT / DAS
 KARTELL design system** — the rules in
-[`docs/specs/ui-design-system.md`](specs/ui-design-system.md) and the visual source of
+[`docs/specs/ui-design-system.md`](../specs/ui-design-system.md) and the visual source of
 truth in the design-system submodule
 (`.claude/skills/das-kartell-design/README.md`). Implementers must work against the
 **current state** of that submodule (materialise/update it before any UI work; never
@@ -730,7 +734,7 @@ the core feature stays forward-compatible:
    Materialsammlung — with its **own** item projection (the §4.4 material-only guards on
    the Materialsammlung seams stay), fragment + live-sync section keys per the
    three-mirror rule. `FE`/`INV`/`ORDERS`/`UI`, `e2e`. **Shipped** as REQ-ORDERS-028
-   ([`orders-item-production.md`](specs/orders-item-production.md)) — endpoint
+   ([`orders-item-production.md`](../specs/orders-item-production.md)) — endpoint
    `GET /api/v1/orders/{id}/item-stock`. Later reorganised (REQ-ORDERS-028/031): the stock
    now renders inline in each ordered item's expand row, and collecting it (owner/location
    transfer + delivered) moved to the standalone Itemsammelübersicht page.
@@ -738,7 +742,7 @@ the core feature stays forward-compatible:
    part of the same epic** (owner decision 2026-07-16 — not backlogged), including the
    kind-aware `updateOffer` fix. `MARKET`/`INV`.
 6. **Phase 6 — delivery consumes item stock (best-effort)**: **Shipped** as
-   [`REQ-ORDERS-030`](specs/orders-item-production.md) — item handover consumes
+   [`REQ-ORDERS-030`](../specs/orders-item-production.md) — item handover consumes
    `min(handed-over amount, the order's earmarked item stock)`, never blocking, so legacy
    manufactured-without-stock lines stay deliverable and the phantom stock a delivery leaves
    behind disappears. Consumed rows draw only this order's earmark slice oldest-first under a
@@ -753,7 +757,7 @@ Each PR carries its spec/README/CHANGELOG slice per the repo's same-PR rules.
 The former open items were decided by the owner on 2026-07-16 (recorded in §10):
 
 1. **Delivery consumes item stock — DECIDED: best-effort — SHIPPED** as
-   [`REQ-ORDERS-030`](specs/orders-item-production.md) (§10 Phase 6). Item handover
+   [`REQ-ORDERS-030`](../specs/orders-item-production.md) (§10 Phase 6). Item handover
    consumes `min(handed-over, the order's earmarked item stock)`, never blocking, so
    legacy manufactured-without-stock lines stay deliverable and phantom stock disappears
    for the normal flow.

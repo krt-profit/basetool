@@ -59,7 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The unit tier is every active Staffel + SK (loaded via {@link
  * OrgUnitRepository#findActiveSquadronsAndSpecialCommands()}), <strong>regardless of {@code
  * is_profit_eligible}</strong> — that flag governs Job-Order processing only, not chart visibility
- * (ADR-0029, REQ-ORG-018), so a unit wired under any Bereich renders there, not just the
+ * (ADR-0029, REQ-ORG-026), so a unit wired under any Bereich renders there, not just the
  * Profit-side ones. Every such unit is rendered even when empty so an admin can fill it in.
  *
  * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
@@ -435,7 +435,7 @@ public class OrgChartService {
    * </ul>
    *
    * <p>Any prior squadron seat of the appointee is first cleared: a led Kommando is
-   * <em>vacated</em> (the node survives, REQ-ORG-011), every other prior seat is removed, so the
+   * <em>vacated</em> (the node survives, REQ-ORG-025), every other prior seat is removed, so the
    * one-user-per-unit chart invariant holds.
    *
    * @param squadronId the Staffel the rank is on; never {@code null}.
@@ -555,7 +555,7 @@ public class OrgChartService {
 
   /**
    * Clears the appointee's single squadron chart seat: a led Kommando ({@code COMMAND_LEAD}) is
-   * vacated so the Kommando survives (REQ-ORG-011), while a {@code SQUADRON_LEAD} / {@code
+   * vacated so the Kommando survives (REQ-ORG-025), while a {@code SQUADRON_LEAD} / {@code
    * DEPUTY_COMMAND_LEAD} / {@code ENSIGN} seat is deleted outright.
    *
    * @param squadronId the Staffel; never {@code null}.
@@ -857,7 +857,7 @@ public class OrgChartService {
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    // The org chart is descriptive across the WHOLE organisation (ADR-0029, REQ-ORG-018): every
+    // The org chart is descriptive across the WHOLE organisation (ADR-0029, REQ-ORG-026): every
     // active unit of any tier may be staffed, regardless of is_profit_eligible. That flag governs
     // Job-Order processing only (a non-Profit Staffel/SK still appears on the chart and can hold
     // functional ranks), so the sole create-time gate here is the active flag — uniform across
@@ -943,7 +943,7 @@ public class OrgChartService {
         }
       }
       case BEREICHSLEITER -> {
-        // Epic #692, REQ-ORG-018: at most one Bereichsleiter PER Bereich (scoped to org_unit_id),
+        // Epic #692, REQ-ORG-026: at most one Bereichsleiter PER Bereich (scoped to org_unit_id),
         // unlike the legacy AREA_LEAD which is a global singleton.
         if (positionRepository.countByOrgUnitIdAndPositionType(
                 orgUnit.getId(), OrgChartPositionType.BEREICHSLEITER)

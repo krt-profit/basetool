@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Executed; epics #936 and #1041 closed on 2026-08-28, on the retired Docker host. The procedures that recur (keystore and certificate rotation, re-provisioning the monitoring secrets on a rebuild, the Loki rule re-check after a Temurin bump) live in the living documents linked below.
+>
+> **Current truth:** [`monitoring/README.md`](../../monitoring/README.md), [`deployment.md`](../deployment.md), [`observability.md`](../specs/observability.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md). Index of the archive: [`README.md`](README.md).
+
 # Monitoring Rollout Runbook
 
 **Doc type:** operator runbook (living). This is the single, execution-ordered document an operator
@@ -6,10 +10,10 @@ single-host production Docker deployment. Everything you need is here — you sh
 another document to execute it.
 
 > README's monitoring section points here: see the `MONITORING_TRACING_ENABLED` /
-> `IRI_MONITORING_ENABLED` rows in [`README.md`](../README.md) and follow this runbook end-to-end.
+> `IRI_MONITORING_ENABLED` rows in [`README.md`](../../README.md) and follow this runbook end-to-end.
 
 Epic #936, ADR-0072, REQ-OBS-005..011. Compose project: `iri-monitoring`
-([`docker-compose.monitoring.yml`](../docker-compose.monitoring.yml) + [`monitoring/`](../monitoring)).
+([`docker-compose.monitoring.yml`](../../docker-compose.monitoring.yml) + [`monitoring/`](../../monitoring)).
 
 ---
 
@@ -262,7 +266,7 @@ echo "prometheus-web.yml written; hash: ${BCRYPT:0:7}..."
 ### 3.5 `alertmanager.yml` — rendered from the template with `envsubst`
 
 Alertmanager does **not** expand environment variables, so the committed
-[`monitoring/alertmanager/alertmanager.yml.tmpl`](../monitoring/alertmanager/alertmanager.yml.tmpl) is
+[`monitoring/alertmanager/alertmanager.yml.tmpl`](../../monitoring/alertmanager/alertmanager.yml.tmpl) is
 rendered on the host. Alert e-mails never contain user data. SMTP is 587 STARTTLS with
 `smtp_require_tls: true`.
 

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-18
 - **Context requirements:** REQ-BANK-022, REQ-BANK-041, REQ-BANK-045, REQ-BANK-055, REQ-BANK-056
-- **Supersedes / amends:** amends [ADR-0021](0021-off-ledger-booking-requests.md) (off-ledger
+- **Supersedes / amends:** amends [ADR-0021](0021-bank-off-ledger-booking-requests.md) (off-ledger
   booking requests) by naming which of a pending request's fields the requester may still change
 
 ## Context

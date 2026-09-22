@@ -81,7 +81,7 @@ class PromotionFeatureFlagPageGateTest {
         new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
-    // OrgUnitContextAdvice.availableSquadrons() now reads the catalogue from the STATIC_DATA_CACHE
+    // OrgUnitContextAdvice.availableSquadrons() now reads the catalogue from the SQUADRON cache
     // (getCached) rather than a plain get (REQ-DATA-007), so the promotion gate's flag lookup goes
     // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))

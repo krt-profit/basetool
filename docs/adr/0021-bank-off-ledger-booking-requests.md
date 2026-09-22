@@ -1,6 +1,6 @@
 # ADR-0021 — Confirm-before-post booking requests as a mutable, off-ledger aggregate
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0133](0133-editable-pending-booking-requests.md)** (a pending booking request becomes editable, in part)
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-022 · REQ-BANK-023 · REQ-BANK-024 · ADR-0010 · issue #666

@@ -103,7 +103,7 @@ public class AdminOrgStructurePageController {
 
   /**
    * The six Kartell departments (Bereichsfarben), mirroring the frozen backend {@code Department}
-   * enum (epic #692, REQ-ORG-018). Used to populate the create-Bereich department picker; the
+   * enum (epic #692, REQ-ORG-026). Used to populate the create-Bereich department picker; the
    * display labels come from the {@code department.*} message keys.
    */
   private static final List<String> DEPARTMENTS =

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -10,6 +10,17 @@ enforced architecturally so business logic never carries ad-hoc checks, and ever
 read/write is isolated to the calling user unless the caller is privileged.
 
 ## Requirements
+
+> [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-22
+> Five `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
+> **REQ-SEC-016** (fail-closed guild + membership gate), **REQ-SEC-017** (a `PENDING` registration
+> holds no authority), **REQ-SEC-019** (Discord-link indicator in member management),
+> **REQ-SEC-022** (colliding Discord first-login precheck) and **REQ-SEC-026** (admin-mediated
+> linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
+> Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
+> decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
+> allocated. The next free id is **REQ-SEC-066** — re-check `origin/main` and open PRs before
+> claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
@@ -110,10 +121,30 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 The following must always hold and are enforced as ArchUnit rules in
 [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
-(backend) and the frontend equivalent — a new violation fails `./gradlew test`:
+(backend) and its [frontend](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/ArchitectureTest.java)
+and [ingest](../../ingest/src/test/java/de/greluc/krt/profit/basetool/ingest/ArchitectureTest.java)
+equivalents — a new violation fails `./gradlew test`:
 
-- No `SecurityContextHolder` use outside the auth-helper service.
-- Every `@RestController` carries at least one `@PreAuthorize`.
+- No `SecurityContextHolder` use outside `AuthHelperService` — in the service, controller and mapper
+  layers alike (`serviceLayerShouldNotReachIntoSecurityContext`,
+  `controllerLayerShouldNotReachIntoSecurityContext`, `mapperLayerShouldNotReachIntoSecurityContext`),
+  and the caller's identity is read through that seam rather than by testing for a
+  `JwtAuthenticationToken` (`identityMustBeReadThroughTheSeamNotTheAuthenticationType`, ADR-0129).
+- Every `@RestController` carries at least one `@PreAuthorize`
+  (`everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation`), and every read **and** every
+  write endpoint carries a gate of its own, class- or method-level
+  (`readEndpointsMustDeclareAnAuthorisationAnnotation`,
+  `writeEndpointsMustDeclareAnAuthorisationAnnotation`). The frontend holds every controller but its
+  public-by-design pages to the same floor (`everyControllerCarriesAGateOfItsOwn`, allow-list pinned
+  by `thePublicByDesignAllowListNamesOnlyControllersThatExist`); the ingest module holds every
+  controller and every `@PostMapping` to it (`everyRestControllerShouldBeAuthorisationAnnotated`,
+  `everyPostMappingShouldBeAuthorisationAnnotated`).
+- `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
+  precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
+- Staffel-scoped write endpoints gate on `OwnerScopeService`
+  (`staffelScopedWriteEndpointsMustGateOnOwnerScopeService`,
+  `staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
+  the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007).
 - Controllers never return JPA entities (DTOs only — see [`api-conventions.md`](api-conventions.md)).
 - No controller depends on `OrgUnitMembershipMapper` — the membership entity→DTO projection runs
   inside `OrgUnitMembershipService`'s own transactions, never controller-side after commit
@@ -125,15 +156,17 @@ The following must always hold and are enforced as ArchUnit rules in
   (the controller and frontend proxy require merely `isAuthenticated()`), so this rule fails a future
   mutation that drops the check — which would otherwise ship reachable by any authenticated member —
   at build time rather than in production (security review, INFO regression guard).
-- The frontend does not depend on Spring Data JPA.
+- The frontend does not depend on Spring Data JPA or JDBC (`frontendShouldNotDependOnSpringDataJpa`,
+  `frontendShouldNotUseJdbcDirectly`); ingest depends on no persistence at all.
 
 ### REQ-SEC-004 — Roles & hierarchy
 
 Roles: `ADMIN`, `OFFICER`, `LOGISTICIAN`, `MISSION_MANAGER`, `KRT_MEMBER` — plus the bank roles,
 which the matrix carries. **`GUEST` is not one of them since `V239`** (ADR-0159): there is no role
 below member, and a token that maps to none of these is refused with `403 NO_ROLE` (REQ-SEC-053).
-Hierarchy: `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > LOGISTICIAN`,
-`OFFICER > MISSION_MANAGER` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
+Hierarchy (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`,
+`OFFICER > LOGISTICIAN`, `OFFICER > MISSION_MANAGER`, and on the bank side
+`ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **never** `MISSION_MANAGER > LOGISTICIAN`, which is
 why a mission manager is inside the peer-redaction tier (REQ-SEC-007). The full matrix is
 authoritative in [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md).
 
@@ -284,12 +317,11 @@ questions that ask about membership — the mission description (REQ-SEC-041), t
 should keep asking it rather than depending on a refusal happening earlier in the chain.
 
 > **Rewritten 2026-09-06 (ADR-0159).** This requirement used to describe a "deliberately public
->
->> surface" shared by two cohorts — anonymous callers and the `GUEST` role — under the name *mission
->> outsider*, and enumerated what they could do: create a job order, browse non-internal missions,
->> sign up as a named guest, check in and out, set a payout preference. None of it is true any more.
->> The term *outsider* is retired; what replaced it is REQ-SEC-052 (the public surface as a list) and
->> REQ-SEC-053 (nothing below member).
+> surface" shared by two cohorts — anonymous callers and the `GUEST` role — under the name *mission
+> outsider*, and enumerated what they could do: create a job order, browse non-internal missions,
+> sign up as a named guest, check in and out, set a payout preference. None of it is true any more.
+> The term *outsider* is retired; what replaced it is REQ-SEC-052 (the public surface as a list) and
+> REQ-SEC-053 (nothing below member).
 
 ### REQ-SEC-008 — Frontend bot protection & silent re-auth
 
@@ -334,9 +366,10 @@ no bound request.
 
 **Attribution MUST resolve the chain right-to-left, ahead of `ForwardedHeaderFilter`.** Reading the
 *first* hop is only safe while exactly one trusted hop writes the header, which is true of the
-frontend relay and false of any appending proxy: nginx-proxy-manager uses
-`$proxy_add_x_forwarded_for`, so the real peer lands on the **right** and everything left of it is
-client-supplied. The resolver MUST therefore honour the header only when the immediate peer is a
+frontend relay and false of any appending proxy: the edge's shared `docker/edge/include/proxy.conf`
+uses `$proxy_add_x_forwarded_for`, so the real peer lands on the **right** and everything left of it
+is client-supplied. (The API vhost and the Keycloak upstream overwrite the header with
+`$remote_addr` instead — `conf.d/50-api.conf.template`, `include/upstream-keycloak.conf`.) The resolver MUST therefore honour the header only when the immediate peer is a
 trusted proxy, then walk the chain from the right, skip trusted hops, and take the first untrusted
 address.
 
@@ -375,13 +408,16 @@ none` and registers `ForwardedHeaderFilter` explicitly (`ForwardedHeaderConfig`,
 after `ClientIpContextFilter`) so scheme/host are still rebuilt for the OAuth2 redirect URI and HSTS,
 **but** the client IP is resolved on the *raw* headers before that filter runs. `ClientIpContextFilter`
 (at `HIGHEST_PRECEDENCE`) honours `X-Forwarded-For` only when the immediate TCP peer matches
-`app.client-ip.trusted-proxies` (the NPM Docker range) and then walks the chain right-to-left, skipping
-trusted hops and taking the first untrusted address — the RemoteIpValve algorithm. Because NPM appends
-the true peer on the right, a client-supplied (leftmost) forged entry is never reached, so rotating a
-forged `X-Forwarded-For` can no longer mint a fresh per-IP bucket per request; a direct
+`app.client-ip.trusted-proxies` (prod: `172.28.0.0/16`, the range every pinned container network is
+carved from — the edge sits on `net-proxy-frontend`) and then walks the chain right-to-left, skipping
+trusted hops and taking the first untrusted address — the RemoteIpValve algorithm. Because the edge
+appends the true peer on the right, a client-supplied (leftmost) forged entry is never reached, so
+rotating a forged `X-Forwarded-For` can no longer mint a fresh per-IP bucket per request; a direct
 (untrusted-peer) connection never has its `X-Forwarded-For` honoured. The trusted range MUST match the
-real NPM subnet (override via `APP_CLIENT_IP_TRUSTED_PROXIES`); a mismatch collapses every bucket onto
-NPM's address — no leak, but the limiter is ineffective.
+real network range (override via `APP_CLIENT_IP_TRUSTED_PROXIES`); a mismatch collapses every bucket
+onto the edge's address — no leak, but the limiter is ineffective. The edge's own `$remote_addr` is
+the real client only because the host-level haproxy hands it over by PROXY protocol (ADR-0187); the
+edge rewrites it from that header alone, never from a client-supplied HTTP header.
 
 **Off-servlet-thread coverage (#1130 / #1110).** The relay reads `ClientIpContext` at WebClient
 filter-assembly time, so it only fires when that thread-local is present on the thread the exchange
@@ -528,7 +564,8 @@ it MUST hold regardless of either.
 keep-alive socket.** With rotation off and the `scope` leak severed, an intermittent forced re-login
 remained; its cause is transport, not protocol. The frontend's `authorization_code` and
 `refresh_token` grants call Keycloak's token endpoint, whose URL derives from the public `issuer-uri`,
-so they hairpin **out through the public NPM edge**. Spring Security 7's default `RestClient`
+so they hairpin **out through the public edge** (then NPM, now the native nginx edge; on the rootless
+host ADR-0196 aliases the public name to the container gateway). Spring Security 7's default `RestClient`
 token-response clients run on reactor-netty's **global** connection pool which — unlike the app's own
 `frontend-pool` / `frontend-sse-pool` (ADR-0078) — has **no idle eviction** (verified from the shipped
 bytecode). The edge reaps idle keep-alive sockets after ~60–75 s, so a refresh grant reusing one fails
@@ -669,8 +706,11 @@ re-login · **ADR:** ADR-0122
 Production Keycloak MUST serve **HTTPS only** — `--http-enabled=false --https-port=18443`, with the
 shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleartext:
 
-- **NPM &rarr; Keycloak:** `nginx-proxy-manager` terminates the public Let's Encrypt cert and
-  re-encrypts to `https://keycloak:18443` (nginx does not verify the self-signed upstream cert).
+- **edge &rarr; Keycloak:** the native nginx edge (ADR-0162) terminates the public Let's Encrypt
+  cert and re-encrypts to `https://keycloak:18443`, serving Keycloak under `/auth` on the app origin
+  (ADR-0166). Since the edge moved into the repository it **verifies** the upstream certificate
+  against the shared CA (`docker/edge/include/upstream-tls.conf`: `proxy_ssl_verify on`,
+  `proxy_ssl_name keycloak`, included by `include/upstream-keycloak.conf`); NPM did not.
 - **backend &rarr; Keycloak (admin/user-sync):** `KeycloakService` calls `https://keycloak:18443`
   directly over the isolated `net-backend-keycloak` network, pinning the self-signed cert via the
   `keycloak-trust` Spring SSL bundle (mirrors the frontend/ingest `backend-trust` approach, audit
@@ -680,23 +720,27 @@ shared bind-mounted `keystore.p12` — so neither edge that reaches it is cleart
 
 The management/health interface (port 9000) is exempt: it stays HTTP via
 `--http-management-scheme=http` because the Quarkus image ships no TLS-capable CLI client for the
-container healthcheck. The port is never published on the host and never on an NPM proxy network;
+container healthcheck. The port is never published on the host and never on an edge proxy network,
+and the edge answers `/auth/health` and `/auth/metrics` with `404` (`conf.d/10-frontend.conf.template`);
 since the monitoring rollout (epic #936, ADR-0072) the **prod** Keycloak additionally joins the
 isolated `net-monitoring-scrape` network so **Prometheus scrapes `http://keycloak:9000/metrics` in
 plain HTTP** there. Dev/test are exempt (Keycloak stays HTTP; the admin URL is plain HTTP and no
 `keycloak-trust` bundle is defined, so `KeycloakService` falls back to the default client).
 
-Since **ADR-0090** the two internet-facing Spring Boot modules (`frontend`, `ingest`) adopt the same
-"management interface on an internal-only port, never host-published nor NPM-proxied" pattern in
-prod: `/actuator/**` moves to a dedicated `management.server.port` (frontend `18091`, ingest `11272`,
-HTTPS via the shared keystore) reachable only from `net-monitoring-scrape` and the container-local
-`HEALTHCHECK`, so their public connectors expose no Actuator at all. See `REQ-OBS-005` (amended) for
-the authoritative rule.
+Since **ADR-0090** the two internet-facing Spring Boot modules (`frontend`, `ingest`) — and since
+**ADR-0134** the backend too — adopt the same "management interface on an internal-only port, never
+host-published nor edge-proxied" pattern in prod: `/actuator/**` moves to a dedicated
+`management.server.port` (backend `11271`, frontend `18091`, ingest `11272`, HTTPS via the shared
+keystore) reachable only from the internal networks that need it (`net-monitoring-scrape`, and
+`net-backend-frontend` for the frontend's backend-health probe) and the container-local health
+check (the Quadlet `HealthCmd`), so their public connectors expose no Actuator at all; the edge
+additionally answers `/actuator` with `404`. See `REQ-OBS-005` (amended) for the authoritative rule.
 
 **Monitoring-plane cleartext carve-out (owner-approved amendment, 2026-07-02).** The HTTPS-only edge
-posture above still holds for every app/Keycloak/NPM edge. It is deliberately amended for traffic that
-stays **inside the isolated monitoring Docker networks** (`net-monitoring-scrape` /
-`net-monitoring-core` / `net-docker-proxy`): Prometheus→exporters, Grafana→datasources,
+posture above still holds for every app/Keycloak edge. It is deliberately amended for traffic that
+stays **inside the isolated monitoring networks** (`net-monitoring-scrape` /
+`net-monitoring-core`; on the Compose-based local stacks also `net-docker-proxy`, which production
+no longer has since the Podman cutover): Prometheus→exporters, Grafana→datasources,
 Alloy→Loki/Tempo, the app/Keycloak OTLP span push to Alloy, and the `keycloak:9000` metrics scrape run
 in plain HTTP. These networks carry no host ports, no public route and no user payload; Prometheus
 still scrapes the three **apps** over HTTPS with the pinned public CA (no `insecure_skip_verify`), and
@@ -707,7 +751,8 @@ ADR-0072.
 
 **Acceptance**
 
-- [ ] In prod, Keycloak exposes no plain-HTTP listener; the public host works through NPM over TLS.
+- [ ] In prod, Keycloak exposes no plain-HTTP listener; the public `/auth` path works through the
+  edge over verified TLS.
 - [ ] The backend user sync succeeds against `https://keycloak:18443` with hostname verification on
   (cert SAN carries `dns:keycloak`).
 - [ ] Keycloak reports `healthy` (the HTTP management healthcheck still passes after the HTTPS flip).
@@ -715,12 +760,15 @@ ADR-0072.
 
 **Enforced by:** `KeycloakServiceTest` · **Code:** `KeycloakService`, `application-prod.yml`
 (`spring.ssl.bundle.jks.keycloak-trust`), `docker-compose.yml` (`keycloak` command, backend
-`KEYCLOAK_ADMIN_URL`) · **Runbook:** [`deployment.md` &rarr; Keycloak behind NPM over HTTPS](../deployment.md#keycloak-behind-npm-over-https)
+`KEYCLOAK_ADMIN_URL` — rendered into `quadlet/systemd/keycloak.container` and
+`quadlet/env.d/*.env.tmpl` by `scripts/generate-quadlet.py`), `docker/edge/include/upstream-keycloak.conf`
+· **Runbook:** [`deployment.md` &rarr; Internal keystore and certificate rotation](../deployment.md#internal-keystore-and-certificate-rotation)
 
 ### REQ-SEC-043 — The Keycloak user sync MUST page the full user list before reconciling deletions
 
-`UserSyncTask` reconciles local users against Keycloak: after syncing every fetched user it calls
-`UserService.markMissingUsers(currentIds)`, which flags every local user whose Keycloak id did **not**
+`UserSyncTask` reconciles local users against Keycloak through `UserSyncService.syncFromKeycloak`:
+after syncing every fetched user it calls `UserReconciliationService.markMissingUsers(presentInKeycloak)`,
+which flags every local user whose Keycloak id did **not**
 appear in the run as no-longer-in-Keycloak. That reconciliation is only safe if the fetched set is the
 **complete** Keycloak user list. The Admin API `GET /users` endpoint caps each response at a server-side
 maximum (~100 by default), so `KeycloakService.fetchUsers(appRoleNames, knownDiscordLinkedIds)` MUST
@@ -747,6 +795,15 @@ interactive JWT path's `findByNameIgnoreCase`), then queries members under Keycl
 removes a scheduled-vs-interactive casing asymmetry: a role whose Keycloak name differs only in case
 from the local name is still resolved, not silently dropped.
 
+**The realm's default-role composite is folded in (REQ-SEC-053).** `default-roles-<realm>` grants
+`KRT Member` to every account Keycloak creates, and `GET /roles/{name}/users` does not list members
+who hold a role only through that composite. `fetchDefaultRoleGrants` therefore resolves what the
+composite grants and credits it to every member of the default role, or a default-only member would
+come back with no role at all. And **a run in which none of the mappable app roles matches a realm
+role is aborted**, not written: that is a realm-side rename or a broken query, and persisting it would
+strip every account of every role and refuse the whole organisation with `NO_ROLE` at once. A single
+account resolving to no role is legitimate and is written through.
+
 **The service account needs `view-realm` on top of `view-users`.** The roster page (`GET /users`) and
 its per-user reads need only `view-users`, but the role-indexed resolution lists realm roles (`GET
 /admin/realms/{realm}/roles`) and reads their members (`GET /roles/{name}/users`), both of which the
@@ -760,8 +817,9 @@ than the generic fetch-failure message, so the daily failure is diagnosable from
 [`docs/keycloak/README.md`](../keycloak/README.md) for the exact grant command.
 
 **A role-membership read failure is fail-safe: it skips the run, never degrades the write.** Because a
-role-stripped set would misclassify holders — mapping a brand-new admin to the `Guest` fallback and
-creating it `PENDING` instead of `ACTIVE`, or mass-downgrading existing admins — a transient failure of
+role-stripped set would misclassify holders — creating a brand-new admin `PENDING` instead of
+`ACTIVE` (and, before REQ-SEC-053, mapping it to the since-removed `Guest` fallback), or
+mass-downgrading existing admins — a transient failure of
 any role read (5xx, 401/403, timeout, malformed body) propagates to `fetchUsers`' top-level catch and
 skips the whole run (empty roster → "skip", never a wipe, never a degraded persist), exactly like a
 roster-page failure. Only a clean `404` on a single role's member read (a benign TOCTOU: the role
@@ -796,7 +854,8 @@ number of users that reconciled successfully; and each failure increments
 
 **Enforced by:** `KeycloakServiceTest` · `UserSyncServiceTest` · **Code:**
 `KeycloakService.fetchAllUsers`, `KeycloakService.fetchRealmRoleNames`,
-`KeycloakService.fetchRoleMemberships`, `KeycloakService.logFetchFailure`,
+`KeycloakService.fetchRoleMemberships`, `KeycloakService.fetchDefaultRoleGrants`,
+`KeycloakService.logFetchFailure`,
 `KeycloakSyncProperties.pageSize`, `UserSyncService.syncFromKeycloak`,
 `UserReconciliationService.markMissingUsers`, `UserSyncTask` · **Issues:** #1825
 
@@ -917,7 +976,9 @@ record of what was once true and why.
 with the service and the flow they tested; the token cases inside `MissionSecurityServiceTest` went
 with the token. **Migration:** V177, undone by `V239`. **Security audit:** finding M1.
 
-### REQ-SEC-019 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
+### REQ-SEC-065 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
 `MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm
@@ -994,10 +1055,11 @@ two fields are not withheld from them.
   pinned by `MissionPeerRedactorTest`.
 - [x] PII (email / real name) remains redacted below Logistician (REQ-SEC-007).
 
-**Enforced by:** `MissionControllerLifecycleTest`
-(`getMissionById_outsider_planned_keepsRosterButHidesDescriptionAndPii` asserts payout + comment are
-`null` for outsiders; `getMissionById_authenticatedCaller_returnsFullDtoUnchanged` keeps them for
-members) and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` outsider roster.
+**Enforced by (the surviving criteria):** `MissionControllerLifecycleTest`
+(`getMissionById_peer_keepsRosterButStripsPii` — a peer below Logistician keeps the roster, payout
+preference and comment while PII is stripped; `getMissionById_logisticianCaller_returnsFullDtoUnchanged`)
+and `MissionControllerSlimEndpointsTest` for the `addParticipantSlim` roster returned to a peer. The
+outsider-tier tests went with the tier.
 **ADR:** [ADR-0034](../adr/0034-anonymous-outsider-mission-visibility.md). **Security audit:**
 finding L3.
 
@@ -1013,17 +1075,16 @@ next free number.)
 > API allow-list lived in Nginx Proxy Manager's SQLite database and in a runbook block pasted into a
 > web form. The edge is now native nginx configured entirely from `docker/edge/` in this repository,
 > validated by `nginx -t` in CI (`scripts/check-edge-nginx.sh`) and applied by the deploy reconcile.
-> The values below are unchanged and were carried across verbatim; read "the custom snippets the
->
->> repo injects into NPM" as `docker/edge/conf.d/00-maps.conf` (the zones) and
->> `docker/edge/include/limits.conf` (their application).
+> The values below are unchanged and were carried across verbatim. `docker/maintenance/nginx/`, the
+> two NPM snippets that held them before, was deleted on 2026-09-22; nothing had read it since the
+> native edge replaced NPM.
 
 Every public vhost at the edge carries a **version-controlled** per-IP safety
 net: `limit_req` (20 r/s sustained, burst 80, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
-IPv6 client's `/64` network prefix), delivered through the custom snippets the
-repo already injects into NPM (`docker/maintenance/nginx/http.conf` defines the zones,
-`server_proxy.conf` applies them in every proxy host's `server` block). The values are
+IPv6 client's `/64` network prefix). `docker/edge/conf.d/00-maps.conf` defines the zones and
+`docker/edge/include/limits.conf` applies them; the frontend, ingest, Grafana and API vhosts each
+include it. The values are
 flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
 inside the burst. Two invariants:
 
@@ -1034,60 +1095,76 @@ inside the burst. Two invariants:
   `limit_req_log_level warn` in the error log) and a sustained 429 rate raises the
   `EdgeRateLimitSpike` Loki alert.
 
-**Real client IP restored (ADR-0112).** The masking was IPv6-specific: `:443` is published on
+**Real client IP — how it reaches the edge today (ADR-0187).** Production runs rootless Podman, whose
+port forwarder would hand the edge its own address for every client. A host-level haproxy therefore
+binds the public `:80`/`:443` (v4 and v6 separately) in pure TCP mode and passes the client address to
+the edge by **PROXY protocol v2**; the edge publishes only on loopback (`127.0.0.1` / `[::1]`, ports
+8080/8443), trusts only a list of **literal** addresses — its own pinned address on each of its
+networks, because rootless Podman presents the forwarder's connection from the edge's own address on
+one of them (`EDGE_TRUSTED_PROXY`; the renderer refuses any prefix or wildcard) — via
+`set_real_ip_from`, and takes `$remote_addr` from `real_ip_header proxy_protocol`, never from a
+client-supplied HTTP header (`docker/edge/render-and-run.sh`, `quadlet/systemd/edge.container`). TLS
+still terminates at the edge, which selects the vhost by SNI, so every vhost keys on the real client
+IP. The paragraph below is the history of the Docker-era fix; the `/64` keying it introduced is
+unchanged.
+
+**Real client IP restored on the Docker host (ADR-0112, historical).** The masking was IPv6-specific:
+`:443` was published on
 `[::]:443` while the container network was IPv4-only, so Docker installed no `ip6tables` DNAT and the
 userland `docker-proxy` relayed every IPv6 client through the bridge gateway (`$binary_remote_addr` =
 `172.28.3.1`); dual-stack browsers prefer IPv6, so almost all real traffic collapsed onto one bucket,
 and a 60-connection cap on it caused the 2026-07-20 outage (long-lived `/notifications/stream` (SSE)
 and `/ws/sync` (WebSocket) connections crossed 60, the edge 429'd legitimate users, the frontend
 degraded into the maintenance page). ADR-0112 made `net-proxy-frontend` dual-stack (`fd00:28:3::/64`)
-so the kernel DNAT preserves the client IPv6 for **this host** (`profit-base.online`); real v4 and v6
-client addresses now reach nginx, so the per-IP limit is meaningful again and `limit_conn` was
-tightened from the 10000 stopgap to **500** concurrent connections per client. Two follow-ups have
-since landed. **(1) IPv6 is keyed on its `/64`.** `http.conf` maps the limiter key to
-`$krt_limit_key` — the full IPv4 address, or an IPv6 client's `/64` network prefix — so a
-subscriber's rotating SLAAC privacy addresses (which vary only in the low 64 bits) share one bucket
-instead of each minting a fresh one and diluting the cap. **(2) The other proxy hosts need no IPv6
-subnet.** There is a single public `:443` ingress: the published-port DNAT targets NPM's dual-stack
-leg on `net-proxy-frontend` (`[fd00:28:3::2]` / `172.28.3.2`) and NPM selects the vhost by SNI only
-after accepting the connection, so keycloak/ingest/grafana already key on the real client IP too. The
-bridge-gateway addresses that dominate those hosts' logs are internal hairpin traffic (blackbox
-probes + the apps' OIDC hairpins, which since ADR-0166 go to `profit-base.online/auth` rather than
-to a Keycloak host of its own), not masked external clients (verified 2026-07-20). Do **not** disable userland-proxy: it deletes the only IPv6 datapath.
+so the kernel DNAT preserved the client IPv6 on that host; real v4 and v6 client addresses reached
+nginx, so the per-IP limit was meaningful again and `limit_conn` was tightened from the 10000 stopgap
+to **500** concurrent connections per client. Two follow-ups landed on top and are still current.
+**(1) IPv6 is keyed on its `/64`.** The limiter key is `$krt_limit_key` (now in `00-maps.conf`) — the
+full IPv4 address, or an IPv6 client's `/64` network prefix — so a subscriber's rotating SLAAC privacy
+addresses (which vary only in the low 64 bits) share one bucket instead of each minting a fresh one
+and diluting the cap. **(2) No vhost needs its own ingress.** There is a single public ingress and the
+vhost is selected by SNI only after the connection is accepted, so every vhost keys on the real
+client IP. The bridge-gateway addresses that dominate the non-frontend logs are internal hairpin
+traffic (blackbox probes + the apps' OIDC hairpins, which since ADR-0166 go to
+`profit-base.online/auth` rather than to a Keycloak host of its own; on the rootless host ADR-0196
+aliases those public names to the container gateway), not masked external clients.
 
-Stricter per-endpoint limits (e.g. the Keycloak login/token paths) may reference the same zones
-from a proxy host's Advanced tab in the NPM UI; that is unversioned host state and out of this
-requirement's scope. The backend's application-level Bucket4j limiter (REQ-SEC-009 family) is
-unchanged and remains the precise, per-subject layer behind this coarse edge net.
+The Keycloak token endpoint carries a stricter, versioned limit on the same zone (`burst=10`,
+status 429 — `location ^~ /auth/realms/iri/protocol/openid-connect/token` in
+`conf.d/10-frontend.conf.template`), the one anonymous POST worth brute-forcing. The backend's
+application-level Bucket4j limiter (REQ-SEC-011, REQ-SEC-032, REQ-SEC-033) is unchanged and remains
+the precise, per-subject layer behind this coarse edge net.
 
 **Acceptance**
 
 - [ ] A burst above rate+burst from one client IP receives 429 responses (not the maintenance page,
-  not 503) while other client IPs are unaffected (real per-client IPs on every vhost via the shared
-  `net-proxy-frontend` v6 ingress, ADR-0112; IPv6 keyed on the `/64`).
+  not 503) while other client IPs are unaffected (real per-client IPs on every vhost via the
+  PROXY-protocol front end, ADR-0187; IPv6 keyed on the `/64`).
 - [ ] Legitimate concurrency (many members each holding the mission page's SSE + WebSocket) does not
   exhaust the 500 per-IP `limit_conn` and is never 429'd.
 - [ ] A normal page load (asset fan-out within the burst) is never limited.
 - [ ] A sustained 429 rate at the edge raises `EdgeRateLimitSpike`.
 
-**Enforced by:** `docker/maintenance/nginx/http.conf` (zones) ·
-`docker/maintenance/nginx/server_proxy.conf` (per-host application, 429 statuses) ·
-`monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) · **Runbook:**
-`docs/deployment.md` → *Edge rate limiting*
+**Enforced by:** `docker/edge/conf.d/00-maps.conf` (zones, `$krt_limit_key`) ·
+`docker/edge/include/limits.conf` (per-vhost application, 429 statuses) ·
+`scripts/check-edge-nginx.sh` (CI renders and starts the edge) ·
+`monitoring/loki/rules/fake/basetool-log-alerts.yml` (`EdgeRateLimitSpike`) · **Decisions:**
+ADR-0112, ADR-0162, ADR-0187 · **Runbook:** [`deployment.md` → Edge rate limiting](../deployment.md#edge-rate-limiting)
 
 ### REQ-SEC-024 — Keycloak resilience: internal JWKS + retryable 503 on IdP outage
 
 Both JWT resource servers — the backend and the ingest gateway (REQ-SEC-001) — fetch Keycloak's
-JWKS to validate every token. Two hardening rules keep a transient Keycloak / edge / Docker-DNS blip
+JWKS to validate every token. Two hardening rules keep a transient Keycloak / edge / container-DNS blip
 from masquerading as an application outage (the failure mode that drove the frontend
 `Http5xxRateHigh` incident: a slow / unreachable Keycloak turned JWKS retrieval into an
 `AuthenticationServiceException` → `500` on every authenticated endpoint):
 
 - **Internal JWKS (opt-in).** Setting `app.security.jwt.jwk-set-uri` (env `KEYCLOAK_JWK_SET_URI`)
   points key retrieval at the **internal** Keycloak connector
-  (`https://keycloak:18443/realms/iri/protocol/openid-connect/certs`), reusing the `keycloak-trust`
+  (`https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs` — Keycloak is mounted under
+  `/auth`, `KC_HTTP_RELATIVE_PATH`), reusing the `keycloak-trust`
   SSL bundle (REQ-SEC-014 — so the cert's SAN must carry `dns:keycloak`) instead of hairpinning
-  through the public edge (NPM). The `iss` claim is still validated against the **public** issuer
+  through the public edge. The `iss` claim is still validated against the **public** issuer
   Keycloak stamps into tokens, so the split-horizon (public `iss`, internal key fetch) is
   transparent. Because `NimbusJwtDecoder.withJwkSetUri` defaults to **RS256-only** (unlike
   issuer-location discovery, which derives the accepted algorithms from the live JWKS), the
@@ -1108,7 +1185,7 @@ from masquerading as an application outage (the failure mode that drove the fron
   reported a stack bring-up error instead of its own result. `JwkSetUriNamespaceTest` now fails the
   build if any profile re-declares Boot's key.
 - **IdP unavailable → retryable 503, not 500.** When the JWKS fetch fails on a transport / upstream
-  problem (timeout, connection error, `UnresolvedAddressException` on a Docker-DNS strand, or a
+  problem (timeout, connection error, `UnresolvedAddressException` on a container-DNS strand, or a
   Keycloak 5xx), the re-thrown `AuthenticationServiceException` — which otherwise escapes as an
   opaque `500` on every authenticated endpoint (Micrometer `uri="UNKNOWN"`) — is re-mapped to a
   retryable `503 Service Unavailable` (RFC-7807 problem+json, `Retry-After`, code
@@ -1133,8 +1210,11 @@ from masquerading as an application outage (the failure mode that drove the fron
   `app.security.jwt.expected-audiences` (wired to `IRI_BACKEND_EXPECTED_AUDIENCES` /
   `IRI_INGEST_EXPECTED_AUDIENCES`), sharing the same `resourceServerJwtDecoder` bean. It is **empty
   by default** (off) so a stack whose realm does not stamp the audience is unaffected; enabling it
-  in prod requires the deployed realm to stamp `aud=basetool-backend` (the `extractor-ingest`
-  default client scope), or every token is rejected.
+  in prod requires the deployed realm to stamp the right audience, or every token is rejected — and
+  the two values differ: the backend expects `aud=basetool-backend` (the `extractor-ingest` default
+  client scope), the ingest gateway `aud=basetool-ingest` (the `extractor-ingest-only` scope,
+  REQ-INGEST-011). Setting the gateway to `basetool-backend` would pass exactly the frontend session
+  tokens that interface must refuse.
 - [x] The **backend's** enforced path is exercised end to end, not only in prod: the E2E realm's
   `basetool-frontend` client carries an `aud-basetool-backend` audience mapper (access token only,
   mirroring the prod scope's mapper) and `E2eStackExtension` arms the stack with
@@ -1229,13 +1309,17 @@ exists.
 
 - [ ] The obligation is rendered on `/terms` in both locales, not only declared in the bundle.
 - [ ] The obligation names interfaces generally, not the ingest path alone.
-- [ ] `terms.last_updated` reflects the date the obligation took effect (2026-08-03).
+- [ ] `terms.last_updated` moved when the obligation took effect (2026-08-03); it has moved with
+  every later wording change since.
 
-**Enforced by:** `TermsTemplateBundleParityTest` (every `terms.*` clause is both declared and
-rendered — a renumbered section cannot silently drop a bullet), `MessageBundleConsistencyTest` (DE/EN
-key parity, so the clause cannot exist in one locale only) · **Text:** `terms.list_4_1_5` in
-`messages_de.properties` / `messages.properties` / `messages_en.properties`, rendered by
-`templates/terms.html` · **Technical counterpart:** REQ-INGEST-011
+**Enforced by:** `TermsDocumentStructureTest` (every `terms.*` clause is reachable by the numbering
+walk of `TermsDocumentService` and every translation has the German shape — a renumbered section
+cannot silently drop a bullet; it replaced the frontend's `TermsTemplateBundleParityTest` when the
+wording moved server-side, ADR-0138), `MessageBundleConsistencyTest` (DE/EN key parity, so the clause
+cannot exist in one locale only) · **Text:** `terms.list_4_1_5` in the **backend's**
+`messages_de.properties` / `messages.properties` / `messages_en.properties`, served by `GET
+/api/v1/terms/document` (REQ-SEC-028) and rendered by the frontend's `templates/terms.html` via
+`fragments/terms-body.html` · **Technical counterpart:** REQ-INGEST-011
 ([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
 
 ### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
@@ -1436,7 +1520,7 @@ path is still redirected, the readable-documents exemption, fail-open, cache bou
 marker, the `krtTermsGate` handoff, no `res.ok` shortcut, self-disarm — pinned against the shipped
 JS), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
 version scoping, one-sided cache, sort translation), `TermsAcceptancePageControllerTest`, `TermsVersionParityTest`,
-`AdminTermsPageControllerTest`, `TermsTemplateBundleParityTest`,
+`AdminTermsPageControllerTest`, `TermsDocumentStructureTest`,
 `LiveSyncSyncHandshakeInterceptorTest` + `LiveSyncWebSocketHandlerTest` +
 `LiveSyncCloseCodeWireParityTest` (the WebSocket handoff: the mark is relayed, the socket is closed
 with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
@@ -1486,10 +1570,9 @@ decoded path.
 > `/.well-known/assetlink%73.json` (`%73` is `s`) was `permitAll` and gate-exempt in neither filter,
 > so the URL layer admitted the request and the gate below it redirected. Fail-closed, and a
 > redirect rather than an exposure — but `PublicPaths` exists to be the *one* answer to "may a
->
->> session gate redirect this path", and it was not the one answer for encoded spellings. That is the
->> same defect as the two drifted `isStaticAsset` copies the class was extracted to replace, one
->> layer down.
+> session gate redirect this path", and it was not the one answer for encoded spellings. That is the
+> same defect as the two drifted `isStaticAsset` copies the class was extracted to replace, one
+> layer down.
 >
 > **The widening is bounded, and that is what makes it safe.** A `PathPattern` decodes per segment
 > and never re-joins them, so a spelling can only reach an entry `SecurityConfig` already
@@ -1585,7 +1668,7 @@ nor the provisioning service account.
 `scripts/verify-dpop-binding.py` (behaviour) · **Code:**
 `scripts/provision-keycloak-mobile-client.py` · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
-[`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7
+[`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
@@ -1734,7 +1817,7 @@ identical reason as `matrix` and `{id}/terminals`: this is UEX trade data, not g
 every consumer of it is an authenticated screen.
 
 They were found while the Android app's Handel screens were being admitted at the API vhost
-(`API_VHOST_ROLLOUT_RUNBOOK.md`, phase W). That ordering is the lesson worth keeping: **a path is
+([`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md), phase W — archived). That ordering is the lesson worth keeping: **a path is
 measured anonymously before it is admitted, and what the measurement says is acted on first.**
 Admitting these as they stood would have published trade prices to the internet — the vhost would
 have let them through and the backend would not have stopped them.
@@ -1746,7 +1829,8 @@ else**: the public surface is now an enumerated list of four backend paths and t
 them. The paragraph is kept because the reasoning is still the reason it was the *last* catalogue
 read to go, not because the exemption survives.
 
-**An unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
+*Retired 2026-09-06 with `AnonymousPageSizeFilter` (ADR-0159) — kept for the reasoning:* **an
+unauthenticated caller MUST NOT request more than 1000 entries per page**, and the refusal MUST
 be an explicit `400` naming the limit rather than a silent reduction. Silently clamping is the defect
 ADR-0104 forbids: the caller gets fewer rows than it asked for, cannot tell, and any surface built on
 a single large page then presents an incomplete list as complete. A page-walking consumer is
@@ -1759,8 +1843,8 @@ Authenticated callers keep the 100 000 clamp. The scope is matched on the **deco
 
 **Acceptance**
 
-- [x] `GET /api/v1/materials/matrix` answers 401 without a token; the rest of the material catalogue
-  stays anonymously readable.
+- [x] `GET /api/v1/materials/matrix` answers 401 without a token — and since REQ-SEC-052 so does the
+  rest of the material catalogue.
 - [x] `GET /api/v1/materials/{id}/terminals` answers 401 without a token (`SecurityTest`).
 - [x] `GET /api/v1/materials/prices-overview`, `GET /api/v1/materials/{id}/prices` and `GET
   /api/v1/materials/profit-calculation` answer 401 without a token
@@ -1795,8 +1879,9 @@ connect holds a server-side emitter open, so a reconnect loop is worth bounding 
 share one bucket on purpose — they come from the same client, and splitting them would let one
 starve the server while the other stayed within its own budget.
 
-Anonymous requests MUST pass through: they carry no subject to key on, and the per-IP limiter plus
-the anonymous page-size ceiling (REQ-SEC-032) are their bounds. The budget MUST be enforced after
+Anonymous requests MUST pass through: they carry no subject to key on, and the per-IP limiter is
+their bound (the anonymous page-size ceiling of REQ-SEC-032 went with the anonymous surface; the few
+anonymous paths REQ-SEC-052 leaves are unpaginated). The budget MUST be enforced after
 the pending-approval and terms gates, so a caller refused there does not spend a token first. The
 scope MUST be decided on the **decoded** path (REQ-SEC-029). The rejection MUST reuse the per-IP
 limiter's contract: `429`, the stable code `RATE_LIMIT_EXCEEDED`, and the
@@ -1932,12 +2017,14 @@ Both halves of the list are load-bearing, and neither is a matter of taste.
 
 **Why the member roles must be there.** The backend does not read the token's roles for
 authorization directly: `UserReconciliationService#syncUser` **replaces** the account's local role
-set from `realm_access.roles` on every authentication, falling back to `Guest` when the claim
-carries none, and `CustomJwtGrantedAuthoritiesConverter` then derives the request's authorities from
+set from `realm_access.roles` on every authentication (an account left with no role is refused
+`403 NO_ROLE` since REQ-SEC-053; it used to fall back to `Guest`), and
+`CustomJwtGrantedAuthoritiesConverter` then derives the request's authorities from
 that stored set. A client with no scope mappings therefore does not merely narrow what the app may
 do — it rewrites the member's row in the database, for the web app too. Measured on the test stack
 before this requirement existed: an account holding `Admin` + `Officer` + `KRT Member` was left
-holding `Guest` alone after one app login.
+holding the `Guest` role of the time alone after one app login — today the same misconfiguration
+would lock the member out with `NO_ROLE`.
 
 **Why `Admin` must be there.** For the same reason as the rest, one tier up. `ADMIN` is not a menu —
 the admin area stays permanently web-only and no app screen renders it — it is a **scope rule**.
@@ -1952,26 +2039,28 @@ using the app was, in effect, a member with no memberships.
 > builds one. The role changes what the *existing* screens are scoped to, not which screens there
 > are.
 
-**What this now depends on, and it is not in this repository.** With `Admin` in the token, the 105
-`@PreAuthorize(HAS_ROLE_ADMIN)` sites and the eight admin URL matchers in `SecurityConfig` are
-satisfied by an app-issued token. The app calls none of those paths, but a token is not a client —
-the remaining boundary is the **default-deny vhost allow-list** of
-[REQ-SEC-037](#req-sec-037--the-api-vhost-denies-by-default), which lives in the edge proxy's
-database and therefore cannot be gated by any test in any repository here. Two consequences, both
-load-bearing:
+**What this now depends on.** With `Admin` in the token, the 106 `@PreAuthorize(Roles.HAS_ROLE_ADMIN)`
+sites and the nine `hasRole(Roles.ADMIN)` URL matchers in the backend `SecurityConfig` (counted
+2026-09-22) are satisfied by an app-issued token. The app calls none of those paths, but a token is
+not a client — the remaining boundary is the **default-deny vhost allow-list** of
+[REQ-SEC-037](#req-sec-037--the-public-api-vhosts-anonymous-surface-is-enumerated-not-incidental).
+When this was written that list lived in the edge proxy's database, out of reach of any test; since
+2026-09-12 it is `docker/edge/include/api-allowlist.conf` in this repository, read by
+`ExternalContractTest`, checked against the nightly probe by the `probe-vs-allowlist` job and
+validated by `scripts/check-edge-nginx.sh` in `repo-lint.yml`. Two consequences, both load-bearing:
 
 - `POST /api/v1/refining-methods` was the one allow-listed path carrying a bare `hasRole('ADMIN')`
-  write. `refining-methods` is therefore added to the read-only family in
-  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md). Nothing loses a capability: the
-  app only reads it (the refinery form's method picker) and the web admin does not traverse this
-  vhost at all. **The runbook is the version-controlled copy of host state — this change is not live
-  until the vhost config is applied on the host.**
+  write. `refining-methods` is therefore in the read-only family of `api-allowlist.conf` (it was
+  first added to the runbook block, now archived at
+  [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)). Nothing loses a
+  capability: the app only reads it (the refinery form's method picker) and the web admin does not
+  traverse this vhost at all.
 - The allow-list is now load-bearing for what this requirement itself used to guarantee. Anyone
   widening it is widening what a stolen mobile token can reach.
 
 **The scope stays partial, and the client stays on the partial-role-scope list.** Adding `Admin`
-covers every realm role that is actually assigned to people, but the realm also holds `Guest`,
-`Logistician` and `Mission Manager` — so `basetool-android` remains a partial-scope client and
+covers every realm role that is actually assigned to people, but the realm also holds
+`Logistician` and `Mission Manager` (and held `Guest` until ADR-0159) — so `basetool-android` remains a partial-scope client and
 remains named in `app.security.partial-role-scope.client-ids`. That keeps
 [REQ-SEC-036](#req-sec-036--a-clients-role-claim-is-authoritative-only-if-its-scope-is-complete)'s
 two properties in force, and the second of them is what makes this requirement work at all: the
@@ -2024,7 +2113,8 @@ That is correct only while every client's token carries the member's whole role 
 being correct the moment one client was deliberately given less.
 
 A client whose Keycloak scope is narrowed — `fullScopeAllowed: false` plus a partial scope mapping,
-which the mobile client of REQ-SEC-035 still is (its scope names five of the realm's eight roles) —
+which the mobile client of REQ-SEC-035 still is (its scope names five of the realm's seven
+application roles) —
 mints a token describing a **smaller member than the real one**. Persisting that description lets whichever client a member happened to use last
 decide what the database says they are.
 
@@ -2039,8 +2129,8 @@ Both halves are load-bearing and each is a defect without the other:
   the 2026-09-02 reversal of REQ-SEC-035 did not soften that — it inverted which way the damage
   runs. While `Admin` was withheld, reading roles off the row would have handed the app an authority
   its token deliberately lacked. Now that the scope carries `Admin`, reading off the row is what
-  would make the scope mapping stop deciding anything at all: `Logistician`, `Mission Manager` and
-  `Guest` are still absent from it, so the row and the token still describe different members, and
+  would make the scope mapping stop deciding anything at all: `Logistician` and `Mission Manager`
+  are still absent from it, so the row and the token still describe different members, and
   the token is the one the client was actually issued.
 
 **Matched on `azp`**, a claim inside a Keycloak-signed token that a client cannot set — the same
@@ -2052,8 +2142,8 @@ this adds no new trust. Configured under `app.security.partial-role-scope.client
 tokens. The default therefore names the client known to be partial rather than shipping blank.
 
 **A brand-new row is the one exception**, in the safe direction: there is no stored set to protect,
-and the alternative is persisting a member with no roles at all, which the `Guest` fallback would
-then stand in for permanently.
+and the alternative is persisting a member with no roles at all, which REQ-SEC-053 would then refuse
+with `NO_ROLE` (before ADR-0159 the `Guest` fallback stood in for it).
 
 **The stored set still converges.** It is maintained by every client whose claim is complete and by
 the daily Admin-API pass (`syncUser(KeycloakUserDto)`), which reads the realm directly and is
@@ -2243,6 +2333,16 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 
 ### REQ-SEC-037 — The public API vhost's anonymous surface is enumerated, not incidental
 
+> [!note] Amended 2026-09-12 (ADR-0162) — the allow-list lives in this repository
+> Until 2026-09-12 the allow-list was a block in the rollout runbook that a human pasted into Nginx
+> Proxy Manager, where no PR and no test could read it — several statements below were written in
+> that world. It is now [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf),
+> included by `conf.d/50-api.conf.template` and applied by the deploy reconcile. Three things read
+> it in CI: `ExternalContractTest`, the `probe-vs-allowlist` job in `repo-lint.yml` (the nightly
+> probe's rows against the list) and `scripts/check-edge-nginx.sh` (renders and starts the edge).
+> The runbook is archived at [`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)
+> and still explains *why* each family was admitted in which phase; it no longer carries the list.
+
 > [!note] Amended 2026-09-06 (ADR-0159) — the enumeration stands, the statuses changed
 > The allow-list is unchanged: no rule was added, removed or reordered, and every path the app sends
 > is still admitted. What changed is the **backend**, which now refuses the caller behind them. The
@@ -2257,67 +2357,63 @@ for an anonymous write and getting `403`, because the CSRF filter runs ahead of 
 > reads, which is why this requirement is about numbers at all.
 >
 > The requirement's discipline is unchanged and was followed here: **no pin, no stated status.**
-> Every row is pinned in `ApiVhostAnonymousSurfaceTest` before the runbook says it.
+> Every refused row is pinned in `ApiVhostAnonymousSurfaceTest`; the two `200` rows are pinned by
+> `AnonymousSurfaceSweepTest` and `OpenApiAnonymousOperationsTest`.
 
 The vhost is a default-deny allow-list (ADR-0135), and every path on it **inherits whatever
-authentication the backend requires of that path**. That is deliberately not uniform: most of the
-API is `authenticated()`, and a few operations are `permitAll` because something already public
-depends on them. Allow-listing therefore decides *reachability*, never *authorisation* — and the two
-are easy to conflate, because the list looks like a security control and is only half of one.
+authentication the backend requires of that path**. Since ADR-0159 that is almost uniform — every
+path but the two below is refused without a token (REQ-SEC-052). Allow-listing therefore decides
+*reachability*, never *authorisation* — and the two are easy to conflate, because the list looks like
+a security control and is only half of one.
 
 **Each path admitted to the allow-list MUST have its anonymous status stated when it is added.** A
-path that turns out anonymous when nobody intended it is the failure this exists to prevent, and it
-is not catchable afterwards: nothing in CI can see what the vhost serves, and an unauthenticated
-endpoint answers exactly as cheerfully as an authenticated one.
+path that turns out anonymous when nobody intended it is the failure this exists to prevent, and the
+list alone cannot show it: CI can read which paths are admitted, but not what the backend answers
+behind them, and an unauthenticated endpoint answers exactly as cheerfully as an authenticated one.
 
 The anonymous surface, complete:
 
 |                 Operation                  |                                                                                                                     Why it is anonymous                                                                                                                      |                                                                             What an anonymous caller gets                                                                              |
 |--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `GET /api/v1/terms/document`               | ADR-0138 — wording everyone must read *before* agreeing cannot require having agreed                                                                                                                                                                         | the same text already world-readable at `/terms`                                                                                                                                       |
-| `GET /api/v1/missions/search`              | the public home page (`/`, `permitAll`) renders its upcoming-Einsatz tiles from this very endpoint                                                                                                                                                           | `PLANNED` + `ACTIVE`, **non-internal** rows only, through the outsider redaction in `MissionController#searchMissions`                                                                 |
-| `GET /api/v1/missions/{id}`                | the same public surface, one Einsatz deep                                                                                                                                                                                                                    | the redacted DTO of ADR-0034 — no description, no owner, no managers, participants without payout preference or comment; an **internal** or **terminal** Einsatz is refused with `403` |
-| `GET /api/v1/ship-types`                   | phase 3's Hangar editor needs the hull catalogue before a member has picked anything, and `/api/v1/ship-types/**` is `permitAll` in the chain                                                                                                                | game data — hull names, manufacturers, SCU — already rendered without a session by the public web frontend; no member, org unit or ship of anyone's is reachable through it            |
-| `GET /api/v1/materials/search`             | phase 3's Lager form needs the material catalogue, and `/api/v1/materials/**` is `permitAll` in the chain                                                                                                                                                    | material names, their unit and their category — the same catalogue the public web frontend renders; no stock figure and no member is reachable through it                              |
-| `GET /api/v1/locations/search`             | the same form needs the place catalogue, under the same `permitAll` prefix                                                                                                                                                                                   | place names and ids; what is *stored* at a place needs a token                                                                                                                         |
-| `GET /api/v1/refining-methods`             | phase M's Methoden-Picker needs the refining catalogue before a member has picked anything, and `/api/v1/refining-methods/**` is `permitAll` in the chain with no method gate beneath it                                                                     | the refining methods by name with their UEX yield/cost ratings — game data with no member, org unit or order in it; the admin CRUD on the same stem stays `hasRole(ADMIN)`             |
-| ~~`GET /api/v1/materials/{id}/terminals`~~ | **No longer anonymous.** Carved out with `/api/v1/materials/matrix` under REQ-SEC-032 (verb-agnostic): its only consumer is the authenticated inventory page, and leaving it open published UEX trade prices per material to the internet from the API vhost | n/a — the path answers `401` without a token, which the nightly edge-deny probe had (correctly) been asserting all along                                                               |
 | `GET /api/v1/app/version-policy`           | REQ-API-010 — an app too old to authenticate must still be able to learn that it is too old; a token-gated gate is silent in the one case it exists for                                                                                                      | three integers and the public GitHub release URL. No caller identity goes in and none comes out — the rare `/api` path with nothing to redact                                          |
 
-**This one was decided, not inherited.** Every other row above is anonymous because something
-already public depends on it; `version-policy` is anonymous because the owner chose it on
+Until ADR-0159 (2026-09-06) the table also listed the mission search and detail (the anonymous home
+page's Einsatz tiles) and four catalogue reads (`ship-types`, `materials/search`,
+`locations/search`, `refining-methods`) that were `permitAll` in the backend chain. All six answer
+`401` now; the landing page makes no backend call at all. (`materials/{id}/terminals` had left the
+table earlier, carved out with `materials/matrix` under REQ-SEC-032.)
+
+**`version-policy` was decided, not inherited.** The terms document is anonymous because something already
+public depends on it; `version-policy` is anonymous because the owner chose it on
 2026-08-24 against the standing stance that the vhost opens no anonymous paths (plan Q8). The
 alternative was considered and rejected on the merits: a token-gated policy endpoint cannot answer
 an app whose *login* is what the new contract broke, and that app would then show an authentication
 error — telling a member their credentials are wrong when they are not. The exception is one path,
 one verb, and a body with nothing in it worth protecting.
 
-**Phase 4's two feature slices add nine paths and not one anonymous one.** The Raffinerie's three
-(`my-orders`, one order, its booking) and the Materialbörse's six all sit behind
-`hasRole(KRT_MEMBER)` and answer `401` without a token; their statuses are pinned in
-`ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Two families are admitted **by
-name rather than by stem**, which is why the wider surfaces behind them stay unreachable: the app
-touches three of the refinery controller's eleven paths, and neither item-create of the board.
+**Feature slices add paths, not anonymous ones.** Phase 4's Raffinerie and Materialbörse slices,
+and every phase since, sit behind a member gate and answer `401` without a token; their statuses are
+pinned in `ApiVhostAnonymousSurfaceTest` like every other allow-listed path. Families with a wide
+controller behind them are admitted **by name rather than by stem** (the refinery family path by
+path, for example), which is why the rest of those surfaces stays unreachable.
 
 Everything else on the list is refused without a token — the Finanzen endpoints among them
-(`isAuthenticated() and isMemberOrAbove() and canSeeMission`), which is why a mission's money is
-reachable from the app and not from the internet even though the mission itself is.
+(`isAuthenticated() and isMemberOrAbove() and canSeeMission`), and since ADR-0159 the mission itself
+as well.
 
-**Refused is not one status.** `PUT /api/v1/orders/{id}/status`, added in phase 3, is the first
-allow-listed path whose chain rule is a *role* rather than a session: anonymous gets `401`, and an
-authenticated member without `LOGISTICIAN` gets `403`. `GET /api/v1/locations/home-locations`
-behaves the same way for the same reason. Both are pinned in `ApiVhostAnonymousSurfaceTest` with
-the status they actually answer, because both were first written down with the wrong one.
-
-So was `GET /api/v1/locations/refineries`, phase M's Raffinerie-Picker — the same `permitAll`
-chain, the same method-level `isAuthenticated()`, the same `403`, recorded as `401` when it was
-admitted and corrected on 2026-08-31 after the nightly probe had reported the difference for three
-nights. Phase M's other picker, `GET /api/v1/refining-methods`, was recorded as `401` in the same
-stroke and is anonymous (the row above). Neither had been pinned in
-`ApiVhostAnonymousSurfaceTest`, which is the step that would have caught both at review time and
-is why the requirement names it: **a path admitted without its pin is admitted without its status
-stated**, whatever the runbook says next to it. The rule the two misses share is that a status is
-read off the layer that refuses the caller, never off the form the field belongs to.
+**A status is read off the layer that refuses the caller.** Before ADR-0159 an admitted path under
+a `permitAll` stem was dispatched and refused at the method seam, which `GlobalExceptionHandler`
+rendered as `403`, while a path the chain refused got `401` from the entry point — so neighbouring
+paths answered different numbers for the same closure. `GET /api/v1/locations/refineries` was
+recorded as `401` when it was admitted, answered `403`, and was corrected on 2026-08-31 after the
+nightly probe had reported the difference for three nights; `refining-methods` was mis-recorded in
+the same stroke. Neither had been pinned in `ApiVhostAnonymousSurfaceTest`, which is the step that
+would have caught both at review time and is why the requirement names it: **a path admitted
+without its pin is admitted without its status stated.** With every stem closed, an anonymous
+caller now meets `401` on every refused admitted path; the role gates still decide what an
+*authenticated* caller gets (`PUT /api/v1/orders/{id}/status` answers a member without
+`LOGISTICIAN` with `403` at the method seam).
 
 **One family on the list used to be reachable anonymously by design, without being *anonymous*.**
 The four participant writes — `…/participants/{id}/slim` and its `check-in`, `check-out` and
@@ -2333,34 +2429,35 @@ with `401`, and the row's existence is not part of the answer. This was the one 
 that was not authenticated-only; there is no longer one. Pinned in
 `ApiVhostAnonymousSurfaceTest.shouldRefuseAnonymousParticipationWritesOnAnAbsentRow`.
 
-**The refusal is not one status, and the split follows the layer that produces it.** The me-scoped
-paths are `authenticated()` in the filter chain, so they never reach a controller and the entry
-point answers `401`. The Finanzen paths sit under `GET /api/v1/missions/**`, which is `permitAll`
-in that chain — the request is dispatched, `@PreAuthorize` refuses it at the method seam, and
-`GlobalExceptionHandler` renders that refusal as `403`. Nothing upgrades it to `401`:
-`ExceptionTranslationFilter`, the component that would substitute the entry point for an anonymous
-caller, never sees an exception the MVC advice has already handled. Both are closed to the
-internet; only the number differs, and it differs *because* authorization lives at the method seam
-in this project rather than in the matcher list. `ApiVhostAnonymousSurfaceTest` pins both, since
-the statuses are what an operator verifies the vhost against
-([`API_VHOST_ROLLOUT_RUNBOOK.md`](../API_VHOST_ROLLOUT_RUNBOOK.md) § D.3a).
+**Why the number used to split, kept because the mechanism still holds for authenticated
+callers.** A request dispatched to a controller and refused by `@PreAuthorize` is rendered by
+`GlobalExceptionHandler` as `403`; nothing upgrades it to `401`, because
+`ExceptionTranslationFilter` — the component that would substitute the entry point for an anonymous
+caller — never sees an exception the MVC advice has already handled. Only a request the filter chain
+refuses gets the entry point's `401`. Before ADR-0159 the Finanzen paths sat under the `permitAll`
+stem `GET /api/v1/missions/**` and answered an anonymous caller `403`; with the stem gone they answer
+`401` like the me-scoped paths, and `ApiVhostAnonymousSurfaceTest` pins that.
 
 **The missions and operations families are additionally read-only on this vhost.**
 `/api/v1/missions/<uuid>` and `/api/v1/operations/<uuid>` answer `PUT` and `DELETE` as well as
 `GET`, and an allow-list that matches on the path cannot tell them apart, so the vhost refuses
-every non-`GET` under either prefix with `405` before the request reaches the backend.
-`@PreAuthorize` would refuse them too; the point is that it does not have to be the only thing
-that does. Under operations the write that matters is `PUT
-/api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opens it, and
-opening it means naming that one path rather than widening the family, because the guard is
-verb-blind by design.
+every non-`GET`/`HEAD` under a read-only family (`$krt_readonly_family` in `api-allowlist.conf`,
+which covers more prefixes than these two) with `405` before the request reaches the backend —
+except where a write is named explicitly. `@PreAuthorize` would refuse them too; the point is that it
+does not have to be the only thing that does. Under operations the write that matters is `PUT
+/api/v1/operations/<uuid>/payouts/paid-out`, which marks a member as paid — phase 3 opened it by
+naming that one path rather than widening the family, because the guard is verb-blind by design.
+Later phases opened more writes the same way (the participation writes, the Einsatz planning set,
+and a **method-scoped** `PUT` on `/operations/<uuid>` and `/orders/<uuid>` that keeps `DELETE` on
+both shut).
 
 **A refusal by this vhost is `404` or `405`, and which one is decided by order, not by family.** The
 allow-list's default deny runs first; the read-only guard runs after it. A path that is on no
 allow-list line is therefore `404` for **every** verb — its family membership in the read-only guard
 is never consulted, because the request is already refused. Only an *admitted* path can answer
-`405`, and that is what `POST /api/v1/orders` does: the queue is on the list as a phase-2 read, so
-the verb is the only thing left to refuse. `POST /api/v1/hangar/import/fleetview` used to read the
+`405`, and that is what `PUT` and `DELETE /api/v1/missions/<uuid>` do: the detail is on the list as a
+read, so the verb is the only thing left to refuse (`POST /api/v1/orders`, the example that stood
+here, has since been admitted and answers `401`). `POST /api/v1/hangar/import/fleetview` used to read the
 other way round: `404`, not `405`, because it was on no allow-list line and the `/hangar` prefix
 sitting in the read-only family only decided what would happen on the day it was admitted. **Phase X
 was that day** — it added both the allow-list line and the `$krt_readonly_family` clearing, so the
@@ -2414,101 +2511,71 @@ were wrong.** An SSE endpoint reachable without a token would not leak one respo
 connection open and feed it another member's events for as long as it lived. It is me-scoped
 (`@PreAuthorize("isAuthenticated()")` on the controller, recipient resolved from the JWT `sub`), so
 it answers `401` — asserted, like every other row, by `ApiVhostAnonymousSurfaceTest`. The mutating
-half of the family (`POST /read-all`, `DELETE /read`, `DELETE /{id}`, `POST /{id}/read`) is off the
-list *and* refused by the read-only guard, which covers `notifications` as well.
+half of the family (`POST /read-all`, `DELETE /read`, `DELETE /{id}`, `POST /{id}/read`) was opened
+by name in phase 5, each authenticated and me-scoped, and answers `401` anonymously too.
 
-**The four Operationen reads answer `401`, not the `403` their Einsatz neighbours give.** Nothing
-in the chain's matcher list names `/api/v1/operations/**`, so they fall through to
-`anyRequest().authenticated()` and are refused before the dispatch, where the entry point writes
-`401`. Same family of screen, same phase, different number — which is why the rollout table is per
-path and `ApiVhostAnonymousSurfaceTest` pins each one.
+**The mission search is no longer the exception it was.** It used to be accepted as anonymous and
+larger than the home page it fed (arbitrary `start`/`end`, paged, JSON rather than HTML), bounded
+only by the edge limiter. ADR-0159 closed it with the rest: the landing page makes no backend call,
+and the search answers `401` without a token.
 
-**The mission search publishes more than the home page does, and that is accepted rather than
-overlooked.** Each row is redacted identically, but the page caps itself at seven days and fifty
-rows while the API takes an arbitrary `start`/`end` and pages through the whole result — so the
-reachable *window* is larger, and JSON is a friendlier scraping target than rendered HTML.
-Requiring a token was considered and rejected: the home page consumes this endpoint
-**anonymously** through the frontend's own client, so authenticating it would blank the tiles for
-every visitor who is not logged in. The rows carry no member identity, and the edge per-IP limiter
-(REQ-SEC-023, 20 r/s burst 80, keyed per IPv4 and per IPv6 `/64`) applies to this host like every
-other, which bounds enumeration without adding a control.
-
-**`permitAll` in the filter chain is not the whole rule.** `/api/v1/missions/**` is `permitAll`
-there, and `POST /api/v1/missions` is nonetheless refused to an anonymous caller by
-`@PreAuthorize("isAuthenticated()")` on the method — this project puts authorization at the method
-seam by design. Auditing the filter chain alone therefore *over*-reports the anonymous surface;
-both layers have to be read together, which is why the table above lists operations rather than
-matchers.
+**Both layers have to be read together.** This project puts authorization at the method seam by
+design, so a matcher list alone over-reports what is open (a path under a `permitAll` stem may still
+carry a method gate) — which is why the table above lists operations rather than matchers, and why
+REQ-SEC-052 requires a method gate on every controller as well.
 
 **Acceptance**
 
-- [x] Every allow-listed path has a recorded expected status without a token, and the rollout
-  runbook's verification step reads from that table rather than assuming one answer for all of them
-  (§ D.3a). The previous single-number check raised a false alarm the first time it was run against
-  a `permitAll` path.
+- [x] Every allow-listed path has a recorded expected status without a token — today in the nightly
+  `edge-deny-probe.yml`, checked against `api-allowlist.conf` by `probe-vs-allowlist` (the archived
+  runbook's § D.3a was its first form). The previous single-number check raised a false alarm the
+  first time it was run against a `permitAll` path.
 - [x] Both anonymous operations are named, each with the already-public surface it mirrors.
 - [x] The two live-sync paths were checked specifically: `isAuthenticated()` at the controller, so
   neither is anonymous; the stream's partial-authorization answer (`403` only when *no* topic was
   accepted) and the publish path's `429` are pinned in `LiveSyncControllerTest`, and both paths get
   their row in `ApiVhostAnonymousSurfaceTest` and in the nightly probe.
-- [x] `POST /api/v1/missions` was checked specifically: `permitAll` in the chain,
-  `isAuthenticated()` at the method, so an anonymous create is refused — and it is not on the
-  allow-list either.
-- [x] The edge rate limiter covers this host without a per-host entry:
-  `docker/maintenance/nginx/server_proxy.conf` is included into every proxy host's server block.
+- [x] `POST /api/v1/missions` was checked specifically: `isAuthenticated()` at the method (and,
+  since ADR-0159, at the chain), so an anonymous create is refused — and it is not on the allow-list
+  either.
+- [x] The edge rate limiter covers this host without a per-host entry: `50-api.conf.template`
+  includes `docker/edge/include/limits.conf` like every other vhost (REQ-SEC-023).
 - [x] A check that fails when an allow-listed path becomes anonymous without the table moving.
   The nightly `edge-deny-probe` workflow asserts the whole table from outside — the only vantage
-  point that can, since the allow-list lives in NPM's database where no PR and no in-repo test can
-  read it. It catches both directions: a `2xx` where the table names a refusal is an
-  unauthenticated read of member data, and a `404` where it names a status means the block was
-  never pasted — the failure that otherwise has no signal at all, and that shipped a blank
-  mission-detail screen once already. The id-dependent rows take their id from the anonymous search
-  rather than a hardcoded UUID, and say so loudly when there is no row to take.
+  point that sees what the deployed vhost and backend actually answer together. It catches both
+  directions: a `2xx` where the table names a refusal is an unauthenticated read of member data,
+  and a `404` where it names a status means the admission never reached the host — the failure
+  that otherwise has no signal at all, and that shipped a blank mission-detail screen once already.
+  The id-dependent rows use a fixed nil UUID: authorisation is decided before the row is looked up,
+  and the old discovery of a real id from the anonymous search was itself the finding REQ-SEC-052
+  closed.
 - [x] The backend half is pinned in CI too: `ApiVhostAnonymousSurfaceTest` asserts the status each
   allow-listed path gives an anonymous caller, so the table cannot drift from the code even between
   nightly runs.
 
 #### What the probe leaves in the backend log
 
-The probe's own refusals surface to an operator as backend WARN lines, and they are the *expected
-output of a passing assertion*. Recognising them matters: on 2026-09-02 they cost a log triage
-twenty minutes, because four anonymous `403`s against real endpoints read exactly like a broken
-relay.
+> [!note] Rewritten 2026-09-22 — the four `403` lines are gone
+> This subsection used to describe a signature of two to four anonymous `403 ACCESS_DENIED` WARN
+> lines (refineries, home-locations and the two Finanzen paths, the last two on a live mission id
+> discovered from the anonymous search). ADR-0159 turned all four into `401`s and the probe now uses
+> a nil UUID, so a passing run leaves no anonymous `403` at all.
 
-The signature is **the path set, not the clock**. A run leaves two to four lines of the shape
-`Access denied for GET … [status=403, code=ACCESS_DENIED, …]` with `userId=anonymous` and
-`orgUnitId=anonymous` (`CorrelationIdFilter`), on exactly these paths and in this order:
+The probe's refusals are the *expected output of a passing assertion*. Every row it asserts `401`
+is refused by the entry point, which logs at **DEBUG** (the REQ-OBS-001 `401` carve-out), and the
+edge-level `404`/`405` rows never reach the backend — so a passing run leaves **no** backend WARN
+line. The schedule is `17 5 * * *` UTC, but match on paths, not the clock: a burst at another hour
+is equally a `workflow_dispatch`, a delayed schedule or an unrelated anonymous caller.
 
-1. `/api/v1/locations/refineries`
-2. `/api/v1/locations/home-locations`
-3. `/api/v1/missions/{id}/finance-entries`
-4. `/api/v1/missions/{id}/finance-entries/summary`
+That makes an anonymous `403 ACCESS_DENIED` WARN on an allow-listed path a finding, not noise: it
+means a path the chain should refuse was dispatched to a controller — a `permitAll` stem has come
+back. Keep that line at WARN and out of the `401`→DEBUG carve-out; `AccessDeniedSpike` (`0.2/s for
+10m`) is a spike detector, not a drift detector.
 
-— the only four `403` assertions in the workflow. The two Finanzen rows carry a **live** mission
-UUID, because the probe discovers the id from the anonymous search rather than hardcoding one, and
-they are skipped altogether when that search returns no row (hence "two to four").
-
-The negatives are what close the triage:
-
-- The run's ~100 `401` assertions log at **DEBUG** and its one app-level `404` likewise, so
-  "four WARN lines and nothing else" *is* the signature. A burst of anonymous `403`s on *other*
-  paths is not this probe.
-- The schedule is `17 5 * * *` UTC, but a burst at another hour proves nothing — it is equally a
-  `workflow_dispatch`, a delayed schedule, the manual runbook check, or an unrelated anonymous
-  caller. Match on the paths.
-- These count toward `basetool_http_error_total{code="ACCESS_DENIED"}` but sit roughly two orders
-  below `AccessDeniedSpike`'s `0.2/s for 10m`, so a firing `AccessDeniedSpike` is never this.
-
-The WARN level is deliberate and must not be lowered for these, nor folded into the REQ-OBS-001
-`401`→DEBUG carve-out. That line is the only human-readable signal that a deliberately-anonymous
-catalogue (`/ship-types`, `/materials/search`, `/locations/search`, `/refining-methods`) has
-accidentally grown a method gate and is now `403`ing the public pickers — drift this probe has
-already caught once. `AccessDeniedSpike` is a spike detector, not a drift detector.
-
-**Enforced by:** review at the moment a path is added — deliberately a documented obligation rather
-than a test, for the reason in the open item above · **Code:** `SecurityConfig` (filter chain),
-`MissionController#searchMissions` (outsider redaction), `HomeController#home` (the anonymous
-consumer) · **Tests:** `ApiVhostAnonymousSurfaceTest` (the four statuses above) ·
+**Enforced by:** review at the moment a path is added, backed by the probe and the pin below ·
+**Code:** `SecurityConfig` (filter chain), `docker/edge/include/api-allowlist.conf`,
+`docker/edge/conf.d/50-api.conf.template` · **Tests:** `ApiVhostAnonymousSurfaceTest` (the
+anonymous status of every admitted path), `edge-deny-probe.yml`, `probe-vs-allowlist` ·
 **Decision:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 [ADR-0138](../adr/0138-terms-wording-is-a-backend-resource.md)
 
@@ -2532,8 +2599,7 @@ distinguish an existing member id from an unknown one.
 > /api/v1/refinery-orders`, and this one) while the fourth, `POST
 > /api/v1/refinery-orders/users/{userId}`, had already been closed with `canManageUserRefineryOrders`
 > in PR #808. **A role that says "may act on behalf of somebody" is not an answer to "may act on
->
->> behalf of *this* somebody."**
+> behalf of *this* somebody."**
 
 The order-ownership check that already guarded this endpoint does **not** cover it: it constrains
 *which order* may be stored, not *who the stock is booked for*. Until this requirement, a member
@@ -2566,10 +2632,18 @@ the caller.
 
 ### REQ-SEC-040 — Guest redaction MUST reach every nested user, not only the participants
 
+> [!note] Amended 2026-09-22 — the rule outlived the guest audience (ADR-0159)
+> The heading keeps its original wording so the id stays searchable. Since ADR-0159 the redactor is
+> `MissionPeerRedactor`, its passes are `cleanup…ForPeer` (`cleanupUserForPeer`,
+> `cleanupUnitForPeer`, `cleanupShipForPeer`), the reader it protects against is a **member below
+> Logistician** rather than an unauthenticated outsider, and the ArchUnit rule is
+> `peerReadableMissionEndpointsMustRedactPii`. The requirement — every nested user record gets its
+> own pass — is unchanged. The text below keeps the guest-era names where it tells the history.
+
 The mission guest redactor's compiler-enforced exhaustiveness (the explicit full-field record
 reconstruction) only holds for records it actually **descends into**. A nested collection forwarded
 by reference is a hole in it, and MUST NOT contain a record that reaches a user, a squadron or free
-text without its own `cleanup…ForGuest` pass.
+text without its own `cleanup…ForGuest` (now `cleanup…ForPeer`) pass.
 
 Concretely: `assignedUnits` is forwarded to outsiders as mission planning data, and each unit's
 `ship` carries a full `UserDto` owner. `UserMapper` nulls only `email`, so an un-redacted
@@ -2577,19 +2651,22 @@ pass-through handed an **unauthenticated** caller of the public mission detail t
 `roles` and `permissions` — i.e. who holds `ADMIN`/`OFFICER` — plus their free-text `description`,
 org-unit memberships, `joinDate` and `discordLinked`. `Ship.owner` is `nullable = false`, so any
 unit with an assigned ship always carried one. The owner is now reduced to the public callsign
-tuple by the same `cleanupUserForGuest` pass every other nested user goes through.
+tuple by the same `cleanupUserForGuest` (now `cleanupUserForPeer`) pass every other nested user
+goes through.
 
 Note what did **not** catch this, because the same blind spots apply to the next nested record:
-`anonymousReadableMissionEndpointsMustRedactGuestPii` asserts that a `cleanup…ForGuest` method is
-*called*, never that the redaction is *complete*; and `ExternalContractTest` freezes
+`anonymousReadableMissionEndpointsMustRedactGuestPii` (now `peerReadableMissionEndpointsMustRedactPii`)
+asserts that a redaction method is *called*, never that the redaction is *complete*; and `ExternalContractTest` freezes
 `assignedUnits` only as a top-level field name and never inspects the nested shape.
 
 **Acceptance**
 
-- [x] An outsider's `GET /api/v1/missions/{id}` returns `assignedUnits[].ship.owner` with `roles`,
-  `permissions`, `description`, `email`, `squadron`, `squadrons`, `joinDate` and `discordLinked`
-  all null, and the callsign tuple (`username`, `displayName`, `effectiveName`, `rank`) intact.
-- [x] The strict outsider level inherits the pass from the member-peer level.
+- [x] A peer's `GET /api/v1/missions/{id}` (written for the outsider, who no longer exists) returns
+  `assignedUnits[].ship.owner` with `roles`, `permissions`, `description`, `email`, `squadron`,
+  `squadrons`, `joinDate` and `discordLinked` all null, and the callsign tuple (`username`,
+  `displayName`, `effectiveName`, `rank`) intact.
+- [x] ~~The strict outsider level inherits the pass from the member-peer level.~~ Retired with the
+  outsider tier (ADR-0159); there is one level left.
 - [x] A unit with no assigned ship redacts without error.
 
 **Enforced by:** `MissionPeerRedactorTest` · **Code:** `MissionPeerRedactor#cleanupUnitForPeer`,
@@ -2642,7 +2719,8 @@ to the mission, any member could post income/expense rows into another squadron'
 attribute them to a member of that squadron — while editing or deleting that same row required being
 its owner or an officer in scope (`canEditFinanceEntry`). A create strictly weaker than the edit of
 what it creates is a broken-object-level-authorization asymmetry, and booking money is a management
-act on the mission (MULTI_SQUADRON_PLAN.md § 1: editing is the owning OrgUnit's prerogative).
+act on the mission ([`MULTI_SQUADRON_PLAN.md`](../archive/MULTI_SQUADRON_PLAN.md) § 1, archived:
+editing is the owning OrgUnit's prerogative).
 
 The self-booking branch resolves the caller's participant row by `(missionId, userId)` and compares
 it to the requested id, so it enforces three conditions at once — the row exists, it belongs to this
@@ -2833,7 +2911,8 @@ layer directly.
 
 **Enforced by:** `MeControllerTest` · **Code:** `MeController`, `StockViewerAccess`,
 `StockViewerAccessService`, `AccessGateService#mayEditJobOrder`, `InventoryItemMapper`,
-`JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, REQ-APP-SEC-001
+`JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047, and the Android counterpart REQ-APP-AUTH-014
+(`basetool-android` `docs/specs/auth.md`)
 
 ### REQ-SEC-048 — One endpoint answers which org units a caller may pin
 
@@ -2863,22 +2942,21 @@ round-trips into one.
 > been fixing the wrong thing.
 >
 > **Correction, 2026-09-01.** This requirement first said "Staffel and SK only, matching what the
->
->> switcher offers". **That was wrong**, and it hid a second empty switcher behind the first. A
->> member may hold a seat on a Bereich or on the Organisationsleitung *and on nothing else*
->> (`V165` forbids an OL member a Staffel row at all), and those units own aggregates in their own
->> right — `OrgUnitStampingService` applies no kind filter, REQ-ORG-016. Listing only Staffeln and
->> SKs therefore left exactly those members with a switcher that had nothing in it but „Alle
->> Org-Einheiten", while the scope predicate would have honoured a pin to any of them
->> (`RequestScopeResolver#currentScopePredicate` accepts a pin inside the caller's expanded reach).
->> The web's own `orgunit-select.html` had grouped all four kinds since epic #692 Phase 5; the
->> restriction lived only in the backend.
+> switcher offers". **That was wrong**, and it hid a second empty switcher behind the first. A
+> member may hold a seat on a Bereich or on the Organisationsleitung *and on nothing else*
+> (`V165` forbids an OL member a Staffel row at all), and those units own aggregates in their own
+> right — `OrgUnitStampingService` applies no kind filter, REQ-ORG-016. Listing only Staffeln and
+> SKs therefore left exactly those members with a switcher that had nothing in it but „Alle
+> Org-Einheiten", while the scope predicate would have honoured a pin to any of them
+> (`RequestScopeResolver#currentScopePredicate` accepts a pin inside the caller's expanded reach).
+> The web's own `orgunit-select.html` had grouped all four kinds since epic #692 Phase 5; the
+> restriction lived only in the backend.
 
 The membership branch is the epic #692 Phase 5 drill-down reach
 (`OrgUnitMembershipQueryService#listPickerOptionsWithDescendants`) rather than the direct-membership
 list (`#listOptionsForUser`), which is what makes a leadership seat resolve to the units below it.
 The admin branch is `#listAllPinnableOptions`, kept separate from `#listAllActiveOptions` because
-that one is also the public Job-Order form's requesting/responsible-unit picker and must stay
+that one is also the Job-Order request form's requesting/responsible-unit picker and must stay
 Staffel/SK-only — only those process orders.
 
 **An admin must reach at least as far as an OL member.** The OL cascade names every org unit, so an
@@ -2896,7 +2974,9 @@ hierarchy that no gate would have caught, because both answers are individually 
   verified against the test stack 2026-09-01.
 - [x] An OL seat is offered every unit the cascade names, top-down
   (`…_olSeat_reachesEveryUnitTheCascadeNames`).
-- [ ] Both clients read this endpoint rather than branching themselves: outstanding.
+- [ ] Both clients read this endpoint rather than branching themselves. The web half is done —
+  `OrgUnitContextAdvice` makes the one call (checked 2026-09-22); the Android half is tracked in
+  `basetool-android`.
 
 **Enforced by:** `MeControllerTest`, `OrgUnitMembershipQueryServiceTest` · **Code:**
 `MeController#getPinnableOrgUnits`, `OrgUnitMembershipQueryService#listAllPinnableOptions` /
@@ -2942,13 +3022,12 @@ the first and so far only entry on the allow-list.
 
 > [!warning] Corrected 2026-09-03 — the handshake is **not** on every logged-in page
 > This paragraph previously read "for this application, every logged-in page, because live sync opens
->
->> `/ws/sync`", and ADR-0154 built its self-healing argument on that. It is false:
->> `krt-live-sync.js` connects **lazily** — `ensureSocket()` is reached only from `subscribe()`,
->> `sendChanged()` and `sendPresence()` — so a page that subscribes to no live-sync room never
->> handshakes. Getting the type id right therefore stops new poisoning but repairs nothing that is
->> already stored, which is what REQ-SEC-050 exists for
->> ([ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md)).
+> `/ws/sync`", and ADR-0154 built its self-healing argument on that. It is false:
+> `krt-live-sync.js` connects **lazily** — `ensureSocket()` is reached only from `subscribe()`,
+> `sendChanged()` and `sendPresence()` — so a page that subscribes to no live-sync room never
+> handshakes. Getting the type id right therefore stops new poisoning but repairs nothing that is
+> already stored, which is what REQ-SEC-050 exists for
+> ([ADR-0157](../adr/0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md)).
 
 Widening the default typing to cover final types is **not** the fix and must not be proposed as a
 simplification: `creationTime`, `lastAccessedTime` and `maxInactiveInterval` are `Long`/`Integer`
@@ -3209,7 +3288,8 @@ a method gate.
 | the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`           | Assets. The three mechanical entries keep the OAuth2 saved-request replay off a 404 (REQ-SEC-025, ADR-0088).                                                                                                                                                                                                                    |
 | `/.well-known/assetlinks.json`                                                  | Android App Links verification is fetched by the platform with no session (REQ-SEC-038).                                                                                                                                                                                                                                        |
 | `/manifest.webmanifest`                                                         | The web app manifest, read by a browser on the landing page before any login (REQ-UI-020, ADR-0164). Three localised strings, two colours and the path of an already-public icon; behind the catch-all it would answer `302` into OAuth and installs would name the app after the login page. Same class as the entry above it. |
-| `/actuator/health`, `/actuator/health/**`                                       | Docker `HEALTHCHECK`; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                                                                                                        |
+| `/app/callback`, `/app/link-help`                                               | The Android App Link fallback (REQ-SEC-038): a member mid-login may hold no session, and behind the catch-all the callback would loop into OAuth and park its authorization code in the saved-request cache. `/app/callback` only answers `303` to the help page, dropping the query.                                          |
+| `/actuator/health`, `/actuator/health/**`                                       | The container health check (the image's `HEALTHCHECK`, rendered into the Quadlet `HealthCmd` in prod); in prod Actuator lives on the internal management port (ADR-0090).                                                                                                                                                     |
 | `/oauth2/authorization/keycloak`, `/login/oauth2/code/keycloak`, `POST /logout` | Spring Security's own login and logout endpoints — filters, not matrix entries.                                                                                                                                                                                                                                                 |
 
 > **Amended 2026-09-22 (ADR-0197, approved by @greluc):** `/licenses` joined the table. It is the
@@ -3248,9 +3328,12 @@ a method gate.
 >
 > The exemption therefore lives in **one** place, `frontend/config/PublicPaths`, which both gates
 > read: `isStaticAsset` (the asset trees, the favicon, `/sm/`, `*.map`), `isPublicDocument`
-> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`) and `isAuthInfrastructure`
-> (login, logout, OAuth, error, actuator). **A new public document goes in both this table and
-> `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
+> (`/robots.txt`, `/.well-known/assetlinks.json`, `/manifest.webmanifest`), `isAuthInfrastructure`
+> (login, logout, OAuth, error, actuator) and `isLegalPage` (`/impressum`, `/privacy`, `/terms` — the
+> pages a gate may never hold a member away from, REQ-SEC-028). **A new public document goes in both
+> this table and `isPublicDocument`.** Pinned by `PublicPathsTest` plus a case in each gate's own test.
+> The App Link fallback pages are `permitAll` but deliberately in none of these sets: they are pages
+> for a member, not documents a verifier fetches, so a signed-in member still meets the gates there.
 >
 > **Both halves match the same way, so both accept the same spellings.** Spring Security matches
 > `permitAll` with a `PathPatternRequestMatcher`, which decides on the percent-**decoded**
@@ -3277,7 +3360,7 @@ a method gate.
 | `GET /api/v1/app/version-policy`          | The forced-update gate (REQ-API-010). A version gate that only answers after a login is silent in exactly the case it exists for: an app too old to log in must still learn that it is too old. Three integers and a public release URL.                              |
 | `GET /api/v1/terms/document`              | The Terms-of-Use wording (ADR-0138 / REQ-SEC-028). A document everyone must read before agreeing to anything cannot require having agreed, and the same text is already on the public `/terms` page.                                                                  |
 | `/internal/**`                            | The Keycloak SPI's account-existence precheck (REQ-SEC-022) — machine-to-machine behind a constant-time shared-secret header, `401` without it. Keycloak sits outside the resource server's trust boundary and carries no JWT to gate on. Not an anonymous data path. |
-| `/actuator/health`, `/actuator/health/**` | Docker `HEALTHCHECK`.                                                                                                                                                                                                                                                 |
+| `/actuator/health`, `/actuator/health/**` | The container health check on the local stacks; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                    |
 | `/error`                                  | Spring's error dispatch.                                                                                                                                                                                                                                              |
 
 **Both anonymous reads are `GET`-scoped**, so a `HEAD` on either falls to the authenticated
@@ -3295,6 +3378,11 @@ that spelling fell through to the catch-all and was merely authenticated, on a p
 whole surface. Corrected 2026-09-06; the sweep excluded it too, by prefix, and now excludes nothing
 of the kind.
 
+**Ingest** — the gateway's chain `permitAll`s only `/actuator/health(/**)` and `/v3/api-docs/**`;
+the springdoc document is disabled in prod (`springdoc.api-docs.enabled: false`, so it answers
+`404`), and in prod Actuator lives on the internal management port `11272` (ADR-0090). Its two
+`/v1/**` endpoints require a bearer token and the client-identity gate (REQ-INGEST-011, ADR-0129).
+
 The prod-only **management-port chain** (`ManagementPortSecurityConfig`,
 `@ConditionalOnProperty("management.server.port")`, port `11271`) is `permitAll` on
 `/actuator/health(/**)`, `/actuator/prometheus` and `/actuator/info` **on the internal connector
@@ -3307,7 +3395,9 @@ it is anonymous access in the brief's sense.
 - [x] Every mapping the dispatcher knows refuses a caller with no token, except the four paths above
   — asserted by enumerating `RequestMappingHandlerMapping`, not by listing paths somebody thought of.
 - [x] Every `GET` is additionally issued as `HEAD`, and the two `GET`-scoped reads answer `401` to it.
-- [x] Exactly three methods declare `@PreAuthorize("permitAll()")`; a fourth fails the build.
+- [x] Exactly four methods declare `@PreAuthorize("permitAll()")` — the two anonymous reads, the SPI
+  precheck and `BasetoolErrorController#handleError` (added 2026-09-07, when the rule learned to see
+  `@RequestMapping`); a fifth fails the build.
 - [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
   scheme the document does not define.
 - [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
@@ -3546,14 +3636,17 @@ and this bounds staleness only *within* one token's life.
   new authorities immediately.
 - [x] The properties class sits in `support`, keeping `ArchitectureTest`'s package-cycle and
   `support`-is-a-leaf invariants green.
-- [x] `docker-compose.yml`'s backend `environment:` allow-list names the variable, so an operator
-  override in the host `.env` actually reaches the container.
+- [x] The operator's `IRI_AUTHORITIES_CACHE_TTL` in the host `.env` reaches the container as
+  `APP_SECURITY_AUTHORITIES_CACHE_TTL`: `docker-compose.yml`'s backend `environment:` allow-list names
+  it, and `scripts/generate-quadlet.py` carries it into `quadlet/env.d/backend.env.tmpl` for the
+  production Quadlet unit.
 
 **Enforced by:** `BackendPropertiesValidationTest` (default, both bounds, and the ceiling accepted
 exactly) · `CustomJwtGrantedAuthoritiesConverterTest` (the converter builds against the real
 properties) · `ArchitectureTest` (`supportPackageMustStayADependencyLeaf`,
 `backendPackagesShouldBeFreeOfDependencyCycles`) · **Code:** `AuthoritiesCacheProperties`,
-`CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml` · **Decision:**
+`CustomJwtGrantedAuthoritiesConverter`, `application.yml`, `docker-compose.yml`,
+`quadlet/env.d/backend.env.tmpl` · **Decision:**
 [ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md)
 
 ### REQ-SEC-057 — A refused registration is purged once its retention window expires
@@ -3599,15 +3692,15 @@ one event type.
 
 **Acceptance**
 
-- [ ] A registration rejected longer ago than `max-age` is removed from `app_user`,
+- [x] A registration rejected longer ago than `max-age` is removed from `app_user`,
   `user_approval_event` and Keycloak by the daily sweep.
-- [ ] A registration reopened (REQ-SEC-034) between the candidate query and the purge transaction
+- [x] A registration reopened (REQ-SEC-034) between the candidate query and the purge transaction
   survives: the re-read inside the transaction re-asserts `REJECTED` and the cutoff.
-- [ ] A rejection inside the window is untouched.
-- [ ] The Keycloak user is deleted only after the database half has committed.
-- [ ] One failing registration does not abort the run; an unreachable Keycloak does not undo or mask
+- [x] A rejection inside the window is untouched.
+- [x] The Keycloak user is deleted only after the database half has committed.
+- [x] One failing registration does not abort the run; an unreachable Keycloak does not undo or mask
   the committed local purge.
-- [ ] The sweep publishes `basetool_scheduled_job_*{task="rejected_registration_retention"}` and is
+- [x] The sweep publishes `basetool_scheduled_job_*{task="rejected_registration_retention"}` and is
   covered by `ScheduledJobStale`.
 
 **Enforced by:** `RejectedRegistrationRetentionServiceTest`, `RejectedRegistrationRetentionTaskTest`
@@ -3674,7 +3767,7 @@ re-deriving it:
 
 **Third-party data is excluded by the projections, not scrubbed afterwards.** Each section is a
 written statement that lists the columns it returns, and no statement selects another member's id or
-handle. A counterparty leak would therefore have to be written into a visible `SELECT` list. Three
+handle. A counterparty leak would therefore have to be written into a visible `SELECT` list. Four
 places where that is the whole point:
 
 - a **mission participation** returns the requester's own row and the mission it belongs to, and
@@ -3702,7 +3795,8 @@ places where that is the whole point:
 
 **Free text is the one place scrubbing is unavoidable**, and it is handled separately. A note the
 member wrote is *their* data and belongs in the export, and it may name somebody else mid-sentence
-where no `SELECT` list can reach. Five columns are scrubbed for the mirror-image reason — they
+where no `SELECT` list can reach. Six columns in five sections are scrubbed for the mirror-image
+reason — they
 carry a **name somebody gave a thing**, which can be a person's: `hangar.name` (`ship.name`),
 `missionsManaged.mission` (`mission.name`, already scrubbed in the two sibling sections that select
 it), `notificationRuleTargets.rule` (`notification_rule.description`), `bankAccountGrants.account`
@@ -3760,7 +3854,7 @@ of its own, and the localised surfaces (`pdf.export.note.thirdParty`, the JSON's
 > `information_schema`, a new name column cannot reach the schema without being registered for
 > the search, and cannot be registered without being classified here.
 
-The scrubbing half had three defects of its own, and it is the half where a defect is a leak rather
+The scrubbing half had four defects of its own, and it is the half where a defect is a leak rather
 than a gap.
 
 > [!warning] Four scrubber defects, all member-reachable — corrected 2026-09-16/-17
@@ -3806,7 +3900,8 @@ None of that closes the gap between what a rule can do and what the article asks
 it from the entries they wrote themselves would be absurd.
 
 **Out of scope, named in the document itself** so the export and the privacy record agree: platform
-logs, metrics and traces (not retrievable per person by design, and swept in 31 / 14 days); backups
+logs, metrics and traces (not retrievable per person by design; logs are kept 31 days, traces 14 and
+metrics 180 — the document itself names the log and trace figures); backups
 (not searched or altered — the data ceases to exist when the backup expires); and Keycloak's own
 account record (visible in the account console).
 
@@ -3841,8 +3936,9 @@ data is no more disclosable to an admin serving somebody's Art. 15 request than 
 `DataExportControllerSecurityTest` · **Code:** `support/DataExportSections`,
 `support/HandleScrubber`, `service/DataExportService`, `service/DataExportReportService`,
 `service/pdf/DataExportPdfFormat`, `controller/DataExportController`,
-`controller/AdminDataExportController`, `templates/fragments/profile-deletion-card.html` (the
-member's buttons live beside the erasure request), `static/js/profile.js` · **Decision:**
+`controller/AdminDataExportController`, frontend `controller/DataExportProxyController`,
+`templates/profile.html` (`#profile-export-card` — the member's export buttons are plain `GET`
+links, beside the separate deletion card) · **Decision:**
 [ADR-0185](../adr/0185-the-data-export-excludes-third-parties-by-projection.md) ·
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
@@ -3943,8 +4039,8 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 
 **Enforced by:** `OrphanedAccountRepositoryIntegrationTest`, `UserReconciliationServiceTest`,
 `BusinessMetricsCollectorTest` · **Code:** `model/User#keycloakAbsentSince`,
-`repository/UserRepository#markMissingUsers` / `#countByInKeycloakFalse` /
-`#findOldestKeycloakAbsentSince`, `service/UserReconciliationService#syncUser`,
+`repository/UserRepository#markMissingUsers` / `#countOrphanedMemberAccounts` /
+`#findOldestOrphanedMemberAbsenceStamp`, `service/UserReconciliationService#syncUser`,
 `task/BusinessMetricsCollector`, `metrics/MetricNames#USERS_PENDING_DELETION`,
 `db/migration/V241`, `monitoring/prometheus/alerts/business.yml`,
 `monitoring/grafana/dashboards/07-basetool-operations.json` · **Decision:**
@@ -4021,7 +4117,8 @@ else into the registry.
 
 **The search is audit-logged, and the term is not.** A read in an otherwise mutation-only trail,
 recorded because its misuse would leave no other trace. The payload carries the **length** of the
-term, the hit count and whether the result was capped — never the term, which is somebody's name
+term, the hit count and whether the overall 300-hit cap truncated the result (`truncated`; the
+per-column cap is not recorded) — never the term, which is somebody's name
 (REQ-AUDIT-001 keeps user free text out of the payload). A trail recording every name an admin
 searched for would be a second store of exactly the data the search exists to help remove. The term
 is likewise kept out of every log line.
@@ -4092,9 +4189,8 @@ not create it.
 
 > [!warning] Corrected 2026-09-17 — a failing Keycloak delete is not self-resolving
 > This paragraph used to say the failure "is logged and swallowed — the member's data is gone,
->
->> which is what they asked for, and the leftover Keycloak account resurfaces as a fresh pending
->> registration an admin can refuse". The first half is true; the second is not, in two ways.
+> which is what they asked for, and the leftover Keycloak account resurfaces as a fresh pending
+> registration an admin can refuse". The first half is true; the second is not, in two ways.
 >
 > The recreated row is only PENDING for an ordinary member. `UserRegistrationService`'s
 > `stampNewPendingRegistration` carves ADMIN-realm-role holders out for bootstrap safety, so an
@@ -4161,23 +4257,30 @@ When an admin grants the member's wish, the member's handle MUST be replaced by 
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
 about what happened is altered — only the name goes.
 
-**The eleven places**, and the reason it is all eleven: erasing ten reads as a completed erasure
-while still naming the person on the eleventh.
+**Twelve columns in eight statements**, and the reason it is all of them: erasing eleven reads as a
+completed erasure while still naming the person on the twelfth. `HandleAnonymisationService.ANONYMISED_COLUMNS`
+is the authoritative list.
 
 |                                   Where                                   |                         Matched by                          |
 |---------------------------------------------------------------------------|-------------------------------------------------------------|
 | `audit_event.actor_handle`                                                | `actor_user_id`                                             |
-| `audit_event.subject_label`                                               | the text, exactly and case-insensitively                    |
-| `audit_event.details`                                                     | the text, replaced in place inside the payload              |
+| `audit_event.subject_label`                                               | the whole text, case-insensitively                          |
 | `bank_audit_event.actor_handle`                                           | `actor_user_id`                                             |
-| `bank_audit_event.details`                                                | the text, replaced in place inside the payload              |
 | `bank_transaction.counterparty_handle`                                    | `counterparty_user_id`                                      |
 | `bank_booking_request` — requester, decider, counterparty, owner approver | the four id columns, in one statement                       |
 | `bank_holder.handle`                                                      | `user_id`                                                   |
-| `job_order.handle`                                                        | **the text, case-insensitively** — there is no id beside it |
+| `job_order.handle`                                                        | **the whole text, case-insensitively** — no id beside it    |
 | `job_order_handover.recipient_handle`                                     | likewise                                                    |
 | `job_order_item_handover.recipient_handle`                                | likewise                                                    |
-| `notification.params`                                                     | the text, replaced in place inside the payload              |
+
+**Every statement is a whole-value comparison or an id match — never a substring rewrite.** Three
+substring `REPLACE` statements over `audit_event.details`, `bank_audit_event.details` and
+`notification.params` were removed on 2026-09-17: they rewrote every row whose text contained the
+needle, with no owner predicate, and the needle is the member's own self-service `display_name` — a
+member who called themselves `aUEC` could have had an admin, acting through the intended workflow,
+irreversibly rewrite the amount annotation on the whole financial trail. A name inside those
+payloads is now an admin's manual step, found through the Personensuche (REQ-SEC-060) and classified
+as such in `HandleErasureCoverage`.
 
 **The text-matched columns have no user id at all**: a handover recipient or a job-order contact is
 typed in by hand and may name somebody with no account. So the match is on the text and must ignore
@@ -4190,8 +4293,9 @@ so each text-matched update runs once per stored spelling — username, display 
 nickname. A handover typed with the member's nickname is as likely as one typed with their display
 name, and the search registry already treats all three as places a person is named.
 
-> [!important] Five of the eleven were added after review, and the set is gate-enforced now
-> Corrected 2026-09-16. The set was documented as closed and was not: `bank_holder.handle` (the
+> [!important] The set was widened after review, and it is gate-enforced now
+> Corrected 2026-09-16 (and again 2026-09-17, when the three payload columns named below were taken
+> back out — see above). The set was documented as closed and was not: `bank_holder.handle` (the
 > custodian registry, which becomes **more** visible after the account is gone, because its
 > `user_id` is `ON DELETE SET NULL` and the display name falls back to the snapshot),
 > `job_order.handle`, `notification.params` (one row per **administrator**, kept for up to the
@@ -4225,7 +4329,9 @@ One more thing the same review found in the same place, about the token rather t
 > asserting an invariant the code does not have is worse than no comment.
 > `HandleAnonymisation.isReserved` is the check and `UserService` applies it to both write paths.
 
-**A sentinel, not `NULL`.** Four of the columns are `NOT NULL`, and that constraint is the
+**A sentinel, not `NULL`.** Six of the columns are `NOT NULL` (both `actor_handle`s,
+`bank_holder.handle`, `bank_booking_request.requester_handle` and the two handover recipients), and
+that constraint is the
 guarantee that a row always says who acted (REQ-AUDIT-001). Relaxing it to make room for an erasure
 would weaken the invariant for every row ever written afterwards. The stored value is
 `#ANONYMISED#` — deliberately not a word in any language, because it is rendered in two and the
@@ -4250,16 +4356,16 @@ it.
 
 **Acceptance**
 
-- [x] All six places are reached in one act, and the totals are reported.
+- [x] All twelve columns are reached in one act, and the totals are reported.
 - [x] The marker events are written after the updates, and their payload does not contain the
   erased handle.
-- [x] The two text-matched columns are skipped, not matched against an empty string, when no handle
-  is known.
+- [x] The four text-matched updates (`subject_label`, `job_order.handle`, both handover recipients)
+  are skipped, not matched against an empty string, when no handle is known.
 - [x] The match on the handover columns is case-insensitive.
 - [x] Nothing is deleted: row counts, timestamps, event types, amounts and subjects are unchanged.
 
-**Enforced by:** `HandleAnonymisationServiceTest` · **Code:**
-`service/HandleAnonymisationService`, `support/HandleAnonymisation`,
+**Enforced by:** `HandleAnonymisationServiceTest`, `HandleErasureCoverageTest` · **Code:**
+`service/HandleAnonymisationService`, `support/HandleAnonymisation`, `support/HandleErasureCoverage`,
 `repository/AuditEventRepository#anonymiseActorHandle`,
 `repository/BankAuditEventRepository#anonymiseActorHandle`,
 `repository/BankTransactionRepository#anonymiseCounterpartyHandle`,
@@ -4269,7 +4375,53 @@ it.
 `frontend/support/HandleDisplay` · **Decision:**
 [ADR-0183](../adr/0183-a-granted-erasure-anonymises-the-handle-snapshots-in-place.md)
 
+### REQ-SEC-064 — Every response carries the security-header policy of its module
+
+*Added 2026-09-22 by the documentation audit: the control existed in code and in ADR-0093, but no
+requirement stated it.*
+
+Each module emits a fixed set of security response headers from its Spring Security chain, and the
+set is shaped by what the module serves.
+
+- **Frontend (HTML)** — `SecurityHeaders.frontend(issuerUri)`: a per-request
+  `Content-Security-Policy` whose `script-src` is `'nonce-…' 'strict-dynamic'` and whose `style-src`
+  is `'self' 'nonce-…'`, with `style-src-attr 'none'` (no inline `style=""` attributes, ADR-0093 /
+  REQ-UI in [`ui-design-system.md`](ui-design-system.md)), `object-src 'none'`, `base-uri 'self'`,
+  `frame-ancestors 'none'` and `form-action 'self'` plus the Keycloak issuer's origin (which since
+  ADR-0166 is normally the app's own); the nonce is minted per request from `SecureRandom` by
+  `CspNonceFilter`. Beside it: `X-Frame-Options: DENY`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`
+  `same-origin`, HSTS (one year, `includeSubDomains`, `preload`), a `Permissions-Policy` that denies
+  every listed feature, and `X-Content-Type-Options: nosniff`.
+- **Backend and ingest (JSON only)** — `Content-Security-Policy: default-src 'none';
+  frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, because neither serves a document,
+  plus `X-Frame-Options: DENY` and HSTS; the backend additionally sends the frontend's
+  referrer, cross-origin, permissions and `nosniff` headers.
+- **Edge** — every public vhost adds `Strict-Transport-Security: max-age=63072000;
+  includeSubDomains; preload` with `always` (`$hsts_header` in `docker/edge/conf.d/00-maps.conf`),
+  so an error page the edge produces itself carries it too.
+
+A new inline script or style in a template MUST carry the request nonce rather than widening the
+policy; `'unsafe-inline'` and `'unsafe-eval'` are never added. Widening any directive is a change to
+this requirement first.
+
+**Acceptance**
+
+- [x] A frontend page carries the nonce-gated CSP with `style-src-attr 'none'` and the Keycloak
+  `form-action` origin, and every static header above.
+- [x] An API response carries the `default-src 'none'` policy and the static headers.
+- [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
+
+**Enforced by:** `SecurityHeadersTest` (frontend and backend), ingest `SecurityConfigTest`, the
+`blackbox-hsts*` probes behind `EdgeHstsHeaderMissing` · **Code:** `frontend/…/config/SecurityHeaders`,
+`frontend/…/config/CspNonceFilter`, the `headers(...)` blocks of the backend and ingest
+`SecurityConfig`, `docker/edge/conf.d/00-maps.conf` · **ADR:**
+[ADR-0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md)
+
 ## Out of scope
 
 OrgUnit scoping/visibility rules (see [`org-unit-tenancy.md`](org-unit-tenancy.md)); the
-confidential-client migration decision (see ADR-0001).
+confidential-client migration decision (see ADR-0001); the Discord federation gates and the Keycloak
+SPI (see [`discord-integration.md`](discord-integration.md)); the ingest gateway's client-identity
+and acting-member rules (see [`desktop-ingest.md`](desktop-ingest.md), ADR-0129); the Actuator
+management-port isolation (see [`observability.md`](observability.md) REQ-OBS-005, ADR-0090/0134).

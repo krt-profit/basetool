@@ -1,18 +1,19 @@
 ; systemd service for the weekly Profit Basetool restore drill (REQ-OPS-011).
 ;
-; Installation (on the production host, one-time — see docs/backup.md):
-;   sudo cp /var/iri/code/scripts/iri-restore-drill.service /etc/systemd/system/
-;   sudo cp /var/iri/code/scripts/iri-restore-drill.timer   /etc/systemd/system/
-;   sudo systemctl daemon-reload
-;   sudo systemctl enable --now iri-restore-drill.timer
+; Installation is by the Ansible role (ansible/roles/basetool_host/tasks/25-scripts.yml), not by
+; hand: it copies this unit and iri-restore-drill.timer to /etc/systemd/system/, verifies them with
+; `systemd-analyze verify`, and enables the timer without starting it.
 ;
 ; Run an immediate drill:
 ;   sudo systemctl start iri-restore-drill.service
-;   journalctl -u iri-restore-drill.service -f
+;   tail -f /var/log/iri-restore-drill.log   # the script output; journald has only the unit lifecycle
+; Off-host: Grafana -> Explore -> Loki, `{app="ops-restore-drill"}`.
 ;
 ; Restores the latest off-site snapshot into a THROWAWAY Postgres container and
 ; verifies it. It never touches production state. A failure (unrestorable
-; backup) makes the unit report `failed` — treat that as a sev incident.
+; backup) makes the unit report `failed` and raises RestoreDrillArtifactNotRestorable
+; / RestoreDrillStaleOrMissing (monitoring/prometheus/alerts/ops-automation.yml) —
+; treat that as a sev incident.
 
 [Unit]
 Description=Profit Basetool — weekly restore drill (prove backups are recoverable)

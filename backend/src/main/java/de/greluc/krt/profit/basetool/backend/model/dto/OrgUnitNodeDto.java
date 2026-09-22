@@ -31,7 +31,7 @@ import java.util.UUID;
  * four kinds: the current {@code parentOrgUnitId} (where the unit sits today) and the
  * optimistic-lock {@code version} (so the UI can PATCH a new parent edge without a stale-version
  * 409). {@code department} is populated only for {@code BEREICH} rows (the Bereichsfarbe,
- * REQ-ORG-018) and {@code null} for every other kind.
+ * REQ-ORG-026) and {@code null} for every other kind.
  *
  * @param id the org unit's id.
  * @param name the org unit's display name.

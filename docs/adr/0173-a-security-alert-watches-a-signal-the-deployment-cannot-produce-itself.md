@@ -1,6 +1,6 @@
 # ADR-0173 — A security alert watches a signal the deployment cannot produce itself
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-13 (`1bfadefc4`: the `no_credentials` reason and the `invalid_token`-keyed brute-force alerts).
 - **Date:** 2026-09-13
 - **Deciders:** @greluc (pending)
 - **Related:** [`observability.md`](../specs/observability.md) > *REQ-OBS-018* ·
@@ -49,7 +49,7 @@ floor also grows every time a probe target is added, silently, in a file nobody 
 input. And the alert's own remediation text told the operator to split by `reason` into three values,
 none of which ever occurs.
 
-This was half-foreseen and never followed up. [`MEMBERS_ONLY_PLAN.md`](../MEMBERS_ONLY_PLAN.md) §
+This was half-foreseen and never followed up. [`MEMBERS_ONLY_PLAN.md`](../archive/MEMBERS_ONLY_PLAN.md) §
 *Risks* predicted that closing the anonymous surface would push scanners from `200` to `401` and
 that "`BackendAuthFailureSpike` may fire during the first days. Measure, then retune (WP-E)." The
 measurement is this ADR, eight days late, and it found a larger cause than the one predicted: not

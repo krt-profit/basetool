@@ -2,7 +2,35 @@
 
 This directory documents the production Keycloak realm (`iri`) that backs the Profit Basetool
 deployment, **in sanitized form**, so the realm's configuration is versioned and reviewable
-without ever committing secrets or PII.
+without ever committing secrets or PII. Last reviewed: 2026-09-22.
+
+## The realm at a glance
+
+As of the 2026-09-09 snapshot. Keycloak 26.7 (`quay.io/keycloak/keycloak:26.7`, pinned by digest),
+serving under `/auth` on the web origin since ADR-0166; in production it runs as the Quadlet unit
+`quadlet/systemd/keycloak.container` (rootless Podman, **read-only root filesystem**, `start`
+without `--import-realm` — the Keycloak database, not `realm-export.json`, is the source of truth).
+
+|          Client           |              Kind               |                                   Used by                                    |                                 Canonical runbook                                 |
+|---------------------------|---------------------------------|------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `basetool-frontend`       | public, authorization code, PKCE `S256` required | the web app's login (Spring OAuth2 client)                  | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) (ADR-0001, pending) |
+| `backend-service`         | confidential, service account   | the backend's user sync and Discord linking (Admin API)                      | [below](#backend-service-service-account-roles-admin-api)                          |
+| `basetool-android`        | public, PKCE `S256`, DPoP-bound refresh token | the Android app                                                 | [below](#runbook--provisioning-the-mobile-client-basetool-android)                 |
+| `basetool-sc-extractor`   | public, device grant            | the desktop SC Extractor (ingest)                                            | [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md)                          |
+| `basetool-ingest-gateway` | confidential, service account   | the ingest gateway's own identity towards the backend (ADR-0129)             | [`INGEST_KEYCLOAK_SETUP.md` step 9](../INGEST_KEYCLOAK_SETUP.md)                   |
+| `grafana`                 | confidential, authorization code | Grafana's OAuth login                                                        | set up once by the archived [`MONITORING_ROLLOUT_RUNBOOK.md`](../archive/MONITORING_ROLLOUT_RUNBOOK.md) |
+
+The `discord` identity provider and the membership gate come from the `keycloak-spi` module
+(provider JAR delivered by `deploy.sh`, ADR-0055) — set up per
+[`DISCORD_KEYCLOAK_SETUP.md`](DISCORD_KEYCLOAK_SETUP.md). The login and account theme is
+`krt-theme` from `keycloak-theme/`. Realm hardening and its per-step status:
+[`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md).
+
+Two scripts read a realm without changing it: `scripts/keycloak-realm-fingerprint.sh` prints a
+secret-free identity list of the realm's database (clients, roles, flows, mappers) to `diff` two
+realms after a move — on the Podman host run it as the service user with `--runtime podman` — and
+`scripts/check-keycloak-issuer.py` asserts that the issuer the apps validate is the one Keycloak
+advertises (ADR-0166).
 
 ## Files
 
@@ -59,14 +87,13 @@ so the conditional-OTP sub-flow of WP-K2 step 11 exists in exactly one place. Ke
 mean establishing first that `authenticatorConfig` carries nothing sensitive — this realm's
 `discord-guild-role-gate` has configuration of its own — which is a decision, not a flag flip.
 
-**Current snapshot: 2026-09-09**, taken mid-procedure during WP-K2. It therefore records an
+**Current snapshot: 2026-09-09**, still a sanitized reference and still **not** importable, taken
+mid-procedure during WP-K2. It therefore records an
 intermediate state: steps 1 and 3–10 of the hardening runbook are applied, step 11 is not, and steps
 2 and 12 are open decisions. It also contains `basetool-provisioner` — the short-lived provisioning
 client the procedure creates and deletes — which is an artifact of the export's timing and **not**
 part of the realm's intended shape. Regenerate once the procedure is finished and that client is
 gone.
-
-Current snapshot: **2026-08-17**. Still a sanitized reference, still **not** importable.
 
 The script strips or replaces the following — **never commit any of them**:
 
@@ -124,7 +151,7 @@ kcadm.sh add-roles -r iri \
 ## Token & session settings (source of truth for session behaviour)
 
 The realm-level token settings reproduced verbatim in the reference are what govern login
-longevity and the refresh flow. As of 2026-06-18:
+longevity and the refresh flow. Unchanged from 2026-06-18 through the 2026-09-09 snapshot:
 
 |                    Setting                    |   Value    |                         Meaning                          |
 |-----------------------------------------------|------------|----------------------------------------------------------|
@@ -196,7 +223,7 @@ docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test
 policy of [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) / REQ-SEC-030. Run it on
 a **test realm first**; production only after that reads clean.
 
-**Two things about kcadm on the production container that cost a procedure attempt if assumed.**
+**Three things about kcadm on the production container that cost a procedure attempt if assumed.**
 Production Keycloak serves **HTTPS only on 18443** (`--http-enabled=false`), so the usual
 `http://localhost:8080` answers `Connection refused` — there is no cleartext listener anywhere. And
 because the connector uses the shared **self-signed** `keystore.p12`, kcadm rejects the connection
@@ -205,41 +232,56 @@ were verified against a Keycloak 26.7 started with the production command line a
 keystore (2026-08-17). `KC_HOSTNAME_STRICT=true` does **not** interfere — `https://localhost:18443`
 and `https://keycloak:18443` both authenticate.
 
+And since the rootless-Podman cutover (2026-09-22) the container belongs to the service user `iri`
+and runs with a **read-only root filesystem**, so kcadm cannot write its default session file
+(`/opt/keycloak/.keycloak/kcadm.config`): every call goes through `sudo -u iri podman exec` and
+carries `--config` pointing at the unit's writable tmpfs. That was derived from the generated unit,
+not yet exercised on the production host; the helper and its reasoning are in
+[`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session). The
+provisioning script is not deployed to the host (copy it over), and its default prefix is
+`docker exec`, so pass `--kcadm-command` as below. Run everything as root, from `/`.
+
 ```bash
+cd /
+KCCFG=/opt/keycloak/data/tmp/kcadm.config
+kc() { sudo -u iri podman exec -i keycloak /opt/keycloak/bin/kcadm.sh "$@" --config "$KCCFG"; }
+KCADM="sudo -u iri podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.sh \"\$@\" --config $KCCFG' kcadm"
+
 # 1. trust the self-signed connector cert. `--trustpass -` prompts, which needs the TTY that
 #    `-it` provides; without one kcadm refuses with "Console is not active". The password is
-#    KC_HTTPS_KEY_STORE_PASSWORD from the deployment env.
-docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
-    --trustpass - /run/secrets/keystore.p12
+#    KC_HTTPS_KEY_STORE_PASSWORD in the container's environment (rendered from
+#    SERVER_SSL_KEY_STORE_PASSWORD in the host .env).
+sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
+    --trustpass - /run/secrets/keystore.p12 --config "$KCCFG"
 
 # 2. authenticate as the provisioning service account (see the section below — an admin account
 #    with OTP cannot authenticate here at all). This must come BEFORE any read: kcadm refuses
 #    every command without a stored credential, and says "No server specified. Use --server, or
 #    'kcadm.sh config credentials'." rather than anything about being unauthenticated.
 #    Omitting --secret makes it prompt, keeping the secret out of shell history.
-docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-    --server https://localhost:18443/auth --realm iri --client basetool-provisioner
+sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
+    --server https://localhost:18443/auth --realm iri --client basetool-provisioner --config "$KCCFG"
 
-# 3. save the current lists — this is the rollback basis, and both are expected to be empty
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri \
-    > kc-profiles.before.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/policies -r iri \
-    > kc-policies.before.json
+# 3. save the current lists — this is the rollback basis
+install -d -m 0700 /root/kc-mobile
+kc get client-policies/profiles -r iri > /root/kc-mobile/kc-profiles.before.json
+kc get client-policies/policies -r iri > /root/kc-mobile/kc-policies.before.json
 
 # 4. see every payload without writing anything
-scripts/provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run
+python3 provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run --kcadm-command "$KCADM"
 
 # 5. apply, then re-assert independently
-scripts/provision-keycloak-mobile-client.py --realm iri --profile prod
-scripts/provision-keycloak-mobile-client.py --realm iri --verify-only
+python3 provision-keycloak-mobile-client.py --realm iri --profile prod --kcadm-command "$KCADM"
+python3 provision-keycloak-mobile-client.py --realm iri --verify-only --kcadm-command "$KCADM"
 
-# 6. clean up: kcadm.config stores the truststore password AND an admin refresh token in
-#    cleartext (mode 0600, inside the container). Remove it when the procedure is done.
-docker exec keycloak rm -f /opt/keycloak/.keycloak/kcadm.config
+# 6. clean up: kcadm.config stores the truststore password AND a token in cleartext.
+sudo -u iri podman exec keycloak rm -f "$KCCFG"
 ```
 
-The kcadm session survives a container **restart** but not a **recreate**, so a deploy that replaces
-the container clears it — which is also why step 6 costs nothing.
+The session file lives on a tmpfs, and under Quadlet every restart is a recreate (`--replace`), so
+any restart or deploy of keycloak clears it — which is also why step 6 costs nothing. On a local
+Docker Compose stack the root filesystem is writable: plain `docker exec keycloak
+/opt/keycloak/bin/kcadm.sh …` without `--config`, and the script's default prefix, work there.
 
 ### Why a service account and not the admin user
 
@@ -250,7 +292,7 @@ fails, and it fails as `invalid_grant` / **"Invalid user credentials"**, which r
 password and sends you looking in the wrong place. The realm's own log is what disambiguates it:
 
 ```bash
-docker logs keycloak --tail 300 2>&1 | grep LOGIN_ERROR \
+sudo -u iri podman logs --tail 300 keycloak 2>&1 | grep LOGIN_ERROR \
     | grep -oE 'realmName="[^"]*"|error="[^"]*"' | tail -10
 ```
 
@@ -295,7 +337,7 @@ script clamps and says so rather than failing.
   create clients — client created
 [3/5] marker role, realm-role scope, audience mapper, offline_access
   create clients/<uuid>/roles — marker role created
-  create clients/<uuid>/scope-mappings/realm — realm roles granted to the client scope: KRT Member, Officer, Bank Employee, Bank Management
+  create clients/<uuid>/scope-mappings/realm — realm roles granted to the client scope: KRT Member, Officer, Bank Employee, Bank Management, Admin
   create clients/<uuid>/protocol-mappers/models — audience mapper created
   delete clients/<uuid>/optional-client-scopes/<id> — offline_access withheld
 [4/5] client profile 'krt-mobile-dpop'
@@ -349,12 +391,12 @@ client-policy endpoints replace the whole realm-global list, so read the current
 write it back **without** our entry — never post an empty list unless it is genuinely empty:
 
 ```bash
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/policies -r iri   # keep a copy
-docker exec keycloak /opt/keycloak/bin/kcadm.sh get client-policies/profiles -r iri   # keep a copy
+kc get client-policies/policies -r iri > /root/kc-mobile/policies.json   # keep a copy
+kc get client-policies/profiles -r iri > /root/kc-mobile/profiles.json   # keep a copy
 # edit both copies to drop krt-mobile-dpop-policy / krt-mobile-dpop, then:
-docker exec -i keycloak /opt/keycloak/bin/kcadm.sh update client-policies/policies -r iri -f - < policies.json
-docker exec -i keycloak /opt/keycloak/bin/kcadm.sh update client-policies/profiles -r iri -f - < profiles.json
-docker exec keycloak /opt/keycloak/bin/kcadm.sh delete clients/<uuid> -r iri          # only if removing the client
+kc update client-policies/policies -r iri -f - < /root/kc-mobile/policies.json
+kc update client-policies/profiles -r iri -f - < /root/kc-mobile/profiles.json
+kc delete clients/<uuid> -r iri          # only if removing the client
 ```
 
 Detaching the policy alone is the safe partial rollback: the client keeps working and simply stops
@@ -362,12 +404,22 @@ having its refresh token bound.
 
 ## Open findings (hardening, tracked separately)
 
-- **`fullScopeAllowed: true`** on `basetool-frontend` and `basetool-sc-extractor` grants the full
-  realm role set into tokens rather than a least-privilege subset. `INGEST_KEYCLOAK_SETUP.md`
-  step 1 specifies `fullScopeAllowed: false` for the extractor; prod currently has it `true`.
+- **`fullScopeAllowed: true` on `basetool-frontend`** grants the member's full realm role set into
+  the web client's tokens. Deliberately not a hardening step: narrowing it belongs to ADR-0001's
+  confidential-client migration.
+- **`basetool-sc-extractor` carries an unused authorization-code flow** (`standardFlowEnabled:
+  true`, loopback redirect wildcards, no PKCE) — the extractor uses only the device grant. The
+  owner's decision, recorded as the hardening runbook's thirteenth item.
+- **`basetool-provisioner` is in the 2026-09-09 snapshot** — an artifact of exporting mid-procedure;
+  it goes when WP-K2 finishes, and the snapshot is regenerated then.
+
+The remaining open hardening steps (2, 11, 12) are tracked in the
+[hardening runbook's status table](../KEYCLOAK_HARDENING_RUNBOOK.md#status).
 
 ## Resolved
 
+- **`fullScopeAllowed: false` on `basetool-sc-extractor` (by 2026-09-09).** Hardening step 8; the
+  extractor's tokens carry only its mapped realm roles.
 - **ROPC disabled on `basetool-frontend` (2026-06-18).** `directAccessGrantsEnabled` is now `false`
   on the public frontend client (it used the browser authorization-code flow anyway), so the
   password can never traverse a direct-access (resource-owner-password) grant. The e2e test realm

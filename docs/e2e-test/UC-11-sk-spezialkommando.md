@@ -7,35 +7,52 @@
 | **Testklasse**   | [`SpecialCommandE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/SpecialCommandE2eTest.java) |
 | **Scope-Regeln** | [Rollen & Scope](rollen-und-scope.md)                                                                                        |
 
-## Akteure
+## Akteur
 
-- **Admin** — legt das SK an und verwaltet seinen Lebenszyklus.
-- **SK Lead** (`is_lead = true` auf der SK-Mitgliedschaft) — verwaltet die Mitglieder genau dieses SK.
-- **SK-Mitglied** — agiert im Kontext des SK.
+Der synthetische Test-User `test-admin` (ADMIN) — in der UI und über die REST-API.
 
 ## Vorbedingungen
 
-- Ein Admin-User.
-- (Für die Member-Verwaltung) ein User mit `is_lead = true` auf dem SK.
+- Eingeloggte Admin-Session.
+- Im ephemeren Modus per REST geseedet: IRIDIUM-Mitgliedschaft, ein SK „E2E SK Alpha" (`createSpecialCommand`) und ein Job-Order-Material.
+- Für den Deaktivierungs-Fall ein eigens geseedetes Wegwerf-SK (nur ephemer, `assumeTrue(STACK.managesStack())`).
 
 ## Auslöser
 
-Ein Spezialkommando wird als eigene OrgUnit aufgesetzt und betrieben.
+Ein Spezialkommando wird als eigene OrgUnit aufgesetzt, deaktiviert und als bearbeitende Einheit eines Auftrags versucht.
 
 ## Hauptablauf
 
-1. **Admin** legt unter `/admin/special-commands` ein SK an (anlegen / umbenennen / löschen — ADMIN-only).
-2. **Admin oder SK-Lead** fügt Mitglieder hinzu / entfernt sie / toggelt deren `is_logistician` / `is_mission_manager` (Gate `SpecialCommandSecurityService.canManageMembers`) — auf der Seite `/organisation/special-commands/{id}`, die der SK-Lead über „Leitung" → „Mitglieder verwalten" erreicht (`/admin/special-commands/{id}` leitet dorthin um). Den Lead-Rang setzt nie der SK-Lead selbst (kein Self-Escalation), sondern ein Admin oder die Bereichsleitung des übergeordneten Bereichs.
-3. Ein SK-Mitglied nutzt das SK als aktiven Kontext (Pin) — analog zu einer Staffel-Mitgliedschaft.
+### SK anlegen (UI)
+
+1. `/admin/special-commands` öffnen, „SK anlegen" (`#add-sc-btn`), Name (`#sc-name`) und Kürzel (`#sc-shorthand`) füllen und in place absenden (`#sc-form`).
+2. Die Liste neu laden.
+
+### SK deaktivieren (UI)
+
+3. In der Zeile des Wegwerf-SK den Papierkorb (`.delete-btn`) klicken → das KRT-Bestätigungsmodal `#sc-delete-modal` öffnet (kein natives `confirm()`); bestätigen (`#sc-delete-form`).
+4. Die Liste neu laden, anschließend mit `?includeInactive=true`.
+
+### SK-Mitgliederseite (UI)
+
+5. `/admin/special-commands/{id}` des geseedeten SK öffnen (nur ephemer).
+
+### SK als bearbeitende Einheit (API)
+
+6. `POST /api/v1/orders` mit dem geseedeten SK als `responsibleOrgUnitId`.
 
 ## Erwartetes Ergebnis
 
-- Das SK existiert als vollwertige OrgUnit (`org_unit.kind = 'SPECIAL_COMMAND'`) mit Mitgliedschaften.
-- Mitgliederverwaltung funktioniert für **Admin** und den **Lead dieses SK**; ein normales SK-Mitglied kann **nicht** verwalten.
-- Das SK taucht im Scope eines Mitglieds auf (Vereinigung der Mitgliedschaften / pinbar).
+- Anlegen und Deaktivieren speichern **in place** (#582): der Reload-Marker `window.__krtNoReload` überlebt den Submit; das neu angelegte SK steht nach dem Neuladen in der Liste.
+- Die alte Admin-URL leitet auf die SK-Mitgliederseite `/organisation/special-commands/{id}` um; dort sind die Mitgliederbox (`#members-box`) und „Mitglied hinzufügen" (`#add-member-btn`) sichtbar.
+- Das deaktivierte SK fehlt in der Standardliste (nur aktive) und erscheint unter `includeInactive=true` wieder, markiert mit `.badge-inactive` — es wird weich gelöscht, nicht entfernt.
+- Der Auftrag mit dem SK als bearbeitender Einheit wird mit **HTTP 400** abgelehnt: nur profit-eligible Einheiten bearbeiten Aufträge (V128), und ein frisch angelegtes SK ist das standardmäßig nicht.
 
 ## Sonderfälle & Lehren
 
-- **SK als besitzende/anfragende OrgUnit von Aggregaten 400t aktuell.** Die Legacy-Spalte `owning_squadron_id` ist noch `NOT NULL`; `requesting_org_unit_id` akzeptiert ein SK laut Design, aber die Persistenz lehnt es bis zur **destruktiven Cleanup-Release** mit 400 ab. Ein E2E-Fall „SK als requesting OrgUnit eines Job Orders" muss daher aktuell **400 erwarten** (oder bis nach der Cleanup-Release vertagt werden).
+- **Die Grenze ist Profit-Eligibility, nicht die Art der OrgUnit.** Seit V102/V103 gibt es die Legacy-Spalte `owning_squadron_id` nicht mehr; ein SK kann besitzende Einheit von Inventar, Schiffen, Refinery Orders, Einsätzen und Operationen sein ([Rollen & Scope](rollen-und-scope.md)) und anfragende Einheit eines Auftrags. Nur als *bearbeitende* Einheit braucht es die Profit-Eligibility.
+- **Der Papierkorb war tot.** Vor dem Fix hatte der Button weder ein umschließendes Formular noch ein Skript — ein SK ließ sich über die Liste nie löschen. Der Deaktivierungs-Fall bewacht genau das.
+- **Wer was darf:** SK anlegen, umbenennen und löschen ist ADMIN-only. Mitglieder und deren Logistiker-/Einsatzmanager-Flags verwalten **Admin oder SK-Lead** (`SpecialCommandSecurityService.canManageMembers`) auf `/organisation/special-commands/{id}`, die der SK-Lead über „Leitung" → „Mitglieder verwalten" erreicht. Den Lead-Rang setzt nie der SK-Lead selbst, sondern ein Admin oder die Bereichsleitung des übergeordneten Bereichs.
+- **Nicht getestet:** die Mitgliederverwaltung durch einen SK-Lead selbst (getestet ist nur, dass der Admin auf der Seite landet) und der SK-Pin als aktiver Kontext. Die Regeln stehen in [Rollen & Scope](rollen-und-scope.md); das SK als besitzende Einheit von Inventar prüft [UC-14](UC-14-inventar-mandanten-scope.md).
 - **Keine Promotion für SK:** Das Beförderungssubsystem ist per DB-CHECK (`kind = 'SQUADRON' OR is_promotion_enabled = FALSE`), V101-Trigger und JPA-Guards für SK gesperrt.
-- **Lead-Scope ist eng:** `is_lead` gilt nur in *diesem einen* SK (kein cross-SK-Carry-over) und nur für die Mitgliederverwaltung — keine sonstigen erhöhten Rechte.
+- **Lead-Scope ist eng:** der Rang `SK_LEAD` gilt nur in *diesem einen* SK (kein cross-SK-Carry-over) und nur für die Mitgliederverwaltung — keine sonstigen erhöhten Rechte.

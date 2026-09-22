@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-27.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** MISSION/UI · **Related ADRs:** [ADR-0044](../adr/0044-mission-ablauf-procedure-steps.md),
 > [ADR-0057](../adr/0057-mission-goals-classified-ordered-children.md)
 
@@ -22,23 +22,24 @@ optimistic-locking versions) and every permission gate of the previous panel lay
 
 The detail page renders a sticky head (title, owning-squadron badge, status pill, and a full-size
 "Anmelden" CTA — #818 follow-up: the primary action is no longer a `btn-xs2`), a high-signal
-`.facts-bar`, and a `.tab-nav` with up to four tabs. The facts bar (#818 follow-up) shows five
+`.facts-bar`, and a `.tab-nav` with up to four tabs. The facts bar (#818 follow-up) shows
 icon-led facts at larger type — TS meeting time (headset), server join = planned start (clock),
-planned end (clock), party lead (user) and a combined participants fact (users) that folds the
-checked-in count into the registered count (`registered · N eingecheckt`). The three time facts
+planned end (clock), the Treffpunkt (map pin, only when set — REQ-MISSION-013), the leader (user —
+the Einsatzleiter with the owner fallback, REQ-MISSION-013) and a combined participants fact (users)
+that folds the checked-in count into the registered count (`registered · N eingecheckt`). The three time facts
 show **time only** (`data-format="time"` on the `.krt-local-dt` span, localised client-side); the
 full date stays in the Übersicht details. The standalone
 finance-total fact was dropped (it stays on the Finanzen tab). Its `#facts-ts` /
-`#facts-planned-start` / `#facts-planned-end` / `#facts-party-lead` / `#facts-registered` /
+`#facts-planned-start` / `#facts-planned-end` / `#facts-leader` / `#facts-registered` /
 `#facts-checked-in` ids are patched in place by the overview / crew / party-lead live-update
 handlers (carried on `#overview-head-meta` + `#crew-count-meta`) so a peer's schedule, party-lead
 or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 
 1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
    2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout; the column sides were
-   swapped and a "Ziele" box added by the REQ-MISSION-012 goals change). Two columns of stacked
+   swapped and a "Ziele" box added by the REQ-MISSION-019 goals change). Two columns of stacked
    panels: **left** = a "Ziele" box (the structured, classified mission goals grouped Hauptziel →
-   Nebenziel → Nicht-Ziel, REQ-MISSION-012), the read-only **Ablauf** checklist (REQ-MISSION-009), a
+   Nebenziel → Nicht-Ziel, REQ-MISSION-019), the read-only **Ablauf** checklist (REQ-MISSION-009), a
    "Teilnehmer" attendance meter (registered count + a checked-in progress bar derived from
    `checkedInParticipants/registeredParticipants`) and a "Kalender" open card; **right** = "Mission auf
    einen Blick" (planned/actual times, meeting time, `Treffpunkt`, operation, internal chip, party lead
@@ -55,8 +56,8 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    click, with a chevron that flips on open, replacing the former bare `hud-details` summary that
    sat directly on the flat page background (member+ gate unchanged; rendered
    server-side via the `@markdown` bean — raw HTML escaped, unsafe link protocols stripped, so
-   `th:utext` never emits user-controlled markup; the same renderer feeds the home-page next-mission
-   banner). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
+   `th:utext` never emits user-controlled markup; the same renderer feeds the home-page mission
+   tiles, REQ-MISSION-012). The `#overview-actual-start` / `#overview-actual-end` / `#overview-party-lead` ids and the
    `freq-value-display` markers are preserved so the schedule / party-lead / frequency live-update
    patches keep working; because the Funk panel now also omits empty entries (#816), setting a
    central frequency additionally re-renders the overview section in place
@@ -67,8 +68,9 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
    board and finance grids carry side-by-side columns (owner decision 2026-06-11).
 2. **Teilnehmer & Einheiten** — the crew board (REQ-MISSION-005).
 3. **Finanzen & Auszahlung** — summary strip + finance ledger (member+ gate unchanged), payout
-   table (public; participation % authenticated-only), and the Wirtschaft `<details>` sections
-   (authenticated + data-present gates unchanged). The summary strip's totals come from a single
+   table with participation %, and the Wirtschaft `<details>` sections (data-present gate). The
+   former public / authenticated-only splits went with the anonymous tier (ADR-0159): every viewer
+   is a signed-in member. The summary strip's totals come from a single
    aggregate endpoint (`GET /api/v1/missions/{id}/finance-entries/summary`, same member+ /
    `canSeeMission` gate as the ledger), and the ledger table is fetched as a bounded page rather than
    loading every entry — so a live-update finance render costs one small query, not a full-ledger
@@ -208,10 +210,12 @@ sub-section (participant / unit incl. crew fallback to the pool / crew / mission
 ### REQ-MISSION-007 — No regression of permissions, contracts, or concurrency behaviour
 
 Every `sec:authorize` / `th:if` permission gate of the previous layout carries over 1:1 (finance
-panel member+; participation % authenticated; payout-select disable logic; participant actions
-canEdit/own/external; check-in/out time-state conditions; Wirtschaft authenticated + data; Verwaltung
-by edit permission). Backend endpoints, DTOs and the optimistic-locking flow (`version` echo,
-`data-version` DOM sync, 409 handling via `MissionSubresource`) are unchanged. Mission data shown
+panel member+; payout-select disable logic; participant actions canEdit/own/external; check-in/out
+time-state conditions; Wirtschaft data-present; Verwaltung by edit permission). The former
+"authenticated-only" gates on participation % and Wirtschaft are moot since ADR-0159 — every
+viewer is authenticated. Backend endpoints, DTOs and the optimistic-locking flow (`version` echo,
+`data-version` DOM sync, 409 handling via `krtFetch`'s conflict path — the transitional
+`MissionSubresource` alias went in #574) are unchanged. Mission data shown
 read-only to non-editors in the old Details panel remains visible via the Übersicht tab.
 
 ### REQ-MISSION-016 — Crew-board write concurrency: idempotent check-in and versioned unit/crew edits
@@ -275,8 +279,8 @@ not excluded from the row lock. Three concrete defects (round-2 audit, epic #110
 
 **Fix.** Each section's check-and-bump is now a **single DB-enforced atomic conditional**
 `UPDATE Mission … SET xVersion = xVersion + 1 WHERE id = :id AND xVersion = :expected`
-(`MissionRepository.bump*VersionIfMatches`, dispatched by the private `MissionSection` enum through
-`MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
+(`MissionRepository.bump*VersionIfMatches`, dispatched by the `MissionSection` enum through
+`support.MissionSectionVersions.enforceSectionVersion`); **0 rows affected → 409**. The statement row-locks
 the mission, so two racing same-section writers genuinely serialise — the loser blocks, re-reads the
 bumped counter and 409s. This is safe only because **every mutable `Mission` scalar and association is
 `@OptimisticLock(excluded = true)` and the entity is `@DynamicUpdate`**: a section edit dirties only
@@ -310,8 +314,7 @@ decoupling, deferred-constraint tolerance + backstop), `MissionUniqueIndexBackst
 per-scalar `@OptimisticLock(excluded = true)`), `MissionRepository.bump*VersionIfMatches` /
 `findByIdForFullReplace`, `MissionSectionVersions.enforceSectionVersion`, `MissionService` /
 `MissionTimelineService` / `MissionParticipantService`, migration `V208`. **Issues:** #1112, #1114,
-
-# 1147 (epic #1109).
+#1147 (epic #1109).
 
 ### REQ-MISSION-009 — Ablauf (procedure timeline) steps
 
@@ -339,7 +342,7 @@ Ablauf edit never 409s a concurrent core/schedule/flags edit, and a stale `steps
 HTTP 409. Reorder reassigns `orderIndex` over the managed children by dirty-checking (no per-child
 save, no clearing bulk query mid-loop) and records **one** event. Mutations re-render the editor +
 overview-checklist fragments in place via `krtFetch`/`krtRefreshMissionSection(['steps','overview'])`
-(no reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an
+(no reload) and propagate to peers through the mission's `mission:{id}` room on the shared live-sync socket (REQ-FE-010/015, ADR-0031, ADR-0094). Missionen is an
 audited area: each mutation records a `MISSION_STEP_*` event (`ADDED` / `UPDATED` / `REMOVED` /
 `REORDERED` / `DONE_CHANGED`) carrying only ids/counts/the done flag — **never** the step title or
 meta (free text), per REQ-AUDIT-001. Migration: V192 (`mission_step` table + `mission.steps_version`). Steps may additionally be **seeded at
@@ -356,7 +359,7 @@ reads it, and its **20,000-char** cap stays (owner request 2026-07-03; the `miss
 column is already `TEXT`, so the cap moved only on the DTOs / form, no migration). Migration: V192 (`mission.meeting_point`).
 
 > The former single short **`objective`** (Ziel, ≤250 chars, shown first in "Mission auf einen Blick")
-> was **superseded by the structured, classified mission goals** of REQ-MISSION-012. V199 drops
+> was **superseded by the structured, classified mission goals** of REQ-MISSION-019. V199 drops
 > `mission.objective`, migrating each existing non-empty value into one Hauptziel so no planning data
 > is lost.
 
@@ -385,7 +388,9 @@ the persisted render (raw HTML escaped, unsafe link protocols stripped). No back
 permission change; every existing operation contract (save / delete AJAX twins, payout paid-out
 asymmetric authorization, missions pager) is preserved.
 
-### REQ-MISSION-012 — Mission goals (Ziele) as classified, ordered children
+### REQ-MISSION-019 — Mission goals (Ziele) as classified, ordered children
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-MISSION-012` until 2026-09-22; that id also named the home-page upcoming-missions tile grid in [`mission-next-banner.md`](mission-next-banner.md), which keeps it.
 
 A mission carries an ordered, reorderable list of **goals** (Ziele) that **replaces** the former
 single short `objective` (REQ-MISSION-010). Each goal is a persisted `MissionObjective` child of the
@@ -415,7 +420,8 @@ family — so a goal edit never 409s a concurrent core / schedule / flags / Abla
 dirty-checking (no per-child save, no clearing bulk query mid-loop) and records **one** event.
 Mutations re-render the editor + overview-Ziele fragments in place via
 `krtFetch`/`krtRefreshMissionSection(['objectives','overview'])` (no reload) and propagate to peers
-over the presence socket (REQ-FE-010, ADR-0031). Missionen is an audited area: each mutation records a
+through the mission's `mission:{id}` room on the shared live-sync socket (REQ-FE-010/015, ADR-0031,
+ADR-0094). Missionen is an audited area: each mutation records a
 `MISSION_OBJECTIVE_*` event (`ADDED` / `UPDATED` / `REMOVED` / `REORDERED`) carrying only ids / counts /
 the **kind enum** — **never** the goal title (free text), per REQ-AUDIT-001. Migration: V199
 (`mission_objective` table + `mission.objectives_version`), which also drops the legacy
@@ -516,7 +522,7 @@ frequency row's own `@Version` (a stale echo surfaces as HTTP 409) and rejects r
 through the custom path; the mission's `frequencies` collection is `@OptimisticLock(excluded = true)`,
 so a frequency change never 409s a concurrent core/schedule/flags edit. The editor and overview Funk
 fragments re-render in place via `krtFetch`/`krtRefreshMissionSection(['frequencies','overview'])` (no
-reload) and propagate to peers over the presence socket (REQ-FE-010, ADR-0031). Missionen is an audited
+reload) and propagate to peers through the mission's `mission:{id}` room on the shared live-sync socket (REQ-FE-010/015, ADR-0031, ADR-0094). Missionen is an audited
 area: add/edit record `MISSION_FREQUENCY_CHANGED` and delete records `MISSION_FREQUENCY_REMOVED`,
 carrying only the row id — **never** the free-text label — per REQ-AUDIT-001. Migration: V201
 (`mission_frequency.name` + nullable `frequency_type_id` + the XOR check constraint).
@@ -524,7 +530,7 @@ carrying only the row id — **never** the free-text label — per REQ-AUDIT-001
 ### REQ-MISSION-015 — Create-time Ziele/Ablauf seeding, Verwaltung landing, and floating Speichern
 
 **Seeding goals + steps at create.** The create form (`/missions/new`) carries the Ziele
-(REQ-MISSION-012) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
+(REQ-MISSION-019) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
 lay out goals and steps in the same action instead of a follow-up per-item call. Both are **optional**
 (an empty section seeds nothing) and can equally be added later through the Verwaltung section editors.
 Because the mission has no id yet, these are **client-side rows** — no per-row AJAX, no section version

@@ -32,7 +32,7 @@ body:
       options:
         - Refactor
         - Tech debt
-        - Dependency upgrade (versions.properties / libs.versions.toml)
+        - Dependency upgrade (gradle/libs.versions.toml)
         - Build / CI / GitHub Actions
         - Docs (CLAUDE.md / README / CHANGELOG / Javadoc)
         - Test coverage / test infrastructure

@@ -59,19 +59,20 @@ import lombok.ToString;
  * <p><b>Squadron joined this hierarchy in R2.b.</b> The {@link Squadron} entity now maps to the
  * {@code org_unit} table via {@code @DiscriminatorValue("SQUADRON")}, alongside {@link
  * SpecialCommand}, so a polymorphic {@code OrgUnit} query materialises {@code kind='SQUADRON'} rows
- * as {@link Squadron} and {@code kind='SPECIAL_COMMAND'} rows as {@link SpecialCommand}. The legacy
- * {@code squadron} table is kept in lockstep with {@code org_unit} by the V97 trigger {@code
- * sync_org_unit_to_squadron} so the existing {@code squadron_id} foreign keys still resolve, and
- * {@code OrgUnitMembership} stores {@code org_unit_id} as a plain UUID rather than a JPA relation
- * to {@code OrgUnit}, decoupling membership rows from the entity hierarchy.
+ * as {@link Squadron} and {@code kind='SPECIAL_COMMAND'} rows as {@link SpecialCommand} ({@link
+ * Bereich} and {@link Organisationsleitung} joined later, ADR-0025). The legacy {@code squadron}
+ * mirror table and its sync trigger were dropped in V105, which retargeted the last {@code
+ * squadron_id}-named foreign keys at {@code org_unit}. {@code OrgUnitMembership} stores {@code
+ * org_unit_id} as a plain UUID rather than a JPA relation to {@code OrgUnit}, decoupling membership
+ * rows from the entity hierarchy.
  *
  * <p>Promotion-feature invariant: {@link #isPromotionEnabled} stays on this superclass so the
- * existing {@code SquadronScopeService.isPromotionFeatureEnabledForCurrentScope} contract carries
- * over unchanged now that {@code Squadron} is in the hierarchy (R2.b). The database CHECK
- * constraint {@code chk_org_unit_promotion_only_squadron} (V94) enforces that {@code
- * is_promotion_enabled} is false for every {@code SPECIAL_COMMAND} row, so a careless setter call
- * on a {@link SpecialCommand} instance surfaces as a constraint violation at flush time rather than
- * silently exposing the promotion menu to SK members.
+ * {@code OwnerScopeService.isPromotionFeatureEnabledForCurrentScope} check can read it from a
+ * polymorphic {@code OrgUnit} reference. The database CHECK constraint {@code
+ * chk_org_unit_promotion_only_squadron} (V94) enforces that {@code is_promotion_enabled} is false
+ * for every {@code SPECIAL_COMMAND} row, so a careless setter call on a {@link SpecialCommand}
+ * instance surfaces as a constraint violation at flush time rather than silently exposing the
+ * promotion menu to SK members.
  */
 @Entity
 @Table(name = "org_unit")
@@ -151,7 +152,7 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
 
   /**
    * The Kartell department (and its frozen Bereichsfarbe) this org unit belongs to (epic #692,
-   * REQ-ORG-018). Meaningful only for a {@link Bereich} — it drives the per-Bereich colour tint of
+   * REQ-ORG-026). Meaningful only for a {@link Bereich} — it drives the per-Bereich colour tint of
    * the multi-Bereich org chart and is {@code null} for every other kind (Squadron / SK /
    * Organisationsleitung) and for a Bereich an admin has not yet assigned a department to. Nullable
    * so the column is purely additive (V166) and the chart degrades to an untinted tree until a

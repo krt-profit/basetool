@@ -415,7 +415,7 @@ class ScWikiBlueprintSyncServiceTest {
     verify(blueprintRepository).markScwikiDeleted(any(), any());
   }
 
-  // ─── #327 curated CIG-mislabel output-name override (REQ-INV-007) ──────────
+  // ─── #327 curated CIG-mislabel output-name override (REQ-INV-047) ──────────
 
   private static final String ARMS_KEY = "BP_CRAFT_qrt_specialist_heavy_arms_01_01_13";
   private static final String HELMET_KEY = "BP_CRAFT_qrt_specialist_heavy_helmet_01_01_12";

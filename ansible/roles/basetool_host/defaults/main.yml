@@ -3,7 +3,7 @@
 #
 # Everything a host might legitimately differ on lives here. The testing host and the production
 # host are built from the SAME role with the same values except where they genuinely differ, which
-# is the property ADR-0188 exists to buy -- see docs/PODMAN_HOST_BOOTSTRAP.md for why each of these
+# is the property ADR-0188 exists to buy -- see docs/archive/PODMAN_HOST_BOOTSTRAP.md for why each of these
 # is what it is.
 
 # --- the rootless service user ----------------------------------------------------------------
@@ -91,7 +91,7 @@ basetool_host_manage_selinux: true
 # The host uid is derived in tasks/30-directories.yml; it is never written here.
 #
 # Every one of these exists because something failed loudly and confusingly when it was missing.
-# The reasons are in docs/PODMAN_HOST_BOOTSTRAP.md section 3 and they have not changed with the
+# The reasons are in docs/archive/PODMAN_HOST_BOOTSTRAP.md section 3 and they have not changed with the
 # runtime -- only the arithmetic has.
 basetool_host_container_owners:
   - container_uid: 10001          # backend / frontend / ingest, set in their Dockerfiles
@@ -221,6 +221,28 @@ basetool_host_podman_exporter_listen: ":9882"
 # The port stays off the network the same way node-exporter's does: firewalld is default-deny and
 # opens 80 and 443 only (65-firewall.yml), which the role asserts rather than assumes.
 basetool_host_alloy_listen: ":12345"
+
+# Memory ceilings for the two host services, and the Go soft limit that keeps each one under its
+# ceiling. Added 2026-09-22: as containers both had a mem_limit and a GOMEMLIMIT in
+# docker-compose.monitoring.yml, and as host services they had neither -- measured on production the
+# day of the cutover, `systemctl show` reported MemoryMax=infinity for both and alloy's Go runtime
+# reported go_gc_gomemlimit_bytes = 9.2e18, i.e. unset. A leak in either one would have had the
+# whole 16 GB host to grow into, alongside the databases.
+#
+# The numbers are the container budgets carried across, re-checked against the host-native reading:
+#   alloy          anon 105 MiB, file 208 MiB (170 MiB of it the mapped binary), peak 329 MiB.
+#                  512M / 360MiB is docker-compose.monitoring.yml's budget -- working set ~= GOMEMLIMIT
+#                  + ~47 MiB of non-Go overhead lands at ~80 % of the limit. The mapped binary is
+#                  clean page cache the kernel reclaims under MemoryMax before it OOM-kills anything.
+#   node-exporter  anon 15 MiB, peak 35 MiB. The container ran at 32M / 24MiB; the host service
+#                  carries the systemd collector reading the system bus as well, so the ceiling is
+#                  doubled rather than copied, and GOMEMLIMIT stays at 75 % of it.
+# The cgroup collector reads both units, so ContainerMemoryHigh, ContainerOomKilled and
+# ContainerPidsHigh watch them under the names `alloy` and `node-exporter`, as they did as containers.
+basetool_host_alloy_memory_max: "512M"
+basetool_host_alloy_gomemlimit: "360MiB"
+basetool_host_node_exporter_memory_max: "64M"
+basetool_host_node_exporter_gomemlimit: "48MiB"
 
 # Where the HOST-NATIVE alloy finds the log sink and the trace store. It cannot use the names in
 # config.alloy (`loki:3100`, `tempo:4317`): those live on the container network, and rootless Podman

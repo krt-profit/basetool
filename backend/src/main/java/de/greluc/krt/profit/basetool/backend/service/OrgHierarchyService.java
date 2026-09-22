@@ -105,7 +105,7 @@ public class OrgHierarchyService {
    * @param description free-form text; nullable.
    * @param parentOrgUnitId the owning OL's id, or {@code null} to leave the Bereich unparented for
    *     now; when non-null it must reference an {@code ORGANISATIONSLEITUNG}.
-   * @param department the Kartell department / Bereichsfarbe (epic #692, REQ-ORG-018), or {@code
+   * @param department the Kartell department / Bereichsfarbe (epic #692, REQ-ORG-026), or {@code
    *     null} to leave the Bereich untinted in the org chart for now.
    * @return the persisted Bereich.
    * @throws DuplicateEntityException if a Bereich with that name already exists.

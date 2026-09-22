@@ -25,6 +25,11 @@
   ersetzt (REQ-FE-001). Schlägt beim Aufnehmen ein Teil fehl, bleiben genau diese Einträge in der
   Auswahl stehen und können erneut abgeschickt werden.
 
+- **Dokumentation: vollständig gegen den Code geprüft, umgesetzte Pläne archiviert.** Specs, ADRs,
+  arc42, Betriebs- und Rollen-Dokumente beschreiben jetzt den Stand nach dem Podman-Umzug;
+  `docs/deployment.md` ist dafür neu geschrieben. Erledigte Pläne und einmalige Runbooks liegen
+  gesammelt in `docs/archive/`. Rein dokumentarisch.
+
 ### Fixed
 
 - **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
@@ -36,6 +41,24 @@
 - **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
   Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
   Auftrag" in der Auftragsliste waren nicht übersetzbar.
+- **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
+  mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
+  Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
+  die Fehler- und Warnzeilen der Edge.
+
+- **Monitoring: Alloy und node_exporter haben wieder ein Speicherlimit und werden wieder überwacht.**
+  Als Host-Dienste liefen sie seit dem Umzug ohne Limit und außerhalb aller Speicher-Alarme; die
+  Ansible-Rolle setzt jetzt `MemoryMax` und `GOMEMLIMIT`, und der cgroup-Collector liest beide mit.
+  Neuer Alarm `HostServiceMetricsMissing`, falls diese Abdeckung wieder verschwindet.
+
+- **Betrieb: eine geänderte Monitoring- oder `acme`-Unit wird beim Deploy jetzt auch neu gestartet.**
+  Bisher wurde sie nur installiert und der alte Container lief weiter. `deploy.sh` läuft außerdem von
+  Hand gestartet aus `/` und prüft vor dem Deploy den Keystore-Pfad, den die Units tatsächlich
+  einbinden, statt den aus `.env`. Rein betriebsseitig.
+
+- **Aufgeräumt: die toten NPM-Snippets unter `docker/maintenance/nginx/` und zwei Security-Regeln für
+  längst entfernte Endpunkte.** Die Release-Prüfung verlangt jetzt auch `docker/edge` und `docker/acme`
+  im Konfigurationspaket. Kein sichtbarer Unterschied.
 
 - **Raffinerie: Ein Auftrag lässt sich nur noch mit einem Einsatz verknüpfen, an dem sein Besitzer
   teilnimmt.** Bisher genügte die ID irgendeines Einsatzes, und der Auftrag floss in dessen
@@ -52,6 +75,11 @@
   Ausführende selbst kein IPv6 hat.** Der Zweig, der genau das unterscheiden sollte, war seit
   jeher unerreichbar, weil die Fehlernummer unterwegs verloren ging. Sie bleibt jetzt erhalten,
   und die Suite überspringt die Prüfung mit einer ehrlichen Begründung. Rein betriebsseitig.
+
+- **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
+  neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
+  Podman. Rein betriebsseitig.
+
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

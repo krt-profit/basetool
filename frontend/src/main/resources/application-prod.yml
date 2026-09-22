@@ -53,13 +53,13 @@ spring.thymeleaf.cache: true
 server:
   shutdown: graceful
 
-# ADR-0090: serve Actuator (/actuator/health for the Docker HEALTHCHECK, /actuator/prometheus for the
-# scrape) on a DEDICATED internal-only management port instead of the public 18081 connector. NPM
-# fronts only 18081, and this port is never host-published nor on any net-proxy-* network, so
-# /actuator/** is unreachable from the internet by construction — the public connector answers 404
-# for it (belt to the REQ-OBS-012 NPM edge-deny braces). Prometheus reaches it over
-# net-monitoring-scrape; the Docker HEALTHCHECK reaches it over localhost (compose overrides the
-# image's default healthcheck to this port). HTTPS with the SAME bind-mounted keystore.p12 as the
+# ADR-0090: serve Actuator (/actuator/health for the container healthcheck, /actuator/prometheus for
+# the scrape) on a DEDICATED internal-only management port instead of the public 18081 connector.
+# The edge fronts only 18081, and this port is never host-published nor on any net-proxy-* network,
+# so /actuator/** is unreachable from the internet by construction — the public connector answers
+# 404 for it (belt to the REQ-OBS-012 edge-deny braces). Prometheus reaches it over
+# net-monitoring-scrape; the healthcheck reaches it over localhost (compose, and the Quadlet unit
+# generated from it, override the image's default healthcheck to this port). HTTPS with the SAME bind-mounted keystore.p12 as the
 # 18081 connector (cert SAN carries dns:frontend) so the scrape stays HTTPS + pinned-CA (REQ-OBS-008).
 # Boot serves this from a separate management context whose security auto-config backs off given the
 # custom SecurityConfig chains, so the endpoint is UNAUTHENTICATED here — acceptable because it is
@@ -98,7 +98,7 @@ app:
   # The backend's ACTUATOR base URL, which in prod is NOT its API base URL: ADR-0134 moved the
   # backend's Actuator to the internal-only management port 11271, so
   # https://backend:11261/actuator/health/readiness answers 404 here. BackendHealthIndicator sits in
-  # the readiness group that gates the Docker HEALTHCHECK, so leaving it pointed at the API port
+  # the readiness group that gates the container healthcheck, so leaving it pointed at the API port
   # made the frontend container permanently unhealthy and the deploy loop rolled v1.5.47 back
   # (2026-08-18). The port must track backend/src/main/resources/application-prod.yml's
   # management.server.port — BackendHealthUrlProdParityTest fails if the two drift apart. The host
@@ -109,12 +109,14 @@ app:
     structured-enabled: true
   # SEC-02 / REQ-SEC-011: the reverse proxies whose X-Forwarded-For the frontend trusts when
   # resolving the originating client IP it relays to the backend's per-IP rate limiter. In
-  # production nginx-proxy-manager fronts the frontend on net-proxy-frontend, and every compose
-  # bridge is PINNED under 172.28.0.0/16 (docker-compose.yml, since #974) — NOT the default Docker
-  # bridge (172.17.0.0/16). A mismatch silently collapses every per-IP bucket onto NPM's address
-  # (no leak, but the limiter degrades into one shared org-wide budget) — exactly what caused the
-  # 2026-07-06 multi-user mission-page outage, where the frontend relayed NPM's address 172.28.3.2
-  # for every user and the shared bucket was exhausted for everyone at once. Mirrors the backend's
+  # production the native nginx edge (ADR-0162, behind the host haproxy of ADR-0187) fronts the
+  # frontend on net-proxy-frontend, and every internal bridge is PINNED under 172.28.0.0/16
+  # (docker-compose.yml since #974, and the Quadlet .network units generated from it) — NOT the
+  # default Docker bridge (172.17.0.0/16). A mismatch silently collapses every per-IP bucket onto the
+  # proxy's address (no leak, but the limiter degrades into one shared org-wide budget) — exactly
+  # what caused the 2026-07-06 multi-user mission-page outage, where the frontend relayed the then
+  # proxy's (nginx-proxy-manager's) address 172.28.3.2 for every user and the shared bucket was
+  # exhausted for everyone at once. Mirrors the backend's
   # app.rate-limit.trusted-proxies; it MUST match the real compose subnet. Override via
   # APP_CLIENT_IP_TRUSTED_PROXIES only if you re-pin the networks.
   client-ip:

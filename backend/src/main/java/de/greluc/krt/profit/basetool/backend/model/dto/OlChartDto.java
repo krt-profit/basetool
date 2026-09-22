@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * The Organisationsleitung tier at the very top of the multi-Bereich org chart (epic #692,
- * REQ-ORG-018): the OL org unit's identity plus its OL_MEMBER nodes. Carried as its own record
+ * REQ-ORG-026): the OL org unit's identity plus its OL_MEMBER nodes. Carried as its own record
  * (rather than a bare node list) so the chart can caption the tier with the OL's name and the
  * inline admin editor can stamp a new OL_MEMBER against {@code orgUnitId} even while the tier is
  * still empty.

@@ -333,12 +333,13 @@ class UserDeletionForeignKeyIntegrityTest {
   /**
    * The FK-less personal stores must be purged by the delete, not left behind. {@code
    * personal_blueprint.owner_user_id}, {@code personal_inventory_item.owner_user_id} and {@code
-   * member_evaluation.user_id} hold the Keycloak subject as plain text with no foreign key to
-   * {@code app_user}, so nothing cascades and no retention job reaches them — before REQ-DATA-008
-   * required the explicit purge they survived the account indefinitely (production carried 16
-   * orphaned blueprints and 12 orphaned evaluations from earlier deletions), stayed undiscoverable
-   * because every lookup is keyed by a subject no roster can still offer, and would have been
-   * silently re-adopted had the same Keycloak subject ever returned.
+   * member_evaluation.user_id} held the user id as plain text with no foreign key to {@code
+   * app_user} until V235 added one with {@code ON DELETE CASCADE}; nothing cascaded and no
+   * retention job reached them — before REQ-DATA-008 required the explicit purge they survived the
+   * account indefinitely (production carried 16 orphaned blueprints and 12 orphaned evaluations
+   * from earlier deletions), stayed undiscoverable because every lookup is keyed by a subject no
+   * roster can still offer, and would have been silently re-adopted had the same Keycloak subject
+   * ever returned.
    */
   @Test
   void deleteUser_purgesTheFkLessPersonalStoresKeyedByTheKeycloakSubject() {

@@ -40,7 +40,7 @@ import java.util.UUID;
  *
  * <p>Only stock at or above {@code qualityFloor} counts toward availability and the effective
  * quality: the floor is the stricter of the ingredient's own {@code min_quality} and the lowest
- * quality at which none of the slot's stat modifiers would worsen the output (REQ-INV-019). The
+ * quality at which none of the slot's stat modifiers would worsen the output (REQ-INV-048). The
  * effective quality is the quantity-weighted average of the best-quality stock consumed first, over
  * one craft's requirement.
  *

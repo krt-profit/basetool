@@ -1,5 +1,10 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-30.
-> **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011 (foundation); ADR-0020,
+> ADR-0028, ADR-0043 (org-unit seam, responsibility, visibility); ADR-0021, ADR-0022, ADR-0133
+> (booking requests); ADR-0039, ADR-0040 (holders); ADR-0041, ADR-0052 (transfer fee); ADR-0054
+> (counterparty); ADR-0045, ADR-0066, ADR-0109, ADR-0123 (approval limits and the KRT ladder);
+> ADR-0070 (responsible-holder audit); ADR-0106 (account search); ADR-0153 (client attribution);
+> ADR-0156 (app direct booking); ADR-0179 (audit retention) — all under [`docs/adr/`](../adr/README.md)
 > **Status:** Implemented — epic
 > [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
 > acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
@@ -15,17 +20,17 @@ independent of any org-unit membership — manages
 accounts for every organizational layer — Staffeln, Spezialkommandos, areas (Bereiche),
 the cartel as a whole, the cartel bank itself, and dynamically named special accounts.
 There are **no accounts for individual players**. Because aUEC in Star Citizen only
-exists on *player* accounts, every bank account additionally tracks its **holder
-distribution**: which player physically holds which part of the account's balance (e.g.
-the area-Profit account holds 1 000 aUEC — 500 with player greluc, 250 with carol, 250
-with doppi). Bank staff book deposits, withdrawals and transfers; every change lands in
+exists on *player* accounts, the bank additionally tracks **custody**: how much each player
+(a *holder*) physically holds, as one global figure per holder that is deliberately decoupled
+from the per-account balances (REQ-BANK-003, ADR-0039 — the original per-account holder
+distribution was retired). Bank staff book deposits, withdrawals and transfers; every change lands in
 an immutable audit log that only administrators can read. Account statements and a management overview are exported
 as KRT-design PDFs. The feature is deliberately **independent of seasons, price lines and
 the mission/operation profit flows** — it is a standalone ledger.
 
 Work is tracked in epic [#556](https://github.com/krt-profit/basetool/issues/556); the
 phase-by-phase implementation plan (including per-phase deployment steps) lives in
-[`docs/BANK_PLAN.md`](../BANK_PLAN.md).
+[`docs/archive/BANK_PLAN.md`](../archive/BANK_PLAN.md).
 
 ## Requirements
 
@@ -225,8 +230,7 @@ coverage; `BANK_HOLDER_OVERDRAFT` is retired.
 
 ### REQ-BANK-007 — Keycloak roles & hierarchy
 
-Bank access is anchored on two new **Keycloak realm roles** (names proposed, owner may
-rename before Phase 1 — see Open questions):
+Bank access is anchored on two **Keycloak realm roles**:
 
 - `Bank Employee` → `ROLE_BANK_EMPLOYEE` — may use the bank area within the limits of
   their per-account grants (REQ-BANK-009).
@@ -383,7 +387,9 @@ is the global holder→holder Umbuchung (REQ-BANK-031), not a transfer.
 ### REQ-BANK-012 — Immutable, complete, admin-only audit log
 
 Every bank mutation writes exactly one row to an **insert-only** audit table
-(`bank_audit_event`, modeled after `external_sync_report` — no `@Version`, no updates):
+(`bank_audit_event`, modeled after `external_sync_report` — no `@Version`; the only in-place update
+is the Art. 17 handle anonymisation of REQ-SEC-062, and rows leave only through the admin purge and
+the retention ceiling of [REQ-AUDIT-004 / -006](audit.md)):
 bookings of every type, reversals, account lifecycle (create/close/reopen), holder
 registry changes, every grant change, the wipe reset, **PDF exports** (statement and
 management export, with parameters), and — since REQ-BANK-035/-036 — **balance-target**
@@ -410,7 +416,24 @@ client's Keycloak scope since it was provisioned and the actor alone therefore n
 the origin here. Rows predating V238 carry `NULL`, which means **not recorded** and must not be
 read as "the web frontend". The audit log is readable **only by admins**
 (`hasRole('ADMIN')` on URL **and** method gate), paginated and filterable (period, actor,
-account, event type, client). Audit rows are never exposed through any non-admin endpoint.
+event type, client; the API additionally accepts an `accountId` filter the viewer does not offer).
+It is read on the Bank tab of the unified viewer ([REQ-AUDIT-002](audit.md)). Audit rows are never
+exposed through any non-admin endpoint.
+
+**Coverage — every `BankAuditEventType`** (each is offered by the viewer's Bank-tab filter and
+labelled under `admin.bank.audit.event.*` in all three bundles):
+
+| Area | Event types |
+|---|---|
+| Accounts | `ACCOUNT_CREATED`, `ACCOUNT_RENAMED`, `ACCOUNT_CLOSED`, `ACCOUNT_REOPENED`, `ACCOUNT_RESPONSIBLE_CHANGED` (REQ-BANK-034) |
+| Holders | `HOLDER_REGISTERED`, `HOLDER_DEACTIVATED`, `HOLDER_REACTIVATED` (manual, and the role-driven reconcile of REQ-BANK-029) |
+| Grants | `GRANT_CREATED`, `GRANT_UPDATED`, `GRANT_REVOKED` |
+| Bookings | `DEPOSIT_BOOKED`, `DEPOSIT_SPLIT_BOOKED` (REQ-BANK-043), `WITHDRAWAL_BOOKED`, `TRANSFER_BOOKED`, `HOLDER_TRANSFER` (REQ-BANK-031), `TRANSACTION_REVERSED`, `WIPE_RESET_EXECUTED` (REQ-BANK-013) |
+| Booking requests | `BOOKING_REQUEST_CREATED` / `_CONFIRMED` / `_REJECTED` / `_CANCELLED` (REQ-BANK-022…024), `BOOKING_REQUEST_UPDATED` (REQ-BANK-056), `BOOKING_REQUEST_OWNER_APPROVAL_GRANTED` / `_REVOKED` / `_CONFIRMED` (REQ-BANK-041) |
+| Account settings | `BALANCE_TARGET_SET` / `_CLEARED` (REQ-BANK-036), `BALANCE_VISIBILITY_GRANTED` / `_REVOKED` (REQ-BANK-035), `APPROVAL_LIMIT_SET` / `_CLEARED` (REQ-BANK-041), `CARTEL_APPROVAL_TIERS_SET` / `_CLEARED` (REQ-BANK-047) |
+| Exports and the trail itself | `STATEMENT_EXPORTED`, `MANAGEMENT_REPORT_EXPORTED`, `AUDIT_LOG_EXPORTED` (REQ-AUDIT-003), `AUDIT_LOG_PURGED` (REQ-AUDIT-004/-006) |
+| Data-subject rights | `HANDLE_SNAPSHOTS_ANONYMISED` (REQ-SEC-062) |
+| Legacy, never emitted | `HOLDER_REBOOKED` — the pre-ADR-0039 intra-account holder rebooking, kept so historical rows still render |
 
 The audit table is business data, not logging — the `docs/specs/observability.md` rule
 (never log names/emails/tokens to the **log stream**) still applies to bank code.
@@ -422,7 +445,7 @@ The audit table is business data, not logging — the `docs/specs/observability.
 - [x] Audit write failures fail the business transaction (same TX — no silent gaps).
 - [x] Non-admin access to the audit endpoints/pages: 403; the page link is hidden.
 
-**Enforced by:** `BankAuditServiceTest`, `BankControllerSecurityTest` (management 403 on audit) · **Code:** `service/BankAuditService`, `controller/BankAdminController`, `db/migration/V154` · **Issues:** #556
+**Enforced by:** `BankAuditServiceTest`, `BankControllerSecurityTest` (management 403 on audit), `AdminAuditLogPageControllerTest` (every produced type offered + labelled) · **Code:** `service/BankAuditService`, `model/BankAuditEventType`, `controller/BankAdminController`, `db/migration/V154`, `db/migration/V238` · **Issues:** #556
 
 ### REQ-BANK-013 — Admin wipe reset
 
@@ -511,7 +534,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > **per Bereich** (A→Z by Bereich name, each leading with its `AREA` account then its Staffel/SK
 > accounts), the **Sonderkonten**, an **"Ohne Bereich"** bucket for org-unit accounts with no Bereich,
 > and finally every **closed** account. Each Bereich header is tinted with its department's
-> Bereichsfarbe (`--color-dept-*`, REQ-ORG-018), mirroring the org chart. The account→Bereich mapping
+> Bereichsfarbe (`--color-dept-*`, REQ-ORG-026), mirroring the org chart. The account→Bereich mapping
 > is a display-only owner-label read resolved from the account's owning org unit + its parent via one
 > bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
 > `BankDashboardService` reads `OrgUnitRepository`, never `OwnerScopeService`). The account-name
@@ -633,6 +656,12 @@ upkeep) and `docs/specs/data-persistence.md` (Flyway-only schema, no N+1). Mutab
 echo it through DTOs and `data-version` DOM attributes; ledger and audit rows are
 insert-only and deliberately version-less. The booking flow observes the CLAUDE.md
 concurrency rules (`…WithinTransaction` pattern, no bulk updates in loops).
+
+The bank endpoints are also consumed by the Android app over the public API vhost: the shapes it
+reads are part of the frozen external contract set ([REQ-API-009](api-conventions.md)), and the
+direct-booking endpoints (`/deposits`, `/withdrawals`, `/transfers`, `/transfer-fee-rate`) are on
+the vhost allow-list ([ADR-0156](../adr/0156-the-app-carries-the-banks-direct-booking.md)). Which
+client a bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005).
 
 **Acceptance**
 
@@ -889,8 +918,9 @@ sweep.
 - [x] V159 enforces that only a `CONFIRMED` request carries a holder + resulting transaction.
 - [x] The lifecycle `BOOKING_REQUEST_*` events are append-only audit rows (no DB CHECK on
   `event_type`, enum is source of truth).
-- [x] Admin audit log surfaces + filters these event types (still admin-only): the
-  `EVENT_TYPES` filter list + `admin.bank.audit.event.BOOKING_REQUEST_*` i18n labels.
+- [x] Admin audit log surfaces + filters these event types (still admin-only): the Bank entry of
+  `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` + `admin.bank.audit.event.BOOKING_REQUEST_*`
+  i18n labels.
 
 **Enforced by:** `db/migration/V159`, `BankBookingRequestServiceTest` (audit on each transition) · **Code:** `model/BankBookingRequest`, `model/BankAuditEventType` · **Issues:** #666, #673
 
@@ -922,7 +952,7 @@ confirm/reject/queue surface; the audit log stays admin-only.
 > **responsible holder** (Kontoverantwortliche) is now also notified when a request on their account
 > is **created or decided**. A new **`ACCOUNT_RESPONSIBLE`** selector resolves the responsible
 > holder(s) from the account carried by the event (`contextAccountId()`), with the org-unit-aware
-> derivation kept inside the `OrgUnitBankAccessService` seam
+> derivation kept outside every `Bank*` class, in `OrgUnitBankResponsibilityService`
 > (`resolveResponsibleHolderUserIds`, REQ-BANK-008) so the bank stays org-unit-blind. On **create**
 > the holder joins the existing `BANK_BOOKING_REQUEST_CREATED` rule (its text is account-centric); on
 > **confirm/reject** two new seeded rules (V194) produce the account-centric
@@ -977,7 +1007,9 @@ admin-editable at runtime.
 `NotificationCreationServiceTest` · **Code:**
 `event/BankBookingRequest{Created,Confirmed,Rejected,Cancelled}Event`,
 `service/RecipientResolutionService#resolveAccountGrantHolders`,
-`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT}`, `db/migration/V160`, `db/migration/V161`;
+`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds`,
+`model/SelectorKind#{ACCOUNT_GRANT,EVENT_RECIPIENT,ACCOUNT_RESPONSIBLE}`, `db/migration/V160`,
+`db/migration/V161`, `db/migration/V194`;
 lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
 
 ### REQ-BANK-027 — Bereich/OL bank access via the OrgUnitBankAccessService seam (cascading view, view-based requests)
@@ -988,8 +1020,7 @@ lifecycle-close removal in REQ-NOTIF-018 · **Issues:** #666, #673, #1252
 > cascading view below is unchanged; the "own-level only" request rule, its subordinate-rejection
 > acceptance criterion and the `currentOwnLevelOversightScope()` implementation note are superseded
 > (the gate is now `canView`, and `canRequest` now means "a request-capable account the caller may
->
->> view"). Bank-staff confirmation still gatekeeps every booking.
+> view"). Bank-staff confirmation still gatekeeps every booking.
 
 The org hierarchy (REQ-ORG-014) extends the epic-#666 officer/lead bank function (REQ-BANK-021/022) up
 the new levels, **without** weakening the bank's org-unit-blindness (REQ-BANK-008, ADR-0011): all new
@@ -1098,9 +1129,11 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
 ### REQ-BANK-029 — Bank staff are auto-registered as holders
 
 Every user holding `ROLE_BANK_EMPLOYEE` or `ROLE_BANK_MANAGEMENT` is automatically present as
-an **active** `bank_holder` row, reconciled idempotently at the existing role-sync points (on
-each login via `UserService.syncUser` and on the periodic `UserSyncTask`) over
-`UserRepository.findUserIdsByRoleCode` (ADR-0040). A `bank_holder.role_managed` flag marks
+an **active** `bank_holder` row, reconciled idempotently at the end of every Keycloak user
+reconciliation (`UserSyncService#syncFromKeycloak` — the daily `UserSyncTask` and the admin's
+manual sync) over `UserRepository.findUserIdsByRoleCode` (ADR-0040). It deliberately does **not**
+run on login, so a freshly granted bank role becomes a holder on the next sync, not the next
+request. A `bank_holder.role_managed` flag marks
 role-derived holders. When a user loses **all** bank roles, their `role_managed` holder is
 **auto-deactivated** — it accepts no new incoming money, but its (possibly negative, ADR-0039)
 balance survives and must be reconciled to zero by a holder→holder Umbuchung (REQ-BANK-031).
@@ -1116,7 +1149,7 @@ reconcile; management may still register any tool user as a custodian.
 - [x] The reconcile never hard-deletes a holder and never alters a manual holder's
   `role_managed = false`.
 
-**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `service/BankHolderReconciliationService`, `service/UserService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `model/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankHolderReconciliationServiceTest`, `BankHolderServiceTest` · **Code:** `service/BankHolderReconciliationService`, `service/UserSyncService` (sync hook), `task/UserSyncTask`, `repository/UserRepository#findUserIdsByRoleCode`, `model/BankHolder`, `db/migration/V182` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
 ### REQ-BANK-030 — Employee bank-administration access (Sonderkonten + holder menu)
 
@@ -1145,7 +1178,7 @@ Bank **employees** reach the bank-administration page (`/bank/manage`) and its s
   registration / (de)activation and grant management remain 403 for employees.
 - [x] The sidebar shows the management entry to employees; the audit log stays admin-only.
 
-**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest` (employee SPECIAL-only + auto-grant), frontend `BankManagePageControllerMvcTest` · **Code:** `service/BankAccountService`, `service/BankSecurityService`, `controller/BankAccountController`, frontend `controller/BankManagePageController`, `templates/bank-manage.html` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
+**Enforced by:** `BankControllerSecurityTest`, `BankAccountServiceTest` (employee SPECIAL-only + auto-grant), frontend `BankManagePageControllerTest` · **Code:** `service/BankAccountService`, `service/BankSecurityService`, `controller/BankAccountController`, frontend `controller/BankManagePageController`, `templates/bank-manage.html` · **ADR:** [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556
 
 ### REQ-BANK-031 — Holder→holder Umbuchung (reconciliation)
 
@@ -1186,7 +1219,7 @@ in the unified activity audit (REQ-AUDIT-001).
   holder overdraft); same source/destination holder is rejected.
 - [x] It is reachable by `BANK_EMPLOYEE` without an account grant; a plain member is 403; it writes a `HOLDER_TRANSFER` audit event (detail carries the fee, amounts only).
 
-**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankHolderControllerTest`/`BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `service/BankLedgerIntegrityService` + `repository/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
+**Enforced by:** `BankLedgerServiceTest` (tiny fee-free Umbuchung, deactivated/negative allowed), `BankHolderTransferFeeTest` (fee borne by CARTEL, missing/closed/overdraft reject, reversal negates all three legs, integrity sweep sound), `BankControllerSecurityTest` · **Code:** `service/BankLedgerService#bookHolderTransfer`, `service/BankLedgerIntegrityService` + `repository/BankTransactionRepository#findTransferTransactionsWithNonZeroSum` (integrity now covers HOLDER_TRANSFER), `controller/BankHolderController`, `model/dto/request/BankHolderTransferRequest`, `model/BankTransactionType`, `model/BankAuditEventType` · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) (amended by #998), [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (amended by #998), [ADR-0040](../adr/0040-bank-staff-are-holders-and-employee-administration-access.md) · **Issues:** #556, #998
 
 ### REQ-BANK-032 — Holder custody history (own for employees, all for management)
 
@@ -1245,9 +1278,8 @@ superseding the carve-out model of ADR-0041):
 - **Where it applies:** `WITHDRAWAL` and an account-to-account `TRANSFER` **when the holder
   changes** (a same-holder transfer is a pure re-label and stays fee-free) — the customer-facing
   moves the bank makes on a member's behalf. **`DEPOSIT` is exempt** (whoever pays money *in* bears
-  their own fee) and so is the internal **`HOLDER_TRANSFER`** (Umbuchung at
-  `/bank/manage?tab=halter`): that reconciliation runs among bank staff, who bear its in-game fee
-  **personally**, so the bank does not model it (REQ-BANK-031).
+  their own fee). *(Originally the internal **`HOLDER_TRANSFER`** Umbuchung was exempt as well;
+  superseded by the #998 amendment below — it now bears the fee, charged to the KRT account.)*
 - **Semantics:** the entered amount is the amount that must **arrive** at the destination. The fee
   `= round(amount × rate)` (whole aUEC, HALF_UP) is **added on top** and recorded on
   `bank_transaction.transfer_fee`; the source (account + holder stash) is **debited the gross**
@@ -1353,12 +1385,11 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
 > **`ACCOUNT_RESPONSIBLE_CHANGED`**. Because the holder is derived, the change is detected by
 > **bracketing** each of the seven `OrgUnitMembershipService` leadership mutations (assign/remove
-> Staffelleiter rank, toggle SK-Lead, add/remove Bereichsleiter, add/remove OL member): the seam
-> `OrgUnitBankAccessService` snapshots the affected accounts' responsible-holder sets **before** the
-> mutation and re-diffs **after** it, on the same transaction, and records one event per account whose
-> set changed. The affected accounts are the account the org unit owns **plus** — for a
-> `Department.PROFIT` Bereich — the collegial `CARTEL` and the `CARTEL_BANK` singletons (their sets
-> include the Profit-Bereichsleiter, REQ-BANK-047). The event carries the **old** and **new**
+> Staffelleiter rank, toggle SK-Lead, add/remove Bereichsleiter, add/remove OL member):
+> `OrgUnitBankResponsibilityService` (split out of `OrgUnitBankAccessService`; it wires no
+> `OwnerScopeService`, so it is not a second org-unit bridge) snapshots the affected accounts'
+> responsible-holder sets **before** the mutation and re-diffs **after** it, on the same transaction,
+> and records one event per account whose set changed. The event carries the **old** and **new**
 > user-id sets in its details (ids, not PII), sets `targetUserId` to the sole new holder for a
 > singleton set (else null, for the collegial accounts), and the initiator is the acting user
 > `BankAuditService` snapshots automatically. The affected accounts are the account the org unit owns
@@ -1367,13 +1398,13 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 > OL-only and no longer ripples from a Profit-Bereich leadership change. Coverage spans **every
 > app-driven path** that can change the derivation: the seven direct leadership mutations, the two
 > indirect membership-removal paths (`removeMember` for an SK-Lead, `reconcileStaffelMemberships` for a
-> Staffelleiter), and **`UserService.deleteUser`** — which snapshots all the user's org-unit accounts
+> Staffelleiter), and **`UserDeletionService.deleteUser`** — which snapshots all the user's org-unit accounts
 > up front and **flushes** the delete before the re-diff, since the membership rows go via the DB
 > `ON DELETE CASCADE`. The bank stays org-unit-blind for **authorization**: all bank access stays
 > inside the seam (both ArchUnit pins hold), reached from the membership/user services via an
 > `ObjectProvider` to break the constructor cycle.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserServiceDeleteTest` / `UserServiceAttributesTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankAccessService` (`snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `service/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `service/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `service/UserDeletionService#deleteUser`, `repository/BereichRepository#findByDepartment`, `repository/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -1418,7 +1449,7 @@ configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible hol
 (always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
 to configure there, not even for an admin.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService`, `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView per type: oversight / membership-role grant / all-members / individual / global-role for SPECIAL; admin override), `OrgUnitBankPageControllerMvcTest`, `OrgUnitBankVisibilityAudienceLabelMvcTest` (the all-members label names the org unit on ORG_UNIT/AREA and stays org-wide on SPECIAL) · **Code:** `model/BankAccountViewGrant`, `repository/BankAccountViewGrantRepository`, `service/OrgUnitBankAccessService` (authorization), `service/OrgUnitBankVisibilityService` (grant/revoke + audit), `controller/OrgUnitBankController`, `db/migration/V189`, frontend `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-036 — Balance target ("Kontostandsziel")
 
@@ -1473,9 +1504,8 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > responsible-holder/OL visibility controls are quiet per-audience toggles (a `chip--success`
 > "granted" badge + a ghost "remove" when granted, an outline "grant" otherwise) rather than a wall of
 > filled CTAs. The only filled CTA on the page stays "Ziel speichern" (and the statement modal's "PDF
->
->> herunterladen"). Endpoints, methods, optimistic-lock versions and the `orgUnitBankSettings` /
->> `orgUnitBankBookings` swap seams are unchanged.
+> herunterladen"). Endpoints, methods, optimistic-lock versions and the `orgUnitBankSettings` /
+> `orgUnitBankBookings` swap seams are unchanged.
 >
 > **Amendment (two-tab layout):** the drill-in body is split into **two tabs** — *Buchungshistorie*
 > (the paginated, Halter-redacted history) and *Verantwortung & Sichtbarkeit* (the responsible
@@ -1508,7 +1538,7 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 > `org-unit-bank-settings` testid so the `orgUnitBankSettings` swap target and the tests still resolve
 > the region.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankStatementReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` (canView gate; bookings redaction; read-only caps), `BankReportServiceTest` (redacted variant omits Halter; both audit `STATEMENT_EXPORTED`), `OrgUnitBankPageControllerMvcTest` (two tabs for a manager; untabbed for a plain viewer with no limits) · **Code:** `service/OrgUnitBankAccessService` (`getViewableAccountDetail` / `getViewableAccountBookings` / `exportViewableStatement`), `service/BankStatementReportService#generateStatement(..., redactHolders)`, `model/dto/OrgUnitBankAccountDetailDto`, `controller/OrgUnitBankController`, frontend `controller/OrgUnitBankPageController` + `OrgUnitBankProxyController`, `templates/org-unit-bank-account-detail.html` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md) · **Issues:** #556
 
 ### REQ-BANK-039 — Booking-request eligibility = view eligibility
 
@@ -1710,7 +1740,8 @@ forced `false` even for management,
 swap) · **Code:**
 `model/BankAccountApprovalLimit`,
 `repository/BankAccountApprovalLimitRepository`, `service/BankApprovalLimitService`,
-`service/OrgUnitBankAccessService`, `service/BankBookingRequestService`, `db/migration/V193`, frontend
+`service/OrgUnitBankAccessService` (resolution + authorization), `service/OrgUnitBankApprovalLimitService`
+(upsert/clear + audit), `service/BankBookingRequestService`, `db/migration/V193`, frontend
 `templates/fragments/bank-approval-limits.html` + `org-unit-bank.html` + `bank-requests.html` +
 `static/js/bank.js` (the `data-exempt` short-circuit in the live warning) ·
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md),
@@ -1870,7 +1901,7 @@ direct memberships across **all four kinds** (Staffel + SK + Bereich + OL —
 `GET /api/v1/users/{id}/memberships?allKinds=true`), auto-preselected when the user has exactly one,
 blank when none — membership is multi, so it must be chosen. Both fields are **optional**. The
 backend validates the chosen org unit is one of the counterparty's memberships (else 400) and
-snapshots its name via the `OrgUnitMembershipService.listDirectMembershipOptions` seam (kind-safe, no
+snapshots its name via the `OrgUnitMembershipQueryService.listDirectMembershipOptions` seam (kind-safe, no
 polymorphic org-unit load). This stays org-unit-blind for **authorization** (REQ-BANK-008): the org
 unit is used only to *record* a snapshot, never to gate a booking; `BankSecurityService` and every
 bank gate are untouched. The `/lookup` and `/memberships` gates are widened to admit
@@ -1905,24 +1936,23 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
 > [ADR-0054](../adr/0054-bank-transaction-counterparty.md) amendment; closes spec Open question #5):**
 > a deposit/withdrawal counterparty may now also be an **external party without a basetool account**,
 > recorded as a **free-text name**. The Kontobewegung modal's counterparty block gains a "kein
->
->> Tool-Account" toggle: off (default) is the unchanged registered-user path; on swaps the
->> `/users/lookup` picker for a free-text **`counterpartyExternalName`** input and **widens the unit
->> picklist to every active org unit** (`GET /api/v1/org-units/active-all-kinds`, all four kinds) with
->> the **membership check skipped** — there is no linked user. Server-side, `counterpartyUserId` and
->> `counterpartyExternalName` are **mutually exclusive** (both → 400); an external counterparty stores
->> the free-text name in the **`counterparty_handle` snapshot with `counterparty_user_id` NULL**, and
->> its org unit — any active one — in the existing `counterparty_org_unit_id` + name snapshot (resolved
->> via `OrgUnitMembershipService.listAllActiveOrgUnitOptionsAllKinds`, still org-unit-blind for
->> authorization). The snapshot columns are reused (no new column); **V205 relaxes the V197 check
->> constraint** so the *handle* is the presence marker (registered handle **or** external name) and the
->> user FK is optional (previously the constraint tied the handle 1:1 to the user id).
->> The audit detail records the external name + unit as **snapshot labels only** and leaves
->> `target_user_id` **null** (REQ-BANK-012 — a counterparty label is a system snapshot, not the
->> free-text note/justification the details-payload rule forbids). Only a **Bank Employee** records it
->> (the staff who already book deposits/withdrawals); external **Halter** stay out of scope. New
->> `bank.field.counterparty.external*` i18n keys (DE/EN); `openapi.json` regenerated
->> (`counterpartyExternalName` on the deposit/withdrawal request DTOs).
+> Tool-Account" toggle: off (default) is the unchanged registered-user path; on swaps the
+> `/users/lookup` picker for a free-text **`counterpartyExternalName`** input and **widens the unit
+> picklist to every active org unit** (`GET /api/v1/org-units/active-all-kinds`, all four kinds) with
+> the **membership check skipped** — there is no linked user. Server-side, `counterpartyUserId` and
+> `counterpartyExternalName` are **mutually exclusive** (both → 400); an external counterparty stores
+> the free-text name in the **`counterparty_handle` snapshot with `counterparty_user_id` NULL**, and
+> its org unit — any active one — in the existing `counterparty_org_unit_id` + name snapshot (resolved
+> via `OrgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds`, still org-unit-blind for
+> authorization). The snapshot columns are reused (no new column); **V205 relaxes the V197 check
+> constraint** so the *handle* is the presence marker (registered handle **or** external name) and the
+> user FK is optional (previously the constraint tied the handle 1:1 to the user id).
+> The audit detail records the external name + unit as **snapshot labels only** and leaves
+> `target_user_id` **null** (REQ-BANK-012 — a counterparty label is a system snapshot, not the
+> free-text note/justification the details-payload rule forbids). Only a **Bank Employee** records it
+> (the staff who already book deposits/withdrawals); external **Halter** stay out of scope. New
+> `bank.field.counterparty.external*` i18n keys (DE/EN); `openapi.json` regenerated
+> (`counterpartyExternalName` on the deposit/withdrawal request DTOs).
 
 **Acceptance**
 
@@ -1937,32 +1967,32 @@ user free text) and sets the structured `target_user_id` on `DEPOSIT_BOOKED` / `
   (amended: previously the counterparty was redacted like the holder).
 - [x] A confirmed deposit/withdrawal **request** records the requester as the counterparty user plus
   their deterministic primary org unit (null when the requester has no membership).
-- [x](#994) An **external** counterparty is booked as a free-text `counterpartyExternalName` +
+- [x] ([#994](https://github.com/krt-profit/basetool/issues/994)) An **external** counterparty is booked as a free-text `counterpartyExternalName` +
   **any** active org unit (membership check skipped), snapshotting the name with
   `counterparty_user_id` NULL and a null audit `target_user_id`; supplying both a registered user and
   an external name is a 400; the registered-user path (incl. the membership 400) is unchanged.
 
 **Enforced by:** `BankLedgerServiceTest` (header snapshot, org-unit-membership validation, external
 free-text name + any-org-unit + null user/target + both-set 400, audit
-target + detail, transfers leave it null), `BankReportServiceTest` (Gegenseite column present in the
-full statement, redacted out), `OrgUnitBankAccessServiceTest` (counterparty redacted for org-unit
-viewers), `OrgUnitMembershipServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
+target + detail, transfers leave it null), `BankReportServiceTest` (Quell-/Zielkonto column in the
+full and the redacted statement), `OrgUnitBankAccessServiceTest` (counterparty kept, Halter nulled
+for org-unit viewers), `OrgUnitMembershipQueryServiceTest` (`listDirectMembershipOptions` spans all four kinds; primary
 resolution), `BankBookingRequestServiceTest` (confirmed request records the requester + their primary
 org unit), `UserControllerTest`/`UserMembershipsSecurityTest` (`allKinds` delegation; `BANK_EMPLOYEE`
 reaches `/memberships`) · **Code:**
 `model/BankTransaction`, `model/dto/request/Bank{Deposit,Withdrawal}Request`, `service/BankLedgerService`
 (`resolveCounterparty`), `service/BankBookingRequestService`,
-`service/OrgUnitMembershipService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
+`service/OrgUnitMembershipQueryService#listDirectMembershipOptions`, `model/projection/BankBookingRow`,
 `repository/BankPostingRepository`, `model/dto/BankBookingDto`, `service/Bank{Statement,Management}ReportService`,
 `service/OrgUnitBankAccessService#redact`, `controller/UserController`, `config/SecurityConfig`,
 `db/migration/V197`, `db/migration/V205` (#994 constraint relax),
-`service/OrgUnitMembershipService#listAllActiveOrgUnitOptionsAllKinds` (#994),
+`service/OrgUnitMembershipQueryService#listAllActiveOrgUnitOptionsAllKinds` (#994),
 frontend `controller/BankPageController`, `controller/BankRequestQueuePageController`,
 `controller/UserProxyController`, `templates/fragments/bank-counterparty.html` (#994),
 `templates/fragments/bank-movement-modal.html`, `templates/bank-account-detail.html`,
 `static/js/bank.js` · **ADR:** [ADR-0054](../adr/0054-bank-transaction-counterparty.md) (amended by
-
-# 994) · **Issues:** #994
+[#994](https://github.com/krt-profit/basetool/issues/994)) · **Issues:**
+[#994](https://github.com/krt-profit/basetool/issues/994)
 
 ### REQ-BANK-045 — Conditional Begründung (justification) on withdrawals & transfers
 
@@ -2158,13 +2188,14 @@ membership-based notification seam; the Bankleitung instead picks the request up
 „Fremde Anträge" band filter, KRT notification union), `BankAccountServiceTest`
 (`setCartelApprovalTiers` management-only/CARTEL-only/`T2≥T1`/audit), `BankLedgerServiceTest`
 (direct-booking cap for employee, uncapped for management/confirmation), `BankControllerSecurityTest`
-(`approval-tiers` gate), frontend `BankManagePageControllerMvcTest` (KRT tab management-only),
+(`approval-tiers` gate), frontend `BankManagePageControllerTest` (KRT tab management-only),
 `OrgUnitBankPageControllerMvcTest` (read-only ladder), `ArchitectureTest` (both bank pins) · **Code:**
 `model/BankAccount#employeeApprovalCeiling/#areaLeadApprovalCeiling`, `model/BankRequestApprover`,
 `model/BankBookingRequest#requiredApprover`, `model/BankAuditEventType#CARTEL_APPROVAL_TIERS_*`,
 `service/BankAccountService#setCartelApprovalTiers`, `service/OrgUnitBankAccessService`
 (`createBookingRequest` KRT branch, `resolveCartelApprovalRouting`, `raiseCartelDirectBookingRequest`,
-`canApprove`, `listRequestsForResponsibleAccounts`, `resolveResponsibleHolderUserIds` CARTEL OL set),
+`canApprove`, `listRequestsForResponsibleAccounts`),
+`service/OrgUnitBankResponsibilityService#resolveResponsibleHolderUserIds` (CARTEL OL set),
 `service/BankBookingGuards#exceedsCartelDirectBookingCeiling`,
 `controller/BankBookingController#bookWithdrawal/#bookTransfer` (202 auto-request),
 `model/dto/BankBookingOutcomeDto`, `controller/BankAccountController#setCartelApprovalTiers`,
@@ -2375,18 +2406,18 @@ unaffected — an authenticated read surface, no blackbox probe), and no new rol
 
 **Acceptance**
 
-- [ ] `GET /api/v1/bank/accounts?query=…` filters by a case-insensitive name **or** account-number
+- [x] `GET /api/v1/bank/accounts?query=…` filters by a case-insensitive name **or** account-number
   substring, honours repeatable `status`/`type` (absent = all), stays caller-scoped, and binds the
   query as a parameter (SQL-injection-safe; a `%`/`_` is a harmless LIKE wildcard).
-- [ ] The transfer-destination, direct-booking source, grant-create and grants per-account pickers
+- [x] The transfer-destination, direct-booking source, grant-create and grants per-account pickers
   carry `data-krt-combobox="remote-bank-accounts"` and preload **no** account roster; typing finds an
   account by number or name; a booking/grant against a searched account submits its id.
-- [ ] The source-account picker still marks the Begründung `required` for a CARTEL/CARTEL_BANK/SPECIAL
+- [x] The source-account picker still marks the Begründung `required` for a CARTEL/CARTEL_BANK/SPECIAL
   source (mandate read from the search metadata, not the `<option>`).
-- [ ] `/bank/manage` pages the accounts table with the standard controls; the tab count shows the
+- [x] `/bank/manage` pages the accounts table with the standard controls; the tab count shows the
   total account count; paging swaps only the `manageBody` fragment; the KRT-Freigaben tab still finds
   the CARTEL account when it is off the current page.
-- [ ] No surface issues the former `?size=500` preload; a 600-account org keeps every account
+- [x] No surface issues the former `?size=500` preload; a 600-account org keeps every account
   reachable via search / the pager.
 
 **Enforced by:** `BankAccountSearchTest` (name/accountNo/status/type filter, grant scoping,
@@ -2472,27 +2503,6 @@ expandable) • **Code:** `model/BankTransaction`, `model/BankBookingRequest`,
 `model/dto/Bank{Booking,BookingRequest}Dto`, `service/BankPostingWriter`, `service/BankLedgerService`,
 `service/BankBookingRequestService`, `service/OrgUnitBankAccessService`,
 `service/Bank{Statement,Management}ReportService`, `service/pdf/KrtPdfSupport`, `db/migration/V231`
-
-## Out of scope
-
-- **Accounts for individual players** — an explicit owner decision: players appear only
-  as holders (custody dimension, REQ-BANK-003), never as account owners.
-- **Automated money flows** from missions/operations/orders into the bank (REQ-BANK-019)
-  — a possible future epic, requires its own spec.
-- **Interest, fees, loans, currencies other than aUEC.**
-- **Full bank access for org-unit members** — plain members still see nothing. Epic #666
-  grants officers/leads only a **balance-only view** and **confirm-before-post booking
-  requests** for their own org unit's account (REQ-BANK-021/-022); the transaction history,
-  holder distribution and audit log stay a bank-staff surface.
-- **Confirmation/rejection notifications & request auto-expiry** — only request *creation*
-  notifies (REQ-BANK-026); a decided request shows its status in the requester's list, and
-  requests do not expire automatically (they are confirmed, rejected or cancelled).
-- **English PDF variants** — v1 statements/exports render German labels (from the
-  message bundles, so a locale switch stays cheap later).
-- ~~**A "Bereich" (area) entity** — area accounts carry a free-form name; the org chart
-  stays purely descriptive (REQ-ORG-010).~~ **Superseded by epic #692:** Bereich and OL are now
-  first-class `org_unit` kinds (REQ-ORG-014); `AREA` accounts link to a Bereich and `CARTEL` to the OL
-  (REQ-BANK-027). The org chart stays descriptive, but is widened to multi-Bereich + OL (org-chart spec).
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 
@@ -2635,15 +2645,33 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 `controller/AdminAuditLogPageController` (audit filter), `templates/org-unit-bank.html` ·
 **ADR:** [ADR-0133](../adr/0133-editable-pending-booking-requests.md)
 
+## Out of scope
+
+- **Accounts for individual players** — an explicit owner decision: players appear only
+  as holders (custody dimension, REQ-BANK-003), never as account owners.
+- **Automated money flows** from missions/operations/orders into the bank (REQ-BANK-019)
+  — a possible future epic, requires its own spec.
+- **Interest, loans, bank-levied fees and currencies other than aUEC.** The in-game transfer fee
+  of REQ-BANK-033 is not a bank fee: it models aUEC the game itself destroys.
+- **Booking by org-unit members.** Members reach the org-unit bank page (REQ-BANK-021, -035…-038):
+  the accounts they may view, a read-only history and a Halter-redacted Kontoauszug, and booking
+  *requests* (REQ-BANK-022, -039…-042). Booking, holders, grants and the audit log stay a bank-staff
+  (audit: admin) surface.
+- **Request auto-expiry** — requests do not expire; they are confirmed, rejected, cancelled or
+  edited (REQ-BANK-056). Creation and decision both notify (REQ-BANK-026).
+- **English PDF variants** — statements/exports render German labels (from the message bundles, so
+  a locale switch stays cheap later).
+- **External holders** — a holder is always a registered tool user (Open question 5).
+
 ## Open questions
 
-1. **Final role naming** — `Bank Employee` / `Bank Management` are proposals; the owner
-   names the Keycloak roles before Phase 1 freezes `DataInitializer` codes.
-2. **Transfer destination rule** — v1 requires the destination account to be *visible*
-   to the employee (grant row). Alternative (any active account as destination) would be
-   a one-line spec change; decide at Phase 1 review.
-3. **Reversal permission** — v1 proposal: reversals require `BANK_MANAGEMENT` (employees
-   ask management to fix mistakes). Confirm at Phase 1 review.
+1. ~~**Final role naming**~~ — **Resolved:** the realm roles are `Bank Employee` /
+   `Bank Management`, seeded as `BANK_EMPLOYEE` / `BANK_MANAGEMENT` (REQ-BANK-007).
+2. ~~**Transfer destination rule**~~ — **Resolved:** a direct transfer needs the destination to be
+   visible to the employee (REQ-BANK-011); a transfer *request* may target any active account and its
+   confirmation skips that check (REQ-BANK-040).
+3. ~~**Reversal permission**~~ — **Resolved:** `POST /api/v1/bank/transactions/{id}/reversal` is
+   gated `BANK_MANAGEMENT`; employees ask management to correct a booking.
 4. **Statement number/archival** — statements are generated on demand and not persisted;
    if the org wants numbered, archived statements, that becomes a follow-up requirement.
 5. **Holders without a basetool account** — v1 requires every holder to be a registered

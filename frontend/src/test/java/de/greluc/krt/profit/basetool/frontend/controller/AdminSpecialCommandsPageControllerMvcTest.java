@@ -258,9 +258,9 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
   }
 
-  // REQ-DATA-007 — every SK lifecycle mutation evicts STATIC_DATA_CACHE so the cached org-units
-  // pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale name/active/profit-eligible
-  // up to the TTL. Classic create path.
+  // REQ-DATA-007 — every SK lifecycle mutation evicts the SQUADRON + ORG_UNIT caches so the cached
+  // org-units pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale
+  // name/active/profit-eligible up to the TTL. Classic create path.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSpecialCommand_classic_evictsStaticDataCache() throws Exception {

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-06.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** MISSION · **Related ADRs:** none
 
 # Mission payout preference
@@ -29,8 +29,8 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
   and continues to win over the profile default; that editing flow is unchanged.
 - Changing the profile default is **forward-only** — it never rewrites `payoutPreference` on
   existing participations.
-- **External participants** have no profile to read a default from, so their row is recorded as
-  `PAYOUT`.
+- **External participants** (a named person without an account, recorded by a member — ADR-0159)
+  have no profile to read a default from, so their row is recorded as `PAYOUT`.
 - A user edits **only their own** default (the value is read for the signing-up user and written for
   the JWT subject), under the user row's optimistic-lock `version` — a stale write surfaces as a
   409, not a silent overwrite.
@@ -48,7 +48,8 @@ the new participant's `payoutPreference` is **seeded from the user's default**. 
 `UserPayoutPreferenceValidationTest` (`@Valid` → 400 on a missing preference/version),
 `ProfileControllerTest`. **Code:** `User.defaultPayoutPreference` (migration `V142`),
 `UserService#updateUserDefaultPayoutPreference`, `UserController` `/api/v1/users/me/payout-preference`,
-`MissionService#addParticipant`, `frontend/.../ProfileController` + `templates/profile.html`.
+`MissionParticipantService#addParticipant` (reached through `MissionService#addParticipant`),
+`frontend/.../ProfileController` (`POST /profile/payout-preference`) + `templates/profile.html`.
 **Issues:** #469.
 
 ## Out of scope

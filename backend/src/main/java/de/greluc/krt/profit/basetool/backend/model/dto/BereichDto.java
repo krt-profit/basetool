@@ -41,7 +41,7 @@ import java.util.UUID;
  * @param parentOrgUnitId the owning {@code Organisationsleitung}'s id, or {@code null} when the
  *     Bereich is not yet wired under the OL. Set on create (optional) or via the dedicated
  *     set-parent endpoint; the parent kind is validated server-side (must be the OL).
- * @param department the Kartell department / frozen Bereichsfarbe (epic #692, REQ-ORG-018) used to
+ * @param department the Kartell department / frozen Bereichsfarbe (epic #692, REQ-ORG-026) used to
  *     tint this Bereich's nodes in the org chart; {@code null} when unassigned (the chart renders
  *     the Bereich untinted). Optional on create.
  * @param version optimistic-lock counter; server-populated on create + read, required on update.

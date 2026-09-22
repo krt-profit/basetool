@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Fully executed on 2026-06-01 (V125).
+>
+> **Current truth:** the Flyway history under `backend/src/main/resources/db/migration/`. Index of the archive: [`README.md`](README.md).
+
 # SC Wiki Sync — R9 Destructive Cleanup Roadmap
 
 Doc type: **historical plan — fully executed.** All four steps shipped; Step 4, the irreversible

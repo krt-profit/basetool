@@ -229,7 +229,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Phase 0 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/check-conformance.py` asserts the
+      # Phase 0 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/check-conformance.py` asserts the
       # deployment's invariants against a RUNNING host -- the client address the edge really
       # sees, the certificate handover, container metrics, log streams -- and it is the gate the
       # container-runtime migration is measured against. It cannot run here: it needs the host.
@@ -251,7 +251,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Phase 4 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/cgroup-container-metrics.py` reads
+      # Phase 4 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/cgroup-container-metrics.py` reads
       # container metrics straight out of cgroup v2 and writes them for node_exporter's textfile
       # collector -- because under rootless Podman there is no cAdvisor, and the exporter that
       # replaces it publishes no OOM counter, no CPU-throttling series and no pids ceiling. All
@@ -300,7 +300,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Phase 3 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/lib/container-runtime.sh` is the seam
+      # Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/lib/container-runtime.sh` is the seam
       # between the operational scripts and the container runtime, and it exists because BOTH
       # shapes are live at once: production serves on Docker until the cutover, the testing host
       # serves on Podman now. A change that only works on one of them breaks the other silently,
@@ -322,7 +322,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Phase 2 of docs/PODMAN_MIGRATION_PLAN.md. `scripts/render-env-d.py` fills the per-service
+      # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. `scripts/render-env-d.py` fills the per-service
       # environment templates from the host `.env`. Under compose this interpolation was compose's
       # own; under Quadlet there is no compose, so it is code -- and it is code whose failure mode
       # is silence. A variable that renders empty does not stop a container: postgres starts on its
@@ -442,7 +442,7 @@ jobs:
           set -eu
           python3 -c "import yaml" 2>/dev/null || pip3 install --disable-pip-version-check pyyaml
 
-      # Phase 2 of docs/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
+      # Phase 2 of docs/archive/PODMAN_MIGRATION_PLAN.md. quadlet/ holds the unit files the migration
       # replaces docker-compose.yml with, and for as long as BOTH exist the compose file is
       # authoritative -- so the units are generated from it and this asserts they still match.
       #

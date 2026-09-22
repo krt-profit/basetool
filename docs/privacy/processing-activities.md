@@ -1,6 +1,6 @@
 # Record of processing activities (Art. 30 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 Art. 30 GDPR requires a controller to maintain a record of its processing activities. The small-
 organisation exemption in **Art. 30(5) does not apply**: it is available only where processing is
@@ -23,7 +23,7 @@ requires it and duplicating it into further files spreads personal data for no g
 | **Members**                      | Register via Keycloak (credentials or Discord), approved by an admin                                                        |
 | **Applicants**                   | Registered but not yet decided (`PENDING`) or refused (`REJECTED`)                                                          |
 | **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients, org-chart placeholders |
-| **Visitors**                     | Reach the public landing, Impressum, terms and privacy pages without an account                                             |
+| **Visitors**                     | Reach the landing page, Impressum, terms and privacy pages without an account — the only pages without a login (ADR-0159)  |
 
 ---
 
@@ -38,20 +38,27 @@ requires it and duplicating it into further files spreads personal data for no g
   **No first or last name is collected.**
 - **Legal basis:** Art. 6(1)(b) (providing the requested service) and Art. 6(1)(f) (operating the
   organisation; secure sign-in and membership verification for the Discord path).
-- **Where:** `app_user`, `user_approval_event`, and the Keycloak realm.
+- **Where:** `app_user`, `user_roles`, `org_unit_membership`, `user_approval_event`, and the
+  Keycloak realm (its own database).
 - **Retention:** for the duration of the account; a refused registration is purged automatically
   (REQ-SEC-057). See [Retention](#retention).
 
 ### A2 — Squadron operations
 
 - **Purpose:** plan and settle missions, operations, warehouse stock, job orders, refinery orders,
-  the hangar, and the personal inventory.
+  the hangar and the personal inventory; run the material exchange; keep the organisation chart and
+  the promotion / evaluation matrix; publish announcements.
 - **Data:** everything a member creates or that is attributed to them, including **free-text fields**
   (notes, comments, booking reasons, mission descriptions) which may contain personal data about
   others if a member enters it there.
 - **Legal basis:** Art. 6(1)(b) and Art. 6(1)(f).
-- **Where:** the operational tables — `inventory_item`, `ship`, `mission*`, `job_order*`,
-  `refinery_order`, `personal_inventory_item`, `personal_blueprint`, `material_*`.
+- **Where:** the operational tables — `inventory_item*`, `ship`, `mission*`, `operation*`,
+  `job_order*`, `refinery_order`, `personal_inventory_item`, `personal_blueprint`,
+  `material_exchange_*`, `material_claim`, `member_evaluation`, `org_chart_position`,
+  `announcement`.
+- **Transient only:** while a member has a mission open, the frontend shares their handle and the
+  section they are editing with the other members viewing it (editor presence, ADR-0126). It is held
+  in memory and relayed over Redis pub/sub, never written to a table.
 - **Retention:** for the duration of the account; on deletion the account-owned rows are purged and
   the shared aggregates are reassigned (REQ-DATA-008).
 
@@ -104,9 +111,12 @@ requires it and duplicating it into further files spreads personal data for no g
 
 - **Purpose:** stability, security, and abuse defence.
 - **Data:** per request one access-log line with method, path, status and duration plus a pseudonymous
-  account id and context ids; IP addresses in the edge-proxy, host-authentication and Keycloak log
-  streams; **no names, e-mail addresses or tokens — these are masked at the logging layer**
-  (`PiiMaskingPatternLayout` / `PiiMaskingLogstashEncoder`). Metrics are aggregate counters with no
+  account id and context ids; **no names, e-mail addresses or tokens — these are masked at the
+  logging layer** (`PiiMaskingPatternLayout` / `PiiMaskingLogstashEncoder`). IP addresses and
+  usernames are kept, deliberately, in the edge access log (native nginx, ADR-0162), the host
+  authentication log and the host security logs (auditd file integrity, fail2ban bans). Keycloak's
+  own log output is shipped with its `username=` and `ipAddress=` fields masked by the log shipper
+  (`monitoring/alloy/config.alloy`, gated by `scripts/check-alloy-log-masking.py`). Metrics are aggregate counters with no
   personal data. Traces carry the path with ids reduced to placeholders and no account id
   (`ObservationPrivacyFilter`).
 - **Legal basis:** Art. 6(1)(f).
@@ -122,6 +132,23 @@ requires it and duplicating it into further files spreads personal data for no g
   > on the host. The hardening step had in fact been carried out; this line is the correction.
 
 - **Retention:** see [Retention](#retention).
+
+### A8 — Backups
+
+- **Purpose:** restore the service after data loss.
+- **Data:** the full restore surface, which includes both databases — therefore **all** of the
+  personal data in A1–A6 and A9, including the Keycloak user database. Keycloak's event store (A7)
+  lives in that database too, so a snapshot carries the events of the 30 days before it for as long
+  as the snapshot is kept.
+- **Legal basis:** Art. 6(1)(f) — availability and integrity, itself an Art. 32 obligation.
+- **Protection:** client-side encrypted before it leaves the host (REQ-OPS-008); the storage target
+  only ever receives encrypted blobs. The target is operated by the controller on their own hardware,
+  so no third party receives the backup at all — see [`processors.md`](processors.md).
+- **Retention:** GFS — 7 daily, 4 weekly, 6 monthly, so **an erased record can persist in backups for
+  up to roughly six months**. Backups are not searched or edited to serve an erasure request; the
+  data leaves as the snapshots expire. If a backup is ever restored, the erasures that had been
+  applied since that snapshot are re-applied before the system is returned to service. Log data is
+  deliberately excluded from backups so its 31-day window cannot be silently extended (ADR-0072).
 
 ### A9 — Handling data-subject requests
 
@@ -145,20 +172,19 @@ requires it and duplicating it into further files spreads personal data for no g
   [`data-subject-requests.md`](data-subject-requests.md). It is personal data and does not belong in
   a git repository.
 
-### A8 — Backups
+### A10 — Companion clients (desktop extractor, Android app)
 
-- **Purpose:** restore the service after data loss.
-- **Data:** the full restore surface, which includes both databases — therefore **all** of the
-  personal data in A1–A6, including the Keycloak user database.
-- **Legal basis:** Art. 6(1)(f) — availability and integrity, itself an Art. 32 obligation.
-- **Protection:** client-side encrypted before it leaves the host (REQ-OPS-008); the storage target
-  only ever receives encrypted blobs. The target is operated by the controller on their own hardware,
-  so no third party receives the backup at all — see [`processors.md`](processors.md).
-- **Retention:** GFS — 7 daily, 4 weekly, 6 monthly, so **an erased record can persist in backups for
-  up to roughly six months**. Backups are not searched or edited to serve an erasure request; the
-  data leaves as the snapshots expire. If a backup is ever restored, the erasures that had been
-  applied since that snapshot are re-applied before the system is returned to service. Log data is
-  deliberately excluded from backups so its 31-day window cannot be silently extended (ADR-0072).
+- **Purpose:** let a member import data the game produced (refinery results, personal blueprints)
+  without typing it, and use the tool from an Android phone.
+- **Data:** the desktop extractor analyses its source locally and sends only the reviewed result, as
+  text, to the ingest gateway after a device login. The gateway stages it **single-use, for the
+  uploading account only**, until the member confirms it in the web interface; only then is it
+  stored, under A2. The Android app shows the same data with the same permissions and processes
+  nothing server-side of its own; on the device it keeps an encrypted refresh token and the content
+  last fetched, both excluded from Android backup and deleted on sign-out.
+- **Legal basis:** Art. 6(1)(b).
+- **Where:** the ingest handoff staging in Redis (REQ-INGEST-003); on the member's own device.
+- **Retention:** a staged handoff expires after **30 minutes** unread; see [Retention](#retention).
 
 ---
 
@@ -174,17 +200,19 @@ The single table every other statement about retention must agree with.
 | Unread notifications                    | **180 days** after being raised                                                | `NotificationRetentionTask` (REQ-NOTIF-009)                                | `app.notifications.retention.unread-max-age`            |
 | Activity + bank audit trail             | **24 months** after the recorded activity                                      | `AuditRetentionTask` (REQ-AUDIT-006), plus the admin purge (REQ-AUDIT-004) | `app.audit.retention.max-age`                           |
 | Application + platform logs             | **31 days**                                                                    | Loki compactor retention                                                   | `retention_period` in `monitoring/loki/loki-config.yml` |
-| Traces                                  | **14 days**                                                                    | Tempo retention                                                            | `monitoring/`                                           |
+| Traces                                  | **14 days**                                                                    | Tempo retention                                                            | `block_retention` in `monitoring/tempo/tempo.yaml`      |
 | Keycloak realm events (login + admin)   | **30 days**                                                                    | Keycloak realm event expiration                                            | `events/config` + the `adminEventsExpiration` attribute |
-| Metrics (no personal data)              | 180 days                                                                       | Prometheus TSDB retention                                                  | `--storage.tsdb.retention.time`                         |
+| Metrics (no personal data)              | 180 days                                                                       | Prometheus TSDB retention                                                  | `--storage.tsdb.retention.time` in `docker-compose.monitoring.yml` (→ `quadlet/systemd/prometheus.container`) |
 | Sessions                                | 30 days idle for an authenticated session                                      | Spring Session / Redis (REQ-SEC-025)                                       | `app.session.authenticated-timeout`                     |
-| Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `scripts/backup.sh`                                     |
+| Ingest handoff (companion import)       | **30 minutes**, single use                                                     | Redis key expiry (REQ-INGEST-003)                                          | `app.ingest.handoff-ttl`                                |
+| Backups                                 | Up to ~6 months (7d/4w/6m)                                                     | `restic forget` (REQ-OPS-008)                                              | `IRI_KEEP_DAILY` / `_WEEKLY` / `_MONTHLY` in `scripts/backup.sh` |
 | Bank booking history (handle snapshots) | Kept beyond account deletion under Art. 6(1)(f), subject to an Art. 17 request | —                                                                          | —                                                       |
 | Audit trail handle snapshots            | Outlive the account, but only to the 24-month ceiling above                    | `AuditRetentionTask` (REQ-AUDIT-006)                                       | `app.audit.retention.max-age`                           |
 | Erasure requests (`deletion_request`)   | Life of the account; removed with it when carried out                          | `ON DELETE CASCADE` (REQ-SEC-061)                                          | —                                                       |
 
-**Every number in this table is also a sentence in the privacy policy.** Changing one without the
-other publishes a false statement — see the note in [`README.md`](README.md).
+**Every number in this table is also a sentence in the privacy policy**, with one exception: the
+policy describes the ingest handoff as cached only briefly and names no figure. Changing a number
+without its sentence publishes a false statement — see the note in [`README.md`](README.md).
 
 ---
 
@@ -196,6 +224,7 @@ Full detail, including the role each party plays, in [`processors.md`](processor
 |-----------------------------------|------------------------|-------------------------------------------------------------------|
 | Hosting provider                  | Processor              | Everything, as the operator of the infrastructure                 |
 | Discord                           | Independent controller | The authentication exchange for members who use the Discord login |
+| GitHub                            | Independent controller | Nothing from the tool — the Android app is downloaded from, and checks for updates at, GitHub directly |
 | Other members of the organisation | —                      | The data the visibility rules expose inside the tool              |
 
 **No transfer to a third country takes place through the tool itself.** The Discord login involves a

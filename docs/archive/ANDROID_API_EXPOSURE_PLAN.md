@@ -1,16 +1,20 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. Every track shipped: the app's API surface went live on its own vhost on 2026-08-21 and app v0.3.0 was released on 2026-09-14. Track D1 (realm hardening) continues in the living [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md).
+>
+> **Current truth:** [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), [ADR-0134](../adr/0134-backend-joins-the-management-port-isolation.md), [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md), [ADR-0136](../adr/0136-external-contract-set-for-shipped-clients.md), [`security-and-access.md`](../specs/security-and-access.md), [`api-conventions.md`](../specs/api-conventions.md) (REQ-API-009). Index of the archive: [`README.md`](README.md).
+
 # Android API Exposure — Phase 0 execution plan
 
 Doc type: **living plan** (draft, pending approval by @greluc).
 
 > **Dated note, 2026-09-06 — the anonymous surface this plan works around is gone.**
-> [ADR-0159](adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md) / `REQ-SEC-052` closed
+> [ADR-0159](../adr/0159-the-basetool-has-no-anonymous-or-guest-surface.md) / `REQ-SEC-052` closed
 > every anonymous path except the landing page, the legal pages, the assets and two documented API
 > reads (`GET /api/v1/terms/document`, `GET /api/v1/app/version-policy`). Everything below that
 > reasons about guest mission edits, anonymous order creation or a branchy anonymous surface
 > describes the state this plan was written in and is kept as the record of why the vhost is a
 > default-deny allow-list. The allow-list itself is **unchanged** by that decision: it still admits
 > the same paths, and the backend now refuses the caller behind them. The current truth is
-> [`docs/specs/security-and-access.md`](specs/security-and-access.md), `REQ-SEC-037` and
+> [`docs/specs/security-and-access.md`](../specs/security-and-access.md), `REQ-SEC-037` and
 > `REQ-SEC-052`.
 > Scope: everything that must happen **in this repository and on the production host** before the
 > native Android app (`krt-profit/basetool-android`) can talk to the Basetool for real. The app-side

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-16.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ADMIN · **Related ADRs:** ADR-0102, ADR-0103
 
 # Admin catalog pages — complete rendering, no silent truncation

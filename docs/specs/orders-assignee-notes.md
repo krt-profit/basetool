@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORDERS · **Related ADRs:** none
 
 # Job-order assignee notes
@@ -33,10 +33,14 @@ order-level write; a stale note edit surfaces as HTTP 409.
 - [ ] A blank/whitespace note clears the value.
 - [ ] Two concurrent note edits: the second, version-stale edit returns HTTP 409.
 - [ ] Editing a note does not change the parent order's `version`.
+- [ ] Setting a note is audited as `JOB_ORDER_ASSIGNEE_NOTE_SET` (only the note's length, never its
+  text), clearing it as `JOB_ORDER_ASSIGNEE_NOTE_CLEARED` (REQ-AUDIT-001).
 
 **Enforced by:** `JobOrderServiceAssigneeAndListTest` (AssigneeNoteTests), `JobOrderMapperTest`
-· **Code:** `JobOrderService.updateAssigneeNote` / `deleteAssigneeNote`,
-`JobOrderController.setAssigneeNote` / `deleteAssigneeNote` · **Issues:** —
+· **Code:** `JobOrderAssigneeService.updateAssigneeNote` / `deleteAssigneeNote` (reached through
+the `JobOrderService` facade), `JobOrderController.setAssigneeNote` / `deleteAssigneeNote`
+(`PUT` / `DELETE /api/v1/orders/{id}/assignees/{userId}/note`), frontend
+`JobOrderWriteController` + `orders-detail.js` · **Issues:** —
 
 ### REQ-ORDERS-014 — Who may change an assignee note
 

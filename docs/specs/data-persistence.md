@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-06-21.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** DB/DATA · **Migration conventions:** [`db/migration/README.md`](../../backend/src/main/resources/db/migration/README.md)
 
 # Data & persistence
@@ -8,11 +8,15 @@
 The schema is owned by Flyway and validated (never auto-generated) against the entities, so
 prod and test run identical, reviewed DDL. Queries avoid N+1 by construction.
 
-> **Concurrency note.** The optimistic-locking / `…WithinTransaction` / bulk-update-in-loop
-> rules are **deliberately kept inline in `CLAUDE.md` → "Concurrency"** because they are
-> "read this before you touch multi-step transactions" agent guidance that must live in the
-> always-read file. They are data-integrity requirements; treat that section as part of this
-> spec's contract.
+> **Concurrency note.** The locking rules are **deliberately kept in the agent guidance** rather
+> than here, because they are "read this before you touch multi-step transactions" guidance that
+> must load where an agent starts: the two cross-cutting rules (`@Version` echo, lock as
+> fine-grained as the data allows) in the root `CLAUDE.md` → "Concurrency", and the full landmine
+> list in [`backend/CLAUDE.md`](../../backend/CLAUDE.md) — the `support.OptimisticLock` helpers
+> (`check` / `checkOptionalClient` / `checkRequired`), `Mission`'s DB-enforced section counters
+> ([ADR-0080](../adr/0080-mission-section-lock-db-enforcement.md)), pessimistic locking for bulk
+> reorders, the `…WithinTransaction` pattern, bulk-updates-inside-loops and the find-or-create
+> retry. They are data-integrity requirements; treat both as part of this spec's contract.
 
 ## Requirements
 
@@ -27,7 +31,12 @@ it before adding a migration.
 
 ### REQ-DATA-002 — Startup seeding
 
-`DataInitializer` seeds roles/permissions on startup.
+`DataInitializer` runs on every startup in every profile and is idempotent: it creates the five
+baseline roles by `code` (`KRT_MEMBER`, `OFFICER`, `ADMIN` with their baseline permissions;
+`BANK_EMPLOYEE`, `BANK_MANAGEMENT` with none) only when missing — so an admin's rename or permission
+change survives a restart — and the canonical IRIDIUM squadron at `Squadron.IRIDIUM_ID` when neither
+that id nor the `IRI` shorthand exists (Flyway `V80` seeds the same row). Other reference data
+ships as Flyway migrations, not here.
 
 ### REQ-DATA-003 — No N+1
 
@@ -108,7 +117,7 @@ row.
 Consequences that must hold:
 
 - The UEX manufacturer sync upserts **each company in its own `REQUIRES_NEW` transaction** (via the
-  `self`-proxy `…WithinTransaction` pattern — see `CLAUDE.md` → Concurrency), so one row that fails
+  `self`-proxy `…WithinTransaction` pattern — see `backend/CLAUDE.md` → Concurrency), so one row that fails
   rolls back only itself and the remaining companies still commit. A bad row may be counted as
   *skipped*; it may never roll back the batch.
 - The feed is processed in **ascending `id` order**. The **canonical** company of a brand — the
@@ -165,7 +174,9 @@ per-item `catch` keeps the run going past a failure so the remaining items still
 uuid already owned by another row leaves the row's `external_uuid` null instead of throwing; and the
 run summary carries the `sharedUuidDeclined` count of such rows.
 
-### REQ-DATA-006 — every hot predicate and foreign key has a covering index
+### REQ-DATA-017 — every hot predicate and foreign key has a covering index
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-DATA-006` until 2026-09-22; that id also named the Discord account link on the user in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 A query predicate on the read path, and every foreign-key column, must be backed by an index;
 falling back to a sequential scan on a growing table is a defect. New indexes ship as a Flyway
@@ -199,15 +210,14 @@ a sort while keeping the index name.
 A backend list that is **global** (no per-principal variance) and **slow-changing** is fetched through
 `BackendApiClient.getCached(...)` — a per-domain Caffeine cache — not a plain `get(...)` on every render.
 The canonical case is the **squadron catalogue** (`GET /api/v1/squadrons?size=1000&sort=name,asc`): it is
-read on **every** authenticated render by `OrgUnitContextAdvice` (`availableSquadrons()` plus the admin
-switcher's `loadAdminOrgUnitCatalogue()`) and by the page controllers that cache the identical catalogue,
-so it is fetched at most once per TTL app-wide.
+read on **every** authenticated render by `OrgUnitContextAdvice.availableSquadrons()` and by the page
+controllers that cache the identical catalogue, so it is fetched at most once per TTL app-wide.
 
 **Type-safe allowlist (FE-CACHE-1).** `getCached` takes a `CachedCatalog` enum constant, **not** a raw
 URI string — the `getCached(String, …)` overloads were removed. Each constant pins its exact request URI
 and its invalidation domain; the cache key is the constant's `name()`. This makes the unsafe state
 **unrepresentable**: a per-principal URI (`/api/v1/users/me`, `/api/v1/me/capabilities`,
-`/api/v1/me/active-org-unit`) cannot be cached because no constant names it, and adding one is a
+`/api/v1/me/active-org-unit`, `/api/v1/me/org-units`) cannot be cached because no constant names it, and adding one is a
 reviewable, spec-gated act. Every `CachedCatalog` is verified global (no `sub` / role /
 `X-Active-Org-Unit-Id` / redaction variance). Each constant also declares its **fetch mode**: a
 paged catalogue consumed as "the whole list" is marked `Fetch.PAGE_WALK` and assembled complete by
@@ -247,29 +257,28 @@ Invariants that must hold:
 - **The same rule enrols the job-order age thresholds.** `GET /api/v1/settings/job_order.age_yellow_days`
   and `…age_red_days` are global, slow-changing settings read through `getCached` on the orders list and
   detail renders (`JobOrderPageController`). Their sole writer is `AdminSettingsPageController`, which
-  evicts `STATIC_DATA_CACHE` on every successful save — on **both** the classic redirect handler and the
+  calls the coarse `clearStaticDataCache()` on every save — on **both** the classic redirect handler and the
   AJAX twin, in a `finally` around the per-setting PUTs so even a **partial save** (an early setting PUT
   lands, a later one throws) still drops the cache rather than stranding the persisted threshold until
   the TTL. Caching them is therefore allowed under the eviction gate above.
-- **The SpecialCommand catalogue (`/api/v1/special-commands?…`) is cached** now that every SK lifecycle
-  mutation evicts `STATIC_DATA_CACHE`: `AdminSpecialCommandsPageController`'s
+- **Every SpecialCommand lifecycle mutation evicts precisely**: `AdminSpecialCommandsPageController`'s
   create / update / soft-delete / re-activate (classic **and** AJAX twins) and
-  `SpecialCommandAdminProxyController`'s profit-eligible flip all call `clearStaticDataCache()`.
-  `OrgUnitContextAdvice`'s admin switcher therefore reads the SK catalogue through `getCached`, at most
-  once per TTL app-wide instead of on every admin render. Member-roster mutations (add / remove / flags /
-  lead) do not change the catalogue's name / shorthand / active / profit-eligible fields, so they
-  deliberately do **not** evict.
+  `SpecialCommandAdminProxyController`'s profit-eligible flip call `evict(SQUADRON, ORG_UNIT)`, because an
+  SK's name / shorthand / active / profit-eligible fields feed the cached org-unit pickers below.
+  Member-roster mutations (add / remove / flags / lead) change none of those fields, so they deliberately
+  do **not** evict. The admin switcher no longer reads an SK catalogue at all: since ADR-0151 it asks the
+  per-principal `GET /api/v1/me/org-units`, which is never cached.
 - **The active-org-unit owner pickers (`/api/v1/org-units/active`, `/api/v1/org-units/active-all-kinds`)
   are cached.** Both return a **global** catalogue (all active org units, no per-principal / per-active-
   org-unit-header / redaction variance — the endpoints do no scope filtering), so the URI-keyed cache is
   safe. `/active` (Staffel + SK) is read on every mission-detail render (`MissionPageController`) and
   every Job-Order render (`JobOrderPageController.fetchActiveOrgUnitOptions`); `/active-all-kinds`
   (+ Bereich + OL) on every bank-management render (`BankManagePageController`) and the authenticated
-  Job-Order requesting picker. Their eviction gate is now complete: Squadron writes
-  (`AdminMissionDataPageController` / `SquadronAdminProxyController`), SK writes
-  (`AdminSpecialCommandsPageController` / `SpecialCommandAdminProxyController`) **and** Bereich/OL writes
-  (`AdminOrgStructurePageController` create-Bereich / create-OL / re-parent) all call
-  `clearStaticDataCache()`, so a picker never shows an org unit more stale than the last mutation.
+  Job-Order requesting picker. Their eviction gate is complete: Squadron writes
+  (`AdminMissionDataPageController` coarse, `SquadronAdminProxyController` `evict(SQUADRON, ORG_UNIT)`),
+  SK writes (`evict(SQUADRON, ORG_UNIT)`, above) **and** Bereich/OL writes
+  (`AdminOrgStructurePageController` create-Bereich / create-OL / re-parent, `evict(ORG_UNIT)`) all drop
+  the `ORG_UNIT` domain, so a picker never shows an org unit more stale than the last mutation.
 - **The reference catalogues cached for the pickers evict their own domain on every admin write.** Each
   single-purpose admin write path calls the precise `evict(CacheDomain…)` for the one domain it changes,
   so a stale list never survives the mutation: `AdminMaterialsPageController`'s create and field-edit AJAX
@@ -282,28 +291,29 @@ Invariants that must hold:
   the apply runs as an async backend job, so the eviction is deliberately eager; the brief window in which
   a concurrent read could re-cache pre-apply data is bounded by the domain TTL and the action is rare and
   admin-only.
-- **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`, and
-  `/api/v1/me/active-org-unit` share a URI across users; a URI-keyed cache would cross-contaminate
+- **Per-principal calls are never URI-cached.** `/api/v1/users/me`, `/api/v1/me/capabilities`,
+  `/api/v1/me/active-org-unit` and `/api/v1/me/org-units` share a URI across users; a URI-keyed cache would cross-contaminate
   them, so they remain plain `get(...)`.
 - **The eviction guarantee holds only under single-instance deployment (CACHE-DIST-01).** Caffeine is
-  per-JVM: both `STATIC_DATA_CACHE` and the backend master-data caches evict only the local JVM's copy.
-  This "no user sees a list more stale than the last mutation" guarantee is airtight **because prod runs
-  exactly one frontend and one backend container** — the fixed `container_name` in `docker-compose.yml`
-  structurally forbids `docker compose --scale`, and `deploy.sh` recreates in place rather than scaling
-  out. **Scaling either module to more than one replica breaks this**: a peer would serve entries up to
+  per-JVM: both the frontend catalogue caches and the backend master-data caches evict only the local
+  JVM's copy. This "no user sees a list more stale than the last mutation" guarantee is airtight
+  **because prod runs exactly one frontend and one backend container** — each is a single Quadlet unit
+  with a fixed `ContainerName=` (`quadlet/systemd/{frontend,backend}.container`, generated from the fixed
+  `container_name` in `docker-compose.yml`), and `scripts/deploy.sh` restarts it in place rather than
+  scaling out. **Scaling either module to more than one replica breaks this**: a peer would serve entries up to
   the TTL stale after another replica's mutation. Horizontal scale-out is therefore gated on first
   replacing the eviction-sensitive caches with a shared / broadcast eviction scheme (preferred: a Redis
   pub/sub evict-broadcast keeping Caffeine as the local read path) — see
   [ADR-0074](../adr/0074-cache-invalidation-per-instance-caffeine.md), deferred and **not** built while
   the topology is single-instance.
 
-**Acceptance** (`OrgUnitContextAdviceTest`): both `availableSquadrons()` and the admin switcher route
-the squadron catalogue through `getCached`, never a plain `get`; the admin switcher also routes the
-SpecialCommand catalogue through `getCached`. (`AdminSpecialCommandsPageControllerMvcTest`,
+**Acceptance** (`OrgUnitContextAdviceTest`): `availableSquadrons()` routes the squadron catalogue
+through `getCached`, never a plain `get`; the switcher asks `/api/v1/me/org-units` and touches neither
+the squadron nor the SpecialCommand catalogue. (`AdminSpecialCommandsPageControllerMvcTest`,
 `SpecialCommandAdminProxyControllerTest`): every SK lifecycle mutation — create / update / delete /
-activate (classic and AJAX) and the profit-eligible flip — evicts `STATIC_DATA_CACHE`, while a
-member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every successful settings save —
-classic and AJAX, including a partial save where a later PUT throws — evicts `STATIC_DATA_CACHE`.
+activate (classic and AJAX) and the profit-eligible flip — evicts `SQUADRON` and `ORG_UNIT`, while a
+member-roster mutation does not. (`AdminSettingsPageControllerMvcTest`): every settings save — classic
+and AJAX, including a partial save where a later PUT throws — clears the catalogue caches.
 (`AdminMaterialsPageControllerTest`): a material create and a field-edit AJAX write — including a
 `QUANTITY_TYPE` edit that the former `updateType` guard skipped — evict `MATERIAL`, while a rejected
 create does not. (`AdminLocationsPageControllerTest`): the visibility / home-location toggles evict
@@ -313,14 +323,17 @@ create does not. (`AdminLocationsPageControllerTest`): the visibility / home-loc
 
 ### REQ-DATA-008 — User deletion reassigns or clears every `app_user` FK that lacks an `ON DELETE` clause
 
-`UserService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak).
+`UserDeletionService.deleteUser(userId)` removes an ex-member (only users already gone from Keycloak).
 **The precondition is verified twice**: against the persisted `in_keycloak` flag *and*, because that
 flag is only a cached mirror that a swallowed sync error can leave stale at `false`, against Keycloak
 itself via `KeycloakService.userExists`. That probe is **fail-closed** — only a clean `404` counts as
 "gone"; an unreachable Keycloak, an expired admin token or a `5xx` propagates and aborts the
 deletion. Without the second check a single swallowed sync error was enough for an admin to
 irreversibly hard-delete an **active** member, which matters more now that the operation purges
-rather than reassigns. Before the terminating `userRepository.delete(user)`, **every foreign key
+rather than reassigns. Two callers skip only the live probe: the configured ingest gateway's service
+account, whose two views disagree by construction, and account consolidation, which removes the
+Keycloak user itself afterwards (`KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER`,
+#1827). Before the terminating `userRepository.delete(user)`, **every foreign key
 referencing `app_user(id)` that carries no `ON DELETE` clause (Postgres default `NO ACTION`) must be
 explicitly reassigned or nulled in code** — otherwise the delete FK-fails with `SQLSTATE 23503`.
 Foreign keys that declare their own `ON DELETE CASCADE` / `SET NULL` are handled DB-side and need no
@@ -437,11 +450,12 @@ membership — nearly every user — returned 500.
 `mission_finance_entry` carries **no** direct `app_user` FK (the V40 `user_id`/`fk_mfe_user`
 `ON DELETE RESTRICT` pair was dropped in V41 in favour of `mission_participant_id`
 `ON DELETE CASCADE`); it reaches a user only through `mission_participant.user_id`, already nulled by
-`unlinkUser`. The approval self/audit FKs added in V173 (`app_user.approved_by_id`,
-`user_approval_event.user_id` / `decided_by_id`) are tracked and resolved by the Discord-approval
-work, not here.
+`unlinkUser`. The approval self/audit FKs added in V173 carry no `ON DELETE` clause either and are
+cleared before the delete: the subject's own `user_approval_event` rows are deleted, rows the account
+decided keep their audit but lose `decided_by_id`, and other users' `app_user.approved_by_id`
+back-pointers to it are nulled (REQ-SEC-017 in [`discord-integration.md`](discord-integration.md)).
 
-**Acceptance**: `UserServiceDeleteTest` (Mockito) verifies the companion reassignment and the
+**Acceptance**: `UserDeletionServiceTest` (Mockito) verifies the companion reassignment and the
 material-claim unlink are invoked, and that both run before `userRepository.delete`;
 `UserDeletionForeignKeyIntegrityTest` (real Postgres) deletes a user who owns a mission and stamped a
 material claim and asserts no `23503`, the mission + its companion are reassigned to the same admin,
@@ -449,7 +463,7 @@ and the claim survives with a null stamp. The same class additionally deletes a 
 an org-unit membership and asserts the flush raises no `TransientPropertyValueException` and that the
 DB cascade removed the membership row.
 
-**Enforced by:** `UserService.deleteUser` (explicit ordered reassignment),
+**Enforced by:** `UserDeletionService.deleteUser` (explicit ordered reassignment),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
 `OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam).
@@ -801,7 +815,8 @@ is I/O, and that single fact decides the server's tuning: storage-shaped setting
 irrelevant here, while anything that adds CPU per query is paid in full, on every request.
 
 Three settings shipped at values that contradicted that, and are set explicitly on the `db-backend`
-`command:` line in `docker-compose.yml`:
+`command:` line in `docker-compose.yml` — which `scripts/generate-quadlet.py` carries into the `Exec=`
+line of the production unit `quadlet/systemd/db-backend.container`:
 
 |              Setting              | Value |                                                                                             Why                                                                                              |
 |-----------------------------------|-------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -823,7 +838,7 @@ would never reach the production volume, while a manual step would reach product
 environment. And the migration **catches its own failure and downgrades it to a `WARNING`**:
 `CREATE EXTENSION` needs superuser and the contrib library, and a diagnostic must never be the
 reason the backend refuses to start. The extension alone collects nothing — `shared_preload_libraries`
-must name it, which the compose `command:` does, taking effect on the next container recreate.
+must name it, which the `command:` / `Exec=` line does, taking effect on the next server restart.
 
 **Acceptance**
 
@@ -836,7 +851,8 @@ must name it, which the compose `command:` does, taking effect on the next conta
   drift against it.
 
 **Enforced by:** the Flyway migration chain running in every `@SpringBootTest` and the E2E stack ·
-**Code:** `V240__enable_pg_stat_statements.sql`, `docker-compose.yml` (db-backend `command:`) ·
+**Code:** `V240__enable_pg_stat_statements.sql`, `docker-compose.yml` (db-backend `command:`),
+`quadlet/systemd/db-backend.container` (generated `Exec=`) ·
 **Decision:** [ADR-0174](../adr/0174-the-authorities-cache-ttl-is-an-operational-knob.md) (the
 investigation this came out of)
 
@@ -848,5 +864,5 @@ spec — [`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-003
 SCU/PIECE quantity rules end-to-end. It is a persistence-boundary rule, but kept with its sibling
 input rules for one place to look.
 
-Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented inline in
-`CLAUDE.md` (see the concurrency note above).
+Optimistic/pessimistic locking and the `…WithinTransaction` patterns — documented in the root and
+`backend/CLAUDE.md` (see the concurrency note above).

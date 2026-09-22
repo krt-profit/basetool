@@ -3,7 +3,7 @@
 - **Status:** Accepted — implemented
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-ORG-018 · REQ-ORG-010 · ADR-0025 · ADR-0027 · issue #692
+- **Related:** spec REQ-ORG-026 · REQ-ORG-010 · ADR-0025 · ADR-0027 · issue #692
 
 ## Context
 
@@ -11,7 +11,7 @@ The org chart (`/org-chart`, "Organigramm") was born as the **Profit-Bereich** c
 was loaded by `OrgUnitRepository.findActiveProfitEligible()` (`active = true AND is_profit_eligible =
 true`), and `OrgChartService.resolveScopeOrgUnit()` additionally rejected staffing a Staffel/SK that
 was not profit-eligible. Epic #692 (REQ-ORG-014, ADR-0025) grew the real hierarchy
-(OL > Bereich > Staffel/SK) and REQ-ORG-018 widened the chart to render the OL plus **every** active
+(OL > Bereich > Staffel/SK) and REQ-ORG-026 widened the chart to render the OL plus **every** active
 Bereich side by side — but the leaf tier kept the legacy profit-eligibility filter.
 
 `is_profit_eligible` is a **Job-Order** flag: it marks the org units that may be the *responsible
@@ -31,7 +31,7 @@ invisible both under its Bereich and in the ungrouped tier, and even if shown co
 ## Decision
 
 We **decouple org-chart visibility from `is_profit_eligible`.** The chart is a descriptive,
-organisation-wide view (REQ-ORG-010 / REQ-ORG-018), so its unit tier is **every active Staffel/SK**,
+organisation-wide view (REQ-ORG-010 / REQ-ORG-026), so its unit tier is **every active Staffel/SK**,
 regardless of the Job-Order flag.
 
 - `OrgUnitRepository.findActiveProfitEligible()` is replaced (for the chart) by
@@ -64,5 +64,5 @@ regardless of the Job-Order flag.
   Bereiche must *not* process orders.
 - **Add a second per-unit "show on chart" flag** — rejected as needless state. The chart is
   descriptive and org-wide by definition; "active" is the right and only gate.
-- **Filter the chart's *Bereiche* to Profit only instead** — rejected: REQ-ORG-018 deliberately
+- **Filter the chart's *Bereiche* to Profit only instead** — rejected: REQ-ORG-026 deliberately
   renders every Bereich; the goal is a complete organisation chart, not a narrower one.

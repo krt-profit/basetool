@@ -403,7 +403,7 @@ class P4kImportServiceTest {
   void blueprint_seedPathAppliesCigMislabelOutputNameOverride() {
     // Given an unmatched, seedable blueprint whose produced item carries the CIG-mislabeled name
     // (#327): the seed path writes output_name from the produced item, so it must apply the same
-    // guarded override the SC Wiki sync uses. Covers REQ-INV-007 (P4K consistency wiring).
+    // guarded override the SC Wiki sync uses. Covers REQ-INV-047 (P4K consistency wiring).
     UUID bpGuid = UUID.randomUUID();
     UUID producedGuid = UUID.randomUUID();
     GameItem produced = new GameItem();

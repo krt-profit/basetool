@@ -1,6 +1,6 @@
 # Personal-data breach runbook (Art. 33, 34 GDPR)
 
-> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-15.
+> **Doc type:** Living document — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 **The clock is 72 hours from becoming aware, and it does not pause for the weekend.** "Aware" means
 having a reasonable degree of certainty that a security incident has led to personal data being
@@ -127,15 +127,16 @@ whether they need to do something.
 
 ## Where the evidence lives
 
-|          Source          |                                   Holds                                    |        Retention        |
-|--------------------------|----------------------------------------------------------------------------|-------------------------|
-| Application access logs  | Method, path, status, duration, pseudonymous account id, context ids       | 31 days                 |
-| Edge-proxy access logs   | All requests to public services, including IP addresses                    | 31 days                 |
-| Keycloak logs            | Authentication events, IP addresses, usernames                             | 31 days                 |
-| Host authentication logs | SSH and host security events                                               | 31 days                 |
-| Activity audit trail     | Every state-changing action in the audited areas, with actor and timestamp | see the retention table |
-| Traces                   | Request paths and timings, no personal data                                | 14 days                 |
-| Metrics                  | Aggregate counters only                                                    | 180 days                |
+|          Source           |                                   Holds                                    |        Retention        |
+|---------------------------|----------------------------------------------------------------------------|-------------------------|
+| Application access logs   | Method, path, status, duration, pseudonymous account id, context ids       | 31 days                 |
+| Edge access logs          | All requests to public services, including IP addresses                    | 31 days                 |
+| Keycloak log output       | Authentication errors and server events; usernames and IPs masked in Loki  | 31 days                 |
+| Keycloak event store      | Sign-ins and admin changes, with account and IP address (in Keycloak's DB) | 30 days                 |
+| Host authentication logs  | SSH and host security events (auditd file integrity, fail2ban bans), IPs   | 31 days                 |
+| Activity audit trail      | Every state-changing action in the audited areas, with actor and timestamp | see the retention table |
+| Traces                    | Request paths and timings, no personal data                                | 14 days                 |
+| Metrics                   | Aggregate counters only                                                    | 180 days                |
 
 The audit trail is the one that survives longest and attributes actions to accounts — for an
 integrity breach it is the primary source, not the logs.

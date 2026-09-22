@@ -5,13 +5,15 @@ view, and because each one has burned somebody at least once.
 
 ## 6.1 Sign-in
 
-1. The browser hits a protected page; the frontend, as an OAuth2 *client*, redirects to Keycloak.
+1. The browser hits a protected page; the frontend, as an OAuth2 *client*, redirects to Keycloak —
+   served under `/auth` on the same origin (ADR-0166).
 2. Keycloak authenticates — either directly, or through the **Discord identity provider** in
    `keycloak-spi`.
 3. On the Discord path the guild/role gate runs: guild membership and an in-guild role are checked
    **fail-closed**. If Discord cannot be reached, the login is refused rather than allowed.
 4. A new sign-up that passes the gate lands in the **approval queue** instead of the application:
-   an admin approves it, rejects it, or links it onto an existing account.
+   while it is pending the account sees nothing but its own registration status, and an admin
+   approves it, rejects it, or links it onto an existing account.
 5. The frontend receives the tokens, creates a Spring Session in **Redis**, and calls the backend
    as a *resource server* with a bearer token. The backend never sees a credential.
 
@@ -45,49 +47,65 @@ missing one turns the next edit into a spurious 409.
 
 ## 6.4 A peer's change appears without a reload
 
-1. A mutation succeeds on the backend and raises a domain event.
-2. The event is published to **Redis pub/sub**, which fans it out across frontend replicas.
-3. Each replica pushes over the one multiplexed **`/ws/sync`** WebSocket to the clients subscribed
-   to that topic.
-4. The client replaces the affected fragment **in place**. No full-page reload on success — that is
-   a binding requirement, not a nicety (`REQ-FE-001…010`).
+1. A mutation succeeds; the client replaces the affected fragment **in place** — no full-page
+   reload on success, which is a binding requirement, not a nicety (`REQ-FE-001…010`).
+2. The browser that made the change announces it: a `changed` frame on its one multiplexed
+   **`/ws/sync`** WebSocket, naming the topic room (`mission:{id}`, …). Publishing needs no
+   subscription; only *receiving* needs an authorised subscribe. Where no browser is involved, the
+   server publishes the same frame itself.
+3. The frontend relays the frame to the room's local members and onto **Redis pub/sub**
+   (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
+4. Each receiving client re-reads the named sections and swaps them in place.
 
-## 6.5 The desktop extractor pushes a screenshot
+The Android app takes a second door to the same relay: a backend **SSE** stream, bridged onto the
+same Redis channel in both directions (ADR-0143). Design: ADR-0094; the knowledge base's Live Sync
+note has the bounds and what has broken.
 
-1. The extractor authenticates and `POST`s JSON to `ingest.profit-base.online`.
-2. The **ingest** gateway checks the token, checks the client is an **approved** one — an
+## 6.5 The desktop extractor sends a refinery order
+
+1. The extractor, holding a sender-constrained (DPoP) token for the member, `POST`s JSON to
+   `ingest.profit-base.online/v1/refinery-extract` (or `/v1/blueprint-preview`).
+2. The **ingest** gateway validates the token, checks the client is an **approved** one — an
    unapproved caller is refused `403 CLIENT_NOT_ALLOWED` — and enforces rate and payload limits.
-3. It relays to the backend over the internal container network.
-4. The backend validates and stores; the user finds a pre-filled refinery order waiting.
+3. It relays to the backend over the internal network under **its own** service-account token,
+   naming the member in an on-behalf-of header; the member's bound token stops at the gateway.
+4. The backend matches the payload and returns a **draft**. Ingest stages it in Redis for a single
+   browser pickup and answers with a handoff link the extractor opens.
+5. The member reviews the pre-filled form and saves it through the **ordinary** create path — so the
+   ingest route cannot bypass a validation, a permission check or an audit event.
 
 The backend is never exposed to the extractor directly. That is the entire reason this module is
-its own deployable.
+its own deployable. Specification: [`desktop-ingest.md`](../specs/desktop-ingest.md).
 
 ## 6.6 A deploy
 
-The only way production changes, and nobody drives it:
+The only way the running application and its configuration change, and nobody drives it (the host
+itself changes only through the Ansible role, which never delivers):
 
-1. `iri-deploy.timer` fires on the host (every few minutes).
-2. `deploy.sh` resolves the `:stable` tags of the app images, the **config bundle** and the
+1. `iri-deploy.timer` fires on the host every five minutes and runs `deploy.sh` as the `deploy`
+   account.
+2. It resolves the `:stable` tags of the app images, the **config bundle** and the
    **Keycloak provider-JAR bundle** to immutable digests.
 3. **Every digest is Cosign-verified on the host** against the release workflow's keyless identity
    *before* anything is pulled, extracted or applied. A `:stable` tag moved out-of-band to an
    untrusted digest is rejected here — which is what makes a blind `:stable` pull safe.
-4. Verified content is unpacked, `env.d` files are rendered from `.env`, and the Quadlet units are
-   reconciled through systemd.
+4. Verified content is unpacked, `env.d` files are rendered from `.env` by `render-env-d.py`, and
+   the Quadlet units are reconciled through the service user's systemd instance, behind a health
+   gate that rolls back on failure (`REQ-OPS-003`).
 5. Nothing is promoted automatically: `:stable` moves only by a deliberate act in the promote
    workflow. The deploy is the *consumer* of that decision, never its author.
 
-## 6.7 The night: backup, then the drill that proves it
+## 6.7 Every night a backup, every week the drill that proves it
 
-1. `iri-backup.timer` runs `backup.sh`: `pg_dump` of both databases, Grafana's SQLite, the
-   monitoring secrets, the three `edge-*` volumes, `.env`, the keystore, the realm export, the
-   Keycloak providers and the **redis ACL** — pushed with **restic** through an **rclone** WebDAV
-   remote to Nextcloud, under a GFS retention policy.
-2. `iri-restore-drill.timer` then runs `restore-drill.sh`, which restores the **latest snapshot**
-   into a throwaway PostgreSQL and checks seven artifacts, writing the result as Prometheus
-   textfile metrics.
+1. `iri-backup.timer` (daily, 04:15) runs `backup.sh`: `pg_dump` of both databases, Grafana's
+   SQLite, the monitoring secrets, the three `edge-*` volumes, `.env`, the keystore, the realm
+   export, the Keycloak providers and the **redis ACL** — pushed with **restic** through an
+   **rclone** WebDAV remote to Nextcloud, under a GFS retention policy.
+2. `iri-restore-drill.timer` (weekly, Sunday 05:30) runs `restore-drill.sh`, which restores the
+   **latest snapshot** into a throwaway PostgreSQL and checks seven artifacts, writing the result
+   as Prometheus textfile metrics (`basetool_restore_drill_artifact_ok`).
 
 The drill inspects **what a restored snapshot contains**, not what the host happens to have. That
 distinction is the whole value: a host can be perfectly healthy while its backups have been
-unrestorable for weeks, and only the drill can tell those apart.
+unrestorable for weeks, and only the drill can tell those apart. Procedure:
+[`docs/backup.md`](../backup.md); requirements: [`backup-recovery.md`](../specs/backup-recovery.md).

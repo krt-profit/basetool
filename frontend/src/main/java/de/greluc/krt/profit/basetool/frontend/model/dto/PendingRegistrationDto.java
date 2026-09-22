@@ -27,7 +27,7 @@ import java.util.UUID;
  *
  * @param id the pending user's id
  * @param username the user's effective display name
- * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-008), or {@code
+ * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-018), or {@code
  *     null} when none was captured
  * @param registeredAt when the registration first appeared
  * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row

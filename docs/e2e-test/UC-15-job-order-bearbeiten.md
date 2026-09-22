@@ -23,17 +23,17 @@ Der User öffnet das Bearbeiten-Modal auf der Auftragsdetailseite `/orders/{id}`
 ## Hauptablauf
 
 1. Navigiere zu `/orders/{id}`.
-2. Öffne das (LOGISTICIAN-gegatete) Bearbeiten-Modal über den Trigger `open-modal-display` / `data-modal-id="edit-modal"`. Das Modal ist vom Page-Controller mit Materialzeilen, Handle und Kommentar vorbefüllt.
-3. Setze die Materialmenge (`materials[0].amount`) auf `250` und einen eindeutigen Kommentar (`#edit-comment`).
-4. Speichern (`#edit-modal button[type=submit]`) → `POST /orders/{id}/update` → Backend `PUT /api/v1/orders/{id}`.
+2. Öffne das (LOGISTICIAN-gegatete) Bearbeiten-Modal über den Trigger `[data-trigger='open-modal-display'][data-modal-id='edit-modal']`. Das Modal ist vom Page-Controller mit Materialzeilen, Handle und Kommentar vorbefüllt.
+3. Wähle in der Material-Combobox des Modals die erste angebotene Option, setze die Menge (`materials[0].amount`) auf `250` und einen eindeutigen Kommentar (`#edit-comment`).
+4. Speichern (Submit-Button im `#edit-modal`) → `POST /orders/{id}/update` → Backend `PUT /api/v1/orders/{id}`.
 
 ## Erwartetes Ergebnis
 
-Die neu geladene Detailseite zeigt in der „Benötigt"-Spalte `250.000` und den neuen Kommentar.
+Ein Read-Back über `GET /api/v1/orders/{id}` — gepollt, bis die neue Menge erscheint — liefert Menge `250` und den neuen Kommentar.
 
 ## Sonderfälle & Lehren
 
-- **Optimistic Locking:** Das Modal trägt das versteckte `version`-Feld; das Backend lehnt einen veralteten Stand mit 409 ab. Der Test lädt nach dem Speichern neu, statt den DOM-Stand weiterzuverwenden.
-- **Read-only `responsibleOrgUnit`:** Die bearbeitende Einheit ist im Modal nur lesend — sie wird ausschließlich über den Umschreib-Flow (`PATCH …/responsible-org-unit`) geändert, nicht über das reguläre Update. Das Update-DTO sendet `responsibleOrgUnitId = null`.
-- **Locale-robuste Assertion:** Statt auf lokalisierten Spaltentext zu prüfen, prüft der Test, dass die Materialzeile den Teilstring `250` enthält (die ursprüngliche `100` und der Lagerstand `0` erzeugen ihn nicht) plus den eindeutigen Kommentar-String.
-- **Post-Submit-Settle:** Der volle Redirect wird über `awaitFormPost` abgewartet, bevor neu navigiert wird (sonst bricht WebKit den In-Flight-Redirect ab — HTTP/2 `INTERNAL_ERROR`).
+- **Optimistic Locking:** Das Modal trägt das versteckte `version`-Feld; das Backend lehnt einen veralteten Stand mit 409 ab.
+- **Read-only `responsibleOrgUnit`:** Die bearbeitende Einheit ist im Modal nur lesend — sie wird ausschließlich über den Umschreib-Flow (`PATCH /api/v1/orders/{id}/responsible-org-unit`) geändert, nicht über das reguläre Update.
+- **Warum die erste Material-Option:** Der Material-Picker baut sich aus einer 10 Minuten gecachten Material-Liste, die das frisch geseedete Material noch nicht enthalten muss (unter WebKit beobachtet); dann fiele die Vorauswahl auf einen leeren Picker. Welches Material gewählt wird, ist egal — geprüft wird nur, dass Menge und Kommentar ankommen.
+- **Pollen statt auf Browser-Events warten:** Das Bearbeiten ist ein voller POST → Redirect → GET. Unter CI-Last verwirft WebKit sowohl das Navigations-Event (`awaitFormPost`) als auch das POST-Response-Event, obwohl der Schreibvorgang committet ist. Der Test pollt deshalb das Backend; ein Klick, der nie gepostet hat, lässt die Menge unverändert, und der Poll schlägt trotzdem fehl. Das vermeidet zugleich die Strict-Mode-Mehrdeutigkeit, dass der Kommentar auf der neu geladenen Seite zweimal steht (Anzeige und vorbefülltes Textfeld).

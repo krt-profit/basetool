@@ -259,6 +259,10 @@ FAKE
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'podman %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
+# The working directory each call inherits. `sudo -u <service user> podman` keeps it, and the service
+# user cannot enter /root -- so the cwd the deployer runs podman in is a precondition, asserted by
+# scenario_podman_runs_podman_from_root_dir.
+printf 'podman-cwd %s\n' "${PWD}" >> "${FAKE_DOCKER_LOG}"
 
 lookup() { local var="$1_$2"; printf '%s' "${!var:-}"; }
 
@@ -1854,6 +1858,10 @@ ContainerName=%s
 Image=placeholder
 ' "${svc}"       > "${T_UNIT_DIR}/${svc}.container"
   done
+  # The keystore mount, as generate-quadlet.py writes it -- pointed at this scenario's keystore rather
+  # than /var/iri/secrets, because under Podman the pre-flight reads the path from HERE and not from
+  # .env (keystore_mount_source in deploy.sh).
+  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >> "${T_UNIT_DIR}/backend.container"
 }
 
 scenario_podman_resolves_without_pulling() {
@@ -2214,11 +2222,149 @@ scenario_docker_still_requires_its_compose_file() {
   rm -rf "${tmp}"
 }
 
+# --- what a release re-defines has to reach the running container ------------
+#
+# Found by the documentation audit on 2026-09-22, the day production moved to
+# Quadlet: rt_monitoring_up only ever said `systemctl start`, which is a no-op on
+# an active unit, and acme was in neither service list at all. So a release that
+# changed a monitoring unit or acme.container installed the new file,
+# daemon-reloaded, and left the old container running the old definition.
+
+scenario_podman_changed_monitoring_and_acme_units_are_restarted() {
+  echo "Scenario: a release that changes a monitoring unit or acme restarts them -- once -- and only them"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_env_renderer
+  local bundle="${tmp}/bundle"
+  write_bundle "${bundle}"
+  # The release: prometheus and acme move, loki does not.
+  printf '[Container]\nContainerName=prometheus\nImage=NEW\n' > "${bundle}/quadlet/systemd/prometheus.container"
+  printf '[Container]\nContainerName=loki\nImage=same\n'      > "${bundle}/quadlet/systemd/loki.container"
+  printf '[Container]\nContainerName=acme\nImage=NEW\n'       > "${bundle}/quadlet/systemd/acme.container"
+  # The host before it.
+  printf '[Container]\nContainerName=prometheus\nImage=OLD\n' > "${T_UNIT_DIR}/prometheus.container"
+  printf '[Container]\nContainerName=loki\nImage=same\n'      > "${T_UNIT_DIR}/loki.container"
+  printf '[Container]\nContainerName=acme\nImage=OLD\n'       > "${T_UNIT_DIR}/acme.container"
+  write_marker "${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|$(hexdig 0ldc0)|${PDIG_KCSPI}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" \
+    "IRI_MONITORING_ENABLED=true" \
+    "FAKE_CONFIG_BUNDLE=${bundle}" \
+    "IRI_ENV_RENDERER=${T_FAKE_BIN}/render-env-d.py" \
+    "IRI_ENV_D_DIR=${T_COMPOSE_DIR}/env.d" || rc=$?
+  assert_exit 0 "$rc" "podman: the release deploys"
+
+  local n
+  n="$(grep -c '^systemctl --user restart prometheus\.service$' "${T_DOCKER_LOG}" || true)"
+  if [[ "${n}" == "1" ]]; then
+    record 1 "podman: a changed monitoring unit is restarted, so the new definition lands"
+  else
+    record 0 "podman: a changed monitoring unit is restarted exactly once (restarted ${n} times)"
+  fi
+  # Once and not twice: the monitoring apply and reconcile_monitoring_reloads both call
+  # rt_monitoring_up, and a pipe into sed used to run the first in a subshell that forgot nothing.
+  assert_docker "systemctl --user start loki.service" "podman: ...an unchanged one is only started"
+  assert_no_docker "systemctl --user restart loki.service" "podman: ...and never recreated for somebody else's change"
+  assert_docker "systemctl --user restart acme.service" "podman: a changed acme unit is restarted with the stack"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_acme_is_part_of_the_stack() {
+  echo "Scenario: acme is started with the stack, like every other prod-profile service"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER_OLD}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  : > "${T_DOCKER_LOG}"
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a deploy that moves the backend exits 0"
+  assert_docker "systemctl --user start acme.service" "podman: an unchanged acme unit is started, so a stopped one comes back"
+  assert_no_docker "systemctl --user restart acme.service" "podman: ...and not recreated when its unit did not move"
+  rm -rf "${tmp}"
+}
+
+# --- the keystore pre-flight checks the file the units mount ------------------
+
+scenario_podman_keystore_checked_where_the_unit_mounts_it() {
+  echo "Scenario: under Quadlet the keystore pre-flight reads the unit's Volume=, not .env"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  # .env names a file that does not exist. Quadlet never reads it, so it must not decide anything.
+  printf 'IRI_KEYSTORE_HOST_PATH=%s/nowhere.p12\n' "${tmp}" > "${T_COMPOSE_DIR}/.env"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 0 "$rc" "podman: a stale .env keystore path does not block a host whose units mount an existing file"
+  assert_excludes "nowhere.p12" "podman: ...and is not what the pre-flight looked at"
+  rm -rf "${tmp}"
+}
+
+scenario_podman_missing_mounted_keystore_refuses() {
+  echo "Scenario: ...and a keystore the units mount but the host lacks refuses, even when .env's exists"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  sed -i "s#^Volume=.*:/run/secrets/keystore.p12:ro\$#Volume=${tmp}/absent.p12:/run/secrets/keystore.p12:ro#" \
+    "${T_UNIT_DIR}/backend.container"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  run_deploy -- "${pod[@]}" "${conv[@]}" || rc=$?
+  assert_exit 1 "$rc" "podman: a missing mounted keystore refuses before anything is applied"
+  assert_contains "required file missing: ${tmp}/absent.p12" "podman: ...and names the path the unit mounts"
+  rm -rf "${tmp}"
+}
+
+# --- the working directory podman inherits -----------------------------------
+
+scenario_podman_runs_podman_from_root_dir() {
+  echo "Scenario: podman is never run from the caller's working directory"
+  local tmp rc=0 first
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  podman_units "${tmp}"
+  write_marker "${PMARKER}"
+  mapfile -t pod < <(podman_env)
+  mapfile -t conv < <(podman_converged_env)
+  : > "${T_DOCKER_LOG}"
+  # From a directory that is neither / nor the compose dir, the way an operator's shell in /root is.
+  (cd "${tmp}" && run_deploy -- "${pod[@]}" "${conv[@]}") || rc=$?
+  assert_exit 0 "$rc" "podman: a converged stack started by hand exits 0"
+  first="$(grep -m1 '^podman-cwd ' "${T_DOCKER_LOG}" || true)"
+  if [[ "${first}" == "podman-cwd /" ]]; then
+    record 1 "podman: the first podman call runs from /, which the service user can always enter"
+  else
+    record 0 "podman: the first podman call runs from / (got '${first}')"
+  fi
+  if grep -qx "podman-cwd ${tmp}" "${T_DOCKER_LOG}"; then
+    record 0 "podman: no podman call inherits the caller's working directory"
+  else
+    record 1 "podman: no podman call inherits the caller's working directory"
+  fi
+  rm -rf "${tmp}"
+}
+
 scenario_podman_bundle_installs_the_units
 scenario_podman_retired_unit_is_stopped_then_removed
 scenario_podman_first_deploy_fills_an_empty_unit_dir
 scenario_podman_runs_without_a_compose_file
 scenario_docker_still_requires_its_compose_file
+scenario_podman_changed_monitoring_and_acme_units_are_restarted
+scenario_podman_acme_is_part_of_the_stack
+scenario_podman_keystore_checked_where_the_unit_mounts_it
+scenario_podman_missing_mounted_keystore_refuses
+scenario_podman_runs_podman_from_root_dir
 
 echo
 if [[ "$tests_failed" -eq 0 ]]; then

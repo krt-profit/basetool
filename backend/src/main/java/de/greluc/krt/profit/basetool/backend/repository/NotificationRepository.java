@@ -141,9 +141,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
   /**
    * Deletes the complete notification history of one recipient, read and unread alike, as part of
-   * the hard account deletion (REQ-DATA-008). {@code recipient_user_id} is a loose reference with
-   * no foreign key to {@code app_user} (V155 says so explicitly and defers row lifetime to
-   * retention), so nothing cascades.
+   * the hard account deletion (REQ-DATA-008). {@code recipient_user_id} was a loose reference with
+   * no foreign key to {@code app_user} (V155) until V235 added one with {@code ON DELETE CASCADE};
+   * the explicit delete stays so the purge is counted inside the deletion transaction.
    *
    * <p>The stated reason for this method used to be that the retention sweep only ever reaps
    * <em>read</em> rows, so a departed member's unread backlog would otherwise survive forever. That

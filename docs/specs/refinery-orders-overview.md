@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-28.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** REFINERY · **Related ADRs:** none
 
 # Refinery-order overview list
@@ -11,7 +11,7 @@ with a status filter and a "Meine Aufträge" (own-orders) toggle. It used to fet
 set in a single unbounded `size=1000` response and render every row at once. As the order history
 grows this is wasteful and unbounded; this spec pins the page down to a server-side page using the
 shared pagination component, exactly like the blueprint availability overview (REQ-INV-013) and the
-squadron hangar overview.
+unit hangar overview (REQ-HANGAR-001).
 
 ## Requirements
 

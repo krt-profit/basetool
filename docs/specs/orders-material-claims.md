@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0092
 
 # Material claims (Eintragungen) on Spezialkommando orders
@@ -7,9 +7,7 @@
 
 A **material claim** ("Eintragung") records that a profit squadron signs up to deliver a partial
 quantity of one material bucket on a **public Spezialkommando (SK) job order** (Job-Order rework
-
-# 340, Phase 4 / #344). A claim is keyed on the aggregated bucket
-
+#340, Phase 4 / #344). A claim is keyed on the aggregated bucket
 `(job_order, material, qualityRequirement)` so the same flow serves both order kinds (a `MATERIAL`
 order buckets its material lines by `minQuality`, an `ITEM` order sums its per-item material
 requirements per quality). Claims are **signal-only** — they record intent and never move inventory.
@@ -51,6 +49,12 @@ claims are allowed **only on non-terminal SK orders**; a squadron holds **at mos
 bucket** (a repeat post updates its row rather than duplicating, backed by the unique index); only a
 **profit-eligible squadron** may claim; and the claim permission matrix (own-squadron
 logistician/officer, or a logistician/lead of the responsible SK, or an admin) gates every mutation.
+Claims are reconciled inside the transaction that changes the order, deleting through the repository
+so the order's `@Version` is never bumped: an order edit that removes a bucket withdraws the claims on
+it (`withdrawOrphanedClaimsWithinTransaction`), and an SK → squadron reassignment, which makes the
+order private, withdraws all of its claims (`withdrawAllForOrderWithinTransaction`); the count is
+folded into the parent edit's / reassignment's audit event. A direct upsert or withdrawal is audited
+as `JOB_ORDER_CLAIM_UPSERTED` / `JOB_ORDER_CLAIM_WITHDRAWN` (REQ-AUDIT-001).
 
 **Acceptance**
 
@@ -61,12 +65,16 @@ logistician/officer, or a logistician/lead of the responsible SK, or an admin) g
   (last-writer-wins) and collapse to exactly one row — no 500, no overclaim.
 - [ ] A single claim that alone exceeds the bucket's required amount is rejected (HTTP 400).
 - [ ] A claim upsert on one bucket does not block a concurrent claim on an unrelated order.
+- [ ] Removing a bucket from an order withdraws the claims on that bucket; reassigning an SK order to
+  a squadron withdraws all its claims — neither bumps the order's `version`.
 
 **Enforced by:** `MaterialClaimConcurrencyTest`
 (`firstClaimRace_differentSquadrons_neverOverclaims`, `firstClaimRace_sameSquadron_*`),
 `MaterialClaimServiceTest` (overclaim rejection + `UpsertClaimConcurrencyTests`) · **Code:**
-`MaterialClaimService.upsertClaim` / `upsertClaimWithinTransaction`,
-`JobOrderRepository.lockForClaimUpsert` · **Issues:** #344 · **ADR:** ADR-0092
+`MaterialClaimService.upsertClaim` / `upsertClaimWithinTransaction` /
+`withdrawOrphanedClaimsWithinTransaction` / `withdrawAllForOrderWithinTransaction`,
+`JobOrderRepository.lockForClaimUpsert`, `MaterialClaimController`
+(`/api/v1/orders/{jobOrderId}/claims`) · **Issues:** #344 · **ADR:** ADR-0092
 
 ## Out of scope
 

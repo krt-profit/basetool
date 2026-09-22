@@ -1,6 +1,10 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Executed 2026-09-22: production has served from the rootless Podman host since 11:21 UTC and the old host is shut down. Its §2 (the way back) matters only until the old host is decommissioned.
+>
+> **Current truth:** [`deployment.md`](../deployment.md), [arc42 §7](../arc42/07-deployment-view.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md). Index of the archive: [`README.md`](README.md).
+
 # Podman cutover runbook — `ubuntu-8gb-nbg1-1` → `rocky-16gb-nbg1-1`
 
-Doc type: **operational runbook**. The decision is [ADR-0163](adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md);
+Doc type: **operational runbook**. The decision is [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md);
 the analysis, the measured state and the ordering are in
 [`PODMAN_MIGRATION_PLAN.md` §23](PODMAN_MIGRATION_PLAN.md). **This file carries only the steps.**
 
@@ -433,7 +437,7 @@ sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user daemon-reloa
 Both come from the role (`10-packages.yml`) since 2026-09-20; before that neither was on the host
 and `backup.sh` failed its pre-flight with a message naming `apt`, which does not exist on Rocky
 either. `backup.env` is operator-provided: the restic repository, its password, and the rclone
-remote — see [`backup.md` §4](backup.md).
+remote — see [`backup.md` §4](../backup.md).
 
 ```bash
 rpm -q restic rclone
@@ -600,7 +604,7 @@ cancel.
 > [!caution] `iri-restore-drill.service` is NOT the restore path
 > `restore-drill.sh` proves recoverability: it pulls the **latest** snapshot into a **throwaway**
 > Postgres and touches nothing else. Running it here would verify a different snapshot and restore
-> nothing. The real procedure is [`backup.md` → *Restoring (disaster recovery)*](backup.md), and its
+> nothing. The real procedure is [`backup.md` → *Restoring (disaster recovery)*](../backup.md), and its
 > commands are Docker-shaped — the Podman equivalents are below.
 
 ```bash

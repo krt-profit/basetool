@@ -362,7 +362,7 @@ main.oc-page .oc-greeting .oc-edit-toggle {
     color: var(--color-dept-profit);
 }
 
-/* --- multi-Bereich tiers (epic #692, REQ-ORG-018) ---------------------------
+/* --- multi-Bereich tiers (epic #692, REQ-ORG-026) ---------------------------
    The chart stacks several independent ARIA trees: the Organisationsleitung on
    top, one tier per Bereich (tinted by its Bereichsfarbe), then the
    legacy/ungrouped tier. Each tier is a caption + an .oc-tree; subsequent tiers
@@ -393,7 +393,7 @@ main.oc-page .oc-greeting .oc-edit-toggle {
    these classes (oc-dept--<name>), which only sets the --oc-dept custom property
    the tier rules below consume. Used as decorative ACCENTS on borders + a caption
    swatch only (never on text), so every department hue stays well clear of the
-   WCAG 4.5:1 text-contrast floor on the dark canvas (REQ-ORG-018). */
+   WCAG 4.5:1 text-contrast floor on the dark canvas (REQ-ORG-026). */
 .oc-dept--profit {
     --oc-dept: var(--color-dept-profit);
 }

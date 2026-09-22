@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-10
 - **Deciders:** Lucas Greuloch (@greluc)
-- **Related:** epic [#439](https://github.com/krt-profit/basetool/issues/439), [`docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md) §5, [`docs/specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) REQ-REFINERY-001, [ADR-0007](0007-client-side-vlm-screenshot-extraction.md)
+- **Related:** epic [#439](https://github.com/krt-profit/basetool/issues/439), [`docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md) §5, [`docs/specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md) REQ-REFINERY-001, [ADR-0007](0007-client-side-vlm-screenshot-extraction.md)
 
 ## Context
 

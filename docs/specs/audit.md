@@ -1,6 +1,6 @@
-# Activity audit logs — Lager, Aufträge, Raffinerie, Mein Inventar
+# Activity audit logs — the unified admin audit trail
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-08-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 
 Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-BANK-012),
 [`observability.md`](observability.md) (the log-stream PII rule), [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -17,7 +17,7 @@ catalogue + member gradings) and **Materialbörse** (`MaterialExchangeOffer` /
 log; all ten logs (the nine here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
-The eight new areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
+The nine areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
 bank keeps its own `bank_audit_event` table (it has bank-specific reference columns and shipped
 first). The storage choice and the unified-viewer architecture are recorded in
 [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -26,10 +26,12 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-Every state-mutating activity in the eight areas writes exactly **one** row to an **append-only**
-audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated; the
-sole deletion path is the explicit admin retention purge, REQ-AUDIT-004) **in the same transaction
-as the business write**. An audit-insert failure rolls the mutation back, so the trail has **no
+Every state-mutating activity in the nine areas writes exactly **one** row to an **append-only**
+audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated except
+by the Art. 17 handle anonymisation of REQ-SEC-062, which overwrites the name snapshots in place;
+rows are deleted only by the admin purge, REQ-AUDIT-004, and the retention ceiling, REQ-AUDIT-006,
+which share one code path) **in the same transaction as the business write**. An audit-insert
+failure rolls the mutation back, so the trail has **no
 silent gaps**. `AuditService.record` is `@Transactional(propagation = MANDATORY)`, which is what
 makes "same transaction" a guard rather than a convention: a call with no transaction in progress
 throws instead of quietly opening one of its own.
@@ -59,7 +61,7 @@ originating-client label of [REQ-AUDIT-005](#req-audit-005--the-trail-records-wh
 
 Coverage is **complete**, including the cross-area writers and the system/automatic mutations:
 
-- **Lager** — create / edit / note / book-out (consume, transfer, sell — a mission-earmarked `SELL`
+- **Lager** — create / note / book-out (consume, transfer, sell — a mission-earmarked `SELL`
   books the seller-chosen per-mission `INCOME` attributions, REQ-INV-027) / **quantity-split
   assignment** (add / change amount / remove a job-order or mission allocation —
   `INVENTORY_ALLOCATION_ADDED` / `INVENTORY_ALLOCATION_CHANGED` / `INVENTORY_ALLOCATION_REMOVED`,
@@ -78,8 +80,10 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   `INVENTORY_RECEIVED_FROM_PRODUCTION`, REQ-INV-032), the org-unit re-stamp on membership change,
   and the purge of a deleted member's warehouse rows and hangar
   (`INVENTORY_PURGED_ON_USER_DELETION`, REQ-DATA-008 — a summary event carrying the affected-row
-  counts, since the set-based DELETE exposes no per-row ids). The legacy
-  `INVENTORY_OWNER_REASSIGNED` is retained for historical rows but no longer emitted.
+  counts, since the set-based DELETE exposes no per-row ids). Two legacy types are retained for
+  historical rows but no longer emitted: `INVENTORY_OWNER_REASSIGNED` (user deletion now purges
+  instead of reassigning) and `INVENTORY_ITEM_UPDATED` (the whole-row edit endpoint went away with
+  Variante C; an edit is now an allocation, note or rebooking event above).
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
   exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
@@ -88,8 +92,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
-  scheduled UEX method+yield sync (one summary event per run, actor `system`); owner-reassignment on
-  user deletion.
+  scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
+  `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
+  (`REFINERY_ORDERS_REASSIGNED`).
 - **Mein Inventar** — create / update / delete (admin-on-behalf carries the target user); and the
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
   notifications, notification-rule selectors and promotion evaluations — as a single summary event
@@ -183,7 +188,8 @@ Coverage is **complete**, including the cross-area writers and the system/automa
     **length**, the hit count and the truncation flag, and **never the term**: the term is somebody's
     name, and a trail of every name an admin searched for would be a second store of exactly the
     data the search exists to help remove.
-  - `ACCOUNT_DELETION_REQUESTED` / `..._WITHDRAWN` / `..._DECLINED` / `..._EXECUTED` — the four
+  - `ACCOUNT_DELETION_REQUESTED` / `ACCOUNT_DELETION_REQUEST_WITHDRAWN` /
+    `ACCOUNT_DELETION_REQUEST_DECLINED` / `ACCOUNT_DELETION_REQUEST_EXECUTED` — the four
     states of an Art. 17 request. All four carry a `null` subject **label**; the member is identified
     by `actor_user_id` and `target_user_id` only. That is not a style choice: a name in the label
     survived the erasure for the full 24-month retention, because the erasure rewrites
@@ -290,8 +296,9 @@ foreign key on both tables.
 - [ ] Non-admin access to `/api/v1/audit/**` and `/admin/audit-log`: 403; the sidebar link is hidden.
 
 A new event type is only half-wired until the viewer can filter for it: the per-area event-type list
-in `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` and the `admin.audit.event.<TYPE>` label in
-all three message bundles are the two mirror points, and `AdminAuditLogPageControllerTest` pins them
+in `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` and the `admin.audit.event.<TYPE>` label
+(`admin.bank.audit.event.<TYPE>` for the bank trail's `BankAuditEventType`) in all three message
+bundles are the two mirror points, and `AdminAuditLogPageControllerTest` pins them
 by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json` and asserting that
 **every** produced type is offered by one of the ten tabs *and* carries a label.
 
@@ -362,7 +369,7 @@ forwarding (defense-in-depth).
 
 Each log can be **pruned** by an admin: a per-log action deletes that log's entries **older than an
 admin-chosen cutoff** (`occurredAt < before`). It is available **separately for every log**,
-including the bank — the four generic areas via `DELETE /api/v1/audit/{domain}`, the bank via
+including the bank — the nine generic areas via `DELETE /api/v1/audit/{domain}`, the bank via
 `DELETE /api/v1/bank/admin/audit`, both gated to `hasRole('ADMIN')` at the URL matcher (and a
 method-level `@PreAuthorize` on the generic controller). The purge is scoped to the selected log
 only — purging one area never touches another.

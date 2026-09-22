@@ -455,7 +455,7 @@ groups:
           stream: ops-deploy
         annotations:
           summary: "Log stream not being tailed: deploy automation"
-          description: "Alloy is not tailing /hostlog/iri-deploy.log — the deploy narrative behind DeployRolledBack / DeployFailed / DeployHealthRestartFailing is unavailable in Grafana, and recovering it needs an approval-gated SSH session to the production host at the worst possible moment. Check the /var/log mount, that /var/log/iri-deploy.log exists and is 0640 deploy:adm, and that the iri-deploy timer is armed."
+          description: "Alloy is not tailing /hostlog/iri-deploy.log — the deploy narrative behind DeployRolledBack / DeployFailed / DeployHealthRestartFailing is unavailable in Grafana, and recovering it means an SSH session to the production host (a read, so no approval needed, but the wrong triage path) at the worst possible moment. Check the /var/log mount, that /var/log/iri-deploy.log exists and is readable by the adm group (logrotate's copytruncate keeps whatever owner and mode it has), and that the iri-deploy timer is armed."
 
       - alert: LokiWriteFailing
         expr: sum by (reason) (rate(loki_write_dropped_entries_total[15m])) > 0

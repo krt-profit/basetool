@@ -63,7 +63,7 @@ public class LayoutMiscAdvice {
 
   /**
    * Composes the dynamic application title rendered in the {@code <title>} tag and the sidebar
-   * brand logo — the single place the active OrgUnit context surfaces to the user (REQ-ORG-010; the
+   * brand logo — the single place the active OrgUnit context surfaces to the user (REQ-ORG-024; the
    * previously-redundant top-right context chip was removed). Resolution:
    *
    * <ul>

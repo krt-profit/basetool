@@ -243,7 +243,7 @@ public class PersonalBlueprintController {
   /**
    * Returns, for every blueprint the caller owns, whether and how many times it can be crafted from
    * the caller's own "My Inventory" stock — the craftability annotation of the Personal Inventory
-   * blueprint view (#781, REQ-INV-019). Strictly owner-scoped: owned blueprints, stock and refinery
+   * blueprint view (#781, REQ-INV-048). Strictly owner-scoped: owned blueprints, stock and refinery
    * yield all come from the caller. Read-only; RESOURCE ingredients and the PIECE-material-bridged
    * ITEM ingredients (hand-mined gems, ADR-0046) are evaluated, craftable sub-assemblies and
    * unresolved items are not.
@@ -288,7 +288,7 @@ public class PersonalBlueprintController {
   })
   public BlueprintImportPreviewDto previewImport(
       @RequestParam("file") @NotNull MultipartFile file, @CurrentUserId UUID ownerUserId) {
-    // Plain @CurrentUserSub again — ActingMemberFilter has already made the acting member the
+    // Plain @CurrentUserId again — ActingMemberFilter has already made the acting member the
     // security identity when the ingest gateway calls this (ADR-0129).
     return importService.previewImport(ownerUserId, file);
   }

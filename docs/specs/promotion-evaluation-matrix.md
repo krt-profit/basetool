@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-07-17.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
 > **Owner area:** PROMO · **Related ADRs:** ADR-0102 (shared page-walk helper), ADR-0100
 > (no-silent-truncation defect class)
 
@@ -6,7 +6,8 @@
 
 ## Context & goal
 
-The Bewertungsverwaltung (`GET /promotion/manage`, ADMIN or OFFICER) renders the squadron's
+The Bewertungsverwaltung (`GET /promotion/manage`, ADMIN or OFFICER, and only where the caller's
+Staffel has the promotion feature enabled) renders the squadron's
 promotion **evaluation matrix**: one row per evaluatable member, one column per promotion
 category, each cell the member's stored level for that category. Officers filter the matrix
 client-side (member search, "nur Beförderbare", "nur ohne Bewertung") over the fully-rendered
@@ -45,7 +46,7 @@ so it is present on both the full-page render and the in-place matrix re-render 
 optimistic-lock conflict recovery swap, REQ-FE-005), and clears the same way. A backend failure
 keeps the page's established fail-soft-to-empty behaviour (empty matrix, no banner).
 
-The read-only self-view (`/promotion/my-evaluations`) and the public overview
+The read-only self-view (`/promotion/my-evaluations`) and the member-facing overview
 (`/promotion/overview`) are out of scope: they render the caller's own evaluations
 (`evaluations/my`, a bounded per-user list) and the rank-requirement catalogue, neither of which
 is the cross-member matrix this requirement governs.

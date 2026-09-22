@@ -20,9 +20,10 @@ so a contract change has to be made twice. Two gates watch for drift (`FrontendD
 ## 4.2 Put the internet-facing gateway in its own module
 
 **`ingest`** owns no database. It authenticates the desktop extractor, checks the client is an
-approved one, and relays over the internal network to the backend. It exists so that the surface
-an unauthenticated internet can reach is a small module with one job, rather than the module that
-holds every table.
+approved one, relays over the internal network to the backend under its own service identity, and
+stages the returned draft in Redis for a one-time browser pickup — saving happens later, in the
+browser, through the ordinary create path. It exists so that the surface an unauthenticated
+internet can reach is a small module with one job, rather than the module that holds every table.
 
 ## 4.3 Let Keycloak own identity, and centralise authorisation on `@PreAuthorize`
 
@@ -61,9 +62,12 @@ bundle, verifies every signature, and reconciles systemd units — there is no i
 no shell session that "just fixes it".
 
 Since the Podman cutover the containers are **rootless** systemd units owned by an unprivileged
-service user, and three observability components that needed privileges or a container socket were
-moved onto the host instead of being given them. §7 has the detail; the point of strategy is that
-the runtime was allowed to change shape rather than the security posture being bent to preserve it.
+service user. Three observability components that needed privileges or a container socket were
+moved onto the host instead of being given them, and the public ports are bound by a host-level
+haproxy, because a rootless port forwarder cannot pass the client address through (ADR-0187). The
+host itself is provisioned by an Ansible role that deliberately cannot deliver (ADR-0188). §7 has
+the detail; the point of strategy is that the runtime was allowed to change shape rather than the
+security posture being bent to preserve it.
 
 ## 4.7 Where the strategy is written down
 

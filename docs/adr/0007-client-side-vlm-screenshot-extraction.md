@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-10
 - **Deciders:** Lucas Greuloch (@greluc)
-- **Related:** epic [#439](https://github.com/krt-profit/basetool/issues/439), [`docs/REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../REFINERY_SCREENSHOT_IMPORT_PLAN.md), [`docs/specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md), [ADR-0008](0008-refinery-extract-json-contract.md)
+- **Related:** epic [#439](https://github.com/krt-profit/basetool/issues/439), [`docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md`](../archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md), [`docs/specs/refinery-screenshot-import.md`](../specs/refinery-screenshot-import.md), [ADR-0008](0008-refinery-extract-json-contract.md)
 
 ## Context
 

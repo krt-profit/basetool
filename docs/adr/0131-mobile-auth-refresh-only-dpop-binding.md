@@ -1,11 +1,11 @@
 # ADR-0131 — The mobile client binds only its refresh token to DPoP
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest (`scripts/provision-keycloak-mobile-client.py` converges the `krt-mobile-dpop` profile, its policy and the `dpop-refresh-only` marker role).
 - **Date:** 2026-08-17
 - **Related:** spec `REQ-SEC-030` ([`security-and-access.md`](../specs/security-and-access.md)) ·
   `REQ-SEC-012` (refresh-token rotation is off realm-wide) ·
   [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the opposite case) ·
-  [`ANDROID_API_EXPOSURE_PLAN.md`](../ANDROID_API_EXPOSURE_PLAN.md) section 7 · script
+  [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7 · script
   `scripts/provision-keycloak-mobile-client.py`
 
 ## Context

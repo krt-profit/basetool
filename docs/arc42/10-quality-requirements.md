@@ -24,7 +24,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q3 | Two members edit *unrelated sections* of the same aggregate and one gets a 409. | Treated as a defect: per-section counters (§8.4) |
 | Q4 | A member's name, e-mail or a token appears in a log line. | The unconditional logging rule; the Alloy masking gate (`alloy-log-masking` CI job) |
 | Q5 | The nightly backup reports success while its snapshot cannot actually be restored. | `restore-drill.sh` scores **seven** artifacts from the restored snapshot; `RestoreDrillArtifactNotRestorable` |
-| Q6 | A public name's certificate is within 14 days of expiry. | `probe_ssl_earliest_cert_expiry` alert; the certificate *files* nothing serves are covered separately by the expiry textfile collector |
+| Q6 | A public name's certificate is within 14 days of expiry. | `CertificateExpiringSoon` on `probe_ssl_earliest_cert_expiry`; the certificate *files* are covered separately by the `iri-cert-expiry` collector and `CertificateFileExpiringSoon` |
 | Q7 | A deploy applies an image whose signature does not verify. | `deploy.sh` Cosign-verifies every digest *before* pulling; fail-closed |
 | Q8 | A scheduled job silently stops running. | Per-timer `last_success_timestamp` metrics with staleness alerts |
 | Q9 | Keycloak advertises an issuer the applications do not validate, and all three die at start-up. | The `keycloak-issuer` CI gate renders every stack through `docker compose config` and compares them |
@@ -34,22 +34,24 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 
 ## 10.3 What operationalises them
 
-- **182 alert rules** in six groups — `apps`, `business`, `containers-runtime`, `infrastructure`,
-  `meta`, `ops-automation`. The `meta` group is the one that matters most and is easiest to forget:
-  it alerts on the *monitoring itself* being silent, which is the failure mode that makes every
-  other alert useless.
-- **Eight Grafana dashboards** — host, containers, Spring apps, PostgreSQL, Redis, Keycloak,
-  Basetool operations, edge.
+- **182 alert rules** in six rule files — `apps`, `business`, `containers-runtime`,
+  `infrastructure`, `meta`, `ops-automation` — with `promtool` unit tests beside them. The `meta`
+  rules are the ones that matter most and are easiest to forget: they alert on the *monitoring
+  itself* being silent, which is the failure mode that makes every other alert useless.
+- **Thirteen Grafana dashboards** — host, containers, Spring apps, PostgreSQL, Redis, Keycloak,
+  Basetool operations, edge, SSH host authentication, logs and errors, ops automation, meta
+  monitoring, tracing.
 - **A large blackbox probe fleet** — not just liveness: the deny rules, the members-only boundary,
   the public surface, HSTS, forced SSL, internal TLS, IPv6 and DNS (A and AAAA) for both public
   names.
-- **CI gates** that assert things review cannot: ADR numbering, Flyway numbering, image pins,
-  Grafana dashboards, Prometheus rules, log masking, the Keycloak issuer, Quadlet drift, the
-  container runtime, the logging facade, shellcheck, actionlint, hadolint, gitleaks, SBOM coverage
-  and the E2E device matrix.
-- **A conformance suite** (`check-conformance.py`) that asserts invariants against a **running
-  host** rather than against configuration — the recurring defect class here is a configuration
-  that is correct on disk and not in force in the process.
+- **CI gates** that assert things review cannot: ADR numbering and registry, Flyway numbering,
+  monitoring image pins, Grafana dashboards, Prometheus rules, log masking, the Keycloak issuer,
+  Quadlet drift (which also checks the edge's trusted-address pins), the container runtime, the
+  logging facade, PID-1 reaping, probes against the API allow-list, ansible-lint, shellcheck,
+  actionlint, hadolint, gitleaks, SBOM coverage and the E2E device matrix.
+- **A conformance suite** ([`check-conformance.py`](../../scripts/check-conformance.py)) that
+  asserts invariants against a **running host** rather than against configuration — the recurring
+  defect class here is a configuration that is correct on disk and not in force in the process.
 
 ## 10.4 The quality goal with no automated gate
 

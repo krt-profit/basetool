@@ -32,7 +32,7 @@
 # way to reach the host. ADR-0188 puts unit files in the delivery column for
 # exactly this reason. Until 2026-09-18 nothing implemented it: the units were
 # generated, drift-checked in CI, committed -- and went nowhere, while
-# docs/PODMAN_HOST_BOOTSTRAP.md already described this bundle as carrying them.
+# docs/archive/PODMAN_HOST_BOOTSTRAP.md already described this bundle as carrying them.
 #
 # The monitoring compose + config tree (epic #936, ADR-0072) ride the same channel so a promoted
 # release ships updated dashboards/alert rules to the host. They carry NO secrets (every credential

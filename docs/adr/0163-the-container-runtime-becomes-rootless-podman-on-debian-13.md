@@ -2,7 +2,10 @@
 
 - **Status:** **Accepted 2026-09-16**, with choice 1 amended **twice on the same day**. Read
   *The second re-ruling* immediately below; then *The re-ruling* and *The measurement came back
-  negative* for the first one. Choices 2 to 5 were never in question.
+  negative* for the first one. Choices 2 to 5 were never in question. **Implemented:** production
+  was cut over to rootless Podman under Quadlet on the rebuilt Rocky Linux 10 host on 2026-09-22
+  (serving since 11:21 UTC, old host shut down —
+  [`PODMAN_CUTOVER_RUNBOOK.md`](../archive/PODMAN_CUTOVER_RUNBOOK.md)).
 - **Published title:** this ADR shipped as *… rootless Podman on Debian 13 …* and the file name
   keeps that spelling so no link breaks. The decision is **Rocky Linux 10**.
 
@@ -44,7 +47,7 @@ certificate handover, the subuid base, cgroup delegation and ADR-0188's full cha
 [ADR-0162](0162-edge-is-native-nginx-with-a-separate-acme-client.md) ·
 specs `REQ-OPS-002`, `REQ-OPS-003`, `REQ-OPS-004`, `REQ-OPS-013`, `REQ-OPS-014`,
 `REQ-OPS-015`, `REQ-OPS-022`, `REQ-OBS-014`, `REQ-SEC-023` ·
-[`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md)
+[`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md)
 
 ## Context
 
@@ -337,7 +340,7 @@ a single bucket" — and rootlessport is that userland proxy for IPv4 and IPv6 a
 "give the bridge a real subnet" escape.
 
 **This ADR therefore needs a re-ruling by @greluc before any further phase runs.** Four paths, set
-out with their costs in [`PODMAN_MIGRATION_PLAN.md` §7](../PODMAN_MIGRATION_PLAN.md): (A) Podman 6.x
+out with their costs in [`PODMAN_MIGRATION_PLAN.md` §7](../archive/PODMAN_MIGRATION_PLAN.md): (A) Podman 6.x
 from a source newer than Debian 13 stable, dropping choice 2; (B) the edge in the host network
 namespace, trading five segments for a correct source address; (C) the hybrid with a rootful edge
 this ADR rejected, which is worth re-reading now; (D) stay on Docker, which is what this ADR's own
@@ -409,7 +412,14 @@ per week and two were used on 2026-09-12.
 **Accepted** on 2026-09-16 by @greluc, with choice 1 amended to CentOS Stream 10 and then, the
 same day, to **Rocky Linux 10** once [ADR-0187](0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md)
 removed the need for Podman 6. The plan it
-governs is [`PODMAN_MIGRATION_PLAN.md`](../PODMAN_MIGRATION_PLAN.md); no host
+governs is [`PODMAN_MIGRATION_PLAN.md`](../archive/PODMAN_MIGRATION_PLAN.md); no host
 has been touched. The phases were sequenced so that the measurements which could reject this ADR came
 first and cost nothing but time — and that is what happened: §3.1 was answered from vendor
 documentation on 2026-09-16, before a host was built, and it rejected the platform as specified.
+
+> **Note (2026-09-22):** "no host has been touched" was true on 2026-09-16 and is not any more. The
+> hosts were built by the Ansible role (ADR-0188), the units are generated from the compose files by
+> `scripts/generate-quadlet.py` into `quadlet/`, and production cut over on 2026-09-22 — see the
+> Status line and [`PODMAN_CUTOVER_RUNBOOK.md`](../archive/PODMAN_CUTOVER_RUNBOOK.md). The current
+> runtime is described in [`deployment.md`](../deployment.md) and
+> [arc42 §7](../arc42/07-deployment-view.md).

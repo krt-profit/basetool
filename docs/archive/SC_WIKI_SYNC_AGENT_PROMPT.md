@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical plan — frozen, kept as a record and no longer updated. The implementation briefing for the SC Wiki sync, which has shipped.
+>
+> **Current truth:** the header of [`SC_WIKI_SYNC_PLAN.md`](SC_WIKI_SYNC_PLAN.md). Index of the archive: [`README.md`](README.md).
+
 # Agent Prompt — SC Wiki + UEX-Items Sync Implementation
 
 Doc type: **historical plan** — the briefing handed to the agent that implemented
@@ -12,7 +16,7 @@ plan it briefs has shipped, and the deviations from it are listed in that docume
 >
 >> stays; the new `sourceSystems` enum coexists", and §9 still pencils the destructive cleanup in as
 >> "V116". Neither holds any more. R9's cleanup landed on **2026-06-01** (#281):
->> [`V125__drop_legacy_material_and_ship_type_columns.sql`](../backend/src/main/resources/db/migration/V125__drop_legacy_material_and_ship_type_columns.sql)
+>> [`V125__drop_legacy_material_and_ship_type_columns.sql`](../../backend/src/main/resources/db/migration/V125__drop_legacy_material_and_ship_type_columns.sql)
 >> dropped `material.is_manual_entry` and `ship_type.description`, and the JPA fields
 >> `Material.isManualEntry` / `ShipType.description` were removed in the same change. (§2.1's other
 >> caveat — "R9 cleanup may have landed by then" — is about the *Spezialkommando* R9 chain V100–V105
@@ -119,20 +123,20 @@ reviewers see the context next to the code.
   `git rev-parse --show-toplevel` and `git worktree list`). Treat `main` as
   the integration branch you'll target with the PR.
 - **Existing UEX integration** to mirror:
-  - [`UexClient.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/integration/UexClient.java)
+  - `UexClient.java`
     — WebClient with ETag + 16 MB buffer + 30 s timeout, fail-soft `List<>`
     returns. Read this file *first* before writing `ScWikiClient`.
-  - [`UexProperties.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/config/UexProperties.java)
+  - `UexProperties.java`
     — `@ConfigurationProperties("krt.uex")` with `@Validated` constraints.
     Mirror exactly for `ScWikiProperties`.
-  - [`UexScheduler.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UexScheduler.java)
+  - `UexScheduler.java`
     — `@Async("uexExecutor")` + `@Scheduled(fixedDelayString=...)`,
     per-service exception swallow.
-  - [`UexCommodityService.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UexCommodityService.java)
+  - `UexCommodityService.java`
     — the upsert + orphan-handling pattern. Mirror its `findByIdCommodity` →
     `findByName` fallback chain, and the `clearStalePrices(seenIds)`
     orphan-mark gated on non-empty seen set.
-  - [`UexVehicleService.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/service/UexVehicleService.java)
+  - `UexVehicleService.java`
     — currently name-only match. Plan §8.5 hardens it to UUID-first; that's a
     **R2** concern, not R1.
 - **Migration directory**: `backend/src/main/resources/db/migration/`. The
@@ -140,11 +144,11 @@ reviewers see the context next to the code.
   `ls backend/src/main/resources/db/migration/ | sort -V | tail -5` before
   committing — R9 cleanup may have landed by then).
 - **Material entity**:
-  [`Material.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/Material.java)
+  `Material.java`
   — already 28 columns. R1 adds nine more (see plan §6.1). The existing
   `isManualEntry` field stays; the new `sourceSystems` enum coexists.
 - **Manufacturer entity**:
-  [`Manufacturer.java`](backend/src/main/java/de/greluc/krt/iri/basetool/backend/model/Manufacturer.java)
+  `Manufacturer.java`
   — already 7 fields. R1 adds `uex_company_id` + `scwiki_uuid` + 6 more.
 
 ---
@@ -173,7 +177,7 @@ For each migration, write a `V<n>Test` integration test under
 `backend/src/test/.../migration/` that uses the existing TestContainers
 config to apply migrations in sequence and asserts the schema delta. Don't
 use any test stack with production credentials —
-[CLAUDE.md](CLAUDE.md#testing) is explicit: `.env.test` and the
+[CLAUDE.md](../../CLAUDE.md#testing) is explicit: `.env.test` and the
 isolated `docker-compose.test.yml` stack only.
 
 ### 3.2 New `integration/scwiki` package
@@ -216,7 +220,7 @@ isolated `docker-compose.test.yml` stack only.
 ### 3.4 ArchUnit rule
 
 Add to
-[`ArchitectureTest.java`](backend/src/test/java/de/greluc/krt/iri/basetool/backend/ArchitectureTest.java):
+`ArchitectureTest.java`:
 
 > *Any class in `integration.scwiki` must inject `ScWikiClient`.*
 

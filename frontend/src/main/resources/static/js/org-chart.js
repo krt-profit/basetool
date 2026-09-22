@@ -593,7 +593,7 @@ const ORG_CHART_UNITS_SECTION = 'units';
     // .oc-tree elements, so the roving-tabindex init + the keydown listeners must re-bind on the
     // fresh elements (the listeners lived on the now-discarded trees). The chart now holds MULTIPLE
     // independent ARIA trees — the Organisationsleitung, one per Bereich, and the legacy/ungrouped
-    // tier (epic #692 / REQ-ORG-018) — so each is initialised separately: every tree keeps its own
+    // tier (epic #692 / REQ-ORG-026) — so each is initialised separately: every tree keeps its own
     // roving tabindex (exactly one tabbable item per tree) and its own keydown listener. chart is
     // the stable swap container that survives the swap.
     function initOneTree(tree) {

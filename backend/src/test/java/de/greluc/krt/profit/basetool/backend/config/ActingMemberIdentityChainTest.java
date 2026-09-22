@@ -242,11 +242,12 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * The second bound endpoint carries the identity too — and it binds {@code @CurrentUserSub}.
+   * The second bound endpoint carries the identity too.
    *
-   * <p>ADR-0129 bounds the header to two endpoints, and the test above covers only the
-   * {@code @CurrentUserId} one. They take different branches of the argument resolver, so proving
-   * one proves the shared lookup but not the String-typed binding a reviewer would have to take on
+   * <p>ADR-0129 bounds the header to two endpoints, and the tests above cover only the refinery
+   * one. Both bind {@code @CurrentUserId} now — the String-typed {@code @CurrentUserSub} twin they
+   * once split across was removed by #1640 — so this pins the second endpoint, reached through a
+   * multipart request on a different controller, rather than leaving it for a reviewer to take on
    * trust. The subject reaching the service is the member's, not the gateway's.
    */
   @Test

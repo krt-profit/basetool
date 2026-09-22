@@ -210,7 +210,7 @@ concurrent) on both apps so a socket surge can never hit "too many open files".
   bounds.
 - **The backend joins a Redis network for the first time** — compose topology changes, which
   makes this release's deployment a manual, runbook-driven one
-  (`docs/LIVESYNC_ROLLOUT_RUNBOOK.md`: clean `down` + redeploy because the in-place `up`
+  (`docs/archive/LIVESYNC_ROLLOUT_RUNBOOK.md`: clean `down` + redeploy because the in-place `up`
   strands containers on network changes, plus an ACL pre-check that the `default` user's
   explicit `users.acl` entry retains `&*` channel permissions for the two channels).
 - **Every deferral recorded here has since been discharged.** Presence dots were per-instance at

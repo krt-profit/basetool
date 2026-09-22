@@ -12,6 +12,21 @@ name: CodeQL
 #   - javascript-typescript -> frontend's own JS under
 #                        `frontend/src/main/resources/static/js/` (vendor
 #                        bundles excluded via the inline config below).
+#   - actions          -> the workflows themselves (template injection,
+#                        over-broad permissions).
+#   - python           -> the CI and ops scripts under `.github/scripts/` and
+#                        `scripts/`, some of which run with write tokens.
+#
+# Advanced setup, not GitHub's default setup (2026-09-22). This file was
+# switched off on 2026-05-20 and the repository ran default setup instead, so
+# none of the settings below were in effect: not `security-extended`, not the
+# `java/log-injection` filter, not the `paths-ignore`, and not
+# `dependency-caching: false` - whose absence let default setup's ~1.2 GB
+# per-run dependency caches evict the NVD and Playwright caches again. The two
+# cannot run side by side: GitHub rejects this workflow's uploads while default
+# setup is configured, so default setup is switched off in the repository's
+# code-security settings. The four languages above are the four default setup
+# covered, so the switch loses no coverage.
 #
 # Trigger model:
 #   - push to main     -> establishes the baseline so PRs can diff against it.
@@ -63,6 +78,8 @@ jobs:
           - language: java-kotlin
             build-mode: manual
           - language: javascript-typescript
+            build-mode: none
+          - language: python
             build-mode: none
 
     steps:

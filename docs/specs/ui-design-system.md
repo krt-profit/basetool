@@ -1,5 +1,16 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** UI · **Related ADRs:** none yet · **Visual source of truth:** the design
+> **Owner area:** UI · **Related ADRs:**
+> [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
+> [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
+> [0120](../adr/0120-per-browser-filter-selection-persistence.md) (REQ-UI-017) ·
+> [0164](../adr/0164-an-installable-web-app-without-a-service-worker.md) and
+> [0166](../adr/0166-identity-moves-onto-the-app-origin.md) (REQ-UI-020) ·
+> [0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md),
+> [0176](../adr/0176-layout-floors-are-defaults-that-controls-opt-out-of.md) and
+> [0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md) (REQ-UI-009) ·
+> [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
+> [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
+> **Next free id:** `REQ-UI-023` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -31,7 +42,8 @@ components in `krt-components.css`.
 - [ ] No hard-coded colour/font/spacing values that duplicate an existing token.
 - [ ] New components reuse the skill's component CSS rather than re-styling from scratch.
 
-**Enforced by:** design review + web-asset linting (Stylelint / ESLint / HTMLHint).
+**Enforced by:** design review. The web-asset linters (`:frontend:lintCss` / `lintJs` /
+`lintHtml`) gate syntax and style only; no rule checks that a value uses a token.
 
 ### REQ-UI-002 — Brand colour & logo
 
@@ -91,18 +103,17 @@ values exactly:
 | Profit                                | `--color-dept-profit`             | `#239E33` |
 | Search and Rescue                     | `--color-dept-search-rescue`      | `#FFD23F` |
 
-> **Deprecated aliases — do not use as names.** The shipped `styles.css` historically
-> mis-named these (it called `#A3000A` "combat", `#355DDC` "sub-radar", `#37BBC0`
-> "research"). Those survive only as deprecated CSS aliases (`--color-dept-combat`,
-> `--color-dept-research`, `--color-dept-marine`) so old code resolves; always use the
-> official names above. *(This corrects the inverted mapping that previously lived in
-> `CLAUDE.md`.)*
+> **Deprecated aliases — do not use as names.** Three earlier code names survive only as CSS
+> aliases so old code resolves: `--color-dept-combat` → Raumüberlegenheit, `--color-dept-research`
+> → Forschung, `--color-dept-marine` → Marinekorps (`styles.css` `:root`). Always use the official
+> names above; the last remaining consumer is `operation-detail.html`'s inline
+> `--color-dept-marine`.
 
 **Acceptance**
 
 - [ ] Department tags/badges use the official token names with the exact hex values.
 
-> **Amended by epic #692 (REQ-ORG-018):** these frozen Bereichsfarben are also applied to **org-chart
+> **Amended by epic #692 (REQ-ORG-026):** these frozen Bereichsfarben are also applied to **org-chart
 > nodes**, tinting each Bereich's sub-tree with its colour. This applies the existing tokens (no new
 > hues); node text must keep ≥ 4.5:1 contrast (use the accessible `--color-*-text` tints where the hue
 > would become small text).
@@ -157,7 +168,8 @@ The shared `krtFetch` mutation layer (REQ-FE-001..005,
 optimistic-lock outcome through the KRT toast/confirm infrastructure precisely so this rule holds
 app-wide; new AJAX call sites inherit it for free.
 
-**Enforced by:** code/design review + ESLint (mechanical grep-able rule).
+**Enforced by:** code/design review only. The rule is grep-able, but ESLint's `no-alert` is **not**
+enabled in `frontend/eslint.config.mjs` (checked 2026-09-22) — see Open questions.
 
 ### REQ-UI-013 — Canonical modal shell + one close convention (S12, #918; one shape, #1891)
 
@@ -184,8 +196,9 @@ modals and migrations use it rather than hand-copying the shell; the bespoke bod
 through the `body` fragment expression (`~{::selector}`) so rendering stays identical, and
 `variant` appends a `.krt-modal--*` class (e.g. `krt-modal--wide`, `krt-modal--danger`). Modals open
 with `data-trigger="open-modal-display"` and **close with the single standardized trigger
-`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js) — the former
-`data-modal-dismiss` convention is being migrated onto it. The overlay's hidden default comes from
+`data-trigger="close-modal-display"` + `data-modal-id`** (common-handlers.js). The older
+`data-modal-dismiss` convention is being migrated onto it and survives only on the
+`mission-detail.html` dialogs (handled in `mission-detail.js`); new dialogs never use it. The overlay's hidden default comes from
 the **global** `.krt-modal-overlay { display:none }` in `styles.css` (loaded on every page;
 `bank.css` duplicates it as defense-in-depth), so the fragment injects no inline style. A modal is
 made visible by adding the `krtm-modal-open` class (`display:flex`, in `inline-migration.css` which
@@ -311,7 +324,9 @@ out-specify the page-level `.form-row > .form-group` floor, which is declared la
   column gap and the container padding — verified by measurement at several desktop widths, since
   whether a column falls below the floor depends on how many items the row keeps per line.
 
-**Enforced by:** per-screen render MvcTest (shell + single-projection assertion) + e2e smoke.
+**Enforced by:** `SingleModalShapeTest` (one shape, one frame per overlay, submit buttons inside
+their form — text-level, runs in `check`) · per-screen render MvcTests (shell + single-projection
+assertion, e.g. `AdminAuditLogModalRenderMvcTest`, `AdminBankWipeModalRenderMvcTest`) · e2e smoke.
 The fits-the-column rule is guarded by `MissionDatetimeSplitLayoutE2eTest`, which measures the
 rendered rectangles of every date/time part against its own column on both mission surfaces, at
 each of 1280 / 1440 / 1600 / 1800px. Two properties of that test are load-bearing. It compares
@@ -333,7 +348,7 @@ Every layout change and new component works on **four** classes:
 
 **Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
 and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
-(REQ-UI-010) — carry a **32px** minimum hit area on **every** device class, touch classes
+(REQ-UI-022) — carry a **32px** minimum hit area on **every** device class, touch classes
 included, rather than the 44px floor above. Density in those clusters is what keeps a wide
 Lager / bank / mission table readable, and the design system specifies exactly that: `.btn-xs`
 at 32px in `krt-components.css`, `.btn-icon` in its README as the icon-only row action that
@@ -350,7 +365,7 @@ been rendering full-size.
 
 **The header is compact on the Smartphone class** (owner decision 2026-09-13). It measured 76px on
 a 375px screen — 16px padding plus 60px of content — and the 60px came from the wordmark wrapping to
-two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-010) and
+two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-024) and
 „Profit Basetool – Alle Staffeln" is simply longer than a phone is wide. The phone class therefore
 renders the mark at 32px and the wordmark on one line with an ellipsis, for roughly 48px. It stays
 **sticky**: menu, mark and bell remain reachable without scrolling, which is why this was chosen
@@ -366,16 +381,17 @@ the class with the least room and the one the app now ships to as its mobile cli
 
 The mechanism is `position: static` inside the `width <= 768px` block, and one consequence is not
 optional: **`--krt-footer-height` means "how much of the viewport bottom is covered", not "how tall
-the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because eight
-places read that property — `main`'s reserve, the Materialbörse / Materialien-Übersicht / Beförderung
-`max-height` calcs, the org-chart proxy scrollbar's `bottom`, and the mission- and operation-detail
-paddings — and every one of them would otherwise reserve space for a footer that is not there.
+the footer is".** `sidebar.js` publishes `0` whenever the footer is not `fixed`, because every
+reader of that property — `main`'s reserve, the shared `--krt-panel-viewport-rest` that caps the
+Materialbörse / Materialien-Übersicht / Gewinnberechnung / Beförderung panels, the org-chart proxy
+scrollbar's `bottom`, the mission-detail action bar's `bottom`, and the mission- and
+operation-detail paddings — would otherwise reserve space for a footer that is not there.
 
 **Two amendments to the dense-action exception, owner-approved 2026-09-13** after the first
 measured sweep of the touch classes found both:
 
 - **`.btn-xs2` is NOT exempt.** It is a page-local 32px variant declared in an inline `<style>` by
-  `mission-detail.html` and `operation-detail.html` (21 uses), and two of its instances are *form*
+  `mission-detail.html` and `operation-detail.html`, and two of its instances are *form*
   actions — „Ziel hinzufügen", „Schritt hinzufügen" on the Einsatz create form. The rule above is
   explicit that a form button keeps the floor, so the whole variant is raised to 44px on the touch
   classes and keeps its density on desktop. The override is written `.btn.btn-xs2` because the
@@ -451,9 +467,15 @@ and no stylesheet had ever declared:
 
 Three rules remain written out per control in the touch block, and each states a decision rather than
 filling a gap: `.btn.btn-xs2` and `input.item-checkbox` must out-specify a page-local `<style>` rule
-that the browser reads after `styles.css`, and the dismiss-button group keeps an explicit
-`min-height` because `.close-modal` is a `<span>` in three `admin/mission-data.html` dialogs, which
-no element selector reaches.
+that the browser reads after `styles.css`, and the dismiss-button group (`.close-sidebar-btn`,
+`.krt-modal-close`) declares its square and its centring. *(2026-09-22: that group used to exist
+because `.close-modal` was a `<span>` no element selector reaches; the span went with the legacy
+dialog shapes in #1891, and the explicit `min-height` is kept only because it is harmless.)*
+
+Declared `--touch-target-dense` consumers today: `.btn.btn-xs`, `.btn-icon` (`styles.css`),
+`input.item-checkbox` (touch block), `.master-row` and `.krt-bp-imp-suggestion`
+(`personal-inventory.css`), `.matrix-flag`, `.bank-row-toggle` and `.bank-chart-range-btn`
+(`bank.css`), and `.pa-sort-controls .pa-sort-btn` (`promotion-admin.css`).
 
 The same inversion applies to **which rows wrap on the phone class**: a row that directly contains a
 control or a link wraps, matched structurally with `:has()` rather than by class name. Enumeration
@@ -464,9 +486,9 @@ was hopeless there for an additional reason — many rows carry a generated clas
 
 - [ ] Verified at all four breakpoints; interactive targets have an **effective hit area** (own box,
   a positioned `::before` / `::after` overlay, or the `<label>` that activates them) ≥ 44px on touch
-  classes, except the dense in-row controls `.btn-xs` / `.btn-icon` / `.master-row` /
-  `.item-checkbox` / `.matrix-flag` / `.bank-row-toggle`, which are ≥ `--touch-target-dense` (32px)
-  on every class. That list is a reader's summary, not the mechanism: the stylesheet's
+  classes, except the dense in-row controls listed above (`.btn-xs`, `.btn-icon`, `.master-row`,
+  `.item-checkbox`, `.matrix-flag`, `.bank-row-toggle`, `.pa-sort-btn`, …), which are ≥
+  `--touch-target-dense` (32px) on every class. That list is a reader's summary, not the mechanism: the stylesheet's
   `--touch-target-dense` consumers are the source of truth, and the guard derives the set from them.
 - [ ] **A new control needs no edit to be compliant.** The floor is a zero-specificity default, so a
   control added with no size rule of its own already meets it; being absent from a list must never
@@ -505,15 +527,18 @@ was hopeless there for an additional reason — many rows carry a generated clas
 - [ ] On ≤768px the footer is `static` and `--krt-footer-height` is `0px`; above it the footer is
   `fixed` and `main`'s `padding-bottom` covers its measured height.
 
-**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per list and every modal on the page — all three shapes, the canonical `.krt-modal-overlay` shell and the legacy `.modal` / `.modal-overlay` ones, 96 roots in all: page-level overflow, cut-off elements, unscrollable tables, control floors,
-footer behaviour, chrome share — with a full-page screenshot per page and class) ·
+**Enforced by:** [ADR-0172](../adr/0172-the-phone-class-gets-its-own-layout-contract.md) · `TouchClassLayoutE2eTest` (all five device classes — 375×812, 810×1080, 1024×768, 1280×800, 1600×900 — over the page routes of the shared `FrontendPageRoutes.PAGES` catalogue, plus a real detail view per
+list and every modal on the page — 96 `.krt-modal-overlay` roots, the one shape `MODAL_SHAPES` holds
+since ADR-0177: page-level overflow, cut-off elements, unscrollable tables, control floors, footer
+behaviour, chrome share — with a full-page screenshot per page and class) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
 in `check`, not in the stack-bound `e2e` suite) + code/design
 review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
 `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
-`static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/js/sidebar.js`
+`static/css/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personal-inventory.css`
+(`.master-row`), `static/css/promotion-admin.css` (`.pa-sort-btn`), `static/js/sidebar.js`
 (`--krt-footer-height`).
 
 > **Until 2026-09-13 the two touch classes had no automated coverage at all** — this requirement
@@ -527,29 +552,19 @@ review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
 > out of the floor with it.
 >
 > **Corrected 2026-09-13: "every modal on the page" was true of one shape out of three.** The sweep
-> selected `.krt-modal-overlay` only — 42 roots — while the template tree also carries two legacy
-> shapes that predate the canonical shell: `.modal` / `.modal-content` (47) and its promotion-admin
-> sister `.modal-overlay` / `.modal-box` (7). **54 of the 96 modal roots went unmeasured**, eight of
-> them in `orders-detail.html` alone, and a comment in the guard called 42 "the full set". None of
-> that markup is dead — all 54 roots are reachable from a trigger or a script — so the sweep was
-> widened rather than the markup deleted.
+> selected `.krt-modal-overlay` only — 42 roots — while 54 more lived in the two legacy shapes, so the
+> sweep was widened to all 96. The selector is declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`)
+> and used at all four sites that have to agree — the count, the probe's measurement loop, and the
+> un-hide and restore around the screenshot — because a modal the probe measures but the un-hide
+> never reveals is still `display: none`, returns 0×0 rects and is silently skipped.
 >
-> The selector is now declared once (`TouchClassLayoutE2eTest.MODAL_SHAPES`) and used at all four
-> sites that have to agree — the count, the probe's measurement loop, and the un-hide and restore
-> around the screenshot — because **widening one alone buys nothing**: a modal the probe measures
-> but the un-hide never reveals is still `display: none`, every rect it returns is 0×0, and every
-> zero-rect guard skips it. The change would look harmless and cost the same time.
->
-> Revealing is per shape, and that is the part worth remembering: an inline `display: flex` outranks
-> every class and opens the two display-toggled families, but `.modal-overlay` takes its **centring**
-> from `.active` alone — so display by itself would have measured a stretched, left-aligned dialog
-> that no user is ever shown. A tool that reveals hidden markup has to reproduce what the markup's
-> own JS does, not merely make the box visible.
->
-> Nothing detects a **fourth** shape. `MODAL_SHAPES` is hand-maintained exactly like the guard's
-> `PAGES` list, and it failed the same way that list did.
+> *Updated 2026-09-22:* #1891 (ADR-0177) then ported all 54 onto the canonical shell and deleted both
+> legacy shapes, so `MODAL_SHAPES` now holds one entry. A **new** shape is detected at `check` time
+> by `SingleModalShapeTest` (REQ-UI-013), not by this hand-maintained list.
 
-### REQ-UI-010 — Standard action-button icons
+### REQ-UI-022 — Standard action-button icons
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-UI-010` until 2026-09-22; that id also named the per-user category grouping toggle on the trade pages in [`materials-overview-grouping.md`](materials-overview-grouping.md), which keeps it.
 
 The recurring CRUD actions use one fixed glyph from the in-house sprite (`fragments/icons.html`
 in the app, `ui_kits/basetool/icons.jsx` in the design system): **delete / remove →
@@ -760,7 +775,7 @@ band already is. The band therefore shows **three** coupled elements, not two.
 > as a substitute, so the overlap is CIG's. Dropping the §2b line would satisfy the Agreement and
 > the Guidelines only in substance — a low-risk deviation, but a deviation, and this requirement is
 > amended first if it is ever taken. The Android app records the same finding in its
-> `REQ-APP-SET-007`.
+> `REQ-APP-SET-007` (`docs/specs/settings.md` in the `basetool-android` repository).
 
 Section 2b accepts three placements on a website — the home page, an always-visible navigation
 area, or both. The Basetool uses the **home page**: the band renders at the end of `index.html`'s
@@ -837,14 +852,14 @@ the subject.
 
 Binding placement:
 
-|                                    Surface                                    |                               Asset                               |
-|-------------------------------------------------------------------------------|-------------------------------------------------------------------|
-| Page header brand link (all templates)                                        | `logos/basetool-logo.svg`                                         |
-| Browser tab                                                                   | `logos/basetool-favicon.svg` + `-32.png` + `-16.png`              |
-| iOS home screen / pinned site                                                 | `logos/basetool-appicon-512.png`                                  |
-| Keycloak login theme                                                          | `img/basetool-logo.svg`                                           |
-| Generated PDF exports (handover protocol, bank statement, three-month report) | `krt.png` / `krt.svg` — **org mark**, unchanged                   |
-| Fan Kit compliance band                                                       | `made-by-the-community.png` — CIG artwork, untouched (REQ-UI-018) |
+|                                    Surface                                    |                                  Asset                                   |
+|-------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| Page header brand link (all templates)                                        | `logos/basetool-logo.svg`                                                |
+| Browser tab                                                                   | `logos/basetool-favicon.svg` + `-32.png` + `-16.png`                     |
+| iOS home screen / pinned site                                                 | `logos/basetool-appicon-512.png`                                         |
+| Keycloak login theme                                                          | `img/basetool-logo.svg`                                                  |
+| Generated PDF exports (handover protocol, bank statement, three-month report) | `krt.png` / `krt.svg` — **org mark**, unchanged                          |
+| Fan Kit compliance band                                                       | `images/made-by-the-community.png` — CIG artwork, untouched (REQ-UI-018) |
 
 Binding details:
 
@@ -972,7 +987,8 @@ Binding details:
 stylesheet colour pin), `SecurityConfigStaticAssetPermitAllTest` (the no-redirect contract),
 `AnonymousSurfaceSweepMvcTest` (the REQ-SEC-052 registry) · **Code:** `WebAppManifestController`,
 `fragments/head.html`, `SecurityConfig`, `RequestLoggingFilter`, `pwa.*` in the three message
-bundles, `monitoring/blackbox/blackbox.yml` + `prometheus.yml` + `alerts/infrastructure.yml` ·
+bundles, `monitoring/blackbox/blackbox.yml` + `monitoring/prometheus/prometheus.yml` +
+`monitoring/prometheus/alerts/infrastructure.yml` ·
 **Related:** REQ-UI-019 (the icon family), REQ-SEC-031 (`no-store`), REQ-SEC-052 (the public-path
 table), REQ-OBS-012 (the edge posture probes).
 
@@ -1026,7 +1042,7 @@ desktop SC Extractor's GUI design lives in
 
 **Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
 cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
-[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-001 / REQ-INV-002) — not here.
+[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-042 / REQ-INV-043) — not here.
 This spec still governs how those fields *look*.
 
 ## Open questions

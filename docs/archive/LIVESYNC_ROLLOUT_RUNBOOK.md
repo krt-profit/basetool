@@ -1,13 +1,17 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Executed; epic #1102 closed on 2026-07-11. The one-time Compose network change it drove (`net-redis-backend`) exists today as a Quadlet network.
+>
+> **Current truth:** [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md), REQ-FE-015 in [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md). Index of the archive: [`README.md`](README.md).
+
 # Live-Sync Rollout Runbook
 
 **Doc type:** operator runbook (living). This is the single, execution-ordered document an operator
 follows to roll the tool-wide live multi-user sync (epic #1102) onto the single-host production Docker
 deployment. Everything you need is here — you should not have to open another document to execute it.
 
-> README's live-sync line points here (see [`README.md`](../README.md)). Requirements: REQ-FE-015 and [ADR-0094](adr/0094-tool-wide-topic-room-live-sync-relay.md). The Redis fan-out infra lands in the self-contained commit `5e648cf4` ("fan the SSE push across replicas via Redis pub/sub").
+> README's live-sync line points here (see [`README.md`](../../README.md)). Requirements: REQ-FE-015 and [ADR-0094](../adr/0094-tool-wide-topic-room-live-sync-relay.md). The Redis fan-out infra lands in the self-contained commit `5e648cf4` ("fan the SSE push across replicas via Redis pub/sub").
 
 Epic #1102 (closes #1115, #1120). Compose project: the app stack (`--profile prod`,
-[`docker-compose.yml`](../docker-compose.yml)).
+[`docker-compose.yml`](../../docker-compose.yml)).
 
 ---
 

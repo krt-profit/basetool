@@ -1,6 +1,6 @@
 # ADR-0181 — Self-service deletion is a request an admin executes, and the admin's click does both halves
 
-- **Status:** Proposed
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since 2026-09-17 (`f8b6c19ae`, PR #1920: `DeletionRequest`, `DeletionRequestController`, `AdminDeletionRequestController`).
 - **Date:** 2026-09-15
 - **Deciders:** @greluc (decisions 5 and 6, plus the execution mechanics on 2026-09-15)
 - **Related:** specs `REQ-SEC-061` (new) · `REQ-SEC-062` (new, the history wish) ·

@@ -1,3 +1,7 @@
+> **Archived 2026-09-22.** Doc type: Historical runbook — frozen, kept as a record and no longer updated. Phases A–G were executed on 2026-08-21 and phases H–Y by 2026-09-09, all on the retired Docker/NPM host; its NPM-era procedure no longer applies. Its allow-list block is a historical copy: the authoritative list has been [`docker/edge/include/api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf) since 2026-09-12, and `ExternalContractTest` and `check_probe_against_allowlist.py` read that file, not this one. The per-phase notes below remain the record of *why* each family was admitted.
+>
+> **Current truth:** [`api-allowlist.conf`](../../docker/edge/include/api-allowlist.conf), [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md), REQ-SEC-037 in [`security-and-access.md`](../specs/security-and-access.md), [`deployment.md`](../deployment.md). Index of the archive: [`README.md`](README.md).
+
 > **Doc type:** Living spec — the operator procedure for exposing `/api/v1` on its own public
 > vhost. Last reviewed: 2026-08-21.
 > **Status: phases A–G were executed on 2026-08-21** (D3/D4/D5). The vhost is live and the
@@ -5,10 +9,10 @@
 > from outside the network. The procedure below stays as written — it is what a rebuild, a host
 > move or a second environment repeats, and phase F's "merging is not enabling" warning applies
 > again every time the monitoring config changes.
-> **Owner area:** OPS · **Related:** [ADR-0135](adr/0135-public-api-vhost-not-a-gateway.md),
+> **Owner area:** OPS · **Related:** [ADR-0135](../adr/0135-public-api-vhost-not-a-gateway.md),
 > [`ANDROID_API_EXPOSURE_PLAN.md`](ANDROID_API_EXPOSURE_PLAN.md) items **D3/D4/D5**,
 > [`MONITORING_ROLLOUT_RUNBOOK.md` Appendix C](MONITORING_ROLLOUT_RUNBOOK.md),
-> [`deployment.md`](deployment.md), specs `REQ-SEC-011`, `REQ-SEC-030`…`REQ-SEC-033`,
+> [`deployment.md`](../deployment.md), specs `REQ-SEC-011`, `REQ-SEC-030`…`REQ-SEC-033`,
 > `REQ-OBS-012`, `REQ-OBS-018`
 
 # API vhost rollout runbook (`api.profit-base.online`)
@@ -1187,9 +1191,11 @@ the table says 200** means the backend's rule moved under the vhost, which is wo
 
 5. A path that is no longer consumed comes back **out** on the same terms.
 
-The edge per-IP rate limiter needs no entry here: `docker/maintenance/nginx/server_proxy.conf` is
-included into **every** proxy host's server block, so the 20 r/s (burst 80) safety net of
-REQ-SEC-023 already applies to this host, keyed per IPv4 address and per IPv6 `/64`.
+The edge per-IP rate limiter needs no entry here: `docker/edge/include/limits.conf` is included
+into **every** vhost, so the 20 r/s (burst 80) safety net of REQ-SEC-023 already applies to this
+host, keyed per IPv4 address and per IPv6 `/64`. (Written against NPM, where the same values lived
+in `docker/maintenance/nginx/server_proxy.conf`; that snippet was deleted on 2026-09-22, ten days
+after the native edge replaced NPM and stopped reading it.)
 
 ### D.4 The Keycloak token endpoint
 
@@ -1203,8 +1209,9 @@ limit_req zone=krt_req_perip burst=10 nodelay;
 limit_req_status 429;
 ```
 
-The zone itself is version-controlled in `docker/maintenance/nginx/http.conf`; only the per-location
-`limit_req` lives in the NPM database. A dedicated, stricter zone is a repo change — ask for it if
+The zone itself is version-controlled — in `docker/maintenance/nginx/http.conf` when this was
+written, in `docker/edge/conf.d/00-maps.conf` since the native edge (ADR-0162); only the
+per-location `limit_req` lived in the NPM database. A dedicated, stricter zone is a repo change — ask for it if
 this burst turns out too generous once real app traffic exists.
 
 **Rollback for the whole phase:** toggle the proxy host to *Disabled*. It keeps its certificate and
@@ -1808,7 +1815,7 @@ receive it.
 >
 > `GET /api/v1/refining-methods` is an anonymous master-data catalogue with no method gate at all,
 > the same family as `/ship-types` and `/materials/search`: it answers **200**, and
-> [`ROLES_AND_PERMISSIONS.md`](../ROLES_AND_PERMISSIONS.md) has said so all along. Method names and
+> [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) has said so all along. Method names and
 > their UEX ratings — no member, org unit or order is reachable through it.
 >
 > All three are now pinned in `ApiVhostAnonymousSurfaceTest`, which is what REQ-SEC-037 asks for on
@@ -2525,7 +2532,7 @@ either.
 **Check the path against this file before making the app depend on it**, not before releasing:
 
 ```bash
-grep -n "<the path>" docs/API_VHOST_ROLLOUT_RUNBOOK.md
+grep -n "<the path>" docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md
 ```
 
 No hit means production answers `404` however green everything else is.
@@ -2567,7 +2574,7 @@ public.
    > `basetool-frontend` session token carries it, so on the gateway the check passes for exactly
    > the tokens the ingest interface exists to refuse — which is what ADR-0018 amendment 1
    > (`REQ-INGEST-011`) reversed on 2026-08-03, and what
-   > [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) step 7a has forbidden in a boxed warning
+   > [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) step 7a has forbidden in a boxed warning
    > ever since. The realm has carried the correct `extractor-ingest-only` scope — stamping
    > `aud=basetool-ingest` on the extractor's tokens and on no one else's — since before this
    > rollout.

@@ -260,12 +260,12 @@ public class AdminMaterialsPageController {
    * AJAX endpoint that edits a single field on a material in place. The request's {@code
    * updateType} discriminator selects which field is being touched ({@code CATEGORY}, {@code
    * REFINED}, {@code QUANTITY_TYPE}, {@code MANUAL_RAW}, {@code JOB_ORDER}, {@code VISIBILITY});
-   * every other field on the material is preserved from the freshly-fetched current record. A
-   * {@code MANUAL_RAW}, {@code JOB_ORDER} or {@code VISIBILITY} change additionally clears the
-   * frontend's static-data cache so dependent pages (pickers, lookups) see the change without a
-   * full reload — unhiding a reviewed commodity must make it appear in trading flows immediately.
-   * Failures collapse to a generic 500 — the AJAX layer in the template renders a toast instead of
-   * relying on per-status semantics.
+   * every other field on the material is preserved from the freshly-fetched current record. Every
+   * successful edit, whatever its {@code updateType}, additionally evicts the frontend's {@code
+   * CacheDomain.MATERIAL} catalogue cache so dependent pages (pickers, lookups) see the change
+   * without a full reload — unhiding a reviewed commodity must make it appear in trading flows
+   * immediately. Failures collapse to a generic 500 — the AJAX layer in the template renders a
+   * toast instead of relying on per-status semantics.
    *
    * @param id material id
    * @param request AJAX patch payload

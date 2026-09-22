@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-13.
-> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0094, ADR-0165
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Owner area:** FE/UI · **Related ADRs:** ADR-0012, ADR-0013, ADR-0031, ADR-0053, ADR-0069, ADR-0071, ADR-0085, ADR-0089, ADR-0094, ADR-0100, ADR-0106, ADR-0125, ADR-0126, ADR-0130, ADR-0143, ADR-0165
 
 # Frontend AJAX mutations — krtFetch, krtCsrf & fragment swaps
 
@@ -15,7 +15,10 @@ child issues (#573–#582).
 
 The foundation lives in [`krt-fetch.js`](../../frontend/src/main/resources/static/js/krt-fetch.js),
 loaded globally from `fragments/head.html`. It exposes `window.krtFetch` (`write`, `submitForm`,
-`swap`, `syncVersion`, `sectionWrite`, `serialize`) and `window.krtCsrf` (`headers`, `token`, `refresh`). The toast/confirm infrastructure
+`swap`, `bindSwap`, `syncVersion`, `handleProblem`, `sectionWrite`, `serialize`, plus the
+re-authentication helpers `maybeReauthenticate` / `reauthRedirect` and the shared
+`ownerOrgUnitRequiredMessage` wording) and `window.krtCsrf` (`headers`, `token`, `headerName`,
+`refresh`). The toast/confirm infrastructure
 (`showFrontendSuccessToast`, `showFrontendErrorToast`, `showKrtConfirm`) is the design-system-mandated
 replacement for native dialogs (see [`ui-design-system.md`](ui-design-system.md)).
 
@@ -346,7 +349,7 @@ add/edit/delete go through JSON twins that re-render the existing `#pi-results` 
 **Blueprints** note-edit returns the fresh blueprint from its twin so the master row (note + version
 + note-marker badge) and the detail pane are patched in place (the selection and the loaded recipe
 survive); remove, batch-add and import-apply re-render the new `#krt-bp-list` fragment (`recipe.js`
-re-inits its master/detail wiring and `personal-inventory-blueprints.js` resyncs the header counts on
+(`personal-inventory-blueprints-recipe.js`) re-inits its master/detail wiring and `personal-inventory-blueprints.js` resyncs the header counts on
 `krt:swapped`), and the variant CSRF helpers in `personal-inventory-blueprints.js` /
 `-import.js` were replaced by `krtCsrf` / `krtFetch`. Every twin relays a backend failure as
 `problem+json` (the shared `propagateBackendError` helper) so an `OPTIMISTIC_LOCK` drives the
@@ -552,8 +555,8 @@ to the same instant rather than failing and nulling it. A broken round-trip sile
 **Enforced by:** `MissionCoreEditAjaxControllerTest` (four-version re-read, microsecond zoneless
 schedule-time round-trip, 422 field map, 409 problem+json, fallback routing) +
 `MissionCoreEditInPlaceE2eTest` (in-place save, double-save no-409, inline validation). **Code:**
-`mission-detail.html`, `MissionPageController` (`updateMissionAjax`, `applyMissionUpdate`,
-`parseToInstant`/`formatInstant`). **Issues:** #589.
+`mission-detail.html`, `MissionWriteController` (`updateMissionAjax`, `applyMissionUpdate`,
+`parseToInstant`), `MissionPageController` (`formatInstant`). **Issues:** #589.
 
 ### REQ-FE-008 — A bfcache history-restore renders fresh server state
 
@@ -741,9 +744,7 @@ live-sync case.
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (relay to peers, origin exclusion, key
 sanitising/dedup, full seam-map whitelist relay for the mission topic, no-op on empty, per-session
 `changed` rate limit, per-session presence-frame rate limit + over-length `sectionKey` dropped —
-
-# 1245) · `LiveSyncPresenceServiceTest` (distinct-section-per-topic cap) ·
-
+#1245) · `LiveSyncPresenceServiceTest` (distinct-section-per-topic cap) ·
 `LiveSyncSubscriptionAuthorizerTest` (mission: allowed on authorized read, refused on 403/404,
 fail-open on transient, malformed topic rejected) · `LiveSyncSectionMapParityTest` (seam map ↔
 registry whitelist set-equality) · `MissionLiveSyncE2eTest` (two-context live participant-add
@@ -967,8 +968,7 @@ thunks, payout-preference `section:participant`, core-edit `submitForm` on `sect
 `operation-detail.js` (`operation:core` serialize + thunk), `bank.js`, `inventory-my.js`,
 `inventory-admin.js`, `inventory-note-modal.js`, `orders-detail.js` (`krtOrderWrite` serialize default
 + `_orderVersion`), `admin-org-structure.js`, `leitung.js` · **ADR:** ADR-0071 · **Issues:** #1143,
-
-# 1145, #1117, #1118
+#1145, #1117, #1118
 
 ### REQ-FE-013 — `krtFetch.swap` lands responses in issue order, not completion order
 
@@ -1026,7 +1026,7 @@ both.
 - [ ] A core-only save that triggers `PLANNED → ACTIVE` does not erase the server-auto-stamped
   `actualStartTime` (its schedule PATCH is skipped).
 
-**Enforced by:** `MissionWriteControllerTest` (dirty-flag-gated PATCH fan-out) + e2e · **Code:**
+**Enforced by:** `MissionCoreEditAjaxControllerTest` (dirty-flag-gated PATCH fan-out) + e2e · **Code:**
 `MissionForm` (`dirtyCore` / `dirtySchedule` / `dirtyFlags`), `MissionWriteController`
 (`applyMissionUpdate`), `mission-detail.html` (hidden dirty inputs), `mission-detail.js` (section
 snapshot + `markDirtySections`) · **Issue:** #1136
@@ -1044,8 +1044,8 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|
 | `mission:{id}`           | crew, finance, mgmt, overview, steps, objectives, frequencies, organisation                                                   | yes           | `GET /api/v1/missions/{id}`                                                                           |
 | `operation:{id}`         | overview, missions, payout, finance                                                                                           | no            | `GET /api/v1/operations/{id}`                                                                         |
-| `order:{id}`             | header, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
-| `orders` (global queue)  | queue                                                                                                                         | no            | capabilities `canViewJobOrders` (requesters are refused)                                              |
+| `order:{id}`             | header, kpi, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
+| `orders` (global queue)  | queue, demand (the cross-order material demand, REQ-ORDERS-034)                                                               | no            | capabilities `canViewJobOrders` (requesters are refused)                                              |
 | `refinery-order:{id}`    | order, store                                                                                                                  | no            | `GET /api/v1/refinery-orders/{id}`                                                                    |
 | `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
@@ -1343,8 +1343,9 @@ The user-picker rule of REQ-FE-011 extends to **catalog** pickers: every field t
 **material**, a **game item** or a **booking-flow location** from the catalog must be a
 `krt-searchable-select` combobox — a plain `<select>` over a full catalog is incomplete. Catalog
 pickers search **server-side** (`remoteSource` mode): the page never preloads the catalog as
-`<option>`s; the picker fetches the matching entries per (debounced) keystroke through the public
-`/catalog/material-search` / `/catalog/location-search` relays onto the backend picker searches
+`<option>`s; the picker fetches the matching entries per (debounced) keystroke through the
+`/catalog/material-search` / `/catalog/location-search` relays (login-gated since REQ-SEC-052 /
+ADR-0159; they were public while the anonymous order form existed) onto the backend picker searches
 (`GET /api/v1/materials/search` with `jobOrderOnly`/`rawOnly` narrowing, `GET
 /api/v1/locations/search`), name-sorted. **No silent caps, ever:** every entry
 stays reachable by typing a narrower term regardless of catalog size, and the complete-list
@@ -1448,7 +1449,8 @@ browse-everything mode carries the same hint.
   bound to a registered remote source (or wires `remoteSource` via the direct API); typing
   fetches the matching entries server-side; the committed value submits under the original field
   name.
-- [ ] An entry beyond any single response page (25 rows) is reachable by typing a narrower term —
+- [ ] An entry beyond any single response page (`PickerSearch.PAGE_SIZE` = 51 rows; 201 for locations)
+  is reachable by typing a narrower term —
   no picker, endpoint or template silently truncates the catalog.
 - [ ] The bespoke UEX location typeahead's browse-everything mode appends a truncation hint when a
   response fills the requested cap, and drops it once a query narrows the result below the cap.
@@ -1467,8 +1469,8 @@ browse-everything mode carries the same hint.
 **Enforced by:** the migrated picker flows in `InventoryOperationsE2eTest`,
 `JobOrderCreateE2eTest`, `OrdersCreateScuHintRevealE2eTest` (quantity-type mirror + stale-key
 removal end-to-end) and `RefineryOrderCreateE2eTest` (via `E2eSupport.selectComboboxByValue`) ·
-`CatalogSearchControllerMvcTest` (relay mapping incl. refined metadata, fail-soft empty list,
-anonymous reachability) · MockMvc view tests asserting the mode-bearing marker on every converted
+`CatalogSearchControllerMvcTest` (relay mapping incl. refined metadata, fail-soft empty list, now
+under an authenticated principal) · MockMvc view tests asserting the mode-bearing marker on every converted
 select (`JobOrderPageControllerResponsiblePickerMvcTest`, `OrderHierarchyVisibilityTest`,
 `InventoryPageControllerMvcTest`, `AdminMaterialAliasesPageControllerMvcTest`,
 `OfficerRefineryAccessTest`) · the search unit tests in `LocationServiceTest` /
@@ -1597,8 +1599,8 @@ Convert them when opting a file in.
 > **Config:** `frontend/tsconfig.json` (`allowJs` + `noEmit` + `moduleDetection: legacy`),
 > `frontend/build.gradle.kts` (`generateApiTypes`, `typecheckJs`) · **Code:**
 > `frontend/types/globals.d.ts`, `frontend/types/thymeleaf-bootstrap.d.ts`,
-> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 32 files carrying
-> `// @ts-check` · **ADR:** ADR-0125, ADR-0130 ·
+> `frontend/types/dto.d.ts`, `frontend/scripts/gen-api-types.mjs`, the 35 files (of 95) carrying
+> `// @ts-check` (recounted 2026-09-22) · **ADR:** ADR-0125, ADR-0130 ·
 > **Issues:** —
 
 ### REQ-FE-019 — The same live sync reaches the native app, in both directions
@@ -1759,6 +1761,11 @@ hot path.
 - [ ] `GlobalBindingAdvice` remains unscoped, and a `String` `@RequestParam`/`@PathVariable` on a
   proxy is still trimmed and length-capped.
 
+**Enforced by:** `LayoutModelScopeMvcTest` (no layout backend read on a `@RestController`),
+`ArchitectureTest` (both halves of the `@UsesLayoutModel` marker rule) · **Code:**
+`config/UsesLayoutModel` and the five `@ControllerAdvice(annotations = UsesLayoutModel.class)` layout
+advices · **ADR:** ADR-0165
+
 ### REQ-FE-021 — A list page's filters collapse behind one toggle
 
 Every list page whose filter block carries **more than a single control** must render that block as
@@ -1804,6 +1811,10 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 > Mein Lager, Lager-Verwaltung and Materialbedarf all register from their `DOMContentLoaded`
 > handler, where the deferred script has run and the restored widget state is also in place.
 
+**Enforced by:** `InventoryFilterPanelCollapseE2eTest`, `JobOrderMaterialDemandE2eTest`,
+`InventoryPageControllerMvcTest` (the panel markup and the shared `filterToggle`) · **Code:**
+`krt-filter-panel.js`, `fragments/components.html` (`filterToggle`)
+
 ## Out of scope
 
 - The per-area conversions themselves (one issue per area, #573–#582) — this spec is the contract
@@ -1829,10 +1840,10 @@ calls `refresh()` after the swap so a collapsed panel never under-reports.
 ## Open questions
 
 - None open. The transitional `MissionSubresource` alias was **removed** in #574; mission-detail now
-  calls `krtFetch.write` through a small page-local `krtMissionWrite` wrapper, so `krt-fetch.js`
-  carries no page-specific code.
+  calls `krtFetch.write` through the `krtMissionWrite` seam the `krtFetch.sectionWrite` factory
+  returns, so `krt-fetch.js` carries no page-specific code.
 - **Resolved (#574 → #589):** the mission core-edit form (`#mission-form`) is now in-place — it saves
-  through the `updateMissionAjax` twin with inline field-error rendering (see REQ-FE-007 below), so
+  through the `updateMissionAjax` twin with inline field-error rendering (see REQ-FE-007 above), so
   the whole mission-detail page is reload-free. The classic `POST→redirect` stays the no-JS fallback.
 - **Resolved (#575 → #591):** the refinery **screenshot-extract import** carve-out is closed — it now
   swaps the pre-filled create-form fragment in place via the `importExtractAjax` twin (see REQ-FE-005

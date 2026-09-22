@@ -589,8 +589,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementsByClassName('missionCheck').length > 0) {
         updateSelectState('missionAll', 'missionCheck', 'missionHeader');
     }
-    // After the restore, never before it: the first-visit default ("collapsed only when nothing is
-    // filtered") and the count chip both read the widgets, so they must see the restored selection
+    // After the restore, never before it: the count chip reads the widgets, so they must see the restored selection
     // rather than the bare server-rendered one.
     if (window.krtFilterPanel) {
         window.krtFilterPanel.registerCounter(
