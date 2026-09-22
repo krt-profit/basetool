@@ -121,8 +121,9 @@ public class PersonalBlueprintImportProxyController {
    * @param file the uploaded blueprint export JSON (SCMDB log-watcher, Basetool BP Extractor, or
    *     scmdb.net export)
    * @return the import preview (per-name rows + status counts)
-   * @throws ResponseStatusException with the backend's status if the upload is rejected (e.g. 400
-   *     for an empty / malformed file), or 500 on an unexpected error
+   * @throws ResponseStatusException 400 for an empty upload and 413 for one above {@link
+   *     #MAX_EXPORT_BYTES} (both refused before the upload is read), the backend's status if the
+   *     backend rejects it (e.g. 400 for a malformed file), or 500 on an unexpected error
    */
   @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public BlueprintImportPreviewDto preview(@RequestParam("file") @NotNull MultipartFile file) {
@@ -131,8 +132,21 @@ public class PersonalBlueprintImportProxyController {
     // upload AFTER this process has buffered it twice - so without a cap here the relay is the
     // cheaper target of the two. Mirrors RefineryImportProxyController.MAX_EXTRACT_BYTES, sized to
     // the backend parser's own limit for this format.
-    if (file.isEmpty() || file.getSize() > MAX_EXPORT_BYTES) {
-      throw new IllegalArgumentException("The uploaded blueprint export is empty or too large.");
+    //
+    // A ResponseStatusException, not the IllegalArgumentException this used to throw: that one had
+    // no handler and reached the caller as a 500 + ERROR stack trace for ordinary client input.
+    // GlobalExceptionHandler#handleResponseStatus keeps the status (APPSEC-11).
+    if (file.isEmpty()) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "The uploaded blueprint export is empty.");
+    }
+    if (file.getSize() > MAX_EXPORT_BYTES) {
+      log.warn(
+          "Blueprint import preview proxy: upload of {} bytes refused, the cap is {} bytes",
+          file.getSize(),
+          MAX_EXPORT_BYTES);
+      throw new ResponseStatusException(
+          HttpStatus.CONTENT_TOO_LARGE, "The uploaded blueprint export is too large.");
     }
     try {
       byte[] bytes = file.getBytes();

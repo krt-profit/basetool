@@ -29,6 +29,12 @@ interface KrtWriteResult {
      * object on a handled error, or null when the response carried no body.
      */
     body: any;
+    /**
+     * Set on a 2xx only: true when fetch followed a redirect to reach it, so a caller swapping an
+     * HTML body can refuse a whole-document answer (e.g. an error-handler bounce) instead of a
+     * fragment.
+     */
+    redirected?: boolean;
 }
 
 /**
@@ -125,6 +131,16 @@ interface KrtSendOpts {
     /** The submit button disabled for the in-flight request (double-submit guard). */
     submitter?: KrtElementRef;
     /**
+     * Accept header value; defaults to `application/json`. Set it for an endpoint that answers
+     * another type (e.g. a `text/html` preview) — a non-JSON 2xx body reaches `onSuccess` as text.
+     */
+    accept?: string;
+    /**
+     * `'blob'` reads a 2xx body as a Blob (a generated PDF, …) instead of JSON/text; an error body
+     * is still parsed as JSON / problem+json so the problem handling keeps working.
+     */
+    responseType?: 'blob';
+    /**
      * Runs after a 2xx with the parsed body. If it returns a thenable the write
      * awaits it, so a serialized chain waits for the caller's fragment refresh
      * — which rewrites the version holder — before the next queued write starts.
@@ -153,6 +169,11 @@ interface KrtWriteOpts extends KrtSendOpts {
     /** JSON payload, or a thunk resolved at send time; omitted for GET and DELETE. */
     payload?: unknown | (() => unknown);
     /**
+     * Send the payload with a DELETE as well, for an endpoint whose DELETE mapping reads a request
+     * body. Off by default, so a DELETE sends no body.
+     */
+    bodyOnDelete?: boolean;
+    /**
      * Lock-scope key: writes sharing it run one at a time, in order. Pair it
      * with thunk `url`/`payload` so a queued write re-reads its optimistic-lock
      * version after the preceding same-key write refreshed the version holder.
@@ -164,14 +185,20 @@ interface KrtWriteOpts extends KrtSendOpts {
 
 /** Options for {@linkcode KrtFetchApi.submitForm}. */
 interface KrtSubmitFormOpts extends KrtSendOpts {
-    /** The form element or a selector for it; supplies action, method and FormData. */
-    form: HTMLFormElement | string;
+    /**
+     * The form element or a selector for it; supplies action, method and FormData. Optional when
+     * the call passes an explicit `url` and `formData` (a file upload assembled in script).
+     */
+    form?: HTMLFormElement | string;
     /** Target URL; defaults to the form's `action` attribute. */
     url?: string | (() => string);
     /** HTTP method; defaults to the form's `method`, else POST. */
     method?: string;
-    /** Explicit FormData; defaults to `new FormData(form)`. */
-    formData?: FormData;
+    /**
+     * Explicit body; defaults to `new FormData(form)`. A `URLSearchParams` is sent urlencoded (the
+     * browser sets the Content-Type for either).
+     */
+    formData?: FormData | URLSearchParams;
     /** Lock-scope key, as on {@linkcode KrtWriteOpts.serialize}. */
     serialize?: string;
     /** Section key resolved against the dictionary by a `sectionWrite` wrapper. */
@@ -276,6 +303,18 @@ interface KrtFetchApi {
     swap(opts: KrtSwapOpts): Promise<boolean>;
     /** Binds in-container pagination/sort anchor interception without an initial fetch. */
     bindSwap(opts: KrtSwapOpts): void;
+    /**
+     * Replaces `el`'s content with a server-rendered fragment — the one sanctioned innerHTML sink
+     * for markup not passed through `escapeHtml` (FE-SEC-05). Only for the text of a same-origin
+     * Thymeleaf fragment response, which the template engine already escaped; never for markup
+     * assembled in script. No-op when `el` is absent; null/undefined `html` clears it.
+     */
+    setTrustedHtml(el: Element | null | undefined, html: string | null | undefined): void;
+    /**
+     * The outerHTML twin of `setTrustedHtml`: replaces `el` itself with the fragment, under the
+     * same trust contract. No-op when `el` is absent or detached; null/undefined `html` removes it.
+     */
+    replaceWithTrustedHtml(el: Element | null | undefined, html: string | null | undefined): void;
     /**
      * Writes `newVersion` to the container and to every `[data-version]`
      * descendant, so the next write on the same aggregate sends a fresh version.

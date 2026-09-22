@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
+import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,6 +39,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -49,9 +52,11 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>The app used to wear the DAS KARTELL org mark ({@code logos/krt.webp}) in the header and the
  * padded org favicon ({@code logos/krt-favicon.webp}) in the browser tab. Both were replaced by the
  * dedicated Basetool logo family, so two regressions are now possible and neither would fail any
- * other test: a template could drift back to the org mark (the string still resolves — the file is
- * deliberately kept for the org-branded PDF exports), and a favicon {@code <link>} could be dropped
- * while the page keeps rendering perfectly.
+ * other test: a template could drift back to the org mark, and a favicon {@code <link>} could be
+ * dropped while the page keeps rendering perfectly. Since FE-PERF-04 (2026-09-22) the two org files
+ * no longer ship from the frontend at all — the org-branded PDF exports read the backend's own
+ * {@code krt.png} — so a template that drifted back would now 404 in the browser, which no
+ * server-side render sees either; the negative match below is still the guard.
  *
  * <p>The {@code krt.*} assertions are therefore written as *negative* matches on the rendered HTML
  * rather than as a grep over the template sources: only the rendered output proves that no fragment
@@ -110,10 +115,10 @@ class BrandMarkRenderMvcTest {
   }
 
   /**
-   * The org mark and the org favicon must not reappear on an app page. Both files still exist —
-   * {@code krt.png}/{@code krt.svg} brand the generated PDF exports, which are org documents rather
-   * than app surfaces — so a copy-paste of an old header would resolve happily at runtime and only
-   * show up as "the logo looks wrong" in review.
+   * The org mark and the org favicon must not reappear on an app page. The generated PDF exports
+   * are org documents and carry the org mark from the backend's {@code krt.png}; the frontend
+   * copies were unreferenced and are deleted (FE-PERF-04), so a copy-paste of an old header would
+   * render a broken image that only a browser notices.
    */
   @Test
   void homePage_ShouldNotFallBackToTheOrgMarkOrOrgFavicon() throws Exception {
@@ -147,5 +152,25 @@ class BrandMarkRenderMvcTest {
     assertThat(new ClassPathResource("META-INF/resources/logos/" + asset).exists())
         .as("brand asset %s must ship under META-INF/resources/logos/", asset)
         .isTrue();
+  }
+
+  /**
+   * Everything under {@code /logos/**} is public and cacheable, so an unreferenced file there is
+   * dead weight every deploy ships and every crawler can fetch. FE-PERF-04 deleted seven of them
+   * (about 570 KB, a 515 KB {@code sc.png} among them); only the Basetool logo family is left, and
+   * a file outside it has to be added here deliberately rather than slip in.
+   *
+   * @throws IOException if the classpath cannot be scanned
+   */
+  @Test
+  void logosDirectory_ShipsOnlyTheBasetoolLogoFamily() throws IOException {
+    Resource[] shipped =
+        new PathMatchingResourcePatternResolver()
+            .getResources("classpath*:META-INF/resources/logos/*.*");
+
+    assertThat(shipped).isNotEmpty();
+    assertThat(shipped)
+        .extracting(Resource::getFilename)
+        .allSatisfy(name -> assertThat(name).startsWith("basetool-"));
   }
 }

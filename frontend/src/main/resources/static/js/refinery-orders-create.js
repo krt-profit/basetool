@@ -564,17 +564,6 @@ document.addEventListener('krt:swapped', function (e) {
     if (c && c.id === 'refineryImportFormContainer') _reinitRefineryForm(true);
 });
 
-// X-Requested-With + krtCsrf headers for the in-place import POSTs (screenshot upload and the
-// one-click handoff consume). Shared so both carry the double-submit-safe CSRF token and the
-// bare-403 refresh-and-retry the same way.
-function _refineryImportHeaders() {
-    const h = { 'X-Requested-With': 'XMLHttpRequest' };
-    const t = window.krtCsrf.token();
-    const n = window.krtCsrf.headerName();
-    if (t && n) h[n] = t;
-    return h;
-}
-
 // Swap a returned refineryImportFormBody fragment into #refineryImportFormContainer and dispatch
 // krt:swapped so the datetime splitter + the create-form re-init pick up the fresh DOM. Shared by
 // the screenshot import and the handoff consume; falls back to a reload only if the stable
@@ -585,47 +574,55 @@ function _swapRefineryImportFragment(html) {
         window.location.reload();
         return;
     }
-    container.innerHTML = html;
+    // Same-origin Thymeleaf fragment (refineryImportFormBody), escaped by the template engine.
+    window.krtFetch.setTrustedHtml(container, html);
     document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container: container } }));
     if (typeof window.resetUnsavedChanges === 'function') window.resetUnsavedChanges();
+}
+
+// Shared outcome handling for the two import POSTs below: swap the returned fragment in, or show
+// the inline import-failed toast. A non-2xx was already toasted by the call's onError (and a
+// re-auth / consent gate is navigating the page away), so only a 2xx that is not a fragment — a
+// followed redirect, whose body is a whole document — is refused here.
+function _applyRefineryImportResult(result) {
+    if (!result.ok) return;
+    if (result.redirected || typeof result.body !== 'string') {
+        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+        return;
+    }
+    _swapRefineryImportFragment(result.body);
+}
+
+// The error hooks both import POSTs share: every failure shows the inline import-failed toast and
+// leaves the page intact.
+function _refineryImportFailed() {
+    if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
+    return true;
 }
 
 // #591: in-place screenshot-import. The picker posts the RefineryExtract as multipart; instead of
 // the classic POST->redirect reload, fetch the pre-filled create-form fragment and swap it into
 // #refineryImportFormContainer, then dispatch krt:swapped (the datetime splitter + the create-form
-// re-init pick up the fresh DOM). A transport/redirect failure shows an inline toast and leaves
-// the page intact; the classic multipart form-POST is the no-JS fallback (krtCsrf absent).
-async function _submitRefineryImport(form) {
-    if (!window.krtCsrf) {
+// re-init pick up the fresh DOM). The upload goes through krtFetch.submitForm (REQ-FE-002: CSRF,
+// the bare-403 refresh-and-retry, the re-auth redirect and the double-submit guard on the submit
+// button); a transport/redirect failure shows an inline toast and leaves the page intact. The
+// classic multipart form-POST is the no-JS fallback (krtFetch absent).
+function _submitRefineryImport(form) {
+    if (!window.krtFetch) {
         form.submit();
         return;
     }
-    const fd = new FormData(form);
-    let res;
-    try {
-        res = await fetch(form.action, {
+    window.krtFetch
+        .submitForm({
+            form: form,
             method: 'POST',
-            body: fd,
-            headers: _refineryImportHeaders(),
-        });
-        if (res.status === 403 && window.krtCsrf.refresh) {
-            const refreshed = await window.krtCsrf.refresh();
-            if (refreshed)
-                res = await fetch(form.action, {
-                    method: 'POST',
-                    body: fd,
-                    headers: _refineryImportHeaders(),
-                });
-        }
-    } catch (_e) {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
-        return;
-    }
-    if (res.redirected || !res.ok) {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
-        return;
-    }
-    _swapRefineryImportFragment(await res.text());
+            // The endpoint answers the re-rendered form as an HTML fragment.
+            accept: 'text/html',
+            toast: false,
+            onError: _refineryImportFailed,
+            onNetworkError: _refineryImportFailed,
+        })
+        .then(_applyRefineryImportResult);
 }
 const _refineryImportForm = document.getElementById('refineryImportForm');
 if (_refineryImportForm) {
@@ -646,7 +643,7 @@ if (_refineryImportForm) {
 // re-POST a now-consumed handoff. A miss (expired/foreign/unknown) swaps in the fragment carrying
 // the friendly ingest.handoff.notFound notice; a transport failure shows an inline toast and leaves
 // the empty form intact.
-async function _loadRefineryHandoff() {
+function _loadRefineryHandoff() {
     if (typeof REFINERY_HANDOFF_ID === 'undefined' || !REFINERY_HANDOFF_ID) return;
     const id = REFINERY_HANDOFF_ID;
     // Drop ?handoff= from the address bar so a manual reload does not re-attempt a consumed id.
@@ -661,25 +658,17 @@ async function _loadRefineryHandoff() {
     } catch (_e) {
         /* address-bar cleanup is best-effort; the consume below is what matters */
     }
-    if (!window.krtCsrf) return;
-    const url = '/refinery-orders/import-handoff?handoff=' + encodeURIComponent(id);
-    let res;
-    try {
-        res = await fetch(url, { method: 'POST', headers: _refineryImportHeaders() });
-        if (res.status === 403 && window.krtCsrf.refresh) {
-            const refreshed = await window.krtCsrf.refresh();
-            if (refreshed)
-                res = await fetch(url, { method: 'POST', headers: _refineryImportHeaders() });
-        }
-    } catch (_e) {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
-        return;
-    }
-    if (res.redirected || !res.ok) {
-        if (window.showFrontendErrorToast) window.showFrontendErrorToast(MSG_RFC_IMPORT_FAILED);
-        return;
-    }
-    _swapRefineryImportFragment(await res.text());
+    if (!window.krtFetch) return;
+    window.krtFetch
+        .write({
+            method: 'POST',
+            url: '/refinery-orders/import-handoff?handoff=' + encodeURIComponent(id),
+            accept: 'text/html',
+            toast: false,
+            onError: _refineryImportFailed,
+            onNetworkError: _refineryImportFailed,
+        })
+        .then(_applyRefineryImportResult);
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _loadRefineryHandoff);

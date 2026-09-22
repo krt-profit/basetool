@@ -56,18 +56,6 @@
     // independent of UI locale; prices are whole-number aUEC.
     const NUM = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
 
-    // Escape HTML meta-characters before any value is written via innerHTML. A self-contained
-    // replace chain (not a delegate to window.escapeHtml) so it is an unconditional, statically
-    // recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
-    function esc(v) {
-        return String(v == null ? '' : v)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     const BUFFER = 8; // extra rows rendered above and below the viewport
     const collapsed = {}; // kind -> true when its rows are hidden
     const GROUP_PREF_KEY = 'materials_matrix_group_by_category';
@@ -369,32 +357,43 @@
         }
         colsSig = sig;
 
-        const cg = ['<col class="mtx-col-first" />'];
-        const sysRow = ['<th></th>'];
-        const termRow = ['<th>' + esc(I18N.material) + '</th>'];
+        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sinks
+        // provably see escaped values (FE-SEC-05).
+        let cgHtml = '<col class="mtx-col-first" />';
+        let sysHtml = '<th></th>';
+        let termHtml = '<th>' + escapeHtml(I18N.material) + '</th>';
 
         systemGroups(cols).forEach(function (sg) {
-            const label = sg.name ? esc(sg.name) : '-';
-            cg.push('<col class="mtx-col-term" span="' + sg.count + '" />');
-            sysRow.push('<th colspan="' + sg.count + '" class="col-system">' + label + '</th>');
+            cgHtml += '<col class="mtx-col-term" span="' + escapeAttr(sg.count) + '" />';
+            sysHtml +=
+                '<th colspan="' +
+                escapeAttr(sg.count) +
+                '" class="col-system">' +
+                escapeHtml(sg.name ? sg.name : '-') +
+                '</th>';
         });
 
         cols.forEach(function (c) {
             const label = c.nickname ? c.nickname : c.name;
             const title = c.planetName ? label + ' — ' + c.planetName : label;
             const cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
-            termRow.push(
-                '<th class="' + cls + '" title="' + esc(title) + '">' + esc(label) + '</th>',
-            );
+            termHtml +=
+                '<th class="' +
+                escapeAttr(cls) +
+                '" title="' +
+                escapeAttr(title) +
+                '">' +
+                escapeHtml(label) +
+                '</th>';
         });
 
-        colgroup.innerHTML = cg.join('');
+        colgroup.innerHTML = cgHtml;
         head.innerHTML =
             '<tr class="row-system">' +
-            sysRow.join('') +
+            sysHtml +
             '</tr>' +
             '<tr class="row-terminal">' +
-            termRow.join('') +
+            termHtml +
             '</tr>';
     }
 
@@ -428,13 +427,109 @@
         if (!flat.length) {
             body.innerHTML =
                 '<tr><td colspan="' +
-                (cols.length + 1) +
+                escapeAttr(cols.length + 1) +
                 '" class="mtx-no-results">' +
-                esc(I18N.noResults) +
+                escapeHtml(I18N.noResults) +
                 '</td></tr>';
             renderedStart = 0;
             renderedEnd = 0;
             return;
+        }
+
+        // The body markup accumulator: every write — here and in the nested append* helpers — is a
+        // literal or an escapeHtml / escapeAttr call, so the one innerHTML sink it feeds provably
+        // sees escaped values only (FE-SEC-05). The helpers are nested so it stays a local here.
+        let bodyHtml = '';
+
+        function appendSpacer(heightPx) {
+            // Spacer height is genuinely dynamic (row count x measured row height). Emit it as a
+            // `data-krtm-height` hint, NOT an inline `style="height:.."` attribute — the latter is
+            // injected via innerHTML and blocked by CSP `style-src-attr 'none'`.
+            // applySpacerHeights() then writes it to `style.height` through the CSSOM, which
+            // `style-src-attr` does not govern.
+            bodyHtml +=
+                '<tr class="row-spacer"><td colspan="' +
+                escapeAttr(cols.length + 1) +
+                '" data-krtm-height="' +
+                escapeAttr(heightPx) +
+                '"></td></tr>';
+        }
+
+        function appendRow(item) {
+            if (item.type === 'kind') {
+                const label = item.kind === I18N.unsortedSentinel ? I18N.unsorted : item.kind;
+                const icon = collapsed[item.kind] ? '+' : '−';
+                bodyHtml +=
+                    '<tr class="row-kind" data-kind="' +
+                    escapeAttr(item.kind) +
+                    '">' +
+                    '<td colspan="' +
+                    escapeAttr(cols.length + 1) +
+                    '" class="mtx-kind-cell">' +
+                    '<span class="toggle-icon">' +
+                    escapeHtml(icon) +
+                    '</span>' +
+                    '<span>' +
+                    escapeHtml(label) +
+                    '</span></td></tr>';
+                return;
+            }
+            const r = item.row;
+            bodyHtml += '<tr class="row-material"><td class="mtx-name-cell">';
+            appendWarnings(r);
+            bodyHtml += escapeHtml(r.materialName) + '</td>';
+            for (let i = 0; i < cols.length; i++) {
+                const c = cols[i];
+                const cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
+                bodyHtml += '<td class="' + escapeAttr(cls) + '">';
+                appendCell(r.prices[c.name]);
+                bodyHtml += '</td>';
+            }
+            bodyHtml += '</tr>';
+        }
+
+        function appendWarnings(r) {
+            if (r.isIllegal) {
+                bodyHtml +=
+                    '<span class="text-danger mtx-warn" title="' +
+                    escapeAttr(I18N.illegal) +
+                    '">⚠</span>';
+            }
+            if (r.isVolatileQt) {
+                bodyHtml +=
+                    '<span class="text-warning mtx-warn" title="' +
+                    escapeAttr(I18N.volatileQt) +
+                    '">⚠</span>';
+            }
+            if (r.isVolatileTime) {
+                bodyHtml +=
+                    '<span class="text-warning mtx-warn" title="' +
+                    escapeAttr(I18N.volatileTime) +
+                    '">⚠</span>';
+            }
+        }
+
+        function appendCell(cell) {
+            let any = false;
+            if (cell) {
+                if (cell.priceSell != null && cell.priceSell > 0) {
+                    bodyHtml +=
+                        '<div class="price-sell">+' +
+                        escapeHtml(NUM.format(cell.priceSell)) +
+                        '</div>';
+                    any = true;
+                }
+                if (cell.priceBuy != null && cell.priceBuy > 0) {
+                    bodyHtml +=
+                        '<div class="price-buy">-' +
+                        escapeHtml(NUM.format(cell.priceBuy)) +
+                        '</div>';
+                    any = true;
+                }
+            }
+            if (!any) {
+                bodyHtml += '-';
+            }
         }
 
         // Before calibration we render an initial window with an estimated row height, measure a
@@ -446,17 +541,16 @@
         const start = Math.max(0, firstVisible - BUFFER);
         const end = Math.min(flat.length, lastVisible + BUFFER);
 
-        const html = [];
         if (start > 0) {
-            html.push(spacer(start * rh));
+            appendSpacer(start * rh);
         }
         for (let i = start; i < end; i++) {
-            html.push(rowHtml(flat[i]));
+            appendRow(flat[i]);
         }
         if (end < flat.length) {
-            html.push(spacer((flat.length - end) * rh));
+            appendSpacer((flat.length - end) * rh);
         }
-        body.innerHTML = html.join('');
+        body.innerHTML = bodyHtml;
         applySpacerHeights();
         renderedStart = start;
         renderedEnd = end;
@@ -464,20 +558,6 @@
         if (!calibrated) {
             calibrate();
         }
-    }
-
-    function spacer(heightPx) {
-        // Spacer height is genuinely dynamic (row count x measured row height). Emit it as a
-        // `data-krtm-height` hint, NOT an inline `style="height:.."` attribute — the latter is
-        // injected via innerHTML and blocked by CSP `style-src-attr 'none'`. applySpacerHeights()
-        // then writes it to `style.height` through the CSSOM, which `style-src-attr` does not govern.
-        return (
-            '<tr class="row-spacer"><td colspan="' +
-            (cols.length + 1) +
-            '" data-krtm-height="' +
-            heightPx +
-            '"></td></tr>'
-        );
     }
 
     // Applies the `data-krtm-height` hints to `style.height` via the CSSOM, mirroring the
@@ -489,66 +569,6 @@
             const h = parseFloat(spacers[i].getAttribute('data-krtm-height'));
             spacers[i].style.height = (isFinite(h) ? h : 0) + 'px';
         }
-    }
-
-    function rowHtml(item) {
-        if (item.type === 'kind') {
-            const label = item.kind === I18N.unsortedSentinel ? I18N.unsorted : item.kind;
-            const icon = collapsed[item.kind] ? '+' : '−';
-            return (
-                '<tr class="row-kind" data-kind="' +
-                esc(item.kind) +
-                '">' +
-                '<td colspan="' +
-                (cols.length + 1) +
-                '" class="mtx-kind-cell">' +
-                '<span class="toggle-icon">' +
-                icon +
-                '</span>' +
-                '<span>' +
-                esc(label) +
-                '</span></td></tr>'
-            );
-        }
-        const r = item.row;
-        const cells = ['<td class="mtx-name-cell">' + warnings(r) + esc(r.materialName) + '</td>'];
-        for (let i = 0; i < cols.length; i++) {
-            const c = cols[i];
-            const cls = 'col-terminal' + (c.planetCssClass ? ' ' + c.planetCssClass : '');
-            cells.push('<td class="' + cls + '">' + cellHtml(r.prices[c.name]) + '</td>');
-        }
-        return '<tr class="row-material">' + cells.join('') + '</tr>';
-    }
-
-    function warnings(r) {
-        let out = '';
-        if (r.isIllegal) {
-            out += '<span class="text-danger mtx-warn" title="' + esc(I18N.illegal) + '">⚠</span>';
-        }
-        if (r.isVolatileQt) {
-            out +=
-                '<span class="text-warning mtx-warn" title="' + esc(I18N.volatileQt) + '">⚠</span>';
-        }
-        if (r.isVolatileTime) {
-            out +=
-                '<span class="text-warning mtx-warn" title="' +
-                esc(I18N.volatileTime) +
-                '">⚠</span>';
-        }
-        return out;
-    }
-
-    function cellHtml(cell) {
-        let out = '';
-        if (cell) {
-            if (cell.priceSell != null && cell.priceSell > 0) {
-                out += '<div class="price-sell">+' + NUM.format(cell.priceSell) + '</div>';
-            }
-            if (cell.priceBuy != null && cell.priceBuy > 0) {
-                out += '<div class="price-buy">-' + NUM.format(cell.priceBuy) + '</div>';
-            }
-        }
-        return out || '-';
     }
 
     // Measure the true height of a rendered material row (all rows are forced to a uniform height

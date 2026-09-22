@@ -45,18 +45,6 @@
         return window.krtBlueprintsEndpoints || {};
     }
 
-    // Escape HTML meta-characters before any value is written via innerHTML. Implemented as a
-    // self-contained replace chain (not a delegate to window.escapeHtml) so it is an unconditional,
-    // statically-recognizable HTML-escape barrier on every path (CodeQL js/xss-through-dom).
-    function esc(v) {
-        return String(v == null ? '' : v)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
     function init() {
         searchInput = $('krt-bp-search-input');
         resultsEl = $('krt-bp-search-results');
@@ -202,7 +190,7 @@
         resultsEl.hidden = false;
         resultsEl.innerHTML =
             '<div class="krt-pi-typeahead-loading">' +
-            esc(i18n().searching || 'Suche...') +
+            escapeHtml(i18n().searching || 'Suche...') +
             '</div>';
         fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
             .then(function (resp) {
@@ -219,7 +207,7 @@
         if (!items || items.length === 0) {
             resultsEl.innerHTML =
                 '<div class="krt-pi-typeahead-empty">' +
-                esc(i18n().noResults || 'Keine Treffer') +
+                escapeHtml(i18n().noResults || 'Keine Treffer') +
                 '</div>';
             return;
         }
@@ -231,27 +219,35 @@
                 'krt-pi-typeahead-item krt-bp-result' +
                 (blocked ? ' krt-bp-result-owned' : '') +
                 (isStaged ? ' krt-bp-result-staged' : '');
-            const variants =
-                it.variantCount && it.variantCount > 1
-                    ? it.variantCount + ' ' + esc(i18n().variants || 'Varianten')
-                    : esc(it.manufacturerName || '');
+            // Optional pieces go through let + if (not a ternary), so every value the innerHTML
+            // sink sees is a literal or an escapeHtml / escapeAttr result (FE-SEC-05).
+            let meta = escapeHtml(it.manufacturerName || '');
+            if (blocked) {
+                meta = escapeHtml(i18n().owned || 'Bereits vorhanden');
+            } else if (it.variantCount && it.variantCount > 1) {
+                meta = escapeHtml(it.variantCount + ' ' + (i18n().variants || 'Varianten'));
+            }
+            let disabledAttr = '';
+            if (blocked) {
+                disabledAttr = ' disabled';
+            }
             html +=
                 '<button type="button" class="' +
-                cls +
+                escapeAttr(cls) +
                 '"' +
                 ' data-key="' +
-                esc(it.productKey) +
+                escapeAttr(it.productKey) +
                 '"' +
                 ' data-name="' +
-                esc(it.name) +
+                escapeAttr(it.name) +
                 '"' +
-                (blocked ? ' disabled' : '') +
+                disabledAttr +
                 '>' +
                 '<span class="krt-pi-typeahead-name">' +
-                esc(it.name || '') +
+                escapeHtml(it.name || '') +
                 '</span>' +
                 '<span class="krt-pi-typeahead-meta">' +
-                (blocked ? esc(i18n().owned || 'Bereits vorhanden') : variants) +
+                meta +
                 '</span>' +
                 '</button>';
         });
@@ -282,29 +278,33 @@
 
     function renderStaging() {
         if (!stagingListEl) return;
+        // Function-level accumulator (not declared inside the else): the lint rule only traces an
+        // accumulator declared in the same function scope as its innerHTML sink (FE-SEC-05).
+        let html = '';
         if (staged.size === 0) {
             stagingListEl.innerHTML =
                 '<span class="krt-bp-staging-empty">' +
-                esc(stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || '') +
+                escapeHtml(
+                    stagingListEl.getAttribute('data-empty-text') || i18n().emptyStaging || '',
+                ) +
                 '</span>';
         } else {
-            let html = '';
             // DS staging chip: the canonical squared .chip (chip--primary), not the bespoke
             // .krt-bp-chip orange-border box. The inline remove × keeps its i18n accessible name.
-            const removeLabel = esc(i18n().chipRemove || 'Entfernen');
+            const removeLabel = i18n().chipRemove || 'Entfernen';
             staged.forEach(function (name, key) {
                 html +=
                     '<span class="chip chip--primary" data-key="' +
-                    esc(key) +
+                    escapeAttr(key) +
                     '">' +
                     '<span class="krt-bp-chip-name">' +
-                    esc(name) +
+                    escapeHtml(name) +
                     '</span>' +
                     '<button type="button" class="krt-bp-chip-remove" data-key="' +
-                    esc(key) +
+                    escapeAttr(key) +
                     '"' +
                     ' aria-label="' +
-                    removeLabel +
+                    escapeAttr(removeLabel) +
                     '">&times;</button>' +
                     '</span>';
             });

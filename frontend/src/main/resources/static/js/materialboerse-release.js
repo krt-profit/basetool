@@ -94,12 +94,6 @@
         }
     }
 
-    function escapeHtml(s) {
-        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-        });
-    }
-
     /**
      * Formats an amount in the material's own unit: an integer count + the piece unit for a PIECE
      * material, otherwise the up-to-3-decimal SCU rendering. Fixes issue #1182, where every offer
@@ -462,38 +456,44 @@
             list.hidden = !pickerListOpen;
             return;
         }
-        list.innerHTML = pickerItems
-            .map(function (it) {
-                // The picker carries both material rows and game-item rows (stock-backed item
-                // offers, REQ-MARKET-014). An item row has no quality — omit the "Q x ·" prefix and
-                // render a blank data-quality so picking it hides the quality fact.
-                let isItem = it.kind === 'ITEM';
-                let meta =
-                    (isItem ? '' : 'Q ' + it.quality + ' · ') +
-                    formatAmount(it.amount, it.quantityType) +
-                    (it.locationName ? ' · ' + escapeHtml(it.locationName) : '') +
-                    (it.alreadyReleased ? ' · ' + escapeHtml(i18n.pickerAlready || '') : '');
-                return (
-                    '<li class="krt-combobox__option" role="option" data-item-id="' +
-                    it.inventoryItemId +
-                    '" data-kind="' +
-                    escapeHtml(it.kind) +
-                    '" data-material="' +
-                    escapeHtml(it.materialName) +
-                    '" data-quantity-type="' +
-                    escapeHtml(it.quantityType) +
-                    '" data-quality="' +
-                    (isItem ? '' : it.quality) +
-                    '" data-amount="' +
-                    it.amount +
-                    '"><strong>' +
-                    escapeHtml(it.materialName) +
-                    '</strong> <small>' +
-                    meta +
-                    '</small></li>'
-                );
-            })
-            .join('');
+        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sink
+        // provably sees escaped values (FE-SEC-05).
+        let html = '';
+        pickerItems.forEach(function (it) {
+            // The picker carries both material rows and game-item rows (stock-backed item
+            // offers, REQ-MARKET-014). An item row has no quality — omit the "Q x ·" prefix and
+            // render a blank data-quality so picking it hides the quality fact.
+            let isItem = it.kind === 'ITEM';
+            let meta = escapeHtml(
+                (isItem ? '' : 'Q ' + it.quality + ' · ') +
+                    formatAmount(it.amount, it.quantityType),
+            );
+            if (it.locationName) {
+                meta += ' · ' + escapeHtml(it.locationName);
+            }
+            if (it.alreadyReleased) {
+                meta += ' · ' + escapeHtml(i18n.pickerAlready || '');
+            }
+            html +=
+                '<li class="krt-combobox__option" role="option" data-item-id="' +
+                escapeAttr(it.inventoryItemId) +
+                '" data-kind="' +
+                escapeAttr(it.kind) +
+                '" data-material="' +
+                escapeAttr(it.materialName) +
+                '" data-quantity-type="' +
+                escapeAttr(it.quantityType) +
+                '" data-quality="' +
+                escapeAttr(isItem ? '' : it.quality) +
+                '" data-amount="' +
+                escapeAttr(it.amount) +
+                '"><strong>' +
+                escapeHtml(it.materialName) +
+                '</strong> <small>' +
+                meta +
+                '</small></li>';
+        });
+        list.innerHTML = html;
         list.hidden = !pickerListOpen;
     }
 
@@ -592,22 +592,23 @@
             list.hidden = !itemPickerListOpen;
             return;
         }
-        list.innerHTML = productItems
-            .map(function (it) {
-                let meta = it.manufacturerName ? escapeHtml(it.manufacturerName) : '';
-                return (
-                    '<li class="krt-combobox__option" role="option" data-product-key="' +
-                    escapeHtml(it.productKey) +
-                    '" data-name="' +
-                    escapeHtml(it.name) +
-                    '"><strong>' +
-                    escapeHtml(it.name) +
-                    '</strong>' +
-                    (meta ? ' <small>' + meta + '</small>' : '') +
-                    '</li>'
-                );
-            })
-            .join('');
+        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
+        let html = '';
+        productItems.forEach(function (it) {
+            html +=
+                '<li class="krt-combobox__option" role="option" data-product-key="' +
+                escapeAttr(it.productKey) +
+                '" data-name="' +
+                escapeAttr(it.name) +
+                '"><strong>' +
+                escapeHtml(it.name) +
+                '</strong>';
+            if (it.manufacturerName) {
+                html += ' <small>' + escapeHtml(it.manufacturerName) + '</small>';
+            }
+            html += '</li>';
+        });
+        list.innerHTML = html;
         list.hidden = !itemPickerListOpen;
     }
 

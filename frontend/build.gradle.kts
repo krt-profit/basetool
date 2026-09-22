@@ -864,9 +864,18 @@ tasks.register<Test>("smokeTest") {
 // flipped to strict. The vendored, minified JS bundles are excluded in the
 // tool configs (eslint.config.mjs / .stylelintrc.json).
 // ---------------------------------------------------------------------------
+//
+// `npmInstall` runs `npm ci`, not `npm install` (CI-SEC-18): `ci` installs exactly what the
+// committed lockfile pins and FAILS when package.json and package-lock.json disagree, where
+// `install` silently re-resolves the ranges and rewrites the lockfile — so a build could lint with
+// a
+// toolchain nobody reviewed. `frontend/.npmrc` adds `ignore-scripts=true`, so no package's
+// install-time lifecycle script runs on a developer machine or a CI runner; none of the lint tools
+// needs one.
 node {
   version.set(libs.versions.node.get())
   download.set(true)
+  npmInstallCommand.set("ci")
 }
 
 val lintCss =

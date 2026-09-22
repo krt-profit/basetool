@@ -20,7 +20,8 @@
  *  - Loaded FIRST and WITHOUT `defer` (see fragments/head.html). A handler installed after the
  *    scripts it is meant to watch cannot observe their failures, and `defer` would install it
  *    after the entire head has been parsed and executed.
- *  - No new global. The module registers two window listeners and exposes nothing.
+ *  - No new global. The module registers two window listeners and one document listener and
+ *    exposes nothing.
  *  - Per-session token bucket. The reporter is self-triggerable — an error inside a rAF/scroll/
  *    input handler repeats at frame rate — so the budget is capped and, crucially, PERSISTED in
  *    sessionStorage: a page that throws during load and a user who hammers F5 must not reset it.
@@ -72,6 +73,7 @@
     const KIND_SCRIPT_ERROR = 'script_error';
     const KIND_UNHANDLED_REJECTION = 'unhandled_rejection';
     const KIND_RESOURCE_ERROR = 'resource_error';
+    const KIND_CSP_VIOLATION = 'csp_violation';
 
     // Client-side cap per free-text field. The server truncates again — this one only keeps the
     // request small; the server's is the one that is actually a guarantee.
@@ -185,6 +187,30 @@
             cut = hash;
         }
         return field(s.slice(0, cut));
+    }
+
+    /**
+     * Reduces a CSP violation's blockedURI to its origin (FE-SEC-04). A blocked URL can carry a
+     * path, a query or a fragment that names a user, a search term or a token; the origin is all
+     * the triage needs (which host the page tried to reach). The keywords the browser reports
+     * instead of a URL for inline code and eval ('inline', 'eval', 'wasm-eval',
+     * 'trusted-types-policy', …) have no origin and pass through as the bare keyword, and a
+     * data: / blob: URL is reduced to its scheme.
+     */
+    function blockedOrigin(value) {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+        const s = String(value);
+        try {
+            const url = new URL(s);
+            if (url.origin && url.origin !== 'null') {
+                return field(url.origin);
+            }
+            return field(url.protocol.replace(/:$/, ''));
+        } catch (_notAUrl) {
+            return field(s.split(/[:/?#\s]/)[0]);
+        }
     }
 
     /**
@@ -324,6 +350,26 @@
         },
         true,
     );
+
+    // A Content-Security-Policy violation (FE-SEC-04). The CSP is enforcing and has no report-uri,
+    // so a template that ships an inline script or style without the nonce, or a page that starts
+    // loading from a new host, broke silently: the browser blocks it, logs to its own console and
+    // tells no server anything. Only the violated directive (a fixed CSP vocabulary) and the
+    // blocked origin travel — never the full blocked URL, the document URL or the source sample.
+    // Listening on the document: the event bubbles from the offending element up to it.
+    document.addEventListener('securitypolicyviolation', function (event) {
+        try {
+            report(
+                KIND_CSP_VIOLATION,
+                event ? event.effectiveDirective || event.violatedDirective : null,
+                event ? blockedOrigin(event.blockedURI) : null,
+                null,
+                null,
+            );
+        } catch (_reportFailed) {
+            /* one broken handler must never become two */
+        }
+    });
 
     // The shape a failed promise chain takes — including a krtFetch write or swap whose caller
     // forgot to catch, which is exactly the M11 class of silent failure.

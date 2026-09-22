@@ -94,6 +94,19 @@ public class HangarPageController {
   private final CachedCatalogListLoader catalogListLoader;
 
   /**
+   * Publishes the ship-import upload cap to every hangar view, so the import button can carry it as
+   * {@code data-max-bytes} and {@code hangar.js} can refuse an oversized file with a localized
+   * message before a single byte is uploaded. The server-side check in {@link
+   * HangarImportProxyController} stays authoritative; this only spares the user a pointless upload.
+   *
+   * @return {@link HangarImportProxyController#MAX_IMPORT_BYTES}, the inclusive byte limit
+   */
+  @ModelAttribute("hangarImportMaxBytes")
+  public long hangarImportMaxBytes() {
+    return HangarImportProxyController.MAX_IMPORT_BYTES;
+  }
+
+  /**
    * Runs a backend GET whose query carries the fixed paging params plus an optional free-text
    * {@code search} term, encoding {@code search} <em>exactly once</em> across the
    * frontend&rarr;backend hop. The caller pre-sets the safe paging params on {@code uri}; this

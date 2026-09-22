@@ -22,7 +22,7 @@
  * org-chart.html (ADR-0069, follow-up to #924).
  *
  * A self-invoking strict-mode IIFE (kept as-is) that drives in-place org-chart editing: the
- * add/reassign/rename/remove/vacate modal (JSON writes with fresh krtCsrf headers + retry-on-403),
+ * add/reassign/rename/remove/vacate modal (JSON writes through krtFetch.write: CSRF + retry-on-403),
  * the #571 fragment-swap chart refresh with horizontal-scroll restoration, an accessible focus-trap
  * dialog with background inert, and full ARIA-tree keyboard navigation (roving tabindex, arrow/Home/
  * End) re-initialised on krt:swapped. Collapse/expand are local view toggles (no server call).
@@ -135,16 +135,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 return !!modal && window.getComputedStyle(modal).display !== 'none';
             },
         });
-    }
-
-    // One JSON write, headers read fresh from window.krtCsrf (epic #571 / REQ-SEC-010) so the
-    // single meta-tag CSRF token is always current; retry-on-403 lives in send().
-    function doFetch(method, url, body) {
-        const opts = { method: method, headers: window.krtCsrf.headers() };
-        if (body !== null) {
-            opts.body = JSON.stringify(body);
-        }
-        return fetch(url, opts);
     }
 
     function field(id) {
@@ -279,56 +269,50 @@ const ORG_CHART_UNITS_SECTION = 'units';
     }
 
     function send(method, url, body) {
-        doFetch(method, url, body)
-            .then(function (resp) {
-                // A bare 403 is the CSRF filter rejecting a stale token (stale tab / re-login
-                // session rotation); refresh once and retry, mirroring krtFetch.write.
-                if (resp.status === 403) {
-                    return window.krtCsrf.refresh().then(function (refreshed) {
-                        return refreshed ? doFetch(method, url, body) : resp;
-                    });
-                }
-                return resp;
-            })
-            .then(function (resp) {
-                if (resp.ok) {
-                    window.showFrontendSuccessToast(OC_I18N.saved);
-                    // Capture the horizontal scroll BEFORE closeModal(): closeModal() returns focus
-                    // to the trigger and clears `inert` on <main>, whose reflow can reset
-                    // chart.scrollLeft to 0 on Chromium/Firefox — read it here so refreshChart
-                    // restores the user's real offset.
+        if (!window.krtFetch) {
+            window.showFrontendErrorToast(OC_I18N.genericError);
+            return;
+        }
+        // krtFetch.write (REQ-FE-002): CSRF read fresh from the meta tags, the bare-403
+        // refresh-and-retry and the re-auth redirect. The success toast and the error handling stay
+        // this page's own, so the success path runs in onSuccess with toast:false.
+        window.krtFetch.write({
+            method: method,
+            url: url,
+            payload: body === null ? undefined : body,
+            toast: false,
+            errorMessage: OC_I18N.genericError,
+            onSuccess: function () {
+                window.showFrontendSuccessToast(OC_I18N.saved);
+                // Capture the horizontal scroll BEFORE closeModal(): closeModal() returns focus to
+                // the trigger and clears `inert` on <main>, whose reflow can reset chart.scrollLeft
+                // to 0 on Chromium/Firefox — read it here so refreshChart restores the user's real
+                // offset.
+                const keepScroll = chart ? chart.scrollLeft : 0;
+                closeModal();
+                // Re-render the tree in place — re-stamps every data-version, so the next edit
+                // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a node
+                // patch because the add affordances + ARIA order are derived state.
+                refreshChart(keepScroll);
+                // #1235: and tell every peer viewing the Organigramm or the admin editor.
+                broadcastOrgStructureChanged();
+            },
+            onError: function (_status, data) {
+                if (data && data.code === 'OPTIMISTIC_LOCK') {
+                    // The version the modal carried is stale; close it and re-render so the user
+                    // retries against the freshly-stamped chart instead of re-409ing — in place,
+                    // which beats the generic reload-confirm here.
+                    window.showFrontendErrorToast(OC_I18N.conflict);
                     const keepScroll = chart ? chart.scrollLeft : 0;
                     closeModal();
-                    // Re-render the tree in place — re-stamps every data-version, so the next edit
-                    // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a
-                    // node patch because the add affordances + ARIA order are derived state.
                     refreshChart(keepScroll);
-                    // #1235: and tell every peer viewing the Organigramm or the admin editor.
-                    broadcastOrgStructureChanged();
-                    return null;
+                    return true;
                 }
-                return resp
-                    .json()
-                    .catch(function () {
-                        return {};
-                    })
-                    .then(function (data) {
-                        if (data && data.code === 'OPTIMISTIC_LOCK') {
-                            // The version the modal carried is stale; close it and re-render so the
-                            // user retries against the freshly-stamped chart instead of re-409ing.
-                            window.showFrontendErrorToast(OC_I18N.conflict);
-                            const keepScroll = chart ? chart.scrollLeft : 0;
-                            closeModal();
-                            refreshChart(keepScroll);
-                            return;
-                        }
-                        const message = data && data.detail ? data.detail : OC_I18N.genericError;
-                        window.showFrontendErrorToast(message);
-                    });
-            })
-            .catch(function () {
-                window.showFrontendErrorToast(OC_I18N.genericError);
-            });
+                const message = data && data.detail ? data.detail : OC_I18N.genericError;
+                window.showFrontendErrorToast(message);
+                return true;
+            },
+        });
     }
 
     function submitModal() {
