@@ -140,35 +140,29 @@ distribution's own `dnf-automatic.timer` with a role drop-in; none rides the con
 
 ### 7.4a The weekly cleanup never prunes volumes
 
-The job was `iri-docker-cleanup` until 2026-09-21 and called `docker` directly — the only
-operational script that did not go through `lib/container-runtime.sh`. On a Podman host there is no
-`docker` binary at all, so the weekly run would fail at its first command while the timer stayed
-enabled. ADR-0194 records the fix. The job ran runtime-aware for a day; since 2026-09-22 the seam is
-Podman-only (OPS-SIMP-01) and the two Docker-only steps are gone from the script.
+`iri-container-cleanup` (ADR-0194) runs `container-cleanup.sh` through `lib/container-runtime.sh`
+as the rootless service user, and what it does **not** prune is the part worth knowing:
 
-Of the Docker job's five steps three translate; **two did not**, and the difference is the part worth
-knowing:
-
-| step | Docker | Podman |
-| --- | --- | --- |
-| stopped containers, unused images, unused networks | pruned | pruned |
-| build cache | pruned | skipped — `podman builder prune` is an alias for `image prune`, already run |
-| anonymous volumes | pruned | **skipped** |
+| what | weekly cleanup |
+| --- | --- |
+| stopped containers, unused images, unused networks | pruned |
+| build cache | not run — `podman builder prune` is an alias for `image prune`, which already ran |
+| volumes, anonymous or named | **never** |
 
 > [!danger] `podman volume prune` would take the edge's certificates with it
-> Docker's `volume prune`, without `--all`, removes **only anonymous** volumes. Podman has no such
-> distinction — *"Volumes that are not currently owned by a container will be removed. Note all
-> data will be destroyed"* — and its only filter is `label=`. Measured on the production host,
+> It removes every volume not currently owned by a container — *"Note all data will be
+> destroyed"* — and its only filter is `label=`. Measured on the production host,
 > `podman volume ls --filter dangling=true` listed **`edge-certs` and `edge-acme-state`**: the TLS
 > material and the ACME account. They are "dangling" whenever the stack is down, which is exactly
-> when a maintenance job runs — and although the nightly backup now carries both, a prune would
-> still take the live copy and the edge with it.
+> when a maintenance job runs — and although the nightly backup carries both, a prune would still
+> take the live copy and the edge with it.
 >
-> A mechanical rename of this job would therefore have been **worse than the broken job it
-> replaced**. The step is skipped on Podman, and the reason it existed was removed at its source:
-> the restore drill's throwaway Postgres left its anonymous data volume behind on every run
-> (156 MB, measured), and `rt_rm_force` now passes `-v`. On Docker, the weekly prune had been
-> silently absorbing that leak for as long as it existed — which is why nobody had seen it.
+> The one producer of anonymous volumes — the restore drill's throwaway Postgres, 156 MB per run,
+> measured — was fixed at its source instead: `rt_rm_force` removes a container together with its
+> anonymous volume.
+
+History — the job's Docker form (`iri-docker-cleanup`, five steps, volume pruning included) and why
+two steps did not survive the move: ADR-0194, `docs/archive/PODMAN_MIGRATION_PLAN.md` and git.
 
 ### 7.4b What the timers wait for after a boot, and what they deliberately do not
 

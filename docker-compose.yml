@@ -2006,6 +2006,14 @@ networks:
   # broad monitoring-scrape net (no new lateral path such as keycloak→db-backend). The subnet/gateway
   # are unchanged, so the SSH-tunnel admin allow-list (which matches net-proxy-* gateways) is
   # unaffected.
+  #
+  # NOT `internal: true` here, deliberately -- and the same holds for net-db-keycloak and the three
+  # net-redis-* networks. In PRODUCTION all five are internal (no egress for the databases and
+  # Redis), but that is set by scripts/generate-quadlet.py (QUADLET_INTERNAL_NETWORKS), not here
+  # (ADR-0162, 2026-09-22 amendment, accepted by the owner). This file also runs the local stacks,
+  # where the -dev twins publish 127.0.0.1:15432 / :15433 / :6379 on these very networks for a
+  # developer's bootRun, and an internal network carries no DNAT: `internal: true` here would
+  # break every local database and Redis connection without an error at startup.
   net-db-backend:
     name: net-db-backend
     driver: bridge
