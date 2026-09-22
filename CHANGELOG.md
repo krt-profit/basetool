@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- **Betrieb: die Container erreichen den eigenen öffentlichen Namen wieder.** Auf einem
+  Rootless-Host kommt ein Container über die öffentliche Adresse gar nicht an die eigene Maschine
+  heran. Die Rolle konnte dafür bisher genau einen Namen umbiegen und tat es für die Produktion
+  überhaupt nicht — unter Docker funktionierte der Umweg noch. Es ist jetzt eine Liste, und Grafana
+  sowie die externen Sonden stehen mit darin; ohne sie schlugen die Keycloak-Anmeldung in Grafana
+  und jede externe Prüfung fehl. Rein betriebsseitig.
+
 - **Die Zertifikatserneuerung fehlte im Auslieferungspaket.** Die ACME-Schleife ist am 16.09. aus
   der Compose-Datei in eine eigene Skriptdatei gewandert, ohne dass das Paket sie mitnimmt: auf
   einem frisch aufgesetzten Host startet der Dienst dadurch gar nicht und erneuert keine
