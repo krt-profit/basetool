@@ -52,12 +52,15 @@
 
 set -euo pipefail
 
-# The container-runtime seam (ADR-0163, Phase 3): both shapes are live at once.
+# The shared helpers (log, fail, read_env, write_textfile) and the container-runtime seam (ADR-0163).
 IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
-# shellcheck source=lib/container-runtime.sh
+# shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
 # repo-lint.yml runs shellcheck without -x, so it cannot follow a sourced file.
+. "${IRI_SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=lib/container-runtime.sh
+# shellcheck disable=SC1091
 . "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
 
 # --- Defaults / paths -------------------------------------------------------
@@ -69,13 +72,12 @@ LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
 # The Redis ACL is CONFIGURATION, not session data -- see the capture below.
 REDIS_ACL_PATH="${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}"
-PROFILE=prod
 
 # Writer services quiesced for the dump. Keycloak + the two Postgres DBs + Redis
 # + the edge stay up (the edge must, to serve the maintenance page). An array so
-# each name is passed as its own argument (no word-splitting landmines).
+# each name is passed as its own argument (no word-splitting landmines). Each stop
+# waits the unit's own StopTimeout= (30 s for the application modules).
 WRITER_SERVICES=(frontend backend ingest)
-STOP_TIMEOUT="${IRI_BACKUP_STOP_TIMEOUT:-30}"
 LOCK_WAIT="${IRI_BACKUP_LOCK_WAIT:-300}"
 
 # GFS retention (REQ-OPS-008). Overridable from backup.env.
@@ -87,8 +89,8 @@ KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 # volumes (the deploy user cannot open them directly; a container running as root
 # can).
 # Defaults to the Postgres image, which is always present on the host.
-# FULLY QUALIFIED, and it has to be. Docker resolves a short name against Docker Hub silently;
-# podman on Rocky enforces short-name resolution and refuses without a TTY:
+# FULLY QUALIFIED, and it has to be: podman on Rocky enforces short-name resolution and refuses
+# without a TTY:
 #
 #     Error: short-name resolution enforced but cannot prompt without a TTY
 #
@@ -108,9 +110,7 @@ HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
 # Monitoring-plane backup (epic #936, ADR-0072). Best-effort and fully guarded so a host WITHOUT the
 # monitoring stack is unaffected. Loki data is deliberately EXCLUDED (its GFS retention would silently
 # extend the approved 31-day IP retention); Tempo + exporter/textfile data are excluded too (ADR-0072).
-MON_COMPOSE="${COMPOSE_DIR}/docker-compose.monitoring.yml"
 MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
-TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 START_EPOCH="$(date +%s)"
 
 QUIESCE=true
@@ -152,57 +152,34 @@ USAGE
 done
 
 # --- Helpers ----------------------------------------------------------------
-log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
-fail() { log "FATAL: $*"; exit 1; }
-
-# Read a single KEY=value from the host .env (same approach as deploy.sh). Never
-# echoes the value to logs.
-read_env() {
-  grep -E "^$1=" "${COMPOSE_DIR}/.env" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' || true
-}
-
-# The runtime seam owns every container operation below; the two `docker compose`
-# wrappers that used to live here went with their call sites.
-
+# log, fail, read_env and write_textfile are lib/common.sh's.
 
 # Writes the backup outcome textfile metric (node_exporter textfile collector; epic #936). Only
 # called after a fully successful upload + restic check, so age>26h or absent() reliably means the
 # backup missed or failed (ADR-0072 alert wiring).
 write_backup_metrics() {
-  local now dur tmp
+  local now dur
   now="$(date +%s)"; dur=$(( now - START_EPOCH ))
-  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
-  tmp="${TEXTFILE_DIR}/backup.prom.$$"
-  if {
+  {
     echo "# HELP basetool_backup_last_success_timestamp Unix time of the last successful off-site backup."
     echo "# TYPE basetool_backup_last_success_timestamp gauge"
     echo "basetool_backup_last_success_timestamp ${now}"
     echo "# HELP basetool_backup_duration_seconds Runtime of the last successful backup in seconds."
     echo "# TYPE basetool_backup_duration_seconds gauge"
     echo "basetool_backup_duration_seconds ${dur}"
-  } > "${tmp}" 2>/dev/null; then
-    mv -f "${tmp}" "${TEXTFILE_DIR}/backup.prom" 2>/dev/null || true
-  else
-    log "WARN: could not write backup textfile metric (${TEXTFILE_DIR})"
-    rm -f "${tmp}" 2>/dev/null || true
-  fi
+  } | write_textfile backup.prom || true
 }
 
 # --- Pre-flight -------------------------------------------------------------
-# NOT docker-compose.yml here. This line ran BEFORE rt_detect and demanded a compose file on every
-# host, so on a Quadlet host -- where the unit files are the deployment and there is no compose file
-# at all -- the nightly backup aborted before it could discover which runtime it was on. The same
-# shape, and the same fix, as deploy.sh's pre-flight. The check moved below, into the docker arm.
 [[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
 # Before the quiesce can stop anything: a catch-up run fires seconds after boot, and stopping the
 # writers while their units are still starting is a race with the stack's own startup.
 rt_wait_for_startup
-export RT_COMPOSE_FILE="${COMPOSE_DIR}/docker-compose.yml" RT_PROFILE="${PROFILE}"
-export RT_PROJECT_DIR="${COMPOSE_DIR}" RT_MONITORING_FILE="${MON_COMPOSE}"
-export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"
-export RT_STOP_TIMEOUT="${STOP_TIMEOUT}"
+# The application services, so rt_monitoring_services can tell the monitoring units apart by
+# elimination -- the same list deploy.sh names.
+export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
 log "container runtime: ${RT_BACKEND}"
 if [[ -z "${HELPER_IMAGE}" ]]; then
   if HELPER_IMAGE="$(rt_unit_image db-backend "${COMPOSE_DIR}/quadlet/systemd")"; then
@@ -212,21 +189,13 @@ if [[ -z "${HELPER_IMAGE}" ]]; then
     log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${HELPER_IMAGE}"
   fi
 fi
-# Under Compose the compose file IS the deployment and the capture reads it; under Quadlet the unit
-# files are, and there is nothing to read.
-[[ "${RT_BACKEND}" != docker ]] || [[ -f "${RT_COMPOSE_FILE}" ]]   || fail "missing ${RT_COMPOSE_FILE}"
-# The package manager differs with the platform this migration moves to, and naming the wrong one
-# sends an operator down a path that cannot work: `apt install restic` on Rocky Linux reports
-# "command not found" for apt, which reads as a broken host rather than a missing package.
-command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
-command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
+command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
+command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
-# The deploy user has no usable $HOME; pin the tool config/cache dirs into
-# STATE_DIR (already in the systemd unit's ReadWritePaths) so docker/restic do
-# not try to write under an unreachable home.
-export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
+# The deploy user has no usable $HOME; pin restic's cache into STATE_DIR (in the systemd unit's
+# ReadWritePaths) so it does not try to write under an unreachable home.
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
-mkdir -p "${DOCKER_CONFIG}" "${RESTIC_CACHE_DIR}" "${STAGING_BASE}"
+mkdir -p "${RESTIC_CACHE_DIR}" "${STAGING_BASE}"
 
 # Load the backup secrets/config (RESTIC_REPOSITORY, RESTIC_PASSWORD, RCLONE_CONFIG, …).
 set -a
@@ -240,12 +209,6 @@ KEYSTORE_PATH="$(read_env IRI_KEYSTORE_HOST_PATH)"
 KEYSTORE_PATH="${KEYSTORE_PATH:-/var/iri/secrets/keystore.p12}"
 
 cd "${COMPOSE_DIR}"
-
-# Compose v2 is a Docker-only prerequisite. Under Quadlet the equivalent question was
-# already answered by rt_detect, which found the containers or refused.
-if [[ "${RT_BACKEND}" == docker ]]; then
-  docker compose version --short >/dev/null 2>&1 || fail "docker compose v2 not available"
-fi
 
 # --- Dry run ----------------------------------------------------------------
 if [[ "${DRY_RUN}" == "true" ]]; then
@@ -413,17 +376,14 @@ fi
 
 # --- Restart writers BEFORE the slow upload -------------------------------
 #
-# LOUD BUT NOT FATAL, and on Podman that distinction is the difference between a nightly snapshot
-# and none. The two runtimes behave differently on this exact line: `docker compose start` returns
-# as soon as the containers are started, while `systemctl start` waits for `Notify=healthy` and
-# returns non-zero if it does not arrive. So a writer that is merely SLOW -- the frontend's unit
+# LOUD BUT NOT FATAL, and that distinction is the difference between a nightly snapshot and none.
+# `systemctl start` waits for `Notify=healthy` and returns non-zero if it does not arrive. So a writer that is merely SLOW -- the frontend's unit
 # allows itself 4m15s -- made this bare command abort the whole run under `set -e`, with both
 # database dumps already on disk and never uploaded.
 #
 # Measured on the testing host 2026-09-20: the backup captured everything, failed here, and the
 # restore drill then reported `no snapshot found`. Losing the irreplaceable dumps because a service
-# was slow to come back is the same landmine the capture blocks above are all guarded against; this
-# line was simply missed, because under Docker it could not fire.
+# was slow to come back is the same landmine the capture blocks above are all guarded against.
 if [[ "${QUIESCED}" == "true" ]]; then
   log "dumps captured — restarting writers (${WRITER_SERVICES[*]})"
   if ! rt_service_start "${WRITER_SERVICES[@]}"; then
@@ -436,7 +396,7 @@ fi
 # Grafana SQLite (consistent copy via a brief graceful stop — a clean shutdown checkpoints the WAL,
 # so a plain copy of grafana.db is complete), the rendered secrets/certs (host-rebuild = restore, not
 # re-provisioning), and the Alertmanager state (silences + notification log). Done while still holding
-# the deploy lock so a concurrent deploy-monitoring `up` cannot restart Grafana mid-copy. Fully guarded
+# the deploy lock so a concurrent deploy tick cannot restart Grafana mid-copy. Fully guarded
 # and best-effort: a monitoring failure never fails the DB backup.
 if rt_monitoring_configured && rt_is_running grafana; then
   mkdir -p "${STAGING}/monitoring"

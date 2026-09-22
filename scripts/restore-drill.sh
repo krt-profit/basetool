@@ -21,20 +21,23 @@
 
 set -euo pipefail
 
-# The container-runtime seam (ADR-0163, Phase 3): both shapes are live at once.
+# The shared helpers (log, fail, read_env, write_textfile) and the container-runtime seam (ADR-0163).
 IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
-# shellcheck source=lib/container-runtime.sh
+# shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
 # repo-lint.yml runs shellcheck without -x, so it cannot follow a sourced file.
+. "${IRI_SCRIPT_DIR}/lib/common.sh"
+# shellcheck source=lib/container-runtime.sh
+# shellcheck disable=SC1091
 . "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
 
 STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
 BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-# FULLY QUALIFIED, and it has to be. Docker resolves a short name against Docker Hub silently;
-# podman on Rocky enforces short-name resolution and refuses without a TTY:
+# FULLY QUALIFIED, and it has to be: podman on Rocky enforces short-name resolution and refuses
+# without a TTY:
 #
 #     Error: short-name resolution enforced but cannot prompt without a TTY
 #
@@ -60,7 +63,6 @@ MIN_KEYCLOAK_TABLES="${IRI_DRILL_MIN_KEYCLOAK_TABLES:-20}"
 # being absent (never ran) — the systemd failed-unit signal alone cannot tell "failed" from "never
 # ran". Per-artifact status (0=not restorable, 1=ok); the DB pair drives last-success, the monitoring
 # artifacts are reported independently so a missing Grafana/secrets artifact alerts on its own.
-TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
 START_EPOCH="$(date +%s)"
 OK_DB_BACKEND=0
 OK_DB_KEYCLOAK=0
@@ -75,15 +77,14 @@ OK_REDIS_ACL=0
 KEEP=false
 [[ "${1:-}" == "--keep" ]] && KEEP=true
 
-log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
-fail() { log "FATAL: $*"; exit 1; }
+# log, fail and write_textfile are lib/common.sh's.
 
 # Writes the restore-drill textfile metric atomically. last_success bumps only when BOTH DB dumps
 # restored (the drill's core recoverability proof); a failed run preserves the previous last_success
 # so it reads as staleness/artifact_ok=0 rather than the metric vanishing (reserved for "never ran").
 # shellcheck disable=SC2317,SC2329  # invoked indirectly via the EXIT trap (cleanup), like cleanup() below
 write_drill_metrics() {
-  local now dur prev tmp
+  local now dur prev
   now="$(date +%s)"
   dur=$(( now - START_EPOCH ))
   prev=0
@@ -94,9 +95,7 @@ write_drill_metrics() {
   if (( OK_DB_BACKEND == 1 && OK_DB_KEYCLOAK == 1 )); then
     prev="${now}"
   fi
-  install -d -m 0755 "${TEXTFILE_DIR}" 2>/dev/null || true
-  tmp="${TEXTFILE_DIR}/restore_drill.prom.$$"
-  if {
+  {
     echo "# HELP basetool_restore_drill_last_success_timestamp Unix time of the last fully-successful DB restore drill."
     echo "# TYPE basetool_restore_drill_last_success_timestamp gauge"
     echo "basetool_restore_drill_last_success_timestamp ${prev}"
@@ -112,12 +111,7 @@ write_drill_metrics() {
     echo "basetool_restore_drill_artifact_ok{artifact=\"edge_certs\"} ${OK_EDGE_CERTS}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"acme_state\"} ${OK_ACME_STATE}"
     echo "basetool_restore_drill_artifact_ok{artifact=\"redis_acl\"} ${OK_REDIS_ACL}"
-  } > "${tmp}" 2>/dev/null; then
-    mv -f "${tmp}" "${TEXTFILE_DIR}/restore_drill.prom" 2>/dev/null || true
-  else
-    log "WARN: could not write restore-drill textfile metric (${TEXTFILE_DIR})"
-    rm -f "${tmp}" 2>/dev/null || true
-  fi
+  } | write_textfile restore_drill.prom || true
 }
 
 # --- Pre-flight -------------------------------------------------------------
@@ -133,12 +127,11 @@ if [[ -z "${DRILL_IMAGE}" ]]; then
     log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${DRILL_IMAGE}"
   fi
 fi
-command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic / apt install restic; ansible role: 10-packages.yml)"
-command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone / apt install rclone; ansible role: 10-packages.yml)"
+command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
+command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
-export DOCKER_CONFIG="${DOCKER_CONFIG:-${STATE_DIR}/.docker}"
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
-mkdir -p "${DOCKER_CONFIG}" "${RESTIC_CACHE_DIR}" "${WORK_BASE}"
+mkdir -p "${RESTIC_CACHE_DIR}" "${WORK_BASE}"
 
 set -a
 # shellcheck source=/dev/null  # operator-provided host file, not in the repo

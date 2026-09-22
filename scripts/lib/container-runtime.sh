@@ -2,38 +2,38 @@
 # =============================================================================
 # The container-runtime seam (ADR-0163, Phase 3 of docs/archive/PODMAN_MIGRATION_PLAN.md).
 #
-# `deploy.sh`, `backup.sh` and `restore-drill.sh` were written against Docker
-# Compose. The Podman migration does not swap a binary underneath them — it
-# changes the orchestration model: there is no compose file, no project, and no
-# `up --wait`. A stack is a set of systemd units that Quadlet generates from
-# `.container` files, and "bring it up and wait for health" is
-# `systemctl --user start`, which blocks because `Notify=healthy` makes each unit
-# `Type=notify`.
+# Every container operation the operational scripts perform -- deploy.sh,
+# backup.sh, restore-drill.sh, container-cleanup.sh -- is named once here. A stack
+# is a set of systemd units that Quadlet generates from `.container` files, and
+# "bring it up and wait for health" is `systemctl --user start`, which blocks
+# because `Notify=healthy` makes each unit `Type=notify`.
 #
-# Both shapes have to work AT THE SAME TIME. Production serves on Docker until
-# the cutover and the testing host serves on Podman now, so a hard rewrite would
-# leave production without a deployer for the length of the migration — which
-# §23 of the plan identifies as a larger data-loss risk than the migration night
-# itself. So this is a seam, not a replacement: every runtime operation the three
-# scripts perform is named once here and implemented twice.
+# ROOTLESS PODMAN ONLY, since 2026-09-22 (OPS-SIMP-01, ADR-0194 amended). This
+# file was a seam with TWO implementations while production served on Docker and
+# the testing host on Podman; each function carried a `docker)` arm beside the
+# Podman one. The Docker host was retired at the cutover and is only kept, shut
+# down, as a way back -- with its own copy of these scripts on its own disk, which
+# a release never reaches. The migration plan's "no soak" ruling said the new host
+# need not keep the old shape working, so the Docker arms were removed rather than
+# left as nineteen untested branches that read as supported.
 #
 # Usage:
 #
 #     . "$(dirname "$0")/lib/container-runtime.sh"
-#     rt_detect                      # sets RT_BACKEND, and dies if neither exists
-#     rt_apply backend frontend      # compose up --wait, or systemctl start
+#     rt_detect                      # finds the lingering service user, or dies
+#     rt_apply backend frontend      # systemctl --user start, which waits for health
 #
 # Every function is prefixed `rt_`. Nothing here writes outside the paths its
 # caller passes in, and nothing here reads a secret.
 #
-# TESTABILITY. `deploy.test.sh` stubs the CLI by putting a fake `docker` on PATH
-# and asserting on the recorded invocations. That works unchanged here: the
-# Podman backend calls `podman`, `skopeo` and `systemctl` by name, so the same
-# harness stubs them the same way. `RT_BACKEND` can also be forced, which is what
-# lets one test exercise both shapes on a machine that has neither.
+# TESTABILITY. `deploy.test.sh` and `container-runtime.test.sh` put fake `podman`,
+# `skopeo` and `systemctl` binaries on PATH and assert on the recorded
+# invocations. `RT_BACKEND=podman` can be preset, which skips the lingering-user
+# probe on a machine that has no service user.
 # =============================================================================
 
-#: Which runtime this host actually has. Set by rt_detect; never guessed.
+#: The runtime. Only `podman` exists; the variable stays because the scripts log it and a preset
+#: value is how the self-tests skip the detection probe.
 RT_BACKEND="${RT_BACKEND:-}"
 
 #: The container CLI, including any privilege prefix a rootless deployment needs.
@@ -124,21 +124,14 @@ rt_die() {
 # fallback picked the current user, and a bare `podman` reported `no such object`
 # for eight healthy containers. Every arm of the caller then read a dead stack.
 #
-# Honours a pre-set RT_BACKEND, which is how the self-test drives both shapes.
+# Honours a pre-set RT_BACKEND=podman, which is how the self-tests skip the probe.
 # -----------------------------------------------------------------------------
 rt_detect() {
   if [[ -n "${RT_BACKEND}" ]]; then
     case "${RT_BACKEND}" in
-      docker) RT_CLI="${RT_CLI:-docker}" ;;
       podman) RT_CLI="${RT_CLI:-podman}"; RT_SYSTEMCTL="${RT_SYSTEMCTL:-systemctl --user}" ;;
-      *) rt_die "RT_BACKEND=${RT_BACKEND} is neither docker nor podman" ;;
+      *) rt_die "RT_BACKEND=${RT_BACKEND} is not podman -- the Docker runtime was retired on 2026-09-22" ;;
     esac
-    return 0
-  fi
-
-  if command -v docker >/dev/null 2>&1 && docker ps >/dev/null 2>&1; then
-    RT_BACKEND=docker
-    RT_CLI=docker
     return 0
   fi
 
@@ -242,7 +235,7 @@ rt_detect() {
     rt_die "podman is installed but no lingering user could be found that owns the containers (looked in ${RT_LINGER_DIR})"
   fi
 
-  rt_die "this host has neither a working docker nor a podman"
+  rt_die "this host has no podman"
 }
 
 # -----------------------------------------------------------------------------
@@ -321,11 +314,8 @@ rt_wait_for_user_runtime() {
 # NOT called by deploy.sh, on purpose. A stack stuck in `starting` because a
 # unit will not come up is exactly what a new release may be needed to fix, and
 # a deployer that refused to act until startup finished could never deliver it.
-#
-# Docker has no user manager and nothing to wait for; it returns at once.
 # -----------------------------------------------------------------------------
 rt_wait_for_startup() {
-  [[ "${RT_BACKEND}" == podman ]] || return 0
   local waited=0 state
   while :; do
     # `|| true` because a manager that is not answering yet makes systemctl exit
@@ -352,10 +342,11 @@ rt_wait_for_startup() {
 #
 # Resolve a tag to the immutable digest it currently points at, WITHOUT pulling.
 #
-# Docker uses `buildx imagetools inspect`. Podman has no equivalent subcommand;
-# `skopeo inspect docker://…` is the registry-native answer and is what
-# ansible/roles/basetool_host installs for this purpose. Both are read-only
-# registry calls.
+# Podman has no subcommand for this; `skopeo inspect docker://…` is the
+# registry-native answer, a read-only registry call, and what
+# ansible/roles/basetool_host installs for this purpose. The digest is the
+# manifest's own -- the index digest for a multi-arch list -- which is what
+# `@sha256:` addresses.
 #
 # Prints the digest (`sha256:…`) on stdout. Non-zero and silent on failure, so a
 # caller can tell "the tag does not exist" from "the registry is unreachable" by
@@ -363,21 +354,10 @@ rt_wait_for_startup() {
 # -----------------------------------------------------------------------------
 rt_resolve_digest() {
   local ref="$1" out
-  case "${RT_BACKEND}" in
-    docker)
-      # The manifest's own digest, which is what `@sha256:` addresses. Works for
-      # a multi-arch list (returns the index digest) and a single manifest alike.
-      # This exact form is what deploy.sh has been using and what its 159 tests
-      # already pin, so the seam adopts it rather than introducing a second one.
-      docker buildx imagetools inspect "${ref}" --format '{{.Manifest.Digest}}' 2>/dev/null
-      ;;
-    podman)
-      command -v skopeo >/dev/null 2>&1 || rt_die "skopeo is not installed; it is how a tag is resolved without pulling"
-      out="$(skopeo inspect --no-tags "docker://${ref}" 2>/dev/null)" || return 1
-      printf '%s' "${out}" | sed -n 's/.*"Digest"[[:space:]]*:[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' | head -1
-      ;;
-    *) rt_die "rt_resolve_digest before rt_detect" ;;
-  esac
+  [[ -n "${RT_BACKEND}" ]] || rt_die "rt_resolve_digest before rt_detect"
+  command -v skopeo >/dev/null 2>&1 || rt_die "skopeo is not installed; it is how a tag is resolved without pulling"
+  out="$(skopeo inspect --no-tags "docker://${ref}" 2>/dev/null)" || return 1
+  printf '%s' "${out}" | sed -n 's/.*"Digest"[[:space:]]*:[[:space:]]*"\(sha256:[a-f0-9]\{64\}\)".*/\1/p' | head -1
 }
 
 # -----------------------------------------------------------------------------
@@ -390,10 +370,10 @@ rt_login() {
   local registry="$1" user="$2" pwfile="$3"
   ${RT_CLI} login "${registry}" --username "${user}" --password-stdin < "${pwfile}" || return 1
 
-  # TWO identities, and that is not a duplicate call. Under Podman the images are pulled by the
-  # SERVICE USER (RT_CLI is `sudo -u <svc> podman`), while the tag is resolved by `skopeo` and the
-  # signature checked by `cosign` -- both of which run as the DEPLOY account, out of its own
-  # credential store. Logging in only through RT_CLI leaves that store empty, and the run dies at
+  # TWO identities, and that is not a duplicate call. The images are pulled by the SERVICE USER
+  # (RT_CLI is `sudo -u <svc> podman`), while the tag is resolved by `skopeo` and the signature
+  # checked by `cosign` -- both of which run as the DEPLOY account, out of its own credential store.
+  # Logging in only through RT_CLI leaves that store empty, and the run dies at
   #
   #     FATAL: cannot resolve ghcr.io/krt-profit/basetool-backend:stable (tag missing or no GHCR access)
   #
@@ -401,10 +381,9 @@ rt_login() {
   # same tag resolved perfectly as the service user and not at all as the deployer.
   #
   # REGISTRY_AUTH_FILE (honoured by the containers/image library that skopeo and podman share) is
-  # pointed at the Docker-style config.json that cosign reads, so one file serves all three tools.
-  # Under Docker RT_CLI is already `docker` and this second call is the same login again, which is
-  # idempotent and costs one request.
-  [[ "${RT_BACKEND}" == podman ]] || return 0
+  # pointed at the config.json that cosign reads, so one file serves all three tools. When RT_CLI is
+  # a bare `podman` (the self-tests, or the service user itself) this is the same login again,
+  # which is idempotent and costs one request.
   podman login "${registry}" --username "${user}" --password-stdin < "${pwfile}"
 }
 
@@ -414,55 +393,36 @@ rt_login() {
 # The container ids belonging to one service, one per line, including stopped
 # ones — the caller decides what a non-running container means.
 #
-# Docker asks compose, which knows the project. Podman has no project, so the
-# label Quadlet stamps on every container it starts is the equivalent: each
-# container carries PODMAN_SYSTEMD_UNIT=<service>.service. Matching on the NAME
-# would also work today and would break the moment two units share a name prefix.
+# There is no compose project to ask, so the label Quadlet stamps on every
+# container it starts is the answer: each carries
+# PODMAN_SYSTEMD_UNIT=<service>.service. Matching on the NAME would also work
+# today and would break the moment two units share a name prefix.
 # -----------------------------------------------------------------------------
 rt_service_container_ids() {
   local svc="$1"
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" ps -aq "${svc}" 2>/dev/null || true
-      ;;
-    podman)
-      ${RT_CLI} ps -aq --filter "label=PODMAN_SYSTEMD_UNIT=${svc}.service" 2>/dev/null || true
-      ;;
-  esac
+  ${RT_CLI} ps -aq --filter "label=PODMAN_SYSTEMD_UNIT=${svc}.service" 2>/dev/null || true
 }
 
 # -----------------------------------------------------------------------------
 # rt_container_probe <container-id>
 #
-# One line: `<is-one-off>|<state>/<health>`, the shape deploy.sh's drift check
-# already parses.
-#
-# The one-off flag exists because `docker compose run` leaves debug containers
-# alongside the service replica, and judging them flags drift on every tick for
-# as long as they exist. Podman has no compose-run, so the flag is always false
-# there — stated rather than left as an empty string that reads like a failure.
+# One line: `<state>/<health>`, the shape deploy.sh's drift check parses, or
+# `gone` when the container no longer exists. (It carried a leading
+# `<is-one-off>|` field for Compose's `run` containers until 2026-09-22; Podman
+# has no such thing.)
 # -----------------------------------------------------------------------------
 rt_container_probe() {
-  local cid="$1" fmt
-  case "${RT_BACKEND}" in
-    docker)
-      fmt='{{index .Config.Labels "com.docker.compose.oneoff"}}|{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}'
-      ;;
-    podman)
-      fmt='false|{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}'
-      ;;
-  esac
-  ${RT_CLI} inspect --format "${fmt}" "${cid}" 2>/dev/null || printf '|gone'
+  local cid="$1"
+  ${RT_CLI} inspect \
+    --format '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' \
+    "${cid}" 2>/dev/null || printf 'gone'
 }
 
 # -----------------------------------------------------------------------------
 # rt_container_image_id <container-id>
 # rt_image_repo_digests <image-id>
 #
-# The pair that answers "is this container running the image we targeted". Both
-# formats were measured identical under podman 5.8.2 and docker 29 on
-# 2026-09-18, which is why they are not branched.
+# The pair that answers "is this container running the image we targeted".
 # -----------------------------------------------------------------------------
 rt_container_image_id() {
   ${RT_CLI} inspect --format '{{.Image}}' "$1" 2>/dev/null || true
@@ -479,32 +439,23 @@ rt_image_repo_digests() {
 # Returns non-zero when any of them does not get there, which is what the health
 # gate and the rollback hang off.
 #
-# The wait is the interesting half. `docker compose up -d --wait` blocks on the
-# healthchecks. Under Quadlet the same guarantee is structural rather than a
-# flag: `Notify=healthy` makes each unit Type=notify, so `systemctl start` does
-# not return until podman reports the container healthy — and the generator's
-# `TimeoutStartSec=`, derived from the service's own health numbers, is what
-# bounds it. Without that key systemd's 90s default would cap a keycloak start
-# that its own configuration allows 330s for, and the unit would be killed
-# mid-start and restarted forever (PR #1933, finding 2).
+# The wait is structural rather than a flag: `Notify=healthy` makes each unit
+# Type=notify, so `systemctl start` does not return until podman reports the
+# container healthy — and the generator's `TimeoutStartSec=`, derived from the
+# service's own health numbers, is what bounds it. Without that key systemd's 90s
+# default would cap a keycloak start that its own configuration allows 330s for,
+# and the unit would be killed mid-start and restarted forever (PR #1933,
+# finding 2).
 #
 # A daemon-reload comes first because the unit files may have just been replaced.
 # -----------------------------------------------------------------------------
 rt_apply() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" up -d --wait "$@"
-      ;;
-    podman)
-      ${RT_SYSTEMCTL} daemon-reload || return 1
-      local svc rc=0
-      for svc in "$@"; do
-        ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
-      done
-      return "${rc}"
-      ;;
-  esac
+  ${RT_SYSTEMCTL} daemon-reload || return 1
+  local svc rc=0
+  for svc in "$@"; do
+    ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+  done
+  return "${rc}"
 }
 
 # -----------------------------------------------------------------------------
@@ -518,104 +469,71 @@ rt_apply() {
 # not control — a quay.io 502 on the Keycloak manifest aborting the run before
 # the apply ever gets to reuse the image that is already on disk.
 #
-# WHY A PAIR, when each runtime only needs one half of it. Because the two halves
-# are not interchangeable and an earlier version of this function let them look
-# as if they were: it took REFERENCES, its single call site passed SERVICE NAMES,
-# and both were right for Docker. `docker compose pull backend` resolves the name
-# through the compose file to that service's pinned image. Podman has no compose
-# file and no project, so the same argument became `podman pull backend` — a bare
-# name resolved against the host's unqualified-search registries (on Rocky:
-# registry.access.redhat.com, registry.redhat.io, docker.io), which fails, or
-# succeeds against a stranger's image of the same name. Measured 2026-09-18 in
-# scripts/deploy.test.sh: the run aborted at "pulling images" and never reached
-# the apply, because the call site runs under `set -e`. Taking the pair makes
-# that mismatch unrepresentable — neither arm has to infer the other's half.
+# WHY A PAIR, when only the reference is pulled. The service half is what the log
+# and a reader name; the reference half is what podman needs, because it has no
+# compose file to map `backend` to an image. A bare `podman pull backend` is
+# resolved against the host's unqualified-search registries (on Rocky:
+# registry.access.redhat.com, registry.redhat.io, docker.io) and fails, or
+# succeeds against a stranger's image of the same name -- measured 2026-09-18 in
+# scripts/deploy.test.sh, when this function took the service names the Docker
+# arm wanted. The pair keeps that mistake unrepresentable.
 #
-# A failed pull IS fatal, by way of that same `set -e` at the call site, and that
-# is deliberate: these three images ARE the release. What must not be fatal is a
+# A failed pull IS fatal, by way of `set -e` at the call site, and that is
+# deliberate: these three images ARE the release. What must not be fatal is a
 # third-party registry hiccup, and that is handled by not pulling infra here at
 # all rather than by swallowing errors.
 # -----------------------------------------------------------------------------
 rt_pull() {
   local pair rc=0
-  case "${RT_BACKEND}" in
-    docker)
-      local -a svcs=()
-      for pair in "$@"; do svcs+=("${pair%%=*}"); done
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
-        --profile "${RT_PROFILE:-prod}" pull --quiet "${svcs[@]}" || rc=1
-      ;;
-    podman)
-      # Every one is attempted even after the first failure, so the journal names
-      # each image that could not be fetched instead of only the earliest.
-      for pair in "$@"; do
-        ${RT_CLI} pull --quiet "${pair#*=}" >/dev/null 2>&1 || rc=1
-      done
-      ;;
-  esac
+  # Every one is attempted even after the first failure, so the journal names each image that could
+  # not be fetched instead of only the earliest.
+  for pair in "$@"; do
+    ${RT_CLI} pull --quiet "${pair#*=}" >/dev/null 2>&1 || rc=1
+  done
   return "${rc}"
 }
 
 # -----------------------------------------------------------------------------
 # rt_apply_stack [service]...
 #
-# The release apply: bring the stack to the pinned digests and WAIT, bounded by
-# RT_HEALTH_TIMEOUT. With no arguments it applies the whole stack.
+# The release apply: bring the stack to the pinned digests and WAIT. With no
+# arguments it applies the whole stack, RT_STACK_SERVICES.
 #
-# The two shapes differ in where the pin lives, not in what is guaranteed.
-# Compose gets the pin as a second `-f` override; under Quadlet the pin is
-# already a drop-in on disk (see rt_pin_write), so the unit files ARE the pinned
-# state and a daemon-reload is what picks them up.
-#
-# `--remove-orphans` has no Quadlet analogue and needs none: a retired service
+# The pin is a drop-in on disk (see rt_pin_write), so the unit files ARE the
+# pinned state and a daemon-reload is what picks them up. A retired service
 # leaves no container behind once its unit is gone, because Quadlet only starts
 # what has a unit file.
 #
-# The wait: compose blocks on `--wait --wait-timeout`; systemd blocks because
-# `Notify=healthy` makes each unit Type=notify, bounded by the generated
-# `TimeoutStartSec=`. Passing RT_HEALTH_TIMEOUT to systemd would fight that
-# value, which is derived per service from its own health numbers, so it is
-# deliberately not forwarded.
+# The wait: systemd blocks because `Notify=healthy` makes each unit
+# Type=notify, bounded by the generated `TimeoutStartSec=`. Passing
+# RT_HEALTH_TIMEOUT to systemd would fight that value, which is derived per
+# service from its own health numbers, so it is deliberately not forwarded.
 # -----------------------------------------------------------------------------
 rt_apply_stack() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose \
-        -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
-        --profile "${RT_PROFILE:-prod}" \
-        up -d --no-build --remove-orphans \
-           --wait --wait-timeout "${RT_HEALTH_TIMEOUT:-180}" "$@"
-      ;;
-    podman)
-      ${RT_SYSTEMCTL} daemon-reload || return 1
-      local svc rc=0
-      if [[ $# -eq 0 ]]; then
-        # "the whole stack" has to be named under Quadlet: there is no project to
-        # ask, so the caller supplies the list. Split explicitly into an array
-        # rather than relying on an unquoted expansion to do it.
-        local -a svcs=()
-        read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
-        set -- "${svcs[@]}"
-      fi
-      for svc in "$@"; do
-        # RESTART what this run re-defined, START what it did not. `start` on an already-active
-        # unit returns 0 without re-reading anything, so a changed pin would never reach the
-        # running container -- see RT_CHANGED_SERVICES at the top of this file for the measurement.
-        # A restart IS a recreate here: the generated ExecStart carries --replace, so the old
-        # container goes and a new one is created from the current unit.
-        #
-        # Everything else is left alone deliberately. Restarting the whole stack on every deploy
-        # would take the databases down for a change that never touched them.
-        case " ${RT_CHANGED_SERVICES} " in
-          *" ${svc} "*) ${RT_SYSTEMCTL} restart "${svc}.service" || rc=1 ;;
-          *)            ${RT_SYSTEMCTL} start   "${svc}.service" || rc=1 ;;
-        esac
-      done
-      return "${rc}"
-      ;;
-  esac
+  ${RT_SYSTEMCTL} daemon-reload || return 1
+  local svc rc=0
+  if [[ $# -eq 0 ]]; then
+    # "the whole stack" has to be named: there is no project to ask, so the caller supplies the
+    # list. Split explicitly into an array rather than relying on an unquoted expansion to do it.
+    local -a svcs=()
+    read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
+    set -- "${svcs[@]}"
+  fi
+  for svc in "$@"; do
+    # RESTART what this run re-defined, START what it did not. `start` on an already-active unit
+    # returns 0 without re-reading anything, so a changed pin would never reach the running
+    # container -- see RT_CHANGED_SERVICES at the top of this file for the measurement. A restart IS
+    # a recreate here: the generated ExecStart carries --replace, so the old container goes and a
+    # new one is created from the current unit.
+    #
+    # Everything else is left alone deliberately. Restarting the whole stack on every deploy would
+    # take the databases down for a change that never touched them.
+    case " ${RT_CHANGED_SERVICES} " in
+      *" ${svc} "*) ${RT_SYSTEMCTL} restart "${svc}.service" || rc=1 ;;
+      *)            ${RT_SYSTEMCTL} start   "${svc}.service" || rc=1 ;;
+    esac
+  done
+  return "${rc}"
 }
 
 # -----------------------------------------------------------------------------
@@ -626,25 +544,13 @@ rt_apply_stack() {
 # staged on the host and only `kc.sh start` re-running the provider build picks
 # it up, so the container has to be recreated rather than restarted in place.
 #
-# Under Quadlet a restart IS a recreate: the generated ExecStart carries
-# `--replace --rm`, so the old container is removed and a new one is created from
-# the current unit on every start.
+# A restart IS a recreate: the generated ExecStart carries `--replace --rm`, so
+# the old container is removed and a new one is created from the current unit on
+# every start.
 # -----------------------------------------------------------------------------
 rt_recreate() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose \
-        -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        ${RT_PIN_FILE:+-f "${RT_PIN_FILE}"} \
-        --profile "${RT_PROFILE:-prod}" \
-        up -d --no-deps --force-recreate \
-           --wait --wait-timeout "${RT_HEALTH_TIMEOUT:-180}" "$1"
-      ;;
-    podman)
-      ${RT_SYSTEMCTL} daemon-reload || return 1
-      ${RT_SYSTEMCTL} restart "$1.service"
-      ;;
-  esac
+  ${RT_SYSTEMCTL} daemon-reload || return 1
+  ${RT_SYSTEMCTL} restart "$1.service"
 }
 
 # -----------------------------------------------------------------------------
@@ -654,15 +560,7 @@ rt_recreate() {
 # container. Never a release rollback (ADR-0083).
 # -----------------------------------------------------------------------------
 rt_restart() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" restart "$1"
-      ;;
-    podman)
-      ${RT_SYSTEMCTL} restart "$1.service"
-      ;;
-  esac
+  ${RT_SYSTEMCTL} restart "$1.service"
 }
 
 # -----------------------------------------------------------------------------
@@ -677,14 +575,13 @@ rt_exec() {
 # rt_extract_from_image <image-ref> <path-in-image> <destination-on-host> [command]
 #
 # Lift one file out of an image without running it — how the Keycloak provider
-# JAR and the config bundle are staged. create/cp/rm is identical in both CLIs;
-# the container is removed even when the copy fails, so a failed deploy does not
-# leave a created-but-never-started container behind on every tick.
+# JAR and the config bundle are staged. The container is removed even when the
+# copy fails, so a failed deploy does not leave a created-but-never-started
+# container behind on every tick.
 #
 # The optional command matters even though it never runs: `create` refuses an
 # image declaring neither CMD nor ENTRYPOINT with "no command specified", and the
-# bundle images are exactly that — a filesystem with no process. Both CLIs accept
-# an argument they will never execute.
+# bundle images are exactly that — a filesystem with no process.
 # -----------------------------------------------------------------------------
 rt_extract_from_image() {
   local ref="$1" src="$2" dst="$3" cmd="${4:-}" cid rc=0
@@ -693,40 +590,31 @@ rt_extract_from_image() {
   else
     cid="$(${RT_CLI} create "${ref}" 2>/dev/null)" || return 1
   fi
-  case "${RT_BACKEND}" in
-    docker)
-      # The daemon runs as root and writes the destination itself, which is what the production
-      # deployment has always done.
-      ${RT_CLI} cp "${cid}:${src}" "${dst}" || rc=1
-      ;;
-    podman)
-      # A TAR STREAM, not a direct copy, and the difference is the account doing the writing.
-      # RT_CLI here is `sudo -u <service user> podman`, so a plain `cp` has the SERVICE USER write
-      # into the DEPLOY account's staging directory, and podman says so at length:
-      #
-      #     copier: put: error creating "/docker": mkdir /docker: permission denied
-      #
-      # Measured on the testing host 2026-09-18, immediately after the signatures verified.
-      # `cp <cid>:<src> -` writes a tar archive to stdout instead; the pipe crosses the account
-      # boundary and the extraction happens as the caller, into its own directory. Same mechanism
-      # rt_read_mount already uses to read a volume out for the backup.
-      #
-      # The destination is a DIRECTORY for the config bundle (`/config/.` -> a tree) and a FILE for
-      # the Keycloak provider JAR (one member). A tar stream has to be unpacked differently for the
-      # two, and treating the second as the first is how the first version of this failed:
-      #
-      #     tar: /var/lib/iri/keycloak-spi-stage.jar: Cannot open: No such file or directory
-      #
-      # `-O` writes the member to stdout instead of to a path, which is exactly the single-file
-      # case. The trailing slash the caller already uses for a tree is what tells them apart, and
-      # an existing directory is honoured too so a caller that omits it still works.
-      if [[ "${dst}" == */ || -d "${dst}" ]]; then
-        ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst%/}" || rc=1
-      else
-        ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xOf - > "${dst}" || rc=1
-      fi
-      ;;
-  esac
+  # A TAR STREAM, not a direct copy, and the difference is the account doing the writing.
+  # RT_CLI here is `sudo -u <service user> podman`, so a plain `cp` has the SERVICE USER write
+  # into the DEPLOY account's staging directory, and podman says so at length:
+  #
+  #     copier: put: error creating "/docker": mkdir /docker: permission denied
+  #
+  # Measured on the testing host 2026-09-18, immediately after the signatures verified.
+  # `cp <cid>:<src> -` writes a tar archive to stdout instead; the pipe crosses the account
+  # boundary and the extraction happens as the caller, into its own directory. Same mechanism
+  # rt_read_mount already uses to read a volume out for the backup.
+  #
+  # The destination is a DIRECTORY for the config bundle (`/config/.` -> a tree) and a FILE for
+  # the Keycloak provider JAR (one member). A tar stream has to be unpacked differently for the
+  # two, and treating the second as the first is how the first version of this failed:
+  #
+  #     tar: /var/lib/iri/keycloak-spi-stage.jar: Cannot open: No such file or directory
+  #
+  # `-O` writes the member to stdout instead of to a path, which is exactly the single-file
+  # case. The trailing slash the caller already uses for a tree is what tells them apart, and
+  # an existing directory is honoured too so a caller that omits it still works.
+  if [[ "${dst}" == */ || -d "${dst}" ]]; then
+    ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xf - -C "${dst%/}" || rc=1
+  else
+    ${RT_CLI} cp "${cid}:${src}" - 2>/dev/null | tar -xOf - > "${dst}" || rc=1
+  fi
   ${RT_CLI} rm -f "${cid}" >/dev/null 2>&1 || true
   return "${rc}"
 }
@@ -739,9 +627,7 @@ rt_extract_from_image() {
 # The digest pin: what stops a tag flip in the registry from moving the running
 # stack underneath us between ticks.
 #
-# Docker keeps it as a compose override file listing every service's image.
-# Quadlet has no override file, so the analogue is a systemd DROP-IN beside the
-# unit. Measured on podman 5.8.2 / Rocky 10, 2026-09-18: `Image=` in a
+# The pin is a systemd DROP-IN beside the unit. Measured on podman 5.8.2 / Rocky 10, 2026-09-18: `Image=` in a
 # `<unit>.container.d/*.conf` REPLACES the base unit's value — one reference
 # reaches the generated ExecStart, with no warning — while list keys such as
 # `AddHost=` append. That is exactly the semantics the pin needs, and it means
@@ -798,9 +684,9 @@ rt_pin_clear() {
 #
 # Read a pin RECORD back into `service=reference` lines.
 #
-# The record is the compose override this deployer has always written, and it
-# stays the single source of truth under both runtimes: a small YAML file under
-# the state directory naming three services and their digests. This function
+# The record is the small YAML file this deployer has always written under the
+# state directory, naming three services and their digests -- the compose-override
+# shape it had under Docker, kept because the rollback reads it back. This function
 # round-trips OUR OWN generated output — a fixed, machine-written shape — and is
 # deliberately not a YAML parser.
 # -----------------------------------------------------------------------------
@@ -814,15 +700,12 @@ rt_pin_record_pairs() {
 # -----------------------------------------------------------------------------
 # rt_pin_apply <service>=<reference>...
 #
-# Write the pin: the record, and — under Quadlet — the drop-ins that actually
-# bind it.
+# Write the pin: the record, and the drop-ins that actually bind it.
 #
-# Both halves matter and for different reasons. Compose reads the record
-# directly as a second `-f` override, so under Docker the record IS the pin.
-# Quadlet reads unit files, so the record alone would pin nothing; the drop-ins
-# are the binding and the record is what makes a ROLLBACK possible, because it
-# is the only place the previous digests survive once the drop-ins have been
-# overwritten.
+# Both halves matter and for different reasons. Quadlet reads unit files, so the
+# record alone pins nothing; the drop-ins are the binding and the record is what
+# makes a ROLLBACK possible, because it is the only place the previous digests
+# survive once the drop-ins have been overwritten.
 # -----------------------------------------------------------------------------
 rt_pin_apply() {
   local pair svc ref
@@ -836,7 +719,6 @@ rt_pin_apply() {
     done
   } > "${RT_PIN_FILE:?RT_PIN_FILE is unset}"
 
-  [[ "${RT_BACKEND}" == podman ]] || return 0
   for pair in "$@"; do
     svc="${pair%%=*}"; ref="${pair#*=}"
     rt_pin_write "${svc}" "${ref}"
@@ -848,11 +730,11 @@ rt_pin_apply() {
 # rt_pin_rollback
 #
 # The rollback anchor. `rt_pin_save` snapshots the live record before it is
-# overwritten; `rt_pin_rollback` puts it back — and under Quadlet re-materialises
-# the drop-ins from it, which is the half that would otherwise be missed.
+# overwritten; `rt_pin_rollback` puts it back — and re-materialises the drop-ins
+# from it, which is the half that would otherwise be missed.
 #
-# Copying the record alone and calling it a rollback is the trap: under Podman
-# the running stack is bound by the DROP-INS, so restoring only the record would
+# Copying the record alone and calling it a rollback is the trap: the running
+# stack is bound by the DROP-INS, so restoring only the record would
 # leave the new digests in place and the "rollback" would silently roll forward
 # into the very release whose health check had just failed.
 # -----------------------------------------------------------------------------
@@ -865,7 +747,6 @@ rt_pin_rollback() {
   [[ -f "${RT_PIN_FILE_PREVIOUS:?RT_PIN_FILE_PREVIOUS is unset}" ]] || return 1
   cp "${RT_PIN_FILE_PREVIOUS}" "${RT_PIN_FILE:?RT_PIN_FILE is unset}"
 
-  [[ "${RT_BACKEND}" == podman ]] || return 0
   local pair
   while IFS= read -r pair; do
     [[ -n "${pair}" ]] || continue
@@ -876,152 +757,100 @@ rt_pin_rollback() {
 # =============================================================================
 # The monitoring plane
 #
-# Under Compose it is a SECOND project (`-p iri-monitoring`) with its own file,
-# deliberately separate so the app stack can be recreated without taking the
-# observability with it. Under Quadlet there are no projects: the nine
-# monitoring units sit in the same directory as the eight application ones and
-# are told apart by name, which RT_MONITORING_SERVICES holds.
+# There are no compose projects: the nine monitoring units sit in the same unit
+# directory as the application ones and are told apart by name.
 #
 # Every one of these is best-effort at the call site — the deploy is not gated on
 # the monitoring plane, because an observability failure must not stop a release
 # that is otherwise healthy.
 # =============================================================================
 
+# -----------------------------------------------------------------------------
+# rt_monitoring_services
+#
+# The monitoring units, one per line: every `.container` in the unit directory
+# that is not an application service (RT_STACK_SERVICES). An explicit
+# RT_MONITORING_SERVICES still wins, which is how the self-tests name a set.
+#
+# DERIVED, since 2026-09-22 (OPS-SIMP-04). deploy.sh and backup.sh each carried
+# the nine names as a literal, and a list that has to be kept in step with the
+# compose file by hand is how `acme` was missing from every list until the same
+# day. The unit directory is what the release installed, so it is the answer.
+# -----------------------------------------------------------------------------
+rt_monitoring_services() {
+  if [[ -n "${RT_MONITORING_SERVICES:-}" ]]; then
+    local -a listed=()
+    read -ra listed <<< "${RT_MONITORING_SERVICES}"
+    printf '%s\n' "${listed[@]}"
+    return 0
+  fi
+  local f name
+  for f in "${RT_UNIT_DIR:-}"/*.container; do
+    [[ -f "${f}" ]] || continue
+    name="$(basename "${f}" .container)"
+    case " ${RT_STACK_SERVICES:-} " in
+      *" ${name} "*) continue ;;
+    esac
+    printf '%s\n' "${name}"
+  done
+}
+
 rt_monitoring_configured() {
-  case "${RT_BACKEND}" in
-    docker)  [[ -f "${RT_MONITORING_FILE:-}" ]] ;;
-    podman)  [[ -n "${RT_MONITORING_SERVICES:-}" ]] ;;
-  esac
+  [[ -n "$(rt_monitoring_services)" ]]
 }
 
 rt_monitoring_up() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
-        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" up -d "$@"
-      ;;
-    podman)
-      ${RT_SYSTEMCTL} daemon-reload || return 1
-      local svc rc=0
-      if [[ $# -eq 0 ]]; then
-        local -a msvcs=()
-        read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
-        set -- "${msvcs[@]}"
-      fi
-      for svc in "$@"; do
-        # RESTART what this run re-defined, START the rest -- the same rule, for the same measured
-        # reason, as rt_apply_stack. Until 2026-09-22 this arm only ever said `start`, and `start`
-        # on an active unit is a no-op: a release that changed prometheus.container (an image
-        # bump, a memory limit, a new mount) installed the new unit, daemon-reloaded, and left the
-        # old container running the old definition until something else happened to restart it.
-        #
-        # A restarted service is then forgotten, because this function runs TWICE on the success
-        # path -- once from the monitoring apply and once from reconcile_monitoring_reloads -- and
-        # the second call must not recreate prometheus a second time for the same change. A restart
-        # that FAILED is remembered, so the second call is its retry.
-        case " ${RT_CHANGED_SERVICES} " in
-          *" ${svc} "*)
-            if ${RT_SYSTEMCTL} restart "${svc}.service"; then
-              rt_forget_changed "${svc}"
-            else
-              rc=1
-            fi
-            ;;
-          *) ${RT_SYSTEMCTL} start "${svc}.service" || rc=1 ;;
-        esac
-      done
-      return "${rc}"
-      ;;
-  esac
-}
-
-# Take the monitoring plane down. Compose needs this before a network-topology
-# recreate because the monitoring project holds the shared data networks as
-# `external`, and a bridge with an endpoint still attached cannot be removed.
-rt_monitoring_down() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
-        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" down --remove-orphans
-      ;;
-    podman)
-      local svc rc=0
-      local -a msvcs=()
-      read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
-      for svc in "${msvcs[@]}"; do
-        ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1
-      done
-      return "${rc}"
-      ;;
-  esac
+  ${RT_SYSTEMCTL} daemon-reload || return 1
+  local svc rc=0
+  if [[ $# -eq 0 ]]; then
+    local -a msvcs=()
+    mapfile -t msvcs < <(rt_monitoring_services)
+    set -- "${msvcs[@]}"
+  fi
+  for svc in "$@"; do
+    # RESTART what this run re-defined, START the rest -- the same rule, for the same measured
+    # reason, as rt_apply_stack. Until 2026-09-22 this only ever said `start`, and `start` on an
+    # active unit is a no-op: a release that changed prometheus.container (an image bump, a memory
+    # limit, a new mount) installed the new unit, daemon-reloaded, and left the old container
+    # running the old definition until something else happened to restart it.
+    #
+    # A restarted service is then forgotten, because this function runs TWICE on the success path --
+    # once from the monitoring apply and once from reconcile_monitoring_reloads -- and the second
+    # call must not recreate prometheus a second time for the same change. A restart that FAILED is
+    # remembered, so the second call is its retry.
+    case " ${RT_CHANGED_SERVICES} " in
+      *" ${svc} "*)
+        if ${RT_SYSTEMCTL} restart "${svc}.service"; then
+          rt_forget_changed "${svc}"
+        else
+          rc=1
+        fi
+        ;;
+      *) ${RT_SYSTEMCTL} start "${svc}.service" || rc=1 ;;
+    esac
+  done
+  return "${rc}"
 }
 
 rt_monitoring_is_running() {
-  case "${RT_BACKEND}" in
-    docker)
-      # The project label is how compose itself identifies its containers.
-      [[ -n "$(docker ps --filter "label=com.docker.compose.project=iri-monitoring" \
-                 --format '{{.Names}}' 2>/dev/null)" ]]
-      ;;
-    podman)
-      local svc
-      local -a msvcs=()
-      read -ra msvcs <<< "${RT_MONITORING_SERVICES:?RT_MONITORING_SERVICES is unset}"
-      for svc in "${msvcs[@]}"; do
-        rt_is_running "${svc}" && return 0
-      done
-      return 1
-      ;;
-  esac
+  local svc
+  while IFS= read -r svc; do
+    [[ -n "${svc}" ]] || continue
+    rt_is_running "${svc}" && return 0
+  done < <(rt_monitoring_services)
+  return 1
 }
 
 # Replace ONE monitoring container so it re-resolves its bind-mount inode and
 # re-reads a changed config file. Not health-gated and never gating: a failed
 # monitoring recreate re-drifts on the next tick rather than failing a release.
 rt_monitoring_recreate() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -p iri-monitoring --project-directory "${RT_PROJECT_DIR:?RT_PROJECT_DIR is unset}" \
-        -f "${RT_MONITORING_FILE:?RT_MONITORING_FILE is unset}" \
-        up -d --force-recreate --no-deps "$1"
-      ;;
-    podman)
-      # A host service is not in the service user's systemd at all, so asking it to restart
-      # one fails with "Unit alloy.service not found" -- which the caller reports as
-      # "monitoring stack down?" about a unit that is up. Route it to the system manager.
-      case " ${RT_HOST_SERVICES} " in
-        *" $1 "*) ${RT_HOST_SYSTEMCTL:-systemctl} restart "$1.service" ;;
-        *)        ${RT_SYSTEMCTL} restart "$1.service" ;;
-      esac
-      ;;
-  esac
-}
-
-# -----------------------------------------------------------------------------
-# rt_stack_down
-#
-# Take the APPLICATION stack down. Only used for a network-topology change, which
-# cannot be applied in place: the bridges have to be removed and recreated on the
-# new subnets.
-# -----------------------------------------------------------------------------
-rt_stack_down() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" down --remove-orphans
-      ;;
-    podman)
-      local svc rc=0
-      local -a svcs=()
-      read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset}"
-      # Reverse order, so a dependent stops before what it depends on.
-      local i
-      for (( i=${#svcs[@]}-1; i>=0; i-- )); do
-        svc="${svcs[i]}"
-        ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1
-      done
-      return "${rc}"
-      ;;
+  # A host service is not in the service user's systemd at all, so asking it to restart one fails
+  # with "Unit alloy.service not found" -- which the caller reports as "monitoring stack down?"
+  # about a unit that is up. Route it to the system manager.
+  case " ${RT_HOST_SERVICES} " in
+    *" $1 "*) ${RT_HOST_SYSTEMCTL:-systemctl} restart "$1.service" ;;
+    *)        ${RT_SYSTEMCTL} restart "$1.service" ;;
   esac
 }
 
@@ -1033,8 +862,8 @@ rt_stack_down() {
 # rt_read_mount <source> <helper-image> <command>...
 #
 # Run a throwaway helper with <source> mounted read-only at /src and stream its
-# stdout. <source> may be a host path OR a named volume — both CLIs accept
-# either in the same position, which is what lets one primitive serve both.
+# stdout. <source> may be a host path OR a named volume — podman accepts either
+# in the same position, which is what lets one primitive serve both.
 #
 # The helper exists because the backup runs as an unprivileged user and most of
 # what it must read is root-owned: the keystore is 0640 (REQ-OPS-016), and the
@@ -1150,9 +979,9 @@ rt_prometheus_snapshot_remove() {
 # declares `VOLUME /var/lib/postgresql/data`, and `rm` without `-v` keeps it. Measured on the
 # migration target 2026-09-21 — one drill run, one orphaned 156 MB volume.
 #
-# Nobody noticed on Docker because the weekly cleanup's `docker volume prune` (anonymous-only
-# there) swept them up. Podman has no anonymous-only prune, so that compensation cannot be carried
-# across, and the leak is fixed where it is made instead (ADR-0194).
+# Nobody noticed on the retired Docker host because its weekly `docker volume prune`
+# (anonymous-only there) swept them up. Podman has no anonymous-only prune, so the leak is fixed
+# where it is made instead (ADR-0194).
 rt_rm_force() {
   ${RT_CLI} rm -f -v "$1" >/dev/null 2>&1 || true
 }
@@ -1170,51 +999,44 @@ rt_run_detached() {
 
 # rt_cp_to <source-on-host> <container> <destination-in-container>
 rt_cp_to() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker cp "$1" "$2:$3"
-      ;;
-    podman)
-      # STREAMED IN, not copied, and for the mirror image of the reason rt_extract_from_image
-      # streams OUT. RT_CLI is `sudo -u <service user> podman`, so a plain `cp` has the service
-      # user READ a file that belongs to the deploy account -- and the restore drill's working tree
-      # is deploy-owned 0700 by design, because it holds restored database dumps:
-      #
-      #     Error: ".../krt_basetool.dump" could not be found on the host: ... permission denied
-      #
-      # Measured on the testing host 2026-09-20. The CALLER reads the file and the bytes cross the
-      # account boundary through a pipe.
-      #
-      # `exec -i`, and NOT `podman cp -`, and that is a bug fix rather than a preference. `cp -`
-      # stops reading the moment it has extracted the entry, so tar's trailing blocks land in a
-      # closed pipe and podman reports its own failed write:
-      #
-      #     Error: 1 error occurred:
-      #             * io: read/write on closed pipe
-      #
-      # It exits 125 -- and the file is COMPLETE in the container anyway. Measured on the production
-      # host 2026-09-22, ten rounds each: `cp -` failed 10/10 while delivering the file correctly
-      # 10/10; `exec -i` succeeded 10/10. Deterministic per file size rather than a race: the
-      # restore drill's 12 MiB backend dump keeps podman reading to the end and passes, its 352 KiB
-      # keycloak dump does not -- so the drill aborted on its second copy and reported four
-      # artifacts unrestorable that it had never got as far as testing.
-      #
-      # This also drops the tar, and with it the rename that existed only because tar preserves the
-      # SOURCE basename. `sh -c '…' sh "${dst}"` passes the destination as $1 rather than
-      # interpolating it into the script, so a path with a quote in it cannot rewrite the command.
-      local src="$1" ctr="$2" dst="$3" want got
-      # shellcheck disable=SC2016  # `$1` belongs to the inner sh, not to this shell -- that is the point
-      ${RT_CLI} exec -i "${ctr}" sh -c 'cat > "$1"' sh "${dst}" < "${src}" || return 1
-      # Verify the bytes arrived instead of trusting the exit status -- which is precisely what the
-      # mechanism this replaces got wrong, in the opposite direction.
-      want="$(wc -c < "${src}" | tr -d '[:space:]')"
-      got="$(${RT_CLI} exec "${ctr}" stat -c %s "${dst}" 2>/dev/null | tr -d '[:space:]')"
-      if [[ "${want}" != "${got}" ]]; then
-        echo "rt_cp_to: ${dst} is ${got:-0} bytes in ${ctr}, expected ${want}" >&2
-        return 1
-      fi
-      ;;
-  esac
+  # STREAMED IN, not copied, and for the mirror image of the reason rt_extract_from_image
+  # streams OUT. RT_CLI is `sudo -u <service user> podman`, so a plain `cp` has the service
+  # user READ a file that belongs to the deploy account -- and the restore drill's working tree
+  # is deploy-owned 0700 by design, because it holds restored database dumps:
+  #
+  #     Error: ".../krt_basetool.dump" could not be found on the host: ... permission denied
+  #
+  # Measured on the testing host 2026-09-20. The CALLER reads the file and the bytes cross the
+  # account boundary through a pipe.
+  #
+  # `exec -i`, and NOT `podman cp -`, and that is a bug fix rather than a preference. `cp -`
+  # stops reading the moment it has extracted the entry, so tar's trailing blocks land in a
+  # closed pipe and podman reports its own failed write:
+  #
+  #     Error: 1 error occurred:
+  #             * io: read/write on closed pipe
+  #
+  # It exits 125 -- and the file is COMPLETE in the container anyway. Measured on the production
+  # host 2026-09-22, ten rounds each: `cp -` failed 10/10 while delivering the file correctly
+  # 10/10; `exec -i` succeeded 10/10. Deterministic per file size rather than a race: the
+  # restore drill's 12 MiB backend dump keeps podman reading to the end and passes, its 352 KiB
+  # keycloak dump does not -- so the drill aborted on its second copy and reported four
+  # artifacts unrestorable that it had never got as far as testing.
+  #
+  # This also drops the tar, and with it the rename that existed only because tar preserves the
+  # SOURCE basename. `sh -c '…' sh "${dst}"` passes the destination as $1 rather than
+  # interpolating it into the script, so a path with a quote in it cannot rewrite the command.
+  local src="$1" ctr="$2" dst="$3" want got
+  # shellcheck disable=SC2016  # `$1` belongs to the inner sh, not to this shell -- that is the point
+  ${RT_CLI} exec -i "${ctr}" sh -c 'cat > "$1"' sh "${dst}" < "${src}" || return 1
+  # Verify the bytes arrived instead of trusting the exit status -- which is precisely what the
+  # mechanism this replaces got wrong, in the opposite direction.
+  want="$(wc -c < "${src}" | tr -d '[:space:]')"
+  got="$(${RT_CLI} exec "${ctr}" stat -c %s "${dst}" 2>/dev/null | tr -d '[:space:]')"
+  if [[ "${want}" != "${got}" ]]; then
+    echo "rt_cp_to: ${dst} is ${got:-0} bytes in ${ctr}, expected ${want}" >&2
+    return 1
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -1229,32 +1051,19 @@ rt_cp_to() {
 # which is a release operation. This is a pause, and it must come back exactly as
 # it was.
 # -----------------------------------------------------------------------------
+#
+# The stop waits as long as the unit's StopTimeout= allows -- the service's own stop grace, 30 s for
+# the application modules -- so a writer finishes its in-flight requests before the dump starts.
 rt_service_stop() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" stop -t "${RT_STOP_TIMEOUT:-30}" "$@"
-      ;;
-    podman)
-      local svc rc=0
-      for svc in "$@"; do ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1; done
-      return "${rc}"
-      ;;
-  esac
+  local svc rc=0
+  for svc in "$@"; do ${RT_SYSTEMCTL} stop "${svc}.service" || rc=1; done
+  return "${rc}"
 }
 
 rt_service_start() {
-  case "${RT_BACKEND}" in
-    docker)
-      docker compose -f "${RT_COMPOSE_FILE:?RT_COMPOSE_FILE is unset}" \
-        --profile "${RT_PROFILE:-prod}" start "$@"
-      ;;
-    podman)
-      local svc rc=0
-      for svc in "$@"; do ${RT_SYSTEMCTL} start "${svc}.service" || rc=1; done
-      return "${rc}"
-      ;;
-  esac
+  local svc rc=0
+  for svc in "$@"; do ${RT_SYSTEMCTL} start "${svc}.service" || rc=1; done
+  return "${rc}"
 }
 
 # -----------------------------------------------------------------------------

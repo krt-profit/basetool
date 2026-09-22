@@ -3,14 +3,13 @@
 # Self-test for scripts/lib/container-runtime.sh — the seam Phase 3 puts between
 # the operational scripts and the container runtime.
 #
-# No daemon, no containers, no network: `docker`, `podman`, `skopeo` and
-# `systemctl` are stubbed on PATH and record what they were called with, which is
-# the same harness deploy.test.sh already uses.
+# No daemon, no containers, no network: `podman`, `skopeo` and `systemctl` are
+# stubbed on PATH and record what they were called with, which is the same
+# harness deploy.test.sh already uses.
 #
-# The point of the file is the SECOND backend. Production serves on Docker until
-# the cutover and the testing host serves on Podman now, so both shapes are live
-# at once and a change that only works on one of them is a change that breaks the
-# other silently. Every behavioural assertion below is therefore made twice.
+# Rootless Podman only, since 2026-09-22 (OPS-SIMP-01): the Docker half of the
+# seam, and with it every assertion this file made twice, was removed with the
+# retired Docker host.
 #
 #   bash scripts/container-runtime.test.sh
 # =============================================================================
@@ -52,17 +51,11 @@ STUB
   chmod +x "${BIN}/${name}"
 }
 
-make_stub docker 'case "$*" in
-  *"buildx imagetools"*) echo "sha256:1111111111111111111111111111111111111111111111111111111111111111" ;;
-  *"ps -aq"*) echo "cid-docker-1" ;;
-  *"inspect --format"*) echo "False|running/healthy" ;;
-  *create*) echo "created-cid" ;;
-esac'
 make_stub podman 'case "$*" in
   *"volume inspect"*) exit 0 ;;
   *"ps -aq"*) echo "cid-podman-1" ;;
   *"ps --format"*) echo "backend" ;;
-  *"inspect --format"*) echo "false|running/healthy" ;;
+  *"inspect --format"*) echo "running/healthy" ;;
   *create*) echo "created-cid" ;;
 esac'
 make_stub skopeo 'echo "{\"Digest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}"'
@@ -82,7 +75,6 @@ run_rt() {
     set +e
     export RT_BACKEND="$backend"
     export RT_CLI="" RT_SYSTEMCTL="" RT_UNIT_DIR="${WORK}/units"
-    export RT_COMPOSE_FILE="${WORK}/docker-compose.yml" RT_PROFILE=prod
     # shellcheck disable=SC1090
     . "$LIB"
     rt_detect
@@ -129,10 +121,10 @@ say "== detecting the runtime, which is where this class of bug lives =="
 # nothing else.
 #
 # `PATH="$1:/usr/bin:/bin"` was the first attempt and it is not isolation: a
-# GitHub runner has a real, working /usr/bin/docker, so "a host with only podman"
-# and "a host with neither" both detected docker and the suite went red there
-# while passing on a workstation that happens to have no docker in /usr/bin.
-# Green for the wrong reason, in the file whose whole subject is detection.
+# GitHub runner has a real, working /usr/bin/podman as well as a docker, so "a
+# host with neither" detected one and the suite went red there while passing on a
+# workstation. Green for the wrong reason, in the file whose whole subject is
+# detection.
 MINIMAL="${WORK}/coreutils"
 mkdir -p "$MINIMAL"
 for util in bash sh env id basename getent cut ls sudo sleep; do
@@ -207,38 +199,29 @@ detect_detail() {
   )
 }
 # The isolation is itself asserted, because it is what silently failed: on a
-# runner with /usr/bin/docker the scenarios below are meaningless unless the PATH
+# runner with /usr/bin/podman the scenarios below are meaningless unless the PATH
 # they run under really cannot reach it. Checking the scenarios without checking
 # this is how the suite went green on a workstation and red in CI.
-if PATH="$MINIMAL" command -v docker >/dev/null 2>&1; then
-  bad "the minimal PATH can still reach a docker -- the detection cases prove nothing"
-else
-  ok "the minimal PATH reaches no docker, so a host-installed one cannot leak in"
-fi
 if PATH="$MINIMAL" command -v podman >/dev/null 2>&1; then
-  bad "the minimal PATH can still reach a podman"
+  bad "the minimal PATH can still reach a podman -- the detection cases prove nothing"
 else
-  ok "...and no podman either"
+  ok "the minimal PATH reaches no podman, so a host-installed one cannot leak in"
 fi
 
-ONLY_DOCKER="${WORK}/only-docker"; mkdir -p "$ONLY_DOCKER"; cp "${BIN}/docker" "$ONLY_DOCKER/"
 ONLY_PODMAN="${WORK}/only-podman"; mkdir -p "$ONLY_PODMAN"; cp "${BIN}/podman" "$ONLY_PODMAN/"
 NEITHER="${WORK}/neither"; mkdir -p "$NEITHER"
+# A docker binary on its own is no runtime any more (OPS-SIMP-01): it must be refused, not used.
+ONLY_DOCKER="${WORK}/only-docker"; mkdir -p "$ONLY_DOCKER"
+printf '#!/usr/bin/env bash\nexit 0\n' > "${ONLY_DOCKER}/docker"; chmod +x "${ONLY_DOCKER}/docker"
 
-got="$(detect_in "$ONLY_DOCKER")"
-if [[ "$got" == docker ]]; then ok "a host with a working docker is docker"; else bad "expected docker, got '${got}'"; fi
 got="$(detect_in "$ONLY_PODMAN")"
-if [[ "$got" == podman ]]; then ok "a host with only podman is podman"; else bad "expected podman, got '${got}'"; fi
+if [[ "$got" == podman ]]; then ok "a host with podman is podman"; else bad "expected podman, got '${got}'"; fi
 got="$(detect_in "$NEITHER")"
-if [[ -z "$got" ]]; then ok "a host with neither refuses instead of guessing"; else bad "expected a refusal, got '${got}'"; fi
-# The real production case: the docker BINARY exists but the daemon is not
-# answering. Treating "installed" as "usable" would pick a backend that cannot
-# run anything.
-BROKEN="${WORK}/broken-docker"; mkdir -p "$BROKEN"
-printf '#!/usr/bin/env bash\nexit 1\n' > "${BROKEN}/docker"; chmod +x "${BROKEN}/docker"
-cp "${BIN}/podman" "${BROKEN}/"
-got="$(detect_in "$BROKEN")"
-if [[ "$got" == podman ]]; then ok "an installed-but-dead docker does not win over a working podman"; else bad "expected podman, got '${got}'"; fi
+if [[ -z "$got" ]]; then ok "a host with no podman refuses instead of guessing"; else bad "expected a refusal, got '${got}'"; fi
+got="$(detect_in "$ONLY_DOCKER")"
+if [[ -z "$got" ]]; then ok "a working docker alone is refused -- the Docker runtime is retired"; else bad "docker was accepted as '${got}'"; fi
+got="$(RT_BACKEND=docker bash -c '. "$1"; rt_detect' _ "$LIB" 2>&1 || true)"
+if [[ "$got" == *"retired"* ]]; then ok "a preset RT_BACKEND=docker is refused and says why"; else bad "RT_BACKEND=docker was not refused: '${got}'"; fi
 
 # The case that shipped broken. `podman ps` succeeds for EVERY account with a
 # podman binary, against that account's own empty store -- so "can I run podman"
@@ -369,7 +352,7 @@ printf '%s\n' "${state}"
 STUB
 chmod +x "${STARTUP}/systemctl"
 
-# Prints "rc=<n> calls=<n>". $1 backend, $2 the states, $3 RT_STARTUP_WAIT.
+# Prints "rc=<n> calls=<n>". $1 backend (podman), $2 the states, $3 RT_STARTUP_WAIT.
 startup_case() {
   # shellcheck disable=SC2030,SC2031,SC2034
   (
@@ -400,8 +383,6 @@ expect_startup "a manager still starting is waited out"        podman "starting 
 expect_startup "a manager not answering yet is waited out too" podman "- - degraded"             10 "rc=0 calls=3"
 expect_startup "shutting down is not a moment to start a job, and it says so at once" \
                                                                 podman "stopping"                 10 "rc=1 calls=1"
-expect_startup "docker has no user manager and nothing to wait for" \
-                                                                docker "starting"                 10 "rc=0 calls=0"
 got="$(startup_case podman "starting" 3)"
 if [[ "$got" == rc=1* ]] && grep -q "still 'starting' after 3s" "${WORK}/startup.err"; then
   ok "a startup that never finishes is refused after the bound, naming the state it was stuck in"
@@ -429,21 +410,15 @@ fi
 
 say ""
 say "== resolving a tag to a digest without pulling =="
-expect_call "docker asks buildx imagetools" docker \
-  'rt_resolve_digest ghcr.io/x/y:stable' 'buildx imagetools inspect ghcr.io/x/y:stable'
-expect_out  "docker returns the manifest digest" docker \
-  'rt_resolve_digest ghcr.io/x/y:stable' 'sha256:1111111111111111111111111111111111111111111111111111111111111111'
 expect_call "podman asks skopeo, which is why the role installs it" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'skopeo inspect --no-tags docker://ghcr.io/x/y:stable'
 expect_out  "podman returns the registry digest" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'sha256:2222222222222222222222222222222222222222222222222222222222222222'
-expect_no_call "neither backend PULLS to resolve a tag" podman \
+expect_no_call "resolving a tag never PULLS it" podman \
   'rt_resolve_digest ghcr.io/x/y:stable' 'podman pull'
 
 say ""
 say "== bringing the stack up, and WAITING for health =="
-expect_call "docker waits with compose --wait" docker \
-  'rt_apply backend frontend' 'up -d --wait backend frontend'
 expect_call "podman reloads before starting, because units may have moved" podman \
   'rt_apply backend' 'systemctl --user daemon-reload'
 expect_call "podman starts the unit, whose Type=notify IS the wait" podman \
@@ -452,23 +427,15 @@ expect_out  "podman reports failure when a start does not reach healthy" podman 
   'STUB_FAIL="start_backend.service" rt_apply backend; echo "rc=$?"' 'rc=1'
 expect_out  "...and success when it does" podman \
   'rt_apply backend; echo "rc=$?"' 'rc=0'
-expect_out  "docker reports failure the same way" docker \
-  'STUB_FAIL="up_-d" rt_apply backend; echo "rc=$?"' 'rc=1'
 
 say ""
 say "== pre-pulling the release, where a service name and a reference are NOT the same thing =="
-# The regression this section exists for. rt_pull used to take REFERENCES while
-# its only call site passed SERVICE NAMES, and both were correct under Docker:
-# `docker compose pull backend` resolves the name through the compose file.
-# Podman has no compose file, so the identical argument became `podman pull
-# backend` -- a bare name resolved against the host's unqualified-search
-# registries -- which fails and, at a call site running under `set -e`, aborted
-# every Podman deploy at "pulling images". It now takes the pair.
+# The regression this section exists for. rt_pull once took SERVICE NAMES, which
+# `docker compose pull` could resolve through the compose file and podman cannot:
+# `podman pull backend` is a bare name resolved against the host's
+# unqualified-search registries, which fails and, at a call site running under
+# `set -e`, aborted every Podman deploy at "pulling images". It takes the pair.
 PULL_PAIRS="'backend=ghcr.io/krt-profit/basetool-backend@sha256:3333333333333333333333333333333333333333333333333333333333333333' 'ingest=ghcr.io/krt-profit/basetool-ingest@sha256:4444444444444444444444444444444444444444444444444444444444444444'"
-expect_call "docker hands compose the SERVICE names it can resolve" docker \
-  "rt_pull ${PULL_PAIRS}" 'pull --quiet backend ingest'
-expect_no_call "...and never a reference, which compose has no argument for" docker \
-  "rt_pull ${PULL_PAIRS}" '@sha256:'
 expect_call "podman pulls the REFERENCE, the only form it can resolve" podman \
   "rt_pull ${PULL_PAIRS}" \
   'pull --quiet ghcr.io/krt-profit/basetool-backend@sha256:3333333333333333333333333333333333333333333333333333333333333333'
@@ -479,27 +446,21 @@ expect_call "every image is attempted, so the journal names all of them" podman 
   'pull --quiet ghcr.io/krt-profit/basetool-ingest@sha256:4444444444444444444444444444444444444444444444444444444444444444'
 expect_out "a failed pull is reported, because these three images ARE the release" podman \
   "STUB_FAIL='pull' rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=1'
-expect_out "docker reports it the same way" docker \
-  "STUB_FAIL='pull_--quiet' rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=1'
 expect_out "...and success stays success" podman \
   "rt_pull ${PULL_PAIRS}; echo \"rc=\$?\"" 'rc=0'
 
 say ""
 say "== finding the containers that belong to a service =="
-expect_call "docker asks compose, which knows the project" docker \
-  'rt_service_container_ids backend' 'ps -aq backend'
 expect_call "podman filters on the label Quadlet stamps, not on the name" podman \
   'rt_service_container_ids backend' 'label=PODMAN_SYSTEMD_UNIT=backend.service'
 expect_out  "podman returns the id" podman 'rt_service_container_ids backend' 'cid-podman-1'
 
 say ""
 say "== judging one container =="
-expect_out "docker carries the compose one-off flag" docker \
-  'rt_container_probe cid-1' 'False|running/healthy'
-expect_out "podman states the flag as false rather than leaving it empty" podman \
-  'rt_container_probe cid-1' 'false|running/healthy'
+expect_out "a container reads as <state>/<health>" podman \
+  'rt_container_probe cid-1' 'running/healthy'
 expect_out "an unknown container reads as gone, not as an empty state" podman \
-  'STUB_FAIL="inspect_--format" rt_container_probe cid-1' '|gone'
+  'STUB_FAIL="inspect_--format" rt_container_probe cid-1' 'gone'
 
 say ""
 say "== the digest pin, which stops a tag flip moving the stack =="
@@ -601,10 +562,8 @@ expect_call    "the age filter that protects the rollback images" podman \
   'rt_prune_images 720h' 'image prune --force --filter until=720h'
 
 say ""
-say "== the monitoring plane, which is a project under one runtime and a name list under the other =="
-mon() { printf 'export RT_PROJECT_DIR=%q RT_MONITORING_FILE=%q RT_MONITORING_SERVICES=%q;' \
-  "$WORK" "${WORK}/docker-compose.monitoring.yml" "prometheus loki grafana"; }
-: > "${WORK}/docker-compose.monitoring.yml"
+say "== the monitoring plane, a set of units told apart from the stack by name =="
+mon() { printf 'export RT_MONITORING_SERVICES=%q;' "prometheus loki grafana"; }
 
 # shellcheck disable=SC2016
 # The snippets below are passed to `eval` inside run_rt, so `${WORK}` is expanded THERE, in the
@@ -625,8 +584,6 @@ expect_no_call "...and the database is never restarted for somebody else's chang
 # shellcheck disable=SC2016  # expanded by eval inside run_rt, not here
 expect_no_call "an unchanged pin does not restart anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   'restart backend.service'
 
-expect_call "docker addresses it as its own project" docker \
-  "$(mon) rt_monitoring_up" '-p iri-monitoring'
 expect_call "podman starts each named unit" podman \
   "$(mon) rt_monitoring_up" 'systemctl --user start prometheus.service'
 expect_call "...all of them, not just the first" podman \
@@ -648,15 +605,6 @@ expect_out "...but a FAILED restart stays pending for the retry" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; norestart() { [[ \"\$1\" != restart ]]; }; RT_SYSTEMCTL=norestart; rt_monitoring_up; printf '[%s]' \"\${RT_CHANGED_SERVICES}\"" '[prometheus]'
 expect_out "...and a successful one is not" podman \
   "$(mon) RT_CHANGED_SERVICES='prometheus'; rt_monitoring_up; printf '[%s]' \"\${RT_CHANGED_SERVICES}\"" '[]'
-# `down` exists for exactly one reason: the monitoring project holds the shared
-# data networks as `external`, and a bridge with an endpoint attached cannot be
-# removed. Skipping it strands the topology change half-applied.
-expect_call "docker takes the project down with its orphans" docker \
-  "$(mon) rt_monitoring_down" 'down --remove-orphans'
-expect_call "podman stops each named unit" podman \
-  "$(mon) rt_monitoring_down" 'systemctl --user stop loki.service'
-expect_call "docker asks the project label whether anything runs" docker \
-  "$(mon) rt_monitoring_is_running" 'label=com.docker.compose.project=iri-monitoring'
 expect_call "a monitoring recreate touches one service only" podman \
   "$(mon) rt_monitoring_recreate loki" 'systemctl --user restart loki.service'
 expect_no_call "...and never the whole plane" podman \
@@ -676,32 +624,36 @@ expect_no_call "...and never through the service user's, which has no such unit"
 # host service turns the whole monitoring plane into system units nobody granted access to.
 expect_call "a containerised one still goes to the service user" podman \
   "$(mon) RT_HOST_SYSTEMCTL=systemctl rt_monitoring_recreate prometheus" 'systemctl --user restart prometheus.service'
-# Under Docker alloy IS a container, and the same name must not take the host route there.
-expect_call "under docker the same service is recreated as a container" docker \
-  "$(mon) rt_monitoring_recreate alloy" 'up -d --force-recreate --no-deps alloy'
 
-say ""
-say "== taking the app stack down, which only a topology change needs =="
-expect_call "docker uses the app project's own file" docker \
-  'rt_apply_stack >/dev/null; rt_stack_down' 'down --remove-orphans'
-# Reverse order: a dependent has to stop before the thing it depends on, or the
-# database is pulled out from under a service still talking to it.
-got="$(run_rt podman 'RT_STACK_SERVICES="db-backend keycloak frontend" rt_stack_down' 2>/dev/null; grep -o 'stop [a-z-]*\.service' "$LOG" | tr '\n' ' ')"
-if [[ "$got" == *"stop frontend.service stop keycloak.service stop db-backend.service"* ]]; then
-  ok "podman stops them in reverse dependency order"
+# The monitoring set is DERIVED from the unit directory (OPS-SIMP-04): every `.container` that is not
+# an application service. deploy.sh and backup.sh each carried the nine names as a literal, and a
+# list kept in step with compose by hand is how acme went missing from every list until 2026-09-22.
+MONDIR="${WORK}/mon-units"; mkdir -p "$MONDIR"
+for u in backend db-backend prometheus loki acme; do printf '[Container]\n' > "${MONDIR}/${u}.container"; done
+got="$(run_rt podman "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${MONDIR}'; RT_STACK_SERVICES='db-backend backend acme'; rt_monitoring_services" 2>/dev/null | sort | tr '\n' ' ')"
+if [[ "$got" == "loki prometheus " ]]; then
+  ok "the monitoring units are the unit directory minus the stack"
 else
-  bad "stop order was '${got}', wanted frontend, keycloak, db-backend"
+  bad "derived monitoring set was '${got}', wanted 'loki prometheus'"
 fi
+expect_call "...and rt_monitoring_up starts exactly those" podman \
+  "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${MONDIR}'; RT_STACK_SERVICES='db-backend backend acme'; rt_monitoring_up" \
+  'systemctl --user start loki.service'
+expect_no_call "...never an application unit" podman \
+  "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${MONDIR}'; RT_STACK_SERVICES='db-backend backend acme'; rt_monitoring_up" \
+  'start backend.service'
+expect_out "an empty unit directory is 'not configured', not an error" podman \
+  "RT_MONITORING_SERVICES=''; RT_UNIT_DIR='${WORK}/nothing-here'; rt_monitoring_configured; echo \"rc=\$?\"" 'rc=1'
 
 say ""
 say "== reading state out for the backup =="
-# One primitive serves a host path and a named volume, because both CLIs accept
+# One primitive serves a host path and a named volume, because podman accepts
 # either in the same position. That is what let the edge's TLS material -- which
 # lives in volumes -- be captured by the same code that reads the keystore.
 expect_call "a named volume is read through the helper" podman \
   'rt_read_mount edge-certs postgres:18-alpine tar -C /src -cz .' \
   'run --rm -v edge-certs:/src:ro postgres:18-alpine tar -C /src -cz .'
-expect_call "...and a host path identically" docker \
+expect_call "...and a host path identically" podman \
   'rt_read_mount /var/iri/monitoring postgres:18-alpine cat /src/x' \
   'run --rm -v /var/iri/monitoring:/src:ro'
 expect_call "the mount is read-only, so a backup cannot write to what it reads" podman \
@@ -758,15 +710,13 @@ expect_no_call "...and nothing is run for it" podman \
 
 say ""
 say "== the quiesce: a pause, not a release =="
-expect_call "docker stops the writers with the configured timeout" docker \
-  'RT_STOP_TIMEOUT=30 rt_service_stop frontend backend ingest' 'stop -t 30 frontend backend ingest'
 expect_call "podman stops each writer unit" podman \
   'rt_service_stop frontend backend' 'systemctl --user stop frontend.service'
 expect_call "and starts them again" podman \
   'rt_service_start frontend' 'systemctl --user start frontend.service'
 # The quiesce must NOT apply the pin or wait for health -- that is a release
 # operation, and the backup is meant to put the stack back exactly as it was.
-expect_no_call "the quiesce does not re-apply the digest pin" docker \
+expect_no_call "the quiesce does not re-apply the digest pin" podman \
   'RT_PIN_FILE=/tmp/pin.yml rt_service_start frontend' '/tmp/pin.yml'
 
 say ""
@@ -797,9 +747,6 @@ expect_no_call "...and never through podman cp -, which exits 125 on a completed
 expect_no_call "...so the service user never opens the deploy account's file" podman \
   'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
   "cp ${WORK}/krt_basetool.dump"
-expect_call "docker copies it directly, where one daemon reads for everybody" docker \
-  'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
-  'cp /work/krt_basetool.dump iri-restore-drill:/tmp/krt_basetool.dump'
 expect_call "and it is removed whatever state it is in" podman \
   'rt_rm_force iri-restore-drill' 'rm -f -v iri-restore-drill'
 
@@ -810,6 +757,46 @@ expect_call "the password is piped, not passed" podman \
   'rt_login ghcr.io someone '"${WORK}"'/token' '--password-stdin'
 expect_no_call "the value itself is never in an argv" podman \
   'rt_login ghcr.io someone '"${WORK}"'/token' 'hunter2'
+
+say ""
+say "== lib/common.sh: the helpers the four operational scripts share (OPS-SIMP-04) =="
+COMMON="${HERE}/lib/common.sh"
+CENV="${WORK}/common-env"; mkdir -p "${CENV}/textfile"
+printf 'A=1\nIRI_MONITORING_ENABLED = "true"\nKEY=first\nKEY=last\nQ=\x27single\x27\n' > "${CENV}/.env"
+common() { # $1 snippet -- runs it with lib/common.sh loaded against the fixture
+  ( set +e; export COMPOSE_DIR="${CENV}" TEXTFILE_DIR="${CENV}/textfile"
+    # shellcheck disable=SC1090
+    . "$COMMON"; eval "$1" )
+}
+got="$(common 'read_env IRI_MONITORING_ENABLED')"
+if [[ "$got" == "true" ]]; then ok "read_env strips whitespace and quotes"; else bad "read_env gave '${got}'"; fi
+got="$(common 'read_env KEY')"
+if [[ "$got" == "last" ]]; then ok "the last assignment wins, as for compose"; else bad "read_env gave '${got}'"; fi
+got="$(common 'read_env Q')"
+if [[ "$got" == "single" ]]; then ok "single quotes are stripped too"; else bad "read_env gave '${got}'"; fi
+got="$(common 'read_env MISSING; echo "[$?]"')"
+if [[ "$got" == "[0]" ]]; then ok "a missing key is empty, not an error"; else bad "read_env gave '${got}'"; fi
+got="$(common 'read_env "A;rm -rf x"; echo "rc=$?"')"
+if [[ "$got" == "rc=1" ]]; then ok "a key that is not a variable name is refused before it reaches sed"; else bad "read_env gave '${got}'"; fi
+common 'printf "m 1\n" | write_textfile t.prom' >/dev/null
+if [[ "$(cat "${CENV}/textfile/t.prom" 2>/dev/null)" == "m 1" ]]; then ok "write_textfile writes stdin to the named file"; else bad "write_textfile wrote nothing"; fi
+leftovers="$(find "${CENV}/textfile" -name '.t.prom.*' | wc -l | tr -d ' ')"
+if [[ "$leftovers" == 0 ]]; then ok "...through a temporary file that does not survive"; else bad "${leftovers} temp file(s) left"; fi
+got="$(common 'printf "x\n" | write_textfile "../evil.prom"; echo "rc=$?"')"
+if [[ "$got" == *"rc=1" ]]; then ok "a name that leaves the directory is refused"; else bad "write_textfile accepted ../evil.prom: '${got}'"; fi
+got="$(common 'TEXTFILE_DIR=/nonexistent/x/y; printf "x\n" | write_textfile u.prom; echo "rc=$?"')"
+if [[ "$got" == *"WARN"*"rc=1" ]]; then ok "an unwritable directory is a WARN and a non-zero return, never a crash"; else bad "write_textfile on an unwritable dir: '${got}'"; fi
+got="$(common 'fail "boom"; echo survived' 2>&1)"
+if [[ "$got" == *"FATAL: boom"* && "$got" != *survived* ]]; then ok "fail logs FATAL and exits"; else bad "fail gave '${got}'"; fi
+for job in deploy backup restore-drill container-cleanup; do
+  # shellcheck disable=SC2016 # a literal `${...SCRIPT_DIR}` is what the pattern looks for
+  if grep -q '^\. "\${[A-Z_]*SCRIPT_DIR}/lib/common.sh"' "${HERE}/${job}.sh" \
+     && ! grep -qE '^(log|fail|read_env)\(\)' "${HERE}/${job}.sh"; then
+    ok "${job}.sh uses lib/common.sh and keeps no copy of its helpers"
+  else
+    bad "${job}.sh does not source lib/common.sh, or still defines its own log/fail/read_env"
+  fi
+done
 
 say ""
 printf '%d passed, %d failed\n' "$PASSED" "$FAILED"

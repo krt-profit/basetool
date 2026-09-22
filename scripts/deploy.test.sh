@@ -4,9 +4,13 @@
 # fast-exit, the running-stack drift verification behind it, and their
 # interplay with the bad-digest backoff and the rollback path.
 #
-# The script under test is run against a STUBBED `docker` CLI (and a no-op
-# `flock`) placed first on PATH, so no daemon, no registry and no compose
-# stack are needed — pure bash, runs in a couple of seconds. The stub records
+# The script under test is run against STUBBED `podman`, `skopeo`, `systemctl`
+# and `cosign` CLIs (and a no-op `flock`) placed first on PATH, so no container,
+# no registry and no service user are needed — pure bash, runs in seconds.
+#
+# Rootless Podman only since 2026-09-22 (OPS-SIMP-01): every scenario that used
+# to drive the Docker arm now drives the Podman one, asserting the same decision
+# on the unit operations instead of on `docker compose` calls. The stub records
 # every invocation into a log file and answers from FAKE_* environment
 # variables, which each scenario sets to model a specific host state.
 #
@@ -34,14 +38,26 @@ fi
 tests_run=0
 tests_failed=0
 
+# A readable 64-hex digest: the tag, then zero padding. REAL-SHAPED, because it has
+# to be: the resolver parses skopeo's JSON with a sed pattern that requires exactly
+# 64 hex characters and silently yields nothing for anything shorter. A test that
+# fed it `sha256:backend-current` would exercise the failure path while reading
+# like the happy one.
+hexdig() {
+  local tag="$1" pad=""
+  while (( ${#tag} + ${#pad} < 64 )); do pad="${pad}0"; done
+  printf 'sha256:%s%s' "${tag}" "${pad}"
+}
+
 # The five digests the stub registry resolves `:stable` to, and the matching
-# local RepoDigest entries of a converged stack. Values are shaped like real
-# digests but deliberately readable.
-DIG_BACKEND="sha256:backend-current"
-DIG_FRONTEND="sha256:frontend-current"
-DIG_INGEST="sha256:ingest-current"
-DIG_CONFIG="sha256:config-current"
-DIG_KCSPI="sha256:kcspi-current"
+# local RepoDigest entries of a converged stack.
+DIG_BACKEND="$(hexdig beef)"
+DIG_FRONTEND="$(hexdig face)"
+DIG_INGEST="$(hexdig 1ce)"
+DIG_CONFIG="$(hexdig c0ffee)"
+DIG_KCSPI="$(hexdig 5b1)"
+# A config digest the registry moves to, for the scenarios that stage a bundle.
+DIG_CONFIG_NEXT="$(hexdig c0ff1e)"
 MARKER="${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
 
 REPO_BACKEND="ghcr.io/krt-profit/basetool-backend@${DIG_BACKEND}"
@@ -97,9 +113,9 @@ fi
 rm -f "${T_MINIMAL}/.symprobe"
 trap 'rm -rf "${T_MINIMAL}"' EXIT
 
-# Builds a complete fake host layout under $1: compose dir with a dummy
-# compose file and .env, state dir, GHCR token, keystore, the stub `docker`
-# and `flock` binaries, and an empty invocation log. Exports the per-scenario
+# Builds a complete fake host layout under $1: config dir with .env, state dir,
+# GHCR token, keystore, a Quadlet unit directory seeded with the application
+# units, the stub binaries, and an empty invocation log. Exports the per-scenario
 # path variables the runner and the assertions use.
 setup_host() {
   local tmp="$1"
@@ -111,150 +127,24 @@ setup_host() {
   T_LOCK="${tmp}/deploy.lock"
 
   mkdir -p "${T_COMPOSE_DIR}" "${T_STATE_DIR}" "${T_FAKE_BIN}"
-  echo "# dummy compose file — never parsed, the docker CLI is stubbed" \
+  echo "# dummy compose file — never parsed; the units are the deployment" \
     > "${T_COMPOSE_DIR}/docker-compose.yml"
+  seed_units "${tmp}"
   printf 'IRI_KEYSTORE_HOST_PATH=%s/keystore.p12\n' "${tmp}" > "${T_COMPOSE_DIR}/.env"
   : > "${tmp}/keystore.p12"
   echo "fake-token" > "${T_TOKEN}"
   : > "${T_DOCKER_LOG}"
-
-  # Stub docker CLI. Dispatches on the subcommand, records every invocation,
-  # and answers from FAKE_* environment variables (container ids are cid-<key>,
-  # <key> is the lookup suffix):
-  #   FAKE_PS_<svc>            container id(s) `compose ps -aq <svc>` prints
-  #   FAKE_STATE_<key>         rendered state template, e.g. running/healthy
-  #   FAKE_ONEOFF_<key>        com.docker.compose.oneoff label value (True/…)
-  #   FAKE_REPODIGESTS_<key>   space-joined RepoDigests of the running image
-  #   FAKE_UP_RC               exit code of `compose up` (default 0)
-  cat > "${T_FAKE_BIN}/docker" <<'FAKE'
-#!/usr/bin/env bash
-set -euo pipefail
-printf 'docker %s\n' "$*" >> "${FAKE_DOCKER_LOG}"
-
-lookup() { # lookup <prefix> <name> — indirect ${<prefix>_<name>} with empty default
-  local var="$1_$2"
-  printf '%s' "${!var:-}"
-}
-
-case "${1:-}" in
-  login)
-    cat > /dev/null
-    exit 0
-    ;;
-  buildx)
-    # buildx imagetools inspect <ref> --format '{{.Manifest.Digest}}'
-    case "${4:-}" in
-      *basetool-backend:*) echo "${FAKE_REMOTE_BACKEND}" ;;
-      *basetool-frontend:*) echo "${FAKE_REMOTE_FRONTEND}" ;;
-      *basetool-ingest:*) echo "${FAKE_REMOTE_INGEST}" ;;
-      *basetool-config:*) echo "${FAKE_REMOTE_CONFIG}" ;;
-      *basetool-keycloak-spi:*) echo "${FAKE_REMOTE_KCSPI}" ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  compose)
-    sub=""
-    for a in "$@"; do
-      case "$a" in
-        version | ps | pull | up) sub="$a"; break ;;
-      esac
-    done
-    case "${sub}" in
-      version) echo "2.29.0" ;;
-      ps)
-        svc="${!#}"
-        val="$(lookup FAKE_PS "${svc}")"
-        if [[ -n "${val}" ]]; then
-          printf '%s\n' "${val}"
-        fi
-        ;;
-      pull) exit "${FAKE_PULL_RC:-0}" ;;
-      up) exit "${FAKE_UP_RC:-0}" ;;
-      *) exit 0 ;;
-    esac
-    ;;
-  ps)
-    # Top-level `docker ps --filter label=com.docker.compose.project=iri-monitoring
-    # --format '{{.Names}}'` — model whether the monitoring compose project has running
-    # containers via FAKE_MON_PS (a container name means "running"; empty/unset means none).
-    if [[ "$*" == *"com.docker.compose.project=iri-monitoring"* ]]; then
-      if [[ -n "${FAKE_MON_PS:-}" ]]; then
-        printf '%s\n' "${FAKE_MON_PS}"
-      fi
-    elif [[ "$*" != *"--filter"* ]]; then
-      # Bare `docker ps --format '{{.Names}}'` — reconcile_edge asking whether the
-      # edge is up before reading its certificates through it. FAKE_EDGE_PS holds
-      # the running names (empty/unset = the edge is not running). An explicit
-      # `if`, not `[[ … ]] && printf`: this stub runs under `set -e`, where a false
-      # test as the last command of a body exits the stub non-zero.
-      if [[ -n "${FAKE_EDGE_PS:-}" ]]; then
-        printf '%s\n' "${FAKE_EDGE_PS}"
-      fi
-    fi
-    exit 0
-    ;;
-  exec)
-    # `docker exec edge sh -c 'find … -exec sha256sum {} +'`. FAKE_EDGE_CERT_LINES
-    # holds the sha256sum output verbatim; FAKE_EDGE_EXEC_RC=1 models an exec that
-    # fails, which must read as "could not tell" rather than "no certificates".
-    if [[ -n "${FAKE_EDGE_CERT_LINES:-}" ]]; then
-      printf '%s\n' "${FAKE_EDGE_CERT_LINES}"
-    fi
-    exit "${FAKE_EDGE_EXEC_RC:-0}"
-    ;;
-  inspect)
-    # inspect --format <fmt> <cid>; container ids are cid-<key>
-    svc="${4#cid-}"
-    case "${3:-}" in
-      *'.State.Status'*)
-        # The drift probe renders "<oneoff-label>|<status>/<health>".
-        val="$(lookup FAKE_STATE "${svc}")"
-        printf '%s|%s\n' "$(lookup FAKE_ONEOFF "${svc}")" "${val:-running/healthy}"
-        ;;
-      '{{.Image}}')
-        printf 'img-%s\n' "${svc}"
-        ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  image)
-    case "${2:-}" in
-      inspect)
-        # image inspect --format '{{join .RepoDigests " "}}' img-<svc>
-        printf '%s\n' "$(lookup FAKE_REPODIGESTS "${5#img-}")"
-        ;;
-      prune) exit 0 ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  create | rm) exit 0 ;;
-  cp)
-    # docker cp <cid>:/config/. <dest>/ — when a scenario supplies a fixture bundle,
-    # populate the extraction target from it; otherwise a no-op like create/rm.
-    if [[ -n "${FAKE_CONFIG_BUNDLE:-}" && "${2:-}" == *:/config/. ]]; then
-      cp -R "${FAKE_CONFIG_BUNDLE}/." "${3%/}/" 2>/dev/null || true
-    fi
-    exit 0
-    ;;
-  *) exit 1 ;;
-esac
-FAKE
-  chmod +x "${T_FAKE_BIN}/docker"
 
   # No-op flock so the test needs no util-linux (and the real one, where it
   # exists, is not exercised — locking is not under test here).
   printf '#!/usr/bin/env bash\nexit 0\n' > "${T_FAKE_BIN}/flock"
   chmod +x "${T_FAKE_BIN}/flock"
 
-  # --- the Podman shape ------------------------------------------------------
+  # --- the runtime stubs -----------------------------------------------------
   #
-  # Production serves on Docker until the cutover and the new host serves on
-  # rootless Podman, so the deployer has TWO live shapes and only one of them was
-  # ever exercised here. These stubs are the second.
-  #
-  # They record into the same log, so the existing assert helpers work unchanged
-  # for both: what an assertion is about is the DECISION the deployer took, not
-  # which binary carried it out.
+  # podman, skopeo, systemctl and the Quadlet generator. They record into one log,
+  # so an assertion is about the DECISION the deployer took. The log file keeps its
+  # historical name (docker-invocations.log) because every scenario reads it.
   cat > "${T_FAKE_BIN}/podman" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -280,17 +170,27 @@ case "${1:-}" in
     if [[ -n "${svc}" ]]; then
       val="$(lookup FAKE_PS "${svc}")"
       if [[ -n "${val}" ]]; then printf '%s\n' "${val}"; fi
-    elif [[ -n "${FAKE_EDGE_PS:-}" ]]; then
-      printf '%s\n' "${FAKE_EDGE_PS}"
+    else
+      # A bare `ps --format {{.Names}}`: which containers run. FAKE_EDGE_PS models the edge being up
+      # (reconcile_edge reads its certificates through it); FAKE_MON_PS a running monitoring unit.
+      if [[ -n "${FAKE_EDGE_PS:-}" ]]; then printf '%s\n' "${FAKE_EDGE_PS}"; fi
+      if [[ -n "${FAKE_MON_PS:-}" ]]; then printf '%s\n' "${FAKE_MON_PS}"; fi
     fi
     exit 0
+    ;;
+  exec)
+    # `podman exec edge sh -c 'find … -exec sha256sum {} +'`. FAKE_EDGE_CERT_LINES holds the
+    # sha256sum output verbatim; FAKE_EDGE_EXEC_RC=1 models an exec that fails, which must read as
+    # "could not tell" rather than "no certificates".
+    if [[ -n "${FAKE_EDGE_CERT_LINES:-}" ]]; then printf '%s\n' "${FAKE_EDGE_CERT_LINES}"; fi
+    exit "${FAKE_EDGE_EXEC_RC:-0}"
     ;;
   inspect)
     cid="${!#}"
     case "$*" in
       *RepoDigests*) printf '%s\n' "$(lookup FAKE_REPODIGESTS "${cid#img-cid-}")" ;;
       *.Image*)      printf 'img-%s\n' "${cid}" ;;
-      *)             printf 'false|%s\n' "$(lookup FAKE_STATE "${cid#cid-}")" ;;
+      *)             val="$(lookup FAKE_STATE "${cid#cid-}")"; printf '%s\n' "${val:-running/healthy}" ;;
     esac
     exit 0
     ;;
@@ -362,8 +262,7 @@ FAKE
 
   # `systemctl --user start <unit>` IS the health gate under Quadlet: Notify=healthy
   # makes the unit Type=notify, so the call blocks until podman reports healthy and
-  # returns non-zero when it does not. FAKE_UP_RC models exactly that -- the same
-  # variable the compose `up --wait` arm uses, because it is the same decision.
+  # returns non-zero when it does not. FAKE_UP_RC models exactly that.
   cat > "${T_FAKE_BIN}/systemctl" <<'FAKE'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -402,7 +301,7 @@ FAKE
   # Stub cosign for the host-side signature gate (REQ-OPS-015). Records the
   # invocation and exits FAKE_COSIGN_RC (default 0 = signature trusted); a
   # scenario sets FAKE_COSIGN_RC=1 to model a verification failure (a :stable
-  # tag moved to an untrusted digest). Placed first on PATH like `docker` so the
+  # tag moved to an untrusted digest). Placed first on PATH like the runtime stubs so the
   # real cosign (absent on the test runner) is never exercised.
   cat > "${T_FAKE_BIN}/cosign" <<'FAKE'
 #!/usr/bin/env bash
@@ -480,6 +379,55 @@ SHIM
   rm -rf "${tmp}/.permprobe"
 }
 
+# Seeds the Quadlet unit directory with the three application units a deployed host has, the
+# backend's carrying the keystore mount (the pre-flight reads the path from HERE, not from .env).
+# A host with an EMPTY unit directory has no stack at all and the deployer stages the bundle to fill
+# it, so a scenario that left it empty would model a host that cannot exist.
+seed_units() {
+  T_UNIT_DIR="${1}/units"
+  mkdir -p "${T_UNIT_DIR}"
+  local svc
+  for svc in backend frontend ingest; do
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+  done
+  printf 'Volume=%s/keystore.p12:/run/secrets/keystore.p12:ro\n' "$1" >> "${T_UNIT_DIR}/backend.container"
+}
+
+# Adds the monitoring units a monitored host has. The deployer derives the monitoring set from the
+# unit directory (every unit not in RT_STACK_SERVICES), so without these a host has no monitoring
+# plane to reconcile -- which is a real host shape, just not the one these scenarios are about.
+seed_monitoring_units() {
+  local svc
+  for svc in prometheus loki blackbox-exporter; do
+    printf '[Container]\nContainerName=%s\nImage=placeholder\n' "${svc}" > "${T_UNIT_DIR}/${svc}.container"
+  done
+}
+
+# What "the stack was applied" looks like: the gated apply starts every stack unit it did not
+# re-pin, and db-backend is never re-pinned. What "nothing was applied" looks like: no unit start or
+# restart at all.
+APPLIED="systemctl --user start db-backend.service"
+
+# assert_no_apply <description> -- fails if any unit was started or restarted.
+assert_no_apply() {
+  local desc="$1"
+  if ! grep -qE 'systemctl (--user )?(start|restart) ' "${T_DOCKER_LOG}"; then
+    record 1 "$desc"
+  else
+    record 0 "$desc (a unit was started or restarted)"
+  fi
+}
+
+# assert_no_monitoring_recreate <description> -- fails if a monitoring component was recreated.
+assert_no_monitoring_recreate() {
+  local desc="$1"
+  if ! grep -qE 'restart (prometheus|blackbox-exporter|alloy)\.service' "${T_DOCKER_LOG}"; then
+    record 1 "$desc"
+  else
+    record 0 "$desc (a monitoring component was recreated)"
+  fi
+}
+
 # Writes the idempotence marker for the scenario's state dir.
 write_marker() {
   echo "$1" > "${T_STATE_DIR}/last-deployed.digests"
@@ -524,6 +472,9 @@ run_deploy() {
       FAKE_REMOTE_INGEST="${DIG_INGEST}" \
       FAKE_REMOTE_CONFIG="${DIG_CONFIG}" \
       FAKE_REMOTE_KCSPI="${DIG_KCSPI}" \
+      RT_BACKEND=podman \
+      IRI_QUADLET_BIN="${T_FAKE_BIN}/quadlet" \
+      RT_UNIT_DIR="${T_UNIT_DIR}" \
       "${extra_env[@]}" \
       bash "${DEPLOY}" "${script_args[@]}" 2>&1
   )" || rc=$?
@@ -554,7 +505,7 @@ record() {
     echo "  FAIL - ${desc}"
     echo "----- deploy.sh output -----"
     echo "${LAST_OUTPUT}"
-    echo "----- docker invocations -----"
+    echo "----- recorded invocations -----"
     cat "${T_DOCKER_LOG}" 2>/dev/null || true
     echo "-------------------------------"
   fi
@@ -630,8 +581,8 @@ scenario_converged_noop() {
   assert_exit 0 "$rc" "converged stack exits 0"
   assert_contains "no change" "the no-op is reported"
   assert_contains "(running stack verified)" "the fast exit states the stack was verified"
-  assert_no_docker " pull " "nothing is pulled"
-  assert_no_docker " up " "nothing is restarted"
+  assert_no_docker "podman pull" "nothing is pulled"
+  assert_no_apply "nothing is restarted"
   assert_no_docker "cosign verify" "no signature verification on the steady-state no-op"
   rm -rf "${tmp}"
 }
@@ -654,7 +605,7 @@ scenario_stale_image_drift() {
   assert_contains "drift: backend: running image" "the stale backend image is reported as drift"
   assert_contains "re-applying" "the run falls through to a re-apply"
   assert_contains "deploy successful" "the re-apply completes"
-  assert_docker " up -d" "the stack is re-applied via compose up"
+  assert_docker "${APPLIED}" "the stack is re-applied through its units"
   if [[ ! -f "${T_STATE_DIR}/failed.digests" ]]; then
     record 1 "no failure is recorded for a successful re-apply"
   else
@@ -683,12 +634,12 @@ scenario_unhealthy_drift() {
     "the unhealthy state is reported as drift"
   assert_contains "targeted restart (not a release rollback)" \
     "the run takes the runtime-health path, not a release rollback"
-  assert_docker "up -d --no-deps --force-recreate" "only the affected service is force-recreated"
+  assert_docker "systemctl --user restart backend.service" "only the affected service is recreated"
   assert_contains "health drift resolved" "the targeted restart is reported resolved"
   assert_excludes "re-applying" "the full re-apply path is NOT taken for a health-only drift"
   assert_excludes "rolling back" "no release rollback happens"
   assert_no_docker "cosign verify" "a targeted restart does not re-verify signatures"
-  assert_no_docker " pull " "a targeted restart does not re-pull images"
+  assert_no_docker "podman pull" "a targeted restart does not re-pull images"
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
      || ! grep -q 'basetool_deploy_last_rollback_timestamp [1-9]' \
             "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
@@ -754,7 +705,7 @@ scenario_health_drift_respects_backoff() {
   run_deploy -- "${fake[@]}" "FAKE_STATE_backend=restarting/unhealthy" || rc=$?
   assert_exit 1 "$rc" "a backed-off health-drift tick exits non-zero"
   assert_contains "in backoff" "the targeted restart is throttled by its backoff"
-  assert_no_docker " up " "nothing is restarted during the health-restart backoff window"
+  assert_no_apply "nothing is restarted during the health-restart backoff window"
   rm -rf "${tmp}"
 }
 
@@ -798,7 +749,7 @@ scenario_missing_container_drift() {
   assert_exit 0 "$rc" "half-down-stack re-apply succeeds"
   assert_contains "drift: ingest: no container" "the missing container is reported as drift"
   assert_excludes "drift: backend" "the healthy backend is not flagged"
-  assert_docker " up -d" "the stack is re-applied"
+  assert_docker "${APPLIED}" "the stack is re-applied"
   rm -rf "${tmp}"
 }
 
@@ -817,7 +768,7 @@ scenario_new_promotion() {
   assert_exit 0 "$rc" "promotion deploy succeeds"
   assert_excludes "drift:" "no drift lines on the normal promotion path"
   assert_contains "deploy successful" "the promotion is applied"
-  assert_docker " up -d" "the stack is applied"
+  assert_docker "${APPLIED}" "the stack is applied"
   rm -rf "${tmp}"
 }
 
@@ -837,8 +788,8 @@ scenario_check_only_drift() {
   assert_contains "check-only: would re-apply" "check-only reports the pending drift re-apply"
   assert_docker "cosign verify" "check-only runs the signature preflight"
   assert_contains "all signatures verified OK" "check-only reports the signatures verified"
-  assert_no_docker " pull " "check-only pulls nothing"
-  assert_no_docker " up " "check-only restarts nothing"
+  assert_no_docker "podman pull" "check-only pulls nothing"
+  assert_no_apply "check-only restarts nothing"
   rm -rf "${tmp}"
 }
 
@@ -858,7 +809,7 @@ scenario_drift_respects_backoff() {
   assert_exit 0 "$rc" "backed-off drift tick exits 0"
   assert_contains "drift: backend: no container" "the drift is still reported"
   assert_contains "in backoff window" "the re-apply is throttled by the backoff"
-  assert_no_docker " up " "nothing is restarted during the backoff window"
+  assert_no_apply "nothing is restarted during the backoff window"
   rm -rf "${tmp}"
 }
 
@@ -886,28 +837,9 @@ scenario_drift_reapply_fails() {
   rm -rf "${tmp}"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 9: a leftover one-off `docker compose run` container (exited debug
-# shell / ad-hoc job) sits next to the healthy replica. `ps -aq` lists it, but
-# it is not part of the deployed stack and must not defeat the fast exit.
-# ---------------------------------------------------------------------------
-scenario_oneoff_ignored() {
-  echo "Scenario: leftover one-off run container next to healthy replica (must fast-exit)"
-  local tmp rc=0
-  tmp="$(mktmp)"
-  setup_host "${tmp}"
-  write_marker "${MARKER}"
-  mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" \
-    "FAKE_PS_backend=cid-backend"$'\n'"cid-backend_oneoff" \
-    "FAKE_ONEOFF_backend_oneoff=True" \
-    "FAKE_STATE_backend_oneoff=exited/no-healthcheck" || rc=$?
-  assert_exit 0 "$rc" "one-off leftover does not defeat the fast exit"
-  assert_contains "(running stack verified)" "the stack still counts as converged"
-  assert_excludes "drift:" "the one-off is not reported as drift"
-  assert_no_docker " up " "nothing is restarted"
-  rm -rf "${tmp}"
-}
+# (Scenario 9, a leftover `docker compose run` one-off container, went with the Docker runtime on
+# 2026-09-22: Podman has no compose `run`, and a container not started by a unit carries no
+# PODMAN_SYSTEMD_UNIT label, so it is never listed as a service's container in the first place.)
 
 # ---------------------------------------------------------------------------
 # Scenario 10: a container still inside its healthcheck start period
@@ -926,7 +858,7 @@ scenario_starting_grace() {
   run_deploy -- "${fake[@]}" "FAKE_STATE_backend=running/starting" || rc=$?
   assert_exit 0 "$rc" "start-period container counts as converged"
   assert_contains "(running stack verified)" "the tick fast-exits during the start window"
-  assert_no_docker " up " "no re-apply races the start-up"
+  assert_no_apply "no re-apply races the start-up"
   rm -rf "${tmp}"
 
   tmp="$(mktmp)"
@@ -938,7 +870,7 @@ scenario_starting_grace() {
     "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
   assert_exit 0 "$rc" "stale image in start period still re-applies"
   assert_contains "drift: backend: running image" "the stale image is reported despite the start period"
-  assert_docker " up -d" "the stack is re-applied"
+  assert_docker "${APPLIED}" "the stack is re-applied"
   rm -rf "${tmp}"
 }
 
@@ -955,7 +887,7 @@ scenario_monitoring_config_reload() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
-  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  seed_monitoring_units
   # The live (pre-apply) monitoring tree — snapshotted as the diff baseline. The changed
   # prometheus.yml deliberately differs in BYTE LENGTH from the bundle's version below:
   # mirror_dir uses rsync on Linux (CI), whose size+mtime quick-check would skip a same-size,
@@ -987,12 +919,12 @@ scenario_monitoring_config_reload() {
   run_deploy -- "${fake[@]}" \
     "IRI_MONITORING_ENABLED=true" \
     "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "config-change deploy with a monitoring recreate succeeds"
-  assert_docker "monitoring.yml up -d" "the monitoring stack is reconciled"
-  assert_docker "force-recreate --no-deps prometheus" "prometheus is force-recreated (its slice changed)"
-  assert_no_docker "force-recreate --no-deps alloy" "alloy is left alone (its slice is unchanged)"
-  assert_no_docker "force-recreate --no-deps blackbox-exporter" "blackbox is left alone (its slice is unchanged)"
+  assert_docker "systemctl --user start loki.service" "the monitoring stack is reconciled"
+  assert_docker "systemctl --user restart prometheus.service" "prometheus is recreated (its slice changed)"
+  assert_no_docker "restart alloy.service" "alloy is left alone (its slice is unchanged)"
+  assert_no_docker "restart blackbox-exporter.service" "blackbox is left alone (its slice is unchanged)"
   rm -rf "${tmp}"
 }
 
@@ -1007,7 +939,7 @@ scenario_monitoring_reload_no_drift() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
-  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
   echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
@@ -1024,8 +956,8 @@ scenario_monitoring_reload_no_drift() {
     "IRI_MONITORING_ENABLED=true" \
     "FAKE_REPODIGESTS_backend=ghcr.io/krt-profit/basetool-backend@sha256:backend-stale" || rc=$?
   assert_exit 0 "$rc" "monitoring-enabled deploy over a converged config succeeds"
-  assert_docker "monitoring.yml up -d" "the monitoring stack is still reconciled"
-  assert_no_docker "--force-recreate" "no service is recreated when on-disk matches the applied snapshot"
+  assert_docker "systemctl --user start loki.service" "the monitoring stack is still reconciled"
+  assert_no_monitoring_recreate "no service is recreated when on-disk matches the applied snapshot"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 0' \
        "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
     record 1 "the reconcile-disabled gauge is 0 when the reconcile is enabled and runs"
@@ -1050,7 +982,7 @@ scenario_monitoring_reload_self_heals_on_noop() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
-  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
   # On-disk carries the committed post-ADR-0090 target (11272); alloy/blackbox are already converged.
@@ -1068,12 +1000,12 @@ scenario_monitoring_reload_self_heals_on_noop() {
   run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
   assert_exit 0 "$rc" "the self-healing no-op tick exits 0"
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
-  assert_no_docker " pull " "the app stack is not pulled on the fast exit"
-  assert_no_docker "profile prod up" "the app stack is not re-applied on the fast exit"
-  assert_docker "monitoring.yml up -d" "the monitoring compose-definition reconcile (up -d) also runs on the fast exit"
-  assert_docker "force-recreate --no-deps prometheus" "the stale Prometheus config is self-healed (force-recreate)"
-  assert_no_docker "force-recreate --no-deps alloy" "alloy is already converged — left alone"
-  assert_no_docker "force-recreate --no-deps blackbox-exporter" "blackbox is already converged — left alone"
+  assert_no_docker "podman pull" "the app stack is not pulled on the fast exit"
+  assert_no_docker "${APPLIED}" "the app stack is not re-applied on the fast exit"
+  assert_docker "systemctl --user start loki.service" "the monitoring unit reconcile also runs on the fast exit"
+  assert_docker "systemctl --user restart prometheus.service" "the stale Prometheus config is self-healed (recreated)"
+  assert_no_docker "restart alloy.service" "alloy is already converged — left alone"
+  assert_no_docker "restart blackbox-exporter.service" "blackbox is already converged — left alone"
   if grep -q '^basetool_monitoring_config_applied_timestamp{component="prometheus"} [1-9]' \
        "${T_STATE_DIR}/textfile/monitoring-config.prom" 2>/dev/null; then
     record 1 "the config-applied timestamp metric is emitted for PrometheusConfigStale"
@@ -1099,7 +1031,7 @@ scenario_monitoring_compose_def_applied_on_noop() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
-  echo "# dummy monitoring compose" > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  seed_monitoring_units
   mkdir -p "${T_COMPOSE_DIR}/monitoring/prometheus" \
     "${T_COMPOSE_DIR}/monitoring/alloy" "${T_COMPOSE_DIR}/monitoring/blackbox"
   echo "scrape_interval: 30s" > "${T_COMPOSE_DIR}/monitoring/prometheus/prometheus.yml"
@@ -1115,10 +1047,10 @@ scenario_monitoring_compose_def_applied_on_noop() {
   run_deploy -- "${fake[@]}" "IRI_MONITORING_ENABLED=true" || rc=$?
   assert_exit 0 "$rc" "the converged no-op tick exits 0"
   assert_contains "no change" "it is still the idempotence no-op for the app stack"
-  assert_no_docker " pull " "the app stack is not pulled on the fast exit"
-  assert_no_docker "profile prod up" "the app stack is not re-applied on the fast exit"
-  assert_docker "monitoring.yml up -d" "the monitoring compose-definition reconcile (up -d) runs on the converged no-op"
-  assert_no_docker "--force-recreate" "no service is force-recreated when the config subtree is converged"
+  assert_no_docker "podman pull" "the app stack is not pulled on the fast exit"
+  assert_no_docker "${APPLIED}" "the app stack is not re-applied on the fast exit"
+  assert_docker "systemctl --user start loki.service" "the monitoring unit reconcile runs on the converged no-op"
+  assert_no_monitoring_recreate "no service is recreated when the config subtree is converged"
   rm -rf "${tmp}"
 }
 
@@ -1136,15 +1068,16 @@ scenario_monitoring_reconcile_disabled_when_running() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
+  seed_monitoring_units
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  # No IRI_MONITORING_ENABLED (defaults to false); FAKE_MON_PS models a running iri-monitoring project.
+  # No IRI_MONITORING_ENABLED (defaults to false); FAKE_MON_PS models a running monitoring unit.
   run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
   assert_exit 0 "$rc" "the gated-but-running no-op tick still exits 0"
   assert_contains "no change" "it is still the idempotence no-op"
   assert_contains "iri-monitoring is RUNNING but IRI_MONITORING_ENABLED != 'true'" \
     "the gated-off-but-running condition is logged as a loud WARN"
-  assert_no_docker "--force-recreate" "nothing is recreated while the reconcile is gated off"
+  assert_no_monitoring_recreate "nothing is recreated while the reconcile is gated off"
   if grep -q '^basetool_monitoring_reconcile_disabled{component="deploy"} 1' \
        "${T_STATE_DIR}/textfile/monitoring-reconcile.prom" 2>/dev/null; then
     record 1 "the reconcile-disabled gauge is 1 (MonitoringReconcileDisabled can fire)"
@@ -1173,11 +1106,10 @@ scenario_monitoring_flag_read_from_env_file() {
   # Appended, not written: setup_host already put IRI_KEYSTORE_HOST_PATH there and deploy.sh needs
   # it. Quoted value on purpose — an operator writes either form, and both must work.
   printf 'SOME_SECRET=must-not-leak\nIRI_MONITORING_ENABLED="true"\n' >> "${T_COMPOSE_DIR}/.env"
-  # A host whose iri-monitoring project is running necessarily HAS the monitoring compose file —
-  # deploy.sh only writes the armed gauge after checking for it, so leaving it out models a state
-  # that cannot occur and silently skips the very assertion this scenario exists for.
-  echo "# dummy monitoring compose file — the docker CLI is stubbed" \
-    > "${T_COMPOSE_DIR}/docker-compose.monitoring.yml"
+  # A host whose monitoring plane is running necessarily HAS its units — deploy.sh only writes the
+  # armed gauge after finding them, so leaving them out models a state that cannot occur and
+  # silently skips the very assertion this scenario exists for.
+  seed_monitoring_units
   mapfile -t fake < <(converged_env)
   # Deliberately NOT passing IRI_MONITORING_ENABLED: the .env is the only source.
   run_deploy -- "${fake[@]}" "FAKE_MON_PS=prometheus" || rc=$?
@@ -1211,7 +1143,7 @@ scenario_signature_verified_on_apply() {
   assert_contains "verifying image signatures" "the verification step runs"
   assert_docker "cosign verify" "cosign verify is invoked for the resolved digests"
   assert_contains "backend: signature OK" "the backend signature is reported OK"
-  assert_docker " up -d" "the stack is applied after verification"
+  assert_docker "${APPLIED}" "the stack is applied after verification"
   rm -rf "${tmp}"
 }
 
@@ -1232,8 +1164,8 @@ scenario_signature_failure_aborts() {
   assert_contains "cosign signature verification failed" "the security abort is reported"
   assert_contains "last cosign error: Error: no matching signatures" \
     "the abort quotes cosign's own reason instead of only that it failed"
-  assert_no_docker " pull " "nothing is pulled from an untrusted target"
-  assert_no_docker " up " "the stack is not recreated on an untrusted target"
+  assert_no_docker "podman pull" "nothing is pulled from an untrusted target"
+  assert_no_apply "the stack is not recreated on an untrusted target"
   if grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
        "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
     record 1 "a deploy-failure metric is written for the verification failure"
@@ -1263,7 +1195,7 @@ scenario_transient_verify_failure_retries() {
   assert_contains "verify attempt 1/3 failed" "the failed attempt is logged"
   assert_contains "TRANSIENT registry error" "cosign's stderr reaches the operator log"
   assert_contains "backend: signature OK" "the retry succeeds and the gate passes"
-  assert_docker " up -d" "the stack is applied after the retry"
+  assert_docker "${APPLIED}" "the stack is applied after the retry"
   rm -rf "${tmp}"
 }
 
@@ -1311,7 +1243,7 @@ scenario_signature_identity_is_anchored() {
     assert_exit 1 "$rc" "a signature minted as ${subject##*/workflows/} is refused"
     assert_contains "none of the expected identities matched" \
       "${subject##*/workflows/}: the abort quotes cosign's identity mismatch"
-    assert_no_docker " up " "${subject##*/workflows/}: nothing is applied"
+    assert_no_apply "${subject##*/workflows/}: nothing is applied"
     rm -rf "${tmp}"
   done
 }
@@ -1331,7 +1263,7 @@ scenario_break_glass_skips_verify() {
   assert_exit 0 "$rc" "break-glass deploy succeeds"
   assert_contains "signature verification DISABLED" "the disabled gate is logged loudly"
   assert_no_docker "cosign verify" "cosign is not invoked when the gate is disabled"
-  assert_docker " up -d" "the stack is still applied under break-glass"
+  assert_docker "${APPLIED}" "the stack is still applied under break-glass"
   rm -rf "${tmp}"
 }
 
@@ -1474,22 +1406,22 @@ scenario_forced_gated_rollback_keeps_marker() {
   local tmp rc=0
   tmp="$(mktmp)"
   setup_host "${tmp}"
-  # Live compose carries a postgres pin; the promoted bundle bumps it → a gated
-  # stateful-infra change (infra_image_pins differ).
-  printf 'services:\n  db-backend:\n    image: postgres:18-alpine\n' \
-    > "${T_COMPOSE_DIR}/docker-compose.yml"
+  # The live units carry a postgres pin; the promoted bundle bumps it → a gated stateful-infra change
+  # (infra_image_pins differ). Written the way the generator writes it: fully qualified.
+  mkdir -p "${T_COMPOSE_DIR}/quadlet/systemd"
+  printf '[Container]\nImage=docker.io/postgres:18-alpine\n' > "${T_COMPOSE_DIR}/quadlet/systemd/db-backend.container"
   local bundle="${tmp}/bundle"
-  mkdir -p "${bundle}"
-  printf 'services:\n  db-backend:\n    image: postgres:19-alpine\n' \
-    > "${bundle}/docker-compose.yml"
+  mkdir -p "${bundle}/quadlet/systemd"
+  echo "# promoted compose" > "${bundle}/docker-compose.yml"
+  printf '[Container]\nImage=docker.io/postgres:19-alpine\n' > "${bundle}/quadlet/systemd/db-backend.container"
   write_marker "${MARKER}"
   # A prior non-force tick already gated this target and wrote the marker.
-  echo "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|sha256:config-next|${DIG_KCSPI}" \
+  echo "${DIG_BACKEND}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG_NEXT}|${DIG_KCSPI}" \
     > "${T_STATE_DIR}/config-blocked.marker"
   echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy --force -- "${fake[@]}" \
-    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=sha256:config-next" "FAKE_UP_RC=1" || rc=$?
+    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" "FAKE_UP_RC=1" || rc=$?
   assert_exit 1 "$rc" "the failed forced apply exits non-zero"
   assert_contains "stateful-infra upgrade forced" "the --force path through the gate is taken"
   assert_contains "health check failed" "the apply fails its health gate and rolls back"
@@ -1519,10 +1451,10 @@ scenario_config_bundle_secret_rejected() {
   echo "services: {}" > "${T_STATE_DIR}/current-digest-pin.yml"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" \
-    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    "FAKE_CONFIG_BUNDLE=${bundle}" "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 1 "$rc" "a secret-carrying bundle aborts the deploy"
   assert_contains "forbidden secret-shaped file" "the widened secret gate rejects the .pem"
-  assert_no_docker " up -d" "nothing is applied when the bundle carries a secret"
+  assert_no_docker "${APPLIED}" "nothing is applied when the bundle carries a secret"
   rm -rf "${tmp}"
 }
 
@@ -1537,7 +1469,6 @@ scenario_new_promotion
 scenario_check_only_drift
 scenario_drift_respects_backoff
 scenario_drift_reapply_fails
-scenario_oneoff_ignored
 scenario_starting_grace
 scenario_monitoring_config_reload
 scenario_monitoring_reload_no_drift
@@ -1568,7 +1499,7 @@ scenario_check_only_noop_verifies() {
   assert_contains "check-only: no change" "it reports the no-op"
   assert_docker "cosign verify" "it still runs the signature preflight"
   assert_contains "all signatures verified OK" "the signatures verify"
-  assert_no_docker " up " "nothing is applied"
+  assert_no_apply "nothing is applied"
   rm -rf "${tmp}"
 }
 
@@ -1613,7 +1544,7 @@ scenario_config_mirrors_edge() {
   echo "<html></html>" > "${bundle}/docker/maintenance/static/index.html"
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}"     "FAKE_CONFIG_BUNDLE=${bundle}"     "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+  run_deploy -- "${fake[@]}"     "FAKE_CONFIG_BUNDLE=${bundle}"     "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "a config-only change applies"
   if [[ -f "${T_COMPOSE_DIR}/docker/edge/nginx.conf" ]]; then
     record 1 "docker/edge/nginx.conf reached the host as a FILE"
@@ -1677,7 +1608,7 @@ scenario_config_mirror_ignores_caller_umask() {
     umask "${saved}"
     rc=0
     run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" \
-      "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+      "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
     umask "${before}"
 
     assert_exit 0 "$rc" "a config-only change applies with the caller's umask ${saved}"
@@ -1698,17 +1629,15 @@ scenario_config_mirror_ignores_caller_umask() {
   fi
 }
 
-# Writes a compose file carrying the stateful-infra image pins the carve-out
-# reads. $1 = destination file, $2 = keycloak tag, $3 = keycloak digest.
-write_infra_compose() {
-  cat > "$1" <<EOF
-# dummy compose file — only the infra image pins below are ever parsed
-services:
-  db-backend:
-    image: postgres:18-alpine@sha256:1111111111111111111111111111111111111111111111111111111111111111
-  keycloak:
-    image: quay.io/keycloak/keycloak:$2@sha256:$3
-EOF
+# Writes a config tree whose units carry the stateful-infra image pins the carve-out reads, spelled
+# the way generate-quadlet.py spells them (`docker.io/postgres:…`, which the carve-out's pattern did
+# not match until 2026-09-22). $1 = the tree, $2 = keycloak tag, $3 = keycloak digest.
+write_infra_units() {
+  mkdir -p "$1/quadlet/systemd"
+  echo "# dummy compose file" > "$1/docker-compose.yml"
+  printf '[Container]\nImage=docker.io/postgres:18-alpine@sha256:%s\n' \
+    1111111111111111111111111111111111111111111111111111111111111111 > "$1/quadlet/systemd/db-backend.container"
+  printf '[Container]\nImage=quay.io/keycloak/keycloak:%s@sha256:%s\n' "$2" "$3" > "$1/quadlet/systemd/keycloak.container"
 }
 
 scenario_infra_digest_refresh_is_not_gated() {
@@ -1721,14 +1650,14 @@ scenario_infra_digest_refresh_is_not_gated() {
 
   # 1. Keycloak 26.7 rebuilt — same tag, new digest. A security refresh, and the
   #    exact shape that froze the testing host for seven days.
-  write_infra_compose "${T_COMPOSE_DIR}/docker-compose.yml" 26.7 \
+  write_infra_units "${T_COMPOSE_DIR}" 26.7 \
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  write_infra_compose "${bundle}/docker-compose.yml" 26.7 \
+  write_infra_units "${bundle}" 26.7 \
     bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${bundle}" \
-    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_exit 0 "$rc" "a digest-only infra refresh completes"
   assert_excludes "CARVE-OUT" "it is not treated as a stateful upgrade"
   assert_excludes "operator-gated" "and it is not skipped"
@@ -1738,16 +1667,33 @@ scenario_infra_digest_refresh_is_not_gated() {
   rc=0
   setup_host "${tmp}/two"
   mkdir -p "${tmp}/bundle2"
-  write_infra_compose "${T_COMPOSE_DIR}/docker-compose.yml" 26.7 \
+  write_infra_units "${T_COMPOSE_DIR}" 26.7 \
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  write_infra_compose "${tmp}/bundle2/docker-compose.yml" 26.8 \
+  write_infra_units "${tmp}/bundle2" 26.8 \
     cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   write_marker "${MARKER}"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${tmp}/bundle2" \
-    "FAKE_REMOTE_CONFIG=sha256:config-next" || rc=$?
+    "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
   assert_contains "CARVE-OUT" "a tag change is still refused"
-  assert_no_docker "up -d" "and nothing is applied"
+  assert_no_docker "${APPLIED}" "and nothing is applied"
+
+  # 3. A postgres MAJOR change, spelled as the generator spells it. Until 2026-09-22 the unit
+  #    pattern was `^Image=postgres:`, which `Image=docker.io/postgres:` never matches, so the postgres
+  #    half of this gate only ever saw the compose file's copy.
+  rc=0
+  setup_host "${tmp}/three"
+  write_infra_units "${T_COMPOSE_DIR}" 26.7 \
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  write_infra_units "${tmp}/bundle3" 26.7 \
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  sed -i 's#postgres:18-alpine#postgres:19-alpine#' "${tmp}/bundle3/quadlet/systemd/db-backend.container"
+  write_marker "${MARKER}"
+  mapfile -t fake < <(converged_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${tmp}/bundle3" \
+    "FAKE_REMOTE_CONFIG=${DIG_CONFIG_NEXT}" || rc=$?
+  assert_contains "CARVE-OUT" "a qualified postgres major change in the units is refused"
+  assert_contains "new: postgres:19-alpine" "...and names the pin without the registry prefix"
 
   rm -rf "${tmp}"
 }
@@ -1778,7 +1724,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "a converged tick with unseen certificates succeeds"
   assert_contains "certificates differs" "the certificate drift is named in the log"
-  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "the edge is recreated to load them"
+  assert_docker "systemctl --user restart edge.service" "the edge is recreated to load them"
   if [[ -s "${T_STATE_DIR}/edge/certs.sha256" ]]; then
     record 1 "the fingerprint is persisted for the next tick"
   else
@@ -1791,14 +1737,14 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${seeded}" || rc=$?
   assert_exit 0 "$rc" "an unchanged tick succeeds"
-  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unchanged certificate recreates nothing"
+  assert_no_docker "systemctl --user restart edge.service" "an unchanged certificate recreates nothing"
 
   # 3. acme renewed it.
   : > "${T_DOCKER_LOG}"
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_CERT_LINES=${renewed}" || rc=$?
   assert_exit 0 "$rc" "the renewal tick succeeds"
-  assert_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "a renewed certificate is loaded"
+  assert_docker "systemctl --user restart edge.service" "a renewed certificate is loaded"
 
   # 4. The exec failed. "Could not tell" must not read as "no certificates" —
   #    sha256sum of an empty input is a valid hash, and folding it in would
@@ -1807,7 +1753,7 @@ scenario_edge_reloads_a_renewed_certificate() {
   rc=0
   run_deploy -- "${fake[@]}" "FAKE_EDGE_PS=edge" "FAKE_EDGE_EXEC_RC=1" || rc=$?
   assert_exit 0 "$rc" "a tick whose certificate read fails still succeeds"
-  assert_no_docker "--no-deps --force-recreate --wait --wait-timeout 180 edge" "an unreadable certificate recreates nothing"
+  assert_no_docker "systemctl --user restart edge.service" "an unreadable certificate recreates nothing"
 
   rm -rf "${tmp}"
 }
@@ -1822,7 +1768,7 @@ scenario_check_only_verify_fail() {
   run_deploy --check-only -- "${fake[@]}" "FAKE_COSIGN_RC=1" || rc=$?
   assert_exit 1 "$rc" "check-only exits non-zero on a failed verification"
   assert_contains "SIGNATURE VERIFICATION FAILED" "the failure is reported"
-  assert_no_docker " up " "nothing is applied"
+  assert_no_apply "nothing is applied"
   if [[ ! -f "${T_STATE_DIR}/textfile/deploy.prom" ]] \
      || ! grep -q 'basetool_deploy_last_failure_timestamp [1-9]' \
             "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
@@ -1845,33 +1791,16 @@ scenario_check_only_noop_verifies
 scenario_check_only_verify_fail
 
 # ---------------------------------------------------------------------------
-# The Podman shape.
-#
-# Everything above exercises Docker. Both runtimes are live at once -- production
-# serves on Docker until the cutover, the new host serves on rootless Podman --
-# and a deployer path that has never run is a path nobody has tested, whatever it
-# looks like on the page.
-#
-# Digests here are real-shaped (64 hex characters) and not the readable
-# `sha256:backend-current` the Docker scenarios use, because they have to be: the
-# Podman resolver parses skopeo's JSON with a sed pattern that requires exactly
-# 64 hex characters and silently yields nothing for anything shorter. A test that
-# fed it the short form would exercise the failure path while reading like the
-# happy one.
+# The Podman-specific paths: resolution through skopeo, the drop-in pin, the unit
+# payload, the pre-flight's tools. (The scenarios above drive the same arm; these
+# were written when it was the second of two.)
 # ---------------------------------------------------------------------------
 
-# A readable 64-hex digest: the tag, then zero padding.
-hexdig() {
-  local tag="$1" pad=""
-  while (( ${#tag} + ${#pad} < 64 )); do pad="${pad}0"; done
-  printf 'sha256:%s%s' "${tag}" "${pad}"
-}
-
-PDIG_BACKEND="$(hexdig beef)"
-PDIG_FRONTEND="$(hexdig face)"
-PDIG_INGEST="$(hexdig 1ce)"
-PDIG_CONFIG="$(hexdig c0ffee)"
-PDIG_KCSPI="$(hexdig 5b1)"
+PDIG_BACKEND="${DIG_BACKEND}"
+PDIG_FRONTEND="${DIG_FRONTEND}"
+PDIG_INGEST="${DIG_INGEST}"
+PDIG_CONFIG="${DIG_CONFIG}"
+PDIG_KCSPI="${DIG_KCSPI}"
 PDIG_BACKEND_NEW="$(hexdig dead)"
 PMARKER="${PDIG_BACKEND}|${PDIG_FRONTEND}|${PDIG_INGEST}|${PDIG_CONFIG}|${PDIG_KCSPI}"
 # The marker of a host still on the OLD backend: config and keycloak-spi match the
@@ -1917,6 +1846,7 @@ podman_converged_env() {
 # podman_units_empty() is for the one scenario that wants that state on purpose.
 podman_units_empty() {
   T_UNIT_DIR="${1}/units"
+  rm -rf "${T_UNIT_DIR}"
   mkdir -p "${T_UNIT_DIR}"
 }
 
@@ -2110,8 +2040,8 @@ scenario_podman_refuses_without_quadlet
 # by an operator action nobody recorded, and a release could change an image, a
 # health command or a memory limit with no path to production at all.
 
-# A bundle fixture: a compose file (the docker arm still needs one), the units,
-# and an env.d template. $1 is the directory to build it in.
+# A bundle fixture: a compose file (the bundle still carries the source), the
+# units, and an env.d template. $1 is the directory to build it in.
 write_bundle() {
   local b="$1"
   mkdir -p "${b}/quadlet/systemd" "${b}/quadlet/env.d"
@@ -2279,20 +2209,6 @@ scenario_podman_runs_without_a_compose_file() {
   rm -rf "${tmp}"
 }
 
-scenario_docker_still_requires_its_compose_file() {
-  echo "Scenario: ...and Docker still refuses without one, because there it IS the deployment"
-  local tmp rc=0
-  tmp="$(mktmp)"
-  setup_host "${tmp}"
-  write_marker "${MARKER}"
-  rm -f "${T_COMPOSE_DIR}/docker-compose.yml"
-  mapfile -t fake < <(converged_env)
-  run_deploy -- "${fake[@]}" || rc=$?
-  assert_exit 1 "$rc" "docker: a host without a compose file still refuses"
-  assert_contains "docker-compose.yml" "docker: and names the file it needs"
-  rm -rf "${tmp}"
-}
-
 # --- what a release re-defines has to reach the running container ------------
 #
 # Found by the documentation audit on 2026-09-22, the day production moved to
@@ -2430,7 +2346,6 @@ scenario_podman_bundle_installs_the_units
 scenario_podman_retired_unit_is_stopped_then_removed
 scenario_podman_first_deploy_fills_an_empty_unit_dir
 scenario_podman_runs_without_a_compose_file
-scenario_docker_still_requires_its_compose_file
 scenario_podman_changed_monitoring_and_acme_units_are_restarted
 scenario_podman_acme_is_part_of_the_stack
 scenario_podman_keystore_checked_where_the_unit_mounts_it

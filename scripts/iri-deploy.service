@@ -23,7 +23,7 @@
 ; Be honest about what that bounds: `podman *` as `iri` is full control of the
 ; application's containers and data, so `deploy` is NOT a hard boundary around the
 ; application against a fully-compromised deploy.sh — only around the host, which
-; the retired Docker host's root-equivalent `docker` group was not. What bounds the
+; which a `docker` group membership (root-equivalent) would not have been. What bounds the
 ; blast radius is: (1) the host-side cosign signature gate (REQ-OPS-015) — deploy.sh
 ; refuses to run an image not signed by our release-images identity, so a moved
 ; `:stable` tag or a compromised GHCR pull token cannot get attacker code executed
@@ -34,28 +34,13 @@ Description=Profit Basetool — pull and apply latest GHCR images
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Wants=network-online.target
 After=network-online.target
-# NO dependency on the container runtime here, and the reason changed on 2026-09-22.
-#
-# These four units used to carry `Wants=`/`After=docker.service`, kept on the grounds that an
-# ordering on a unit that does not exist is inert. It was inert -- and it READ as if the unit were
-# ordered on its runtime, which is how nobody noticed that on a rootless-Podman host nothing orders
-# it on anything. The Docker host was retired at the 2026-09-22 cutover, so the line pointed at
-# nothing on every host that remains. (`Requires=docker.service` was removed earlier still, because
-# it made the units unstartable on Podman.)
-#
-# The comment beside it also said "a tick that fires while the runtime is still coming up costs one
-# retry; the timer fires again". Measured on the first reboot after the cutover, that is wrong on
-# both counts. The timers carry `Persistent=true`, so a catch-up run fires seconds after boot; it
-# found no runtime and FAILED, SystemdUnitFailed paged critical, and the unit stayed failed until
-# its next scheduled run -- the next night for the backup, the next week for the drill and the
-# cleanup. The catch-up Persistent=true exists for was the run that was lost.
-#
-# What the job needs is the rootless service user's manager -- and not merely running, but FINISHED
-# starting, because backup.sh quiesces the writers and container-cleanup.sh prunes. Measured on the
-# same boot: user@994.service was active at 16:26:03, the stack at 16:27:33. So an
-# `After=user@<uid>.service` here would have fixed the detection and let the backup stop the
-# backend while it was still coming up. Only the script can wait on the right signal, and only the
-# script knows the uid -- scripts/lib/container-runtime.sh, rt_detect and rt_wait_for_startup.
+# No dependency on the container runtime. What the job needs is the rootless service user's manager
+# FINISHED starting, and only the script can wait on that signal -- rt_detect and
+# rt_wait_for_startup in scripts/lib/container-runtime.sh. Measured on the first reboot after the
+# 2026-09-22 cutover: the timers' Persistent=true catch-up fired eleven seconds after boot, one
+# second before user@<uid>.service came up, and an `After=user@<uid>.service` would still have let
+# the backup quiesce a stack that was starting. (These units carried `After=docker.service` until
+# then, which ordered them on nothing on a Podman host.)
 
 [Service]
 Type=oneshot
@@ -65,20 +50,9 @@ Type=oneshot
 # shell — interactive use is impossible — and no sudo beyond the bridge named in
 # the header.
 User=deploy
-# NOT `Group=docker`. That group does not exist on a rootless-Podman host, and a unit naming a
-# group that does not exist refuses to start -- so all four of these were unstartable on the
-# platform the migration moves to.
-#
-# Removing it costs nothing on the Docker host: read from production 2026-09-18, the account is
-# `uid=999(deploy) gid=987(deploy) groups=987(deploy),988(docker)`, so it already CARRIES the
-# membership. With `User=` and no `Group=`, systemd takes the user's own primary group and
-# initialises its supplementary groups from the user database -- docker among them. The directive
-# was pinning what the account already had.
-#
-# On the Podman host the socket is not the path at all: the deploy account reaches the containers
-# through a sudoers rule naming two commands against the service user
-# (ansible/roles/basetool_host/tasks/22-deploy-user.yml), which is strictly narrower than docker
-# group membership, that being root-equivalent by design.
+# No Group=: systemd takes the account's own primary group. The deploy account reaches the
+# containers through the sudoers rule of ansible/roles/basetool_host/tasks/22-deploy-user.yml, not
+# through any group membership.
 
 ExecStart=/var/iri/code/scripts/deploy.sh
 
@@ -97,63 +71,22 @@ ExecStart=/var/iri/code/scripts/deploy.sh
 StandardOutput=append:/var/log/iri-deploy.log
 StandardError=append:/var/log/iri-deploy.log
 
-# --- Hardening -------------------------------------------------------------
-# Defence-in-depth: the deploy user is already unprivileged, but if a bug
-; in deploy.sh or a malicious tag in GHCR triggered code execution inside
-; the unit's process, these directives bound the damage radius.
-; NOT NoNewPrivileges=true, and the reason is the whole point of this unit.
-;
-; This service's job is to act AS ANOTHER USER: under rootless Podman the containers belong to the
-; service account, and the deploy account reaches them through a sudoers rule naming two commands
-; against that one user (ansible/roles/basetool_host/tasks/22-deploy-user.yml). NoNewPrivileges
-; forbids exactly that, and sudo says so rather than failing quietly:
-;
-;     sudo: The "no new privileges" flag is set, which prevents sudo from running as root.
-;
-; Measured on the testing host 2026-09-18: without the flag the same call lists all eleven
-; containers; with it, the runtime detection finds no user that owns any and the unit dies with
-; "podman is installed but no lingering user could be found". All four operational units carried
-; the flag, so none of them could ever have run on the platform this migration moves to.
-;
-; What is NOT lost. The privilege boundary was never this flag -- it is the sudoers rule, which
-; names two commands and one target user and is strictly narrower than the `Group=docker` this
-; replaces (that group is root-equivalent by design: it can bind-mount / into a privileged
-; container). Everything else below stays: ProtectSystem=strict, ProtectHome, PrivateTmp,
-; PrivateDevices, the kernel protections, RestrictNamespaces, and a ReadWritePaths list of four
-; directories.
-;
-; On the Docker host the flag was compatible because group membership is not a privilege GAIN.
-; It is removed on both, so the two deployments stay one file.
-ProtectSystem=strict
-; ProtectHome=read-only, NOT true. `true` makes /home an inaccessible empty tmpfs, and rootless
-; podman has to resolve the SERVICE user's home to find its container store:
-;
-;     cannot resolve /home/iri: lstat /home/iri: permission denied
-;
-; read-only keeps the protection that matters here -- this unit has no business writing into
-; anybody's home -- and was measured working on the testing host 2026-09-18, against a baseline
-; taken seconds earlier so a transient rootless-podman state could not be mistaken for a verdict.
-ProtectHome=read-only
-PrivateTmp=true
-PrivateDevices=true
-ProtectKernelTunables=true
-ProtectKernelModules=true
+; --- Hardening ----------------------------------------------------------------
+; The sandbox all four deploy-account units share -- ProtectSystem=strict, ProtectHome=read-only,
+; PrivateTmp, PrivateDevices, the kernel and cgroup protections -- is the drop-in
+; 10-deploy-account-sandbox.conf the Ansible role installs beside this unit, from
+; scripts/iri-deploy-account-sandbox.conf, together with why NoNewPrivileges and RestrictNamespaces
+; are absent (OPS-SIMP-03). What follows is this job's own.
+; iri-deploy adds the protections below: it holds the registry token and rewrites unit files, so it
+; is the one job whose process is worth confining further than the shared baseline.
 ProtectKernelLogs=true
-ProtectControlGroups=true
 ProtectClock=true
 ProtectHostname=true
 ProtectProc=invisible
-; NOT RestrictNamespaces=true. Rootless Podman IS a user namespace: the flag makes the container
-; runtime fail with "cannot set user namespace" before it reaches any container. There is no
-; narrower form that works -- `RestrictNamespaces=user` fails identically, because podman needs
-; mount, pid, ipc, net and uts as well.
-RestrictRealtime=true
 RestrictSUIDSGID=true
 RemoveIPC=true
-LockPersonality=true
-# NOT emptied, which is what it was. Under Docker the reasoning held: deploy.sh talks to a socket
-# and the root daemon acts out-of-band, so the script itself needs no capability. Under rootless
-# Podman it has to BECOME the service user, and sudo says exactly what an empty set costs:
+# NOT emptied. deploy.sh has to BECOME the service user, and sudo says exactly what an empty set
+# costs:
 #
 #     sudo: unable to change to root gid: Operation not permitted
 #
@@ -170,7 +103,7 @@ CapabilityBoundingSet=~CAP_SYS_ADMIN CAP_SYS_MODULE CAP_SYS_RAWIO CAP_SYS_BOOT C
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 SystemCallArchitectures=native
 # Confine to the syscall set a normal service needs (blocks @obsolete, @privileged,
-# raw @swap/@reboot etc.). docker CLI, cosign and the coreutils/bash the script
+# raw @swap/@reboot etc.). podman, skopeo, cosign and the coreutils/bash the script
 # drives all fall inside @system-service. If a future tool trips this,
 # `deploy.sh --check-only` surfaces it before a real deploy — widen or comment it
 # out then, do not weaken the rest of the sandbox.
@@ -189,11 +122,12 @@ SystemCallErrorNumber=EPERM
 # service user outside this sandbox, so deploy.sh needs no write access to them.
 #   /var/lib/iri/       — state files (digest pins, last-deployed marker, the
 #                         config-stage/ + config-previous/ dirs, config-blocked.marker,
-#                         the DOCKER_CONFIG credential + the $HOME/.sigstore cosign cache)
+#                         the registry credential cosign and skopeo read + the
+#                         $HOME/.sigstore cosign cache)
 #   /var/log/           — append to iri-deploy.log
 #   /var/lock/          — flock file
-#   /var/iri/code/      — where the config bundle is applied (docker-compose.yml +
-#                         maintenance/theme trees) and the keycloak provider JAR is staged
+#   /var/iri/code/      — where the config bundle is applied (units, compose source,
+#                         edge/monitoring/theme trees) and the keycloak provider JAR is staged
 #   /var/iri/monitoring — the node_exporter textfile dir deploy.sh writes metrics into
 #                         (absent on a host without monitoring → the metric write
 #                         degrades to a best-effort no-op)
