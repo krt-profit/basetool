@@ -390,24 +390,24 @@
 #
 # Conditioned on the exclusion being present, so withdrawing the decision in defaults/ restores the
 # unit to whatever the profile wants rather than leaving it silently off.
-- name: Stop the journal uploader the tailoring excuses this host from
-  ansible.builtin.systemd_service:
-    name: systemd-journal-upload.service
-    enabled: false
-    state: stopped
-  when:
-    - not ansible_check_mode
-    - basetool_host_hardening_exclusions
-      | selectattr('rule', 'equalto', 'service_systemd-journal-upload_enabled') | list | length > 0
 
 # `disable` and `stop` do not clear a unit that is ALREADY in the failed state: systemctl keeps the
 # result until something resets it, and node_exporter's systemd collector goes on reporting it -- so
 # SystemdUnitFailed would stay critical about a unit nobody is running any more.
-- name: Ask whether it is still in a failed state
-  # The module with no state/enabled asks and changes nothing, returning the unit's own
-  # ActiveState. `systemctl is-failed` would have said the same thing and ansible-lint is right to
-  # refuse it: a bare command needs a hand-written changed_when, and a hand-written changed_when on
-  # a command is a guess -- the same reasoning 65-firewall.yml already gives for service_facts.
+- name: Ask what state the journal uploader is in, and whether it exists at all
+  # Asks and changes nothing: the module with no state/enabled returns the unit's own ActiveState.
+  # `failed_when: false` is what makes "no such unit" an ANSWER rather than an abort, and
+  # `status.LoadState` below is the existence test the two tasks after this one need.
+  #
+  # LoadState, NOT `status is defined`: the first version of this guard used the latter and failed
+  # identically. `systemctl show` on a unit that does not exist EXITS 0 and prints
+  # `LoadState=not-found ActiveState=inactive`, so the module returns a populated status dict and
+  # `is defined` is true for a unit that is not there. Measured on the target 2026-09-22 --
+  # the module only refuses when asked to CHANGE the state of such a unit.
+  #
+  # `systemctl is-failed` would have said the same thing and ansible-lint is right to refuse it: a
+  # bare command needs a hand-written changed_when, and a hand-written changed_when on a command is
+  # a guess -- the same reasoning 65-firewall.yml already gives for service_facts.
   ansible.builtin.systemd_service:
     name: systemd-journal-upload.service
   register: basetool_host_journal_upload_state
@@ -415,6 +415,25 @@
   failed_when: false
   check_mode: false
   when:
+    - basetool_host_hardening_exclusions
+      | selectattr('rule', 'equalto', 'service_systemd-journal-upload_enabled') | list | length > 0
+
+# Guarded on the unit EXISTING, which it does not on a minimal Rocky install: `systemd-journal-
+# upload.service` ships with systemd-journal-remote, and this host has never had it. Measured
+# 2026-09-22 on the migration target -- the play aborted here with "Could not find the requested
+# service", and everything after it (fail2ban among them) never ran.
+#
+# The trap is worth naming: this task carries `not ansible_check_mode`, so `--check` SKIPS it. A
+# dry run therefore reported the whole play clean and the real run failed on the first task the dry
+# run could not see. A task that only executes for real is a task the rehearsal does not rehearse.
+- name: Stop the journal uploader the tailoring excuses this host from
+  ansible.builtin.systemd_service:
+    name: systemd-journal-upload.service
+    enabled: false
+    state: stopped
+  when:
+    - not ansible_check_mode
+    - basetool_host_journal_upload_state.status.LoadState | default('not-found') != 'not-found'
     - basetool_host_hardening_exclusions
       | selectattr('rule', 'equalto', 'service_systemd-journal-upload_enabled') | list | length > 0
 
