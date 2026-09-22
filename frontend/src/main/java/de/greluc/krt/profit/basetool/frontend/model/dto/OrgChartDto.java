@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * Frontend mirror of the complete org chart, decoded from {@code GET /api/v1/org-chart}.
- * Multi-Bereich since epic #692 / REQ-ORG-018: the OL tier on top, one tier per Bereich, then the
+ * Multi-Bereich since epic #692 / REQ-ORG-026: the OL tier on top, one tier per Bereich, then the
  * ungrouped/legacy area-leadership tier with any Staffeln/SKs not wired under a Bereich (the whole
  * chart until an admin builds the hierarchy).
  *

@@ -174,7 +174,9 @@ per-item `catch` keeps the run going past a failure so the remaining items still
 uuid already owned by another row leaves the row's `external_uuid` null instead of throwing; and the
 run summary carries the `sharedUuidDeclined` count of such rows.
 
-### REQ-DATA-006 — every hot predicate and foreign key has a covering index
+### REQ-DATA-017 — every hot predicate and foreign key has a covering index
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-DATA-006` until 2026-09-22; that id also named the Discord account link on the user in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 A query predicate on the read path, and every foreign-key column, must be backed by an index;
 falling back to a sequential scan on a growing table is a defect. New indexes ship as a Flyway

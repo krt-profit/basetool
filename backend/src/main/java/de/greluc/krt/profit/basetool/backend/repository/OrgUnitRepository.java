@@ -63,7 +63,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
    * de.greluc.krt.profit.basetool.backend.model.Squadron Squadron} and {@link
    * de.greluc.krt.profit.basetool.backend.model.SpecialCommand SpecialCommand} — across both kinds
    * via single-table inheritance, <strong>regardless of {@code is_profit_eligible}</strong>. Backs
-   * the organisation-wide org chart (ADR-0029, REQ-ORG-018): the chart's unit tier is every active
+   * the organisation-wide org chart (ADR-0029, REQ-ORG-026): the chart's unit tier is every active
    * Staffel + SK so that a Staffel/SK an admin has wired under any Bereich renders there, not only
    * the Profit-side ones. {@code is_profit_eligible} governs Job-Order processing only (the {@code
    * countProfitEligibleByIdIn} path) and must not gate chart visibility. The caller splits the
@@ -119,7 +119,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.model.Bereich} (epic #692,
-   * REQ-ORG-018). Backs the multi-Bereich org chart's tier list: each Bereich renders as its own
+   * REQ-ORG-026). Backs the multi-Bereich org chart's tier list: each Bereich renders as its own
    * leadership sub-tree, coloured by its {@link
    * de.greluc.krt.profit.basetool.backend.model.Department Department}, with its child Staffeln/SKs
    * grouped underneath. Returns the {@code BEREICH} discriminator only via the typed JPQL {@code
@@ -132,7 +132,7 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
 
   /**
    * Loads the active {@link de.greluc.krt.profit.basetool.backend.model.Organisationsleitung} (epic
-   * #692, REQ-ORG-018) — normally a singleton. Backs the OL root tier of the org chart.
+   * #692, REQ-ORG-026) — normally a singleton. Backs the OL root tier of the org chart.
    *
    * @return the active OL row(s) in arbitrary order; never {@code null}, normally one or zero.
    */

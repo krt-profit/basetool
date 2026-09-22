@@ -288,7 +288,7 @@ public class BlueprintProductService {
    * high-confidence <em>tag match</em> (REQ-INV-019): an scmdb.net export entry carries the
    * DataForge blueprint key under {@code tag}, which equals a blueprint's {@code scwiki_key}, so
    * the import can resolve it straight to the owned product — bypassing the name chain and the
-   * CIG-mislabel pitfalls the name match has to correct for (REQ-INV-007).
+   * CIG-mislabel pitfalls the name match has to correct for (REQ-INV-047).
    *
    * <p>The key is lower-cased because the two sources spell the same DataForge identifier with
    * different casing (the Wiki keeps CamelCase like {@code BP_CRAFT_AMRS_LaserCannon_S1}; scmdb.net

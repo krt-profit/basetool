@@ -38,7 +38,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * ADMIN user so the editor affordances render. Complements {@code OrgChartKeyboardA11yE2eTest}
  * (which covers the keyboard/ARIA behaviour) by exercising the create / edit / delete lifecycle of
  * actual positions through the UI — the descriptive-chart, ADMIN-edited contract (REQ-ORG-010), the
- * "a Kommando outlives its Kommandoleiter" rule (REQ-ORG-011) and the cascading remove
+ * "a Kommando outlives its Kommandoleiter" rule (REQ-ORG-025) and the cascading remove
  * (REQ-ORG-012):
  *
  * <ol>
@@ -148,7 +148,7 @@ class OrgChartPositionCrudE2eTest {
 
   /**
    * Creates a Kommando, assigns then reassigns a free-text Kommandoleiter, vacates the seat —
-   * asserting the Kommando(gruppe) survives the vacate, per REQ-ORG-011 — then removes the whole
+   * asserting the Kommando(gruppe) survives the vacate, per REQ-ORG-025 — then removes the whole
    * group. Account-linked seats are managed under Organisation -&gt; Leitung since REQ-ROLE-006, so
    * the chart editor places only a typed name; holder changes are asserted by the reassign
    * control's {@code data-display-name} and the vacate affordance's presence.

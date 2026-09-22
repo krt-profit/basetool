@@ -37,9 +37,9 @@ or check-in change never leaves the bar stale (REQ-FE-010). The four tabs:
 
 1. **Übersicht** — read-only landing tab, re-split per the final Einsatz design (owner decision
    2026-06-27, superseding the 2026-06-11 consolidated single-`.kv-list` layout; the column sides were
-   swapped and a "Ziele" box added by the REQ-MISSION-012 goals change). Two columns of stacked
+   swapped and a "Ziele" box added by the REQ-MISSION-019 goals change). Two columns of stacked
    panels: **left** = a "Ziele" box (the structured, classified mission goals grouped Hauptziel →
-   Nebenziel → Nicht-Ziel, REQ-MISSION-012), the read-only **Ablauf** checklist (REQ-MISSION-009), a
+   Nebenziel → Nicht-Ziel, REQ-MISSION-019), the read-only **Ablauf** checklist (REQ-MISSION-009), a
    "Teilnehmer" attendance meter (registered count + a checked-in progress bar derived from
    `checkedInParticipants/registeredParticipants`) and a "Kalender" open card; **right** = "Mission auf
    einen Blick" (planned/actual times, meeting time, `Treffpunkt`, operation, internal chip, party lead
@@ -359,7 +359,7 @@ reads it, and its **20,000-char** cap stays (owner request 2026-07-03; the `miss
 column is already `TEXT`, so the cap moved only on the DTOs / form, no migration). Migration: V192 (`mission.meeting_point`).
 
 > The former single short **`objective`** (Ziel, ≤250 chars, shown first in "Mission auf einen Blick")
-> was **superseded by the structured, classified mission goals** of REQ-MISSION-012. V199 drops
+> was **superseded by the structured, classified mission goals** of REQ-MISSION-019. V199 drops
 > `mission.objective`, migrating each existing non-empty value into one Hauptziel so no planning data
 > is lost.
 
@@ -388,13 +388,9 @@ the persisted render (raw HTML escaped, unsafe link protocols stripped). No back
 permission change; every existing operation contract (save / delete AJAX twins, payout paid-out
 asymmetric authorization, missions pager) is preserved.
 
-### REQ-MISSION-012 — Mission goals (Ziele) as classified, ordered children
+### REQ-MISSION-019 — Mission goals (Ziele) as classified, ordered children
 
-> **ID collision (recorded 2026-09-22).** `REQ-MISSION-012` also names the home-page upcoming-missions
-> grid in [`mission-next-banner.md`](mission-next-banner.md). Both are shipped and referenced from
-> code, so neither is renumbered without the owner's sign-off — see the collision list in
-> [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors). Cite this one as "REQ-MISSION-012
-> (goals)" until then.
+> **Renumbered 2026-09-22:** this requirement was `REQ-MISSION-012` until 2026-09-22; that id also named the home-page upcoming-missions tile grid in [`mission-next-banner.md`](mission-next-banner.md), which keeps it.
 
 A mission carries an ordered, reorderable list of **goals** (Ziele) that **replaces** the former
 single short `objective` (REQ-MISSION-010). Each goal is a persisted `MissionObjective` child of the
@@ -534,7 +530,7 @@ carrying only the row id — **never** the free-text label — per REQ-AUDIT-001
 ### REQ-MISSION-015 — Create-time Ziele/Ablauf seeding, Verwaltung landing, and floating Speichern
 
 **Seeding goals + steps at create.** The create form (`/missions/new`) carries the Ziele
-(REQ-MISSION-012) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
+(REQ-MISSION-019) and Ablauf (REQ-MISSION-009) editors **above** the description field so a planner can
 lay out goals and steps in the same action instead of a follow-up per-item call. Both are **optional**
 (an empty section seeds nothing) and can equally be added later through the Verwaltung section editors.
 Because the mission has no id yet, these are **client-side rows** — no per-row AJAX, no section version

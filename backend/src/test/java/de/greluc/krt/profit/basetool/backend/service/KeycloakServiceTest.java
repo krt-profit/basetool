@@ -678,7 +678,7 @@ class KeycloakServiceTest {
       server.enqueue(new MockResponse().setResponseCode(204));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
-      service.linkDiscordIdentity(target, "123456789012345678", "conrad7247");
+      service.linkDiscordIdentity(target, "123456789012345678", "examplehandle4711");
 
       server.takeRequest(); // token
       RecordedRequest post = server.takeRequest();
@@ -715,11 +715,11 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse(
               "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
-                  + "\"userName\":\"conrad7247\"}]"));
+                  + "\"userName\":\"examplehandle4711\"}]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
       assertDoesNotThrow(
-          () -> service.linkDiscordIdentity(target, "123456789012345678", "conrad7247"));
+          () -> service.linkDiscordIdentity(target, "123456789012345678", "examplehandle4711"));
     } finally {
       server.shutdown();
     }
@@ -751,7 +751,7 @@ class KeycloakServiceTest {
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
       assertThrows(
           ExternalServiceException.class,
-          () -> service.linkDiscordIdentity(target, "123456789012345678", "conrad7247"));
+          () -> service.linkDiscordIdentity(target, "123456789012345678", "examplehandle4711"));
     } finally {
       server.shutdown();
     }
@@ -832,14 +832,14 @@ class KeycloakServiceTest {
       server.enqueue(
           jsonResponse(
               "[{\"identityProvider\":\"discord\",\"userId\":\"123456789012345678\","
-                  + "\"userName\":\"conrad7247\"}]"));
+                  + "\"userName\":\"examplehandle4711\"}]"));
 
       KeycloakService service = new KeycloakService(properties, sslBundles, meterRegistry);
       Optional<KeycloakService.DiscordLink> link = service.readDiscordLink(pending);
 
       assertTrue(link.isPresent());
       assertEquals("123456789012345678", link.get().userId());
-      assertEquals("conrad7247", link.get().userName());
+      assertEquals("examplehandle4711", link.get().userName());
     } finally {
       server.shutdown();
     }
@@ -849,7 +849,7 @@ class KeycloakServiceTest {
    * {@code readDiscordLink} maps a {@code 404} (the Keycloak user itself no longer exists) to an
    * empty result rather than propagating it, so the account-linking flow can fall back to the local
    * {@code discord_user_id} and recover a registration whose throwaway Keycloak user was already
-   * deleted by an earlier partial failure (the stranded conrad7247/MardukSedras case).
+   * deleted by an earlier partial failure (the stranded case the fix was written for).
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */

@@ -10,7 +10,7 @@
 > [0191](../adr/0191-touch-drags-the-crew-board-through-pointer-events.md) (REQ-UI-009) ·
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
-> **Next free id:** `REQ-UI-022` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-023` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -113,7 +113,7 @@ values exactly:
 
 - [ ] Department tags/badges use the official token names with the exact hex values.
 
-> **Amended by epic #692 (REQ-ORG-018):** these frozen Bereichsfarben are also applied to **org-chart
+> **Amended by epic #692 (REQ-ORG-026):** these frozen Bereichsfarben are also applied to **org-chart
 > nodes**, tinting each Bereich's sub-tree with its colour. This applies the existing tokens (no new
 > hues); node text must keep ≥ 4.5:1 contrast (use the accessible `--color-*-text` tints where the hue
 > would become small text).
@@ -348,7 +348,7 @@ Every layout change and new component works on **four** classes:
 
 **Dense row actions are an explicit exception at 32px.** The two compact variants `.btn-xs`
 and `.btn-icon` — the *repeated* per-row actions of a dense table / tree action cluster
-(REQ-UI-010) — carry a **32px** minimum hit area on **every** device class, touch classes
+(REQ-UI-022) — carry a **32px** minimum hit area on **every** device class, touch classes
 included, rather than the 44px floor above. Density in those clusters is what keeps a wide
 Lager / bank / mission table readable, and the design system specifies exactly that: `.btn-xs`
 at 32px in `krt-components.css`, `.btn-icon` in its README as the icon-only row action that
@@ -365,7 +365,7 @@ been rendering full-size.
 
 **The header is compact on the Smartphone class** (owner decision 2026-09-13). It measured 76px on
 a 375px screen — 16px padding plus 60px of content — and the 60px came from the wordmark wrapping to
-two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-010) and
+two lines, not from the 50px mark: the wordmark carries the active OrgUnit context (REQ-ORG-024) and
 „Profit Basetool – Alle Staffeln" is simply longer than a phone is wide. The phone class therefore
 renders the mark at 32px and the wordmark on one line with an ellipsis, for roughly 48px. It stays
 **sticky**: menu, mark and bell remain reachable without scrolling, which is why this was chosen
@@ -562,13 +562,9 @@ review for the rest · **Code:** `static/css/styles.css` (`.btn`, `.btn.btn-xs`,
 > legacy shapes, so `MODAL_SHAPES` now holds one entry. A **new** shape is detected at `check` time
 > by `SingleModalShapeTest` (REQ-UI-013), not by this hand-maintained list.
 
-### REQ-UI-010 — Standard action-button icons
+### REQ-UI-022 — Standard action-button icons
 
-> **ID collision (recorded 2026-09-22).** `REQ-UI-010` also denotes "Category grouping is a
-> per-user toggle on the trade pages" in [`materials-overview-grouping.md`](materials-overview-grouping.md);
-> see [INDEX.md § Requirement IDs](INDEX.md#2-requirement-ids-traceability-anchors). Both are
-> shipped and referenced, so neither is renumbered without owner sign-off. Cite this one as
-> "REQ-UI-010 (action-button icons)". The next free UI id is **`REQ-UI-022`**.
+> **Renumbered 2026-09-22:** this requirement was `REQ-UI-010` until 2026-09-22; that id also named the per-user category grouping toggle on the trade pages in [`materials-overview-grouping.md`](materials-overview-grouping.md), which keeps it.
 
 The recurring CRUD actions use one fixed glyph from the in-house sprite (`fragments/icons.html`
 in the app, `ui_kits/basetool/icons.jsx` in the design system): **delete / remove →
@@ -1046,7 +1042,7 @@ desktop SC Extractor's GUI design lives in
 
 **Material-amount input fields** (SCU/PIECE precision, positivity, the `.`/`,` separator) are
 cross-cutting (inventory, orders, refinery), so their rules live in their own spec —
-[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-001 / REQ-INV-002) — not here.
+[`inv-material-quantities.md`](inv-material-quantities.md) (REQ-INV-042 / REQ-INV-043) — not here.
 This spec still governs how those fields *look*.
 
 ## Open questions

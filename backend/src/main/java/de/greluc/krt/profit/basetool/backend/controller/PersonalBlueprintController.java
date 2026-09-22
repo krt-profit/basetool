@@ -243,7 +243,7 @@ public class PersonalBlueprintController {
   /**
    * Returns, for every blueprint the caller owns, whether and how many times it can be crafted from
    * the caller's own "My Inventory" stock — the craftability annotation of the Personal Inventory
-   * blueprint view (#781, REQ-INV-019). Strictly owner-scoped: owned blueprints, stock and refinery
+   * blueprint view (#781, REQ-INV-048). Strictly owner-scoped: owned blueprints, stock and refinery
    * yield all come from the caller. Read-only; RESOURCE ingredients and the PIECE-material-bridged
    * ITEM ingredients (hand-mined gems, ADR-0046) are evaluated, craftable sub-assemblies and
    * unresolved items are not.

@@ -12,14 +12,15 @@ read/write is isolated to the calling user unless the caller is privileged.
 ## Requirements
 
 > [!note] Where the rest of the `REQ-SEC` namespace lives — checked 2026-09-22
-> Four `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
+> Five `REQ-SEC` ids are specified in [`discord-integration.md`](discord-integration.md), not here:
 > **REQ-SEC-016** (fail-closed guild + membership gate), **REQ-SEC-017** (a `PENDING` registration
-> holds no authority), **REQ-SEC-022** (colliding Discord first-login precheck) and **REQ-SEC-026**
-> (admin-mediated linking of a registration). **REQ-SEC-019 is a known collision:** it names the
-> mission finance-entry scope below *and* the Discord-link indicator in `discord-integration.md`;
-> as with the ORG collision in [`INDEX.md`](INDEX.md), the shipped id is not renumbered unilaterally.
-> **REQ-SEC-054** was never allocated. The next free id is **REQ-SEC-065** — re-check `origin/main`
-> and open PRs before claiming it. Requirements are grouped by subject, not strictly by number.
+> holds no authority), **REQ-SEC-019** (Discord-link indicator in member management),
+> **REQ-SEC-022** (colliding Discord first-login precheck) and **REQ-SEC-026** (admin-mediated
+> linking of a registration). The mission finance-entry scope below shared `REQ-SEC-019` with the
+> Discord-link indicator until 2026-09-22, when it was renumbered to **REQ-SEC-065** on the owner's
+> decision (see the renumbering table in [`INDEX.md`](INDEX.md)). **REQ-SEC-054** was never
+> allocated. The next free id is **REQ-SEC-066** — re-check `origin/main` and open PRs before
+> claiming it. Requirements are grouped by subject, not strictly by number.
 
 ### REQ-SEC-001 — OIDC topology
 
@@ -975,7 +976,9 @@ record of what was once true and why.
 with the service and the flow they tested; the token cases inside `MissionSecurityServiceTest` went
 with the token. **Migration:** V177, undone by `V239`. **Security audit:** finding M1.
 
-### REQ-SEC-019 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
+### REQ-SEC-065 — Mission finance-entry writes are owning-OrgUnit-scoped for officers
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/finance-entries/{entryId}`) gates on
 `MissionSecurityService.canEditFinanceEntry`. `ROLE_OFFICER` is a flat, cross-squadron realm

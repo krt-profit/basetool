@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * The complete org chart as one nested read model. With epic #692 / REQ-ORG-018 it is
+ * The complete org chart as one nested read model. With epic #692 / REQ-ORG-026 it is
  * multi-Bereich:
  *
  * <ul>

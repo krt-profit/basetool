@@ -17,11 +17,13 @@ the write rules and the rank mirror live in
 [`OrgChartService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/OrgChartService.java),
 behind [`OrgChartController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/OrgChartController.java).
 
-> **Numbering note.** `REQ-ORG-010`, `-011`, `-018` and `-021` are also used, for different
-> requirements, in [`org-unit-tenancy.md`](org-unit-tenancy.md) (see the note there). Ids are never
-> renumbered; cite them together with this file.
+> **Numbering note.** The ORG ids are shared with [`org-unit-tenancy.md`](org-unit-tenancy.md). Four
+> of them had each named one requirement here and a different one there; on 2026-09-22, on the
+> owner's decision, they were renumbered once: this file keeps `REQ-ORG-010` and `REQ-ORG-021`, while
+> its Kommandoleiter requirement (was `REQ-ORG-011`) is now `REQ-ORG-025` and its multi-Bereich chart
+> (was `REQ-ORG-018`) is now `REQ-ORG-026`. See the renumbering table in [`INDEX.md`](INDEX.md).
 
-> **Widened by epic #692 (REQ-ORG-018):** the chart was originally a single "Profit-Bereich" tree
+> **Widened by epic #692 (REQ-ORG-026):** the chart was originally a single "Profit-Bereich" tree
 > (`OrgChartScope.AREA` as a singleton). With the real hierarchy (REQ-ORG-014: OL > Bereich > Staffel/SK)
 > it becomes **multi-Bereich with an Organisationsleitung at the top**. It stays **purely descriptive**
 > (REQ-ORG-010): a position grants no permission — authorization lives in the role model and the
@@ -72,7 +74,9 @@ the inline editor as an admin) · **Code:** `OrgChartController` · **Issues:** 
 > seat can be bolted onto a mirror-managed Kommando. A legacy chart-only Kommando (`kommandoGroupId`
 > = `null`) keeps the full structural CRUD.
 
-### REQ-ORG-011 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
+### REQ-ORG-025 — A Kommando(gruppe) carries an independently fillable *and* vacatable Kommandoleiter
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-011` until 2026-09-22; that id also named the personal-aggregate owner retaining see/edit across org-unit changes in [`org-unit-tenancy.md`](org-unit-tenancy.md), which keeps it.
 
 A `COMMAND_LEAD` row models the Kommando itself, not merely the person leading it: it carries an
 optional group name and an optional holder (the Kommandoleiter). The seat may be **filled after** the
@@ -109,7 +113,7 @@ through the UI and asserts the Kommandogruppe survives) · **Code:**
 
 Removing a Kommando (`DELETE /positions/{id}` on a `COMMAND_LEAD`) deletes the row and, via the
 `ON DELETE CASCADE` `parent_id` FK, its Stv. Kommandoleiter and the Ensigns reporting into it. This
-is a distinct, more destructive operation than vacating the Kommandoleiter (REQ-ORG-011): the inline
+is a distinct, more destructive operation than vacating the Kommandoleiter (REQ-ORG-025): the inline
 editor warns the admin about the affected children before the delete, whereas vacating prompts only
 to clear the seat.
 
@@ -127,7 +131,7 @@ through the inline editor's confirm dialog) · **Code:** `OrgChartService#delete
 ### REQ-ORG-013 — The org chart is keyboard-operable and screen-reader-navigable
 
 The chart conveys its hierarchy to assistive technology and is fully operable without a
-mouse. It is exposed as ARIA **tree**s — since epic #692 (REQ-ORG-018) the chart renders one
+mouse. It is exposed as ARIA **tree**s — since epic #692 (REQ-ORG-026) the chart renders one
 tree per tier: the Organisationsleitung on top, the Bereich tier-trees **side by side** beneath it
 (joined to the OL by the same connector lines a Bereich draws to its Staffeln/SKs), then the
 legacy/ungrouped tier — each its own `role="tree"` (labelled by its tier caption), each child row
@@ -195,7 +199,9 @@ in-place refresh), `org-chart.css`
 (`.oc-fan--bereiche`, `.oc-leader-wrap`, `.oc-collapse`, `.oc-bereich-body`),
 `fragments/org-chart-node.html` (`ocBereich`) · **Issues:** —
 
-### REQ-ORG-018 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
+### REQ-ORG-026 — Multi-Bereich chart with an Organisationsleitung level, coloured by Bereich
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-018` until 2026-09-22; that id also named the mission owning-OrgUnit reassignment in [`org-unit-tenancy.md`](org-unit-tenancy.md), which keeps it.
 
 With the real hierarchy (REQ-ORG-014) the chart renders **OL → each Bereich (Bereichsleiter +
 Bereichskoordinatoren + Bereichsoperatoren) → its Staffeln + SKs**, not a single Profit-Bereich. The unit tier is **every active Staffel/SK regardless of

@@ -598,7 +598,7 @@ class UserReconciliationServiceTest {
 
     @Test
     void newDiscordLogin_persistsGuildNickname_trimmed() {
-      // covers REQ-DATA-008 — the per-guild server nickname claim is persisted (trimmed) for
+      // covers REQ-DATA-018 — the per-guild server nickname claim is persisted (trimmed) for
       // display in the admin approval queue.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -620,7 +620,7 @@ class UserReconciliationServiceTest {
 
     @Test
     void discordLoginWithoutNicknameClaim_leavesGuildNicknameNull() {
-      // covers REQ-DATA-008 — the nickname capture is best-effort/optional: an absent claim leaves
+      // covers REQ-DATA-018 — the nickname capture is best-effort/optional: an absent claim leaves
       // the field null rather than failing the login.
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
       when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));

@@ -13,11 +13,13 @@ behind this spec are archived: [`MULTI_SQUADRON_PLAN.md`](../archive/MULTI_SQUAD
 [`SPEZIALKOMMANDO_PLAN.md`](../archive/SPEZIALKOMMANDO_PLAN.md) (history only — this spec is the
 living truth).
 
-> **Numbering note.** The ORG ids are shared with [`org-chart.md`](org-chart.md), and three are
-> defined twice: `REQ-ORG-010`, `REQ-ORG-011` and `REQ-ORG-021` name one requirement here and a
-> different one there, and `REQ-ORG-018` likewise (here: mission owning-unit reassignment; there:
-> the multi-Bereich chart). Ids are never renumbered (see [`INDEX.md`](INDEX.md)); cite them
-> together with the file. `REQ-ORG-012`, `-013` and `-020` live only in `org-chart.md`.
+> **Numbering note.** The ORG ids are shared with [`org-chart.md`](org-chart.md). Four of them had
+> each named one requirement here and a different one there; on 2026-09-22, on the owner's decision,
+> they were renumbered once: this file keeps `REQ-ORG-011` (owner retains see/edit) and `REQ-ORG-018`
+> (mission owning-unit reassignment), while its active-context surfacing (was `REQ-ORG-010`) is now
+> `REQ-ORG-024` and its participant escape (was `REQ-ORG-021`) is now `REQ-ORG-027`. See the
+> renumbering table in [`INDEX.md`](INDEX.md). `REQ-ORG-010`, `-012`, `-013`, `-020`, `-021`, `-025`
+> and `-026` live only in `org-chart.md`.
 
 ## Requirements
 
@@ -269,7 +271,9 @@ construction, no creator-owner fallback and no ownerless-leadership use case).
 > owner scopes the row to that level's leadership (strict silo). No existing `NULL`-owner row is
 > backfilled to a concrete owner.
 
-### REQ-ORG-010 — Active-context surfacing in the UI
+### REQ-ORG-024 — Active-context surfacing in the UI
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-010` until 2026-09-22; that id also named the descriptive, ADMIN-edited org chart in [`org-chart.md`](org-chart.md), which keeps it.
 
 The active OrgUnit context is surfaced to the user **only** by appending it to the application
 title (`appTitle`, resolved in
@@ -352,7 +356,7 @@ so the system is byte-identical to today's flat behaviour while the hierarchy is
 - [x] An ADMIN-only management UI (`/admin/org-structure`) creates Bereiche and the Organisationsleitung
   and sets the parent edges (Staffel/SK → Bereich, Bereich → OL) over the existing `/api/v1/org-hierarchy`
   API, reading the whole structure — each unit's current parent and optimistic-lock version — from a
-  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-018).
+  single `GET /api/v1/org-hierarchy/org-units`. Leadership seating stays on the org chart (REQ-ORG-026).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V164: the two new kinds, the `parent_org_unit_id` column +
 its kind-pairing parent trigger, the OL-has-no-parent CHECK, `ddl-auto=validate` at boot), and
@@ -686,7 +690,9 @@ referenced from the code and `INDEX.md` but had no entry in any spec.)*
 `BankAccountService`, `BankAccount`, `OrgUnitController#listActiveOrgUnitsAllKinds`,
 `V168__link_bank_area_cartel_to_org_unit.sql` · **Issues:** #692, #699.
 
-### REQ-ORG-021 — The participant escape opens the operation, not its ledger
+### REQ-ORG-027 — The participant escape opens the operation, not its ledger
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-ORG-021` until 2026-09-22; that id also named the single Grand Admiral at the top of the Organisationsleitung in [`org-chart.md`](org-chart.md), which keeps it.
 
 `OwnerScopeService.canSeeOperation` admits a caller either through org-unit scope (or the
 ownerless-leadership case of REQ-ORG-009) **or** through the participant escape of ADR-0006. The

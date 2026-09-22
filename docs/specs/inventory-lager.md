@@ -108,7 +108,7 @@ Both tree levels are collapsible, and their expand/collapse state is **persisted
 (`localStorage`, keyed by the viewer's id — `expanded_rows_lager_*` for material groups,
 `expanded_stacks_lager_*` for location stacks) and re-applied on initial load **and after every
 in-place grouped-table re-swap** — a filter change or a modal write (book-out, Umbuchen and
-bulk-checkout all re-swap `#inventoryTable` on success, REQ-INV-003/REQ-INV-007). A fragment swap
+bulk-checkout all re-swap `#inventoryTable` on success, REQ-INV-044/REQ-INV-007). A fragment swap
 does not re-fire `DOMContentLoaded`, so the expansion is restored explicitly after the swap; a
 restored stack re-fetches its (now up-to-date) entries. A modal mutation therefore never collapses
 the tree the user was working in.
@@ -134,7 +134,9 @@ the tree the user was working in.
 `static/js/inventory-my.js`, `static/js/inventory-admin.js` (tree expand/collapse persistence) ·
 **Issues:** #466
 
-### REQ-INV-003 — Actions operate per entry
+### REQ-INV-044 — Actions operate per entry
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-003` until 2026-09-22; that id also named the server-side SCU/PIECE enforcement and storage scale in [`inv-material-quantities.md`](inv-material-quantities.md), which keeps it.
 
 Every single-row Lager action — book-out (consume / transfer / sell), personal-marker rebooking
 (Umbuchung, REQ-INV-007), note edit, delivered toggle, allocation add / change / remove
@@ -188,7 +190,7 @@ rows with no owning org unit), returned **oldest-first** by
 `idx_inventory_item_stack_key` on the inventory natural key backs both the grouped `GROUP BY`
 and the per-stack entries lookup. The `/all` drill-down re-applies the same org-unit scope
 predicate as the grouped view; the `/my` drill-down is owner-scoped from the JWT (no
-impersonation). Per-entry actions (REQ-INV-003) operate on the fetched rows unchanged. Each
+impersonation). Per-entry actions (REQ-INV-044) operate on the fetched rows unchanged. Each
 drill-down row shows the entry's amount, its job-order / mission allocation chips with the
 `+ Zuordnen` picker (REQ-INV-027) and the per-entry actions (book-out, Umbuchen, note — plus, on
 `/inventory/my`, the Materialbörse release toggle of [`materialboerse.md`](materialboerse.md)),
@@ -223,7 +225,9 @@ identical.
 columns by `V218__drop_inventory_scalar_associations.sql`) ·
 **Issues:** #466
 
-### REQ-INV-006 — "Mein Lager" personal- / non-personal-entries-only filters
+### REQ-INV-046 — "Mein Lager" personal- / non-personal-entries-only filters
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-006` until 2026-09-22; that id also named the blueprint import's match on the normalized `output_name` in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 The personal Lager view (`/inventory/my`) offers two **mutually exclusive** stock-kind filters
 alongside the existing material / min-quality / job-order / mission filters: a **personal-entries-only**
@@ -286,7 +290,7 @@ the source row's current flag, never from the client:
 The operation is an **append-only split** (REQ-INV-001), structurally identical to the book-out
 `TRANSFER` branch: the moved `amount` is decremented off the source row (the source row is deleted
 when it depletes below the quantity epsilon) and inserted as its own new row with the opposite
-`personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-003), guarded
+`personal` flag — it is never folded into an existing stack. It is per-entry (REQ-INV-044), guarded
 by optimistic locking on the source row's `version`, and owner-scoped (`@ownerScopeService.canEditInventoryItem`;
 an admin/logistician may act within scope). Every rebooking records its own audit event
 (`INVENTORY_ITEM_DEPERSONALIZED` / `INVENTORY_ITEM_PERSONALIZED`, REQ-AUDIT-001).
@@ -745,7 +749,7 @@ no-silent-cap principle).
   already removed (the backend bulk-checkout 404s on any unknown id). Select-all itself does not
   re-swap the table, so a live selection survives drill-down expansion.
 - **No new mutation.** Select-all is a read that feeds the existing bulk check-out
-  (`POST /inventory/bulk-checkout`, REQ-INV-003); it adds no new write path and no new audit event
+  (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
 
 **Acceptance**

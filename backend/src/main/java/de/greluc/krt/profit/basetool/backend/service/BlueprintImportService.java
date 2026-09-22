@@ -331,7 +331,7 @@ public class BlueprintImportService {
    * BlueprintImportStatus#MATCHED} when the entry's {@code tag} maps (case-insensitively, and only
    * when unambiguous) to a known product key, bypassing the name match entirely. This makes the
    * scmdb.net import robust against the CIG-mislabeled {@code output_name}s the name match has to
-   * correct for (REQ-INV-007) and against cosmetic-variant name drift. For the watcher / extractor
+   * correct for (REQ-INV-047) and against cosmetic-variant name drift. For the watcher / extractor
    * exports, which carry no {@code tag}, the step is a no-op and the name chain decides as before.
    *
    * @param entry the parsed external name + tag + acquisition suggestion

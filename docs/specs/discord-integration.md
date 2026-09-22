@@ -19,9 +19,12 @@ The backend half — login-time reconciliation, the approval queue and the accou
 `UserReconciliationService` (sync), `UserRegistrationService` (approve / reject / reopen / link) and
 `UserDeletionService` (FK-safe delete).
 
-> **Numbering note.** `REQ-DATA-006` and `REQ-DATA-008` are defined here **and**, for different
-> requirements, in [`data-persistence.md`](data-persistence.md) (covering indexes; user-deletion FK
-> handling). Ids are never renumbered (see [`INDEX.md`](INDEX.md)); cite them together with the file.
+> **Numbering note.** Requirement ids are stable. Two ids in this file were renumbered once, on
+> 2026-09-22 and on the owner's decision, because each had also named a different requirement: this
+> file keeps `REQ-DATA-006` (Discord account link), while the guild-nickname requirement below was
+> `REQ-DATA-008` and is now `REQ-DATA-018` — `REQ-DATA-008` stays with the user-deletion FK handling
+> in [`data-persistence.md`](data-persistence.md), whose covering-index rule moved to `REQ-DATA-017`.
+> See the renumbering table in [`INDEX.md`](INDEX.md).
 
 ## Requirements
 
@@ -522,7 +525,9 @@ name-less body, empty-admins no-op) · `PendingRegistrationMailEventListenerTest
 `event/DiscordRegistrationPendingEvent`, `repository/UserRepository#findAllAdmins`,
 `messages*.properties` (`email.pendingRegistration.*`) · **Decision:** ADR-0064 · **Issues:** #720
 
-### REQ-DATA-008 — Discord guild nickname captured at login & shown at approval (admin-only)
+### REQ-DATA-018 — Discord guild nickname captured at login & shown at approval (admin-only)
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-DATA-008` until 2026-09-22; that id also named the user-deletion FK handling in [`data-persistence.md`](data-persistence.md), which keeps it.
 
 To let an admin recognise who a pending Discord registration actually is, Basetool captures the
 name the guild **displays** for the user — the per-guild `nick` they set inside the `das-kartell`

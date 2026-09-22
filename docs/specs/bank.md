@@ -534,7 +534,7 @@ design/delivery/audit rules as REQ-BANK-014. Employees cannot trigger this expor
 > **per Bereich** (A→Z by Bereich name, each leading with its `AREA` account then its Staffel/SK
 > accounts), the **Sonderkonten**, an **"Ohne Bereich"** bucket for org-unit accounts with no Bereich,
 > and finally every **closed** account. Each Bereich header is tinted with its department's
-> Bereichsfarbe (`--color-dept-*`, REQ-ORG-018), mirroring the org chart. The account→Bereich mapping
+> Bereichsfarbe (`--color-dept-*`, REQ-ORG-026), mirroring the org chart. The account→Bereich mapping
 > is a display-only owner-label read resolved from the account's owning org unit + its parent via one
 > bounded query (no per-account N+1); the bank stays org-unit-blind (REQ-BANK-008 —
 > `BankDashboardService` reads `OrgUnitRepository`, never `OwnerScopeService`). The account-name

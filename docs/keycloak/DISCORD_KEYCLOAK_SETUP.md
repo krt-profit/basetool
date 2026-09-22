@@ -148,7 +148,7 @@ already used for user sync (its service account needs `view-users` **and** `view
 
 ### 3d. (Optional) Capture the per-guild server nickname for the approval queue
 
-To show each pending user's **das-kartell server name** in the admin approval queue (REQ-DATA-008),
+To show each pending user's **das-kartell server name** in the admin approval queue (REQ-DATA-018),
 capture the guild display name — the Discord `nick`, or the global display name (`user.global_name`)
 when the member set no per-guild nick — and carry it into a token claim, mirroring `discord_user_id`.
 (The provider injects `nick ?? global_name` into `guild_nick`, so a member who appears in the server

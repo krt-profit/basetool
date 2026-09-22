@@ -5,7 +5,7 @@
 - **Deciders:** @greluc (four decisions, recorded below), Claude (measurement and implementation)
 - **Related:** [ADR-0164](0164-an-installable-web-app-without-a-service-worker.md) (the PWA that made
   this load-bearing) · specs [`ui-design-system.md`](../specs/ui-design-system.md) `REQ-UI-009`
-  (amended), `REQ-UI-019`, `REQ-UI-020` · `REQ-ORG-010` (the OrgUnit context in the title)
+  (amended), `REQ-UI-019`, `REQ-UI-020` · `REQ-ORG-024` (the OrgUnit context in the title)
 
 ## Context
 
@@ -47,7 +47,7 @@ measures it.** Four owner decisions, taken 2026-09-13:
    `sidebar.js` publishes `0` whenever the footer is not `fixed`, so all eight of its consumers stop
    reserving in one step rather than each needing its own media query.
 2. **The header stays sticky and becomes compact.** It measured 76px, and the 60px of content came
-   from the wordmark wrapping to two lines — it carries the OrgUnit context (REQ-ORG-010), which is
+   from the wordmark wrapping to two lines — it carries the OrgUnit context (REQ-ORG-024), which is
    longer than a phone is wide. One line with an ellipsis plus a 32px mark gives ~48px, and menu,
    mark and bell stay reachable without scrolling. Chosen over letting the header scroll away.
 3. **`.btn-xs2` is not a dense row action** and takes the 44px floor on touch classes. It is a

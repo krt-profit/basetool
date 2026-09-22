@@ -108,7 +108,9 @@ over-delivery beyond the outstanding amount.
 `backend/.../model/JobOrderItemHandoverEntry` (`amount` is `Integer`),
 `templates/orders-detail.html`, `JobOrderWriteController#createItemHandover`. **Issues:** PR #465.
 
-### REQ-INV-004 — Personal-inventory quantity: positive whole numbers
+### REQ-INV-045 — Personal-inventory quantity: positive whole numbers
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-004` until 2026-09-22; that id also named the org-unit reconcile that re-stamps without merging in [`inventory-lager.md`](inventory-lager.md), which keeps it.
 
 A **personal-inventory** item (a member's own item stash) is counted in whole units. Its quantity is
 a **positive whole number** (`Integer`, `≥ 1`). The user and admin forms use
@@ -117,7 +119,7 @@ strips non-digits and floors the value at `1`; `PersonalInventoryItem{Create,Upd
 is `@NotNull @Min(1) Integer` and the frontend form mirrors it.
 
 This requirement is numbered in the `INV` area but lives here, not in
-[`inv-material-quantities.md`](inv-material-quantities.md): `REQ-INV-001..003` cover **material**
+[`inv-material-quantities.md`](inv-material-quantities.md): `REQ-INV-003`, `REQ-INV-042` and `REQ-INV-043` cover **material**
 (SCU/PIECE) amounts, whereas personal inventory is a distinct feature whose quantity follows the
 non-material whole-number rule shared with the order counts above.
 
@@ -136,6 +138,6 @@ non-material whole-number rule shared with the order counts above.
 
 The fractional **SCU** / whole **PIECE** rules for squadron *material* quantities (book-in / book-out,
 material order, claim, material handover, refinery store) — those are
-[`inv-material-quantities.md`](inv-material-quantities.md) (`REQ-INV-001..003`). Refinery good
+[`inv-material-quantities.md`](inv-material-quantities.md) (`REQ-INV-003`, `REQ-INV-042`, `REQ-INV-043`). Refinery good
 input/output quantities keep their own validation. Currency display formatting (grouping separators,
 the `aUEC` suffix, department colours) is governed by [`ui-design-system.md`](ui-design-system.md).

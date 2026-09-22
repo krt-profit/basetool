@@ -603,7 +603,7 @@ change them only through the API.
 > **(3)** **participant visibility** (ADR-0006): whoever took part in one of the linked
 > missions sees the operation and **their own** payout row even across Staffeln.
 >
-> ³ **The third path does not carry the ledger (ADR-0150, REQ-ORG-021).** It is self-issuable —
+> ³ **The third path does not carry the ledger (ADR-0150, REQ-ORG-027).** It is self-issuable —
 > `POST /api/v1/missions/{id}/join` is open for every non-internal mission of every org unit — so
 > `/finances`, `/finances/{missionId}` and `/finance-summary` require org-unit scope
 > (`canSeeOperationLedger`), and `/payouts` reduces an escape-only caller to their own row. Before

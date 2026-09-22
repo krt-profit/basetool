@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Computes, for each of the caller's owned blueprints, whether and how many times it can be crafted
  * from the caller's own stock — the answer the Personal Inventory blueprint view annotates each
- * blueprint with (#781, REQ-INV-019).
+ * blueprint with (#781, REQ-INV-048).
  *
  * <p>Strictly owner-scoped: the owned blueprints come from the caller's {@code sub}, the stock from
  * the caller's "My Inventory" rows ({@code user == me}, pooled across all locations), and the

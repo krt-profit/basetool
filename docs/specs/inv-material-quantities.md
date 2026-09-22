@@ -17,7 +17,9 @@ spec ([`ui-design-system.md`](ui-design-system.md)); amounts are persisted per
 
 ## Requirements
 
-### REQ-INV-001 — SCU amounts: positive, ≤ 3 decimals, either separator
+### REQ-INV-042 — SCU amounts: positive, ≤ 3 decimals, either separator
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-001` until 2026-09-22; that id also named the append-only stock-entry rule in [`inventory-lager.md`](inventory-lager.md), which keeps it.
 
 A material whose quantity type is `SCU` is measured in **0.001** increments (microSCU). Every field
 that takes an amount of an SCU material accepts a **positive (> 0) decimal** with **at most three
@@ -52,7 +54,9 @@ gated to SCU rows only) + web-asset linting (ESLint / HTMLHint / Prettier). _Ser
 `frontend/.../static/js/scu-decimal-input.js`, `fragments/head.html` (`window.krtScuI18n`),
 `fragments/scu-hint.html`, `refinery-orders-details.html`. **Issues:** PR #465.
 
-### REQ-INV-002 — PIECE amounts: positive whole numbers only
+### REQ-INV-043 — PIECE amounts: positive whole numbers only
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-002` until 2026-09-22; that id also named the group-on-read Lager view in [`inventory-lager.md`](inventory-lager.md), which keeps it.
 
 A material whose quantity type is `PIECE` (Stück) is counted in whole units. The same fields, when
 the chosen material is PIECE-typed, accept **only positive whole numbers** (≥ 1): decimal separators
@@ -71,7 +75,7 @@ see [REQ-INV-003](#req-inv-003--server-side-enforcement--scu-scale-storage). **C
 
 ### REQ-INV-003 — Server-side enforcement & SCU-scale storage
 
-REQ-INV-001 / REQ-INV-002 are enforced server-side as well, so non-browser API clients cannot bypass
+REQ-INV-042 / REQ-INV-043 are enforced server-side as well, so non-browser API clients cannot bypass
 them. **Validation:** `@ValidQuantityAmount` rejects `≤ 0` (both types) and fractional `PIECE`
 amounts on the validated write DTOs — inventory create (`InventoryItemCreateDto`; stock rows are
 append-only, there is no amount-update DTO), refinery store, and **job-order material (create + the
@@ -114,7 +118,7 @@ reference, so bean validation cannot reach them).
 Whole-unit counts and currency that are **not** material quantities — item-order piece counts,
 item-handover entries, personal-inventory quantity (all `Integer`, `≥ 1`) and mission-finance money
 amounts (whole aUEC) — are specified in [`whole-number-amounts.md`](whole-number-amounts.md)
-(`REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-004`). Refinery good input/output quantities
+(`REQ-MISSION-001`, `REQ-ORDERS-001` / `002`, `REQ-INV-045`). Refinery good input/output quantities
 keep their own validation. The DB-precision / migration mechanics live in
 [`data-persistence.md`](data-persistence.md).
 

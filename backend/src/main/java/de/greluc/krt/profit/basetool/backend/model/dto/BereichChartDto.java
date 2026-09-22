@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-018): its Bereichsleitung
+ * One Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-026): its Bereichsleitung
  * sub-tree plus the Staffeln and Spezialkommandos that report into it, tinted by the Bereich's
  * frozen {@link Department Bereichsfarbe}.
  *

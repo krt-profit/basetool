@@ -3,7 +3,7 @@
 - **Status:** Accepted — Track 1 implemented. The import-attribute half of the *link claim* is **superseded by [ADR-0036](0036-discord-link-recognised-from-federated-identity.md)**. *Status corrected 2026-09-22:* it said "operator Discord + Keycloak setup pending"; the Discord identity provider is live in production — a read-only production query on 2026-09-13 counted 45 Discord-linked accounts.
 - **Date:** 2026-06-20
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · REQ-DATA-008 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-SEC-016 · REQ-DATA-006 · REQ-SEC-017 · REQ-NOTIF-012 · REQ-DATA-018 · issue #720 · #721 · #723 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
 
 ## Context
 
@@ -52,7 +52,7 @@ approval gate are independent layers — the first proves *Kartell membership*, 
 (the automated Discord-role → app-role/unit sync is Track 2).
 
 We also capture the user's **per-guild server nickname** to give the approving admin a recognisable
-in-server identity (REQ-DATA-008). Discord's `/users/@me` profile has no nickname (it is per-guild),
+in-server identity (REQ-DATA-018). Discord's `/users/@me` profile has no nickname (it is per-guild),
 so `DiscordIdentityProvider` fetches the guild-member object best-effort, injects the `nick` into the
 brokered profile JSON, and a standard *Attribute Importer* + protocol mapper carry it into the
 `discord_guild_nickname` claim — exactly the `discord_user_id` shape. Crucially this capture is
@@ -79,7 +79,7 @@ security boundary, *fail open* on cosmetic enrichment.
   hiccup denies a new login); the optional nickname capture fails **open** (a Discord hiccup just
   omits the nickname). The nickname adds a second best-effort guild-member call per login when the
   `DISCORD_GUILD_ID` env var is set — bounded by the same timeout and swallowing every error, so it
-  can never break or stall a login (REQ-DATA-008).
+  can never break or stall a login (REQ-DATA-018).
 - **Discord secrets live as Keycloak component config supplied at deploy** (IdP client id/secret;
   gate guild id + role id) — never committed. The redacted shape is documented in the realm
   reference and the runbook.

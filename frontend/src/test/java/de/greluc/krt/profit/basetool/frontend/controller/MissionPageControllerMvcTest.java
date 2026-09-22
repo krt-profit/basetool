@@ -223,7 +223,7 @@ class MissionPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void missionDetail_omitsEmptyGoalAndProcedureTiles_andOpensDescription() throws Exception {
-    // Owner request 2026-07-01 (REQ-MISSION-004/-009/-012): when no goals + no Ablauf steps are
+    // Owner request 2026-07-01 (REQ-MISSION-004/-009/-019): when no goals + no Ablauf steps are
     // authored, the read-only Übersicht Ziele and Ablauf tiles are omitted entirely — no "Noch
     // keine …" placeholder — and the detailed-description <details> opens by default.
     // minimalMission
@@ -254,7 +254,7 @@ class MissionPageControllerMvcTest {
   /**
    * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus one goal (Ziel) and
    * a meeting point (Treffpunkt), so the per-step checklist/editor, the Ziele box/editor and the
-   * new at-a-glance rows actually render (REQ-MISSION-009/-012). Editable (canEdit), so the editors
+   * new at-a-glance rows actually render (REQ-MISSION-009/-019). Editable (canEdit), so the editors
    * + done-toggle show.
    *
    * @param missionId the id to stamp on the mission

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link BlueprintModifierMath} — the server-side mirror of the frontend modifier
- * slider math and the REQ-INV-019 no-degradation floor.
+ * slider math and the REQ-INV-048 no-degradation floor.
  */
 class BlueprintModifierMathTest {
 

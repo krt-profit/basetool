@@ -38,7 +38,7 @@ cap (issue #823). The page controller pages the backend in chunks and concatenat
 page, so the facts subtitle ("N Blueprints"), the `.tab-count`, and the instant client-side filter
 all cover **every** owned blueprint, never a truncated first page. Loading the full set never blocks
 the render because the heavy per-row work stays off the critical path: the recipe is lazy per
-selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-019) — so "all are listed
+selection (REQ-INV-009) and craftability is one bulk async fetch (REQ-INV-048) — so "all are listed
 and searchable, only what you open / what the badge pass covers is computed".
 
 ### REQ-INV-009 — Detail pane on the existing lazy recipe endpoint, calculation unchanged
@@ -246,13 +246,9 @@ and a global sharer is counted once.
 [`JobOrderItemBlueprintOwnersService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/JobOrderItemBlueprintOwnersService.java),
 [`V163__add_share_blueprints_globally_to_user.sql`](../../backend/src/main/resources/db/migration/V163__add_share_blueprints_globally_to_user.sql).
 
-### REQ-INV-019 — Craftability of own blueprints from "My Inventory" stock
+### REQ-INV-048 — Craftability of own blueprints from "My Inventory" stock
 
-> **Id collision (recorded 2026-09-22).** `REQ-INV-019` also names a *different* requirement in
-> [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md) (structural tag match).
-> This file's `REQ-INV-019` is the craftability requirement; a renumber of either needs owner
-> sign-off (see the known-collision convention in [`INDEX.md`](INDEX.md)). The same holds for
-> `REQ-INV-021` below.
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-019` until 2026-09-22; that id also named the structural tag match for the scmdb.net export in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 The blueprint view annotates each of the caller's owned blueprints with whether and how many times
 it can be crafted **right now** from the caller's own stock, the output stats that stock's quality
@@ -361,11 +357,9 @@ over existing data via `GET /api/v1/personal-blueprints/craftability?includeRefi
 [`PersonalInventoryBlueprintsPageController#craftability`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageController.java),
 [`personal-inventory-blueprints-recipe.js`](../../frontend/src/main/resources/static/js/personal-inventory-blueprints-recipe.js).
 
-### REQ-INV-021 — Import preview: auto-selected top suggestion, honest include checkbox
+### REQ-INV-049 — Import preview: auto-selected top suggestion, honest include checkbox
 
-> **Id collision (recorded 2026-09-22).** `REQ-INV-021` also names the seeded German-suffix aliases
-> in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md); see the note under
-> REQ-INV-019 above.
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-021` until 2026-09-22; that id also named the seeded aliases for localised (German-suffix) client names in [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md), which keeps it.
 
 In the JSON-import preview modal (REQ-INV-010) every parsed row carries an **include checkbox** that
 is the single source of truth for what "Anwenden" imports: a row is imported **iff** its checkbox is
@@ -373,7 +367,7 @@ ticked **and** it has resolved to a product. The two states must never disagree 
 carries a resolved `product_key`, an unresolved row is never ticked. The preview groups rows by match
 status:
 
-- **Auto-matched** (exact / alias / structural tag — REQ-INV-006/007/019 of
+- **Auto-matched** (exact / alias / structural tag — REQ-INV-006/047/019 of
   [`blueprint-import-name-matching.md`](blueprint-import-name-matching.md)) — carry their resolved
   product and render ticked.
 - **Suggestions** (a fuzzy candidate set, no exact match) — **auto-select their top suggestion**: the
@@ -539,7 +533,7 @@ removable owned blueprints of **every** user at once — a maintenance/reset too
 
 ### REQ-INV-038 — SC Extractor release link in the add bar
 
-The JSON import (REQ-INV-021) consumes an export the member has to produce with the desktop
+The JSON import (REQ-INV-049) consumes an export the member has to produce with the desktop
 **Basetool SC Extractor** first, so the add bar carries the way to obtain that tool directly next
 to the import trigger it feeds — a member who has no extractor yet no longer has to leave the tool
 and search for it.
@@ -559,7 +553,7 @@ and search for it.
   mutation, so there is nothing to live-update and nothing to audit.
 - Label and tooltip come from the **shared** bundle keys `scExtractor.download.button` /
   `.title` (DE + EN) rather than a page-scoped key: the refinery create page carries the same
-  control next to its screenshot import (`REQ-REFINERY-019`,
+  control next to its screenshot import (`REQ-REFINERY-021`,
   [`refinery-screenshot-import.md`](refinery-screenshot-import.md)), and the two must not
   drift apart in wording or target URL.
 

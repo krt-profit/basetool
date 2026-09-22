@@ -4952,7 +4952,7 @@ textarea:focus-visible,
      * screen — 16px padding plus 60px of content — and the 60px did NOT come
      * from the 50px mark. It came from the wordmark wrapping to two lines,
      * because it carries the active OrgUnit context ("Profit Basetool – Alle
-     * Staffeln", REQ-ORG-010) and that is simply longer than a phone is wide.
+     * Staffeln", REQ-ORG-024) and that is simply longer than a phone is wide.
      *
      * So the fix is one line of text, not a smaller font alone: `nowrap` +
      * ellipsis caps the row at a single line, and `min-width: 0` on both flex

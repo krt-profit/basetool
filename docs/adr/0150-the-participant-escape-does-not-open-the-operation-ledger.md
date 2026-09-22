@@ -2,7 +2,7 @@
 
 > **Status:** Accepted · **Date:** 2026-08-30 · **Deciders:** @greluc
 > **Related:** ADR-0006 (the participant visibility escape it narrows), `REQ-ORG-003` (Operation's
-> two read-only escapes), `REQ-ORG-021` (this decision, as a requirement), `REQ-SEC-009` (the
+> two read-only escapes), `REQ-ORG-027` (this decision, as a requirement), `REQ-SEC-009` (the
 > anonymous mission surface that makes the escape self-issuable), `docs/specs/org-unit-tenancy.md`
 
 ## Context

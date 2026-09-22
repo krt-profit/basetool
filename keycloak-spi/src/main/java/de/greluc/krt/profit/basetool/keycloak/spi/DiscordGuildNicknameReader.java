@@ -37,7 +37,7 @@ import org.keycloak.util.JsonSerialization;
  * Best-effort reader for a Discord user's per-guild server nickname — the {@code nick} field of the
  * guild-member object returned by {@code GET {apiBaseUrl}/users/@me/guilds/{guildId}/member}.
  * Called with the user's own brokered access token (scope {@code guilds.members.read}) so no bot is
- * needed, the same source the membership gate uses (REQ-DATA-008).
+ * needed, the same source the membership gate uses (REQ-DATA-018).
  *
  * <p><strong>Fails open.</strong> Unlike {@link DiscordMembershipChecker} (which gates the login
  * and fails <em>closed</em>), the nickname is purely cosmetic — it is shown to an admin at approval
@@ -54,8 +54,8 @@ import org.keycloak.util.JsonSerialization;
  * the guild actually shows for the member — the per-guild {@code nick} if set, otherwise the
  * account's global display name ({@code user.global_name}) — used for the admin approval-queue
  * label, so a member who never set a server nick is still shown a recognisable name instead of a
- * blank em-dash (REQ-DATA-008; the reported conrad7247/MadrukSedras case, where the server name is
- * the global display name and no per-guild nick is set).
+ * blank em-dash (REQ-DATA-018; the reported case of a member whose server name is the global
+ * display name, with no per-guild nick set).
  *
  * <p>This class never logs the token, the response body, or any captured name.
  */
@@ -96,7 +96,7 @@ public class DiscordGuildNicknameReader {
   /**
    * Reads the name the guild <em>displays</em> for the user, best-effort: the per-guild {@code
    * nick} if set, otherwise the account's global display name ({@code user.global_name}). This is
-   * the recognisable label shown in the admin approval queue (REQ-DATA-008), so a member who never
+   * the recognisable label shown in the admin approval queue (REQ-DATA-018), so a member who never
    * set a server nickname is still identifiable rather than a blank em-dash.
    *
    * @param apiBaseUrl Discord API base URL, e.g. {@code https://discord.com/api/v10}
@@ -177,7 +177,7 @@ public class DiscordGuildNicknameReader {
    * per-guild {@code nick} if present and non-blank, otherwise the account's global display name
    * ({@code user.global_name}). Trimmed and length-bounded exactly like {@link
    * #extractNick(String)} — the fallback is what lets a member with no per-guild nickname still
-   * surface a recognisable name in the approval queue (REQ-DATA-008).
+   * surface a recognisable name in the approval queue (REQ-DATA-018).
    *
    * @param body the raw guild-member response body
    * @return the guild display name (nick, else global name), or {@link Optional#empty()} when

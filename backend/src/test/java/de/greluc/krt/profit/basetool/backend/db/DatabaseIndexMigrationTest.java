@@ -138,7 +138,7 @@ class DatabaseIndexMigrationTest {
     // V162 (REQ-DATA-004 / ADR-0023): the UEX company-id → manufacturer alias lookup index.
     assertIndexExists(
         jdbc, "manufacturer_uex_company", "idx_manufacturer_uex_company_manufacturer");
-    // V175 (REQ-DATA-006): round-three FK / hot-query backfill — standalone FK indexes the
+    // V175 (REQ-DATA-017): round-three FK / hot-query backfill — standalone FK indexes the
     // leading-column composites could not serve, plus two partial indexes for the pending-approval
     // queue and the active job-order board.
     assertIndexExists(jdbc, "job_order_assignees", "idx_job_order_assignees_user_id");

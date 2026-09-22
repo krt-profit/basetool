@@ -112,12 +112,6 @@ the viewer has any:
 
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)
 
-> **ID collision (recorded 2026-09-22).** `REQ-MISSION-012` also names the mission goals (Ziele) in
-> [`mission-detail-tabs.md`](mission-detail-tabs.md). Both are shipped and referenced from code, so
-> neither is renumbered without the owner's sign-off — see the collision list in
-> [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors). Cite this one as "REQ-MISSION-012
-> (home grid)" until then. The next free MISSION id is `REQ-MISSION-019`.
-
 The home page (`/`) renders the missions whose `plannedStartTime` falls within the next seven days
 (from "now" to "now + 7 days") as a **tile grid**, ordered by `plannedStartTime` ascending — the
 nearest planned start first. This replaces the former single next-mission banner; the first tile is

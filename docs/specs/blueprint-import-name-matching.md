@@ -41,7 +41,9 @@ from `output_name` (not the resolved `output_item`/`game_item` name), so a bluep
 `BlueprintNameNormalizer`, `BlueprintProductService`, `ScWikiBlueprintSyncService` · **Issues:**
 [#327](https://github.com/krt-profit/basetool/issues/327)
 
-### REQ-INV-007 — Curated, guarded, self-healing correction of CIG-mislabeled `output_name`s
+### REQ-INV-047 — Curated, guarded, self-healing correction of CIG-mislabeled `output_name`s
+
+> **Renumbered 2026-09-22:** this requirement was `REQ-INV-007` until 2026-09-22; that id also named the personal-marker rebooking (Umbuchung) in [`inventory-lager.md`](inventory-lager.md), which keeps it.
 
 Some blueprints carry a wrong English `output_name` because CIG's game data (`Data.p4k`) has a
 mislabeled localization string; the SC Wiki mirrors it faithfully and the basetool copies it, so
@@ -163,7 +165,7 @@ string only), via a single `BlueprintVariantFamilyResolver.familyKey(name)` both
   `ammo box` — gets an **atomic** family key that can only equal an identical magazine. It folds into
   no weapon family, and two capacities of the "same" magazine stay distinct.
 - A small, curated, guarded/self-healing **alias map** (`BlueprintVariantAliasOverrides`, mirroring
-  `BlueprintOutputNameOverrides`, `REQ-INV-007`) canonicalizes the residual same-line cases the
+  `BlueprintOutputNameOverrides`, `REQ-INV-047`) canonicalizes the residual same-line cases the
   structural rule cannot merge — base-name spelling drift (`Pulse "Blacklist" Pistol` → `pulse pistol`
   folded onto `pulse laser pistol`) and confirmed unquoted sub-models (`Salvo Esteban Frag Pistol`,
   `Model II Arclight`). Each entry is a deliberate game-domain judgement; a non-matching key is a no-op.
@@ -203,11 +205,11 @@ The match is deliberately robust and conservative:
 - **De-duplication keys on the tag.** Because a tag identifies a blueprint structurally, the parse
   de-duplicates by `tag` when present (else by name). Two **distinct** blueprints scmdb.net displays
   under one name — e.g. a genuine piece and a CIG-mislabeled one both shown as `Antium Core Jet`
-  (REQ-INV-007) — therefore stay separate and each resolves via its own tag, instead of collapsing
+  (REQ-INV-047) — therefore stay separate and each resolves via its own tag, instead of collapsing
   by name and importing only one of the two owned products.
 - **Immune to the name-mislabel problem.** Because the tag identifies the blueprint structurally, an
   entry still resolves correctly even when the blueprint's `output_name` is one of the CIG-mislabeled
-  names REQ-INV-007 has to correct, or a cosmetic-variant spelling the name match would only
+  names REQ-INV-047 has to correct, or a cosmetic-variant spelling the name match would only
   fuzzy-suggest.
 - **Self-healing for future name imports.** A tag-resolved entry whose `name` does not normalize to
   the resolved `product_key` still learns a `blueprint_external_alias` on apply (the existing

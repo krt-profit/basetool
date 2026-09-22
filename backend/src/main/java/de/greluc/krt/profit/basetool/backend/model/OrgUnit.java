@@ -152,7 +152,7 @@ public abstract class OrgUnit extends AbstractEntity<UUID> {
 
   /**
    * The Kartell department (and its frozen Bereichsfarbe) this org unit belongs to (epic #692,
-   * REQ-ORG-018). Meaningful only for a {@link Bereich} — it drives the per-Bereich colour tint of
+   * REQ-ORG-026). Meaningful only for a {@link Bereich} — it drives the per-Bereich colour tint of
    * the multi-Bereich org chart and is {@code null} for every other kind (Squadron / SK /
    * Organisationsleitung) and for a Bereich an admin has not yet assigned a department to. Nullable
    * so the column is purely additive (V166) and the chart degrades to an untinted tree until a

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-20
 - **Deciders:** @greluc, Claude
-- **Related:** spec REQ-SEC-026 · REQ-DATA-006 · REQ-DATA-008 · extends [ADR-0036](0036-discord-link-recognised-from-federated-identity.md) (self-service linking → admin-mediated) · complements [ADR-0051](0051-discord-first-login-account-existence-precheck.md) (REQ-SEC-022 login-time deny, unchanged) · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-SEC-026 · REQ-DATA-006 · REQ-DATA-018 · extends [ADR-0036](0036-discord-link-recognised-from-federated-identity.md) (self-service linking → admin-mediated) · complements [ADR-0051](0051-discord-first-login-account-existence-precheck.md) (REQ-SEC-022 login-time deny, unchanged) · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
 
 > **Note (2026-09-22):** a member's in-app name and Discord handle stood in this record as the worked
 > example. Both are personal data and are replaced by the placeholders `<in-app-name>` and
@@ -26,7 +26,7 @@ combined to let this happen:
    way to link on the member's behalf; approving would create a **duplicate** account.
 
 The owner wants to link such a registration onto the existing account **himself**, from the queue.
-(The nickname-capture gap is fixed separately under REQ-DATA-008 — the display now falls back to the
+(The nickname-capture gap is fixed separately under REQ-DATA-018 — the display now falls back to the
 global name — but name mismatches remain the normal case, so a manual admin path is still needed.)
 
 **Constraint discovered:** `KeycloakService` was strictly **read-only**. Moving a Discord federated

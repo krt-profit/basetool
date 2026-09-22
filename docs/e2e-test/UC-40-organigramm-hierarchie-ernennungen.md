@@ -5,7 +5,7 @@
 | **ID**         | UC-40  |
 | **Tag**        | `e2e`  |
 | **Testklasse** | [`OrgChartPositionCrudE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrgChartPositionCrudE2eTest.java) · [`OrgChartKeyboardA11yE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrgChartKeyboardA11yE2eTest.java) · [`OrgHierarchyVisibilityMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/OrgHierarchyVisibilityMatrixE2eTest.java) · [`RoleAppointmentMatrixE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RoleAppointmentMatrixE2eTest.java) |
-| **Spec**       | [`org-chart.md`](../specs/org-chart.md) (REQ-ORG-010…013) · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (REQ-ORG-015/-016/-017) · [`role-model.md`](../specs/role-model.md) (REQ-ROLE-006) |
+| **Spec**       | [`org-chart.md`](../specs/org-chart.md) (REQ-ORG-010, -012, -013, -025) · [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) (REQ-ORG-015/-016/-017) · [`role-model.md`](../specs/role-model.md) (REQ-ROLE-006) |
 
 ## Akteure
 
@@ -48,7 +48,7 @@ Ein Admin pflegt das Organigramm per Maus und Tastatur; ein Bereichsleiter liest
 
 ## Erwartetes Ergebnis
 
-- **CRUD:** Der Gruppenkopf spiegelt jeden Schritt; nach dem Räumen des Sitzes **überlebt** die Kommandogruppe (REQ-ORG-011), das Entfernen nimmt sie samt Sitzen weg (REQ-ORG-012). Die Besetzung wird über `data-display-name` am Neu-besetzen-Element und über das Vorhandensein des Räumen-Elements geprüft.
+- **CRUD:** Der Gruppenkopf spiegelt jeden Schritt; nach dem Räumen des Sitzes **überlebt** die Kommandogruppe (REQ-ORG-025), das Entfernen nimmt sie samt Sitzen weg (REQ-ORG-012). Die Besetzung wird über `data-display-name` am Neu-besetzen-Element und über das Vorhandensein des Räumen-Elements geprüft.
 - **Tastatur:** Genau ein `treeitem` hat `tabindex="0"` — nach jeder Bewegung; End/Home springen zum letzten/ersten Knoten, Pfeil rechts/links steigen eine Ebene ab und wieder auf. Solange der Dialog offen ist, ist die Seite dahinter `inert` und `aria-hidden`, Tab bleibt im `.krt-modal`, Esc schließt, und der Fokus kehrt zum auslösenden Element zurück. Nach dem Umbenennen stimmt `scrollLeft` exakt mit dem Wert vor dem Speichern überein.
 - **Sichtbarkeit:** Der Bereichsleiter sieht den Bestand seines Bereichs, nie den des fremden; ein einfaches Staffelmitglied sieht keinen Bereichsbestand; der ADMIN-Endpunkt bleibt **403** (REQ-ORG-015). In der UI erscheint nur die Gruppenzeile des eigenen Bereichs.
 - **Ernennungen:** Koordinator im eigenen Bereich — erlaubt; fremder Bereich und weiterer Bereichsleiter — verweigert; einfaches Mitglied — **403** auf beiden Endpunkten; Silo-Rang für ein Staffelmitglied — **400** vom Service-Wächter, bevor der DB-Trigger (V165/V187) feuert (REQ-ORG-017). Die Ernennung projiziert den kontogebundenen Sitz ins Organigramm (REQ-ROLE-006).

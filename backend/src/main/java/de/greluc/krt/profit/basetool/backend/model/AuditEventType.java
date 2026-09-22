@@ -279,9 +279,9 @@ public enum AuditEventType {
 
   /**
    * A deleted user's complete "Mein Inventar" and personal blueprints were purged along with their
-   * account (REQ-DATA-008). Summary event carrying the two affected-row counts; these tables key on
-   * the Keycloak subject with no foreign key to {@code app_user}, so nothing else would ever have
-   * removed them.
+   * account (REQ-DATA-008). Summary event carrying the two affected-row counts. Both tables key on
+   * the user id and, since V235, cascade from {@code app_user}; the explicit purge is what makes
+   * the counts recordable here.
    */
   PERSONAL_DATA_PURGED_ON_USER_DELETION(AuditDomain.PERSONAL_INVENTORY),
 

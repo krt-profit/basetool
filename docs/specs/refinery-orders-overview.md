@@ -17,12 +17,6 @@ unit hangar overview (REQ-HANGAR-001).
 
 ### REQ-REFINERY-019 — Refinery-order list is paginated server-side
 
-> **ID collision (recorded 2026-09-22).** `REQ-REFINERY-019` also names the SC Extractor release
-> link in [`refinery-screenshot-import.md`](refinery-screenshot-import.md). Both are shipped and
-> test-referenced, so neither is renumbered without the owner's sign-off — see the collision list in
-> [`INDEX.md`](INDEX.md#2-requirement-ids-traceability-anchors). Cite this one as "REQ-REFINERY-019
-> (list pagination)" until then.
-
 The refinery-order overview MUST fetch one **server-side page** of orders (from
 `/api/v1/refinery-orders/all` or, when the own-orders toggle is on, `/api/v1/refinery-orders/my-orders`)
 instead of the former unbounded `size=1000` pull, and render the shared pagination component — the

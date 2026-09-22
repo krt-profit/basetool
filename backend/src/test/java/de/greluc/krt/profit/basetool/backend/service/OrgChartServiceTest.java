@@ -883,7 +883,7 @@ class OrgChartServiceTest {
                         null)));
   }
 
-  // -------------------------------------------- Bereich / OL scopes (REQ-ORG-018) --
+  // -------------------------------------------- Bereich / OL scopes (REQ-ORG-026) --
 
   @Test
   void createPosition_bereichsleiterFreeText_persists() {

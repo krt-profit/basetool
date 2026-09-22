@@ -202,7 +202,7 @@ chart position keyed by org unit (singletons are reassigned, not duplicated, so 
 indexes hold), while the in-Kommando ranks project onto the Kommando sub-tree — a `COMMAND_LEAD`
 node tied to its Kommandogruppe via the V186 `kommando_group_id` link carries the Kommandoleiter, and
 the stellv. Kommandoleiter / Ensigns hang off it. A Kommandogruppe create / rename / delete mirrors
-the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-011) or
+the leaderless node, and revoking a rank vacates a led Kommando (keeping the node, REQ-ORG-025) or
 removes the other seats. Legacy admin-authored Kommandos (no `kommando_group_id`) stay chart-only.
 
 The mirror is the **single writer** of account-linked chart seats: the chart editor itself is
@@ -210,7 +210,7 @@ account-free — its write API rejects setting an account holder, and editing / 
 mirror-managed seat (account-held or `kommando_group`-linked), with
 `problem.org_chart.account_managed_in_leitung`. So an admin can no longer manually set an
 account-linked seat on the chart (no drift); only free-text holders stay editable there
-(org-chart.md REQ-ORG-010 / -011 / -020 amendments). A `kommando_group`-linked Kommando is read-only
+(org-chart.md REQ-ORG-010 / -025 / -020 amendments). A `kommando_group`-linked Kommando is read-only
 as a whole subtree: `CommandChartDto.kommandoGroupId` drives the editor to suppress every affordance
 on it (rename / remove / assign-lead / add-child) and the backend additionally **rejects creating a
 child** (Stv. / Ensign) under a `kommando_group`-linked parent — so no chart-only seat can be bolted
