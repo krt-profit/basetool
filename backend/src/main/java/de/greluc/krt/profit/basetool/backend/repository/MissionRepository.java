@@ -182,50 +182,24 @@ public interface MissionRepository
       Pageable pageable);
 
   /**
-   * Full-text + date-range + status + scope search across missions. Each parameter is optional - a
-   * {@code null} cast removes the corresponding clause; the {@code status IN (:status)} list is
-   * always applied (pass the full enum set to disable status filtering). Result is sorted by
-   * planned start ascending; the {@code @EntityGraph} pre-loads participants and assigned units to
-   * avoid N+1 when the caller renders the result list.
+   * Full-text + date-range + status + scope search across missions, one page at a time. Each filter
+   * parameter is optional - a {@code null} cast removes the corresponding clause; the {@code status
+   * IN (:status)} list is always applied (pass the full enum set to disable status filtering), and
+   * sorting is delegated to {@link Pageable} so the caller can pick the column.
    *
    * <p>Multi-tenant access control via the org-unit scope-predicate triple ({@code isAdminAllScope}
-   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a
-   * pinned {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the
-   * membership union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public
-   * escape). Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same
-   * public/internal split — public to all; internal only to organisation members-or-above (the
-   * {@code viewerIsMemberOrAbove} flag). See MULTI_SQUADRON_PLAN.md section 1.
-   */
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
-  @Query(
-      "SELECT m FROM Mission m WHERE "
-          + ScopeSpecifications.MISSION_SCOPE_PREDICATE
-          + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%') OR CAST(m.description AS string) ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%')) AND (CAST(:start AS timestamp) IS NULL OR m.plannedStartTime >="
-          + " :start) AND (CAST(:end AS timestamp) IS NULL OR m.plannedStartTime <= :end) AND"
-          + " (m.status IN (:status)) AND (:isInternal IS NULL OR m.isInternal = :isInternal) AND"
-          + " (CAST(:operationId AS uuid) IS NULL OR m.operation.id = :operationId) ORDER BY"
-          + " m.plannedStartTime ASC")
-  List<Mission> searchMissions(
-      @Param("query") String query,
-      @Param("start") Instant start,
-      @Param("end") Instant end,
-      @Param("status") List<String> status,
-      @Param("isInternal") Boolean isInternal,
-      @Param("operationId") UUID operationId,
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
-      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove);
-
-  /**
-   * Paged variant of {@link #searchMissions(String, Instant, Instant, List, Boolean, UUID, UUID)} -
-   * same filter contract; sorting is delegated to {@link Pageable} so the caller can pick the
-   * column.
+   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a pinned
+   * {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the membership
+   * union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public escape).
+   * Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same public/internal
+   * split — public to all; internal only to organisation members-or-above (the {@code
+   * viewerIsMemberOrAbove} flag).
    *
-   * <p><strong>EntityGraph contract differs from the non-paged variant on purpose.</strong> The
-   * controller maps the page result through {@code MissionMapper.toListDto}, which reads only
+   * <p>The unpaged {@code List} sibling, which fetch-joined both {@code participants} and {@code
+   * assignedUnits} into a cartesian product, had no caller and was deleted on 2026-09-22
+   * (BE-PERF-02, REQ-DATA-003).
+   *
+   * <p><strong>No collection graph, on purpose.</strong> The controller maps the page result through {@code MissionMapper.toListDto}, which reads only
    * scalar columns plus the two {@code @ManyToOne} associations {@code operation} and {@code
    * owningSquadron} — it never touches {@code participants} or {@code assignedUnits}. Eager-loading
    * those collections via {@code @EntityGraph} forces Hibernate into in-memory pagination ({@code
@@ -258,19 +232,6 @@ public interface MissionRepository
       @Param("memberOrgUnitIds") java.util.Collection<UUID> memberOrgUnitIds,
       @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
       Pageable pageable);
-
-  /**
-   * Lists every mission as a page. Overridden here to attach an {@code @EntityGraph} so the
-   * mission-list render does not N+1 on {@code participants} and {@code assignedUnits}. The
-   * unbounded {@code List<Mission> findAll()} sibling was deleted (M-9 from the performance audit)
-   * because the audit found zero production callers and an ArchUnit guard now blocks anyone from
-   * re-introducing a no-arg list-returning override on any repository in this package — every
-   * mission read path must go through paged search, the scoped search query, or a {@code findById}
-   * lookup.
-   */
-  @Override
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
-  Page<Mission> findAll(Pageable pageable);
 
   /**
    * Bulk-reassigns every mission owned by {@code oldUser} to {@code newUser}; used by the
@@ -438,14 +399,18 @@ public interface MissionRepository
    * mutable mission scalar is {@code @OptimisticLock(excluded = true)}, so a whole-mission
    * overwrite would no longer bump the row {@code @Version} on its own; forcing the increment here
    * restores the "two concurrent full overwrites 409 against each other" guarantee that path always
-   * had. The same {@code participants} / {@code assignedUnits} graph as {@link #findById(UUID)} is
-   * fetched because the full-replace re-clamps participant end-times in memory.
+   * had. The same single-collection {@code participants} graph as {@link #findById(UUID)} is
+   * fetched because the full-replace re-clamps participant end-times in memory; {@code
+   * assignedUnits} batch-loads on first touch. Graphing both siblings, as this finder did until
+   * 2026-09-22, fetch-joined them into a {@code |participants| x |units|} cartesian product with
+   * every mission column repeated per row (REQ-DATA-003, #1138, BE-PERF-03).
    *
    * @param id the mission id.
-   * @return the graphed mission under a forced version increment, or empty when unknown.
+   * @return the mission with its participants loaded, under a forced version increment, or empty
+   *     when unknown.
    */
   @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
-  @EntityGraph(attributePaths = {"participants", "assignedUnits"})
+  @EntityGraph(attributePaths = {"participants"})
   @Query("SELECT m FROM Mission m WHERE m.id = :id")
   Optional<Mission> findByIdForFullReplace(@Param("id") UUID id);
 }

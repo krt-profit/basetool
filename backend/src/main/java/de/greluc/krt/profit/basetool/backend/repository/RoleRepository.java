@@ -23,9 +23,6 @@ import de.greluc.krt.profit.basetool.backend.model.Role;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -88,15 +85,6 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
    */
   @Query("SELECT DISTINCT r FROM Role r LEFT JOIN FETCH r.permissions")
   List<Role> findAllWithPermissions();
-
-  /**
-   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
-   */
-  @Override
-  @NotNull
-  @EntityGraph(attributePaths = {"permissions"})
-  Page<Role> findAll(@NotNull Pageable pageable);
 
   /**
    * Returns the display {@code name} of every role in the local catalog. Backs the Keycloak user

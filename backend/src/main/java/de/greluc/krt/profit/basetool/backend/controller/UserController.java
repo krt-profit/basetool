@@ -144,6 +144,7 @@ public class UserController {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.profit.basetool.backend.model.User> p = userService.findAll(pageable);
+    userMapper.primeStaffelMemberships(p.getContent());
     return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
   }
 
@@ -248,6 +249,7 @@ public class UserController {
         PaginationUtil.createPageRequest(page, size, sort, ALLOWED_SORT, "username");
     Page<de.greluc.krt.profit.basetool.backend.model.User> p =
         userService.searchByUsername(query == null ? "" : query, pageable);
+    userMapper.primeStaffelMemberships(p.getContent());
     return PageResponse.of(p.map(userMapper::toDto).map(this::redactForPeerIfNeeded));
   }
 

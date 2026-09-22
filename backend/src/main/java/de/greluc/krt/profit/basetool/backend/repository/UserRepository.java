@@ -197,8 +197,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * org_unit_membership} against the caller's scope set (REQ-ORG-017: up to two Staffeln) — users
    * without a Staffel membership (admins, members of no Staffel) are always visible so the focused
    * admin can manage them.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
+   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
+   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
@@ -253,8 +256,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons.
    * @param pageable Spring Data paging and sorting parameters.
    * @return paged ordinary squadron members that an Officer / Admin may evaluate.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
+   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
+   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id =
@@ -271,8 +277,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    * Squadron-scoped substring search. Mirrors {@link
    * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
    * but adds the squadron-membership predicate.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
+   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
+   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   @Query(
       """
       SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR
@@ -461,20 +470,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   /**
    * Derived Spring-Data query - returns entities matching {@code
-   * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}. Eagerly fetches the configured
-   * relations via {@code @EntityGraph}.
+   * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}, one page at a time.
+   *
+   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection would
+   * make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's roles
+   * batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
    */
-  @EntityGraph(attributePaths = {"roles"})
   Page<User> findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
       String username, String displayName, Pageable pageable);
-
-  /**
-   * Lists every entity. Overridden here to attach an {@code @EntityGraph}. Eagerly fetches the
-   * configured relations via {@code @EntityGraph}.
-   */
-  @Override
-  @EntityGraph(attributePaths = {"roles"})
-  Page<User> findAll(Pageable pageable);
 
   /**
    * Sets {@code inKeycloak = false} on every user whose id is not in the freshly-synced Keycloak id
