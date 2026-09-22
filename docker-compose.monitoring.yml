@@ -166,7 +166,12 @@ services:
       - --storage.tsdb.retention.size=40GB
       - --web.enable-admin-api
       - --web.config.file=/etc/prometheus/web.yml
-      - --web.enable-lifecycle
+      # NO --web.enable-lifecycle (removed 2026-09-22, OPS-SEC-07). It opened POST /-/reload and
+      # /-/quit, and nothing uses either: deploy.sh applies a config change by RECREATING the
+      # container, because the single-file bind mounts are inode-pinned and a reload would re-read
+      # the old file. An endpoint nobody calls is only attack surface -- /-/quit stops the
+      # monitoring plane for anyone holding the web password. The admin API above stays (ADR-0072):
+      # the weekly TSDB snapshot in backup.sh needs it.
       # (#1041 item 22a) Accept the Tempo metrics-generator's remote_write of the service-graph
       # series (traces_service_graph_*). Off by default in Prometheus 3.x. The receiver sits on the
       # same basic-auth-protected web listener, so the generator authenticates as the `grafana` user.

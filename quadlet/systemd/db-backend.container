@@ -24,6 +24,7 @@ Notify=healthy
 Memory=1536M
 PidsLimit=512
 PodmanArgs=--cpus=4.0
+StopTimeout=60
 
 [Service]
 TimeoutStartSec=110
@@ -31,7 +32,7 @@ Restart=always
 RestartSec=1
 RestartSteps=6
 RestartMaxDelaySec=60
-TimeoutStopSec=60
+TimeoutStopSec=75
 
 [Install]
 WantedBy=default.target

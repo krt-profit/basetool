@@ -486,6 +486,34 @@ case "$cmd" in
       *)             emit_prom "$(sample '' 4127)" ;;
     esac
     ;;
+  # --- host-exporter-versions ------------------------------------------------------------------
+  # The pins come from the real compose file (the harness exports them), so a Dependabot bump there
+  # moves the healthy answer with it instead of turning this suite red.
+  *"node_exporter_build_info"*)
+    case "$scenario" in
+      exporter-drift) echo 'node_exporter_build_info{branch="HEAD",goversion="go1.24.1",revision="x",tags="",version="1.11.0"} 1' ;;
+      exporter-down)  echo "" ;;
+      *)              echo "node_exporter_build_info{branch=\"HEAD\",goversion=\"go1.24.1\",revision=\"x\",tags=\"\",version=\"${STUB_NODE_PIN}\"} 1" ;;
+    esac
+    ;;
+  *"alloy_build_info"*)
+    echo "alloy_build_info{branch=\"HEAD\",goarch=\"amd64\",goos=\"linux\",goversion=\"go1.24.1\",revision=\"x\",tags=\"\",version=\"v${STUB_ALLOY_PIN}\"} 1"
+    ;;
+  # --- security-updates-enabled ----------------------------------------------------------------
+  *"is-enabled dnf-automatic.timer"*)
+    case "$scenario" in updates-disabled) echo "disabled" ;; *) echo "enabled" ;; esac
+    ;;
+  *"is-active dnf-automatic.timer"*)
+    case "$scenario" in updates-disabled) echo "inactive" ;; *) echo "active" ;; esac
+    ;;
+  *"/etc/dnf/automatic.conf"*)
+    case "$scenario" in
+      updates-download-only) printf 'upgrade_type = security\napply_updates = no\nexclude = podman crun\n' ;;
+      updates-everything)    printf 'upgrade_type = default\napply_updates = yes\nexclude = podman crun\n' ;;
+      updates-runtime)       printf 'upgrade_type = security\napply_updates = yes\n' ;;
+      *)                     printf 'upgrade_type = security\napply_updates = yes\nexclude = podman podman-* crun conmon netavark aardvark-dns containers-common containers-common-* passt passt-*\n' ;;
+    esac
+    ;;
   *)
     echo "hoststub: unhandled command: $cmd" >&2
     exit 1
@@ -870,6 +898,53 @@ STUB_SCENARIO=env-unreadable assert_status \
 STUB_SCENARIO=healthy assert_status \
   "env-reaches-the-units passes when no per-host override is set at all" \
   env-reaches-the-units pass "uncontested" -- "${STUB_ARGS[@]}"
+
+# --- host-exporter-versions (OPS-SEC-06) -------------------------------------------------------
+# node_exporter and Alloy are host packages the role installs with `state: present`, so a host keeps
+# whatever version it was provisioned with while Dependabot moves the compose pin. The pins below
+# are read from the real compose file by the suite's own parser, and exported for the stub.
+pins="$("$PY" - "$SUITE" <<'PYEOF'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("cc", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+sys.modules["cc"] = m
+spec.loader.exec_module(m)
+print(m._compose_pinned_version("node-exporter") or "", m._compose_pinned_version("alloy") or "")
+PYEOF
+)"
+read -r STUB_NODE_PIN STUB_ALLOY_PIN <<< "$pins"
+export STUB_NODE_PIN STUB_ALLOY_PIN
+if [[ "$STUB_NODE_PIN" =~ ^[0-9]+\.[0-9]+ && "$STUB_ALLOY_PIN" =~ ^[0-9]+\.[0-9]+ ]]; then
+  ok "the compose pins are readable without a YAML parser (node-exporter ${STUB_NODE_PIN}, alloy ${STUB_ALLOY_PIN})"
+else
+  bad "the compose pins could not be read: '${pins}'"
+fi
+STUB_SCENARIO=healthy assert_status \
+  "host-exporter-versions passes when both host packages run the pinned version" \
+  host-exporter-versions pass "match the compose pins" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=exporter-drift assert_status \
+  "host-exporter-versions fails when the host package drifted from the pin" \
+  host-exporter-versions fail "runs 1.11.0, the compose pin is" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=exporter-down assert_status \
+  "host-exporter-versions fails, rather than passes, when the version cannot be read" \
+  host-exporter-versions fail "not readable" -- "${STUB_ARGS[@]}"
+
+# --- security-updates-enabled (OPS-SEC-01, REQ-OPS-032) ----------------------------------------
+STUB_SCENARIO=healthy assert_status \
+  "security-updates-enabled passes on an enabled, security-only, runtime-excluding setup" \
+  security-updates-enabled pass "security-only" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=updates-disabled assert_status \
+  "security-updates-enabled fails when the timer is installed and not running" \
+  security-updates-enabled fail "no security updates" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=updates-download-only assert_status \
+  "security-updates-enabled fails when updates are downloaded and never applied" \
+  security-updates-enabled fail "never installed" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=updates-everything assert_status \
+  "security-updates-enabled fails on unattended feature updates" \
+  security-updates-enabled fail "expected security" -- "${STUB_ARGS[@]}"
+STUB_SCENARIO=updates-runtime assert_status \
+  "security-updates-enabled fails when the container runtime is not excluded" \
+  security-updates-enabled fail "runtime is not excluded" -- "${STUB_ARGS[@]}"
 
 # =============================================================================================
 say ""

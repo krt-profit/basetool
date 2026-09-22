@@ -3,3 +3,4 @@
 NetworkName=net-db-keycloak
 Subnet=172.28.1.0/24
 Gateway=172.28.1.1
+Internal=true

@@ -3,3 +3,4 @@
 NetworkName=net-redis-ingest
 Subnet=172.28.9.0/24
 Gateway=172.28.9.1
+Internal=true

@@ -928,9 +928,13 @@ Tracing on the OTel SDK) behind a hard master gate:
 
   An ungraceful container stop is a distinct trigger of this write-path failure
   mode: the two dskit stores (`loki`, `tempo`) both set `stop_grace_period: 45s` in the compose
-  source, which the generator carries into their units as `TimeoutStopSec=45`, so a routine restart
+  source, which the generator carries into their units as `StopTimeout=45` (podman's own wait
+  before the `SIGKILL`) plus `TimeoutStopSec=60` (systemd's wait for podman), so a routine restart
   cannot `SIGKILL` them mid-drain (dskit `server.graceful_shutdown_timeout` 30s) and truncate the
-  write-ahead log (ADR-0072 amendment 2026-07-12). The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
+  write-ahead log (ADR-0072 amendment 2026-07-12). *Corrected 2026-09-22:* until then only
+  `TimeoutStopSec=45` was generated, and Quadlet's `ExecStop` (`podman rm -f`) killed the container
+  after podman's default 10 s regardless — the protection this paragraph described did not exist on
+  the Podman host. The service-graph (node graph) is lit by the metrics-generator's `service-graphs`
   processor → Prometheus `remote_write` (#1041 item 22a, ADR-0076 amendment): it authenticates as the
   shared `grafana` web-auth user (Tempo runs `-config.expand-env`), Prometheus adds
   `--web.enable-remote-write-receiver`, cardinality is capped by `max_active_series`, and
@@ -974,6 +978,12 @@ Binding conditions on this retention:
 - **31 days, then automatic deletion**, enforced by the Loki compactor (`retention_period: 744h`);
   Loki is **deliberately excluded from backups** so restic's GFS retention cannot silently extend the
   31 days (ADR-0072).
+- **The host journal is held to the same 31 days** (since 2026-09-22). Under Podman every container
+  logs with `LogDriver=journald`, so the edge's access log — every client address — sits in the host's
+  persistent journal before Alloy ships it, and journald had no time bound on it at all, only its
+  size cap. The bootstrap role sets `MaxRetentionSec=31d` and an explicit `SystemMaxUse=4G`
+  (`tasks/27-observability.yml`); a size cap that binds first deletes sooner, which stays inside the
+  approved retention.
 - **Admin-only access** — these streams are readable only through Grafana behind Keycloak OIDC
   restricted to the realm role `Admin` (REQ-OBS-008).
 - **Privacy-policy linkage (mandatory):** the decision is conditioned on the privacy policy covering
@@ -1085,6 +1095,22 @@ frontend, ingest and Keycloak all serve — so the probes already cover it.
 
 **openssl rather than a Python X.509 library:** `cryptography` is not installed on the target host,
 and a collector must not add a dependency to a box whose point is a fixed, audited package set.
+
+##### `basetool_host_updates_*`, `basetool_host_reboot_required` — whether the host is being patched
+
+Written by [`scripts/host-updates-metrics.sh`](../../scripts/host-updates-metrics.sh) into the same
+textfile directory (`host-updates.prom`): from `dnf-automatic.service`'s `ExecStopPost=` after every
+run, and from `iri-host-updates-metrics.service` at boot. Added 2026-09-22 with REQ-OPS-032.
+
+| series | type | source | why |
+|---|---|---|---|
+| `basetool_host_updates_last_run_timestamp_seconds` | gauge | the run's own `ExecStopPost=` | when dnf-automatic last finished; `HostSecurityUpdatesStale` |
+| `basetool_host_updates_last_run_success` | gauge | systemd's `$SERVICE_RESULT` | `1` success, `0` failure; `HostSecurityUpdatesFailing` |
+| `basetool_host_reboot_required` | gauge | `needs-restarting -r` | `1` while an installed update waits for a reboot; `HostRebootRequired` |
+
+**No labels.** A series the script cannot establish — no run yet, a `needs-restarting` that could not
+answer — is **left out** rather than written as `0`, so `absent()` and a stale reading stay visible;
+the boot run carries the last run's values over and re-reads only the reboot flag.
 
 > [!important] `basetool_scheduled_job_enabled` exists so `absent()` can tell "off" from "wedged"
 > Added 2026-09-17. The last-success gauge is registered **lazily, on a job's first
@@ -2343,6 +2369,17 @@ therefore alerts on:
   self-disabled the way `PrometheusConfigStale` was. The fix is `IRI_MONITORING_ENABLED=true` in the
   host `.env`, which `deploy.sh` reads for this one key since 2026-08 (the unit declares no
   `EnvironmentFile=`); an `Environment=` drop-in on `iri-deploy.service` still works and wins.
+- **The deployer's own heartbeat** (since 2026-09-22). Every other deploy alert reads an outcome a
+  tick wrote; none could see ticks that stopped happening. `DeployHeartbeatStale` (warning) fires
+  when `basetool_deploy_last_stack_healthy_timestamp` — stamped by every tick that finds the stack at
+  target and healthy — is over an hour old, or absent.
+- **The stateful services themselves** (since 2026-09-22). An exporter that cannot reach its target
+  stays up and scraped, so `TargetDown` never saw a down database. `PostgresDown` (`pg_up == 0`) and
+  `RedisDown` (`redis_up == 0`), both critical after 2 minutes, close that; the nightly quiesce stops
+  only the writers and needs no carve-out. `ContainerUnhealthy` (warning, 10 minutes) names any
+  container failing its own health check — the podman exporter's `podman_container_health == 1`
+  joined to `podman_container_info` for the name — which deploy.sh's targeted restart covers for the
+  three application modules only.
 - **Rule-evaluation & notification failures.** The two independent alert evaluators (Prometheus and
   the Loki ruler) must keep evaluating and delivering. `PrometheusRuleEvaluationFailures`,
   `PrometheusNotificationsDropped`, `LokiRuleEvaluationFailures`, `LokiRulerNotificationsFailing`
@@ -2487,7 +2524,7 @@ therefore alerts on:
   2026-07-26 it sat at 512/512 pids with 493 unreaped zombies and `pids.events max=7445`, refusing
   every fork and reporting `unhealthy` for two days **with no alert mail at all**. The root cause is
   fixed the same way as #1274 — `init: true` on the grafana service in
-  `docker-compose.monitoring.yml`, which the generator carries into the unit as `PodmanArgs=--init` —
+  `docker-compose.monitoring.yml`, which the generator carries into the unit as `RunInit=true` —
   and the denominator carries a `> 0` guard so a cgroup exporting a zero cap cannot divide to `+Inf`
   and permafire. Headroom is ample: measured on prod, grafana read 100% while the next-highest
   container (tempo) sat at 12.5%. It is the cgroup-level companion to `JvmThreadsHigh` and covers
@@ -2510,13 +2547,16 @@ therefore alerts on:
   cutover only the right-hand side produces samples. Normalisation also **strips** cAdvisor's `id` /
   `image` labels, so an alert kept its identity across the cutover. The dashboard panels that still
   read cAdvisor names directly were moved onto these rules on 2026-09-22 (CHANGELOG v1.9.2 — they had
-  read "No data" since the cutover); `ContainerRestartLoop` is the one consumer left behind (above).
+  read "No data" since the cutover); `ContainerRestartLoop` was the one consumer left behind and was
+  repointed the same day (above). *Corrected 2026-09-22.*
   The per-alert mapping is `docs/archive/PODMAN_MIGRATION_PLAN.md` → *"The seven alerts, one by one"*.
   `ContainerCgroupCollectorStale` and `ContainerCgroupCollectorFoundNothing` (both warning) watch
   the collector itself, because a collector that stops writing — or writes a **fresh** file
   matching zero cgroups — takes the container alerts down with it silently, which is the failure
   mode the collector's own docstring names: *"an alert that never fires, which looks exactly like a
-  healthy system"*. Both are inert on a host that never runs it. The normalisation, including the
+  healthy system"*. `ContainerCgroupCollectorStale` also fires when the timestamp is **absent** —
+  since 2026-09-22; it used to be inert there so the Docker host, which never ran the collector, was
+  not paged, and that host is retired. The normalisation, including the
   no-double-alert property during the cutover window, is locked by
   `monitoring/prometheus/tests/container_runtime_normalisation_test.yml`, and the exporter-fed
   rules by `container_network_and_lifetime_rules_test.yml`.

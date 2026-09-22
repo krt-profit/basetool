@@ -54,6 +54,13 @@
   when: basetool_host_manage_observability | default(true) | bool
   tags: [observability, monitoring]
 
+# Also after the labels, for the same 203/EXEC reason: dnf-automatic's ExecStopPost= and the boot
+# refresh both exec a script out of /var/iri/code/scripts.
+- name: Unattended security updates, and whether they are happening
+  ansible.builtin.import_tasks: 45-updates.yml
+  when: basetool_host_manage_updates | default(true) | bool
+  tags: [updates]
+
 - name: Podman configuration
   ansible.builtin.import_tasks: 50-podman.yml
   tags: [podman]

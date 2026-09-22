@@ -29,9 +29,12 @@ HealthStartupInterval=5s
 Notify=healthy
 Memory=1792M
 PidsLimit=2048
+RunInit=true
 AddHost=localhost:127.0.0.1
 AddHost=alloy:host-gateway
-PodmanArgs=--cpus=2.0 --init --ulimit nofile=65536:65536
+Ulimit=nofile=65536:65536
+PodmanArgs=--cpus=2.0
+StopTimeout=30
 
 [Service]
 TimeoutStartSec=255
@@ -39,7 +42,7 @@ Restart=always
 RestartSec=1
 RestartSteps=6
 RestartMaxDelaySec=60
-TimeoutStopSec=30
+TimeoutStopSec=45
 
 [Install]
 WantedBy=default.target

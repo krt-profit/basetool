@@ -2,7 +2,26 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
+  täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
+  wird nie automatisch. Neue Alarme melden fehlgeschlagene oder ausbleibende Läufe und einen
+  fälligen Neustart (REQ-OPS-032).
+
+- **Monitoring: Alarme für ausgefallene Datenbanken, Redis und ungesunde Container**
+  (`PostgresDown`, `RedisDown`, `ContainerUnhealthy`) sowie `DeployHeartbeatStale`, wenn der
+  Deploy-Timer eine Stunde lang nichts prüft.
+
 ### Changed
+
+- **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
+  Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
+  ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
+  31 Tagen wie Loki (REQ-OBS-010). Die Netzänderung braucht einen einmaligen Neuaufbau der Netze.
+
+- **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
+  der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
 
 - **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
   vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und
@@ -18,6 +37,15 @@
   `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
 
 ### Fixed
+
+- **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
+  Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten
+  Herunterfahren. Die Units setzen jetzt `StopTimeout=` passend zur konfigurierten Frist.
+
+- **Backup: der wöchentliche Prometheus-Snapshot lief unter Podman nicht.** Der Hilfscontainer
+  wurde abgelehnt und trug das Passwort auf der Kommandozeile; der Snapshot wird jetzt im
+  Prometheus-Container angefordert und dort auch wieder gelöscht. Backup-Helfer und Restore-Drill
+  nutzen das per Digest gepinnte PostgreSQL-Image von db-backend.
 
 - **Extractor: Serverfehler wurden als „bitte anmelden" gemeldet.** Lehnte das Backend die eigene
   Kennung des Ingest-Gateways ab, sah das Mitglied einen Anmeldefehler. Jetzt kommt ein 502 mit

@@ -182,3 +182,23 @@ the in-memory head that replay reconstructs. The stateless exporters, the socket
 and Alloy keep the 10s default (no persistent write path that an abrupt stop can corrupt). No alert,
 metric, dashboard or scrape target changes — this is a shutdown-timing hardening of the compose
 definition only.
+
+## Amendment 2026-09-22 — what the Podman host did to three of these decisions
+
+An operations audit after the cutover found three places where this ADR's decisions were no longer
+in force on the rootless Podman host, and corrected each:
+
+- **The 45 s stop grace of 2026-07-12 was not honoured.** The Quadlet generator emitted
+  `stop_grace_period` only as `[Service] TimeoutStopSec=`, while Quadlet's `ExecStop` is a
+  `podman rm -f` that kills after the container's own stop timeout — podman's 10 s default. Loki and
+  Tempo were therefore `SIGKILL`ed mid-drain exactly as under Docker's old default. The generator now
+  emits `StopTimeout=45` and `TimeoutStopSec=60`.
+- **The 31-day IP retention (decision 8) had a second store.** Every container logs through
+  `journald` on this host, so the edge's access log sits in the persistent journal before Alloy ships
+  it, and journald bounded it only by size. The bootstrap role sets `MaxRetentionSec=31d` and
+  `SystemMaxUse=4G`; REQ-OBS-010 records the condition.
+- **`--web.enable-lifecycle` is removed.** Nothing called `/-/reload` or `/-/quit` — deploy.sh applies
+  a configuration change by recreating the container, because the single-file mounts are
+  inode-pinned. The **admin API stays** (decision 9): the weekly TSDB snapshot needs it, and it is
+  now requested from inside the Prometheus container with the password read from its own mounted
+  secret rather than from a throwaway `curl` container carrying it on the command line.
