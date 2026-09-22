@@ -1770,9 +1770,9 @@ select.association-select {
     min-width: 190px;
     min-height: var(--touch-target);
     padding: 0.375rem 2.5rem 0.375rem var(--space-3);
-    background-color: var(--color-bg-dark-gray, #141414);
-    border: 1px solid var(--color-primary, #e77e23);
-    color: var(--color-gray-1, #d6d6d6);
+    background-color: var(--color-bg-dark-gray);
+    border: 1px solid var(--color-primary);
+    color: var(--color-gray-1);
     box-sizing: border-box;
 }
 
