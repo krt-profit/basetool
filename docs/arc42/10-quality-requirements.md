@@ -45,10 +45,12 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
   the public surface, HSTS, forced SSL, internal TLS, IPv6 and DNS (A and AAAA) for both public
   names.
 - **CI gates** that assert things review cannot: ADR numbering and registry, Flyway numbering,
-  monitoring image pins, Grafana dashboards, Prometheus rules, log masking, the Keycloak issuer,
+  monitoring image pins, Grafana dashboards, Prometheus rules, the Prometheus, Alertmanager, Alloy
+  and Loki configuration files (each checked by its own tool in the pinned image), log masking, the Keycloak issuer,
   Quadlet drift (which also checks the edge's trusted-address pins), the container runtime, the
   logging facade, PID-1 reaping, probes against the API allow-list, ansible-lint, shellcheck,
-  actionlint, hadolint, gitleaks, SBOM coverage and the E2E device matrix.
+  actionlint, zizmor, hadolint, gitleaks, SBOM coverage, the E2E device matrix and the cosign
+  signer identity (every copy anchored and identical).
 - **A conformance suite** ([`check-conformance.py`](../../scripts/check-conformance.py)) that
   asserts invariants against a **running host** rather than against configuration — the recurring
   defect class here is a configuration that is correct on disk and not in force in the process.

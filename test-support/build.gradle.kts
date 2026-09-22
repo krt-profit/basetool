@@ -22,8 +22,9 @@ description = "test-support"
 // rather than in a `src/testFixtures` source set, so the build needs no plugin this repo does not
 // already use.
 //
-// NOTHING SHIPS FROM HERE. Both consumers depend on it as `testImplementation`, so it never reaches
-// a runtime classpath, an image or an SBOM. Keep it that way: production code does not belong in
+// NOTHING SHIPS FROM HERE. Every consumer (backend, frontend, and since 2026-09-22 ingest's
+// IngestEndpointSurfaceTest) depends on it as `testImplementation`, so it never reaches a runtime
+// classpath, an image or an SBOM. Keep it that way: production code does not belong in
 // this module, and its name is the only thing saying so.
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 
@@ -59,7 +60,9 @@ dependencies {
   // StaticWebApplicationContext and RequestMappingHandlerMapping load one when the fixture builds a
   // registry. Compile-scoping it would claim a dependency this module does not have.
   testImplementation("jakarta.servlet:jakarta.servlet-api")
-  testImplementation(platform(libs.junit.bom))
+  // JUnit comes from the Boot BOM imported above, like every other Boot-managed dependency here.
+  // A `platform(libs.junit.bom)` on top of it used to pin the catalog's keycloak-spi JUnit line
+  // into this module as well, i.e. two JUnit versions competing in one build.
   testImplementation(libs.junit.jupiter)
   testImplementation("org.assertj:assertj-core")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")

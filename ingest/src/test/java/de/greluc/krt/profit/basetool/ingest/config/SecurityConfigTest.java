@@ -48,7 +48,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.cors.CorsConfiguration;
 
 /**
@@ -57,7 +56,12 @@ import org.springframework.web.cors.CorsConfiguration;
  */
 class SecurityConfigTest {
 
-  private static final List<String> EXPECTED = List.of("basetool-backend");
+  /**
+   * The gateway's real audience (ADR-0018 amendment 1). This constant used to be the backend's
+   * {@code basetool-backend}, which made the suite assert — and document — exactly the wrong
+   * configuration.
+   */
+  private static final List<String> EXPECTED = List.of("basetool-ingest");
 
   private static Jwt jwtWithAudience(List<String> audience) {
     return Jwt.withTokenValue("token")
@@ -73,13 +77,30 @@ class SecurityConfigTest {
   void shouldAcceptTokenWhoseAudienceContainsAnExpectedValue() {
     // Given
     OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
-    Jwt jwt = jwtWithAudience(List.of("other", "basetool-backend"));
+    Jwt jwt = jwtWithAudience(List.of("basetool-backend", "basetool-ingest"));
 
     // When
     OAuth2TokenValidatorResult result = validator.validate(jwt);
 
     // Then
     assertThat(result.hasErrors()).isFalse();
+  }
+
+  @Test
+  void shouldRejectAFrontendSessionTokenThatCarriesOnlyTheBackendAudience() {
+    // The reason the gateway's audience is not the backend's: every frontend session token carries
+    // basetool-backend, and only the extractor's extractor-ingest-only scope adds basetool-ingest.
+    OAuth2TokenValidator<Jwt> validator = SecurityConfig.audienceValidator(EXPECTED);
+    Jwt frontendSession = jwtWithAudience(List.of("basetool-backend"));
+
+    assertThat(validator.validate(frontendSession).hasErrors()).isTrue();
+  }
+
+  @Test
+  void effectiveAudiencesDropBlankEntriesAndTolerateNull() {
+    assertThat(SecurityConfig.effectiveAudiences(null)).isEmpty();
+    assertThat(SecurityConfig.effectiveAudiences(List.of(" ", "", " basetool-ingest ")))
+        .containsExactly("basetool-ingest");
   }
 
   @Test
@@ -145,13 +166,13 @@ class SecurityConfigTest {
       keycloak.start();
 
       SecurityConfig config = new SecurityConfig();
-      ReflectionTestUtils.setField(config, "expectedAudiences", List.of("  ", ""));
 
       // When
       JwtDecoder decoder =
           config.resourceServerJwtDecoder(
               "https://keycloak.example/realms/iri",
               keycloak.url("/certs").toString(),
+              List.of("  ", ""),
               new DefaultSslBundleRegistry());
 
       // Then: a token whose audience matches nothing still decodes — no audience rule is active.
@@ -173,11 +194,11 @@ class SecurityConfigTest {
       keycloak.start();
 
       SecurityConfig config = new SecurityConfig();
-      ReflectionTestUtils.setField(config, "expectedAudiences", EXPECTED);
       JwtDecoder decoder =
           config.resourceServerJwtDecoder(
               "https://keycloak.example/realms/iri",
               keycloak.url("/certs").toString(),
+              EXPECTED,
               new DefaultSslBundleRegistry());
 
       // When / Then

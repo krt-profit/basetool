@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.backend.task;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.AuditRetentionService;
+import de.greluc.krt.profit.basetool.backend.support.AuditRetentionProperties;
 import jakarta.annotation.PostConstruct;
-import java.time.Duration;
 import java.time.Instant;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -40,10 +40,14 @@ import org.springframework.stereotype.Component;
  * thread.
  *
  * <p>The default window is <b>730 days</b>, two years. Expressed in days rather than months because
- * {@link Duration} has no month unit — a month is not a fixed length — and the precision does not
- * matter for a retention boundary. There is no statutory retention obligation behind this number:
- * it is chosen to outlast the organisation's own operating cycles so an old dispute stays
+ * {@link java.time.Duration} has no month unit — a month is not a fixed length — and the precision
+ * does not matter for a retention boundary. There is no statutory retention obligation behind this
+ * number: it is chosen to outlast the organisation's own operating cycles so an old dispute stays
  * reconstructible, and to stop there, because "indefinitely" is not a retention period.
+ *
+ * <p>The window is read from the validated {@link AuditRetentionProperties}, which refuse to start
+ * the context for a window under 30 days — a {@code P0D} or negative value would otherwise have
+ * deleted the whole trail on the next run (BE-MOD-03).
  */
 @Component
 @ConditionalOnProperty(
@@ -52,33 +56,22 @@ import org.springframework.stereotype.Component;
     havingValue = "true",
     matchIfMissing = true)
 @Slf4j
+@RequiredArgsConstructor
 public class AuditRetentionTask {
 
+  /** The service performing the per-domain purge. */
   private final AuditRetentionService auditRetentionService;
+
+  /** The scheduled-job instrumentation wrapper. */
   private final TaskMetrics taskMetrics;
-  private final Duration maxAge;
+
+  /** The validated retention window; its {@code maxAge} sets the cutoff. */
+  private final AuditRetentionProperties properties;
 
   /**
-   * Creates the retention task.
-   *
-   * @param auditRetentionService the service performing the per-domain purge
-   * @param taskMetrics the scheduled-job instrumentation wrapper
-   * @param maxAge how long an audit row is retained after it occurred before the sweep removes it
-   *     (ISO-8601 duration; default {@code P730D}, two years)
-   */
-  public AuditRetentionTask(
-      AuditRetentionService auditRetentionService,
-      TaskMetrics taskMetrics,
-      @Value("${app.audit.retention.max-age:P730D}") Duration maxAge) {
-    this.auditRetentionService = auditRetentionService;
-    this.taskMetrics = taskMetrics;
-    this.maxAge = maxAge;
-  }
-
-  /**
-   * Purges audit rows older than {@link #maxAge}, publishing the {@code audit_retention} job
-   * metrics. A failure is recorded and swallowed by {@link TaskMetrics} so the scheduler thread
-   * survives.
+   * Purges audit rows older than the configured {@code maxAge}, publishing the {@code
+   * audit_retention} job metrics. A failure is recorded and swallowed by {@link TaskMetrics} so the
+   * scheduler thread survives.
    */
   @Scheduled(fixedDelayString = "${app.audit.retention.interval:PT24H}")
   public void purgeExpiredAuditEvents() {
@@ -91,8 +84,8 @@ public class AuditRetentionTask {
    * @return the number of audit rows deleted this run (the {@code items} metric)
    */
   private int purgeExpired() {
-    log.info("Starting scheduled audit retention sweep (max age {})...", maxAge);
-    int deleted = auditRetentionService.purgeOlderThan(Instant.now().minus(maxAge));
+    log.info("Starting scheduled audit retention sweep (max age {})...", properties.maxAge());
+    int deleted = auditRetentionService.purgeOlderThan(Instant.now().minus(properties.maxAge()));
     log.info("Audit retention sweep finished — {} audit row(s) deleted.", deleted);
     return deleted;
   }

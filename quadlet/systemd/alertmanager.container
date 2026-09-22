@@ -22,7 +22,8 @@ HealthStartPeriod=20s
 Notify=healthy
 Memory=48M
 PidsLimit=512
-PodmanArgs=--oom-score-adj=500 --init
+RunInit=true
+PodmanArgs=--oom-score-adj=500
 
 [Service]
 TimeoutStartSec=280

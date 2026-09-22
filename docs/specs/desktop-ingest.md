@@ -123,6 +123,24 @@ network only.
   header naming the caller (ADR-0129), and no backend write.
 - [x] The gateway declares no `DataSource`/JPA and runs no schema migration (architecture
   test / startup assertion).
+- [x] The routed surface is **exactly** `POST /v1/refinery-extract` and `POST /v1/blueprint-preview`
+  (plus springdoc's non-prod `/v3/api-docs` tree and Boot's `/error` dispatch target). Every
+  protective filter — client identity, payload cap, per-IP rate limit, access log — scopes itself to
+  `/v1/**` through `IngestPathScope`, so a controller mapped anywhere else would be served with none
+  of them; `IngestEndpointSurfaceTest` asks the dispatcher for every mapping through the shared
+  `test-support` enumeration engine and fails on any other one (ING-SEC-05, 2026-09-22).
+- [x] A backend `401`/`403` on the relay refuses the **gateway's own** service-account identity, not
+  the member's (ADR-0129), so it is answered `502 BACKEND_RELAY_FAILED` (logged at `WARN`, counted
+  under `basetool_ingest_handoff_errors_total{reason="backend_auth"}`) and the cached gateway token is
+  invalidated so the next upload mints a fresh one — never relayed as the member's own auth failure,
+  which told the extractor to sign in again for a server-side fault (ING-SEC-02, 2026-09-22). The
+  token cache holds token and expiry as one atomic value, and a failed grant backs off for 5 s before
+  Keycloak is asked again (`outcome="backoff"` on `basetool_ingest_service_account_token_total`).
+- [x] The servlet filters run in five distinct slots, outermost first: `CorrelationIdFilter` (+10),
+  `BotProtectionFilter` (+12), `RequestLoggingFilter` (+15), `RateLimitingFilter` (+20),
+  `PayloadSizeLimitFilter` (+30) — all ahead of Spring Security. Bot and access log used to tie at
+  +15, and the size cap (+20) buffered a chunked body before the rate limiter (+30) was consulted
+  (ING-SIMP-01, 2026-09-22).
 - [x] The gateway serves **HTTPS** on 11262 (`server.ssl.enabled=true`), mirroring backend/frontend.
   The native nginx edge terminates the public TLS and **re-encrypts** to the gateway
   (`docker/edge/conf.d/30-ingest.conf.template`: `proxy_pass https://ingest:11262`, upstream
@@ -136,8 +154,11 @@ network only.
 
 **Enforced by:** `ArchitectureTest` (no JPA / no relational persistence; every controller +
 `@PostMapping` is `@PreAuthorize`-annotated), `IngestControllerTest` (exactly the two endpoints,
-forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `BackendImportClientTest`
-(the backend is called as the gateway, naming the caller) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
+forward-only relay, backend 4xx relayed verbatim, 502 on backend-unreachable), `IngestEndpointSurfaceTest`
+(the dispatcher routes exactly the two `/v1` endpoints), `FilterOrderTest` (the registered filter order),
+`GlobalExceptionHandlerTest` (backend 401/403 → 502 + token invalidation), `ServiceAccountTokenProviderTest`
+(atomic cache under concurrency, `invalidate()`, failure backoff), `BackendImportClientTest`
+(the backend is called as the gateway, naming the caller; a refused token is replaced on the next relay) · **Code:** `IngestController`, `IngestService`, `BackendImportClient`,
 `IngestApplication`, `application.yml` (`server.port: 11262`, `server.ssl.enabled: true`) · **Issues:** #642
 
 ### REQ-INGEST-002 — Authentication & authorization
@@ -170,8 +191,11 @@ never acts for a user other than the one it authenticated.
   desktop binary or in any committed config.
 - [x] The handoff staged by an ingest call is readable only under the same `sub`.
 
-**Enforced by:** `SecurityConfigTest` (audience validator accepts a token carrying `basetool-backend`,
-rejects one without it), `IngestControllerTest` (an unauthenticated caller is 401, no forward),
+**Enforced by:** `SecurityConfigTest` (audience validator accepts a token carrying `basetool-ingest`,
+rejects a frontend session token that carries only `basetool-backend` — corrected 2026-09-22, the test
+used to assert the backend's value), `scripts/check-ingest-audience.py` (repo-lint `ingest-audience`:
+no ingest config, env template or runbook pairs `expected-audiences` / `IRI_INGEST_EXPECTED_AUDIENCES`
+with `basetool-backend`), `IngestControllerTest` (an unauthenticated caller is 401, no forward),
 `ArchitectureTest` (every REST surface is authorization-annotated) · **Code:** `SecurityConfig`,
 `IngestController`, `HandoffStagingService` (per-`sub` Redis key); the public `basetool-sc-extractor`
 device-grant client per [`INGEST_KEYCLOAK_SETUP.md`](../INGEST_KEYCLOAK_SETUP.md) · **Issues:** #641, #642
@@ -239,9 +263,11 @@ by-reason `IngestHandoffErrors` threshold. This mirrors the treatment
 - [x] A Redis outage during staging yields a `503` with `Retry-After` and a `WARN`, not a `500` with
   an `ERROR` stack trace, and is counted under its own `staging_unavailable` reason.
 
-**Enforced by:** `HandoffStagingServiceTest` (Testcontainers Redis: stage + consume-once, a
-foreign-`sub` read returns empty without deleting, an unknown id returns empty, the log line carries
-`draftLen` but neither the draft nor the raw ids), `GlobalExceptionHandlerTest`
+**Enforced by:** `HandoffStagingServiceTest` (Testcontainers Redis: stage + consume-once through a
+test-side consume that reads the frontend's literal `ingest:handoff:<sub>:<id>` key schema — the
+gateway itself only writes; a foreign-`sub` read returns empty without deleting, an unknown id returns
+empty, the per-subject index stays at exactly the cap using the `RPUSH` answer instead of a separate
+`LLEN`, the log line carries `draftLen` but neither the draft nor the raw ids), `GlobalExceptionHandlerTest`
 (`DataAccessException` → 503 + `Retry-After` + both counters, `WARN` without the endpoint), frontend
 `IngestHandoffServiceTest` (single-use consume, per-`sub` scoping, kind match) · **Code:**
 `HandoffStagingService`, `StagedHandoff`, `IngestProperties#handoffTtl`,
@@ -318,7 +344,14 @@ pre-auth front line; the source IP is resolved through Tomcat's `RemoteIpValve`
 (`forward-headers-strategy: native`), which honours `X-Forwarded-For` only from a trusted
 internal proxy, so an external client cannot trivially mint a fresh budget by spoofing the
 header. Both bucket maps are bounded (LRU, capped key count) so neither grows without limit
-under key churn. Defensive payload caps inherited from the backend DTOs
+under key churn. The two keys have **separate budgets**: the per-`sub` bucket is
+`app.rate-limit.capacity` / `refill-tokens` (30 per minute), the per-IP bucket its own, looser
+`app.rate-limit.ip-capacity` / `ip-refill-tokens` (120 per minute, `IRI_INGEST_RATE_LIMIT_IP_CAPACITY`
+/ `IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`), both refilled over `refill-period`. The IP bucket used to
+share the per-member budget, so every member behind one CGNAT or office NAT shared a single member's
+30 requests a minute (ING-SIMP-02, 2026-09-22). One factory (`RateLimitBuckets.newBucket`) builds
+both. The per-IP limiter runs **before** the payload cap, so an over-budget caller is refused without
+the gateway reading a chunked body first. Defensive payload caps inherited from the backend DTOs
 (`REQ-REFINERY-001` envelope limits) still apply at the backend; the gateway does not relax
 them.
 
@@ -329,9 +362,10 @@ them.
 - [x] A burst of ingest calls from one `sub` is throttled with a `Retry-After`, not passed
   straight through; rotating the source IP does not defeat the per-`sub` limit.
 
-**Enforced by:** `FiltersTest`, `SubjectRateLimiterTest` · **Code:** `PayloadSizeLimitFilter`,
-`SubjectRateLimiter`, `RateLimitingFilter` · **Issues:** #642, security audit
-INGEST-DOS-1 / INGEST-RATELIMIT-1
+**Enforced by:** `FiltersTest`, `SubjectRateLimiterTest`, `IngestPropertiesTest` (the IP budget's own
+defaults and property names), `FilterOrderTest` (rate limit before the payload cap) · **Code:**
+`PayloadSizeLimitFilter`, `SubjectRateLimiter`, `RateLimitingFilter`, `RateLimitBuckets`,
+`RateLimitProperties` · **Issues:** #642, security audit INGEST-DOS-1 / INGEST-RATELIMIT-1
 
 ### REQ-INGEST-006 — Egress is opt-in; the CLI stays offline
 
@@ -537,6 +571,22 @@ same sequencing discipline `REQ-INGEST-008` imposes on the audience validator.
 > believed to be observe-only. The runbook now orders the audience **last**, after the audit-only
 > pass has completed.
 
+**An authenticated principal that is not a JWT is refused, fail-closed** (ING-SEC-05, 2026-09-22).
+Every check above reads token claims, so such a principal would otherwise skip all of them while
+`.anyRequest().authenticated()` still passed it. None exists on today's chain — the bearer and the
+DPoP provider both yield a `JwtAuthenticationToken` — which is exactly why it is refused rather than
+waved through, under its own `non_jwt_principal` reason, even with nothing configured and even under
+`audit-only`. An anonymous token is not a caller and stays the resource server's `401`.
+
+**The configured posture is a scraped fact** (ING-SEC-03, 2026-09-22). Every gate is switched on by
+the environment alone, so nothing in the code or the deploy said whether production was protected —
+on 2026-08-28 neither control refused anything, found only by reading the host. The gauge
+`basetool_ingest_gate_enforcing{gate="azp|scope|tool|audience"}` reports `1` while a gate refuses
+callers and `0` while it is unconfigured or only counting under `audit-only` (which does not apply to
+the audience). The same booleans and list sizes — never a configured value — are logged once at
+startup (`Client gates` banner line, `WARN` while the audience is off), the operations dashboard
+shows them, and `IngestAudienceGateOff` fires while the audience check is off.
+
 **Every rejection names which check refused it.** All four used to share one identical problem
 `detail`, so a client message could not distinguish a token-level refusal from the payload-provenance
 one and the operator had to reach for the log to find out — which, during the 2026-08-03 incident,
@@ -571,6 +621,13 @@ authentication: the field is client-supplied and the contract that documents it 
 - [x] The `client_id` metric label never carries a raw token claim — it is an allowlist entry or the
   bounded `other` literal.
 - [x] The rejected `tool` is `LogSafe`-sanitized before logging and is never echoed to the caller.
+- [x] An authenticated non-JWT principal is refused `403 CLIENT_NOT_ALLOWED` under
+  `non_jwt_principal`, also when inert and under audit-only; an anonymous token passes to the `401`.
+- [x] `basetool_ingest_gate_enforcing{gate}` reports each gate's posture with four bounded labels;
+  audit-only turns `azp`/`scope`/`tool` to `0` but never `audience`; no configured value reaches the
+  log.
+- [x] Every endpoint the dispatcher routes lies inside the `/v1` scope these filters guard
+  (`IngestEndpointSurfaceTest`).
 - [x] The gate cannot be shed by percent-encoding the path. Every filter that limits itself to the
   ingest surface — client identity, payload cap, rate limit and the access log — decides that
   through the shared `IngestPathScope`, which matches a parsed `PathPattern` against the **decoded**
@@ -583,13 +640,17 @@ authentication: the field is client-supplied and the contract that documents it 
   path, so an encoded call still required a valid realm token.
 
 **Enforced by:** `ClientIdentityFilterTest` (all four checks, fail-closed on absent claims, audit-only,
-bounded label, unauthenticated pass-through, percent-encoded path), `IngestPathScopeTest` (decoded
+bounded label, unauthenticated pass-through, non-JWT principal refused, percent-encoded path),
+`IngestEndpointSurfaceTest` (the routed surface is exactly the two `/v1` endpoints),
+`IngestGatePostureMetricTest` and `StartupBannerListenerTest` (the posture gauge and log line),
+the promtool test `ingest_audience_gate_off_test.yml`, `IngestPathScopeTest` (decoded
 scope matching), `FiltersTest` / `RequestLoggingFilterTest` (payload cap, rate limit and access log
 on an encoded path), `ProvenanceGuardTest` (allowlist, absent producer,
 audit-only, log sanitisation, no echo-back) · **Code:** `ClientIdentityFilter`,
 `ClientIdentityProperties`, `IngestPathScope`, `ProvenanceGuard`, `Provenance`,
 `ClientNotAllowedException`, `MetricNames` · **Monitoring:** `basetool_ingest_client_total{client_id}`,
-`basetool_ingest_client_rejected_total{reason}`, alert `IngestUnknownClient`
+`basetool_ingest_client_rejected_total{reason}`, `basetool_ingest_gate_enforcing{gate}`, alerts
+`IngestUnknownClient` and `IngestAudienceGateOff`
 
 ### REQ-INGEST-012 — DPoP is validated at the gateway, and never relayed
 

@@ -19,10 +19,13 @@
 
 package de.greluc.krt.profit.basetool.ingest.ratelimit;
 
+import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Factory for the bounded token-bucket maps the ingest rate limiters key on (REQ-INGEST-005).
@@ -51,6 +54,23 @@ public final class RateLimitBuckets {
    */
   public static Map<String, Bucket> boundedLru(int maxEntries) {
     return Collections.synchronizedMap(new LruBucketMap(maxEntries));
+  }
+
+  /**
+   * Builds one greedy-refill token bucket — the single factory both ingest limiters use, so the
+   * per-IP and the per-subject bucket cannot drift apart in shape and differ only in the budget
+   * they are handed.
+   *
+   * @param capacity the maximum burst the bucket admits; must be positive
+   * @param refillTokens the tokens added back every {@code refillPeriod}; must be positive
+   * @param refillPeriod the refill cadence
+   * @return a fresh, full bucket
+   */
+  public static @NotNull Bucket newBucket(
+      int capacity, int refillTokens, @NotNull Duration refillPeriod) {
+    Bandwidth limit =
+        Bandwidth.builder().capacity(capacity).refillGreedy(refillTokens, refillPeriod).build();
+    return Bucket.builder().addLimit(limit).build();
   }
 
   /** Access-ordered {@link LinkedHashMap} that evicts its eldest entry past the configured cap. */

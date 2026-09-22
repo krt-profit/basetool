@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -30,6 +31,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import de.greluc.krt.profit.basetool.ingest.config.ClientIdentityProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.support.LogCapture;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
+import de.greluc.krt.profit.basetool.ingest.support.TestProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import java.util.List;
@@ -39,6 +42,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -85,7 +90,8 @@ class ClientIdentityFilterTest {
    * @return the filter wired to the test meter registry
    */
   private ClientIdentityFilter filter(ClientIdentityProperties properties) {
-    return new ClientIdentityFilter(properties, registry, JsonMapper.builder().build());
+    return new ClientIdentityFilter(
+        properties, registry, JsonMapper.builder().build(), TestLoggingProperties.defaults());
   }
 
   /**
@@ -94,10 +100,7 @@ class ClientIdentityFilterTest {
    * @return a fully-configured, enforcing client-identity configuration
    */
   private static ClientIdentityProperties enforcing() {
-    ClientIdentityProperties properties = new ClientIdentityProperties();
-    properties.setAllowedClientIds(List.of(ALLOWED_CLIENT));
-    properties.setRequiredScope(INGEST_SCOPE);
-    return properties;
+    return new ClientIdentityProperties(List.of(ALLOWED_CLIENT), INGEST_SCOPE, List.of(), false);
   }
 
   /**
@@ -153,11 +156,48 @@ class ClientIdentityFilterTest {
     // otherwise deploying it rejects every real extractor token (REQ-INGEST-008 sequencing).
     authenticate("some-unregistered-client", null);
 
-    filter(new ClientIdentityProperties()).doFilter(request, response, chain);
+    filter(TestProperties.clientIdentity()).doFilter(request, response, chain);
 
     verify(chain, times(1)).doFilter(request, response);
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(rejected(MetricNames.REASON_UNKNOWN_CLIENT)).isZero();
+  }
+
+  /**
+   * An authenticated principal that is not a JWT fails CLOSED (ING-SEC-05): every check here reads
+   * token claims, so letting it through would skip the whole allowlist while {@code
+   * .authenticated()} still passed. It is refused even with nothing configured and even under
+   * audit-only, because there is no client population to measure — only a gate that would not run.
+   */
+  @Test
+  void shouldRefuseAnAuthenticatedNonJwtPrincipalEvenWhenInertAndAuditOnly() throws Exception {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            UsernamePasswordAuthenticationToken.authenticated(
+                "someone", "n/a", List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+
+    filter(TestProperties.clientIdentity("audit-only", "true")).doFilter(request, response, chain);
+
+    verify(chain, never()).doFilter(any(), any());
+    assertThat(response.getStatus()).isEqualTo(403);
+    assertThat(response.getContentAsString())
+        .contains("CLIENT_NOT_ALLOWED")
+        .doesNotContain("someone");
+    assertThat(rejected(MetricNames.REASON_NON_JWT_PRINCIPAL)).isEqualTo(1.0d);
+  }
+
+  /** An anonymous token is not a caller; the resource-server chain owns that answer (401). */
+  @Test
+  void shouldLetAnAnonymousTokenThroughForTheChainToAnswer() throws Exception {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new AnonymousAuthenticationToken(
+                "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+
+    filter(enforcing()).doFilter(request, response, chain);
+
+    verify(chain, times(1)).doFilter(request, response);
+    assertThat(rejected(MetricNames.REASON_NON_JWT_PRINCIPAL)).isZero();
   }
 
   @Test
@@ -274,8 +314,8 @@ class ClientIdentityFilterTest {
   @Test
   void shouldServeTheRequestButStillCountAndLogWhileAuditOnly() throws Exception {
     // The safe rollout path: measure the real client population before enforcing.
-    ClientIdentityProperties properties = enforcing();
-    properties.setAuditOnly(true);
+    ClientIdentityProperties properties =
+        new ClientIdentityProperties(List.of(ALLOWED_CLIENT), INGEST_SCOPE, List.of(), true);
     authenticate("some-other-tool", INGEST_SCOPE);
 
     List<ILoggingEvent> events =
@@ -321,7 +361,7 @@ class ClientIdentityFilterTest {
             Level.WARN,
             () -> {
               try {
-                filter(new ClientIdentityProperties()).doFilter(request, response, chain);
+                filter(TestProperties.clientIdentity()).doFilter(request, response, chain);
               } catch (Exception e) {
                 throw new IllegalStateException(e);
               }
@@ -356,7 +396,7 @@ class ClientIdentityFilterTest {
             Level.WARN,
             () -> {
               try {
-                filter(new ClientIdentityProperties()).doFilter(request, response, chain);
+                filter(TestProperties.clientIdentity()).doFilter(request, response, chain);
               } catch (Exception e) {
                 throw new IllegalStateException(e);
               }

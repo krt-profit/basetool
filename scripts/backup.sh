@@ -96,7 +96,14 @@ KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 # volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
 # the backup went on to report success over a snapshot that was missing all of them. Precisely the
 # class the certificate-capture work was about, arriving through the registry instead.
-HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-docker.io/library/postgres:18-alpine}"
+#
+# And PINNED BY DIGEST, since 2026-09-22 (OPS-SEC-03): the reference is read at runtime from
+# db-backend's own unit (`rt_unit_image`, below, after rt_detect has found the unit directory), so
+# the helper runs byte-for-byte the PostgreSQL image the database runs -- already on disk, never a
+# fresh pull of whatever the tag points at that night, and never a second pin for Dependabot to
+# miss. The tag is only the last resort, and it says so in the log.
+HELPER_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
+HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
 
 # Monitoring-plane backup (epic #936, ADR-0072). Best-effort and fully guarded so a host WITHOUT the
 # monitoring stack is unaffected. Loki data is deliberately EXCLUDED (its GFS retention would silently
@@ -104,7 +111,6 @@ HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-docker.io/library/postgres:18-alpine}"
 MON_COMPOSE="${COMPOSE_DIR}/docker-compose.monitoring.yml"
 MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
 TEXTFILE_DIR="${IRI_MONITORING_TEXTFILE_DIR:-/var/iri/monitoring/textfile}"
-CURL_IMAGE="${IRI_BACKUP_CURL_IMAGE:-curlimages/curl:8.11.1}"
 START_EPOCH="$(date +%s)"
 
 QUIESCE=true
@@ -198,6 +204,14 @@ export RT_PROJECT_DIR="${COMPOSE_DIR}" RT_MONITORING_FILE="${MON_COMPOSE}"
 export RT_MONITORING_SERVICES="prometheus loki tempo grafana alertmanager blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter"
 export RT_STOP_TIMEOUT="${STOP_TIMEOUT}"
 log "container runtime: ${RT_BACKEND}"
+if [[ -z "${HELPER_IMAGE}" ]]; then
+  if HELPER_IMAGE="$(rt_unit_image db-backend "${COMPOSE_DIR}/quadlet/systemd")"; then
+    log "helper image: ${HELPER_IMAGE} (db-backend's own pin)"
+  else
+    HELPER_IMAGE="${HELPER_IMAGE_FALLBACK}"
+    log "WARN: no Image= readable in db-backend.container -- falling back to the unpinned ${HELPER_IMAGE}"
+  fi
+fi
 # Under Compose the compose file IS the deployment and the capture reads it; under Quadlet the unit
 # files are, and there is nothing to read.
 [[ "${RT_BACKEND}" != docker ]] || [[ -f "${RT_COMPOSE_FILE}" ]]   || fail "missing ${RT_COMPOSE_FILE}"
@@ -459,28 +473,33 @@ log "deploy lock released; the rest runs while fully live"
 
 # --- Weekly (Sunday) Prometheus TSDB snapshot into the backup ---------------
 # Protects the 180-day metric archive + the #937 baseline against host/disk loss (ADR-0072). Uses the
-# admin API (enabled ONLY together with basic auth) via a throwaway curl container on the core net —
-# the host has no published Prometheus port by design. Best-effort; the snapshot dir is cleaned after
-# staging so the prometheus volume does not grow unbounded.
-if [[ "$(date -u +%u)" == "7" ]] && rt_monitoring_configured && rt_network_exists net-monitoring-core; then
-  PROM_PW="$(read_env PROMETHEUS_WEB_PASSWORD)"
-  if [[ -n "${PROM_PW}" ]]; then
-    mkdir -p "${STAGING}/monitoring"
-    log "weekly Prometheus TSDB snapshot via admin API"
-    snap_json="$(rt_run_on_network net-monitoring-core "${CURL_IMAGE}" \
-      -sS -u "grafana:${PROM_PW}" -XPOST http://prometheus:9090/api/v1/admin/tsdb/snapshot 2>/dev/null || true)"
-    snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
-    if [[ -n "${snap_name}" && -d "${MON_DATA}/data/prometheus/snapshots/${snap_name}" ]]; then
-      if rt_read_mount "${MON_DATA}/data/prometheus/snapshots/${snap_name}" "${HELPER_IMAGE}" \
-           sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null; then
-        log "captured Prometheus TSDB snapshot ${snap_name}"
-      else
-        log "WARN: could not archive the Prometheus TSDB snapshot"
-      fi
-      rm -rf "${MON_DATA}/data/prometheus/snapshots/${snap_name}" 2>/dev/null || true
+# admin API (enabled ONLY together with basic auth), asked from INSIDE the prometheus container with
+# the password read there from its own mounted secret (rt_prometheus_snapshot) -- no helper image, and
+# no password on any command line. Best-effort; the snapshot dir is removed after staging, again from
+# inside the container that owns it, so the prometheus volume does not grow unbounded.
+#
+# The existence test that used to guard the archive (`-d` on the snapshot's host path) is gone on
+# purpose: the TSDB directory belongs to the container's `nobody` under rootless Podman, so the
+# deploy account could not see into it and the test was false every week. The archive's own result is
+# the answer instead.
+if [[ "$(date -u +%u)" == "7" ]] && rt_monitoring_configured && rt_is_running prometheus; then
+  mkdir -p "${STAGING}/monitoring"
+  log "weekly Prometheus TSDB snapshot via admin API"
+  snap_json="$(rt_prometheus_snapshot 2>/dev/null || true)"
+  snap_name="$(printf '%s' "${snap_json}" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
+  if [[ "${snap_name}" =~ ^[0-9A-Za-z-]+$ ]]; then
+    if rt_read_mount "${MON_DATA}/data/prometheus/snapshots/${snap_name}" "${HELPER_IMAGE}" \
+         sh -c 'tar -C /src -cz .' > "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" 2>/dev/null \
+       && [[ -s "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz" ]]; then
+      log "captured Prometheus TSDB snapshot ${snap_name}"
     else
-      log "WARN: Prometheus TSDB snapshot failed or dir missing (name='${snap_name:-}')"
+      rm -f "${STAGING}/monitoring/prometheus-tsdb-snapshot.tar.gz"
+      log "WARN: could not archive the Prometheus TSDB snapshot ${snap_name}"
     fi
+    rt_prometheus_snapshot_remove "${snap_name}" >/dev/null 2>&1 \
+      || log "WARN: could not remove snapshot ${snap_name} from the Prometheus volume"
+  else
+    log "WARN: Prometheus TSDB snapshot failed (answer did not name a snapshot)"
   fi
 fi
 

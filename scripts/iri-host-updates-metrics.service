@@ -1,0 +1,54 @@
+; systemd service that refreshes the host's patch-state metrics at boot (OPS-SEC-01, REQ-OPS-032).
+;
+; WHAT IT IS. scripts/host-updates-metrics.sh writes three series into node_exporter's textfile
+; directory: when dnf-automatic last ran, whether that run succeeded, and whether an installed update
+; still waits for a reboot. The first two are written by dnf-automatic's own run, through an
+; ExecStopPost= drop-in the role installs beside dnf-automatic.service. This unit is the third
+; writer, and exists for one reason: after a reboot, "a reboot is required" is no longer true, and
+; nothing would say so until the next nightly run. HostRebootRequired would then keep warning for up
+; to a day about a reboot that already happened -- which is how an alert teaches people to ignore it.
+;
+; It runs without $SERVICE_RESULT, so the script carries the last run's values over unchanged and
+; re-reads only the reboot flag.
+;
+; Installation is by the Ansible role (tasks/45-updates.yml), not by hand.
+
+[Unit]
+Description=Profit Basetool — host patch-state metrics after boot
+Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/host-updates-metrics.sh
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/var/iri/code/scripts/host-updates-metrics.sh
+
+; Root because `needs-restarting -r` reads the rpm database and every process's mapped files; the
+; rest of the unit is locked down to compensate. No network: the answer is entirely local.
+;
+; ProtectSystem=full and NOT strict: `dnf needs-restarting` initialises dnf, and dnf takes its lock
+; and cache under /var. strict would make that a read-only-filesystem failure, which the script
+; reports as "cannot tell" -- an absent series and a silent HostRebootRequired. full still keeps
+; /usr, /boot and /etc read-only.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+TimeoutStartSec=120
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

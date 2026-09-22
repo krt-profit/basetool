@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -71,8 +72,14 @@ public class SecurityProblemResponseHandler
   private final BearerTokenAuthenticationEntryPoint bearerEntryPoint =
       new BearerTokenAuthenticationEntryPoint();
 
+  /** Serializes the problem body. */
   private final ObjectMapper objectMapper;
+
+  /** Counts every 401/403 on the bounded auth-failure and error counters. */
   private final MeterRegistry meterRegistry;
+
+  /** Supplies the MDC key the problem body's {@code correlationId} is read from. */
+  private final LoggingProperties loggingProperties;
 
   /**
    * Answers an unauthenticated request to a protected endpoint with a {@code 401} problem body,
@@ -200,6 +207,7 @@ public class SecurityProblemResponseHandler
       HttpServletResponse response, HttpStatus status, String title, String code, String detail)
       throws IOException {
     meterRegistry.counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, code).increment();
-    ProblemResponseWriter.write(response, objectMapper, status, title, code, detail);
+    ProblemResponseWriter.write(
+        response, objectMapper, loggingProperties, status, title, code, detail);
   }
 }

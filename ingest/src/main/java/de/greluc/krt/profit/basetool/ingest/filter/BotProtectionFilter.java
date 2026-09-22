@@ -65,7 +65,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * </ol>
  *
  * <p>Runs after {@link CorrelationIdFilter} (so a blocked request is still correlation-tagged in
- * the logs) but before the size-cap, rate-limit and Spring Security filters. Detection is
+ * the logs) but before the rate-limit, size-cap and Spring Security filters. Detection is
  * case-insensitive to defeat trivial casing bypasses. Only the bounded reject {@code rule} is
  * recorded on {@code basetool_bot_blocked_total} — never the attacker-controlled URI or method
  * (REQ-OBS-006/-011).
@@ -76,8 +76,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class BotProtectionFilter extends OncePerRequestFilter {
 
-  /** After correlation id, before the size-cap, rate-limit and Spring Security filters. */
-  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 15;
+  /**
+   * After correlation id, before the access log, the rate-limit, size-cap and Spring Security
+   * filters. Its own slot: it used to share {@code HIGHEST_PRECEDENCE + 15} with {@link
+   * RequestLoggingFilter}, which left the relative order of the two to bean-registration order
+   * (guarded by {@code FilterOrderTest}).
+   */
+  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 12;
 
   /** The Micrometer registry the per-rule bot-block counter is bumped against. */
   private final @NotNull MeterRegistry meterRegistry;

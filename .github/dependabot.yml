@@ -5,12 +5,26 @@
 # so the two systems do not generate duplicate PRs.
 version: 2
 updates:
+  # One PR per week for ALL action bumps (audit item CI-13). One PR per action used to mean up to
+  # five PRs a Monday, each re-running the whole CI and each needing its own review and merge. A
+  # group is one review, one CI cycle, one merge. The Docker entries below stay
+  # separate on purpose (see their comment): there a wrong key would silently stop updates to a
+  # base image, and the lever for a faster OS-level patch is this file's interval, not a batch.
+  #
+  # `directories` rather than `directory: /`: the root entry reads .github/workflows only, so the
+  # SHA pins inside the local composite actions (.github/actions/*) were watched by nothing.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - dependencies
       - github-actions
@@ -66,6 +80,22 @@ updates:
   # image must get the same automated CVE bumps (security audit gap-fill).
   - package-ecosystem: docker
     directory: /ingest
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: "chore(docker)"
+
+  # The BuildKit image every release build boots, pinned by digest in a carrier Dockerfile that
+  # nothing builds (.github/actions/setup-buildx/Dockerfile, audit item CI-SEC-13). The composite
+  # action reads the reference from that file, so this entry is what keeps the pin moving with
+  # the `buildx-stable-1` channel instead of freezing it.
+  - package-ecosystem: docker
+    directory: /.github/actions/setup-buildx
     schedule:
       interval: weekly
       day: monday

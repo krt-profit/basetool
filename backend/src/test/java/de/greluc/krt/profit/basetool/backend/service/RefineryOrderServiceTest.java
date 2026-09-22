@@ -32,6 +32,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.model.City;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -162,12 +163,14 @@ class RefineryOrderServiceTest {
 
     RefineryOrderStoreDto dto = new RefineryOrderStoreDto(Collections.emptyList());
 
-    IllegalStateException ex =
+    // A client-side condition: 400 with a localized detail, not a raw IllegalStateException
+    // (which is a 500 since APPSEC-06).
+    BadRequestException ex =
         assertThrows(
-            IllegalStateException.class,
+            BadRequestException.class,
             () -> refineryOrderService.storeRefineryOrder(OWNER_ID, ORDER_ID, dto, false));
 
-    assertEquals("Refinery order is already completed and stored.", ex.getMessage());
+    assertEquals("error.refinery_order.already_stored", ex.getMessage());
   }
 
   // ------------------------------------------------------------------

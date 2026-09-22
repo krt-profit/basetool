@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.MissionParticipantRequiredException;
 import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.InventoryItem;
@@ -689,7 +690,9 @@ public class RefineryOrderService {
 
     if (order.getStatus()
         == de.greluc.krt.profit.basetool.backend.model.RefineryOrderStatus.COMPLETED) {
-      throw new IllegalStateException("Refinery order is already completed and stored.");
+      // A client-side condition (a second store of the same order), so a 400 with a localized
+      // detail — a raw IllegalStateException is answered as a 500 (APPSEC-06).
+      throw new BadRequestException("error.refinery_order.already_stored");
     }
 
     if (!isLogistician

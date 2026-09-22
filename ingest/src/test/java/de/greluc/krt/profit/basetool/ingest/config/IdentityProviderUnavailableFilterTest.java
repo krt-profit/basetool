@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
+import de.greluc.krt.profit.basetool.ingest.support.TestLoggingProperties;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -60,7 +61,9 @@ class IdentityProviderUnavailableFilterTest {
   @BeforeEach
   void setUp() {
     meterRegistry = new SimpleMeterRegistry();
-    filter = new IdentityProviderUnavailableFilter(JsonMapper.builder().build(), meterRegistry);
+    filter =
+        new IdentityProviderUnavailableFilter(
+            JsonMapper.builder().build(), meterRegistry, TestLoggingProperties.defaults());
   }
 
   private MockHttpServletResponse run(FilterChain chain) throws Exception {

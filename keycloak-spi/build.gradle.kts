@@ -3,8 +3,16 @@ import org.cyclonedx.Version
 plugins {
   java
   checkstyle
+  // Coverage report + the ratchet in `check`, wired by the root build's `plugins.withId("jacoco")`
+  // block exactly as for the three applications. This JAR runs inside the Keycloak JVM on every
+  // Discord login, so it is the one shipped module a coverage regression must not slip past.
+  id("jacoco")
   alias(libs.plugins.cyclonedx.bom)
   alias(libs.plugins.licensee)
+  // SpotBugs + FindSecBugs, the same `-base` variant and the same explicitly registered
+  // `spotbugsMain` task as ingest (KC-CI-01). Until 2026-09-22 this module had neither, although
+  // it handles brokered Discord tokens, a shared secret and a pinned truststore.
+  alias(libs.plugins.spotbugs.base)
   id("com.diffplug.spotless")
 }
 
@@ -66,6 +74,10 @@ dependencies {
   compileOnly(libs.keycloak.core)
   compileOnly(libs.jetbrains.annotations)
 
+  // FindSecBugs: security-focused SpotBugs detectors, wired into spotbugsMain below. A build-time
+  // plugin configuration only -- nothing here reaches the provider JAR or its (empty) SBOM.
+  spotbugsPlugins(libs.findsecbugs.plugin)
+
   // Lombok, on both source sets. `compileOnly` + `annotationProcessor` keeps it out of the JAR
   // exactly as the Keycloak SPIs are kept out -- nothing here reaches the Keycloak JVM, so the
   // module's "bundles no third-party code at all" property (see the SBOM note above) is untouched.
@@ -93,3 +105,28 @@ dependencies {
   testImplementation(libs.keycloak.core)
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+// SpotBugs task for the main source set, identical to ingest's. The `-base` plugin variant does not
+// auto-create tasks, so it is registered explicitly and wired into `check`. BLOCKING
+// (`ignoreFailures = false`): a HIGH-confidence finding fails the build. The analysed class files
+// are the `--release 21` bytecode Keycloak actually loads.
+tasks.register<com.github.spotbugs.snom.SpotBugsTask>("spotbugsMain") {
+  group = "verification"
+  description = "Runs SpotBugs analysis on the main source set."
+  sourceDirs.from(sourceSets.main.get().allSource.sourceDirectories)
+  classDirs.from(sourceSets.main.get().output.classesDirs)
+  auxClassPaths.from(sourceSets.main.get().compileClasspath)
+  pluginJarFiles.from(configurations.named("spotbugsPlugins"))
+  effort.set(com.github.spotbugs.snom.Effort.DEFAULT)
+  reportLevel.set(com.github.spotbugs.snom.Confidence.HIGH)
+  ignoreFailures = false
+  // XML reporter ONLY — the SpotBugs multi-output ordering bug writes a zero-class report when
+  // html precedes xml. XML is the canonical machine-readable format.
+  reports.create("xml") {
+    required.set(true)
+    outputLocation.set(layout.buildDirectory.file("reports/spotbugs/main.xml"))
+  }
+  dependsOn("classes")
+}
+
+tasks.named("check").configure { dependsOn("spotbugsMain") }

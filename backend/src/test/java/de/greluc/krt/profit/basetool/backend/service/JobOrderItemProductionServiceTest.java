@@ -67,6 +67,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 
 /**
  * Unit tests for {@link JobOrderItemProductionService#bookProduction}: the happy-path counter bump
@@ -97,6 +98,7 @@ class JobOrderItemProductionServiceTest {
   @Mock private LocationRepository locationRepository;
   @Mock private OwnerScopeService ownerScopeService;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
+  @Mock private AuthHelperService authHelperService;
   @InjectMocks private JobOrderItemProductionService service;
 
   private UUID orderId;
@@ -321,7 +323,7 @@ class JobOrderItemProductionServiceTest {
   }
 
   @Test
-  void bookProduction_consumedEntryHasNoOrderSlice_throwsIllegalState() {
+  void bookProduction_consumedEntryHasNoOrderSlice_throwsBadRequest() {
     // Given — the coverage plan is exact (40 SCU for the 40-SCU demand), but the entry carries no
     // slice earmarked to this order, so the per-entry guard rejects it.
     inventoryItem.getJobOrderAllocations().clear();
@@ -337,8 +339,8 @@ class JobOrderItemProductionServiceTest {
 
     // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("does not belong");
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
@@ -481,6 +483,8 @@ class JobOrderItemProductionServiceTest {
     UUID orgUnitId = UUID.randomUUID();
     Squadron orgUnit = new Squadron();
     orgUnit.setId(orgUnitId);
+    // A same-Staffel owner: the on-behalf scope gate passes (APPSEC-01).
+    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, orgUnitId))
@@ -595,6 +599,8 @@ class JobOrderItemProductionServiceTest {
     UUID locationId = UUID.randomUUID();
     Location location = new Location();
     location.setId(locationId);
+    // The caller names themselves: a personal book-in is only ever into one's own pool.
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(inventoryItemRepository.save(any(InventoryItem.class)))
@@ -623,6 +629,8 @@ class JobOrderItemProductionServiceTest {
     // Given a book-in naming an owner that does not exist
     givenProducibleLineWithoutMaterials();
     UUID unknownOwnerId = UUID.randomUUID();
+    // Only a caller who passes the scope gate ever reaches the lookup (and so the 404).
+    when(ownerScopeService.canManageUserInventory(unknownOwnerId)).thenReturn(true);
     when(userRepository.findById(unknownOwnerId)).thenReturn(Optional.empty());
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -689,5 +697,116 @@ class JobOrderItemProductionServiceTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("no game item");
     verify(inventoryItemRepository, never()).save(any());
+  }
+
+  // covers REQ-INV-032 (APPSEC-01: an owner outside the caller's scope is refused before anything)
+  @Test
+  void bookProduction_bookIn_ownerOutsideCallerScope_throwsAccessDenied_noLookupNoSave() {
+    // Given a book-in naming a member of another Staffel: the on-behalf scope gate refuses
+    UUID callerId = UUID.randomUUID();
+    UUID foreignOwnerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(ownerScopeService.canManageUserInventory(foreignOwnerId)).thenReturn(false);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), foreignOwnerId, null, null, null));
+
+    // When / Then — refused before the order is loaded or any stock consumed, and before the owner
+    // lookup, so the refusal is no existence oracle for the id
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(AccessDeniedException.class);
+    verify(inventoryItemRepository, never()).save(any());
+    verify(userRepository, never()).findById(any());
+    verify(jobOrderRepository, never()).findById(any());
+    verifyNoInteractions(auditService);
+    assertThat(line.getManufacturedAmount()).isZero();
+  }
+
+  // covers REQ-INV-032 (APPSEC-01: never into another member's personal pool, even in scope)
+  @Test
+  void bookProduction_bookIn_personalOnBehalfOfOther_throwsAccessDenied_noSave() {
+    // Given a same-Staffel owner the caller may book for, but a personal (private-pool) target
+    UUID callerId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(UUID.randomUUID(), ownerId, null, true, false));
+
+    // When / Then
+    assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("personal");
+    verify(inventoryItemRepository, never()).save(any());
+    verify(userRepository, never()).findById(any());
+  }
+
+  // covers REQ-INV-032 (APPSEC-01: a same-Staffel owner passes the gate and receives the row)
+  @Test
+  void bookProduction_bookIn_ownerInCallerScope_passesGate_andBooksIntoOwnersLedger() {
+    // Given a named owner the caller shares a Staffel with
+    givenProducibleLineWithoutMaterials();
+    UUID callerId = UUID.randomUUID();
+    UUID ownerId = UUID.randomUUID();
+    User owner = new User();
+    owner.setId(ownerId);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(BOOK_IN_LOCATION_ID, ownerId, null, null, null));
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — the gate was asked for exactly that owner, and the row lands in the owner's ledger
+    verify(ownerScopeService).canManageUserInventory(ownerId);
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertThat(captor.getValue().getUser()).isSameAs(owner);
+  }
+
+  // covers REQ-INV-032 (APPSEC-01: naming oneself explicitly needs no on-behalf check)
+  @Test
+  void bookProduction_bookIn_ownerIsCaller_skipsOnBehalfGate() {
+    // Given a book-in whose explicit owner is the caller themselves
+    givenProducibleLineWithoutMaterials();
+    UUID callerId = UUID.randomUUID();
+    User caller = new User();
+    caller.setId(callerId);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(userRepository.findById(callerId)).thenReturn(Optional.of(caller));
+    JobOrderItemProductionCreateDto dto =
+        new JobOrderItemProductionCreateDto(
+            1,
+            LINE_VERSION,
+            List.of(),
+            List.of(),
+            bookIn(BOOK_IN_LOCATION_ID, callerId, null, null, null));
+
+    // When
+    service.bookProduction(orderId, lineId, dto);
+
+    // Then — no scope question for one's own ledger; the row is the caller's
+    verify(ownerScopeService, never()).canManageUserInventory(any());
+    org.mockito.ArgumentCaptor<InventoryItem> captor =
+        org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).save(captor.capture());
+    assertThat(captor.getValue().getUser()).isSameAs(caller);
   }
 }

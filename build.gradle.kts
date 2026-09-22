@@ -394,10 +394,23 @@ subprojects {
     // `ingest` sits far above the other two because the gateway is small and
     // almost entirely branch logic (filters, relay, problem mapping) — the
     // generic 0.50/0.40 fallback it used before was no gate at all there.
+    // `keycloak-spi` joined on 2026-09-22 (KC-CI-01) at a measured ~70% instr / ~64% branch; the
+    // untested remainder is mostly the Keycloak-session plumbing (brokered-context deserialisation,
+    // the IdP's live profile call) that only a running Keycloak exercises.
     val instructionFloor =
-      mapOf("backend" to "0.82", "frontend" to "0.60", "ingest" to "0.93")[project.name] ?: "0.50"
+      mapOf(
+        "backend" to "0.82",
+        "frontend" to "0.60",
+        "ingest" to "0.93",
+        "keycloak-spi" to "0.66",
+      )[project.name] ?: "0.50"
     val branchFloor =
-      mapOf("backend" to "0.65", "frontend" to "0.46", "ingest" to "0.85")[project.name] ?: "0.40"
+      mapOf(
+        "backend" to "0.65",
+        "frontend" to "0.46",
+        "ingest" to "0.85",
+        "keycloak-spi" to "0.60",
+      )[project.name] ?: "0.40"
     tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
       dependsOn(tasks.named("test"))
       classDirectories.setFrom(filterGenerated(classDirectories))
@@ -436,12 +449,15 @@ subprojects {
   //   `-Xshare:off -javaagent:<mockito-core>` so Mockito 5+ self-attaches in
   //   PIT's isolated minion processes; without that the green-suite
   //   prerequisite fails before any mutation is generated).
-  // - The first invocation will almost certainly fail because some service
-  //   tests rely on a Spring context that PIT's minion process does not
-  //   start; the team should add the affected test classes to
-  //   `excludedTestClasses` (or move them to `*IntegrationTest` naming) as a
-  //   follow-up, then tighten `mutationThreshold` / `coverageThreshold` to
-  //   make the gate strict.
+  // - Spring-context tests DO run under PIT: the minions start their contexts like any other JVM,
+  //   provided they get the `test` profile (below) -- which is what the three @SpringBootTest
+  //   classes without their own @ActiveProfiles("test") were missing (audit item CI-03). This note
+  //   used to say they "rely on a Spring context that PIT's minion does not start" and advised
+  //   renaming them to `*IntegrationTest`; neither was true -- `targetTests` is `service.*Test`,
+  //   which matches `*IntegrationTest` too. `pitest.yml` fails the run when no mutations.xml is
+  //   written or PIT reports PitHelpError, so a red coverage phase can no longer hide behind the
+  //   step's `continue-on-error`. Tighten `mutationThreshold` / `coverageThreshold` once a few
+  //   weekly runs have produced a baseline.
   plugins.withId("info.solidsoft.pitest") {
     extensions.configure<info.solidsoft.gradle.pitest.PitestPluginExtension>("pitest") {
       junit5PluginVersion.set(libs.versions.pitestJunit5.get())
@@ -455,10 +471,21 @@ subprojects {
       // can self-attach as a Java agent inside PIT's isolated minions and the
       // native-access warning is silenced. The mockito-core path is resolved
       // lazily from the test runtime classpath.
+      //
+      // `-Dspring.profiles.active=test` too, for the same reason: it is the other half of what the
+      // Test task sets (`systemProperty("spring.profiles.active", "test")` above), and PIT's
+      // minions inherit neither. Without it every @SpringBootTest that does not carry its own
+      // @ActiveProfiles("test") boots on the DEFAULT profile, finds no `jdbc:tc:` datasource and
+      // fails -- which is exactly what `FirstLoginAuthoritiesIntegrationTest`,
+      // `MissionManagerIntegrationTest` and `SquadronServiceTest` did under PIT for the eight weeks
+      // before 2026-09-22: "10 tests did not pass without mutation", PitHelpError, no
+      // mutations.xml, and a job shown green by `continue-on-error` (audit item CI-03). They pass
+      // under `./gradlew test` because the Test task supplies the profile.
       val testClasspath = configurations.getByName("testRuntimeClasspath")
       jvmArgs.set(
         provider {
-          val args = mutableListOf("--enable-native-access=ALL-UNNAMED")
+          val args =
+            mutableListOf("--enable-native-access=ALL-UNNAMED", "-Dspring.profiles.active=test")
           val mockitoCore = testClasspath.files.find { it.name.contains("mockito-core") }
           if (mockitoCore != null) {
             args += "-Xshare:off"

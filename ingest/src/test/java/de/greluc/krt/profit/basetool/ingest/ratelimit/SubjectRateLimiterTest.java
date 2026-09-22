@@ -43,12 +43,8 @@ class SubjectRateLimiterTest {
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private static RateLimitProperties props(int capacity, boolean enabled) {
-    RateLimitProperties p = new RateLimitProperties();
-    p.setEnabled(enabled);
-    p.setCapacity(capacity);
-    p.setRefillTokens(capacity);
-    p.setRefillPeriod(Duration.ofMinutes(1));
-    return p;
+    return new RateLimitProperties(
+        enabled, capacity, capacity, Duration.ofMinutes(1), capacity * 4, capacity * 4);
   }
 
   @Test

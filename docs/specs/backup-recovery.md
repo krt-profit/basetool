@@ -164,7 +164,9 @@ content, so nothing it logs can carry a key — and reports each through
 - [ ] A snapshot missing the edge certificates, the ACME state or the redis ACL reports
   `artifact_ok=0` for that artifact, which `RestoreDrillArtifactNotRestorable` pages on.
 - [ ] Every run writes `basetool_restore_drill_last_success_timestamp` (bumped only when both
-  dumps restored); `RestoreDrillStaleOrMissing` pages when it is older than 35 days or absent.
+  dumps restored); `RestoreDrillStaleOrMissing` pages when it is older than 8 days — one weekly drill
+  missed, plus a day of slack — or absent. It said 35 days until 2026-09-22, which let four
+  consecutive weekly drills fail before anyone was told.
 
 **Enforced by:** `scripts/restore-drill.sh` · `scripts/iri-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
 

@@ -8,8 +8,9 @@
 #   - each alert FIRES from the cgroup-collector series alone   (the post-cutover host);
 #   - each alert FIRES from the cAdvisor series alone           (production today);
 #   - a host serving BOTH does not double-alert                 (the cutover window itself);
-#   - the collector's own liveness alerts fire when it stops or matches nothing,
-#     and stay SILENT on a host that never runs it.
+#   - the collector's own liveness alerts fire when it stops, matches nothing, or has never
+#     written at all (the absent() leg, 2026-09-22 -- the Docker host it used to stay silent for is
+#     retired).
 #
 # The last one is the whole reason the collector has alerts at all. Its docstring puts it plainly:
 # a parsing bug here is "an alert that never fires, which looks exactly like a healthy system".
@@ -160,7 +161,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "The cgroup container-metrics collector has stopped writing"
-              description: "basetool_container_metrics_timestamp_seconds is more than 5 minutes old, so every basetool_container_* series is stale and the container memory, OOM, CPU-throttling and pids alerts have lost their input on this host. They will NOT fire while this is true. Check iri-container-metrics.timer and the textfile directory."
+              description: "basetool_container_metrics_timestamp_seconds is more than 5 minutes old or absent, so every basetool_container_* series is stale or missing and the container memory, OOM, CPU-throttling and pids alerts have lost their input on this host. They will NOT fire while this is true. Check iri-container-metrics.timer and the textfile directory."
 
   - name: collector - a fresh textfile is silent
     interval: 1m
@@ -195,9 +196,12 @@ tests:
               summary: "The cgroup container-metrics collector found no containers"
               description: "The collector is running and writing, but matched zero container cgroups for 10 minutes. Either nothing is running on this host, or the cgroup layout stopped matching its pattern -- in which case the file is fresh, ContainerCgroupCollectorStale stays green, and every container-level alert has no data to fire on."
 
-  # A Docker host never runs the collector. Neither rule may fire there, or the migration hands
-  # production two permanent warnings for a thing it does not have.
-  - name: collector - silent on a host that does not run it
+  # A collector that has NEVER written (OPS-MON-04, 2026-09-22). This scenario used to assert
+  # silence, because the Docker host never ran the collector and must not be paged for it. That host
+  # is retired, and on the Podman host "no series at all" -- a timer never enabled, a textfile
+  # directory node_exporter does not read -- is the worst form of the failure. FoundNothing stays
+  # silent: it reads a gauge the collector writes, and there is none.
+  - name: collector - a collector that never wrote fires the staleness alert
     interval: 1m
     input_series:
       - series: 'container_last_seen{name="backend"}'
@@ -205,7 +209,12 @@ tests:
     alert_rule_test:
       - eval_time: 30m
         alertname: ContainerCgroupCollectorStale
-        exp_alerts: []
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "The cgroup container-metrics collector has stopped writing"
+              description: "basetool_container_metrics_timestamp_seconds is more than 5 minutes old or absent, so every basetool_container_* series is stale or missing and the container memory, OOM, CPU-throttling and pids alerts have lost their input on this host. They will NOT fire while this is true. Check iri-container-metrics.timer and the textfile directory."
       - eval_time: 30m
         alertname: ContainerCgroupCollectorFoundNothing
         exp_alerts: []

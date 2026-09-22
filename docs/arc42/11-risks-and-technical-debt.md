@@ -129,7 +129,7 @@ the cutover happened to produce a matching peer, so the next release would have 
 
 Three guards stand against it, and their division of labour is the point:
 
-- `scripts/generate-quadlet.py` (CI, the `quadlet-drift` job) — the generator's pins, the emitted
+- `scripts/generate-quadlet.py` (CI, the `quadlet-drift` check) — the generator's pins, the emitted
   unit and the Ansible list must name the same set, **and every network the edge joins must carry a
   pin**. That last clause is what keeps the set finite: adding a network without one fails the
   build. `scripts/check-edge-nginx.sh` checks the list's shape end to end.

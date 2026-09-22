@@ -531,6 +531,14 @@ the next sweep while the others commit.
 (default `PT24H`). Expressed in days because `Duration` has no month unit; the precision is
 irrelevant at a retention boundary.
 
+**Lower bounds (2026-09-22, BE-MOD-03).** The keys bind through the validated
+`AuditRetentionProperties` record, and the context refuses to start when `max-age` is under
+**`P30D`** or `interval` under **`PT1M`**. Before, they were plain `@Value` durations: a mistyped
+`P0D` put the cutoff at "now" and a negative value put it in the future, so the next sweep would have
+deleted the entire trail, irreversibly. The floor guards against that slip; it is not a retention
+policy — the policy is the two-year default, and a deliberately shorter window down to 30 days stays
+possible.
+
 **Observability** — the sweep publishes the `audit_retention` scheduled-job metrics through
 `TaskMetrics` and is covered by the `ScheduledJobStale` alert (REQ-OBS-008). Failures are recorded
 and swallowed there, so the scheduler thread survives a bad run.
@@ -549,9 +557,12 @@ and swallowed there, so the scheduler thread survives a bad run.
   still purged.
 - [x] The cutoff is `now - max-age`; the job reports the deleted count as its `items` metric.
 - [x] The sweep is disabled under the `test` profile.
+- [x] A `max-age` under `P30D` (including `P0D` and negative values) or an `interval` under `PT1M`
+  refuses to start the context; exactly `P30D` binds.
 
-**Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest` · **Code:**
-`service/AuditRetentionService`, `task/AuditRetentionTask`, `metrics/ScheduledJob#AUDIT_RETENTION`,
+**Enforced by:** `AuditRetentionServiceTest`, `AuditRetentionTaskTest`,
+`BackendPropertiesValidationTest` (the floors) · **Code:**
+`service/AuditRetentionService`, `task/AuditRetentionTask`, `support/AuditRetentionProperties`, `metrics/ScheduledJob#AUDIT_RETENTION`,
 `repository/AuditEventRepository#existsByDomainAndOccurredAtBefore`,
 `repository/BankAuditEventRepository#existsByOccurredAtBefore`, `templates/admin/audit-log.html` ·
 **Decision:** [ADR-0179](../adr/0179-both-audit-trails-are-swept-on-a-retention-ceiling.md),

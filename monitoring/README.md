@@ -94,6 +94,9 @@ rpm -q alloy node-exporter prometheus-podman-exporter     # the host services
 
 The two host packages are not pinned by the role: `alloy` and `node-exporter` resolve to the
 versions the compose file pins (measured 2026-09-18), and a second pin would be a drift source.
+Whether they still do is checked, not assumed: `python scripts/check-conformance.py --ssh <host>
+--only host-exporter-versions` compares each running `*_build_info` with the compose pin and fails
+on any difference (OPS-SEC-06, 2026-09-22).
 Tags quoted inside runnable commands in this repository *are* pinned, and
 [`scripts/check-monitoring-image-pins.sh`](../scripts/check-monitoring-image-pins.sh) (CI,
 `repo-lint.yml`) fails the build if any of them drifts from the compose file. It scans every tracked
@@ -102,8 +105,9 @@ deliberately not pins opts out with an `image-pin-gate: ignore-file` marker in i
 
 ## Config tree map
 
-- **`prometheus/prometheus.yml`** — scrape configuration. Retention (180d / 40GB), the admin API,
-  `--web.enable-lifecycle` and the remote-write receiver are **not** in this file; they are flags in
+- **`prometheus/prometheus.yml`** — scrape configuration. Retention (180d / 40GB), the admin API and
+  the remote-write receiver are **not** in this file (`--web.enable-lifecycle` was removed on
+  2026-09-22 — nothing used it); they are flags in
   the Prometheus service's `command:` in the compose file, carried into `prometheus.container`'s
   `Exec=` line.
 - **`prometheus/alerts/*.yml`** — alerting and recording rules by concern: `infrastructure.yml`,
@@ -186,6 +190,10 @@ section above.
 | **DnsResolutionFailed** | The public DNS probe against 1.1.1.1 failed — the apex or the API vhost is not resolving an A/AAAA record. Check the zone (`dig A`/`dig AAAA profit-base.online @1.1.1.1`). |
 | **HostDiskCritical / HostDiskWarning** | Disk filling. Find the largest consumers (`du -xh /var/iri --max-depth 2`, `journalctl --disk-usage`, `sudo -u iri podman system df`). Reclaim images with the cleanup job (`systemctl start iri-container-cleanup.service`); **never** `podman volume prune` — it removes the named `edge-certs` / `edge-acme-state` volumes (ADR-0194). Critical = act now; the monitoring stores share `/var/iri` with both PGDATA directories. |
 | **HostMemoryPressureStalled / HostCpuPressure / HostIoPressure** | PSI pressure on the host; memory full-pressure is the earliest saturation signal before the OOM killer. Read dashboard `01-host`, then the container memory panels. If the panels are **empty**, PSI is off: `ls /proc/pressure` must exist — the role sets `psi=1` for the next boot and does not reboot (`grubby --info=DEFAULT` shows what the next boot will carry). |
+| **PostgresDown / RedisDown** | The exporter answers but cannot reach its database or Redis (`pg_up == 0` / `redis_up == 0`) for 2 minutes — `TargetDown` cannot see this, because the exporter itself is up. `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) systemctl --user status db-backend.service` (or `db-keycloak` / `redis`) and `journalctl CONTAINER_NAME=<svc>`. A missing or unreadable `/var/iri/redis/users.acl` keeps Redis from starting at all (ADR-0088). The nightly backup does not stop either, so these never fire for the 04:15 quiesce. |
+| **ContainerUnhealthy** | A container has failed its **own** health check for 10 minutes (`podman_container_health == 1`, joined to `podman_container_info` for the name). deploy.sh restarts only backend/frontend/ingest; for every other container nothing restarts it. `sudo -u iri XDG_RUNTIME_DIR=/run/user/$(id -u iri) podman healthcheck run <name>` and `journalctl CONTAINER_NAME=<name>`. |
+| **HostSecurityUpdatesFailing / HostSecurityUpdatesStale** | `dnf-automatic` failed its last run, or has not finished one for over two days (or never recorded one). `journalctl -u dnf-automatic.service`, `systemctl list-timers dnf-automatic.timer`, and that `/etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf` exists (role `tasks/45-updates.yml`). REQ-OPS-032. |
+| **HostRebootRequired** | An installed update (kernel, glibc, systemd) has waited a day for a reboot (`needs-restarting -r`). dnf-automatic never reboots — it is an owner decision. The stack comes back on its own after a reboot; the boot unit `iri-host-updates-metrics.service` clears the flag. |
 | **PostgresConnectionsCritical** | Connection pool near max. Check for a connection leak or runaway query; inspect HikariCP and `pg_stat_activity`. |
 | **PostgresWraparoundCritical** | XID wraparound age > 1.5 billion (the metric value is an XID count, not seconds). Autovacuum is not freezing; the DB nears a forced read-only shutdown. Check autovacuum progress and terminate long-idle transactions urgently. |
 | **RedisRdbStale** | Redis has held **unsaved changes** for over an hour with no completed RDB snapshot — the snapshot fork is failing or blocked. AOF is the primary durability layer, so this is not a data-loss signal by itself; check disk space on `/var/iri/redis` and the Redis log. It does **not** fire on an idle store: `--save "60 1"` snapshots only when a key changed (the unguarded rule paged twice on 2026-09-08 for exactly that). |
@@ -200,7 +208,7 @@ section above.
 | **CertificateMetricsStale** | The certificate collector stopped writing (newest sample >36h), or never wrote on a host whose node_exporter has been up 36h. `systemctl status iri-cert-expiry.timer iri-cert-expiry.service`; check `/var/iri/monitoring/textfile/certificates.prom`. |
 | **ContainerRestartLoop** | A container is crash-looping. `${SYSTEMCTL} status <svc>.service` and `journalctl _SYSTEMD_USER_UNIT=<svc>.service`, check the last deploy and the unit's `Memory=` / `PidsLimit=`; roll back if a bad image shipped. Reads `basetool:container:start_time_seconds` (the podman exporter's start time, one series per name across recreates). Until 2026-09-22 it read cAdvisor's `container_start_time_seconds` and could not fire on the Podman host (REQ-OBS-014). |
 | **ContainerMetricsMissing / CoreContainerMetricsMissing** | Fewer containers report `basetool:container:present` than expected, so the container alerts are blind. Check the collector: `systemctl status iri-container-metrics.timer`, `/var/iri/monitoring/textfile/containers.prom`, and `ContainerCgroupCollectorStale` / `…FoundNothing`. |
-| **ContainerCgroupCollectorStale / ContainerCgroupCollectorFoundNothing** | The cgroup collector stopped writing, or writes a fresh file matching **no** cgroup (a changed slice layout). Every container memory/OOM/CPU/pids alert has lost its input. `sudo /var/iri/code/scripts/cgroup-container-metrics.py --dry-run` shows what it would write; the cgroups it reads are `user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<name>.service`. |
+| **ContainerCgroupCollectorStale / ContainerCgroupCollectorFoundNothing** | The cgroup collector stopped writing (or never wrote — `absent()`, since 2026-09-22), or writes a fresh file matching **no** cgroup (a changed slice layout). Every container memory/OOM/CPU/pids alert has lost its input. `sudo /var/iri/code/scripts/cgroup-container-metrics.py --dry-run` shows what it would write; the cgroups it reads are `user.slice/user-<uid>.slice/user@<uid>.service/app.slice/<name>.service`. |
 | **HostServiceMetricsMissing** | The cgroup collector stopped publishing `alloy` or `node-exporter`, the two host services it reads beside the containers. Either the service is down (`TargetDown` / `SystemdUnitFailed` say so) or its unit was renamed or moved out of `system.slice`, and its memory/OOM/pids alerts have lost their input. Compare `DEFAULT_HOST_SERVICES` in `scripts/cgroup-container-metrics.py` with `systemctl status alloy prometheus-node-exporter`. |
 | **ContainerOomKilled** | A container was OOM-killed. Check its `Memory=` limit and anon memory on dashboard `02`; on the memory-capped host confirm the OOM hit the intended sacrifice victim, not a core service. |
 | **ContainerCpuThrottledHigh** | A container is CPU-starved against its `--cpus` quota (>25% of CFS periods throttled). Read the throttled seconds, not only the ratio (sizing section below). |
@@ -219,6 +227,7 @@ section above.
 | **UserSyncZeroItems** | User sync succeeds but processes zero users (Keycloak returned an empty roster) — local accounts will drift. Check Keycloak reachability and the sync path. |
 | **IngestHandoffErrors / IngestBackendUnavailable** | The ingest gateway is failing to relay handoffs. Check the ingest logs and the ingest→backend path; `backend_unavailable` points at backend health. |
 | **IngestStagingUnavailable** | The gateway reached the backend but could not park the draft in Redis. Check the `redis` unit and the gateway's Redis configuration — the backend itself is fine. |
+| **IngestAudienceGateOff** | The gateway's JWT audience check is off (`basetool_ingest_gate_enforcing{gate="audience"}` = 0), so any valid realm token passes its decoder. Not an incident — an unfinished rollout step: once the client-identity gate has left audit-only and a live extractor token carries `aud=basetool-ingest`, set `IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest` (**never** the backend's audience) per `docs/INGEST_KEYCLOAK_SETUP.md` step 7a, re-render `env.d`, restart `ingest`. The startup log's `Client gates` line shows the full posture. |
 | **OptimisticLockConflictSpike** | A likely locking regression. Check recent deploys; look for a coarse lock or a missed `data-version` propagation on the affected surface. |
 | **IdentityProviderUnavailable** | The app is re-mapping unreachable-Keycloak-JWKS failures to 503. Check Keycloak reachability / DNS before 5xx surfaces to users. |
 | **AccessDeniedSpike** | 403 access-denied at an elevated rate — possible authorization probing or a permission gate broken by a deploy. |
@@ -259,10 +268,11 @@ section above.
 | **AcmeRenewalFailing** | The `acme` unit logged more than one failed renewal in 26h. Read `{app="acme"}`; the edge keeps serving the old certificate until it expires, and `CertificateExpiringSoon` is the backstop. |
 | **DeployRolledBack / DeployFailed** | A promoted release did not ship. Read why in Loki: `{app="ops-deploy"} \|~ "rolling back\|SECURITY: cosign\|health check failed\|FATAL"`, then widen to `{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit appends its output to `/var/log/iri-deploy.log`. Determine the cause before re-promoting. |
 | **DeployHealthRestartFailing** | A container runs the target image but is unhealthy and the targeted restart will not stick — a runtime fault, deliberately not a rollback. `{app="ops-deploy"} \|~ "health drift"` names the service(s). |
+| **DeployHeartbeatStale** | No tick has found the stack at target and healthy for over an hour (or the heartbeat was never written): the deployer stopped, is stuck on its lock, aborts before writing, or is deliberately skipping. `systemctl list-timers iri-deploy.timer`, `systemctl status iri-deploy.service`, then `{app="ops-deploy"}` for the last tick. A gated stateful-infra change and a post-rollback backoff also stop it — `DeployConfigBlocked` / `DeployRolledBack` name those. |
 | **DeployConfigBlocked** | A deploy was blocked on a stateful-infra guard. `{app="ops-deploy"} \|~ "CARVE-OUT"` names the image pin that tripped it. Run the documented stateful-infra upgrade ([`docs/deployment.md`](../docs/deployment.md)), then re-run `deploy.sh --force`. |
 | **GhcrPullTokenExpired / GhcrPullTokenExpiring** | The GHCR pull token's recorded expiry has passed or is <14d away; a lapsed token stops every deploy at the registry login. Rotate it and update the `.expiry` sidecar ([`docs/deployment.md`](../docs/deployment.md)). The account name in `{app="ops-deploy"} \|~ "logging in to"` is masked (REQ-OBS-004). |
 | **BackupStaleOrMissing** | No successful backup for 26h, or the metric is absent. `{app="ops-backup"} \|~ "FATAL\|WARN"` carries the abort reason; an empty stream means the unit never fired (`systemctl list-timers iri-backup.timer`). See [`docs/backup.md`](../docs/backup.md). |
-| **RestoreDrillStaleOrMissing / RestoreDrillArtifactNotRestorable** | No successful drill for 35d, or one artifact did not restore. `{app="ops-restore-drill"} \|~ "FATAL\|WARN"`, filtered on the artifact from the alert label. A non-restorable artifact means backups are unverified — fix before relying on them. See the restore-drill section below. |
+| **RestoreDrillStaleOrMissing / RestoreDrillArtifactNotRestorable** | No successful drill for 8 days (one weekly drill missed; 35 days until 2026-09-22), or one artifact did not restore. `{app="ops-restore-drill"} \|~ "FATAL\|WARN"`, filtered on the artifact from the alert label. A non-restorable artifact means backups are unverified — fix before relying on them. See the restore-drill section below. |
 | **ContainerCleanupStaleOrMissing** | The weekly cleanup job is overdue. `{app="ops-cleanup"}` over 10d shows the last run; an empty stream means the timer never fired. |
 | **PrometheusTsdbApproachingCap** | Prometheus TSDB nearing the 40GB / 180d cap. Verify retention and disk; investigate label cardinality if growth is abnormal. |
 | **AlertmanagerNotificationsFailing** | Alertmanager cannot deliver. Check its log (`{app="mon-alertmanager"}`) and the receiver config; this alert itself routes to Discord because e-mail may be what is broken. |
@@ -454,7 +464,7 @@ echoing them (e.g. `read -rs SMTP_AUTH_PASSWORD; export SMTP_AUTH_PASSWORD`), th
 
 ```bash
 envsubst < /var/iri/code/monitoring/alertmanager/alertmanager.yml.tmpl > /var/iri/monitoring/secrets/alertmanager.yml.new
-grep -n '\${' /var/iri/monitoring/secrets/alertmanager.yml.new      # expect no output: nothing left unrendered
+grep -n '\${' /var/iri/monitoring/secrets/alertmanager.yml.new | grep -v '^[0-9]*:[[:space:]]*#'   # expect no output: nothing left unrendered
 chown "$(own 65534):$(own 65534)" /var/iri/monitoring/secrets/alertmanager.yml.new
 chmod 600 /var/iri/monitoring/secrets/alertmanager.yml.new
 ${PODMAN} run --rm -v /var/iri/monitoring/secrets/alertmanager.yml.new:/cfg.yml:ro \
@@ -762,10 +772,21 @@ Lint the configs with ephemeral containers before committing (from the repo root
 workstation). CI runs the structural gates in `repo-lint.yml`:
 
 ```bash
-# Prometheus scrape config + alert rules. The --entrypoint is required: the image's entrypoint is
+# All four configuration files at once -- Prometheus (+ the rule files it loads), Alertmanager
+# (rendered with dummy values the way the runbook renders it), Alloy (fmt, and validate gated on
+# EMPTY OUTPUT) and Loki -- in the digest-pinned images docker-compose.monitoring.yml names. This is
+# the CI gate (repo-lint, since 2026-09-22); the .test.sh breaks each file once and must see it fail.
+scripts/check-monitoring-configs.sh
+scripts/check-monitoring-configs.test.sh
+
+# Prometheus scrape config by hand. The --entrypoint is required: the image's entrypoint is
 # /bin/prometheus, so passing `promtool` as the first argument fails with "unexpected promtool".
-docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
-  check config /cfg/prometheus.yml
+# Mount where the unit mounts: `rule_files: /etc/prometheus/alerts/*.yml` is an absolute glob, and
+# with the directory elsewhere it matches nothing and promtool silently checks no rule file at all.
+docker run --rm --entrypoint promtool \
+  -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+  -v "$PWD/monitoring/prometheus/alerts:/etc/prometheus/alerts:ro" prom/prometheus:v3.14.0 \
+  check config /etc/prometheus/prometheus.yml
 # The glob'd commands go through `sh -c` so the pattern is expanded INSIDE the container.
 docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/cfg" prom/prometheus:v3.14.0 \
   -c 'promtool check rules /cfg/alerts/*.yml'

@@ -11,7 +11,7 @@
 #
 # WHY THIS GATE EXISTS
 # --------------------
-# Nothing read docs/adr/README.md at all. The `adr-numbering` job is the only automated check over
+# Nothing read docs/adr/README.md at all. The `adr-numbering` check is the only automated check over
 # the ADR sequence and it reads FILENAMES: it fails a PR that duplicates a number or takes one the
 # base already holds. To that gate, an ADR with no index row is a perfectly well-numbered ADR.
 #

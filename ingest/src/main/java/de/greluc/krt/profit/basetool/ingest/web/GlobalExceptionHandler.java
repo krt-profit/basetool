@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.ingest.web;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.logging.LogSafe;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitedException;
@@ -29,7 +30,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.MDC;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -54,9 +55,9 @@ import tools.jackson.databind.ObjectMapper;
  * REQ-API-*). Validation and malformed bodies are 400s; a backend 4xx keeps the backend status and
  * relays only the backend problem's {@code detail} (content-type-checked + length-capped, so the
  * envelope-reject message reaches the extractor without echoing a raw response body —
- * REQ-REFINERY-001/003); a backend 5xx, a connection failure, or an open circuit becomes 502;
- * anything else is a generic 500. The handler never echoes a token or PII into the response
- * (REQ-OBS-*).
+ * REQ-REFINERY-001/003) — except a backend 401/403, which refuses the gateway's own identity and
+ * becomes 502; a backend 5xx, a connection failure, or an open circuit becomes 502; anything else
+ * is a generic 500. The handler never echoes a token or PII into the response (REQ-OBS-*).
  *
  * <p>Extends {@link ResponseEntityExceptionHandler} so the framework's standard MVC exceptions (and
  * therefore Spring Boot's auto-configured problem-details advice, which is conditional on no
@@ -97,7 +98,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    */
   private final ObjectMapper objectMapper;
 
+  /** Counts every mapped failure on the bounded {@code basetool_*} counters (REQ-OBS-011). */
   private final MeterRegistry meterRegistry;
+
+  /** Supplies the MDC key the {@code correlationId} problem member is read from. */
+  private final LoggingProperties loggingProperties;
+
+  /**
+   * The gateway's own backend identity, invalidated when the backend refuses it (a relayed {@code
+   * 401}/{@code 403}) so the next upload mints a fresh token instead of replaying the refused one.
+   */
+  private final ServiceAccountTokenProvider serviceAccountTokenProvider;
 
   /**
    * Increments {@code basetool_ingest_handoff_errors_total} for a failed backend relay, tagged by
@@ -201,12 +212,39 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * content-type-checks and caps it — never the raw body); a 5xx is collapsed to 502 so the gateway
    * never surfaces backend internals.
    *
+   * <p><b>Except a backend {@code 401} or {@code 403}: those become a {@code 502}.</b> Since
+   * ADR-0129 the backend hop is authenticated with the <em>gateway's own</em> service-account
+   * token, not the caller's, so a backend auth refusal says something about the gateway — an
+   * expired or revoked service-account token, a rotated secret, a broken on-behalf-of allowlist —
+   * and nothing about the member. Relaying it verbatim told the extractor "you are not signed in"
+   * or "you are not allowed", sending the member to re-login for a fault they cannot fix, and it
+   * left the refused token in the cache so every following upload failed the same way until it
+   * expired. It is therefore answered as the relay failure it is, logged at {@code WARN} (this one
+   * the backend cannot have logged on the gateway's behalf), and the cached token is invalidated so
+   * the next upload mints a fresh one.
+   *
    * @param ex the WebClient response exception
-   * @return a relayed 4xx problem, or a 502 for backend 5xx
+   * @return a relayed 4xx problem, or a 502 for a backend auth refusal or a backend 5xx
    */
   @ExceptionHandler(WebClientResponseException.class)
   public @NotNull ProblemDetail handleBackendResponse(@NotNull WebClientResponseException ex) {
     HttpStatusCode status = ex.getStatusCode();
+    if (status.value() == HttpStatus.UNAUTHORIZED.value()
+        || status.value() == HttpStatus.FORBIDDEN.value()) {
+      log.warn(
+          "Backend refused the gateway's own identity with {} — invalidating the cached"
+              + " service-account token and surfacing as 502",
+          status.value());
+      serviceAccountTokenProvider.invalidate();
+      countHandoffError(MetricNames.REASON_BACKEND_AUTH);
+      return problem(
+          HttpStatus.BAD_GATEWAY,
+          "Backend relay failed",
+          CODE_UPSTREAM,
+          "The basetool gateway could not authenticate to the import backend. This is a"
+              + " server-side problem, not a problem with your export or your login — please try"
+              + " again shortly and report it if it persists.");
+    }
     if (status.is4xxClientError()) {
       // DEBUG, not WARN: the backend already logged this reject at WARN with the full context, and
       // REQ-OBS-001 allows exactly one line per failure. This is the gateway-side breadcrumb that
@@ -392,7 +430,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   /**
    * Builds a {@link ProblemDetail} with the stable {@code code} and the current correlation id
-   * (when present in the MDC) attached as extension members.
+   * (when present in the MDC under the configured key) attached as extension members, via the
+   * shared {@link Problems#of} builder.
    *
    * @param status the HTTP status
    * @param title a short, stable title
@@ -400,16 +439,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    * @param detail the human-readable, non-sensitive detail
    * @return the assembled problem
    */
-  private static @NotNull ProblemDetail problem(
-      @NotNull HttpStatusCode status, @NotNull String title, @NotNull String code, String detail) {
-    ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail == null ? "" : detail);
-    problem.setTitle(title);
-    problem.setProperty("code", code);
-    String correlationId = MDC.get("correlationId");
-    if (correlationId != null) {
-      problem.setProperty("correlationId", correlationId);
-    }
-    return problem;
+  private @NotNull ProblemDetail problem(
+      @NotNull HttpStatusCode status,
+      @NotNull String title,
+      @NotNull String code,
+      @Nullable String detail) {
+    return Problems.of(loggingProperties, status, title, code, detail);
   }
 
   /**

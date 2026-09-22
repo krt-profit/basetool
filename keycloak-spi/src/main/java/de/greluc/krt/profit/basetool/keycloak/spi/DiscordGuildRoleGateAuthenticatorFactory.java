@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.keycloak.spi;
 
-import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -70,22 +69,15 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
   public static final String BACKEND_TRUSTSTORE_PASSWORD_ENV = "KRT_BACKEND_TRUSTSTORE_PASSWORD";
 
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
-  private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(10);
+  private static final Duration HTTP_TIMEOUT = DiscordHttp.TIMEOUT;
 
   // One shared, stateless authenticator + checker (per-login config arrives via the flow context).
   // A bounded 429 retry budget honours Discord rate limits without blocking the login indefinitely.
+  // The checker's single guild-member read also supplies the server nickname for the precheck, so
+  // this factory no longer builds a separate nickname reader with a client of its own (KC-PERF-01);
+  // it shares the one Discord client of the whole provider JAR (KC-SIMP-01).
   private static final DiscordMembershipChecker CHECKER =
-      new DiscordMembershipChecker(
-          HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build(),
-          HTTP_TIMEOUT,
-          2,
-          Duration.ofSeconds(2));
-
-  // Best-effort per-guild server-nickname reader: one of the account-existence candidates. Uses a
-  // default client — it talks to the public Discord API (publicly-trusted CA), not the backend.
-  private static final DiscordGuildNicknameReader NICKNAME_READER =
-      new DiscordGuildNicknameReader(
-          HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build(), HTTP_TIMEOUT);
+      new DiscordMembershipChecker(DiscordHttp.CLIENT, HTTP_TIMEOUT, 2, Duration.ofSeconds(2));
 
   // Fail-open backend account-existence client (REQ-SEC-022). Its HTTPS client trusts the backend's
   // (self-signed) certificate via the configured PKCS#12 truststore; never trust-all. A missing or
@@ -100,7 +92,7 @@ public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFa
           HTTP_TIMEOUT);
 
   private static final DiscordGuildRoleGateAuthenticator INSTANCE =
-      new DiscordGuildRoleGateAuthenticator(CHECKER, NICKNAME_READER, BACKEND_CHECKER);
+      new DiscordGuildRoleGateAuthenticator(CHECKER, BACKEND_CHECKER);
 
   private static final AuthenticationExecutionModel.Requirement[] REQUIREMENT_CHOICES = {
     AuthenticationExecutionModel.Requirement.REQUIRED,
