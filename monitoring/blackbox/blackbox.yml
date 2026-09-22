@@ -92,8 +92,21 @@ modules:
   # NOTE (issue #1252): this only measures the REAL edge because the blackbox-exporter container has its
   # own IPv6 egress — the net-blackbox-v6 bridge in docker-compose.monitoring.yml. Without it the
   # container has no v6 route and every probe here CONNECT-fails locally, a STRUCTURAL false
-  # EdgeIpv6Unreachable, not an edge regression. The modules are correct as-is; the v6 route is the
-  # load-bearing part — do not drop net-blackbox-v6 from the exporter's networks list.
+  # EdgeIpv6Unreachable, not an edge regression. The modules are correct as-is; the v6 route is
+  # load-bearing — do not drop net-blackbox-v6 from the exporter's networks list.
+  #
+  # THAT ROUTE IS NECESSARY AND NOT SUFFICIENT under rootless Podman — learned 2026-09-22, and the
+  # note above reads as a complete answer, which is how the gap survived the cutover. The exporter
+  # had its v6 route and reached Cloudflare over IPv6 fine; what it could not reach was its own
+  # machine, in EITHER family, because a rootless container has no hairpin. ADR-0196 aliases the
+  # public names to `host-gateway` to solve that — and `host-gateway` is IPv4 only, so these two
+  # ip6-pinned modules were left with no address at all and failed with "no suitable address found"
+  # against an edge serving IPv6 perfectly well.
+  #
+  # Three things now have to hold together, and each is silent on its own: the v6 route (here),
+  # a v6 `--map-guest-addr` in the rootless netns's pasta (containers.conf, from the Ansible role),
+  # and a v6 `AddHost` for these names on this container (the 10-host-alias.conf drop-in). See
+  # ADR-0196 Amendment 1.
   http_2xx_ipv6:
     prober: http
     timeout: 10s

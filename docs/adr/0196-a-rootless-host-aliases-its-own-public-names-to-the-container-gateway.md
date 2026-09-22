@@ -77,6 +77,53 @@ Three consequences follow from making it real rather than notional:
 `IRI_KEYCLOAK_HOST_ALIAS` in the host `.env` — `check-conformance.py` fails a host where the two
 disagree silently, which is the whole reason that check exists.
 
+## Amendment 1 — the hairpin was made to work, for IPv6 — 2026-09-22
+
+*"Make the hairpin work"* is listed below as a rejected alternative, on the grounds that it was not
+a configuration this deployment had and that a cutover window is not the place to measure one. It
+was measured afterwards, on the testing host, and it works.
+
+**What the alias could not do.** `host-gateway` is IPv4 only. Podman implements it by starting the
+rootless netns's pasta with `--map-guest-addr 169.254.1.2` — one address, one family — so an alias
+gives a container an A record and nothing else. The blackbox modules `http_2xx_ipv6` and
+`http_2xx_or_401_ipv6` pin `preferred_ip_protocol: ip6` with `ip_protocol_fallback: false`, so they
+had no address at all and failed locally. `EdgeIpv6Unreachable` then fired about the monitoring
+rather than about the edge, against an edge serving IPv6 perfectly well — measured from the host
+itself the same day: `302`, `302`, `401` in tens of milliseconds.
+
+**What was measured** on `10.9.0.15`, Rocky 10.2 and podman 5.8.2, the same versions production
+runs, in a throwaway rootless namespace so the running stack was never touched:
+
+| question | answer |
+| --- | --- |
+| Does `containers.conf`'s `pasta_options` reach the **rootless netns** pasta, or only `--network=pasta` containers? | It reaches it. |
+| Does a v6 `--map-guest-addr` work? | Yes — the mapped address went from `unreachable` to `open`. |
+| Does podman **append** its own `--map-guest-addr 169.254.1.2`? | **No — it replaces it.** In the run that set only the v6 mapping, `host-gateway` went from `open` to `unreachable`. |
+| Do both work together? | Yes. Both families open, in one container, in the same second. |
+| Does a real request work, not just a connect? | `https://<name>/` answered **200** and `/healthz` **302** over the mapped v6 — byte-identical to its v4 twin. |
+
+**The decision.** `containers.conf` gains `pasta_options` naming **both** addresses, and the alias
+drop-in gains a second `AddHost` block pointing the same public names at the v6 one. Three things
+follow, and each is a trap avoided rather than a preference:
+
+1. **The IPv4 entry is restated, not inherited.** Podman replaces the argument rather than adding
+   to it, so omitting `169.254.1.2` from `pasta_options` breaks every alias in this ADR at once —
+   the backend's issuer lookup, Grafana's sign-in and all four IPv4 probes.
+2. **Only services with an IPv6 route get the v6 alias**, which today means `blackbox-exporter`
+   alone, on `net-blackbox-v6`. An AAAA record in a container with no v6 route is a resolver trap:
+   Go's RFC 6724 sorting puts an unreachable IPv6 address ahead of a reachable IPv4 one, which has
+   already cost this deployment a day.
+3. **The address is a ULA chosen to read as the v4 one's twin** (`fd00:169:254::2`) and must not
+   overlap any network in the stack — `fd00:bb::/64` and `fd00:28:*::/64` are taken.
+
+**What this does not change.** The probe still does not leave the machine; it reaches haproxy
+through a mapping rather than through public DNS and internet routing, exactly as the IPv4 probe
+does. What it restores is parity between the two families and an alert that means something.
+
+`containers.conf` is therefore no longer empty, and the paragraph documenting its emptiness stays —
+the question it answers (*"shouldn't this set `rootless_port_forwarder`?"*) is still asked and the
+answer is still no. A different setting arrived; that one did not.
+
 ## Consequences
 
 **The probes no longer traverse public DNS or internet routing.** TLS, the certificate, haproxy, the
@@ -103,11 +150,12 @@ make — it reaches its own public IPv6 perfectly well.
 
 ## Rejected alternatives
 
-- **Make the hairpin work.** It is the fix that would remove every alias, and it is not a
-  configuration this deployment has: it means giving pasta a host mapping, in a
-  `containers.conf` the role keeps deliberately empty and whose emptiness is itself documented. It
-  is worth measuring on the testing host first, and doing it during a cutover window on the machine
-  that serves is not measuring.
+- ~~**Make the hairpin work.**~~ **Accepted for IPv6 on 2026-09-22 — see Amendment 1.** The
+  reasoning here was right about the method and about the timing, and wrong only about the verdict:
+  it does mean giving pasta a host mapping in a `containers.conf` the role kept deliberately empty,
+  and a cutover window is not where that gets measured. Measured afterwards on the testing host, it
+  works — so the IPv6 half of the problem is solved this way and the IPv4 aliases stay, because
+  podman replaces its own mapping rather than adding to it and the aliases are what carry v4.
 - **Point the alias at the edge container's address on a shared network.** It skips haproxy — so the
   PROXY header, the rate limiter's view of the client and the TLS the edge actually presents all go
   untested by the very probes that exist to test them — and the address changes whenever the
