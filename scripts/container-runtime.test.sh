@@ -549,14 +549,24 @@ expect_call "it is started detached, by name" podman \
 expect_no_call "it joins none of the deployment's networks" podman \
   'rt_run_detached iri-restore-drill img -e A=b' '--network'
 # STREAMED in under podman: RT_CLI is `sudo -u <svc> podman`, so a plain `cp` would have the
-# service user read a file in the deploy account's 0700 working tree. `cp -` takes a tar on
-# stdin, so the CALLER does the reading and the pipe crosses the boundary.
-expect_call "a dump is streamed in, not read by the service user" podman \
-  'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
-  'cp - iri-restore-drill:/tmp'
+# service user read a file in the deploy account's 0700 working tree. `exec -i` has the CALLER do
+# the reading, and the bytes cross the boundary on stdin.
+#
+# NOT `podman cp -`, which is what this used to be: it stops reading once it has extracted the
+# entry, so tar's trailing blocks land in a closed pipe and it exits 125 -- with the file complete
+# in the container. Measured on the production host 2026-09-22, ten rounds each: `cp -` failed
+# 10/10 while delivering correctly 10/10, `exec -i` passed 10/10. The restore drill aborted on its
+# second copy and reported four artifacts unrestorable that it had never got as far as testing.
+printf 'a dump\n' > "${WORK}/krt_basetool.dump"
+expect_call "a dump is streamed in on stdin, not read by the service user" podman \
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  'exec -i iri-restore-drill sh -c'
+expect_no_call "...and never through podman cp -, which exits 125 on a completed copy" podman \
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  'cp -'
 expect_no_call "...so the service user never opens the deploy account's file" podman \
-  'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
-  'cp /work/krt_basetool.dump'
+  'rt_cp_to '"${WORK}"'/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
+  "cp ${WORK}/krt_basetool.dump"
 expect_call "docker copies it directly, where one daemon reads for everybody" docker \
   'rt_cp_to /work/krt_basetool.dump iri-restore-drill /tmp/krt_basetool.dump' \
   'cp /work/krt_basetool.dump iri-restore-drill:/tmp/krt_basetool.dump'
