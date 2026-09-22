@@ -97,7 +97,8 @@ class MissionTimeTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(mission.getId(), memberUser.getId());
+    missionService.addParticipant(
+        mission.getId(), memberUser.getId(), null, null, null, null, null);
   }
 
   @Test
@@ -241,7 +242,8 @@ class MissionTimeTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(memberUser))
+                    + getParticipantId(memberUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -269,7 +271,8 @@ class MissionTimeTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(memberUser))
+                    + getParticipantId(memberUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))

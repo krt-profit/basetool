@@ -744,31 +744,6 @@ class MissionControllerLifecycleTest {
     verify(missionService).updateMissionOwner(id, newOwnerId, 42L);
   }
 
-  // ── PUT /api/v1/missions/{id}/owner/{userId} (legacy) ────────────────
-
-  // Deliberately invokes the deprecated-for-removal MissionController.setMissionOwnerLegacy to pin
-  // its no-version behaviour; the [removal] warning is expected and unavoidable here.
-  @Test
-  @SuppressWarnings("removal")
-  void setMissionOwnerLegacy_doesNotForwardAnyVersion() {
-    UUID id = UUID.randomUUID();
-    UUID newOwnerId = UUID.randomUUID();
-    Mission persisted = new Mission();
-    MissionDto dto = fullMissionDto(id);
-    when(missionService.setMissionOwner(id, newOwnerId)).thenReturn(persisted);
-    when(missionMapper.toDto(persisted)).thenReturn(dto);
-
-    MissionDto result = controller.setMissionOwnerLegacy(id, newOwnerId);
-
-    // The legacy endpoint deliberately has NO version field — that is the exact reason the
-    // {@code /owner} version-checked endpoint exists alongside it. Pin the (mission-id,
-    // user-id) two-arg shape so a future "let's add a version param to be safe" change to the
-    // legacy endpoint surfaces here as a compile error.
-    assertThat(result).isSameAs(dto);
-    verify(missionService).setMissionOwner(id, newOwnerId);
-    verify(missionService, never()).updateMissionOwner(any(), any(), any());
-  }
-
   // ── GET /api/v1/missions/{id}/participants/unassigned ────────────────
 
   @Test

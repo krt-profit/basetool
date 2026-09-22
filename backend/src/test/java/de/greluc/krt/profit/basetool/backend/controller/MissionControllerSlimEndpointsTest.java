@@ -55,11 +55,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the additive slim sub-resource endpoints introduced for multi-user concurrency on the
- * mission detail page (Option A, Paket 2). The legacy MissionDto-returning endpoints are deprecated
- * via @ApiDeprecation(sunset = 2026-10-20) and remain functional; these tests focus on the new
- * {@code /slim} endpoints: they must be reachable under the same role gates, they must return slim
- * sub-DTOs (not the full MissionDto), and DELETE variants must return 204 No Content.
+ * Verifies the slim sub-resource endpoints introduced for multi-user concurrency on the mission
+ * detail page (Option A, Paket 2). Their MissionDto-returning predecessors were deprecated with a
+ * sunset of 2026-10-20 and deleted on 2026-09-22 (BE-SIMP-02), so these are now the only write
+ * paths for units, crew, participants, frequencies and managers: they must be reachable under the
+ * role gates, they must return slim sub-DTOs (not the full MissionDto), and DELETE variants must
+ * return 204 No Content.
  */
 @SpringBootTest
 class MissionControllerSlimEndpointsTest {

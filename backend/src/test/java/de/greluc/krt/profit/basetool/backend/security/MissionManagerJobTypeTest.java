@@ -140,7 +140,11 @@ class MissionManagerJobTypeTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + participant.getId())
+            put("/api/v1/missions/"
+                    + mission.getId()
+                    + "/participants/"
+                    + participant.getId()
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(b -> b.subject(manager.getId().toString()))
@@ -160,7 +164,7 @@ class MissionManagerJobTypeTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew")
+            post("/api/v1/missions/" + mission.getId() + "/units/" + unit.getId() + "/crew/slim")
                 .with(
                     jwt()
                         .jwt(b -> b.subject(manager.getId().toString()))

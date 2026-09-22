@@ -25,9 +25,13 @@ import de.greluc.krt.profit.basetool.backend.mapper.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.ShipMapper;
 import de.greluc.krt.profit.basetool.backend.mapper.UserMapper;
 import de.greluc.krt.profit.basetool.backend.model.Mission;
+import de.greluc.krt.profit.basetool.backend.model.MissionCrew;
+import de.greluc.krt.profit.basetool.backend.model.MissionObjective;
+import de.greluc.krt.profit.basetool.backend.model.MissionParticipant;
+import de.greluc.krt.profit.basetool.backend.model.MissionStep;
+import de.greluc.krt.profit.basetool.backend.model.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddCrewRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddExternalParticipantRequest;
-import de.greluc.krt.profit.basetool.backend.model.dto.AddParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.AddUnitRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionCrewDto;
@@ -36,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MissionFrequencyDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionObjectiveDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
@@ -45,6 +50,24 @@ import de.greluc.krt.profit.basetool.backend.model.dto.UpdateParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdatePayoutPreferenceRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateUnitRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.AddCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionStepRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionCoreRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionFlagsRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionScheduleRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionObjectivesRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionStepsRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.SetPartyLeadRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.ToggleMissionStepRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateCustomFrequencyRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionObjectiveRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwningOrgUnitRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionStepRequest;
 import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.MissionSecurityService;
 import de.greluc.krt.profit.basetool.backend.service.MissionService;
@@ -55,8 +78,13 @@ import de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,8 +116,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST surface over the mission aggregate — the squadron's planning and execution view. The surface
  * is intentionally large because missions have many sub-aggregates (units, crew, participants,
- * frequencies, managers, ownership) and Option A / multi-user concurrency required a second family
- * of "slim" endpoints alongside the legacy MissionDto-returning ones.
+ * frequencies, managers, ownership).
  *
  * <p>Two endpoint families live side-by-side:
  *
@@ -97,10 +124,10 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li><b>Section patches</b> ({@code /core}, {@code /schedule}, {@code /flags}) split the mission
  *       header into independently versioned sections so two managers editing different sections do
  *       not collide on {@code Mission.version}.
- *   <li><b>Slim sub-resource endpoints</b> ({@code .../slim}) return only the affected sub-DTO
- *       instead of the full {@link MissionDto}. Behaviour is identical to the legacy
- *       MissionDto-returning sibling; only the response shape differs. Legacy endpoints carry
- *       {@code @Deprecated(forRemoval=true)} with sunset {@value #SLIM_DEPRECATION_SUNSET}.
+ *   <li><b>Slim sub-resource endpoints</b> ({@code .../slim}) return only the affected sub-DTO (or
+ *       204) instead of the full {@link MissionDto}. Their seventeen MissionDto-returning
+ *       predecessors were deprecated with a sunset of 2026-10-20 and removed once no client called
+ *       them any more (BE-SIMP-02).
  * </ul>
  *
  * <p>Peer reads are redacted (REQ-SEC-007): for a caller below Logistician, {@link
@@ -131,9 +158,6 @@ public class MissionController {
   private final AuthHelperService authHelperService;
   private final MissionPeerRedactor missionPeerRedactor;
   private final ParticipantTargetResolver participantTargetResolver;
-
-  /** Sunset date for legacy sub-section endpoints that still return the full MissionDto. */
-  private static final String SLIM_DEPRECATION_SUNSET = "2026-10-20";
 
   /**
    * Paged mission list, scoped to the calling member.
@@ -180,8 +204,7 @@ public class MissionController {
   /**
    * Lightweight projection (id + label) of the missions offered by the warehouse mission picker:
    * every active mission plus the {@code COMPLETED} / {@code CANCELLED} ones from the last three
-   * months. See {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#findAllActiveReference()}.
+   * months. See {@link MissionService#findAllActiveReference()}.
    *
    * @return picker-visible missions as reference DTOs
    */
@@ -194,8 +217,7 @@ public class MissionController {
               + " the last three months.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
-  public List<de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto>
-      lookupMissions() {
+  public List<MissionReferenceDto> lookupMissions() {
     return missionService.findAllActiveReference();
   }
 
@@ -285,9 +307,9 @@ public class MissionController {
 
   /**
    * Creates a new mission. The caller becomes the owner via {@link MissionService#createMission}.
-   * The {@link de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest} record
-   * structurally excludes {@code id} / {@code version} / {@code owningSquadron} / {@code parent} /
-   * {@code owner} / collections (audit finding C-3) — those are stamped server-side.
+   * The {@link CreateMissionRequest} record structurally excludes {@code id} / {@code version} /
+   * {@code owningSquadron} / {@code parent} / {@code owner} / collections (audit finding C-3) —
+   * those are stamped server-side.
    *
    * @param request create payload
    * @return the persisted DTO
@@ -301,18 +323,15 @@ public class MissionController {
   @PostMapping
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
-  public MissionDto createMission(
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest request) {
+  public MissionDto createMission(@RequestBody @Valid @NotNull CreateMissionRequest request) {
     return redactForPeer(missionMapper.toDto(missionService.createMission(request)));
   }
 
   /**
    * Attaches a new sub-mission to a parent. Sub-missions are independent missions that aggregate up
-   * to the parent for finance/payout roll-ups. Uses the same {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest} as the top-level
-   * create — {@code parent} and {@code owningSquadron} are stamped from the path-resolved parent
-   * (audit finding C-3).
+   * to the parent for finance/payout roll-ups. Uses the same {@link CreateMissionRequest} as the
+   * top-level create — {@code parent} and {@code owningSquadron} are stamped from the path-resolved
+   * parent (audit finding C-3).
    *
    * @param id parent mission id
    * @param request create payload for the sub-mission
@@ -322,9 +341,7 @@ public class MissionController {
   @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
     return redactForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
   }
 
@@ -349,9 +366,7 @@ public class MissionController {
               + "prefer the section PATCH endpoints (/core, /schedule, /flags) instead, so "
               + "concurrent edits to other sections do not trigger optimistic-lock conflicts.")
   public MissionDto updateMission(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull UpdateMissionRequest request) {
     return redactForPeer(missionMapper.toDto(missionService.updateMission(id, request)));
   }
 
@@ -373,8 +388,7 @@ public class MissionController {
               + " 409 (application/problem+json).")
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionCoreRequest request) {
+      @RequestBody @Valid @NotNull PatchMissionCoreRequest request) {
     return redactForPeer(
         missionMapper.toDto(
             missionService.updateCoreSection(
@@ -406,9 +420,7 @@ public class MissionController {
               + "no longer cause a version conflict. Timestamps are in UTC.")
   public MissionDto patchMissionSchedule(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionScheduleRequest
-              request) {
+      @RequestBody @Valid @NotNull PatchMissionScheduleRequest request) {
     return redactForPeer(
         missionMapper.toDto(
             missionService.updateScheduleSection(
@@ -435,9 +447,7 @@ public class MissionController {
       description = "Patches only the flags section (e.g. isInternal) of a mission.")
   public MissionDto patchMissionFlags(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.PatchMissionFlagsRequest
-              request) {
+      @RequestBody @Valid @NotNull PatchMissionFlagsRequest request) {
     return redactForPeer(
         missionMapper.toDto(
             missionService.updateFlagsSection(id, request.isInternal(), request.version())));
@@ -495,7 +505,7 @@ public class MissionController {
   public MissionDto joinMission(
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
-      @RequestBody(required = false) @jakarta.validation.Valid JoinMissionRequest request) {
+      @RequestBody(required = false) @Valid JoinMissionRequest request) {
     // Self-enrolment only: the user comes from the token, never from the body. Everything the
     // body can say is about the caller's own row, which is why it needs no self-vs-manager check.
     MissionDto dto =
@@ -514,432 +524,6 @@ public class MissionController {
     // mission surface most likely to be below Logistician. The old rule could not see it, because
     // it selected only gates that lacked isAuthenticated() and this one has always had it.
     return redactForPeer(dto);
-  }
-
-  /**
-   * Legacy add-unit endpoint. Returns the full {@link MissionDto}. Replaced by {@link #addUnitSlim}
-   * which avoids coupling the parent {@code Mission.version} into every AJAX round-trip.
-   *
-   * @param id mission id
-   * @param request unit payload
-   * @return the persisted parent DTO
-   * @deprecated use {@link #addUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/units")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/slim")
-  @Operation(
-      summary = "Add a unit to a mission (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/units/slim which returns"
-              + " only the updated list of units and avoids parent-coupled payloads (Option A /"
-              + " multi-user concurrency).",
-      deprecated = true)
-  public MissionDto addUnit(
-      @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull AddUnitRequest request) {
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.addUnitToMission(
-                id,
-                request.name(),
-                request.shipTypeId(),
-                request.shipId(),
-                request.isHighValueUnit(),
-                request.frequency(),
-                request.responsibleUserId(),
-                request.note())));
-  }
-
-  /**
-   * Legacy update-unit endpoint.
-   *
-   * @param id mission id
-   * @param unitId unit id
-   * @param request unit payload
-   * @return the persisted parent DTO
-   * @deprecated use {@link #updateUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PutMapping("/{id}/units/{unitId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/{unitId}/slim")
-  @Operation(
-      summary = "Update a mission unit (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer PUT /api/v1/missions/{id}/units/{unitId}/slim which"
-              + " returns only the updated unit.",
-      deprecated = true)
-  public MissionDto updateUnit(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID unitId,
-      @jakarta.validation.Valid @RequestBody @NotNull UpdateUnitRequest request) {
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.updateMissionUnit(
-                id,
-                unitId,
-                request.version(),
-                request.name(),
-                request.shipTypeId(),
-                request.shipId(),
-                request.isHighValueUnit(),
-                request.frequency(),
-                request.responsibleUserId(),
-                request.note())));
-  }
-
-  /**
-   * Legacy delete-unit endpoint.
-   *
-   * @param id mission id
-   * @param unitId unit id
-   * @return the persisted parent DTO
-   * @deprecated use {@link #deleteUnitSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @DeleteMapping("/{id}/units/{unitId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/{unitId}/slim")
-  @Operation(
-      summary = "Delete a mission unit (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/units/{unitId}/slim"
-              + " which returns 204 No Content.",
-      deprecated = true)
-  public MissionDto deleteUnit(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID unitId) {
-    return redactForPeer(missionMapper.toDto(missionService.removeMissionUnit(id, unitId)));
-  }
-
-  /**
-   * Legacy add-crew endpoint.
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param request crew payload (participant + job types)
-   * @return the persisted parent DTO
-   * @deprecated use {@link #addCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/units/{missionUnitId}/crew")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/slim")
-  @Operation(
-      summary = "Add crew to a mission unit (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST"
-              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/slim which returns only the crew"
-              + " list of the affected unit.",
-      deprecated = true)
-  public MissionDto addCrew(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @RequestBody @jakarta.validation.Valid @NotNull AddCrewRequest request) {
-    java.util.Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds)));
-  }
-
-  /**
-   * Legacy update-crew endpoint — replaces the job-type set of a crew entry.
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param crewId crew entry id
-   * @param request crew payload
-   * @return the persisted parent DTO
-   * @deprecated use {@link #updateCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PutMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim")
-  @Operation(
-      summary = "Update crew in a mission unit (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer PUT"
-              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns only"
-              + " the updated crew entry.",
-      deprecated = true)
-  public MissionDto updateCrew(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @PathVariable @NotNull UUID crewId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdateCrewRequest request) {
-    java.util.Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.updateCrewInShip(
-                id, missionUnitId, crewId, request.version(), jobTypeIds)));
-  }
-
-  /**
-   * Legacy remove-crew endpoint.
-   *
-   * @param id mission id
-   * @param missionUnitId unit id
-   * @param crewId crew entry id
-   * @return the persisted parent DTO
-   * @deprecated use {@link #removeCrewSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @DeleteMapping("/{id}/units/{missionUnitId}/crew/{crewId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim")
-  @Operation(
-      summary = "Remove crew from a mission unit (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer DELETE"
-              + " /api/v1/missions/{id}/units/{missionUnitId}/crew/{crewId}/slim which returns 204"
-              + " No Content.",
-      deprecated = true)
-  public MissionDto removeCrew(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID missionUnitId,
-      @PathVariable @NotNull UUID crewId) {
-    return redactForPeer(
-        missionMapper.toDto(missionService.removeCrewFromShip(id, missionUnitId, crewId)));
-  }
-
-  /**
-   * Legacy update-participant endpoint.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @param request participant payload (carries the expected participant version)
-   * @return the persisted parent DTO, redacted via {@link
-   *     MissionPeerRedactor#cleanupMissionForPeer} for a caller below Logistician (REQ-SEC-007)
-   * @deprecated use {@link #updateParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PutMapping("/{id}/participants/{participantId}")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
-  @Operation(
-      summary = "Update a participant (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer PUT"
-              + " /api/v1/missions/{id}/participants/{participantId}/slim which returns only the"
-              + " updated participant.",
-      deprecated = true)
-  public MissionDto updateParticipant(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
-      Authentication authentication) {
-    MissionDto dto =
-        missionMapper.toDto(
-            missionService.updateParticipantAttributes(
-                id,
-                participantId,
-                request.desiredMissionJobTypeId(),
-                request.plannedMissionJobTypeId(),
-                request.comment(),
-                request.startTime(),
-                request.endTime(),
-                request.orgUnitIds(),
-                request.payoutPreference(),
-                request.guestName(),
-                request.version(),
-                authentication));
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
-  }
-
-  /**
-   * Legacy check-in endpoint. Stamps {@code startTime} on the participant.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
-   * @deprecated use {@link #checkInParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/participants/{participantId}/check-in")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/{participantId}/check-in/slim")
-  @Operation(
-      summary = "Check in a participant (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST"
-              + " /api/v1/missions/{id}/participants/{participantId}/check-in/slim which returns"
-              + " only the updated participant.",
-      deprecated = true)
-  public MissionDto checkInParticipant(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    MissionDto dto = missionMapper.toDto(missionService.checkIn(id, participantId));
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
-  }
-
-  /**
-   * Legacy check-out endpoint. Stamps {@code endTime} on the participant.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
-   * @deprecated use {@link #checkOutParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/participants/{participantId}/check-out")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/{participantId}/check-out/slim")
-  @Operation(
-      summary = "Check out a participant (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST"
-              + " /api/v1/missions/{id}/participants/{participantId}/check-out/slim which returns"
-              + " only the updated participant.",
-      deprecated = true)
-  public MissionDto checkOutParticipant(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    MissionDto dto = missionMapper.toDto(missionService.checkOut(id, participantId));
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
-  }
-
-  /**
-   * Legacy payout-preference endpoint. {@code DONATE} on any participant is sticky for the whole
-   * operation (handled in the service). A member reaches this path for a participant row they may
-   * touch — their own, or an external one on an Einsatz they can manage — via {@code
-   * MissionSecurityService#canAccessParticipant}, and below Logistician receives a redacted
-   * response.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @param request payout preference payload
-   * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
-   * @deprecated use {@link #updatePayoutPreferenceSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PutMapping("/{id}/participants/{participantId}/payout-preference")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/{participantId}/payout-preference/slim")
-  @Operation(
-      summary = "Update payout preference for a participant (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer PUT"
-              + " /api/v1/missions/{id}/participants/{participantId}/payout-preference/slim which"
-              + " returns only the updated participant.",
-      deprecated = true)
-  public MissionDto updatePayoutPreference(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request) {
-    MissionDto dto =
-        missionMapper.toDto(
-            missionService.updatePayoutPreference(id, participantId, request.preference()));
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
-  }
-
-  /**
-   * Legacy admin add-participant endpoint (registered users only). The counterpart that also
-   * records external participants is {@link #addParticipantPublic}.
-   *
-   * @param id mission id
-   * @param request add-participant payload (registered user id)
-   * @return the persisted parent DTO
-   * @deprecated use {@link #addParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/participants")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/slim")
-  @Operation(
-      summary = "Add a participant (admin, legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/participants/slim which"
-              + " returns only the updated participant list.",
-      deprecated = true)
-  public MissionDto addParticipant(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull AddParticipantRequest request) {
-    return redactForPeer(missionMapper.toDto(missionService.addParticipant(id, request.userId())));
-  }
-
-  /**
-   * Legacy remove-participant endpoint.
-   *
-   * @param id mission id
-   * @param participantId participant id
-   * @return the persisted parent DTO, redacted below Logistician (REQ-SEC-007)
-   * @deprecated use {@link #removeParticipantSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @DeleteMapping("/{id}/participants/{participantId}")
-  @PreAuthorize(
-      "isAuthenticated() and @authHelperService.isMemberOrAbove()"
-          + " and @missionSecurityService.canAccessParticipant(#id, #participantId,"
-          + " authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/participants/{participantId}/slim")
-  @Operation(
-      summary = "Remove a participant (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer DELETE"
-              + " /api/v1/missions/{id}/participants/{participantId}/slim which returns 204 No"
-              + " Content.",
-      deprecated = true)
-  public MissionDto removeParticipant(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
-    MissionDto dto = missionMapper.toDto(missionService.removeParticipant(id, participantId));
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII.
-    if (!authHelperService.isLogisticianOrAbove()) {
-      dto = missionPeerRedactor.cleanupMissionForPeer(dto);
-    }
-    return dto;
   }
 
   /**
@@ -971,17 +555,13 @@ public class MissionController {
               + " Free-text names are resolved case-insensitively against existing users: a unique"
               + " match links the participant as a registered member; no match records an external"
               + " participant; multiple matches return 409 (ambiguous name).")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Participant added"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Validation error"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Participant added"),
+    @ApiResponse(responseCode = "400", description = "Validation error"),
+    @ApiResponse(
         responseCode = "403",
         description = "Only mission managers may add somebody other than themselves"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(
         responseCode = "409",
         description = "Participant name is ambiguous and matches more than one registered user")
   })
@@ -994,7 +574,7 @@ public class MissionController {
           + " and @ownerScopeService.canSeeMission(#id)")
   public MissionDto addParticipantPublic(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
+      @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
       Authentication authentication) {
     ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
     MissionDto dto =
@@ -1011,177 +591,6 @@ public class MissionController {
     // stripped. There used to be a stricter tier above this one for anonymous and role-less
     // callers; ADR-0159 removed that audience, so one tier is all that is left.
     return redactForPeer(dto);
-  }
-
-  /**
-   * Legacy add/update frequency endpoint — upsert by frequency-type.
-   *
-   * @param id mission id
-   * @param request frequency payload (type + value)
-   * @return the persisted parent DTO
-   * @deprecated use {@link #addOrUpdateFrequencySlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/frequencies")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/frequencies/slim")
-  @Operation(
-      summary = "Add or update a frequency for a mission (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/frequencies/slim which"
-              + " returns only the updated frequency list.",
-      deprecated = true)
-  public MissionDto addOrUpdateFrequency(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest request) {
-    return redactForPeer(
-        missionMapper.toDto(
-            missionService.addOrUpdateMissionFrequency(
-                id, request.frequencyTypeId(), request.value())));
-  }
-
-  /**
-   * Legacy remove-frequency endpoint.
-   *
-   * @param id mission id
-   * @param frequencyId frequency id
-   * @return the persisted parent DTO
-   * @deprecated use {@link #removeFrequencySlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @DeleteMapping("/{id}/frequencies/{frequencyId}")
-  @PreAuthorize("@missionSecurityService.canManageMission(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/frequencies/{frequencyId}/slim")
-  @Operation(
-      summary = "Remove a frequency from a mission (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer DELETE"
-              + " /api/v1/missions/{id}/frequencies/{frequencyId}/slim which returns 204 No"
-              + " Content.",
-      deprecated = true)
-  public MissionDto removeFrequency(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID frequencyId) {
-    return redactForPeer(
-        missionMapper.toDto(missionService.removeMissionFrequency(id, frequencyId)));
-  }
-
-  /**
-   * Legacy add-manager endpoint. Wraps the service call in try/catch with debug-level tracing to
-   * aid diagnosis of intermittent test-environment failures — kept until the slim replacement
-   * absorbs production load.
-   *
-   * @param id mission id
-   * @param userId user id to add as manager
-   * @return the persisted parent DTO
-   * @deprecated use {@link #addManagerSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @PostMapping("/{id}/managers/{userId}")
-  @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/managers/{userId}/slim")
-  @Operation(
-      summary = "Add a manager to a mission (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer POST /api/v1/missions/{id}/managers/{userId}/slim"
-              + " which returns only the updated manager list.",
-      deprecated = true)
-  public MissionDto addManager(@PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    log.debug("MissionController.addManager START - id: {}, userId: {}", id, userId);
-    try {
-      var mission = missionService.addManager(id, userId);
-      log.debug("MissionController.addManager SUCCESS - id: {}, userId: {}", id, userId);
-      return redactForPeer(missionMapper.toDto(mission));
-    } catch (Exception e) {
-      log.debug(
-          "MissionController.addManager ERROR - id: {}, userId: {}, error: {}",
-          id,
-          userId,
-          e.getMessage(),
-          e);
-      throw e;
-    }
-  }
-
-  /**
-   * Legacy remove-manager endpoint.
-   *
-   * @param id mission id
-   * @param userId user id to remove from managers
-   * @return the persisted parent DTO
-   * @deprecated use {@link #removeManagerSlim}; sunset {@value #SLIM_DEPRECATION_SUNSET}
-   */
-  @Deprecated(forRemoval = true)
-  @DeleteMapping("/{id}/managers/{userId}")
-  @PreAuthorize("@missionSecurityService.canManageManagers(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = SLIM_DEPRECATION_SUNSET,
-      replacement = "/api/v1/missions/{id}/managers/{userId}/slim")
-  @Operation(
-      summary = "Remove a manager from a mission (legacy, deprecated)",
-      description =
-          "Returns the full MissionDto. Prefer DELETE /api/v1/missions/{id}/managers/{userId}/slim"
-              + " which returns 204 No Content.",
-      deprecated = true)
-  public MissionDto removeManager(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    log.info("Request to remove manager {} from mission {}", userId, id);
-    try {
-      var mission = missionService.removeManager(id, userId);
-      log.info("Manager {} removed from mission {} successfully", userId, id);
-      return redactForPeer(missionMapper.toDto(mission));
-    } catch (Exception e) {
-      log.debug("Failed to remove manager {} from mission {}: {}", userId, id, e.getMessage(), e);
-      throw e;
-    }
-  }
-
-  /**
-   * Legacy owner-change endpoint without optimistic lock on the ownership aggregate. Replaced by
-   * {@link #updateMissionOwner} which carries a version field and does not bump {@code
-   * Mission.version}.
-   *
-   * @param id mission id
-   * @param userId new owner id
-   * @return the persisted parent DTO
-   * @deprecated use {@link #updateMissionOwner}; sunset 2026-10-20
-   */
-  @Deprecated(forRemoval = true)
-  @PutMapping("/{id}/owner/{userId}")
-  @PreAuthorize("@missionSecurityService.canChangeOwner(#id, authentication)")
-  @de.greluc.krt.profit.basetool.backend.annotation.ApiDeprecation(
-      sunset = "2026-10-20",
-      replacement = "/api/v1/missions/{id}/owner")
-  @Operation(
-      summary = "Change the owner of a mission (legacy, deprecated)",
-      description =
-          "Legacy endpoint without optimistic lock on the ownership aggregate. Prefer PUT"
-              + " /api/v1/missions/{id}/owner with UpdateMissionOwnerRequest (includes version) to"
-              + " benefit from per-section optimistic locking that does not invalidate other users'"
-              + " open forms on the same mission.",
-      deprecated = true)
-  public MissionDto setMissionOwnerLegacy(
-      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
-    log.debug("MissionController.setMissionOwnerLegacy START - id: {}, userId: {}", id, userId);
-    try {
-      var mission = missionService.setMissionOwner(id, userId);
-      log.debug("MissionController.setMissionOwnerLegacy SUCCESS - id: {}, userId: {}", id, userId);
-      return redactForPeer(missionMapper.toDto(mission));
-    } catch (Exception e) {
-      log.debug(
-          "MissionController.setMissionOwnerLegacy ERROR - id: {}, userId: {}, error: {}",
-          id,
-          userId,
-          e.getMessage(),
-          e);
-      throw e;
-    }
   }
 
   /**
@@ -1203,28 +612,18 @@ public class MissionController {
               + "(NOT the parent Mission.version) to prevent lost updates on concurrent owner "
               + "changes. Changing the owner does NOT bump Mission.version, so other users' "
               + "open forms on the same mission remain valid (Option A / multi-user concurrency).")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Owner updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Validation error"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Forbidden"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Mission or user not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Owner updated"),
+    @ApiResponse(responseCode = "400", description = "Validation error"),
+    @ApiResponse(responseCode = "403", description = "Forbidden"),
+    @ApiResponse(responseCode = "404", description = "Mission or user not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Ownership version conflict (application/problem+json)")
   })
   public MissionDto updateMissionOwner(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwnerRequest
-              request) {
+      @RequestBody @Valid @NotNull UpdateMissionOwnerRequest request) {
     var mission = missionService.updateMissionOwner(id, request.userId(), request.version());
     return redactForPeer(missionMapper.toDto(mission));
   }
@@ -1255,28 +654,20 @@ public class MissionController {
               + " is validated against the caller's assignable-org-unit scope: a non-admin may only"
               + " pick a unit they belong to or may edit, and may only choose null when"
               + " membershipless.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Owning org unit updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Validation error or unknown target org unit"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Owning org unit updated"),
+    @ApiResponse(responseCode = "400", description = "Validation error or unknown target org unit"),
+    @ApiResponse(
         responseCode = "403",
         description = "Forbidden (caller may not change owner or may not assign to target)"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Mission not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    @ApiResponse(responseCode = "404", description = "Mission not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "owningOrgUnitVersion conflict (application/problem+json)")
   })
   public MissionDto updateMissionOwningOrgUnit(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionOwningOrgUnitRequest
-              request) {
+      @RequestBody @Valid @NotNull UpdateMissionOwningOrgUnitRequest request) {
     var mission =
         missionService.updateOwningOrgUnit(id, request.owningOrgUnitId(), request.version());
     return redactForPeer(missionMapper.toDto(mission));
@@ -1315,27 +706,17 @@ public class MissionController {
               + " neither"
               + " clears the party lead. The version must match the mission's current"
               + " partyLeadVersion or 409 (application/problem+json) is returned.")
-  @io.swagger.v3.oas.annotations.responses.ApiResponses({
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "200",
-        description = "Party lead updated"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "400",
-        description = "Validation error"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "403",
-        description = "Caller may not manage this mission"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-        responseCode = "404",
-        description = "Mission or referenced user not found"),
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Party lead updated"),
+    @ApiResponse(responseCode = "400", description = "Validation error"),
+    @ApiResponse(responseCode = "403", description = "Caller may not manage this mission"),
+    @ApiResponse(responseCode = "404", description = "Mission or referenced user not found"),
+    @ApiResponse(
         responseCode = "409",
         description = "Ambiguous party-lead name or stale partyLeadVersion")
   })
   public MissionDto setPartyLead(
-      @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.SetPartyLeadRequest request) {
+      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull SetPartyLeadRequest request) {
     // The participant free-text resolution: a unique member match links the member, several are a
     // 409, none keeps the external handle. The caller is always a mission manager here
     // (canManageMission), so the self-vs-manager check the participant add needs is moot.
@@ -1351,15 +732,10 @@ public class MissionController {
   // -------------------------------------------------------------------------------------
   // Slim sub-resource endpoints (Option A / multi-user concurrency).
 
-  // These endpoints are additive replacements for the legacy MissionDto-returning
-  // sub-endpoints above. They return only the affected slim sub-DTO (or a slim list,
-  // or 204 No Content) instead of the full MissionDto. This lets the frontend run
-  // per-sub-aggregate DOM `data-version` synchronisation without coupling the
-  // Mission parent version into every AJAX round-trip.
-
-  // Behaviour and service-level concurrency semantics are IDENTICAL to the legacy
-  // endpoints; only the response shape is slim. See ApiDeprecation annotations on
-  // the legacy endpoints for the sunset date.
+  // They return only the affected slim sub-DTO (or a slim list, or 204 No Content)
+  // instead of the full MissionDto. This lets the frontend run per-sub-aggregate DOM
+  // `data-version` synchronisation without coupling the Mission parent version into
+  // every AJAX round-trip. Their MissionDto-returning predecessors are gone (BE-SIMP-02).
   // -------------------------------------------------------------------------------------
 
   /**
@@ -1370,8 +746,7 @@ public class MissionController {
    * @param unitId unit id to find
    * @return the matching unit
    */
-  private de.greluc.krt.profit.basetool.backend.model.MissionUnit findUnit(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID unitId) {
+  private MissionUnit findUnit(@NotNull Mission mission, UUID unitId) {
     return mission.getAssignedUnits().stream()
         .filter(u -> unitId.equals(u.getId()))
         .findFirst()
@@ -1385,8 +760,7 @@ public class MissionController {
    * @param participantId participant id to find
    * @return the matching participant
    */
-  private de.greluc.krt.profit.basetool.backend.model.MissionParticipant findParticipant(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission mission, UUID participantId) {
+  private MissionParticipant findParticipant(@NotNull Mission mission, UUID participantId) {
     return mission.getParticipants().stream()
         .filter(p -> participantId.equals(p.getId()))
         .findFirst()
@@ -1400,8 +774,7 @@ public class MissionController {
    * @param crewId crew entry id to find
    * @return the matching crew entry
    */
-  private de.greluc.krt.profit.basetool.backend.model.MissionCrew findCrew(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.MissionUnit unit, UUID crewId) {
+  private MissionCrew findCrew(@NotNull MissionUnit unit, UUID crewId) {
     return unit.getCrew().stream()
         .filter(c -> crewId.equals(c.getId()))
         .findFirst()
@@ -1411,8 +784,8 @@ public class MissionController {
   // --- Units ---
 
   /**
-   * Adds a unit and returns only the updated unit list (slim). Preferred over {@link #addUnit} —
-   * doesn't drag the {@code Mission.version} into the round-trip.
+   * Adds a unit and returns only the updated unit list (slim), so the {@code Mission.version} is
+   * not dragged into the round-trip.
    *
    * @param id mission id
    * @param request unit payload
@@ -1427,8 +800,7 @@ public class MissionController {
               + "Preferred replacement for POST /api/v1/missions/{id}/units to support "
               + "multi-user concurrency on the mission detail page.")
   public List<MissionUnitDto> addUnitSlim(
-      @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull AddUnitRequest request) {
+      @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddUnitRequest request) {
     var mission =
         missionService.addUnitToMission(
             id,
@@ -1459,7 +831,7 @@ public class MissionController {
   public MissionUnitDto updateUnitSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID unitId,
-      @jakarta.validation.Valid @RequestBody @NotNull UpdateUnitRequest request) {
+      @Valid @RequestBody @NotNull UpdateUnitRequest request) {
     var mission =
         missionService.updateMissionUnit(
             id,
@@ -1512,9 +884,7 @@ public class MissionController {
           "Adds a procedure-timeline step and returns the mission's ordered step list as slim"
               + " DTOs.")
   public List<MissionStepDto> addStepSlim(
-      @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionStepRequest request) {
+      @PathVariable @NotNull UUID id, @Valid @RequestBody @NotNull AddMissionStepRequest request) {
     var mission =
         missionService.addStep(id, request.title(), request.meta(), request.stepsVersion());
     return toStepDtos(mission);
@@ -1536,9 +906,7 @@ public class MissionController {
   public List<MissionStepDto> updateStepSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionStepRequest
-              request) {
+      @Valid @RequestBody @NotNull UpdateMissionStepRequest request) {
     var mission =
         missionService.updateStep(
             id, stepId, request.title(), request.meta(), request.stepsVersion());
@@ -1580,9 +948,7 @@ public class MissionController {
       description = "Reorders the procedure timeline and returns the ordered step list.")
   public List<MissionStepDto> reorderStepsSlim(
       @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionStepsRequest
-              request) {
+      @Valid @RequestBody @NotNull ReorderMissionStepsRequest request) {
     var mission = missionService.reorderSteps(id, request.stepIds(), request.stepsVersion());
     return toStepDtos(mission);
   }
@@ -1603,9 +969,7 @@ public class MissionController {
   public List<MissionStepDto> toggleStepDoneSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID stepId,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.ToggleMissionStepRequest
-              request) {
+      @Valid @RequestBody @NotNull ToggleMissionStepRequest request) {
     var mission = missionService.toggleStepDone(id, stepId, request.done(), request.stepsVersion());
     return toStepDtos(mission);
   }
@@ -1613,12 +977,9 @@ public class MissionController {
   /**
    * Projects a mission's Ablauf steps into an ordered list of slim DTOs (by {@code orderIndex}).
    */
-  private List<MissionStepDto> toStepDtos(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission m) {
+  private List<MissionStepDto> toStepDtos(@NotNull Mission m) {
     return m.getSteps().stream()
-        .sorted(
-            java.util.Comparator.comparingInt(
-                de.greluc.krt.profit.basetool.backend.model.MissionStep::getOrderIndex))
+        .sorted(Comparator.comparingInt(MissionStep::getOrderIndex))
         .map(missionMapper::toDto)
         .toList();
   }
@@ -1642,9 +1003,7 @@ public class MissionController {
           "Adds a classified goal and returns the mission's ordered goal list as slim DTOs.")
   public List<MissionObjectiveDto> addObjectiveSlim(
       @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.AddMissionObjectiveRequest
-              request) {
+      @Valid @RequestBody @NotNull AddMissionObjectiveRequest request) {
     var mission =
         missionService.addObjective(
             id, request.title(), request.kind(), request.objectivesVersion());
@@ -1667,9 +1026,7 @@ public class MissionController {
   public List<MissionObjectiveDto> updateObjectiveSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID objectiveId,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateMissionObjectiveRequest
-              request) {
+      @Valid @RequestBody @NotNull UpdateMissionObjectiveRequest request) {
     var mission =
         missionService.updateObjective(
             id, objectiveId, request.title(), request.kind(), request.objectivesVersion());
@@ -1711,21 +1068,16 @@ public class MissionController {
       description = "Reorders the goal list and returns the ordered goal list.")
   public List<MissionObjectiveDto> reorderObjectivesSlim(
       @PathVariable @NotNull UUID id,
-      @jakarta.validation.Valid @RequestBody @NotNull
-          de.greluc.krt.profit.basetool.backend.model.dto.request.ReorderMissionObjectivesRequest
-              request) {
+      @Valid @RequestBody @NotNull ReorderMissionObjectivesRequest request) {
     var mission =
         missionService.reorderObjectives(id, request.objectiveIds(), request.objectivesVersion());
     return toObjectiveDtos(mission);
   }
 
   /** Projects a mission's goals into an ordered list of slim DTOs (by {@code orderIndex}). */
-  private List<MissionObjectiveDto> toObjectiveDtos(
-      @NotNull de.greluc.krt.profit.basetool.backend.model.Mission m) {
+  private List<MissionObjectiveDto> toObjectiveDtos(@NotNull Mission m) {
     return m.getObjectives().stream()
-        .sorted(
-            java.util.Comparator.comparingInt(
-                de.greluc.krt.profit.basetool.backend.model.MissionObjective::getOrderIndex))
+        .sorted(Comparator.comparingInt(MissionObjective::getOrderIndex))
         .map(missionMapper::toDto)
         .toList();
   }
@@ -1773,9 +1125,9 @@ public class MissionController {
   public List<MissionCrewDto> addCrewSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID missionUnitId,
-      @RequestBody @jakarta.validation.Valid @NotNull AddCrewRequest request) {
-    java.util.Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
+      @RequestBody @Valid @NotNull AddCrewRequest request) {
+    Set<UUID> jobTypeIds =
+        request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
     var mission =
         missionService.addCrewToShip(id, missionUnitId, request.participantId(), jobTypeIds);
     return missionMapper.toDto(findUnit(mission, missionUnitId)).crew();
@@ -1799,9 +1151,9 @@ public class MissionController {
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID missionUnitId,
       @PathVariable @NotNull UUID crewId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdateCrewRequest request) {
-    java.util.Set<UUID> jobTypeIds =
-        request.jobTypeIds() != null ? request.jobTypeIds() : java.util.Collections.emptySet();
+      @RequestBody @Valid @NotNull UpdateCrewRequest request) {
+    Set<UUID> jobTypeIds =
+        request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
     var mission =
         missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds);
     // MissionCrewDto carries no nested user — id, participantId, participantName, version and
@@ -1851,7 +1203,7 @@ public class MissionController {
   public MissionParticipantDto updateParticipantSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdateParticipantRequest request,
+      @RequestBody @Valid @NotNull UpdateParticipantRequest request,
       Authentication authentication) {
     var mission =
         missionService.updateParticipantAttributes(
@@ -1940,7 +1292,7 @@ public class MissionController {
   public MissionParticipantDto updatePayoutPreferenceSlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID participantId,
-      @RequestBody @jakarta.validation.Valid @NotNull UpdatePayoutPreferenceRequest request) {
+      @RequestBody @Valid @NotNull UpdatePayoutPreferenceRequest request) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
     // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
@@ -1973,7 +1325,7 @@ public class MissionController {
           + " and @ownerScopeService.canSeeMission(#id)")
   public List<MissionParticipantDto> addParticipantSlim(
       @PathVariable @NotNull UUID id,
-      @RequestBody @jakarta.validation.Valid @NotNull AddExternalParticipantRequest request,
+      @RequestBody @Valid @NotNull AddExternalParticipantRequest request,
       Authentication authentication) {
     ParticipantTarget target = resolveParticipantTarget(id, request, authentication);
     var mission =
@@ -2051,9 +1403,7 @@ public class MissionController {
       description =
           "Adds or updates a frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addOrUpdateFrequencySlim(
-      @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.profit.basetool.backend.model.dto.request.AddFrequencyRequest request) {
+      @PathVariable @NotNull UUID id, @NotNull @RequestBody @Valid AddFrequencyRequest request) {
     var mission =
         missionService.addOrUpdateMissionFrequency(id, request.frequencyTypeId(), request.value());
     return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
@@ -2094,9 +1444,7 @@ public class MissionController {
           "Adds a free-text mission frequency and returns the updated frequency list as slim DTOs.")
   public List<MissionFrequencyDto> addCustomFrequencySlim(
       @PathVariable @NotNull UUID id,
-      @NotNull @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.profit.basetool.backend.model.dto.request.AddCustomFrequencyRequest
-              request) {
+      @NotNull @RequestBody @Valid AddCustomFrequencyRequest request) {
     var mission = missionService.addCustomMissionFrequency(id, request.name(), request.value());
     return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
   }
@@ -2121,9 +1469,7 @@ public class MissionController {
   public List<MissionFrequencyDto> updateCustomFrequencySlim(
       @PathVariable @NotNull UUID id,
       @PathVariable @NotNull UUID frequencyId,
-      @NotNull @RequestBody @jakarta.validation.Valid
-          de.greluc.krt.profit.basetool.backend.model.dto.request.UpdateCustomFrequencyRequest
-              request) {
+      @NotNull @RequestBody @Valid UpdateCustomFrequencyRequest request) {
     var mission =
         missionService.updateCustomMissionFrequency(
             id, frequencyId, request.name(), request.value(), request.version());

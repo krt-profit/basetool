@@ -9,6 +9,12 @@
   kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
   Seite funktioniert ohne Neuladen.
 
+### Removed
+
+- **API: die 17 veralteten Einsatz-Schnittstellen sind entfernt** (angekündigter Sunset
+  2026-10-20). Ersatz sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen
+  vor dem Umstieg vom 07.09.2026 können als Einsatzleitung keine Mitglieder mehr per ID eintragen.
+
 ### Changed
 
 - **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen

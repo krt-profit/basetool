@@ -95,16 +95,6 @@ public class MissionParticipantService {
   private final ParticipantTargetResolver participantTargetResolver;
 
   /**
-   * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
-   * to the full-form {@link #addParticipant(UUID, ParticipantForm)} with default values for the
-   * optional fields.
-   */
-  @Transactional
-  public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
-    return addParticipant(missionId, userId, null, null, null, null, null);
-  }
-
-  /**
    * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
    * authenticated), an optional desired job type, and an optional comment. Convenience overload
    * that delegates to the full form with {@code orgUnitIds=null} and no explicit payout choice.
