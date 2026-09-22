@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:4f20b831-9081-4ae7-915b-838397209b51",
+  "serialNumber" : "urn:uuid:c39d3c25-4bf8-4bd1-ab8b-1755c58e0e75",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-09-18T16:03:39Z",
+    "timestamp" : "2026-09-22T05:51:19Z",
     "tools" : {
       "components" : [
         {
@@ -26,7 +26,7 @@
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/35366058916"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/35692280931"
         },
         {
           "type" : "vcs",
@@ -166,43 +166,43 @@
     },
     {
       "type" : "library",
-      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
+      "bom-ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.20.0?type=jar",
       "group" : "com.bucket4j",
       "name" : "bucket4j_jdk17-core",
-      "version" : "8.19.0",
+      "version" : "8.20.0",
       "description" : "Bucket4j core library",
       "hashes" : [
         {
           "alg" : "MD5",
-          "content" : "a5c80b0934147b34b721b329b2f79e18"
+          "content" : "9a1ca7ed1e10625a7e903a35bb4b4077"
         },
         {
           "alg" : "SHA-1",
-          "content" : "ac649e24d0f3518010c588302cea0dfdf4763511"
+          "content" : "22e8be5fdd95dc06c7d237eb07396949335cb1f1"
         },
         {
           "alg" : "SHA-256",
-          "content" : "603885663799e203f7e17394315fdbdc584fe021643614d8a34b49b53e618c74"
+          "content" : "970326506dcbb7291cfd9672e3d12c82d24b3f060c37f1d8ccf38d132e77eff9"
         },
         {
           "alg" : "SHA-512",
-          "content" : "59d7f6a2034c3b8afa6eaee4d6d4a97d2e9009bd212e99769209ceba0c97d20fbcbdca9b54f01f57c67c88eaf35512973daf085691d148eaac7250de2f137a26"
+          "content" : "e669739c5da31428c7aa13f5e65c4be2509015f92a360506f93440dfe3865065ec98338462bc17495849c0bee9a4972c9d9c3af181929b7deb4b3c4e4d0d3b33"
         },
         {
           "alg" : "SHA3-256",
-          "content" : "94e2ad1fa92e67f08771068a34c3733d4d012c5283cc5c7030ed4d2f0dd4609d"
+          "content" : "b50976ce839ae3c7e095e02bd0980bd8bc2b96bf9af8595cfe729bf0bdf2d89d"
         },
         {
           "alg" : "SHA3-512",
-          "content" : "2617e742a19aea4ecd8f76ea25359556800183e03aba841d41bb42d750282d58d100acc2e3283e5e36ffeae0c34809a62590732293eaff6d7fec1fe5bd46821f"
+          "content" : "6416d65969989b0cd95ed116c5ad48bfb6bd2dcebacb7242b75b45c2b36ce1a9af48c34100d78776f40b55318f7716dadc91025ee9d8590b4ba180b286c5adb4"
         },
         {
           "alg" : "SHA-384",
-          "content" : "f563f64186b04a0445ec0d3245728bc2bb4fb498caea5414acd44ddb2050009078ec49c21ab744b45c9d1f2b098993ce"
+          "content" : "3fd49bb3691fd594b763598f5418ef81e6070524709f229a0c26b64addd71bebb967d3564848ddbbaf89ad4494c4328a"
         },
         {
           "alg" : "SHA3-384",
-          "content" : "2ca3399bfd65ff8f38128763a065661aa05e2226064aa494d12365c068c0ccaddcdf9525ab54c8e812d86a309f46316b"
+          "content" : "8056740ee1ce347cc7146ac0a6a70539ffb3055118a7ff283c88e5ab62625a13d8fb5a3d49c36556542fe2046172d976"
         }
       ],
       "licenses" : [
@@ -212,7 +212,7 @@
           }
         }
       ],
-      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
+      "purl" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.20.0?type=jar",
       "modified" : false,
       "externalReferences" : [
         {
@@ -11625,7 +11625,7 @@
       "dependsOn" : [ ]
     },
     {
-      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
+      "ref" : "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.20.0?type=jar",
       "dependsOn" : [ ]
     },
     {
@@ -11708,7 +11708,7 @@
     {
       "ref" : "pkg:maven/de.greluc.krt.profit.basetool/ingest@0.0.1-SNAPSHOT?project_path=%3Aingest",
       "dependsOn" : [
-        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.19.0?type=jar",
+        "pkg:maven/com.bucket4j/bucket4j_jdk17-core@8.20.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar",
         "pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar",
         "pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar",

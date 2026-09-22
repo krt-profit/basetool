@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v1.9.0](https://github.com/krt-profit/basetool/releases/tag/v1.9.0) - 2026-09-22
+
 ### Added
 
 - **Entwicklung: die Architektur ist jetzt vollständig nach arc42 dokumentiert.** Zwölf Kapitel unter `docs/arc42/` — Kontext, Bausteine, Laufzeit, Verteilung, Querschnitt, Qualität, Risiken und Glossar — mit dem Stand **nach** dem Podman-Umzug. Sie verweisen auf Specs und ADRs, statt sie zu wiederholen. Rein entwicklungsseitig.
