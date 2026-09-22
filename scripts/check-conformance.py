@@ -523,7 +523,16 @@ def _connect(host: str, port: int, family: int, timeout: int) -> socket.socket:
             return sock
         except OSError as exc:  # try the next record rather than failing on the first
             last = exc
-    raise OSError(f"{host}:{port} unreachable: {last}")
+    # CARRY THE ERRNO. This used to raise OSError(f"..."), a single-argument OSError whose `errno`
+    # is None -- and check_ipv6_reachable decides whether a failure is the DEPLOYMENT'S or THIS
+    # MACHINE'S by reading exactly that attribute. The effect was that its skip path could never be
+    # taken: run from a v4-only network, the suite reported `ipv6-reachable FAIL ... [Errno 101]
+    # Network is unreachable` about four vhosts that were serving IPv6 correctly (measured
+    # 2026-09-22, from a WSL host with no global v6 address and no route to any). A red that means
+    # "the runner has no IPv6" and a red that means "the edge lost its AAAA" were indistinguishable,
+    # which is the exact failure the check's own docstring exists to prevent.
+    raise OSError(getattr(last, "errno", None),
+                  f"{host}:{port} unreachable: {last}") from last
 
 
 def _peer_certificate(host: str, family: int = 0, timeout: int = 20) -> dict:
@@ -810,6 +819,31 @@ def check_http_redirects(ctx: Context) -> str:
     return f"all {len(ctx.hosts)} vhosts redirect :80 to HTTPS"
 
 
+def _require_ipv6_route() -> None:
+    """Skip unless this machine can actually route IPv6.
+
+    ``socket.has_ipv6`` is a COMPILE-TIME property of the interpreter and is true on a host with no
+    IPv6 address at all, which is why it was never enough on its own. This asks the kernel instead:
+    a connected UDP socket sends nothing, it only makes the kernel pick a source address for the
+    destination, and it fails immediately with ENETUNREACH when there is no route.
+
+    Deliberately a documentation address (RFC 3849, ``2001:db8::/32``): it is guaranteed never to be
+    routed anywhere, so the probe cannot depend on some third party being up, and it cannot generate
+    traffic to a real host.
+
+    Raises:
+        Skip: when this machine has no usable IPv6 route.
+    """
+    probe = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("2001:db8::1", 53))
+    except OSError as exc:
+        raise Skip(f"no usable IPv6 route from this machine ({exc}) - "
+                   "this says nothing about the deployment") from exc
+    finally:
+        probe.close()
+
+
 def check_ipv6_reachable(ctx: Context) -> str:
     """Every vhost has an AAAA record and answers over IPv6.
 
@@ -823,6 +857,13 @@ def check_ipv6_reachable(ctx: Context) -> str:
     machine** is the runner's problem and skips - otherwise the suite would report a red about
     the deployment every time it ran from a v4-only network.
 
+    That separation was written from the start and did not work until 2026-09-22: ``_connect``
+    raised a single-argument ``OSError`` whose ``errno`` was ``None``, so the branch that reads the
+    errno could never be taken and the suite reported ``FAIL ... [Errno 101] Network is
+    unreachable`` about four vhosts that were serving IPv6 correctly. The errno is preserved now,
+    and :func:`_require_ipv6_route` asks the question ONCE, up front, instead of inferring it from
+    whichever host happened to be probed first.
+
     Args:
         ctx: the run context.
 
@@ -835,6 +876,7 @@ def check_ipv6_reachable(ctx: Context) -> str:
     """
     if not socket.has_ipv6:
         raise Skip("this machine has no IPv6 support")
+    _require_ipv6_route()
 
     missing_aaaa, unreachable, seen = [], [], []
     for role, host in sorted(ctx.hosts.items()):

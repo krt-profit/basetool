@@ -936,6 +936,51 @@ fi
 
 # =============================================================================================
 say ""
+say "== a connection failure carries its errno =="
+# =============================================================================================
+# check_ipv6_reachable decides whether a failure belongs to the DEPLOYMENT or to THIS MACHINE by
+# reading `exc.errno` -- ENETUNREACH means the runner has no IPv6 and the check must skip rather
+# than report a red about four vhosts that are serving. `_connect` used to re-raise a
+# single-argument OSError built from an f-string, whose errno is None, so that branch was dead code
+# and the suite reported `FAIL ... [Errno 101] Network is unreachable` from any v4-only network
+# (measured 2026-09-22). Nothing else in the suite would have noticed: the check still ran, still
+# produced a verdict, and the verdict was confidently wrong.
+errno_probe="$("$PY" - "$SUITE" <<'PYEOF'
+import importlib.util, socket, sys
+
+spec = importlib.util.spec_from_file_location("conf", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+# Registered BEFORE exec: the suite defines dataclasses, and dataclasses resolves a field's type
+# through sys.modules[cls.__module__], which is None for a module loaded but never registered.
+sys.modules["conf"] = m
+spec.loader.exec_module(m)
+
+# A port nothing listens on, on loopback: connect fails immediately with ECONNREFUSED. The value of
+# the errno does not matter here -- that it SURVIVES does.
+sock = socket.socket()
+sock.bind(("127.0.0.1", 0))
+free_port = sock.getsockname()[1]
+sock.close()
+
+try:
+    m._connect("127.0.0.1", free_port, socket.AF_INET, 5)
+except OSError as exc:
+    print("errno=%r" % (exc.errno,))
+else:
+    print("errno=CONNECTED-UNEXPECTEDLY")
+PYEOF
+)"
+case "$errno_probe" in
+  errno=None|errno=CONNECTED-UNEXPECTEDLY)
+    bad "_connect lost the errno ($errno_probe) - the ipv6-reachable skip path is dead again" ;;
+  errno=*)
+    ok "_connect preserves the errno ($errno_probe)" ;;
+  *)
+    bad "the errno probe produced nothing usable: $errno_probe" ;;
+esac
+
+# =============================================================================================
+say ""
 say "-------------------------------------------------------------"
 say "${PASSED} passed, ${FAILED} failed"
 [ "$FAILED" -eq 0 ] || exit 1
