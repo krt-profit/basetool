@@ -7,7 +7,7 @@
 - **Betrieb: die IPv6-Prüfung der Abnahme-Suite meldete Rot über die Bereitstellung, wenn der
   Ausführende selbst kein IPv6 hat.** Der Zweig, der genau das unterscheiden sollte, war seit
   jeher unerreichbar, weil die Fehlernummer unterwegs verloren ging. Sie bleibt jetzt erhalten,
-  die Suite fragt einmal vorab und überspringt ehrlich. Rein betriebsseitig.
+  und die Suite überspringt die Prüfung mit einer ehrlichen Begründung. Rein betriebsseitig.
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

@@ -819,29 +819,19 @@ def check_http_redirects(ctx: Context) -> str:
     return f"all {len(ctx.hosts)} vhosts redirect :80 to HTTPS"
 
 
-def _require_ipv6_route() -> None:
-    """Skip unless this machine can actually route IPv6.
-
-    ``socket.has_ipv6`` is a COMPILE-TIME property of the interpreter and is true on a host with no
-    IPv6 address at all, which is why it was never enough on its own. This asks the kernel instead:
-    a connected UDP socket sends nothing, it only makes the kernel pick a source address for the
-    destination, and it fails immediately with ENETUNREACH when there is no route.
-
-    Deliberately a documentation address (RFC 3849, ``2001:db8::/32``): it is guaranteed never to be
-    routed anywhere, so the probe cannot depend on some third party being up, and it cannot generate
-    traffic to a real host.
-
-    Raises:
-        Skip: when this machine has no usable IPv6 route.
-    """
-    probe = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-    try:
-        probe.connect(("2001:db8::1", 53))
-    except OSError as exc:
-        raise Skip(f"no usable IPv6 route from this machine ({exc}) - "
-                   "this says nothing about the deployment") from exc
-    finally:
-        probe.close()
+# DO NOT add an up-front "can this machine route IPv6?" probe here. One was written on
+# 2026-09-22 and removed the same hour: it connected a UDP socket to a documentation address
+# (2001:db8::1) and skipped the whole check on ENETUNREACH, which asks about GLOBAL routing -- while
+# the self-test's fixture serves on ::1, where global routing is absent and irrelevant. Every ipv6
+# scenario in the suite turned from pass/fail into skip, including the one that proves the check can
+# go red at all.
+#
+# It also passed locally and failed in CI, which is the part worth remembering: Windows lets that
+# UDP connect succeed and Linux does not, so the probe's verdict depended on the operating system
+# rather than on the network.
+#
+# The question is answered where it is actually asked -- by the real connection attempt, whose
+# errno _connect now preserves. That is the whole fix.
 
 
 def check_ipv6_reachable(ctx: Context) -> str:
@@ -860,9 +850,9 @@ def check_ipv6_reachable(ctx: Context) -> str:
     That separation was written from the start and did not work until 2026-09-22: ``_connect``
     raised a single-argument ``OSError`` whose ``errno`` was ``None``, so the branch that reads the
     errno could never be taken and the suite reported ``FAIL ... [Errno 101] Network is
-    unreachable`` about four vhosts that were serving IPv6 correctly. The errno is preserved now,
-    and :func:`_require_ipv6_route` asks the question ONCE, up front, instead of inferring it from
-    whichever host happened to be probed first.
+    unreachable`` about four vhosts that were serving IPv6 correctly. Preserving the errno is the
+    whole fix; see the comment above this function for the up-front probe that was tried instead and
+    why it must not come back.
 
     Args:
         ctx: the run context.
@@ -876,7 +866,6 @@ def check_ipv6_reachable(ctx: Context) -> str:
     """
     if not socket.has_ipv6:
         raise Skip("this machine has no IPv6 support")
-    _require_ipv6_route()
 
     missing_aaaa, unreachable, seen = [], [], []
     for role, host in sorted(ctx.hosts.items()):
@@ -895,7 +884,11 @@ def check_ipv6_reachable(ctx: Context) -> str:
             if getattr(exc, "errno", None) in (
                     getattr(__import__("errno"), "ENETUNREACH", -1),
                     getattr(__import__("errno"), "EAFNOSUPPORT", -2)):
-                raise Skip(f"no usable IPv6 route from this machine ({exc})") from exc
+                # exc.strerror, not exc: the wrapped message already carries "[Errno 101]", and
+                # str(OSError(errno, msg)) prefixes it a second time.
+                raise Skip(f"no usable IPv6 route from this machine "
+                           f"({exc.strerror or exc}) - this says nothing about the "
+                           f"deployment") from exc
             unreachable.append(f"{host}: {exc}")
 
     problems = []
