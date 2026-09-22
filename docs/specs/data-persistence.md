@@ -67,6 +67,10 @@ Staffel-membership lookup so its three derived-field resolvers share one query (
 direct query outside an HTTP request). The delegated appointment verdicts
 (`OrgRoleManagementSecurityService`) read the caller's membership rows once per request the same way,
 because the Leitung view asks them for every Bereich, Staffel and Spezialkommando (BE-PERF-15).
+Every such memo goes through **`support.RequestMemo`** with a typed `RequestMemo.Key<T>` (BE-SIMP-09,
+2026-09-23): `get(request, key, supplier)` on a request the caller holds, `getIfBound(key, supplier)`
+on the thread-bound one (answering `null` outside a request). The one unchecked cast lives in the
+key; a new memo does not hand-roll a request attribute.
 
 **Every embedded `UserDto` of a list or aggregate is primed in two queries** (BE-PERF-01, 2026-09-22).
 Mapping one user costs up to three statements — its Staffel memberships and the Staffel entities for

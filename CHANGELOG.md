@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- **Einsätze: „Leiter" in der Kopfzeile zeigt wieder den Einsatzleiter.** Das Backend schickte die
+  Einsatzleiter-Markierung der geplanten Rolle eines Teilnehmers nicht mit, deshalb stand dort immer
+  der Besitzer des Einsatzes, auch wenn ein Einsatzleiter eingetragen war.
+
 - **Netty auf 4.2.18.Final angehoben (Sicherheitsupdate).** Schließt CVE-2026-89044 (Request
   Smuggling über einen fehlerhaften `Transfer-Encoding`-Header) in Backend, Webtool und Ingest.
   Keine Funktionsänderung.

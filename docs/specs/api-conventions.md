@@ -51,8 +51,13 @@ therefore frozen against in-place shape change even though they live under `/api
 Never expose JPA entities at controller boundaries (also ArchUnit-enforced — see
 [`security-and-access.md`](security-and-access.md) REQ-SEC-003). DTOs are records; write DTOs
 carry Jakarta validation (`@NotBlank`, `@NotNull`, `@Min`, `@Max`, …). Use a MapStruct
-mapper (`@Mapper(componentModel = "spring")`) for Entity↔DTO; break circular refs with
-`@Mapping(ignore = true)`.
+mapper (`@Mapper(config = CentralMapperConfig.class)`) for Entity↔DTO; break circular refs with
+`@Mapping(ignore = true)`. `CentralMapperConfig` injects used mappers through the constructor and
+sets **`unmappedTargetPolicy = ERROR`** (BE-MOD-05/05b, 2026-09-23): a target property no source
+feeds fails the build, so a DTO field added later can no longer ship silently `null`. Every
+intended gap is an explicit `@Mapping(target = "…", ignore = true)`; the one method-level exemption
+is `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a catalogue row. The switch found
+one real gap — the job type a mission embeds never carried `isMissionLead`.
 
 ### REQ-API-003 — Validation on writes
 
