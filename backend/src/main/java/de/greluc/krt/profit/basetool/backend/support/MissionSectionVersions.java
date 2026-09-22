@@ -190,6 +190,14 @@ public final class MissionSectionVersions {
    * invoke this <strong>before</strong> mutating the section — the bump takes the row lock that
    * serialises the writers.
    *
+   * <p>The {@code expectedVersion + 1} is computed with {@link Math#addExact(long, long)} because
+   * the operand is the client's echo: a plain {@code +} would wrap {@link Long#MAX_VALUE} to {@link
+   * Long#MIN_VALUE} and write a negative counter onto the managed entity. Against the real schema
+   * that echo cannot get this far: a stale or forged value matches no row, and a counter really at
+   * {@code Long.MAX_VALUE} makes the {@code bigint} bump above fail in PostgreSQL (out of range)
+   * before this line runs. So this states the bound rather than changing an observable outcome
+   * (CodeQL {@code java/tainted-arithmetic}).
+   *
    * @param repository the mission repository that owns the conditional bump query.
    * @param mission the managed mission whose in-memory counter to advance on success.
    * @param section the section the caller echoed a version back for.
@@ -198,6 +206,8 @@ public final class MissionSectionVersions {
    *     identifier.
    * @throws ObjectOptimisticLockingFailureException when the expected version is stale (0 rows
    *     affected).
+   * @throws ArithmeticException when the bump matched a counter already at {@link Long#MAX_VALUE};
+   *     the in-memory counter is then left untouched rather than wrapped.
    */
   public static void enforceSectionVersion(
       @NotNull MissionRepository repository,
@@ -209,7 +219,7 @@ public final class MissionSectionVersions {
     if (updated == 0) {
       throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }
-    section.set(mission, expectedVersion + 1L);
+    section.set(mission, Math.addExact(expectedVersion, 1L));
   }
 
   /**
@@ -220,8 +230,10 @@ public final class MissionSectionVersions {
    *
    * @param mission the managed mission whose counter to bump.
    * @param section the section whose counter to increment.
+   * @throws ArithmeticException when the counter is already at {@link Long#MAX_VALUE}, instead of
+   *     wrapping it negative — the same bound {@link #enforceSectionVersion} states.
    */
   public static void bumpSectionVersion(@NotNull Mission mission, @NotNull MissionSection section) {
-    section.set(mission, section.current(mission) + 1L);
+    section.set(mission, Math.addExact(section.current(mission), 1L));
   }
 }
