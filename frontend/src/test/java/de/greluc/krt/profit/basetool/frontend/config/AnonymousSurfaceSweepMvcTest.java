@@ -81,7 +81,7 @@ class AnonymousSurfaceSweepMvcTest {
    * their "must not redirect" contract, which is a different assertion from "must not serve data".
    */
   private static final Set<String> PUBLIC_PAGES =
-      Set.of("/", "/impressum", "/privacy", "/terms", "/app/link-help");
+      Set.of("/", "/impressum", "/privacy", "/terms", "/licenses", "/app/link-help");
 
   /**
    * Public, and a redirect — so neither of the two sets above describes it.

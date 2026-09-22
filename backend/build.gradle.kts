@@ -9,6 +9,7 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
+  alias(libs.plugins.licensee)
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
   id("com.diffplug.spotless")
@@ -47,7 +48,19 @@ dependencies {
   // and the reactive CBOR codecs on its own, so no wiring follows from this line. Which side
   // actually asks for CBOR is `app.http.codec` on the frontend, and nothing else asks at all.
   implementation("tools.jackson.dataformat:jackson-dataformat-cbor")
-  implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+  // AspectJ is excluded for its licence, not its size (ADR-0197). `spring-boot-data-jpa` pulls
+  // `spring-aspects` -> `aspectjweaver`, whose jar is `EPL-2.0 AND BSD-3-Clause AND Apache-1.1`
+  // (its own LICENSE-AspectJ.adoc): EPL-2.0 with no GPL Secondary License, plus a modified BCEL
+  // under Apache-1.1 — neither may be redistributed inside a GPL-3.0-only image. Nothing here
+  // needs it: no `@Aspect`, `@Configurable`, `@Timed` or `@Observed`, no load-time weaving.
+  // `@Transactional`, `@PreAuthorize`, `@Cacheable`, `@Async` and `@Scheduled` are proxy-based
+  // infrastructure advisors, which Boot's AopAutoConfiguration keeps applying without AspectJ
+  // (ClassProxyingConfiguration). The licence gate refuses EPL-2.0 on its own, so a new path that
+  // brings AspectJ back fails `:backend:licensee` instead of shipping silently.
+  implementation("org.springframework.boot:spring-boot-starter-data-jpa") {
+    exclude(group = "org.springframework", module = "spring-aspects")
+    exclude(group = "org.aspectj", module = "aspectjweaver")
+  }
   implementation("org.springframework.boot:spring-boot-starter-security")
   implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
   implementation("org.springframework.boot:spring-boot-starter-validation")

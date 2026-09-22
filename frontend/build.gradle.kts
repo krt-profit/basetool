@@ -9,6 +9,7 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
+  alias(libs.plugins.licensee)
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
   id("com.diffplug.spotless")
@@ -366,6 +367,170 @@ tasks.named<org.cyclonedx.gradle.CyclonedxDirectTask>("cyclonedxDirectBom") {
   skipConfigs.set(listOf("^e2e.*"))
 }
 
+// ---------------------------------------------------------------------------
+// The „Open-Source-Lizenzen“ page (REQ-UI-021, ADR-0197) — generated, never committed.
+//
+// Every shipped module runs the Licensee gate against its own runtime classpath (root
+// build.gradle.kts) and exports the report; this task merges the four reports with the hand-kept
+// `oss-bundled-components.json` (fonts, image layers — nothing Maven can see) into
+// `oss/oss-licenses.json` on the classpath, which `OssLicenseCatalog` reads at startup. So the page
+// lists the exact versions of the build that serves it, and a dependency bump cannot leave it
+// stale. The reports arrive through the `ossLicenseReportElements` variant each module publishes,
+// not through a path into another module's build directory.
+//
+// The licence of each entry is normalised with the SAME tables the gate uses
+// (`ossLicenseUrlAliases`, `ossLicenseCoordinateOverrides`), and SPDX names and links come from the
+// SPDX list inside the Licensee plugin — the one Licensee itself resolved the POMs against.
+val ossLicenseReports = configurations.dependencyScope("ossLicenseReports")
+val ossLicenseReportFiles =
+  configurations.resolvable("ossLicenseReportFiles") {
+    extendsFrom(ossLicenseReports.get())
+    attributes { attribute(Usage.USAGE_ATTRIBUTE, objects.named("oss-license-report")) }
+  }
+
+dependencies {
+  "ossLicenseReports"(project(":backend"))
+  "ossLicenseReports"(project(":ingest"))
+  "ossLicenseReports"(project(":keycloak-spi"))
+}
+
+val generatedOssLicenses = layout.buildDirectory.dir("generated/oss-licenses")
+
+val generateOssLicenses =
+  tasks.register("generateOssLicenses") {
+    group = "build"
+    description = "Merges the shipped modules' Licensee reports into oss/oss-licenses.json."
+
+    // This module's own report is a task output rather than a variant: a project cannot resolve
+    // its own outgoing configuration.
+    val moduleReports =
+      files(
+        ossLicenseReportFiles,
+        tasks.named("exportLicenseeReport").map { it.outputs.files.asFileTree },
+      )
+    val bundledComponents = file("oss-bundled-components.json")
+    @Suppress("UNCHECKED_CAST")
+    val urlAliases = rootProject.extra["ossLicenseUrlAliases"] as Map<String, String>
+    @Suppress("UNCHECKED_CAST")
+    val coordinateOverrides =
+      rootProject.extra["ossLicenseCoordinateOverrides"] as Map<String, String>
+    val generator = "licensee ${libs.versions.licensee.get()}"
+    val outputFile = generatedOssLicenses.map { it.file("oss/oss-licenses.json") }
+
+    inputs
+      .files(moduleReports)
+      .withPropertyName("moduleReports")
+      .withPathSensitivity(PathSensitivity.NAME_ONLY)
+    inputs
+      .file(bundledComponents)
+      .withPropertyName("bundledComponents")
+      .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.property("urlAliases", urlAliases)
+    inputs.property("coordinateOverrides", coordinateOverrides)
+    inputs.property("generator", generator)
+    outputs.dir(generatedOssLicenses)
+
+    doLast {
+      val slurper = groovy.json.JsonSlurper()
+
+      // SPDX identifier -> (name, canonical link), from the list Licensee resolves against.
+      val spdxList =
+        app.cash.licensee.LicenseeTask::class
+          .java
+          .classLoader
+          .getResource("app/cash/licensee/licenses.json")
+          ?.let { slurper.parse(it) as Map<*, *> }
+          ?: throw GradleException("Licensee's bundled SPDX list is missing; cannot name licences")
+      val spdx =
+        (spdxList["licenses"] as List<*>).filterIsInstance<Map<*, *>>().associate {
+          val link = (it["seeAlso"] as? List<*>)?.firstOrNull() ?: it["reference"]
+          it["licenseId"] as String to (it["name"] as String to link as String?)
+        }
+      fun spdxLicense(id: String): Map<String, String?> {
+        val (name, link) =
+          spdx[id] ?: throw GradleException("'$id' is not an SPDX identifier Licensee knows")
+        return mapOf("spdxId" to id, "name" to name, "url" to link)
+      }
+
+      val components = sortedMapOf<String, MutableMap<String, Any?>>()
+      moduleReports.files
+        .sortedBy { it.name }
+        .forEach { report ->
+          val module = report.nameWithoutExtension
+          (slurper.parse(report) as List<*>).filterIsInstance<Map<*, *>>().forEach { artifact ->
+            val name = "${artifact["groupId"]}:${artifact["artifactId"]}"
+            val version = artifact["version"] as String
+            val entry =
+              components.getOrPut("$name:$version") {
+                val override = coordinateOverrides[name]
+                val licenses =
+                  if (override != null) {
+                    listOf(spdxLicense(override))
+                  } else {
+                    val known =
+                      (artifact["spdxLicenses"] as? List<*>)
+                        .orEmpty()
+                        .filterIsInstance<Map<*, *>>()
+                        .map {
+                          mapOf(
+                            "spdxId" to it["identifier"],
+                            "name" to it["name"],
+                            "url" to it["url"],
+                          )
+                        }
+                    val unknown =
+                      (artifact["unknownLicenses"] as? List<*>)
+                        .orEmpty()
+                        .filterIsInstance<Map<*, *>>()
+                        .map {
+                          val alias = urlAliases[it["url"]]
+                          if (alias != null) {
+                            spdxLicense(alias)
+                          } else {
+                            mapOf("spdxId" to null, "name" to it["name"], "url" to it["url"])
+                          }
+                        }
+                    (known + unknown).distinctBy { it["spdxId"] ?: it["name"] }
+                  }
+                mutableMapOf(
+                  "name" to name,
+                  "version" to version,
+                  "title" to artifact["name"],
+                  "url" to (artifact["scm"] as? Map<*, *>)?.get("url"),
+                  "modules" to sortedSetOf<String>(),
+                  "licenses" to licenses,
+                )
+              }
+            @Suppress("UNCHECKED_CAST") (entry["modules"] as MutableSet<String>).add(module)
+          }
+        }
+
+      val bundled =
+        ((slurper.parse(bundledComponents) as Map<*, *>)["components"] as List<*>).filterIsInstance<
+          Map<*, *>
+        >()
+
+      val out = outputFile.get().asFile
+      out.parentFile.mkdirs()
+      out.writeText(
+        groovy.json.JsonOutput.prettyPrint(
+          groovy.json.JsonOutput.toJson(
+            mapOf(
+              "generator" to generator,
+              "components" to components.values + bundled,
+            )
+          )
+        ),
+        Charsets.UTF_8,
+      )
+      logger.lifecycle(
+        "generateOssLicenses: ${components.size} libraries + ${bundled.size} bundled components"
+      )
+    }
+  }
+
+sourceSets.named("main") { resources.srcDir(generateOssLicenses) }
+
 // Third instance of the cross-module input defect the backend build already fixes twice
 // (`crossModuleParitySources`, `apiVhostRunbook`). `DtoMirrorConsistencyTest` lives in this module
 // but reads the BACKEND DTO records as source text — there is no compile-time dependency from
@@ -465,6 +630,19 @@ tasks.named<Test>("test") {
       rootProject.file("frontend/src/e2e/resources/realm-export.e2e.json"),
     )
     .withPropertyName("e2eAudienceParitySources")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  // `OssBundledComponentsTest` (REQ-UI-021) walks every font directory of the repository and
+  // reads the hand-kept bundled-component list as source files. The backend and keycloak-theme
+  // trees are off this task's classpath entirely, so without this a font added there — with no
+  // OFL.txt beside it — would leave the test UP-TO-DATE and green.
+  inputs
+    .files(
+      fileTree("src/main/resources/static/fonts"),
+      rootProject.fileTree("backend/src/main/resources/fonts"),
+      rootProject.fileTree("keycloak-theme"),
+      file("oss-bundled-components.json"),
+    )
+    .withPropertyName("ossBundledComponentSources")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

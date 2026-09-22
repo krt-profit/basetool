@@ -4,6 +4,7 @@ plugins {
   java
   checkstyle
   alias(libs.plugins.cyclonedx.bom)
+  alias(libs.plugins.licensee)
   id("com.diffplug.spotless")
 }
 

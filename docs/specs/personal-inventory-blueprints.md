@@ -91,8 +91,8 @@ the admin-managed default set (REQ-INV-017). Provisioning MUST be idempotent and
 existing and future users:
 
 - a brand-new user receives the defaults synchronously when their `app_user` row is first created
-  (the grant runs in the same `UserService.syncUser` transaction, so the rows are committed before
-  the first request returns);
+  (the grant runs in the same `UserReconciliationService.syncUser` transaction, so the rows are
+  committed before the first request returns);
 - a deploy / drift is reconciled by a startup backfill and a periodic sweep
   (`DefaultBlueprintProvisioningTask`), both bulk `INSERT … SELECT … ON CONFLICT (owner_user_id,
   product_key) DO NOTHING` so a re-run never duplicates;
@@ -123,7 +123,7 @@ owned blueprints. Provisioning can be disabled per environment via
 
 **Code links:** [`DefaultBlueprintProvisioningService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintProvisioningService.java),
 [`PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/repository/PersonalBlueprintRepository.java),
-[`UserService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserService.java),
+[`UserReconciliationService#syncUser`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/UserReconciliationService.java),
 [`DefaultBlueprintProvisioningTask`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/task/DefaultBlueprintProvisioningTask.java),
 [`PersonalBlueprintService#requireRemovable`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/PersonalBlueprintService.java).
 
@@ -142,6 +142,21 @@ ADMIN-gated surface (`/api/v1/admin/default-blueprints`, `@PreAuthorize("hasRole
 duplicate add MUST return 409. Adding MUST immediately grant the new default to all existing users
 (REQ-INV-016).
 
+The admin page (`/admin/default-blueprints`) performs both mutations **in place** (REQ-FE-001,
+ADR-0012): the add sends every staged product key in one `krtFetch.write` to the
+`X-Requested-With`-routed `POST /admin/default-blueprints/add` twin, which relays one backend add per
+key and answers `200` with `{added, skipped, failedKeys}` — a key that is already a default (the
+backend's 409) counts as skipped, any other failure is reported per key and the rest still go
+through. The page toasts the outcome, keeps only the failed keys staged for a retry, and re-renders
+the list from `GET /admin/default-blueprints?fragment=rows`. The remove goes through the confirm
+modal to the `POST /admin/default-blueprints/{id}/delete` twin (a backend failure is relayed as
+`problem+json`) and re-renders the same fragment. The type-ahead's „Bereits Standard" marking is read
+back from the swapped rows, so it cannot drift from the list on screen. The fragment read re-throws a
+backend failure rather than rendering an empty set, so a failed refresh toasts and leaves the list
+standing. The classic POST → redirect handlers remain as the fallback when `krtFetch` did not load.
+The page has no live-sync room: like most admin screens it is not a shared working surface, and a
+second admin sees another's change on the next refresh after their own write.
+
 **Acceptance criteria:**
 
 - [ ] Given a fresh database with the catalog populated, when the app boots, then the starter
@@ -150,11 +165,20 @@ duplicate add MUST return 409. Adding MUST immediately grant the new default to 
   gains the owned row; adding the same product again returns 409.
 - [ ] Given a non-admin calls the default-blueprint admin endpoints, then the request is rejected
   with 403.
+- [ ] Given an admin adds or removes a default on `/admin/default-blueprints`, then the list updates
+  in place with no page reload, and a partially failed add leaves exactly the failed keys staged.
+
+**Enforced by:** `DefaultBlueprintServiceTest`, `AdminDefaultBlueprintControllerTest`,
+`AdminDefaultBlueprintsPageControllerMvcTest` (the XHR twins, the `rows` fragment, the redirect
+fallback), `DefaultBlueprintsE2eTest` (in-place remove, no-reload marker).
 
 **Code links:** [`DefaultBlueprintService`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintService.java),
 [`AdminDefaultBlueprintController`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/controller/AdminDefaultBlueprintController.java),
-[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/config/DefaultBlueprintBootstrap.java),
-[`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql).
+[`DefaultBlueprintBootstrap`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/service/DefaultBlueprintBootstrap.java),
+[`V157__create_default_blueprint.sql`](../../backend/src/main/resources/db/migration/V157__create_default_blueprint.sql),
+[`AdminDefaultBlueprintsPageController`](../../frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/controller/AdminDefaultBlueprintsPageController.java),
+[`admin/default-blueprints.html`](../../frontend/src/main/resources/templates/admin/default-blueprints.html),
+[`admin-default-blueprints.js`](../../frontend/src/main/resources/static/js/admin-default-blueprints.js).
 
 ### REQ-INV-018 — Opt-in global blueprint sharing
 

@@ -113,6 +113,18 @@ class PublicPathsTest {
     assertThat(PublicPaths.isAssetOrPublicDocument(path)).as(path).isFalse();
   }
 
+  @ParameterizedTest
+  @DisplayName("the four legal pages are gate-exempt but are pages, not cheap-skip documents")
+  @ValueSource(strings = {"/impressum", "/privacy", "/terms", "/licenses"})
+  void legalPagesAreExemptButNotSkippable(String path) {
+    // Nobody can be asked to agree to terms they are prevented from reading, and the licence
+    // notice of REQ-UI-021 is held to the same rule. They render the layout, so the role sync
+    // still has to run for them — they are not in the cheap-skip set.
+    assertThat(PublicPaths.isLegalPage(path)).as(path).isTrue();
+    assertThat(PublicPaths.isGateExempt(path)).as(path).isTrue();
+    assertThat(PublicPaths.isAssetOrPublicDocument(path)).as(path).isFalse();
+  }
+
   @Test
   @DisplayName("the path is taken relative to the context path, not raw")
   void relativePathStripsTheContextPath() {

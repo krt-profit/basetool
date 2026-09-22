@@ -1637,6 +1637,16 @@
               }
             }
           },
+          "403" : {
+            "description" : "Forbidden",
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
           "404" : {
             "description" : "Not Found",
             "content" : {
@@ -1662,16 +1672,6 @@
           },
           "401" : {
             "description" : "Unauthorized",
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Forbidden",
             "content" : {
               "application/problem+json" : {
                 "schema" : {

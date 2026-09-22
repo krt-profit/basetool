@@ -121,7 +121,8 @@ two gates are parallel, not a replacement.
 `InventoryPageControllerMvcTest` (stack-entry picker + book-in form `data-materials`) /
 `RefineryOrderStoreJobOrderDropdownTest` (picker filters),
 `JobOrderRepositoryActiveLookupOrderingTest` (lookup ordering + distinct roots) ·
-**Code:** `InventoryItemService.createInventoryItem` / `updateInventoryItem`,
+**Code:** `InventoryItemService.createInventoryItem` / `addAllocation` (the former
+`updateInventoryItem` went with `PUT /api/v1/inventory/{id}` in d03a9238b; corrected 2026-09-22),
 `JobOrderItemService.requiredMaterialIds`, `JobOrderReferenceDto.requiredMaterialIds`,
 `JobOrderService.findAllActiveReference`, `templates/fragments/inventory-stack-entries.html`,
 `templates/inventory-input.html` / `static/js/inventory-input.js`,

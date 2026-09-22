@@ -142,12 +142,18 @@ final class PublicPaths {
           PATH_PARSER.parse("/error/**"),
           PATH_PARSER.parse("/actuator/**"));
 
-  /** The three pages a gate may never hold a member away from — see {@link #isLegalPage}. */
+  /**
+   * The four pages a gate may never hold a member away from — see {@link #isLegalPage}. {@code
+   * /licenses} joined the three original ones with REQ-UI-021: a third-party licence notice is a
+   * legal page too, and a member held at the consent page must still be able to read what the
+   * software they are asked to accept terms for is built from.
+   */
   private static final List<PathPattern> LEGAL_PAGES =
       List.of(
           PATH_PARSER.parse("/impressum"),
           PATH_PARSER.parse("/privacy"),
-          PATH_PARSER.parse("/terms"));
+          PATH_PARSER.parse("/terms"),
+          PATH_PARSER.parse("/licenses"));
 
   /** Not instantiable: a predicate holder with no state. */
   private PublicPaths() {}
@@ -328,7 +334,7 @@ final class PublicPaths {
   }
 
   /**
-   * The three pages a member must be able to read while a gate is holding them.
+   * The four pages a member must be able to read while a gate is holding them.
    *
    * <p>Neither gate may redirect these, and for the same reason in both cases: nobody can be asked
    * to agree to terms they are prevented from reading, and nobody may be cut off from the imprint
@@ -340,8 +346,13 @@ final class PublicPaths {
    * read them. They live here now because this class exists precisely so that two gates cannot
    * disagree about what is reachable.
    *
+   * <p>The third-party licence notice ({@code /licenses}, REQ-UI-021) is the fourth, for the same
+   * reason: it states what the software is built from and under which licences, and a gate that hid
+   * it behind the consent it asks for would withhold exactly the notice those licences require.
+   *
    * @param path a context-relative path, as returned by {@link #relativePath}
-   * @return {@code true} for the imprint, the privacy policy or the public terms page
+   * @return {@code true} for the imprint, the privacy policy, the public terms page or the licence
+   *     notice
    */
   static boolean isLegalPage(@NotNull String path) {
     return isLegalPage(PathContainer.parsePath(path));
@@ -351,7 +362,8 @@ final class PublicPaths {
    * {@link #isLegalPage(String)} against an already-parsed path.
    *
    * @param path the parsed context-relative path
-   * @return {@code true} for the imprint, the privacy policy or the public terms page
+   * @return {@code true} for the imprint, the privacy policy, the public terms page or the licence
+   *     notice
    */
   private static boolean isLegalPage(@NotNull PathContainer path) {
     return matchesAny(LEGAL_PAGES, path);

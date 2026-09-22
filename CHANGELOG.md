@@ -9,6 +9,22 @@
   Logistiker/Einsatz-Manager setzen. Das Recht bestand im Backend schon, nur lag die einzige Seite
   dafür im Admin-Bereich. Den Lead-Rang setzen weiterhin Admin und Bereichsleitung.
 
+- **Neue Seite „Open-Source-Lizenzen“ in der Fußleiste, neben den Nutzungsbedingungen.** Sie
+  listet jede mitgelieferte Fremdkomponente mit Version und Lizenz, gruppiert nach Lizenz, und
+  wird bei jedem Build neu erzeugt. Öffentlich wie Impressum und Datenschutz.
+
+### Changed
+
+- **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
+  GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
+  AspectJ im Backend auf (EPL-2.0 ohne GPL-Zusatz); es wurde nicht genutzt und ist entfernt.
+  Zu jeder mitgelieferten Lato-Schrift liegt jetzt ihr Lizenztext (OFL).
+
+- **Admin: Standard-Blueprints aufnehmen und entfernen aktualisiert die Liste ohne Neuladen.** Die
+  Seite `/admin/default-blueprints` lud nach jeder Änderung komplett neu; jetzt wird nur die Liste
+  ersetzt (REQ-FE-001). Schlägt beim Aufnehmen ein Teil fehl, bleiben genau diese Einträge in der
+  Auswahl stehen und können erneut abgeschickt werden.
+
 ### Fixed
 
 - **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,

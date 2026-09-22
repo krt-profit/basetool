@@ -37,6 +37,7 @@ any other decision in context.
 | **0188** | The host bootstrap is an Ansible role; provisioning stays separate from delivery | A rebuilt host is reproducible, and the deploy path does not have to double as a provisioner. |
 | **0189** | Stateful containers run as their own uid, not as root that steps down | Measured against the assumption: the capability set REQ-OPS-014 assumed was wrong in *both* directions, and reducing redis's capabilities would have **raised** its privilege. |
 | **0190** | Every container but Keycloak runs on a read-only root filesystem | Also measured against the assumption that the JVM and the databases write all over the filesystem. They do not. |
+| **0197** | Shipped dependencies pass a GPL-compatible licence gate and are listed on a public page | The build refuses a library it may not redistribute under GPL-3.0-only — AspectJ was excluded for exactly that — and the footer's „Open-Source-Lizenzen“ page is generated from the same reports. |
 | **0192 / 0193** | Lombok and the JetBrains annotations everywhere; one logging facade, enforced | Style rules turned into compile errors and CI gates, so they stop depending on review attention. |
 
 ## 9.3 Where a decision is *not* an ADR
