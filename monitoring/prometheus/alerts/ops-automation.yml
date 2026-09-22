@@ -88,14 +88,19 @@ groups:
           summary: "Backup stale >26h or metric absent"
           description: "The nightly backup last succeeded more than 26 hours ago, or the backup metric is absent (never ran). backup.sh writes its abort reason as a `FATAL:` line: `{app=\"ops-backup\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki, then the bare `{app=\"ops-backup\"}` for the run. A completely empty stream over the window means the unit never fired at all — check `systemctl list-timers iri-backup.timer`. Not visible via `journalctl -u iri-backup.service` (stdout/stderr are appended to /var/log/iri-backup.log)."
 
+      # EIGHT days, not 35 (corrected 2026-09-22, OPS-MON-05). The drill runs WEEKLY (REQ-OPS-011,
+      # Sunday 05:30), so 35 days let four consecutive drills fail -- a month of unverified backups --
+      # before anyone was told. Eight is one weekly interval plus a day of slack for a run that finishes
+      # late, so the FIRST Sunday that fails or does not run is reported the next day -- the same
+      # margin ContainerCleanupStaleOrMissing uses for its weekly job.
       - alert: RestoreDrillStaleOrMissing
-        expr: (time() - basetool_restore_drill_last_success_timestamp) > 35 * 24 * 3600 or absent(basetool_restore_drill_last_success_timestamp)
+        expr: (time() - basetool_restore_drill_last_success_timestamp) > 8 * 24 * 3600 or absent(basetool_restore_drill_last_success_timestamp)
         for: 1h
         labels:
           severity: critical
         annotations:
-          summary: "Restore drill stale >35d or metric absent"
-          description: "The weekly restore drill (iri-restore-drill.timer, Sun 05:30) last succeeded more than 35 days ago, or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 40d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
+          summary: "Restore drill stale >8d or metric absent"
+          description: "The weekly restore drill (iri-restore-drill.timer, Sun 05:30) has not succeeded for more than 8 days -- at least one weekly drill failed or did not run -- or the metric is absent (never ran). `{app=\"ops-restore-drill\"} |~ \"FATAL|WARN\"` in Grafana -> Explore -> Loki over the last 10d carries the abort reason; an empty stream means the unit never fired — check `systemctl list-timers iri-restore-drill.timer`. Not visible via `journalctl -u iri-restore-drill.service` (stdout/stderr are appended to /var/log/iri-restore-drill.log)."
 
       - alert: RestoreDrillArtifactNotRestorable
         expr: basetool_restore_drill_artifact_ok == 0
@@ -117,6 +122,29 @@ groups:
 
   - name: ops-automation-warning
     rules:
+      # The deployer's own heartbeat (OPS-MON-02, added 2026-09-22). deploy.sh stamps
+      # basetool_deploy_last_stack_healthy_timestamp on every tick that finds the stack at its target
+      # and healthy -- which on a quiet host is every five minutes. Every other deploy alert reads an
+      # OUTCOME a tick wrote; none of them can see ticks that stopped happening. A disabled timer, a
+      # lock that is never released, a pre-flight that aborts before the first metric write, a host
+      # whose textfile directory went read-only: each leaves the last outcome standing, and the last
+      # outcome was a success. An hour is twelve missed ticks.
+      #
+      # It also fires, correctly, while a tick deliberately skips -- a stateful-infra carve-out
+      # (DeployConfigBlocked pages that one) or a bad-digest backoff (DeployRolledBack) -- because in
+      # both the running stack is no longer being verified. `absent()` covers a host whose deployer
+      # never wrote the gauge at all.
+      - alert: DeployHeartbeatStale
+        expr: >-
+          (time() - basetool_deploy_last_stack_healthy_timestamp) > 3600
+          or absent(basetool_deploy_last_stack_healthy_timestamp)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deploy heartbeat stale >1h (no tick has verified the stack)"
+          description: "No deploy tick has observed the stack at its target and healthy for over an hour, or the heartbeat metric is absent -- so the running stack is not being verified and no release can reach it. Check `systemctl list-timers iri-deploy.timer` and `systemctl status iri-deploy.service`, then `{app=\"ops-deploy\"}` in Grafana -> Explore -> Loki for the last tick's lines (a FATAL, a lock message, or nothing at all). A deliberate skip (a gated stateful-infra change, a backoff after a rollback) also stops the heartbeat; DeployConfigBlocked and DeployRolledBack name those."
+
       # Opt-in: fires ONLY when an expiry has been recorded (the .expiry sidecar
       # exists) and is <14d away. A token with no expiry (a classic PAT kept
       # non-expiring by choice) simply has no .expiry file, emits no metric, and

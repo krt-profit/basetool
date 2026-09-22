@@ -1064,21 +1064,77 @@ rt_volume_exists() {
   ${RT_CLI} volume inspect "$1" >/dev/null 2>&1
 }
 
-rt_network_exists() {
-  ${RT_CLI} network inspect "$1" >/dev/null 2>&1
+# -----------------------------------------------------------------------------
+# rt_unit_image <service> [fallback-unit-directory]
+#
+# Print the image reference -- digest included -- that a Quadlet unit runs, read
+# from its `Image=` line. The helper and drill containers use it to run EXACTLY
+# the PostgreSQL image db-backend runs, instead of naming a tag of their own.
+#
+# Until 2026-09-22 backup.sh and restore-drill.sh each carried
+# `docker.io/library/postgres:18-alpine` as a literal: a floating tag, resolved at
+# pull time against whatever the registry said that night, and a second place to
+# forget when Dependabot bumps the digest in docker-compose.yml. The generated unit
+# is where that digest already lives, so it is read from there.
+#
+# The installed unit wins, because it is what actually runs; the copy in the
+# config tree is the fallback for a host whose unit directory is not readable
+# yet. Prints nothing and returns 1 when neither names an image, so the caller
+# decides what a missing answer costs.
+# -----------------------------------------------------------------------------
+rt_unit_image() {
+  local svc="$1" fallback="${2:-}" dir file ref
+  for dir in "${RT_UNIT_DIR:-}" "${fallback}"; do
+    [[ -n "${dir}" ]] || continue
+    file="${dir}/${svc}.container"
+    [[ -r "${file}" ]] || continue
+    ref="$(sed -n 's/^Image=\([^[:space:]]\{1,\}\)[[:space:]]*$/\1/p' "${file}" | tail -n 1)"
+    if [[ -n "${ref}" ]]; then
+      printf '%s\n' "${ref}"
+      return 0
+    fi
+  done
+  return 1
 }
 
 # -----------------------------------------------------------------------------
-# rt_run_on_network <network> <image> <command>...
+# rt_prometheus_snapshot
 #
-# Run a throwaway container attached to one internal network. The weekly
-# Prometheus TSDB snapshot needs it: the admin API is reachable only from inside
-# the monitoring plane, because the host publishes no Prometheus port by design.
+# Ask Prometheus for a TSDB snapshot through its admin API (ADR-0072) and print
+# the JSON answer, whose `data.name` is the snapshot directory under
+# /prometheus/snapshots.
+#
+# It runs INSIDE the prometheus container, with the image's own BusyBox wget, and
+# reads the web password there from the secret the container already mounts. Until
+# 2026-09-22 backup.sh started a throwaway `curlimages/curl:8.11.1` container for
+# this and handed it `-u grafana:<password>`, which failed twice over on Podman:
+#
+#   * a short image name, which podman refuses to resolve without a TTY
+#     ("short-name resolution enforced but cannot prompt"), and an unpinned tag;
+#   * the password on `podman run`'s argv, readable by every account on the host
+#     through /proc/<pid>/cmdline for as long as the pull and the request took.
+#
+# Inside the container the password never leaves it: it goes from the mounted file
+# into an Authorization header in one shell, the same way check-conformance.py's
+# _promql reads Prometheus. The admin API needs no network hop, so nothing new is
+# pulled and nothing joins net-monitoring-core.
 # -----------------------------------------------------------------------------
-rt_run_on_network() {
-  local net="$1" image="$2"
-  shift 2
-  ${RT_CLI} run --rm --network "${net}" "${image}" "$@"
+rt_prometheus_snapshot() {
+  # shellcheck disable=SC2016  # expanded by the shell INSIDE the container, from its own secret
+  rt_exec prometheus sh -c \
+    'p="$(cat /etc/prometheus/secrets/web_password)" && a="$(printf "grafana:%s" "${p}" | base64 -w0)" && wget -q -O- --post-data="" --header="Authorization: Basic ${a}" http://127.0.0.1:9090/api/v1/admin/tsdb/snapshot'
+}
+
+# rt_prometheus_snapshot_remove <name> -- delete one snapshot directory, from
+# inside the container that owns it. The deploy account cannot: under rootless
+# Podman the TSDB belongs to the container's `nobody`, i.e. host uid 165533, and a
+# host-side `rm -rf` fails in silence, so every weekly snapshot used to stay in the
+# 40 GB volume. The name is checked against the shape Prometheus gives it
+# (`20260922T041500Z-<hex>`) before it is used in a path.
+rt_prometheus_snapshot_remove() {
+  local name="$1"
+  [[ "${name}" =~ ^[0-9A-Za-z-]+$ ]] || return 1
+  rt_exec prometheus rm -rf "/prometheus/snapshots/${name}"
 }
 
 # =============================================================================

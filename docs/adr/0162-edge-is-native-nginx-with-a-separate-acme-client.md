@@ -178,3 +178,30 @@ project keeps meeting, caught here before it shipped rather than after.
 
 **If the migration is wrong, the way back is one command.** `docker compose --profile rollback up -d
 npm` with the service definition and data untouched.
+
+## Amendment 2026-09-22 — the principle extends to the data networks (OPS-SEC-05)
+
+Decision 4 took the outbound path away from the one container that did not need it. The same
+reasoning holds for three more: `db-backend`, `db-keycloak` and `redis` need no internet either, and
+each sits on its data networks and nothing else. So **`net-db-backend`, `net-db-keycloak`,
+`net-redis-backend`, `net-redis-frontend` and `net-redis-ingest` are `Internal=true`** as well —
+approved by @greluc on 2026-09-22. A compromised database or session store can no longer fetch a
+second stage or send anything out; every other member of those networks (the three application
+modules, Keycloak, the three exporters) keeps a non-internal network of its own for the egress it
+has, and name resolution is unaffected because aardvark-dns answers on an internal network — which
+the five `net-proxy-*` networks have relied on since this ADR.
+
+**It is expressed in the Quadlet units, not in compose**, and that is the one difference from
+decision 4. The compose file also runs the local stacks, where the `-dev` twins of these three
+services publish `127.0.0.1:15432`, `:15433` and `:6379` on these very networks for a developer's
+`bootRun`. An internal network carries no DNAT — the lesson this ADR learned the hard way with the
+edge — so `internal: true` in compose would have broken every local database connection silently.
+Production publishes nothing on them. `scripts/generate-quadlet.py` holds the list
+(`QUADLET_INTERNAL_NETWORKS`) and **refuses** a unit whose every network is internal while it
+publishes a port or aliases the host gateway, since on such a container both would start clean and
+never work.
+
+**Rollout needs a network recreation.** Quadlet creates a network with `podman network create
+--ignore`, so a changed `.network` unit does not alter an existing network; the five have to be
+removed and recreated with their members stopped — a brief outage of the stack, testing host first.
+The exact commands are in the PR that introduced this amendment.

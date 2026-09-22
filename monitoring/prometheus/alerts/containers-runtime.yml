@@ -169,25 +169,32 @@ groups:
   # worse, not better -- a collector that stops writing leaves the left side of each `or` empty on
   # a Podman host and every container alert silently loses its input. Nothing else would notice.
   #
-  # Both rules are inert where the collector does not run: the series are absent on a Docker host,
-  # and an expression over an absent series produces no samples rather than a false alarm.
+  # The staleness rule also fires on ABSENCE (since 2026-09-22, OPS-MON-04). It used to be inert where
+  # the collector does not run, because the Docker host had no collector and must not be paged for
+  # it. That host is retired; on the one host this plane now watches, "the collector never wrote" is
+  # the worst version of the failure, not an exemption -- a timer that was never enabled, or a
+  # textfile directory node_exporter does not read, leaves no series at all, and a staleness test
+  # over no series produces no samples. The role takes the first reading at provisioning time, so a
+  # healthy host never shows the absence.
   # ===============================================================================================
   - name: container-metrics-collector
     rules:
       - alert: ContainerCgroupCollectorStale
         # The timer runs every 30s. Five minutes is ten missed runs, which is a stopped timer or a
         # collector that is failing every time, not a slow host.
-        expr: time() - basetool_container_metrics_timestamp_seconds > 300
+        expr: >-
+          time() - basetool_container_metrics_timestamp_seconds > 300
+          or absent(basetool_container_metrics_timestamp_seconds)
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "The cgroup container-metrics collector has stopped writing"
           description: >-
-            basetool_container_metrics_timestamp_seconds is more than 5 minutes old, so every
-            basetool_container_* series is stale and the container memory, OOM, CPU-throttling and
-            pids alerts have lost their input on this host. They will NOT fire while this is true.
-            Check iri-container-metrics.timer and the textfile directory.
+            basetool_container_metrics_timestamp_seconds is more than 5 minutes old or absent, so
+            every basetool_container_* series is stale or missing and the container memory, OOM,
+            CPU-throttling and pids alerts have lost their input on this host. They will NOT fire
+            while this is true. Check iri-container-metrics.timer and the textfile directory.
 
       - alert: ContainerCgroupCollectorFoundNothing
         # It writes a file listing zero containers when the cgroup paths stop matching -- a layout
