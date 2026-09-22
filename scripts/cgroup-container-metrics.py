@@ -28,6 +28,7 @@ cAdvisor series                              this collector
 ``container_threads_max``                    ``basetool_container_pids_max``
 ``container_memory_rss``                     ``basetool_container_memory_anon_bytes``
 ``container_memory_working_set_bytes``       ``basetool_container_memory_working_set_bytes``
+``container_memory_mapped_file``             ``basetool_container_memory_mapped_file_bytes``
 ``container_spec_memory_limit_bytes``        ``basetool_container_memory_limit_bytes``
 ``container_cpu_usage_seconds_total``        ``basetool_container_cpu_usage_seconds_total``
 ===========================================  =================================================
@@ -214,6 +215,15 @@ def sample(path: str) -> dict[str, float]:
     if anon is not None:
         out["memory_anon_bytes"] = anon
 
+    # The third series of the dashboard's memory breakdown, which explains the gap between anon and
+    # the working set: mapped executables and libraries are page cache, so they count toward the
+    # working set and toward no process's RSS. The panel asked cAdvisor's
+    # `container_memory_mapped_file` for it, and cAdvisor is deleted on this runtime, so the series
+    # was simply absent -- indistinguishable from a container that maps nothing.
+    file_mapped = _number(mem.get("file_mapped"))
+    if file_mapped is not None:
+        out["memory_mapped_file_bytes"] = file_mapped
+
     current = _number(_read(os.path.join(path, "memory.current")))
     inactive_file = _number(mem.get("inactive_file"))
     if current is not None:
@@ -249,6 +259,7 @@ HELP = {
     "memory_anon_bytes": ("gauge", "Anonymous memory in use, from memory.stat anon. The cgroup v2 analogue of RSS."),
     "memory_usage_bytes": ("gauge", "Total memory charged to the cgroup, from memory.current."),
     "memory_working_set_bytes": ("gauge", "memory.current minus reclaimable page cache, as cAdvisor computed it."),
+    "memory_mapped_file_bytes": ("gauge", "Mapped file pages, from memory.stat file_mapped -- binaries and libraries."),
     "memory_limit_bytes": ("gauge", "Memory ceiling from memory.max; +Inf when unlimited."),
     "pids": ("gauge", "Processes and threads in the cgroup, from pids.current."),
     "pids_max": ("gauge", "Process ceiling from pids.max; +Inf when unlimited."),

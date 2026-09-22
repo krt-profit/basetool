@@ -72,6 +72,15 @@ groups:
           max by (name) (container_memory_working_set_bytes{name=~".+"})
           or max by (name) (basetool_container_memory_working_set_bytes)
 
+      # The other half of that explanation: mapped executables and libraries are page cache, so
+      # they count toward the working set and toward no process's RSS. The dashboard read this
+      # straight from cAdvisor until 2026-09-22 and therefore read nothing on a Podman host --
+      # a container that maps nothing looks identical to a metric that does not exist.
+      - record: basetool:container:memory_mapped_file_bytes
+        expr: >-
+          max by (name) (container_memory_mapped_file{name=~".+"})
+          or max by (name) (basetool_container_memory_mapped_file_bytes)
+
       # --- cpu ---------------------------------------------------------------------------------
       - record: basetool:container:cpu_usage_seconds_total
         expr: >-
@@ -112,6 +121,45 @@ groups:
         expr: >-
           max by (name) (container_oom_events_total{name=~".+"})
           or max by (name) (basetool_container_oom_kills_total)
+
+      # --- network and lifetime, from the exporter rather than the cgroup collector -------------
+      #
+      # These three have a DIFFERENT right-hand side to every rule above, and the reason is worth
+      # stating once. The cgroup collector reads the container's own cgroup files, which carry cpu,
+      # memory and pids -- and carry no network counters and no start time at all. Those come from
+      # prometheus-podman-exporter, which labels by `id` and nothing else, so each one has to be
+      # joined against `podman_container_info` to learn the name the dashboards and every rule
+      # above are keyed on.
+      #
+      # Added 2026-09-22, after the cutover left three panels reading an empty result: "Container
+      # Restarts (1h)" and "Network RX/TX per Container" queried `container_start_time_seconds` and
+      # `container_network_*` directly, and those are cAdvisor families. cAdvisor is deleted on this
+      # runtime (ADR-0163 / arc42 section 7.3), so the panels said "No data" about a host whose
+      # containers were running and serving. A panel that asks a deleted exporter is indistinguishable
+      # from a panel that has found nothing to report.
+      - record: basetool:container:start_time_seconds
+        expr: >-
+          max by (name) (container_start_time_seconds{name=~".+"})
+          or max by (name) (
+            podman_container_started_seconds * on (id) group_left(name) podman_container_info
+          )
+
+      # SUM, not max: a container is on several networks here and the exporter counts per container,
+      # so the sum is the container's traffic. `max` would silently under-report the moment the
+      # exporter ever splits these per interface.
+      - record: basetool:container:network_receive_bytes_total
+        expr: >-
+          sum by (name) (container_network_receive_bytes_total{name=~".+"})
+          or sum by (name) (
+            podman_container_net_input_total * on (id) group_left(name) podman_container_info
+          )
+
+      - record: basetool:container:network_transmit_bytes_total
+        expr: >-
+          sum by (name) (container_network_transmit_bytes_total{name=~".+"})
+          or sum by (name) (
+            podman_container_net_output_total * on (id) group_left(name) podman_container_info
+          )
 
   # ===============================================================================================
   # The collector that produces the right-hand side of every `or` above.

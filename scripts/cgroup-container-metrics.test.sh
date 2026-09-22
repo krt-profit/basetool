@@ -93,6 +93,7 @@ EOF
   cat > "${dir}/memory.stat" <<EOF
 anon 104857600
 file 52428800
+file_mapped 31457280
 inactive_file 20971520
 slab 1048576
 EOF
@@ -144,6 +145,13 @@ assert_line "anon memory is the RSS analogue" \
 # 134217728 - 20971520 = 113246208
 assert_line "working set is current minus reclaimable page cache" \
   '^basetool_container_memory_working_set_bytes\{name="backend"\} 113246208$'
+# The third series of the dashboard's memory breakdown. Mapped executables and libraries are page
+# cache, so they count toward the working set and toward no process's RSS -- which is what makes
+# the gap between anon and working set readable at all. The panel asked cAdvisor's
+# container_memory_mapped_file for it, and cAdvisor is deleted on this runtime, so the series was
+# absent and read as "this container maps nothing".
+assert_line "mapped file pages, the third series of the memory breakdown" \
+  '^basetool_container_memory_mapped_file_bytes\{name="backend"\} 31457280$'
 assert_line "cpu seconds scaled from usec" \
   '^basetool_container_cpu_usage_seconds_total\{name="backend"\} 2\.5$'
 assert_line "throttled seconds scaled from usec" \

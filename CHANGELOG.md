@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Betrieb: fünf leere Dashboard-Panels zeigen wieder Daten.** „Container Restarts", „Network
+  RX/TX", die dritte Reihe der Speicheraufschlüsselung und die beiden Redis-Speicherpanels fragten
+  Werte ab, die es nur unter der alten Container-Laufzeit gab — sie meldeten „No data" über
+  Container, die einwandfrei liefen. Die fehlenden Größen kommen jetzt aus den Quellen, die dieser
+  Host tatsächlich hat. Rein betriebsseitig.
+
 - **Der Edge sieht wieder die echte Client-Adresse.** Die gepinnte Adresse, der er den
   PROXY-Header glaubt, lag am falschen Netz: die Verbindung kommt über ein anderes, geteiltes
   Netz herein, dessen Adressen bei jedem Neuanlegen wandern. Der Edge verwarf den Header deshalb
