@@ -118,9 +118,40 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   boolean existsByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
 
   /**
-   * Derived Spring-Data query - returns the count of rows matching {@code OwnerIdAndShipTypeId}.
+   * Counts one owner's ships per ship type in a single grouped statement — the hangar import's
+   * "how many of this type does the member already have" check for every type in the upload at
+   * once, instead of one {@code COUNT} per distinct type (REQ-DATA-003, BE-PERF-15). Types the
+   * owner has no ship of are absent from the result.
+   *
+   * @param ownerId the hangar owner
+   * @return one row per ship type the owner holds, with its ship count
    */
-  long countByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
+  @Query(
+      "SELECT s.shipType.id AS shipTypeId, COUNT(s) AS shipCount FROM Ship s"
+          + " WHERE s.owner.id = :ownerId GROUP BY s.shipType.id")
+  List<ShipTypeCount> countShipsPerTypeByOwnerId(
+      @org.springframework.data.repository.query.Param("ownerId") UUID ownerId);
+
+  /**
+   * Row of {@link #countShipsPerTypeByOwnerId(UUID)}: a ship type and how many ships of it one
+   * owner holds.
+   */
+  interface ShipTypeCount {
+
+    /**
+     * The ship type the row counts.
+     *
+     * @return the ship type id
+     */
+    UUID getShipTypeId();
+
+    /**
+     * How many ships of that type the owner holds.
+     *
+     * @return the count, at least one
+     */
+    long getShipCount();
+  }
 
   /**
    * Derived Spring-Data query - returns entities matching {@code OwnerId}. Eagerly fetches the

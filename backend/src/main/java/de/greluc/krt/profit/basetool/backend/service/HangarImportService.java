@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.Ship;
 import de.greluc.krt.profit.basetool.backend.model.ShipType;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -215,15 +217,26 @@ public class HangarImportService {
       firstEntryByTypeId.putIfAbsent(typeId, entry);
     }
 
-    // Phase 2: for each distinct ShipType, create only the missing ships.
+    // Phase 2: for each distinct ShipType, create only the missing ships. The member's current
+    // per-type counts come from one grouped query rather than one COUNT per type (REQ-DATA-003).
     int importedCount = 0;
     int alreadySufficientCount = 0;
+    Map<UUID, Long> hangarCountByTypeId = new HashMap<>();
+    if (!uploadCountByTypeId.isEmpty()) {
+      for (ShipRepository.ShipTypeCount row : shipRepository.countShipsPerTypeByOwnerId(userId)) {
+        hangarCountByTypeId.put(row.getShipTypeId(), row.getShipCount());
+      }
+    }
+    // The owning org unit depends only on the importer, so it is resolved once, on the first ship
+    // actually created (a multi-membership importer's 400 still surfaces only when one is).
+    OrgUnit owningOrgUnit = null;
+    boolean owningOrgUnitResolved = false;
 
     for (Map.Entry<UUID, Integer> e : uploadCountByTypeId.entrySet()) {
       UUID typeId = e.getKey();
       ShipType shipType = shipTypeById.get(typeId);
       int jsonCount = e.getValue();
-      long hangarCount = shipRepository.countByOwnerIdAndShipTypeId(userId, typeId);
+      long hangarCount = hangarCountByTypeId.getOrDefault(typeId, 0L);
       int toCreate = (int) Math.max(0L, jsonCount - hangarCount);
 
       if (toCreate > 0) {
@@ -244,8 +257,11 @@ public class HangarImportService {
           // ({@code owningOrgUnit == null}) for a membershipless importer (V132 made the column
           // nullable for exactly this), and surfaces a multi-membership importer as a clean 400
           // until a per-import picker is added (post-SK §5.5 stamping wave).
-          ship.setOwningOrgUnit(
-              ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null));
+          if (!owningOrgUnitResolved) {
+            owningOrgUnit = ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null);
+            owningOrgUnitResolved = true;
+          }
+          ship.setOwningOrgUnit(owningOrgUnit);
           ship.setShipType(shipType);
           ship.setInsurance(insurance);
           ship.setFitted(false);
