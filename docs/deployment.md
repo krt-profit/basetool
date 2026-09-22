@@ -337,8 +337,14 @@ Three gates, in order (REQ-OPS-002, REQ-OPS-024):
    architectures, failing on a fixed HIGH/CRITICAL finding. Break-glass: `-f allow_vulnerable=true`,
    which is announced in the approval record.
 2. **Approval** by the required reviewer on the `production` GitHub Environment (one `approve` job).
-3. **Signature** — cosign-verify against the `release-images.yml@refs/(heads/main|tags/v.+)`
-   identity, then re-tag all five artifacts to `:stable` in lock-step, `fail-fast`.
+3. **Signature** — cosign-verify against the anchored
+   `release-images.yml@refs/(heads/main|tags/vMAJOR.MINOR.PATCH)` identity, then re-tag all five
+   artifacts to `:stable` in lock-step, `fail-fast`.
+
+`promote.yml` must be dispatched **from `main`**: its first job fails on any other ref, and the
+`production` environment accepts deployments from `main` only. The approval gate guards against a
+mistaken promotion; the signature gate guards against a tampered image — neither stands in for the
+other.
 
 A production promotion also carries `:testing` forward whenever testing would otherwise fall behind
 (`sync-testing`, decided by commit ancestry, never by timestamp).
@@ -807,9 +813,13 @@ verifying image signatures (cosign keyless)
   keycloak-spi: signature OK
 ```
 
-- Identity `https://github.com/krt-profit/basetool/.github/workflows/release-images.yml@refs/(heads/main|tags/v.+)`,
+- Identity `^https://github\.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`,
   issuer `https://token.actions.githubusercontent.com` — the same as `promote.yml`. A
-  `workflow_dispatch` build off a feature branch is not trusted.
+  `workflow_dispatch` build off a feature branch is not trusted. **Anchored since 2026-09-22**: the
+  earlier unanchored `…@refs/(heads/main|tags/v.+)` also matched `refs/heads/main-x` or
+  `refs/tags/vfoo`. A host running a `deploy.sh` from before that date still verifies with the old
+  regexp — `deploy.sh` reaches the host only through the Ansible role (`--tags scripts`), not through
+  the promoted bundle.
 - **Fail-closed**, with three attempts and doubling delay first (`IRI_COSIGN_VERIFY_ATTEMPTS`,
   `IRI_COSIGN_VERIFY_DELAY`), so a registry blip is not a security alarm; the abort quotes cosign's
   own error and records `DeployFailed`.

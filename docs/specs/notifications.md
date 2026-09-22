@@ -245,6 +245,12 @@ Gated by `app.notifications.retention.enabled` and paced by
 `app.notifications.retention.interval`. Disabled under the `test` profile. The sweep is
 independent of the user-initiated delete (REQ-NOTIF-005).
 
+**Lower bounds (2026-09-22, BE-MOD-03).** The keys bind through the validated
+`NotificationRetentionProperties` record: each window must be at least **`P1D`**, `unread-max-age`
+must not be shorter than `max-age`, and `interval` must be at least **`PT1M`** — otherwise the context
+refuses to start. As plain `@Value` durations a `P0D` or negative window would have emptied every
+inbox on the next run, and "never reaped sooner for being unread" held only for the defaults.
+
 **The unread half is not an optimisation.** Until it existed the sweep reached read rows only, so an
 inbox nobody opened retained its notifications — including the triggering member's handle —
 indefinitely. The retention period the privacy policy states therefore held for attentive members
@@ -277,9 +283,12 @@ which is the question a half that has quietly stopped raises (REQ-OBS-011).
 - [x] A failure in one half still lets the other half run, and the run is still recorded as
   failed.
 - [x] The two halves are counted separately as well as together.
+- [x] A window under `P1D`, an unread window shorter than the read one, or an interval under `PT1M`
+  refuses to start the context.
 
 **Enforced by:** `NotificationRetentionTaskTest`, `NotificationRepositoryIntegrationTest`
-(`deleteReadOlderThan`, `deleteUnreadOlderThan`) · **Code:** `task/NotificationRetentionTask`,
+(`deleteReadOlderThan`, `deleteUnreadOlderThan`), `BackendPropertiesValidationTest` (the bounds) ·
+**Code:** `task/NotificationRetentionTask`, `support/NotificationRetentionProperties`,
 `service/NotificationService#purgeReadOlderThan` / `#purgeUnreadOlderThan`,
 `metrics/ScheduledJob#NOTIFICATION_RETENTION`, `metrics/MetricNames#NOTIFICATION_RETENTION_DELETED`
 

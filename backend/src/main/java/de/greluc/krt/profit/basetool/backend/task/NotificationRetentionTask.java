@@ -23,15 +23,15 @@ import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.metrics.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.metrics.TaskMetrics;
 import de.greluc.krt.profit.basetool.backend.service.NotificationService;
+import de.greluc.krt.profit.basetool.backend.support.NotificationRetentionProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.function.IntSupplier;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -60,6 +60,7 @@ import org.springframework.stereotype.Component;
     havingValue = "true",
     matchIfMissing = true)
 @Slf4j
+@RequiredArgsConstructor
 public class NotificationRetentionTask {
 
   /** The bounded {@code kind} tag value for the read-retention half. */
@@ -68,11 +69,20 @@ public class NotificationRetentionTask {
   /** The bounded {@code kind} tag value for the unread-retention half. */
   private static final String KIND_UNREAD = "unread";
 
+  /** The inbox service performing the two deletes. */
   private final NotificationService notificationService;
+
+  /** The scheduled-job instrumentation wrapper. */
   private final TaskMetrics taskMetrics;
+
+  /** Where the per-half deleted counter is registered. */
   private final MeterRegistry meterRegistry;
-  private final Duration maxAge;
-  private final Duration unreadMaxAge;
+
+  /**
+   * The validated windows: {@code maxAge} for read, {@code unreadMaxAge} for unread notifications,
+   * each at least one day and the unread one never shorter (BE-MOD-03).
+   */
+  private final NotificationRetentionProperties properties;
 
   /**
    * The first failure of the current run, held while the other half is still to be attempted.
@@ -83,34 +93,10 @@ public class NotificationRetentionTask {
   private @Nullable RuntimeException firstFailure;
 
   /**
-   * Creates the retention task.
-   *
-   * @param notificationService the inbox service performing the delete
-   * @param taskMetrics the scheduled-job instrumentation wrapper
-   * @param meterRegistry where the per-half deleted counter is registered
-   * @param maxAge how long a read notification is retained after being read before the sweep
-   *     removes it (ISO-8601 duration; default {@code P90D})
-   * @param unreadMaxAge how long an unread notification is retained after being raised before the
-   *     sweep removes it (ISO-8601 duration; default {@code P180D})
-   */
-  public NotificationRetentionTask(
-      NotificationService notificationService,
-      TaskMetrics taskMetrics,
-      MeterRegistry meterRegistry,
-      @Value("${app.notifications.retention.max-age:P90D}") Duration maxAge,
-      @Value("${app.notifications.retention.unread-max-age:P180D}") Duration unreadMaxAge) {
-    this.notificationService = notificationService;
-    this.taskMetrics = taskMetrics;
-    this.meterRegistry = meterRegistry;
-    this.maxAge = maxAge;
-    this.unreadMaxAge = unreadMaxAge;
-  }
-
-  /**
-   * Deletes read notifications read longer ago than {@link #maxAge} and unread notifications raised
-   * longer ago than {@link #unreadMaxAge}, publishing the {@code notification_retention} job
-   * metrics. A failure is recorded and swallowed by {@link TaskMetrics} so the scheduler thread
-   * survives.
+   * Deletes read notifications read longer ago than the configured {@code maxAge} and unread
+   * notifications raised longer ago than {@code unreadMaxAge}, publishing the {@code
+   * notification_retention} job metrics. A failure is recorded and swallowed by {@link TaskMetrics}
+   * so the scheduler thread survives.
    */
   @Scheduled(fixedDelayString = "${app.notifications.retention.interval:PT24H}")
   public void purgeExpiredNotifications() {
@@ -144,14 +130,15 @@ public class NotificationRetentionTask {
   private int purgeExpired() {
     log.info(
         "Starting scheduled notification retention sweep (read max age {}, unread max age {})...",
-        maxAge,
-        unreadMaxAge);
+        properties.maxAge(),
+        properties.unreadMaxAge());
     Instant now = Instant.now();
+    Instant readCutoff = now.minus(properties.maxAge());
+    Instant unreadCutoff = now.minus(properties.unreadMaxAge());
     int readDeleted =
-        purgeHalf(KIND_READ, () -> notificationService.purgeReadOlderThan(now.minus(maxAge)));
+        purgeHalf(KIND_READ, () -> notificationService.purgeReadOlderThan(readCutoff));
     int unreadDeleted =
-        purgeHalf(
-            KIND_UNREAD, () -> notificationService.purgeUnreadOlderThan(now.minus(unreadMaxAge)));
+        purgeHalf(KIND_UNREAD, () -> notificationService.purgeUnreadOlderThan(unreadCutoff));
     log.info(
         "Notification retention sweep finished — {} read and {} unread notification(s) deleted.",
         readDeleted,

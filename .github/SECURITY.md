@@ -188,9 +188,12 @@ before reporting a finding against it:
 
 - **Signature** — every image is signed keyless with
   [Sigstore Cosign](https://docs.sigstore.dev/cosign/overview/). The
-  signing identity is the `release-images.yml` workflow on a ref under
-  `refs/heads/main` or `refs/tags/v*.*.*`, issued by
-  `https://token.actions.githubusercontent.com`.
+  signing identity is the `release-images.yml` workflow on exactly
+  `refs/heads/main` or a `refs/tags/vMAJOR.MINOR.PATCH` release tag, issued by
+  `https://token.actions.githubusercontent.com`. Verify with the anchored
+  regexp
+  `^https://github\.com/krt-profit/basetool/\.github/workflows/release-images\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$`
+  — an unanchored one also matches look-alike refs such as `main-x`.
 - **Provenance (in the registry)** — SLSA build provenance
   (`provenance: mode=max`) is attached as an OCI attestation to every
   published manifest.

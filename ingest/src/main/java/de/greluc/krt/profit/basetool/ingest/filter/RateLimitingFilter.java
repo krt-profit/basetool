@@ -19,11 +19,11 @@
 
 package de.greluc.krt.profit.basetool.ingest.filter;
 
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.ratelimit.RateLimitBuckets;
 import de.greluc.krt.profit.basetool.ingest.web.ProblemResponseWriter;
-import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -48,8 +48,12 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Per-client-IP token-bucket rate limiter for the ingest endpoints (REQ-INGEST-005). The new
  * ingress must not be usable to hammer the backend's import endpoints, so each source IP gets a
- * small bucket; an exhausted bucket yields 429 with a {@code Retry-After}. Mirrors the backend's
- * bucket4j approach.
+ * bucket; an exhausted bucket yields 429 with a {@code Retry-After}. Mirrors the backend's bucket4j
+ * approach.
+ *
+ * <p>The IP budget ({@code app.rate-limit.ip-capacity}, default 120/min) is deliberately looser
+ * than the per-subject one: several members can share one public address behind a CGNAT or an
+ * office NAT, and the IP limiter used to hand all of them the single 30/min a lone member gets.
  *
  * <p>This filter runs before the security chain and keys on the source IP, which a caller can
  * influence via {@code X-Forwarded-For}. It is therefore only a coarse front line; the enforceable
@@ -67,16 +71,31 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-  /** After correlation id and size cap, still before Spring Security. */
-  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 30;
+  /**
+   * After correlation id, bot filter and access log — and <b>before</b> {@link
+   * PayloadSizeLimitFilter}. That order is the point: the size cap buffers a chunked body of up to
+   * 2&nbsp;MiB to measure it, so running it first let a caller who was already over their budget
+   * still make the gateway read and hold a full body per request before the 429. Throttling first
+   * means a rejected request costs nothing but a map lookup.
+   */
+  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 20;
 
   /** Hard cap on simultaneously-tracked source IPs, bounding the bucket map's memory footprint. */
   static final int MAX_TRACKED_IPS = 50_000;
 
   private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_IPS);
+
+  /** The per-IP budget ({@code ipCapacity} / {@code ipRefillTokens} / {@code refillPeriod}). */
   private final RateLimitProperties properties;
+
+  /** Serializes the 429 problem body. */
   private final ObjectMapper objectMapper;
+
+  /** Counts every bucket evaluation and rejection under the bounded {@code ip} bucket label. */
   private final MeterRegistry meterRegistry;
+
+  /** Supplies the MDC key the problem body's {@code correlationId} is read from. */
+  private final LoggingProperties loggingProperties;
 
   @Override
   protected void doFilterInternal(
@@ -84,7 +103,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    Bucket bucket = buckets.computeIfAbsent(clientIp(request), ip -> newBucket());
+    Bucket bucket =
+        buckets.computeIfAbsent(
+            clientIp(request),
+            ip ->
+                RateLimitBuckets.newBucket(
+                    properties.ipCapacity(),
+                    properties.ipRefillTokens(),
+                    properties.refillPeriod()));
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
     // the per-IP rejection ratio rather than 429-only detection. Bounded `ip` literal, not the IP.
@@ -107,13 +133,14 @@ public class RateLimitingFilter extends OncePerRequestFilter {
       // and the edge log carries the address.
       log.debug(
           "Per-IP ingest rate limit exceeded (capacity={} per {}, retryAfter={}s)",
-          properties.getCapacity(),
-          properties.getRefillPeriod(),
+          properties.ipCapacity(),
+          properties.refillPeriod(),
           retryAfterSeconds);
       response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
       ProblemResponseWriter.write(
           response,
           objectMapper,
+          loggingProperties,
           HttpStatus.TOO_MANY_REQUESTS,
           "Rate limit exceeded",
           "RATE_LIMITED",
@@ -135,21 +162,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
    */
   @Override
   protected boolean shouldNotFilter(@NotNull HttpServletRequest request) {
-    return !properties.isEnabled() || !IngestPathScope.isIngestRequest(request);
-  }
-
-  /**
-   * Builds a fresh per-IP bucket from the configured capacity / refill.
-   *
-   * @return a new token bucket
-   */
-  private @NotNull Bucket newBucket() {
-    Bandwidth limit =
-        Bandwidth.builder()
-            .capacity(properties.getCapacity())
-            .refillGreedy(properties.getRefillTokens(), properties.getRefillPeriod())
-            .build();
-    return Bucket.builder().addLimit(limit).build();
+    return !properties.enabled() || !IngestPathScope.isIngestRequest(request);
   }
 
   /**

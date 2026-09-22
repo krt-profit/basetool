@@ -218,6 +218,11 @@ three calls and the one absence.
                         iri-deploy.timer ─┴─► verify → pull → render env.d → reconcile units
 ```
 
+Only `main` and a `vMAJOR.MINOR.PATCH` tag on a commit already on `main` may sign (the `ref-guard`
+job in `release-images.yml`), and only the jobs that sign hold the OIDC token that signing needs;
+the jobs that run the build do not. `promote.yml`, `promote-testing.yml` and `deploy.sh` trust the
+same anchored signer identity (REQ-OPS-015).
+
 `deploy.sh` and the host's own `iri-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
 ride the bundle. Provider JARs are barred from the config bundle and get their own promotable,

@@ -595,16 +595,17 @@ x-backend: &backend-template
     # verified against compose's nested interpolation for all three cases (neither set, hostname
     # only, issuer overridden). The frontend and ingest templates below derive it the same way.
     KEYCLOAK_ISSUER_URI: ${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri}
-    # JWT audience enforcement (security review, audit L-1). Empty by default, so a stack whose realm
-    # does not stamp aud — a hand-rolled local test realm — stays off. The E2E suite is the exception
+    # JWT audience enforcement (security review, audit L-1). REQUIRED for this prod-profile service
+    # since 2026-09-22 (APPSEC-08): the backend refuses to start under `prod` with it blank. The
+    # compose default stays empty so the dev and test stacks, which run the dev profile, stay off. The E2E suite is the exception
     # and runs ENFORCED: its realm stamps aud=basetool-backend and E2eStackExtension sets this var,
     # so the enforced code path is exercised on every e2e-labelled PR. Set
     # IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend in the prod .env — ONLY after confirming the
     # DEPLOYED realm stamps aud=basetool-backend on frontend tokens (the `extractor-ingest` default
     # client scope does). The gateway's IRI_INGEST_EXPECTED_AUDIENCES is a SEPARATE decision with a
     # DIFFERENT value (basetool-ingest, see the ingest service below) — do not set the two alike.
-    # Enabling it before that rejects every token and breaks the app; set the var back to empty to
-    # disable instantly.
+    # Enabling it before that rejects every token and breaks the app. Setting the var back to empty
+    # is no longer a rollback under `prod` — the backend then refuses to start.
     APP_SECURITY_JWT_EXPECTED_AUDIENCES: ${IRI_BACKEND_EXPECTED_AUDIENCES:-}
     # Which client may act for another member via X-Ingest-On-Behalf-Of (ADR-0129). Must be the
     # ingest gateway's confidential client id. EMPTY MEANS NOBODY.
@@ -622,6 +623,12 @@ x-backend: &backend-template
     # because the TTL is also the window in which a revoked role stays effective on an
     # already-issued token. Lower it to tighten revocation, raise it to cut database load.
     APP_SECURITY_AUTHORITIES_CACHE_TTL: ${IRI_AUTHORITIES_CACHE_TTL:-PT5M}
+    # Per-account budget for the export / statement / report / PDF endpoints (REQ-SEC-033
+    # carve-out, APPSEC-10, owner decision 2026-09-22). Forwarded for the same closed-allow-list
+    # reason as the line above; the defaults equal application.yml's (10 per minute). Validated at
+    # startup: a capacity below 1 refuses to start.
+    APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY: ${APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY:-10}
+    APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD: ${APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD:-1m}
     # Internal admin / user-sync path: direct backend→Keycloak over the isolated
     # net-backend-keycloak network, now TLS because the prod Keycloak serves HTTPS only. Trust is
     # pinned to the shared self-signed cert via the `keycloak-trust` SSL bundle
@@ -1154,6 +1161,10 @@ x-ingest: &ingest-template
     # but opening the pre-filled page is a separate manual click afterwards, so a shorter window
     # expired before pickup for slower users ("Import-Link abgelaufen"). Tune via .env if needed.
     APP_INGEST_HANDOFF_TTL: ${IRI_INGEST_HANDOFF_TTL:-PT30M}
+    # Per-IP ingest budget (REQ-INGEST-005), looser than the per-member 30/min on purpose: members
+    # behind one CGNAT / office NAT share a single public address. Requests per minute.
+    APP_RATE_LIMIT_IP_CAPACITY: ${IRI_INGEST_RATE_LIMIT_IP_CAPACITY:-120}
+    APP_RATE_LIMIT_IP_REFILL_TOKENS: ${IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS:-120}
     REDIS_HOST: redis
     REDIS_PORT: 6379
     REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}

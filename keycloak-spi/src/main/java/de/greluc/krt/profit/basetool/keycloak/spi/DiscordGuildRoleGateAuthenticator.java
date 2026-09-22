@@ -93,11 +93,11 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   private static final String DEFAULT_API_BASE_URL = "https://discord.com/api/v10";
   private static final String HTTPS_PREFIX = "https://";
 
-  /** The fail-closed membership decision logic. */
+  /**
+   * The fail-closed membership decision logic, and the only Discord call this gate makes: the
+   * member object it reads also supplies the server nickname for the precheck.
+   */
   private final @NotNull DiscordMembershipChecker checker;
-
-  /** The best-effort per-guild server-nickname reader (a precheck candidate). */
-  private final @NotNull DiscordGuildNicknameReader nicknameReader;
 
   /** The fail-open backend account-existence client. */
   private final @NotNull BackendAccountChecker backendChecker;
@@ -129,17 +129,20 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
       return;
     }
 
-    DiscordMembershipChecker.Result result =
-        checker.check(apiBaseUrl, guildId, roleId, brokered.accessToken());
-    if (result != DiscordMembershipChecker.Result.ALLOWED) {
+    // The ONE guild-member read of this login (KC-PERF-01). It used to be two here: the roles,
+    // then the same endpoint again for the nickname, on top of the identity provider's own read,
+    // so a first login spent three calls of the user's Discord rate-limit budget on one object.
+    DiscordMembershipChecker.MemberLookup lookup =
+        checker.lookup(apiBaseUrl, guildId, roleId, brokered.accessToken());
+    if (lookup.result() != DiscordMembershipChecker.Result.ALLOWED) {
       // Coarse reason only — never the token, payload or any Discord id.
-      log.infof("Discord membership gate denied login (reason=%s).", result);
+      log.infof("Discord membership gate denied login (reason=%s).", lookup.result());
       deny(context, ERROR_MESSAGE_KEY);
       return;
     }
 
     // Membership confirmed. Now the fail-open duplicate-account guard (REQ-SEC-022).
-    if (accountAlreadyExists(context, apiBaseUrl, guildId, brokered)) {
+    if (accountAlreadyExists(context, lookup.memberBody(), brokered)) {
       log.info(
           "Discord first-login denied: a Basetool account already exists for this identity; "
               + "directing the user to link instead.");
@@ -155,16 +158,18 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
    * confidently reports a collision; every skip/ambiguity returns {@code false} so the login
    * proceeds.
    *
+   * <p>The server nickname candidate comes from the member object the membership gate already read,
+   * so the precheck costs no Discord call of its own. It stays fail-open: an absent or unreadable
+   * {@code nick} simply means no nickname candidate.
+   *
    * @param context the authentication flow context
-   * @param apiBaseUrl the Discord API base URL (for the server-nickname fetch)
-   * @param guildId the configured guild id (for the server-nickname fetch)
+   * @param memberBody the guild-member JSON the membership gate read, or {@code null}
    * @param brokered the brokered Discord identity (username + e-mail + access token)
    * @return {@code true} iff a collision is confidently established and the login must be denied
    */
   private boolean accountAlreadyExists(
       @NotNull AuthenticationFlowContext context,
-      @NotNull String apiBaseUrl,
-      @NotNull String guildId,
+      @Nullable String memberBody,
       @NotNull Brokered brokered) {
     // ADR-0036: an already-authenticated session means an existing account is LINKING Discord, not
     // registering. Skip — otherwise the precheck would match the very account being linked and
@@ -180,8 +185,7 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
       return false;
     }
 
-    String serverNickname =
-        nicknameReader.readNickname(apiBaseUrl, guildId, brokered.accessToken()).orElse(null);
+    String serverNickname = DiscordGuildNicknameReader.extractNick(memberBody).orElse(null);
     BackendAccountChecker.Result existence =
         backendChecker.check(url, secret, brokered.username(), brokered.email(), serverNickname);
     // Fail open: only a confident EXISTS denies; NOT_EXISTS and UNKNOWN allow.

@@ -95,6 +95,20 @@ chain, so the MDC is already populated and the header already echoed.
 
 Document the format in OpenAPI and keep frontend error display in sync.
 
+**A raw `IllegalStateException` is a 500, never a 400 (APPSEC-06, 2026-09-22).** The handler used to
+answer every `IllegalStateException` with a 400 and echo its message as `detail`, on the assumption
+that only the application's own guards threw it. The JDK, Spring, Hibernate and every library throw
+it too — for server defects, with messages that can carry data values or internal names — so a defect
+reached the client as "your request was wrong" with an internal message attached, and escaped every
+5xx alert. `handleIllegalState` now delegates to the generic 500 (message and stack trace logged under
+the `correlationId`, generic localized `detail` to the client), exactly like `IllegalArgumentException`
+never echoes its message. **A client-side guard throws `BadRequestException` (or another
+`AppException`) with an i18n key** — never `IllegalStateException`. The four guards that relied on the
+old mapping were converted: `error.job_order.inventory_item_not_linked` (handover and production,
+an entry not earmarked to the order), `error.refinery_order.already_stored` and
+`error.user.still_in_keycloak` (both Keycloak-presence checks of the account deletion); their status
+stays 400. `GlobalExceptionHandlerTest` pins both halves.
+
 Service-layer repository lookups raise their 404 through the fetch-or-throw helper
 `exception.Entities.require(optional, message)` (S1, #907) rather than a hand-written
 `find*(id).orElseThrow(() -> new NotFoundException(…))`. The not-found `detail` stays

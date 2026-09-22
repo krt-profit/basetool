@@ -100,14 +100,13 @@ public class DiscordIdentityProvider
    */
   public static final String DEFAULT_SCOPE = "identify email guilds.members.read";
 
-  private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(10);
+  private static final Duration HTTP_TIMEOUT = DiscordHttp.TIMEOUT;
 
-  private static final HttpClient HTTP_CLIENT =
-      HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build();
+  // The one Discord client of the provider JAR (KC-SIMP-01), shared with the first-login gate.
+  private static final HttpClient HTTP_CLIENT = DiscordHttp.CLIENT;
 
   // Best-effort (fail-open) reader for the per-guild server nickname; shares the profile-call
-  // client
-  // and timeout. Never breaks the login — see enrichWithGuildNickname.
+  // client and timeout. Never breaks the login — see enrichWithGuildNickname.
   private static final DiscordGuildNicknameReader NICKNAME_READER =
       new DiscordGuildNicknameReader(HTTP_CLIENT, HTTP_TIMEOUT);
 

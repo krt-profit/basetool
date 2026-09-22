@@ -55,7 +55,7 @@ this repository cannot see them:
 
 |             Variable             |               Service               |                                                               State                                                                |
 |----------------------------------|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `IRI_BACKEND_EXPECTED_AUDIENCES` | backend                             | `basetool-backend` — enforcing since #1247 (2026-08-28)                                                                            |
+| `IRI_BACKEND_EXPECTED_AUDIENCES` | backend                             | `basetool-backend` — enforcing since #1247 (2026-08-28); **required** since 2026-09-22 — blank refuses the prod start (APPSEC-08) |
 | `IRI_INGEST_ALLOWED_CLIENT_IDS`  | ingest                              | `basetool-sc-extractor`                                                                                                            |
 | `IRI_INGEST_CLIENT_AUDIT_ONLY`   | ingest                              | `false` since 2026-08-30 — the `azp` allowlist enforces                                                                            |
 | `IRI_INGEST_EXPECTED_AUDIENCES`  | ingest                              | **must be `basetool-ingest`**; read on 2026-08-28 as the backend's value (wrong, see 7a) and not re-read since — **open**          |
@@ -344,8 +344,11 @@ signature / issuer / expiry validation. Apply it and restart the backend
 ([*Applying an `.env` change*](#applying-an-env-change-on-the-production-host)). Smoke-test: the frontend still works
 (pages load, writes succeed) **and** an extractor ingest call still reaches the backend.
 
-Rollback is instant and needs no release: blank the variable (or delete the line), re-render and
-restart.
+~~Rollback is instant and needs no release: blank the variable (or delete the line), re-render and
+restart.~~ **No longer true since 2026-09-22 (APPSEC-08):** the backend refuses to start under the
+`prod` profile while the variable is blank, so blanking it is an outage, not a rollback. If a token
+population turns out to lack the audience, fix its mapper or scope assignment (steps 2–3); as a
+stop-gap, add the audience that population does carry to the comma list.
 
 **Done 2026-08-28** (#1247).
 
@@ -436,7 +439,15 @@ IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest
 ```
 
 > **Do not point the gateway at `basetool-backend`.** That is the backend's audience and every
-> frontend token carries it — the check would pass for tokens this interface must refuse.
+> frontend token carries it — the check would pass for tokens this interface must refuse. Since
+> 2026-09-22 the repo-lint job `ingest-audience` (`scripts/check-ingest-audience.py`) fails a PR
+> that pairs the gateway's audience with that value in any config, env template or runbook.
+>
+> **Reading the result without the host** (2026-09-22): the gauge
+> `basetool_ingest_gate_enforcing{gate="audience"}` is `1` once this variable holds a value and `0`
+> while it is empty; `IngestAudienceGateOff` fires while it is `0`, and the gateway's startup log
+> prints the whole posture on its `Client gates` line (booleans and counts only). The same gauge
+> reports `azp` / `scope` / `tool`, which read `0` while `AUDIT_ONLY` is on.
 >
 > ### ⚠️ `AUDIT_ONLY` does NOT cover this variable — set it LAST
 >
@@ -687,9 +698,11 @@ is the defect being fixed, and those installs must update.
   with a named configuration error rather than misbehaving. The Keycloak client can be left in
   place; it issues tokens nobody consumes. Note this does **not** restore sends for a 2.7.x
   extractor, which was already broken before this change.
-- **Step 6:** unset `IRI_BACKEND_EXPECTED_AUDIENCES`, re-render and restart the backend — the
-  validator becomes inert (the decoder bean is no longer created); all previously-valid
-  tokens are accepted again. This is the fast rollback if anything 401s after step 6.
+- **Step 6:** ~~unset `IRI_BACKEND_EXPECTED_AUDIENCES`, re-render and restart the backend — the
+  validator becomes inert~~. **Corrected 2026-09-22 (APPSEC-08):** a blank value now stops the prod
+  backend from starting at all (`JwtAudienceStartupCheck`), so this is not a rollback any more. If
+  anything 401s, fix the realm side (steps 2–3) or temporarily add the audience the failing tokens
+  carry to the comma list.
 - **Steps 1–3:** removing the `extractor-ingest` scope assignment or the `basetool-sc-extractor`
   client stops every extractor send, and removing the scope from `basetool-frontend` breaks the web
   app while step 6 is enforcing. There is no reason to roll these back short of retiring ingest.

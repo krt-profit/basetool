@@ -29,6 +29,7 @@ import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.jbosslog.JBossLog;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
@@ -85,6 +86,34 @@ public class DiscordMembershipChecker {
       @NotNull String guildId,
       @NotNull String roleId,
       @NotNull String accessToken) {
+    return lookup(apiBaseUrl, guildId, roleId, accessToken).result();
+  }
+
+  /**
+   * Performs the one guild-member read of a first login and returns the membership decision
+   * together with the member object it was taken from.
+   *
+   * <p>Exists so the first-login gate needs exactly one Discord call. It used to read the same
+   * {@code /users/@me/guilds/{guildId}/member} twice — once here for the roles, once more through
+   * {@link DiscordGuildNicknameReader} for the nickname — which doubled the rate-limit budget a
+   * login spends and let the two answers disagree. The body is handed back only on an {@link
+   * Result#ALLOWED} decision, i.e. only from a clean HTTP 200 that parsed; a caller derives the
+   * nickname from it with {@link DiscordGuildNicknameReader#extractNick(String)}.
+   *
+   * <p>The fail-closed contract is unchanged: every outcome other than a 200 carrying the role is a
+   * denial, and a denial carries no body.
+   *
+   * @param apiBaseUrl Discord API base URL, e.g. {@code https://discord.com/api/v10}
+   * @param guildId the required guild (server) id
+   * @param roleId the required role id (numeric snowflake, as a string)
+   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
+   * @return the decision, plus the member JSON when (and only when) the login is allowed
+   */
+  public @NotNull MemberLookup lookup(
+      @NotNull String apiBaseUrl,
+      @NotNull String guildId,
+      @NotNull String roleId,
+      @NotNull String accessToken) {
     String url = apiBaseUrl + "/users/@me/guilds/" + guildId + "/member";
     int attempt = 0;
     while (true) {
@@ -100,27 +129,30 @@ public class DiscordMembershipChecker {
             e,
             "Discord membership check failed to reach the API (%s); denying.",
             e.getClass().getSimpleName());
-        return Result.DENIED_ERROR;
+        return MemberLookup.denied(Result.DENIED_ERROR);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         log.warn("Discord membership check was interrupted; denying.");
-        return Result.DENIED_ERROR;
+        return MemberLookup.denied(Result.DENIED_ERROR);
       }
 
       int status = response.statusCode();
       if (status == 200) {
         try {
-          return hasRole(response.body(), roleId) ? Result.ALLOWED : Result.DENIED_NOT_MEMBER;
+          String body = response.body();
+          return hasRole(body, roleId)
+              ? new MemberLookup(Result.ALLOWED, body)
+              : MemberLookup.denied(Result.DENIED_NOT_MEMBER);
         } catch (IOException e) {
           // Malformed / unparseable body — fail closed. Distinct from a transport failure: this one
           // means Discord answered 200 with something we could not read, i.e. a contract change.
           log.warnf(e, "Discord returned an unreadable member payload; denying.");
-          return Result.DENIED_ERROR;
+          return MemberLookup.denied(Result.DENIED_ERROR);
         }
       }
       if (status == 404) {
         // Clean "not a member of the guild".
-        return Result.DENIED_NOT_MEMBER;
+        return MemberLookup.denied(Result.DENIED_NOT_MEMBER);
       }
       if (status == 429 && attempt < max429Retries) {
         attempt++;
@@ -133,7 +165,37 @@ public class DiscordMembershipChecker {
       // guild id).
       log.warnf(
           "Discord membership check denied on HTTP %d after %d retry attempt(s).", status, attempt);
-      return Result.DENIED_ERROR;
+      return MemberLookup.denied(Result.DENIED_ERROR);
+    }
+  }
+
+  /**
+   * The outcome of one guild-member read: the membership decision and, on an allowed login only,
+   * the raw member JSON it was decided from. Never logged — the body carries Discord ids and names.
+   *
+   * @param result the fail-closed membership decision
+   * @param memberBody the guild-member JSON on {@link Result#ALLOWED}; {@code null} on any denial
+   */
+  public record MemberLookup(@NotNull Result result, @Nullable String memberBody) {
+
+    /**
+     * A denial, which by contract carries no member body.
+     *
+     * @param result the non-allowed decision
+     * @return the lookup outcome
+     */
+    static @NotNull MemberLookup denied(@NotNull Result result) {
+      return new MemberLookup(result, null);
+    }
+
+    /**
+     * Renders the decision only, so the member body can never reach a log line through the record.
+     *
+     * @return the decision
+     */
+    @Override
+    public @NotNull String toString() {
+      return "MemberLookup[result=" + result + "]";
     }
   }
 

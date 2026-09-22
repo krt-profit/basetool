@@ -51,7 +51,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * verbatim.
  *
  * <p>Ordered just inside {@link CorrelationIdFilter} (so the MDC id is populated when this filter
- * logs in its {@code finally}) but OUTSIDE the size-cap / rate-limit / security filters, so the
+ * logs in its {@code finally}) but OUTSIDE the rate-limit / size-cap / security filters, so the
  * line captures the final status even when one of them short-circuits (a 413 payload reject, a 429
  * rate limit, a 401/403). {@link #shouldNotFilter} keeps it to {@code /v1/**} so actuator / health
  * / api-docs traffic never pollutes the access log.

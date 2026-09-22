@@ -33,6 +33,6 @@ Das von Staffel B beigesteuerte Material wird übergeben — optional an Staffel
 
 ## Sonderfälle & Lehren
 
-- **Keine OrgUnit-Prüfung im Handover:** `JobOrderHandoverService` verlangt nur, dass der Lagereintrag eine Zuordnung zu *diesem* Auftrag trägt (sonst „Inventory item does not belong to this JobOrder"), nicht, dass er der Staffel des Protokollierenden gehört — das ist die Mechanik hinter „B liefert in A's Auftrag, A protokolliert die Übergabe". Das Rollen-Gate (LOGISTICIAN/OFFICER/ADMIN + `canEditJobOrder`) sitzt am Controller.
+- **Keine OrgUnit-Prüfung im Handover:** `JobOrderHandoverService` verlangt nur, dass der Lagereintrag eine Zuordnung zu *diesem* Auftrag trägt (sonst `400` mit `error.job_order.inventory_item_not_linked`, „Der Lagereintrag ist diesem Auftrag nicht (mehr) zugeordnet"; bis 2026-09-22 ein `IllegalStateException`-Text), nicht, dass er der Staffel des Protokollierenden gehört — das ist die Mechanik hinter „B liefert in A's Auftrag, A protokolliert die Übergabe". Das Rollen-Gate (LOGISTICIAN/OFFICER/ADMIN + `canEditJobOrder`) sitzt am Controller.
 - **`recipientSquadron`** erfasst die Heimat-Staffel des Empfängers (Freitext-Handle + optionale Staffel-Auswahl) — so ist der Drei-Staffel-Fall (A bestellt, B liefert, C empfängt) dokumentierbar.
 - **Concurrency/409:** Der Handover dekrementiert Inventar **und** offene Auftragsmenge in einer Transaktion (`*WithinTransaction`-Pattern); Bulk-Unlinks laufen einmalig nach der Schleife (sonst detachte Entities → 409).

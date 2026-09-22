@@ -13,6 +13,52 @@
   (`PostgresDown`, `RedisDown`, `ContainerUnhealthy`) sowie `DeployHeartbeatStale`, wenn der
   Deploy-Timer eine Stunde lang nichts prüft.
 
+### Changed
+
+- **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
+  Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
+  ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
+  31 Tagen wie Loki (REQ-OBS-010). Die Netzänderung braucht einen einmaligen Neuaufbau der Netze.
+
+- **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
+  der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
+
+- **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
+  vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und
+  gespeichert. Wer angemeldet bleiben will, setzt den Haken selbst (REQ-SEC-066).
+
+- **Ingest-Gateway: eigene, großzügigere Grenze pro IP-Adresse.** Mehrere Mitglieder hinter einem
+  gemeinsamen Anschluss (CGNAT, Büro) teilen sich nicht mehr 30 Sendungen pro Minute: pro IP gelten
+  jetzt 120, pro Mitglied weiter 30. Neu: `IRI_INGEST_RATE_LIMIT_IP_CAPACITY` /
+  `IRI_INGEST_RATE_LIMIT_IP_REFILL_TOKENS`.
+
+- **Betrieb: Das Ingest-Gateway meldet, welche Client-Sperren wirklich greifen.** Neue Metrik
+  `basetool_ingest_gate_enforcing{gate}`, eine Zeile im Startlog, ein Dashboard-Panel und der Alarm
+  `IngestAudienceGateOff`, solange die Audience-Prüfung aus ist.
+
+### Fixed
+
+- **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
+  Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten
+  Herunterfahren. Die Units setzen jetzt `StopTimeout=` passend zur konfigurierten Frist.
+
+- **Backup: der wöchentliche Prometheus-Snapshot lief unter Podman nicht.** Der Hilfscontainer
+  wurde abgelehnt und trug das Passwort auf der Kommandozeile; der Snapshot wird jetzt im
+  Prometheus-Container angefordert und dort auch wieder gelöscht. Backup-Helfer und Restore-Drill
+  nutzen das per Digest gepinnte PostgreSQL-Image von db-backend.
+
+- **Extractor: Serverfehler wurden als „bitte anmelden" gemeldet.** Lehnte das Backend die eigene
+  Kennung des Ingest-Gateways ab, sah das Mitglied einen Anmeldefehler. Jetzt kommt ein 502 mit
+  Hinweis auf ein Serverproblem, und das Gateway holt beim nächsten Senden ein frisches Token.
+
+- **Ingest-Konfiguration nannte die falsche Audience.** Der Kommentar in `application.yml` empfahl
+  noch `basetool-backend`, was Browser-Sitzungstokens durchließe; richtig ist `basetool-ingest`. Ein
+  neuer Repo-Lint-Check verhindert, dass der Wert wieder auftaucht.
+
+## [v1.10.0](https://github.com/krt-profit/basetool/releases/tag/v1.10.0) - 2026-09-22
+
+### Added
+
 - **Spezialkommandos: SK-Leiter verwalten die Mitglieder ihres SK jetzt selbst.** „Leitung" →
   „Mitglieder verwalten" öffnet die Mitgliederseite des eigenen SK: hinzufügen, entfernen,
   Logistiker/Einsatz-Manager setzen. Das Recht bestand im Backend schon, nur lag die einzige Seite
@@ -24,13 +70,26 @@
 
 ### Changed
 
-- **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
-  Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
-  ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
-  31 Tagen wie Loki (REQ-OBS-010). Die Netzänderung braucht einen einmaligen Neuaufbau der Netze.
+- **Exporte und Berichte: höchstens zehn pro Minute und Konto.** Kontoauszüge, Bank-3-Monats-Report,
+  Übergabeprotokolle, Audit- und Datenexporte (Art. 15) zählen gegen ein eigenes Kontingent; darüber
+  antwortet das Backend mit `429`. Einstellbar über `APP_RATE_LIMIT_SUBJECT_EXPORT_CAPACITY` /
+  `APP_RATE_LIMIT_SUBJECT_EXPORT_REFILL_PERIOD`.
 
-- **Monitoring: der Restore-Drill meldet einen ausgefallenen Wochenlauf nach 8 statt 35 Tagen**, und
-  der Container-Metrik-Kollektor alarmiert auch, wenn er nie geschrieben hat.
+- **Betrieb: das Backend startet in Produktion nicht mehr ohne `IRI_BACKEND_EXPECTED_AUDIENCES`.**
+  Ein leerer Wert schaltete die JWT-Audience-Prüfung bisher still ab; jetzt bricht der Start mit
+  einer klaren Meldung ab, und die aktiven Audiences stehen beim Start im Log.
+
+- **Betrieb: Aufbewahrungsfristen haben Untergrenzen.** Ein Tippfehler wie `P0D` hätte beim nächsten
+  Lauf das ganze Audit-Protokoll bzw. alle Benachrichtigungen gelöscht. Jetzt verweigert das Backend
+  den Start unter 30 Tagen (Audit), 1 Tag (Benachrichtigungen, abgelehnte Registrierungen) oder
+  einem Intervall unter einer Minute.
+  
+- **CI/Lieferkette: Signaturprüfung und Workflows gehärtet.** Die cosign-Signaturidentität in
+  `promote*.yml`, `release-images.yml` und `deploy.sh` ist jetzt verankert (`^…$`) – Refs wie
+  `main-x` oder `vfoo` gelten nicht mehr als vertrauenswürdig –, und signiert wird nur noch von
+  `main` oder einem Release-Tag auf `main`, von Jobs ohne eigenen Build. Dazu keine gespeicherten
+  Checkout-Credentials, Prüfsummen für CI-Werkzeuge, BuildKit per Digest, ein zizmor-Job und die
+  Gradle-Abhängigkeiten im Dependency Graph; der neue `deploy.sh` kommt über die Ansible-Rolle.
 
 - **Build: jedes ausgelieferte Modul prüft die Lizenzen seiner Abhängigkeiten gegen eine
   GPL-3.0-kompatible Liste.** Eine unverträgliche Lizenz lässt den Build scheitern. Dabei fiel
@@ -49,14 +108,15 @@
 
 ### Fixed
 
-- **Betrieb: Container bekommen beim Stoppen wieder ihre Nachlaufzeit.** Podman beendete jeden
-  Container nach 10 s hart — Anwendungen, Datenbanken, Loki und Tempo mitten im geordneten
-  Herunterfahren. Die Units setzen jetzt `StopTimeout=` passend zur konfigurierten Frist.
+- **Aufträge: Herstellung bucht nur noch in Lager, die man verwalten darf.** Ein Logistiker konnte
+  hergestellte Items auf jedes Mitglied einbuchen, auch einer anderen Staffel und in dessen
+  persönlichen Bestand. Jetzt gilt dieselbe Prüfung wie beim Einbuchen (sonst `403`); „persönlich"
+  geht nur für einen selbst.
 
-- **Backup: der wöchentliche Prometheus-Snapshot lief unter Podman nicht.** Der Hilfscontainer
-  wurde abgelehnt und trug das Passwort auf der Kommandozeile; der Snapshot wird jetzt im
-  Prometheus-Container angefordert und dort auch wieder gelöscht. Backup-Helfer und Restore-Drill
-  nutzen das per Digest gepinnte PostgreSQL-Image von db-backend.
+- **Fehlermeldungen: ein interner Fehler erscheint nicht mehr als „ungültige Anfrage" mit
+  Originaltext.** Er wird als Serverfehler gemeldet und nur ins Log geschrieben. Die bekannten
+  Fälle (Lagereintrag gehört nicht zum Auftrag, Raffinerieauftrag schon eingelagert, Konto noch in
+  Keycloak) haben eigene, übersetzte Meldungen.
 
 - **Benachrichtigungsregeln: vorkonfigurierte Regeln lassen sich wieder bearbeiten.** Bank-,
   Materialbörsen- und Kontolöschungs-Regeln scheiterten beim Speichern, selbst beim Deaktivieren,
@@ -67,6 +127,7 @@
 - **Texte: durchgängig „du", und keine fest verdrahteten Beschriftungen mehr.** Zwölf Hinweise und
   Rückfragen siezten noch; „Nutzer zuordnen" und „Eigener Eintrag" beim Einbuchen sowie „Neuer
   Auftrag" in der Auftragsliste waren nicht übersetzbar.
+
 - **Monitoring: der Alarm für Container in einer Neustart-Schleife konnte seit dem Podman-Umzug nicht
   mehr auslösen.** Er las eine Metrik, die nur das entfernte cAdvisor lieferte; jetzt liest er die
   Startzeit aus dem Podman-Exporter. Das Dashboard-Panel „NPM errors & warnings“ zeigt stattdessen
@@ -105,7 +166,6 @@
 - **Betrieb: der monatliche Bankbericht liest die Zahlen wieder.** Das Abfrageskript rief auf dem
   neuen Server noch `docker exec` auf und wäre beim nächsten Lauf gescheitert; es nutzt jetzt
   Podman. Rein betriebsseitig.
-
 
 ## [v1.9.2](https://github.com/krt-profit/basetool/releases/tag/v1.9.2) - 2026-09-22
 

@@ -394,10 +394,23 @@ subprojects {
     // `ingest` sits far above the other two because the gateway is small and
     // almost entirely branch logic (filters, relay, problem mapping) — the
     // generic 0.50/0.40 fallback it used before was no gate at all there.
+    // `keycloak-spi` joined on 2026-09-22 (KC-CI-01) at a measured ~70% instr / ~64% branch; the
+    // untested remainder is mostly the Keycloak-session plumbing (brokered-context deserialisation,
+    // the IdP's live profile call) that only a running Keycloak exercises.
     val instructionFloor =
-      mapOf("backend" to "0.82", "frontend" to "0.60", "ingest" to "0.93")[project.name] ?: "0.50"
+      mapOf(
+        "backend" to "0.82",
+        "frontend" to "0.60",
+        "ingest" to "0.93",
+        "keycloak-spi" to "0.66",
+      )[project.name] ?: "0.50"
     val branchFloor =
-      mapOf("backend" to "0.65", "frontend" to "0.46", "ingest" to "0.85")[project.name] ?: "0.40"
+      mapOf(
+        "backend" to "0.65",
+        "frontend" to "0.46",
+        "ingest" to "0.85",
+        "keycloak-spi" to "0.60",
+      )[project.name] ?: "0.40"
     tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
       dependsOn(tasks.named("test"))
       classDirectories.setFrom(filterGenerated(classDirectories))

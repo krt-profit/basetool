@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.ingest.filter;
 
 import de.greluc.krt.profit.basetool.ingest.config.IngestProperties;
+import de.greluc.krt.profit.basetool.ingest.config.LoggingProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.ingest.web.ProblemResponseWriter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -67,12 +68,25 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
-  /** After correlation id, before rate limit and Spring Security. */
-  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 20;
+  /**
+   * After the per-IP {@link RateLimitingFilter}, still before Spring Security. It used to run
+   * first, which meant a chunked body was read and buffered (up to the cap) before the caller's
+   * budget was even consulted — an over-budget flood still cost the gateway a full body read per
+   * request.
+   */
+  public static final int ORDER = Ordered.HIGHEST_PRECEDENCE + 30;
 
+  /** Supplies the payload cap ({@code maxPayloadBytes}). */
   private final IngestProperties ingestProperties;
+
+  /** Serializes the 413 problem body. */
   private final ObjectMapper objectMapper;
+
+  /** Counts every 413 on {@code basetool_ingest_payload_rejected_total}. */
   private final MeterRegistry meterRegistry;
+
+  /** Supplies the MDC key the problem body's {@code correlationId} is read from. */
+  private final LoggingProperties loggingProperties;
 
   @Override
   protected void doFilterInternal(
@@ -80,7 +94,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    long max = ingestProperties.getMaxPayloadBytes();
+    long max = ingestProperties.maxPayloadBytes();
     long declared = request.getContentLengthLong();
 
     // Fast path: an honestly-declared oversized body is rejected without reading it.
@@ -128,6 +142,7 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
     ProblemResponseWriter.write(
         response,
         objectMapper,
+        loggingProperties,
         HttpStatus.CONTENT_TOO_LARGE,
         "Payload too large",
         "PAYLOAD_TOO_LARGE",
@@ -179,14 +194,26 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
   /**
    * Re-serves an already-counted request body to downstream handlers from an in-memory buffer, so
    * the controller can still read a chunked body the filter had to consume to measure it.
+   *
+   * <p>The buffer is adopted, not copied: {@link #readWithinCap} hands over a freshly allocated
+   * array nothing else references, so the former defensive {@code clone()} only doubled the peak
+   * memory of every chunked upload — up to the full cap — for no protection at all.
    */
   private static final class CachedBodyRequest extends HttpServletRequestWrapper {
 
+    /** The measured body; owned exclusively by this wrapper and never mutated. */
     private final byte[] body;
 
+    /**
+     * Wraps the request around its already-read body.
+     *
+     * @param request the original request whose stream was consumed
+     * @param body the body bytes, adopted without copying; the caller must not retain or mutate
+     *     them
+     */
     CachedBodyRequest(@NotNull HttpServletRequest request, byte @NotNull [] body) {
       super(request);
-      this.body = body.clone();
+      this.body = body;
     }
 
     @NotNull
@@ -197,6 +224,13 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
         @Override
         public int read() {
           return delegate.read();
+        }
+
+        @Override
+        public int read(byte @NotNull [] buffer, int offset, int length) {
+          // Bulk read. The inherited InputStream#read(byte[], int, int) loops over read() one byte
+          // at a time, which is what Jackson hit for every byte of a buffered chunked body.
+          return delegate.read(buffer, offset, length);
         }
 
         @Override

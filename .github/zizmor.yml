@@ -1,0 +1,17 @@
+# zizmor configuration for the `zizmor` job in .github/workflows/repo-lint.yml (audit item
+# CI-SEC-15). zizmor discovers this file by its location.
+#
+# Every entry below is a finding that was READ, judged and found not to apply, with the reason next
+# to it. An entry without a reason is a finding nobody looked at; do not add one. Anything zizmor
+# reports that is not listed here fails the job, and the fix belongs in the workflow.
+rules:
+  dangerous-triggers:
+    ignore:
+      # `workflow_run` is dangerous when the triggered workflow checks out or executes what the
+      # triggering run produced, with the elevated token `workflow_run` receives. cache-janitor.yml
+      # does neither: it checks out nothing, downloads no artifact, reads nothing from the
+      # triggering run but its event metadata, and calls only the runner's own `gh` to list and
+      # delete Actions caches, under `actions: write` as its single permission. There is no
+      # attacker-controlled input for the trigger to smuggle in; the trigger is there only because
+      # it is the event closest to GitHub Code Quality saving its cache (see the file's header).
+      - cache-janitor.yml

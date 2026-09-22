@@ -51,13 +51,18 @@ jobs:
           # the ordering check would silently degrade to "no new migrations".
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Fetch base branch tip
         if: github.event_name == 'pull_request'
         # checkout fetched the PR head with full history; this brings the base
         # branch into origin/<base_ref> so the script can resolve both the ref
-        # and the merge-base against it.
-        run: git fetch --no-tags origin "${{ github.base_ref }}"
+        # and the merge-base against it. Through the environment, not `${{ }}` in
+        # the script: a branch name is attacker-chosen text (zizmor
+        # `template-injection`).
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "${BASE_REF}"
 
       - name: Self-test the migration checker
         shell: bash

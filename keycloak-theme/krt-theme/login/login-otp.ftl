@@ -5,7 +5,7 @@
     <#elseif section="form">
         <div class="login-container">
             <h1>${msg("doLogIn")}</h1>
-            <form id="kc-otp-login-form" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
+            <form id="kc-otp-login-form" action="${url.loginAction}" method="post">
                 <#if otpLogin.userOtpCredentials?size gt 1>
                     <div class="form-group krt-info-text">
                         <#list otpLogin.userOtpCredentials as otpCredential>

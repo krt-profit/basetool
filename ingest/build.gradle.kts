@@ -13,6 +13,11 @@ plugins {
   id("com.diffplug.spotless")
 }
 
+// Force :test-support to be evaluated before this project, exactly as backend and frontend do.
+// With org.gradle.configureondemand=true it would otherwise be configured lazily, mid-configuration
+// of this one, and Spotless cannot register its afterEvaluate hook that late.
+evaluationDependsOn(":test-support")
+
 group = "de.greluc.krt.profit.basetool"
 
 version = "0.0.1-SNAPSHOT"
@@ -104,6 +109,10 @@ dependencies {
   // ArchUnit core (no archunit-junit5: it drags a clashing JUnit Platform version;
   // rules are invoked from plain @Test methods).
   testImplementation(libs.archunit.core)
+  // The shared endpoint-enumeration engine (#1804), so IngestEndpointSurfaceTest asks the
+  // dispatcher for every mapping exactly the way the backend and frontend surface sweeps do.
+  // Test-only: nothing from it reaches the bootJar, the image or the SBOM.
+  testImplementation(project(":test-support"))
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

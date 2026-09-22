@@ -22,12 +22,19 @@ package de.greluc.krt.profit.basetool.backend.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.servlet.Filter;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.ResolvableType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.PathContainer;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
  * The order of the gates, which is a decision and not an accident.
@@ -52,11 +59,15 @@ import org.springframework.security.web.FilterChainProxy;
  * per-subject limiter, so a refused caller is turned away on its own terms rather than spending a
  * token first — and, symmetrically, so a client cannot hide from the rate counter behind its own
  * 403s.
+ *
+ * <p>The same context also sweeps the mapped endpoints for the limiter's export carve-out
+ * (APPSEC-10): every handler that renders a document must be covered by it.
  */
 @SpringBootTest
 class SecurityFilterChainOrderTest {
 
   @Autowired private FilterChainProxy filterChainProxy;
+  @Autowired private ApplicationContext applicationContext;
 
   /**
    * Returns the simple class names of the API chain's filters, in order.
@@ -102,6 +113,64 @@ class SecurityFilterChainOrderTest {
                 + " addFilterAfter calls on one anchor end up reversed, so this is asserted rather"
                 + " than assumed")
         .isLessThan(subjectLimit);
+  }
+
+  /**
+   * Every API handler that renders a document — it answers with a raw {@code byte[]} body, which is
+   * how each PDF, statement and audit export in this codebase is returned — must fall under the
+   * per-subject export budget (REQ-SEC-033 carve-out, APPSEC-10).
+   *
+   * <p>The criterion is deliberately independent of the filter's own segment list: a new document
+   * endpoint whose path the list does not recognise fails here instead of silently riding the loose
+   * per-IP budget. Path variables are replaced by a placeholder before matching, since the filter
+   * sees concrete request paths.
+   */
+  @Test
+  @DisplayName("every document-rendering endpoint spends from the export budget")
+  void everyDocumentEndpointIsUnderTheExportBudget() {
+    RequestMappingHandlerMapping mapping =
+        applicationContext.getBean(
+            "requestMappingHandlerMapping", RequestMappingHandlerMapping.class);
+    List<String> documentPaths = new ArrayList<>();
+    mapping
+        .getHandlerMethods()
+        .forEach(
+            (info, handler) -> {
+              if (!rendersDocument(handler) || info.getPathPatternsCondition() == null) {
+                return;
+              }
+              info.getPathPatternsCondition().getPatternValues().stream()
+                  .filter(pattern -> pattern.startsWith("/api/"))
+                  .forEach(documentPaths::add);
+            });
+
+    assertThat(documentPaths)
+        .as(
+            "the sweep must actually find the document endpoints (ten on 2026-09-22), or it"
+                + " asserts nothing")
+        .hasSizeGreaterThanOrEqualTo(10);
+    assertThat(documentPaths)
+        .allSatisfy(
+            pattern ->
+                assertThat(
+                        SubjectRateLimitingFilter.isExportPath(
+                            PathContainer.parsePath(pattern.replaceAll("\\{[^}]+}", "x"))))
+                    .as(pattern + " renders a document but is not under the export budget")
+                    .isTrue());
+  }
+
+  /**
+   * Whether a handler answers with a raw binary body.
+   *
+   * @param handler the mapped handler method
+   * @return {@code true} for {@code byte[]} or {@code ResponseEntity<byte[]>}
+   */
+  private static boolean rendersDocument(HandlerMethod handler) {
+    ResolvableType type = ResolvableType.forMethodReturnType(handler.getMethod());
+    if (ResponseEntity.class.isAssignableFrom(type.toClass())) {
+      type = type.getGeneric(0);
+    }
+    return byte[].class.equals(type.toClass());
   }
 
   @Test

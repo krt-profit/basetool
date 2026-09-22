@@ -68,7 +68,9 @@ note has the bounds and what has broken.
 2. The **ingest** gateway validates the token, checks the client is an **approved** one — an
    unapproved caller is refused `403 CLIENT_NOT_ALLOWED` — and enforces rate and payload limits.
 3. It relays to the backend over the internal network under **its own** service-account token,
-   naming the member in an on-behalf-of header; the member's bound token stops at the gateway.
+   naming the member in an on-behalf-of header; the member's bound token stops at the gateway. If the
+   backend refuses that token (`401`/`403`), the fault is the gateway's, not the member's: the
+   extractor gets a `502`, and the cached token is dropped so the next send mints a fresh one.
 4. The backend matches the payload and returns a **draft**. Ingest stages it in Redis for a single
    browser pickup and answers with a handoff link the extractor opens.
 5. The member reviews the pre-filled form and saves it through the **ordinary** create path — so the

@@ -6,21 +6,34 @@
         <div class="login-container">
             <img src="${url.resourcesPath}/img/basetool-logo.svg" alt="" class="login-logo">
             <h1>PROFIT BASETOOL</h1>
-            <form id="kc-form-login" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
+            <#-- No inline onsubmit handler (THEME-SIMP-01): the double-submit guard it carried is not
+                 worth inline script on the one page that handles a password. -->
+            <form id="kc-form-login" action="${url.loginAction}" method="post">
                 <div class="form-group">
                     <label for="username" class="krt-label"><#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
-                    <input tabindex="1" id="username" class="krt-input" name="username" value="${(login.username!'')}"  type="text" autofocus autocomplete="off" />
+                    <#-- autocomplete="username" / "current-password" (THEME-SEC-01) so password managers fill
+                         and save the credential; "off" pushed members towards weaker, remembered passwords.
+                         When Keycloak already knows who is signing in (usernameHidden - a re-authentication or
+                         an identity-first flow), the name is shown read-only instead of being editable, as the
+                         base theme does, and the password field takes the focus. -->
+                    <#if usernameHidden??>
+                        <input tabindex="1" id="username" class="krt-input" name="username" value="${(login.username!'')}" type="text" readonly autocomplete="username" />
+                    <#else>
+                        <input tabindex="1" id="username" class="krt-input" name="username" value="${(login.username!'')}" type="text" autofocus autocomplete="username" />
+                    </#if>
                 </div>
 
                 <div class="form-group">
                     <label for="password" class="krt-label">${msg("password")}</label>
-                    <input tabindex="2" id="password" class="krt-input" name="password" type="password" autocomplete="off" />
+                    <input tabindex="2" id="password" class="krt-input" name="password" type="password" autocomplete="current-password" <#if usernameHidden??>autofocus</#if> />
                 </div>
 
                 <#if realm.rememberMe>
                     <div class="form-group">
                         <label class="krt-checkbox-label">
-                            <input tabindex="3" id="rememberMe" name="rememberMe" type="checkbox" class="krt-checkbox" checked />
+                            <#-- Not pre-ticked (owner decision 2026-09-22): checked only when the member ticked it
+                                 on a previous attempt of this login, exactly as the Keycloak base theme does. -->
+                            <input tabindex="3" id="rememberMe" name="rememberMe" type="checkbox" class="krt-checkbox" <#if login.rememberMe??>checked</#if> />
                             ${msg("rememberMe")}
                         </label>
                     </div>
@@ -33,6 +46,9 @@
                 </#if>
 
                 <div class="form-group login-action">
+                    <#-- The credential the member picked on a previous step, carried through exactly as the
+                         base theme does; without it a flow offering a choice of credentials loses it here. -->
+                    <input type="hidden" id="id-hidden-input" name="credentialId" <#if auth.selectedCredential?has_content>value="${auth.selectedCredential}"</#if>/>
                     <input tabindex="4" class="krt-button" name="login" id="kc-login" type="submit" value="${msg("doLogIn")}"/>
                 </div>
             </form>

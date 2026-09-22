@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.keycloak.spi;
 import java.util.ArrayList;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.FederatedIdentityModel;
 import org.keycloak.models.KeycloakSession;
@@ -86,9 +87,22 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
   /** Default token claim name; the backend reads exactly this claim ({@code discord_user_id}). */
   public static final String DEFAULT_CLAIM_NAME = "discord_user_id";
 
-  private static final List<ProviderConfigProperty> CONFIG_PROPERTIES = new ArrayList<>();
+  /**
+   * The admin-console configuration of this mapper, frozen once built. It used to be a
+   * public-facing mutable {@code ArrayList} handed straight out of {@link #getConfigProperties()},
+   * so any caller inside the Keycloak JVM could add to or clear the definition every mapper
+   * instance shares.
+   */
+  private static final @Unmodifiable List<ProviderConfigProperty> CONFIG_PROPERTIES =
+      buildConfigProperties();
 
-  static {
+  /**
+   * Assembles the configuration: the identity-provider alias plus Keycloak's standard claim-name
+   * and include-in-tokens properties, with the claim name pre-filled.
+   *
+   * @return the frozen property list
+   */
+  private static @NotNull @Unmodifiable List<ProviderConfigProperty> buildConfigProperties() {
     ProviderConfigProperty idpAlias = new ProviderConfigProperty();
     idpAlias.setName(CONFIG_IDP_ALIAS);
     idpAlias.setLabel("Identity provider alias");
@@ -97,19 +111,20 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
     idpAlias.setHelpText(
         "Alias of the Discord identity provider whose federated link supplies the id. Must match "
             + "the IdP alias configured in the realm (default: discord).");
-    CONFIG_PROPERTIES.add(idpAlias);
+    List<ProviderConfigProperty> properties = new ArrayList<>(List.of(idpAlias));
 
-    OIDCAttributeMapperHelper.addTokenClaimNameConfig(CONFIG_PROPERTIES);
+    OIDCAttributeMapperHelper.addTokenClaimNameConfig(properties);
     OIDCAttributeMapperHelper.addIncludeInTokensConfig(
-        CONFIG_PROPERTIES, DiscordFederatedIdentityMapper.class);
+        properties, DiscordFederatedIdentityMapper.class);
 
     // Pre-fill the claim name with the value the backend expects, so a hand-added mapper that is
     // saved without editing the field still emits the right claim.
-    for (ProviderConfigProperty property : CONFIG_PROPERTIES) {
+    for (ProviderConfigProperty property : properties) {
       if (OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME.equals(property.getName())) {
         property.setDefaultValue(DEFAULT_CLAIM_NAME);
       }
     }
+    return List.copyOf(properties);
   }
 
   @Override
@@ -130,7 +145,7 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
   }
 
   @Override
-  public @NotNull List<ProviderConfigProperty> getConfigProperties() {
+  public @NotNull @Unmodifiable List<ProviderConfigProperty> getConfigProperties() {
     return CONFIG_PROPERTIES;
   }
 

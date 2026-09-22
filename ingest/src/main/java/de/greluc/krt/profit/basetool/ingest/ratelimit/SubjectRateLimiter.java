@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.ingest.ratelimit;
 
 import de.greluc.krt.profit.basetool.ingest.config.RateLimitProperties;
 import de.greluc.krt.profit.basetool.ingest.metrics.MetricNames;
-import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -69,10 +68,15 @@ public class SubjectRateLimiter {
    *     Retry-After} delay.
    */
   public void requireWithinLimit(@NotNull String sub) {
-    if (!properties.isEnabled()) {
+    if (!properties.enabled()) {
       return;
     }
-    Bucket bucket = buckets.computeIfAbsent(sub, key -> newBucket());
+    Bucket bucket =
+        buckets.computeIfAbsent(
+            sub,
+            key ->
+                RateLimitBuckets.newBucket(
+                    properties.capacity(), properties.refillTokens(), properties.refillPeriod()));
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
     // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
     // the per-subject rejection ratio. Bounded `subject` literal, never the JWT sub itself.
@@ -96,25 +100,10 @@ public class SubjectRateLimiter {
       // one stays at DEBUG because an attacker controls how often it fires.
       log.warn(
           "Per-subject ingest rate limit exceeded (capacity={} per {}, retryAfter={}s)",
-          properties.getCapacity(),
-          properties.getRefillPeriod(),
+          properties.capacity(),
+          properties.refillPeriod(),
           retryAfterSeconds);
       throw new RateLimitedException(retryAfterSeconds);
     }
-  }
-
-  /**
-   * Builds a fresh per-subject bucket from the shared {@code app.rate-limit} capacity / refill
-   * budget.
-   *
-   * @return a new token bucket.
-   */
-  private @NotNull Bucket newBucket() {
-    Bandwidth limit =
-        Bandwidth.builder()
-            .capacity(properties.getCapacity())
-            .refillGreedy(properties.getRefillTokens(), properties.getRefillPeriod())
-            .build();
-    return Bucket.builder().addLimit(limit).build();
   }
 }
