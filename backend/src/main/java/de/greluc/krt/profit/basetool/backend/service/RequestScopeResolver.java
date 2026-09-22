@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.Squadron;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.support.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.support.StaffelMembershipResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,16 +90,16 @@ public class RequestScopeResolver {
    * cached for the duration of the current HTTP request. Stored as {@code Optional<UUID>} (never
    * {@code null}) so the cache can distinguish "resolved to empty" from "not yet resolved".
    */
-  private static final String CACHE_KEY_PERSISTENT_USER_SQUADRON_ID =
-      RequestScopeResolver.class.getName() + ".persistentUserSquadronId";
+  private static final RequestMemo.Key<Optional<UUID>> CACHE_KEY_PERSISTENT_USER_SQUADRON_ID =
+      RequestMemo.Key.of(RequestScopeResolver.class, "persistentUserSquadronId");
 
   /**
    * Request-attribute key under which the result of {@link #currentSquadron()} is cached for the
    * duration of the current HTTP request. Same distinction-via-Optional contract as {@link
    * #CACHE_KEY_PERSISTENT_USER_SQUADRON_ID}.
    */
-  private static final String CACHE_KEY_CURRENT_SQUADRON =
-      RequestScopeResolver.class.getName() + ".currentSquadron";
+  private static final RequestMemo.Key<Optional<Squadron>> CACHE_KEY_CURRENT_SQUADRON =
+      RequestMemo.Key.of(RequestScopeResolver.class, "currentSquadron");
 
   /**
    * Request-attribute key under which {@link #currentMemberOrgUnitIds()} caches the caller's
@@ -107,8 +108,8 @@ public class RequestScopeResolver {
    * means "already resolved this request", so the membership read happens at most once even though
    * several gates consult it.
    */
-  private static final String CACHE_KEY_MEMBER_ORG_UNIT_IDS =
-      RequestScopeResolver.class.getName() + ".memberOrgUnitIds";
+  private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_MEMBER_ORG_UNIT_IDS =
+      RequestMemo.Key.of(RequestScopeResolver.class, "memberOrgUnitIds");
 
   /**
    * Request-attribute key under which {@link #currentCallerMemberships()} caches the current
@@ -117,8 +118,8 @@ public class RequestScopeResolver {
    * membership list; memoising it collapses those repeated {@code findAllByIdUserId} reads (e.g.
    * the gate + body double-read on the availability overview) to a single query per request.
    */
-  private static final String CACHE_KEY_CALLER_MEMBERSHIPS =
-      RequestScopeResolver.class.getName() + ".callerMemberships";
+  private static final RequestMemo.Key<List<OrgUnitMembership>> CACHE_KEY_CALLER_MEMBERSHIPS =
+      RequestMemo.Key.of(RequestScopeResolver.class, "callerMemberships");
 
   /**
    * Request-attribute key under which {@link #canViewJobOrders()} caches its boolean verdict for
@@ -128,8 +129,8 @@ public class RequestScopeResolver {
    * the otherwise-repeated {@code countProfitEligibleByIdIn} aggregate to a single query per
    * request. A present attribute of type {@link Boolean} means "already resolved this request".
    */
-  private static final String CACHE_KEY_CAN_VIEW_JOB_ORDERS =
-      RequestScopeResolver.class.getName() + ".canViewJobOrders";
+  private static final RequestMemo.Key<Boolean> CACHE_KEY_CAN_VIEW_JOB_ORDERS =
+      RequestMemo.Key.of(RequestScopeResolver.class, "canViewJobOrders");
 
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -401,21 +402,15 @@ public class RequestScopeResolver {
    *     over, never {@code null}.
    */
   @NotNull
-  public java.util.Set<UUID> currentMemberOrgUnitIds() {
-    Object cached = request.getAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS);
-    if (cached instanceof java.util.Set<?> set) {
-      @SuppressWarnings("unchecked")
-      java.util.Set<UUID> typed = (java.util.Set<UUID>) set;
-      return typed;
-    }
+  public Set<UUID> currentMemberOrgUnitIds() {
     // Reuse the request-memoised membership rows (REQ-DATA-003): the blueprint-overview gate
     // and the oversight scopes now share one membership read. currentCallerMemberships() is
     // empty for anonymous callers and expandWithDescendants of an empty input is the empty
     // set, so both the anonymous and member paths behave exactly as before.
-    java.util.Set<UUID> ids =
-        orgUnitCascadeService.expandWithDescendants(currentCallerMemberships());
-    request.setAttribute(CACHE_KEY_MEMBER_ORG_UNIT_IDS, ids);
-    return ids;
+    return RequestMemo.get(
+        request,
+        CACHE_KEY_MEMBER_ORG_UNIT_IDS,
+        () -> orgUnitCascadeService.expandWithDescendants(currentCallerMemberships()));
   }
 
   /**
@@ -428,19 +423,14 @@ public class RequestScopeResolver {
    */
   @NotNull
   private List<OrgUnitMembership> currentCallerMemberships() {
-    Object cached = request.getAttribute(CACHE_KEY_CALLER_MEMBERSHIPS);
-    if (cached instanceof List<?> list) {
-      @SuppressWarnings("unchecked")
-      List<OrgUnitMembership> typed = (List<OrgUnitMembership>) list;
-      return typed;
-    }
-    List<OrgUnitMembership> memberships =
-        authHelper
-            .currentUserId()
-            .map(orgUnitMembershipRepository::findAllByIdUserId)
-            .orElseGet(List::of);
-    request.setAttribute(CACHE_KEY_CALLER_MEMBERSHIPS, memberships);
-    return memberships;
+    return RequestMemo.get(
+        request,
+        CACHE_KEY_CALLER_MEMBERSHIPS,
+        () ->
+            authHelper
+                .currentUserId()
+                .map(orgUnitMembershipRepository::findAllByIdUserId)
+                .orElseGet(List::of));
   }
 
   /**
@@ -488,12 +478,7 @@ public class RequestScopeResolver {
    * @return {@code true} iff the caller may view job orders.
    */
   public boolean canViewJobOrders() {
-    if (request.getAttribute(CACHE_KEY_CAN_VIEW_JOB_ORDERS) instanceof Boolean cached) {
-      return cached;
-    }
-    boolean verdict = resolveCanViewJobOrders();
-    request.setAttribute(CACHE_KEY_CAN_VIEW_JOB_ORDERS, verdict);
-    return verdict;
+    return RequestMemo.get(request, CACHE_KEY_CAN_VIEW_JOB_ORDERS, this::resolveCanViewJobOrders);
   }
 
   /**
@@ -842,24 +827,27 @@ public class RequestScopeResolver {
    */
   @NotNull
   public Optional<Squadron> currentSquadron() {
-    Optional<Optional<Squadron>> cached = readCachedOptional(CACHE_KEY_CURRENT_SQUADRON);
-    if (cached.isPresent()) {
-      return cached.get();
-    }
+    return RequestMemo.get(request, CACHE_KEY_CURRENT_SQUADRON, this::loadCurrentSquadron);
+  }
+
+  /**
+   * The uncached load behind {@link #currentSquadron()}.
+   *
+   * @return the {@link Squadron} for the current effective context, or empty when none applies.
+   */
+  @NotNull
+  private Optional<Squadron> loadCurrentSquadron() {
     // Polymorphic load + unproxy instead of a Squadron-typed findById (the R2.d repository swap
     // announced on currentOrgUnit()): the effective Staffel id is frequently already present in the
     // caller's persistence context as a base-typed OrgUnit proxy (e.g. an aggregate's owning unit),
     // and a subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==).
     // The instanceof filter replaces the SQL discriminator filter 1:1 — a non-Staffel id still
     // resolves to empty.
-    Optional<Squadron> resolved =
-        currentSquadronId()
-            .flatMap(orgUnitRepository::findById)
-            .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-            .filter(Squadron.class::isInstance)
-            .map(Squadron.class::cast);
-    request.setAttribute(CACHE_KEY_CURRENT_SQUADRON, resolved);
-    return resolved;
+    return currentSquadronId()
+        .flatMap(orgUnitRepository::findById)
+        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+        .filter(Squadron.class::isInstance)
+        .map(Squadron.class::cast);
   }
 
   /**
@@ -985,10 +973,17 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Optional<UUID> readPersistentSquadronFromUser() {
-    Optional<Optional<UUID>> cached = readCachedOptional(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID);
-    if (cached.isPresent()) {
-      return cached.get();
-    }
+    return RequestMemo.get(
+        request, CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, this::resolvePersistentSquadronFromUser);
+  }
+
+  /**
+   * The uncached resolution behind {@link #readPersistentSquadronFromUser()}.
+   *
+   * @return the caller's active Staffel id, or empty when none applies.
+   */
+  @NotNull
+  private Optional<UUID> resolvePersistentSquadronFromUser() {
     // REQ-ORG-017: the user's Staffel lives in org_unit_membership (kind=SQUADRON), and a user may
     // now hold up to TWO Staffeln (the V98 uq_org_unit_membership_one_squadron index was relaxed to
     // <=2 in V164). This single-valued accessor resolves the caller's ACTIVE Staffel: honour an
@@ -999,54 +994,27 @@ public class RequestScopeResolver {
     // name-sorted primary (matching UserMapper.resolveSquadron / UserDto.squadron) rather than an
     // arbitrary first row, so the auto-stamp and single-value surfaces agree with the displayed
     // primary Staffel.
-    Optional<UUID> resolved =
-        authHelper
-            .currentUserId()
-            .flatMap(
-                userId -> {
-                  List<OrgUnitMembership> rows =
-                      orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-                          userId, OrgUnitKind.SQUADRON);
-                  if (rows.isEmpty()) {
-                    return Optional.empty();
-                  }
-                  Optional<UUID> pinned = readActiveSquadronFromHeader();
-                  if (pinned.isPresent()
-                      && rows.stream()
-                          .anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
-                    return pinned;
-                  }
-                  // No matching pin: the deterministic name-sorted primary. The name-sort (and the
-                  // single-Staffel fast path that skips the squadron load) is owned by
-                  // StaffelMembershipResolver so this fallback agrees with UserDto.squadron /
-                  // OrgUnitMembershipService.findStaffelMembershipOrgUnitIds by construction.
-                  return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
-                      .findFirst();
-                });
-    request.setAttribute(CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, resolved);
-    return resolved;
-  }
-
-  /**
-   * Reads a previously-cached {@link Optional} from the current {@link HttpServletRequest} under
-   * {@code key}. The outer {@link Optional} of the return value signals presence in the cache: an
-   * outer {@link Optional#empty()} means "key not yet written, do the real work", while a present
-   * outer Optional wraps the cached value (which may itself be {@link Optional#empty()} for the
-   * "resolved-to-empty" case). Keeps the unchecked cast confined to a single helper instead of
-   * being repeated at every call site.
-   *
-   * @param key request-attribute key under which the cached Optional was previously stored.
-   * @param <T> element type of the cached Optional.
-   * @return outer-present iff the key has been written this request; the inner Optional is the
-   *     cached value as written.
-   */
-  @NotNull
-  @SuppressWarnings("unchecked")
-  private <T> Optional<Optional<T>> readCachedOptional(@NotNull String key) {
-    Object raw = request.getAttribute(key);
-    if (raw instanceof Optional<?> opt) {
-      return Optional.of((Optional<T>) opt);
-    }
-    return Optional.empty();
+    return authHelper
+        .currentUserId()
+        .flatMap(
+            userId -> {
+              List<OrgUnitMembership> rows =
+                  orgUnitMembershipRepository.findAllByIdUserIdAndKind(
+                      userId, OrgUnitKind.SQUADRON);
+              if (rows.isEmpty()) {
+                return Optional.empty();
+              }
+              Optional<UUID> pinned = readActiveSquadronFromHeader();
+              if (pinned.isPresent()
+                  && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
+                return pinned;
+              }
+              // No matching pin: the deterministic name-sorted primary. The name-sort (and the
+              // single-Staffel fast path that skips the squadron load) is owned by
+              // StaffelMembershipResolver so this fallback agrees with UserDto.squadron /
+              // OrgUnitMembershipService.findStaffelMembershipOrgUnitIds by construction.
+              return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
+                  .findFirst();
+            });
   }
 }

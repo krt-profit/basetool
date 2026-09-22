@@ -22,19 +22,15 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.metrics.MetricNames;
 import de.greluc.krt.profit.basetool.backend.support.LiveSyncTopic;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The bridge itself: publishes app-originated {@code changed} frames onto the frontend's Redis
@@ -50,18 +46,14 @@ import tools.jackson.databind.node.ObjectNode;
  * called, so a Redis outage costs peer delivery and nothing else — the same ordering, for the same
  * reason, as {@link RedisNotificationFanout}.
  */
-@Slf4j
 public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
 
   /** Payload schema version, so a later format change is detectable on consume. */
   private static final int PAYLOAD_VERSION = 1;
 
   private final LiveSyncStreamService streamService;
-  private final StringRedisTemplate redisTemplate;
   private final MeterRegistry meterRegistry;
-  private final JsonMapper jsonMapper;
-  private final String channel;
-  private final String instanceId;
+  private final RedisJsonFanout transport;
 
   /**
    * Builds the Redis live-sync bridge.
@@ -79,11 +71,15 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       @NotNull String channel,
       @NotNull String instanceId) {
     this.streamService = streamService;
-    this.redisTemplate = redisTemplate;
     this.meterRegistry = meterRegistry;
-    this.jsonMapper = JsonMapper.builder().build();
-    this.channel = channel;
-    this.instanceId = instanceId;
+    this.transport =
+        new RedisJsonFanout(
+            redisTemplate,
+            meterRegistry,
+            channel,
+            instanceId,
+            MetricNames.LIVESYNC_REDIS_ERRORS,
+            "Live-sync");
   }
 
   /**
@@ -93,34 +89,30 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
    */
   @NotNull
   public String channel() {
-    return channel;
+    return transport.channel();
   }
 
   /** {@inheritDoc} */
   @Override
   public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {
-    try {
-      ObjectNode root = jsonMapper.createObjectNode();
-      root.put("v", PAYLOAD_VERSION);
-      root.put("topic", topic.canonical());
-      root.put("origin", instanceId);
-      ArrayNode sectionsArray = root.putArray("sections");
-      for (String section : sections) {
-        sectionsArray.add(section);
-      }
-      redisTemplate.convertAndSend(channel, jsonMapper.writeValueAsString(root));
-      meterRegistry
-          .counter(
-              MetricNames.LIVESYNC_REDIS_PUBLISHED,
-              MetricNames.TAG_TOPIC_CLASS,
-              topic.topicClass().metricLabel())
-          .increment();
-    } catch (RuntimeException e) {
-      meterRegistry
-          .counter(MetricNames.LIVESYNC_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_PUBLISH)
-          .increment();
-      log.debug("Live-sync Redis publish failed", e);
-    }
+    transport.publish(
+        root -> {
+          // v, topic, origin, sections — the order a frontend instance writes.
+          root.put("v", PAYLOAD_VERSION);
+          root.put("topic", topic.canonical());
+          root.put("origin", transport.instanceId());
+          ArrayNode sectionsArray = root.putArray("sections");
+          for (String section : sections) {
+            sectionsArray.add(section);
+          }
+        },
+        () ->
+            meterRegistry
+                .counter(
+                    MetricNames.LIVESYNC_REDIS_PUBLISHED,
+                    MetricNames.TAG_TOPIC_CLASS,
+                    topic.topicClass().metricLabel())
+                .increment());
   }
 
   /**
@@ -136,42 +128,40 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
    */
   @Override
   public void onMessage(@NotNull Message message, byte[] pattern) {
-    try {
-      JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
-      if (instanceId.equals(text(root, "origin"))) {
-        return;
-      }
-      LiveSyncTopic topic = LiveSyncTopic.parse(text(root, "topic"));
-      if (topic == null) {
-        // A room this backend does not serve — a frontend staff room, or a newer peer's class.
-        // Counted apart from the error series on purpose: the staff rooms ride this same channel,
-        // so this trickles steadily, and putting it under errors would leave a permanent non-zero
-        // rate beneath the alert that watches them.
-        meterRegistry
-            .counter(
-                MetricNames.LIVESYNC_REDIS_SKIPPED,
-                MetricNames.TAG_REASON,
-                MetricNames.REASON_UNKNOWN_TOPIC)
-            .increment();
-        return;
-      }
-      List<String> sections = topic.topicClass().clipSections(sections(root));
-      if (sections.isEmpty()) {
-        return;
-      }
-      streamService.deliver(topic, sections);
+    transport.consume(message, this::deliver);
+  }
+
+  /**
+   * Delivers a peer's parsed frame to this instance's streams.
+   *
+   * @param root the parsed payload, already known not to be this instance's own
+   */
+  private void deliver(@NotNull JsonNode root) {
+    LiveSyncTopic topic = LiveSyncTopic.parse(text(root, "topic"));
+    if (topic == null) {
+      // A room this backend does not serve — a frontend staff room, or a newer peer's class.
+      // Counted apart from the error series on purpose: the staff rooms ride this same channel,
+      // so this trickles steadily, and putting it under errors would leave a permanent non-zero
+      // rate beneath the alert that watches them.
       meterRegistry
           .counter(
-              MetricNames.LIVESYNC_REDIS_CONSUMED,
-              MetricNames.TAG_TOPIC_CLASS,
-              topic.topicClass().metricLabel())
+              MetricNames.LIVESYNC_REDIS_SKIPPED,
+              MetricNames.TAG_REASON,
+              MetricNames.REASON_UNKNOWN_TOPIC)
           .increment();
-    } catch (RuntimeException e) {
-      meterRegistry
-          .counter(MetricNames.LIVESYNC_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_CONSUME)
-          .increment();
-      log.debug("Live-sync Redis consume failed", e);
+      return;
     }
+    List<String> sections = topic.topicClass().clipSections(sections(root));
+    if (sections.isEmpty()) {
+      return;
+    }
+    streamService.deliver(topic, sections);
+    meterRegistry
+        .counter(
+            MetricNames.LIVESYNC_REDIS_CONSUMED,
+            MetricNames.TAG_TOPIC_CLASS,
+            topic.topicClass().metricLabel())
+        .increment();
   }
 
   /**
