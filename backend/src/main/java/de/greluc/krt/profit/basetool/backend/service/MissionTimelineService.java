@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.repository.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.MissionStepRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.MissionSectionVersions.MissionSection;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -42,7 +43,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,7 +106,7 @@ public class MissionTimelineService {
 
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
     step.setDone(false);
     step.setOrderIndex(nextStepOrderIndex(mission));
     mission.addStep(step);
@@ -139,7 +139,7 @@ public class MissionTimelineService {
   public void addStepAtCreate(@NotNull Mission mission, String title, String meta, int orderIndex) {
     MissionStep step = new MissionStep();
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
     step.setDone(false);
     step.setOrderIndex(orderIndex);
     mission.addStep(step);
@@ -175,7 +175,7 @@ public class MissionTimelineService {
 
     MissionStep step = findStep(mission, stepId);
     step.setTitle(title == null ? null : title.trim());
-    step.setMeta(normalizeStepMeta(meta));
+    step.setMeta(StringNormalization.trimToNull(meta));
 
     missionRepository.save(mission);
     auditService.record(
@@ -315,15 +315,6 @@ public class MissionTimelineService {
         .filter(s -> s.getId() != null && s.getId().equals(stepId))
         .findFirst()
         .orElseThrow(() -> new NotFoundException("MissionStep not found in this mission"));
-  }
-
-  /**
-   * Normalises a step's optional time/place hint: trims surrounding whitespace and collapses blank
-   * input to {@code null}.
-   */
-  @Nullable
-  private static String normalizeStepMeta(String meta) {
-    return meta == null || meta.isBlank() ? null : meta.trim();
   }
 
   /** Returns the {@code orderIndex} to assign a newly appended step (max existing + 1, or 0). */

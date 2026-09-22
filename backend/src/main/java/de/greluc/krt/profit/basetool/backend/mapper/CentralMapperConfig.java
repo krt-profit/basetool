@@ -19,18 +19,30 @@
 
 package de.greluc.krt.profit.basetool.backend.mapper;
 
+import org.mapstruct.InjectionStrategy;
 import org.mapstruct.MapperConfig;
 import org.mapstruct.ReportingPolicy;
 
 /**
  * Shared MapStruct configuration inherited by every mapper via {@code @Mapper(config =
- * CentralMapperConfig.class)}. It centralises the two settings that were previously repeated on
- * each mapper: {@code componentModel = "spring"} (so MapStruct emits Spring {@code @Component}
- * beans that can be constructor-injected) and {@code unmappedTargetPolicy = IGNORE} (so unmapped
- * target properties are silently skipped instead of failing the build). Pointing every mapper at
- * this config replaces the per-mapper boilerplate, which previously spelled the policy three
- * different ways ({@code ReportingPolicy.IGNORE}, {@code org.mapstruct.ReportingPolicy.IGNORE}, and
- * a bare imported {@code IGNORE}), with a single authoritative declaration.
+ * CentralMapperConfig.class)}. It centralises three settings (REQ-API-002):
+ *
+ * <ul>
+ *   <li>{@code componentModel = "spring"} — MapStruct emits Spring {@code @Component} beans.
+ *   <li>{@code injectionStrategy = CONSTRUCTOR} — a generated mapper receives the mappers it {@code
+ *       uses} through its constructor, never through {@code @Autowired} fields, matching the
+ *       constructor-injection rule the rest of the code base follows.
+ *   <li>{@code unmappedTargetPolicy = ERROR} — a target property no source feeds <em>fails the
+ *       build</em>. A DTO field added later would otherwise ship silently {@code null}; every gap
+ *       that is intended is spelled out with {@code @Mapping(target = "...", ignore = true)} on the
+ *       method, so a reader sees what is deliberately left unset.
+ * </ul>
+ *
+ * <p>Pointing every mapper at this config replaces the per-mapper boilerplate, which previously
+ * spelled the policy three different ways, with a single authoritative declaration.
  */
-@MapperConfig(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@MapperConfig(
+    componentModel = "spring",
+    injectionStrategy = InjectionStrategy.CONSTRUCTOR,
+    unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface CentralMapperConfig {}

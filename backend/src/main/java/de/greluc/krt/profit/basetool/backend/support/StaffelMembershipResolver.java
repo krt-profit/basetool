@@ -196,7 +196,7 @@ public class StaffelMembershipResolver {
       // The common single-Staffel case needs no name sort and no entity hydration — but still
       // confirms the squadron resolves (cheap existsById) so a dangling row is dropped consistently
       // with the multi-row branch, rather than returned unchecked.
-      UUID staffelId = squadronRows.get(0).getId().getOrgUnitId();
+      UUID staffelId = squadronRows.getFirst().getId().getOrgUnitId();
       return squadronRepository.existsById(staffelId) ? List.of(staffelId) : List.of();
     }
     return resolveNameSortedStaffeln(squadronRows).stream().map(Squadron::getId).toList();

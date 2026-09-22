@@ -58,18 +58,6 @@ public class IngestGatewayProperties {
   private List<String> clientIds = List.of();
 
   /**
-   * The usernames of the configured gateways' service accounts.
-   *
-   * @return one {@code service-account-<clientId>} per configured client, empty when none is
-   *     configured
-   */
-  public java.util.Set<String> serviceAccountUsernames() {
-    return clientIds.stream()
-        .map(clientId -> SERVICE_ACCOUNT_PREFIX + clientId)
-        .collect(java.util.stream.Collectors.toUnmodifiableSet());
-  }
-
-  /**
    * Whether {@code azp} names a configured ingest gateway.
    *
    * <p>The single place the rule lives, so the two decisions that depend on it — "may act for

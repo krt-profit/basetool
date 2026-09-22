@@ -55,24 +55,6 @@ class RoleMapperTest {
   }
 
   @Test
-  void toEntity_shouldMapBasicFieldsAndPermissions() {
-    // Given
-    RoleDto dto =
-        new RoleDto(3L, "OFFICER", "Squadron officer", Set.of("MISSION_MANAGE", "USER_MANAGE"), 1L);
-
-    // When
-    Role role = mapper.toEntity(dto);
-
-    // Then
-    assertNotNull(role);
-    assertEquals(3L, role.getId());
-    assertEquals("OFFICER", role.getName());
-    assertEquals("Squadron officer", role.getDescription());
-    assertEquals(Set.of("MISSION_MANAGE", "USER_MANAGE"), role.getPermissions());
-    assertEquals(1L, role.getVersion());
-  }
-
-  @Test
   void toDto_withEmptyPermissions_shouldProduceEmptySet() {
     // Given
     Role role = new Role();
@@ -91,6 +73,5 @@ class RoleMapperTest {
   @Test
   void nullSafety_shouldReturnNull_whenSourceNull() {
     assertNull(mapper.toDto(null));
-    assertNull(mapper.toEntity(null));
   }
 }

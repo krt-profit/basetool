@@ -31,12 +31,12 @@ import de.greluc.krt.profit.basetool.backend.model.dto.NotificationRuleWriteRequ
 import de.greluc.krt.profit.basetool.backend.repository.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.repository.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -147,7 +147,7 @@ public class NotificationRuleService {
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     rule.setEventType(request.eventType());
     rule.setNotificationType(request.notificationType());
-    rule.setDescription(trimToNull(request.description()));
+    rule.setDescription(StringNormalization.trimToNull(request.description()));
     rule.setEnabled(request.enabled());
     rule.setExcludeActor(request.excludeActor());
   }
@@ -200,7 +200,7 @@ public class NotificationRuleService {
         }
       }
       case ROLE -> {
-        String roleCode = trimToNull(selector.roleCode());
+        String roleCode = StringNormalization.trimToNull(selector.roleCode());
         if (roleCode == null) {
           throw new IllegalArgumentException("ROLE selector requires roleCode");
         }
@@ -257,15 +257,5 @@ public class NotificationRuleService {
     return notificationRuleRepository
         .findByIdWithSelectors(id)
         .orElseThrow(() -> new NotFoundException("Notification rule not found: " + id));
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private static String trimToNull(String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 }

@@ -43,10 +43,13 @@ import de.greluc.krt.profit.basetool.backend.service.HangarService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -54,10 +57,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -68,8 +67,9 @@ import org.springframework.web.multipart.MultipartFile;
  * reaches the service (the controller's core data-isolation guarantee for personal-hangar
  * endpoints); (2) {@code /squadron-overview} shapes its response payload based on the caller's role
  * at the HTTP boundary, so the service stays free of {@code SecurityContextHolder} reads (the
- * ArchUnit rule). The role-driven branch is exercised for ADMIN, OFFICER, plain authenticated user,
- * and anonymous — only the first two pass {@code includeOwnerDetails=true} downstream.
+ * ArchUnit rule). The role-driven branch is exercised for every caller shape in {@link
+ * RoleGateFixture#callers()} — only ADMIN and OFFICER pass {@code includeOwnerDetails=true}
+ * downstream.
  */
 @ExtendWith(MockitoExtension.class)
 class HangarControllerTest {
@@ -80,7 +80,24 @@ class HangarControllerTest {
   @Mock private ShipMapper shipMapper;
   @Mock private UserMapper userMapper;
 
-  @InjectMocks private HangarController controller;
+  private HangarController controller;
+
+  @BeforeEach
+  void setUp() {
+    controller =
+        new HangarController(
+            hangarService,
+            hangarImportService,
+            userService,
+            shipMapper,
+            userMapper,
+            RoleGateFixture.realAuthHelper());
+  }
+
+  @AfterEach
+  void clearSecurityContext() {
+    RoleGateFixture.clear();
+  }
 
   private static ShipDto shipDto(String name) {
     return new ShipDto(UUID.randomUUID(), name, null, "LTI", null, true, null, null, 1L);
@@ -161,76 +178,28 @@ class HangarControllerTest {
 
   // ── GET /squadron-overview (role-shaped payload) ─────────────────────
 
-  @Test
-  void getSquadronOverview_whenCallerIsAdmin_includesOwnerDetails() {
-    Authentication admin =
-        new UsernamePasswordAuthenticationToken(
-            "alice", "n/a", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true), isNull()))
-        .thenReturn(page);
-
-    controller.getSquadronOverview(0, 20, null, null, admin);
-
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true), isNull());
+  static java.util.stream.Stream<String> callers() {
+    return RoleGateFixture.callers();
   }
 
-  @Test
-  void getSquadronOverview_whenCallerIsOfficer_includesOwnerDetails() {
-    Authentication officer =
-        new UsernamePasswordAuthenticationToken(
-            "bob", "n/a", List.of(new SimpleGrantedAuthority("ROLE_OFFICER")));
-    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(true), isNull()))
-        .thenReturn(page);
+  /**
+   * BE-SIMP-07: the owner-detail shaping moved from a raw {@code "ROLE_ADMIN" || "ROLE_OFFICER"}
+   * scan of the injected {@code Authentication} to {@code AuthHelperService.isAdminOrOfficer()}.
+   * Every caller shape must still get exactly the answer the raw scan gave.
+   */
+  @ParameterizedTest
+  @MethodSource("callers")
+  void getSquadronOverview_includesOwnerDetailsExactlyForAdminAndOfficer(String caller) {
+    boolean expected = RoleGateFixture.rawCheckAccepted(caller, "ROLE_ADMIN", "ROLE_OFFICER");
+    RoleGateFixture.authenticateAs(caller);
+    when(hangarService.getSquadronOverview(any(Pageable.class), eq(expected), isNull()))
+        .thenReturn(new PageImpl<>(List.of()));
 
-    controller.getSquadronOverview(0, 20, null, null, officer);
+    controller.getSquadronOverview(0, 20, null, null);
 
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(true), isNull());
-  }
-
-  @Test
-  void getSquadronOverview_whenCallerIsPlainUser_hidesOwnerDetails() {
-    Authentication user =
-        new UsernamePasswordAuthenticationToken(
-            "carol", "n/a", List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
-    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
-        .thenReturn(page);
-
-    controller.getSquadronOverview(0, 20, null, null, user);
-
-    // Plain authenticated callers see only the aggregated counts — the per-ship owner is hidden
-    // at the HTTP boundary so the service doesn't have to read SecurityContextHolder.
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
-  }
-
-  @Test
-  void getSquadronOverview_whenCallerIsAnonymous_hidesOwnerDetails() {
-    Authentication anon =
-        new AnonymousAuthenticationToken(
-            "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
-    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
-        .thenReturn(page);
-
-    controller.getSquadronOverview(0, 20, null, null, anon);
-
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
-  }
-
-  @Test
-  void getSquadronOverview_whenAuthenticationIsNull_hidesOwnerDetails() {
-    // Defensive branch — Spring should always pass a non-null Authentication, but the controller
-    // documents the null-check explicitly and the test pins it so a future cleanup cannot delete
-    // the guard without surfacing here.
-    Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
-    when(hangarService.getSquadronOverview(any(Pageable.class), eq(false), isNull()))
-        .thenReturn(page);
-
-    controller.getSquadronOverview(0, 20, null, null, null);
-
-    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
+    // Plain callers see only the aggregated counts — the per-ship owner is hidden at the HTTP
+    // boundary so the service doesn't have to read SecurityContextHolder.
+    verify(hangarService).getSquadronOverview(any(Pageable.class), eq(expected), isNull());
   }
 
   // ── POST /ships ───────────────────────────────────────────────────────
@@ -454,7 +423,7 @@ class HangarControllerTest {
     when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), isNull()))
         .thenReturn(page);
 
-    controller.getSquadronOverview(null, null, null, null, null);
+    controller.getSquadronOverview(null, null, null, null);
 
     verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), isNull());
   }
@@ -467,7 +436,7 @@ class HangarControllerTest {
     when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), eq("Cutlass")))
         .thenReturn(page);
 
-    controller.getSquadronOverview(0, 10, null, "Cutlass", null);
+    controller.getSquadronOverview(0, 10, null, "Cutlass");
 
     verify(hangarService).getSquadronOverview(any(Pageable.class), eq(false), eq("Cutlass"));
   }

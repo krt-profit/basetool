@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.repository.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Map;
@@ -190,7 +191,7 @@ public class HangarService {
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
     ScopePredicate scope = ownerScopeService.currentUnitOverviewScope();
-    String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+    String normalizedQuery = StringNormalization.trimToNull(query);
     Page<Object[]> p =
         shipRepository.countShipsByType(
             scope.adminAllScope(),

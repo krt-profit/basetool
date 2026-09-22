@@ -51,9 +51,9 @@ public interface PersonalInventoryItemMapper {
    * assigned by the service from the JWT sub claim; the location name snapshot is set by the
    * service after a UEX lookup, never by the client.
    */
-  // Note: inherited fields from AbstractEntity (id, version, createdAt, updatedAt) are
-  // not part of the Lombok @Builder generated for this class and are therefore covered
-  // by the global unmappedTargetPolicy = IGNORE rather than by explicit @Mapping(ignore).
+  // version / createdAt / updatedAt are inherited from AbstractEntity and not part of the
+  // Lombok @Builder MapStruct maps through; id is, and belongs to the persistence provider.
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "ownerUserId", ignore = true)
   @Mapping(target = "locationNameSnapshot", ignore = true)
   PersonalInventoryItem toEntity(PersonalInventoryItemCreateRequest request);

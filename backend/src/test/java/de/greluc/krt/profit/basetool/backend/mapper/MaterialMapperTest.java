@@ -29,11 +29,10 @@ import de.greluc.krt.profit.basetool.backend.model.QuantityType;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.mapstruct.factory.Mappers;
 
 class MaterialMapperTest {
 
-  private final MaterialMapper mapper = Mappers.getMapper(MaterialMapper.class);
+  private final MaterialMapper mapper = new MaterialMapperImpl(new MaterialCategoryMapperImpl());
 
   @Test
   void toDto_shouldMapScalarFieldsAndConvertIntegerFlagsToBoolean() {

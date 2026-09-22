@@ -176,6 +176,7 @@ public abstract class MissionMapper {
   /** Maps a {@link JobType} entity nested inside a mission to its outbound DTO. */
   @Mapping(target = "parentId", source = "parent.id")
   @Mapping(target = "isLeadershipRole", source = "leadershipRole")
+  @Mapping(target = "isMissionLead", source = "missionLead")
   public abstract JobTypeDto toDto(JobType jobType);
 
   /** Narrow reference DTO (id + name) used wherever the full mission payload is overkill. */

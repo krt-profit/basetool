@@ -292,7 +292,7 @@ public class ScWikiCommoditySyncService {
     if (canon != null && !canon.isBlank()) {
       List<Material> candidates = canonicalIndex.getOrDefault(canon, List.of());
       if (candidates.size() == 1) {
-        return ResolveResult.matched(candidates.get(0));
+        return ResolveResult.matched(candidates.getFirst());
       }
       if (candidates.size() > 1) {
         String names =

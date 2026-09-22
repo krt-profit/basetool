@@ -38,9 +38,9 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgChartPositionReposito
 import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -138,7 +138,7 @@ public class OrgChartService {
   public OrgChartPositionDto createPosition(@NotNull OrgChartPositionCreateRequest request) {
     OrgChartPositionType type = request.positionType();
     OrgChartScope scope = type.scope();
-    final String displayName = trimToNull(request.displayName());
+    final String displayName = StringNormalization.trimToNull(request.displayName());
     final User user = resolveHolderForCreate(type, request.userId(), displayName);
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
@@ -225,14 +225,14 @@ public class OrgChartService {
     // Symmetric with createPosition: a position is held by an account OR a free-text name, never
     // both, so a single update may not set both at once. A bare userId still clears any existing
     // free-text name below (the regression-free swap); only supplying both together is ambiguous.
-    if (request.userId() != null && trimToNull(request.displayName()) != null) {
+    if (request.userId() != null && StringNormalization.trimToNull(request.displayName()) != null) {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
     if (request.name() != null) {
       if (position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
         throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
       }
-      position.setName(trimToNull(request.name()));
+      position.setName(StringNormalization.trimToNull(request.name()));
     }
     if (request.userId() != null) {
       // Account holder: assign (if changed) and clear any free-text name in the same transaction.
@@ -250,7 +250,7 @@ public class OrgChartService {
     } else if (request.displayName() != null) {
       // Free-text holder: a non-blank typed name replaces the account holder; a blank value clears
       // it, which is only allowed where a holder is optional (a COMMAND_LEAD Kommando).
-      String typed = trimToNull(request.displayName());
+      String typed = StringNormalization.trimToNull(request.displayName());
       if (typed == null
           && position.getUser() == null
           && position.getPositionType() != OrgChartPositionType.COMMAND_LEAD) {
@@ -824,7 +824,7 @@ public class OrgChartService {
   }
 
   private String validateAndNormalizeName(OrgChartPositionType type, String rawName) {
-    String normalized = trimToNull(rawName);
+    String normalized = StringNormalization.trimToNull(rawName);
     if (normalized != null && type != OrgChartPositionType.COMMAND_LEAD) {
       throw new BadRequestException(ERR_NAME_NOT_ALLOWED);
     }
@@ -968,15 +968,5 @@ public class OrgChartService {
     if (alreadyAssigned) {
       throw new BadRequestException(ERR_USER_ASSIGNED);
     }
-  }
-
-  @Contract("null -> null")
-  @Nullable
-  private static String trimToNull(String value) {
-    if (value == null) {
-      return null;
-    }
-    String trimmed = value.trim();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 }

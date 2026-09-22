@@ -87,6 +87,9 @@ public abstract class InventoryItemMapper {
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(inventoryItem))")
+  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
+  // is no such property, so it is ignored.
+  @Mapping(target = "withVersion", ignore = true)
   public abstract InventoryItemDto toDto(InventoryItem inventoryItem);
 
   /**

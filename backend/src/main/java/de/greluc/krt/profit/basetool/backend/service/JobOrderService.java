@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -56,9 +57,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -125,7 +124,7 @@ public class JobOrderService {
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
-            .comment(normalizeComment(createDto.comment()))
+            .comment(StringNormalization.trimToNull(createDto.comment()))
             .priority(newPriority)
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requesting)
@@ -192,7 +191,7 @@ public class JobOrderService {
     JobOrder jobOrder =
         JobOrder.builder()
             .handle(createDto.handle())
-            .comment(normalizeComment(createDto.comment()))
+            .comment(StringNormalization.trimToNull(createDto.comment()))
             .priority(newPriority)
             .type(JobOrderType.ITEM)
             .responsibleOrgUnit(responsible)
@@ -460,7 +459,7 @@ public class JobOrderService {
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
-    jobOrder.setComment(normalizeComment(updateDto.comment()));
+    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
     MaterialReplaceOutcome outcome =
         replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
@@ -612,7 +611,7 @@ public class JobOrderService {
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
     }
     jobOrder.setHandle(updateDto.handle());
-    jobOrder.setComment(normalizeComment(updateDto.comment()));
+    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
     // Reconcile the ordered-item lines: matched lines are re-derived + re-snapshotted in place so
     // their booked manufacturedAmount survives (REQ-ORDERS-032); only lines the payload dropped are
@@ -817,7 +816,7 @@ public class JobOrderService {
     // Requester edits are limited to the comment and the material lines. The handle, the
     // requesting/responsible org units, the status and the priority are NOT touched (their DTO
     // inputs are ignored) — those stay processing-side concerns.
-    jobOrder.setComment(normalizeComment(updateDto.comment()));
+    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
     MaterialReplaceOutcome outcome =
         replaceMaterialsWithinTransaction(id, jobOrder, updateDto.materials());
@@ -872,7 +871,7 @@ public class JobOrderService {
         jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
     assertRequesterEditable(jobOrder);
 
-    jobOrder.setComment(normalizeComment(updateDto.comment()));
+    jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
     // Snapshot the required materials and requested game items before the rebuild so we can unlink
     // the inventory of anything the new line set no longer requires.
@@ -1248,25 +1247,6 @@ public class JobOrderService {
             .with("toOrgUnit", orgUnitRef(target))
             .with("claimsWithdrawn", claimsWithdrawn));
     return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-  }
-
-  /**
-   * Normalises an inbound free-text comment: trims surrounding whitespace and collapses a
-   * blank/empty result to {@code null} so "comment present" stays unambiguous downstream. Length is
-   * already bounded by {@code @Size} at the controller boundary; this method does not log the
-   * value.
-   *
-   * @param comment raw comment from the create/update DTO, may be {@code null}
-   * @return the trimmed comment, or {@code null} when absent/blank
-   */
-  @Contract("null -> null")
-  @Nullable
-  private static String normalizeComment(String comment) {
-    if (comment == null) {
-      return null;
-    }
-    String trimmed = comment.strip();
-    return trimmed.isEmpty() ? null : trimmed;
   }
 
   /**

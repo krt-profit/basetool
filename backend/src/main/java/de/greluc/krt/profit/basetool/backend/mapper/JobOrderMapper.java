@@ -98,6 +98,10 @@ public abstract class JobOrderMapper {
   // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
   @Mapping(target = "redacted", ignore = true)
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
+  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
+  // is no such property, so it is ignored.
+  @Mapping(target = "withAssignees", ignore = true)
+  @Mapping(target = "withRedacted", ignore = true)
   public abstract JobOrderDto toDto(JobOrder jobOrder);
 
   /**

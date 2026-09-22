@@ -26,7 +26,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -37,6 +38,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.UnmodifiableView;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -218,7 +220,7 @@ public class LiveSyncStreamService {
               MetricNames.TAG_EVENT,
               event,
               MetricNames.TAG_CAUSE,
-              causeTag(e))
+              SseSendFailureCause.tagOf(e))
           .increment();
       log.debug(
           "Dropping live-sync stream of {} after a failed '{}' push", subscription.sub(), event, e);
@@ -313,29 +315,13 @@ public class LiveSyncStreamService {
    * @return the room keys this stream belongs to
    */
   @NotNull
+  @UnmodifiableView
   private static Set<String> canonicalTopics(@NotNull List<LiveSyncTopic> topics) {
-    Map<String, Boolean> ordered = new LinkedHashMap<>();
+    Set<String> ordered = new LinkedHashSet<>();
     for (LiveSyncTopic topic : topics) {
-      ordered.put(topic.canonical(), Boolean.TRUE);
+      ordered.add(topic.canonical());
     }
-    return Set.copyOf(ordered.keySet());
-  }
-
-  /**
-   * Maps a send failure onto its bounded metric tag.
-   *
-   * @param cause the throwable the send raised
-   * @return the {@code cause} tag value
-   */
-  @NotNull
-  private static String causeTag(@NotNull Throwable cause) {
-    if (cause instanceof IOException) {
-      return MetricNames.CAUSE_IO;
-    }
-    if (cause instanceof IllegalStateException) {
-      return MetricNames.CAUSE_ILLEGAL_STATE;
-    }
-    return MetricNames.CAUSE_OTHER;
+    return Collections.unmodifiableSet(ordered);
   }
 
   /**

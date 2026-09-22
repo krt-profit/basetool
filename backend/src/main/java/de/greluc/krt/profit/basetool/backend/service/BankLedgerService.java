@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingReposit
 import de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.StringNormalization;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -818,7 +819,7 @@ public class BankLedgerService {
   @Nullable
   private CounterpartySnapshot resolveCounterparty(
       @Nullable UUID userId, @Nullable String externalName, @Nullable UUID orgUnitId) {
-    String external = externalName == null || externalName.isBlank() ? null : externalName.trim();
+    String external = StringNormalization.trimToNull(externalName);
     if (userId != null && external != null) {
       throw new BadRequestException(
           "A counterparty is either a registered user or an external free-text name, not both");

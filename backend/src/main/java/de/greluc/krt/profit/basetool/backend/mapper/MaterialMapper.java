@@ -22,11 +22,13 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.Material;
 import de.greluc.krt.profit.basetool.backend.model.dto.MaterialDto;
 import org.jetbrains.annotations.NotNull;
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 
 /** MapStruct mapper between Material entities and DTOs. */
-@Mapper(config = CentralMapperConfig.class)
+@Mapper(config = CentralMapperConfig.class, uses = MaterialCategoryMapper.class)
 public interface MaterialMapper {
   /**
    * Maps a {@link Material} entity to its DTO. UEX-style {@code Integer} 0/1 flags ({@code
@@ -54,7 +56,15 @@ public interface MaterialMapper {
   /**
    * Builds a new {@link Material} entity from the DTO. Boolean flags are converted back to
    * UEX-style {@code Integer} 0/1 storage.
+   *
+   * <p>The one method exempt from the central {@code unmappedTargetPolicy = ERROR}: {@link
+   * MaterialDto} is the admin-editable subset, and its only consumer ({@code
+   * MaterialService.updateMaterial}) copies exactly that subset onto the managed row. Every other
+   * {@link Material} column — the UEX, SC Wiki and P4K catalogue data and the timestamps — is owned
+   * by the sync jobs and left unset here on purpose; listing its ~40 names one by one would only
+   * have to be kept in step with the catalogue.
    */
+  @BeanMapping(unmappedTargetPolicy = ReportingPolicy.IGNORE)
   @Mapping(
       target = "isIllegal",
       expression = "java(dto.isIllegal() != null && dto.isIllegal() ? 1 : 0)")

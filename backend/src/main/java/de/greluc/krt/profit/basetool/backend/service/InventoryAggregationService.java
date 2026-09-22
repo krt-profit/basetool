@@ -1110,7 +1110,7 @@ public class InventoryAggregationService {
     List<JobOrderItemStockGroupDto> groups = new java.util.ArrayList<>();
     byGameItem.forEach(
         (gameItemId, rows) -> {
-          GameItem gameItem = rows.get(0).getGameItem();
+          GameItem gameItem = rows.getFirst().getGameItem();
           List<JobOrderItemStockEntryDto> entries = new java.util.ArrayList<>();
           long allocatedTotal = 0L;
           for (InventoryItem row : rows) {

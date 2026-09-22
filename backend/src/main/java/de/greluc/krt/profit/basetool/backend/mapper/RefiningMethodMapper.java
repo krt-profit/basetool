@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import de.greluc.krt.profit.basetool.backend.model.RefiningMethod;
 import de.greluc.krt.profit.basetool.backend.model.dto.RefiningMethodDto;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /** MapStruct mapper between Refining Method entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
@@ -30,5 +31,9 @@ public interface RefiningMethodMapper {
   RefiningMethodDto toDto(RefiningMethod entity);
 
   /** Builds a new {@link RefiningMethod} entity from the inbound DTO. */
+  // RefiningMethodDto carries no version: the admin edit is last-writer-wins by design.
+  @Mapping(target = "version", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "updatedAt", ignore = true)
   RefiningMethod toEntity(RefiningMethodDto dto);
 }

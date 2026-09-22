@@ -51,6 +51,7 @@ public interface PromotionCategoryMapper {
    * @param request validated payload describing the new category
    * @return a transient entity ready to be persisted
    */
+  @Mapping(target = "id", ignore = true)
   @Mapping(target = "topic", ignore = true)
   @Mapping(target = "levelContents", ignore = true)
   PromotionCategory toEntity(PromotionCategoryWriteRequest request);

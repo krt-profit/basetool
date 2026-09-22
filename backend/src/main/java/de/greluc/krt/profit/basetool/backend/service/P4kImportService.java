@@ -1154,7 +1154,7 @@ public class P4kImportService {
       return null;
     }
     List<T> matches = finder.apply(key.trim());
-    return matches.size() == 1 ? matches.get(0) : null;
+    return matches.size() == 1 ? matches.getFirst() : null;
   }
 
   /**
