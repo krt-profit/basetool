@@ -107,7 +107,7 @@ express safely, and fix the leak one of them was absorbing at its source.**
 ## Amendment 2026-09-22 — Podman only, one name (OPS-SIMP-01, OPS-SIMP-02)
 
 The job stopped being runtime-aware the day after this ADR: every Docker arm left the operational
-scripts ([ADR-0202](0202-compose-stays-the-source-of-the-units-and-the-scripts-speak-podman-only.md)),
+scripts ([ADR-0203](0203-compose-stays-the-source-of-the-units-and-the-scripts-speak-podman-only.md)),
 so `container-cleanup.sh` now runs the three Podman steps and nothing else. The two Docker-only steps
 — `builder prune` and the anonymous-only `volume prune` — are gone from the script rather than
 skipped, together with `IRI_CLEANUP_BUILDER_UNTIL`, `IRI_CLEANUP_PRUNE_VOLUMES` and the unit's

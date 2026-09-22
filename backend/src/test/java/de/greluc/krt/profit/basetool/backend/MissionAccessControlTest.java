@@ -198,7 +198,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -246,7 +246,7 @@ class MissionAccessControlTest {
     // The other member tries to edit the first one's row -> forbidden
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(otherMember.getId().toString()))
@@ -288,7 +288,7 @@ class MissionAccessControlTest {
     // Officer updates the member's row
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -339,7 +339,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))
@@ -357,7 +357,7 @@ class MissionAccessControlTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId())
+            put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(memberUser.getId().toString()))

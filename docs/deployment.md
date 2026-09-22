@@ -322,9 +322,13 @@ Two phases, PR-based; no hand-pushed tag, no tag ever moved.
 
 The tag run **does not rebuild**: it cosign-verifies and re-tags the `:sha-<short>` digest `main`
 already built, so `:X.Y.Z` and `:sha-<short>` are the same bytes (REQ-OPS-021, ADR-0137). Any doubt
-falls back to a full build. The tag is created with the `RELEASE_TOKEN` secret so that it triggers
-`release-images.yml`; without it the publish job warns and the images have to be started by hand
-(*Actions → Release Images → Run workflow*), which always does a full build.
+falls back to a full build. The tag is created with a short-lived token of the **`basetool-release`
+GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
+lets only that App and @greluc create `v*` tags, and an App token's events trigger
+`release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
+publish job stops with an error. The manual path is @greluc creating the tag at the release PR's
+merge commit and re-running the failed publish job, which then skips the tag and publishes the
+rest.
 
 Nothing is deployed yet: `:stable` still names the previous release.
 
@@ -582,6 +586,24 @@ restorecon -F /var/iri/code/keycloak/providers/keycloak-spi.jar
 ${UCTL} restart keycloak.service
 ${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 ```
+
+### Keycloak realm shape
+
+The realm lives in `db-keycloak`, not in any artifact: delivery never touches it, and
+`realm-export.json` only seeds an empty one. What the Basetool needs from it — its clients, the two
+ingest audience scopes, scope assignments, the DPoP policy, service-account roles, token settings —
+is brought to production's shape by `scripts/provision-keycloak-realm.py` (`REQ-OPS-033`,
+[ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md)):
+dry run by default, `--apply` to write, origins from `--public-origin`, nothing deleted that only
+the target has. Run it on a **new** host's realm, and on the **testing** host whenever
+`scripts/keycloak-config-snapshot.sql` diffs against production outside the environment-specific
+lines. The procedure, and the `.env` values a newly created confidential client needs, are in
+[`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner).
+On production an `--apply` is a gated write like any other.
+
+The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
+frontend's token carries that audience only once the realm is in shape — so on a host whose realm
+was never provisioned, **provision first, then set the variable**.
 
 ### Updating the operational scripts and units
 
@@ -846,8 +868,8 @@ then `ansible-playbook site.yml --limit production --tags cosign`, then
 
 The GHCR pull token has to be a **classic** PAT: GitHub Packages does not accept fine-grained
 tokens. Scope `read:packages` only, 90-day expiry, authorised for the organisation's SSO if
-enforced. Its scope is account-wide, which the short expiry compensates for. `RELEASE_TOKEN` is a
-separate CI secret and unrelated.
+enforced. Its scope is account-wide, which the short expiry compensates for. The release workflows'
+`basetool-release` App key (ADR-0201) is a separate CI secret and unrelated.
 
 If the token expires, record the date in the sidecar: `deploy.sh` publishes it every tick as
 `basetool_ghcr_token_expiry_timestamp`, and `GhcrPullTokenExpiring` (under 14 days) /

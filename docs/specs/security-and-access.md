@@ -1671,9 +1671,11 @@ nor the provisioning service account.
 - [x] Verification fails loudly when `dpop.bound.access.tokens` is flipped on, when the marker role
   is missing, or when the policy is present but unscoped.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` (configuration) and
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` and, for the whole realm,
+`provision-keycloak-realm.test.sh` section 4 (configuration and write order) and
 `scripts/verify-dpop-binding.py` (behaviour) · **Code:**
-`scripts/provision-keycloak-mobile-client.py` · **Decision:**
+`scripts/provision-keycloak-mobile-client.py`, which `scripts/provision-keycloak-realm.py` imports
+for the client, profile and policy (`REQ-OPS-033`) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md) · **Measurements:**
 [`ANDROID_API_EXPOSURE_PLAN.md`](../archive/ANDROID_API_EXPOSURE_PLAN.md) section 7
 
@@ -2126,9 +2128,11 @@ not one that also silently changes what a post-incident review can reconstruct.
   unit; and the Lager under it reads **1403.4 SCU** (102.93 + 700 + 180 + 420.5), the org-wide
   total, against the 784.8 the same screen shows a member of one Staffel.
 
-**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 · **Code:**
+**Enforced by:** `provision-keycloak-mobile-client.test.sh` section 7 and
+`provision-keycloak-realm.test.sh` sections 2 and 4 · **Code:**
 `scripts/provision-keycloak-mobile-client.py` (`MEMBER_REALM_ROLES`, `FORBIDDEN_REALM_ROLES`,
-`upsert_realm_role_scope`), `UserReconciliationService#syncUser`,
+`upsert_realm_role_scope`), `scripts/provision-keycloak-realm.py` (`_converge_role_scope`, which
+converges the same list in both directions), `UserReconciliationService#syncUser`,
 `CustomJwtGrantedAuthoritiesConverter`, `OrgUnitViewModel` (app) · **Decision:**
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 

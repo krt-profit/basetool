@@ -69,13 +69,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Coverage for {@link MissionService} lifecycle / ownership methods that the existing focused test
- * files don't reach: {@code deleteMission}, {@code removeParticipant}, {@code setMissionOwner},
+ * files don't reach: {@code deleteMission}, {@code removeParticipant}, {@code updateMissionOwner},
  * {@code removeMissionFrequency}, and {@code findAllActiveReference}.
  *
  * <p>{@code deleteMission} performs two manual collection detachments (refinery orders,
  * sub-missions) before deleting the mission row — exactly the kind of multi-step transaction
  * CLAUDE.md flags as bug-prone; since Variante C (REQ-INV-027) the inventory earmarks cascade via
- * the mission-allocation FK instead of a manual null-out. {@code setMissionOwner} is
+ * the mission-allocation FK instead of a manual null-out. {@code updateMissionOwner} is
  * privilege-escalation surface. None of these had dedicated tests before this PR.
  */
 @ExtendWith(MockitoExtension.class)
@@ -407,17 +407,18 @@ class MissionServiceLifecycleTest {
   }
 
   // ---------------------------------------------------------------
-  // setMissionOwner — explicit upsert of MissionOwnership
+  // updateMissionOwner — explicit upsert of MissionOwnership
   // ---------------------------------------------------------------
 
   @Nested
-  class SetMissionOwnerTests {
+  class UpdateMissionOwnerTests {
 
     @Test
     void throwsNotFound_whenMissionMissing() {
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.empty());
 
-      assertThrows(NotFoundException.class, () -> service.setMissionOwner(MISSION_ID, USER_ID));
+      assertThrows(
+          NotFoundException.class, () -> service.updateMissionOwner(MISSION_ID, USER_ID, 0L));
       verify(userRepository, never()).findById(org.mockito.ArgumentMatchers.any());
     }
 
@@ -427,26 +428,31 @@ class MissionServiceLifecycleTest {
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-      assertThrows(NotFoundException.class, () -> service.setMissionOwner(MISSION_ID, USER_ID));
-      verify(missionOwnershipRepository, never()).save(org.mockito.ArgumentMatchers.any());
+      assertThrows(
+          NotFoundException.class, () -> service.updateMissionOwner(MISSION_ID, USER_ID, 0L));
+      verify(missionOwnershipRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void happyPath_setsOwnerAndUpsertsOwnership_newOwnership() {
-      // No existing MissionOwnership row -> the orElseGet branch creates one.
+      // No existing MissionOwnership row -> the orElseGet branch creates one, for the owner being
+      // replaced, and then moves it to the new one.
       Mission mission = newMission();
       User user = newUser(USER_ID);
 
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(mission));
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
       when(missionOwnershipRepository.findByMissionId(MISSION_ID)).thenReturn(Optional.empty());
+      when(missionOwnershipRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(inv -> inv.getArgument(0));
 
-      service.setMissionOwner(MISSION_ID, USER_ID);
+      service.updateMissionOwner(MISSION_ID, USER_ID, 0L);
 
       assertSame(user, mission.getOwner(), "mission.owner must point to the looked-up user");
 
       ArgumentCaptor<MissionOwnership> captor = ArgumentCaptor.forClass(MissionOwnership.class);
-      verify(missionOwnershipRepository).save(captor.capture());
+      verify(missionOwnershipRepository, org.mockito.Mockito.times(2))
+          .saveAndFlush(captor.capture());
       MissionOwnership saved = captor.getValue();
       assertSame(user, saved.getOwner());
       assertSame(
@@ -457,9 +463,8 @@ class MissionServiceLifecycleTest {
 
     @Test
     void happyPath_existingOwnership_isMutatedInPlace() {
-      // Existing MissionOwnership row -> the orElse branch is skipped, the
-      // existing row's owner is updated. setMissionOwner passes null for the
-      // expectedVersion so the optimistic check is bypassed.
+      // Existing MissionOwnership row -> the orElseGet branch is skipped and the existing row's
+      // owner is updated once the echo matched its version.
       Mission mission = newMission();
       User newOwner = newUser(USER_ID);
       User oldOwner = newUser(UUID.randomUUID());
@@ -474,8 +479,9 @@ class MissionServiceLifecycleTest {
       when(userRepository.findById(USER_ID)).thenReturn(Optional.of(newOwner));
       when(missionOwnershipRepository.findByMissionId(MISSION_ID))
           .thenReturn(Optional.of(existing));
+      when(missionOwnershipRepository.saveAndFlush(existing)).thenReturn(existing);
 
-      service.setMissionOwner(MISSION_ID, USER_ID);
+      service.updateMissionOwner(MISSION_ID, USER_ID, 5L);
 
       assertSame(
           newOwner,
@@ -485,7 +491,7 @@ class MissionServiceLifecycleTest {
           5L,
           existing.getVersion(),
           "version must not be touched directly — Hibernate bumps it on flush");
-      verify(missionOwnershipRepository).save(existing);
+      verify(missionOwnershipRepository).saveAndFlush(existing);
     }
   }
 

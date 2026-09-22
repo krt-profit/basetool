@@ -2,7 +2,32 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Monitoring: Container-Limits werden wieder gelesen.** Der cgroup-Collector las seit der
+  Podman-Umstellung die Unit statt des Containers und sah deshalb kein Speicher-, pids- oder
+  CPU-Limit: Die Alarme `ContainerMemoryHigh`, `ContainerPidsHigh` und `ContainerCpuThrottledHigh`
+  konnten nicht auslösen, und drei Panels im Container-Dashboard blieben leer. Podmans
+  Healthcheck-Units erscheinen dort außerdem nicht mehr als Hex-Container.
+
+- **Einsätze: Besitzerwechsel meldet jetzt einen Konflikt, wenn jemand anderes den Besitzer
+  inzwischen geändert hat.** Bisher gewann still der spätere von zwei gleichzeitigen Wechseln; jetzt
+  kommt der bekannte Konflikt-Dialog mit „Aktuelle Werte laden". Ein zweiter Wechsel auf derselben
+  Seite funktioniert ohne Neuladen.
+
+### Removed
+
+- **API: die 17 veralteten Einsatz-Schnittstellen sind vorzeitig entfernt.** Angekündigt war der
+  Sunset 2026-10-20; per Entscheidung vom 22.09.2026 fielen sie schon mit diesem Release weg. Ersatz
+  sind die `/slim`-Endpunkte und der versionierte Besitzerwechsel. App-Versionen älter als der
+  07.09.2026 müssen aktualisiert werden.
+  
 ### Added
+
+- **App: Einsatzleitung kann wieder Mitglieder zu einem Einsatz hinzufügen.** Dafür gibt es einen
+  eigenen, nur für Verwalter freigegebenen Weg, der ein Mitglied ausschließlich per ID einträgt
+  (`POST …/participants/by-id/slim`); die allgemeinen Anmelde-Wege bleiben für die App gesperrt.
+  Die App braucht dafür ein Update.
 
 - **Server: automatische Sicherheitsupdates.** Der Produktionshost spielt Security-Advisories jetzt
   täglich um 07:00 selbst ein (dnf-automatic); die Container-Runtime ist ausgenommen, neu gestartet
@@ -15,6 +40,16 @@
 
 ### Changed
 
+- **Einsätze: die Weboberfläche nutzt keine der 17 als veraltet markierten Einsatz-Schnittstellen
+  mehr**. Auszahlungsart, Ein-/Auschecken, Teilnehmer, Einheiten und Crew laufen
+  über die schlanken Nachfolger; ein Test verhindert künftig jeden Aufruf einer veralteten
+  Schnittstelle aus dem Frontend.
+
+- **Build: Release-Tags und Release-PRs legt jetzt die GitHub-App „basetool-release“ an.** Seit die
+  Tag-Regel nur noch sie und den Maintainer zulässt, scheiterte das persönliche Token beim Anlegen
+  des Tags, und v1.10.0 musste von Hand getaggt werden. Beide Release-Workflows holen sich jetzt ein
+  kurzlebiges, pro Schritt beschränktes App-Token; das alte Token wird nicht mehr gelesen.
+
 - **Server-Härtung.** Datenbank- und Redis-Netze haben in Produktion keinen Internetzugang mehr,
   Keycloak bindet Theme und Provider nur lesend und `realm-export.json` gar nicht mehr ein, die
   ungenutzte Prometheus-Lifecycle-API ist abgeschaltet, und das Host-Journal löscht Einträge nach
@@ -25,7 +60,7 @@
 
 - **Betrieb: die Betriebsskripte kennen nur noch Podman.** Die Docker-Zweige in Deploy, Backup,
   Restore-Drill und Cleanup sind entfernt, ebenso cAdvisor und der Docker-Socket-Proxy im Monitoring
-  (ADR-0202). Für Nutzer ändert sich nichts.
+  (ADR-0203). Für Nutzer ändert sich nichts.
 
 - **Anmeldeseite: Passwortmanager funktionieren, „Angemeldet bleiben" ist nicht mehr
   vorausgewählt.** Benutzername und Passwort werden jetzt von Passwortmanagern ausgefüllt und

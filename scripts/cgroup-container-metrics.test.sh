@@ -68,15 +68,15 @@ assert_absent() {
 # ---------------------------------------------------------------------------------------------
 USER_SLICE="${FAKE}/user.slice/user-1000.slice/user@1000.service"
 
-make_container() { # dir  memory.max  pids.max  oom_kill  nr_throttled
-  local dir=$1 memmax=$2 pidsmax=$3 oom=$4 throttled=$5
+make_container() { # dir  memory.max  pids.max  oom_kill  nr_throttled  [nr_periods]
+  local dir=$1 memmax=$2 pidsmax=$3 oom=$4 throttled=$5 periods=${6:-4200}
   mkdir -p "$dir"
   cat > "${dir}/cpu.stat" <<EOF
 usage_usec 2500000
 user_usec 1500000
 system_usec 1000000
 nice_usec 0
-nr_periods 4200
+nr_periods ${periods}
 nr_throttled ${throttled}
 throttled_usec 1250000
 nr_bursts 0
@@ -103,13 +103,43 @@ EOF
   printf '%s\n' "${pidsmax}" > "${dir}/pids.max"
 }
 
+# A Quadlet container as podman actually lays it out under --cgroups=split: the unit's cgroup is
+# only a parent, with NO limit of its own (memory.max "max", pids.max the user manager's default,
+# zero CFS periods), and the container's limits sit on its libpod-payload-<id> child beside
+# conmon's `runtime`. Measured on production 2026-09-22. Until then this fixture put the limits on
+# the unit itself -- the one place they never are -- so it stayed green while production reported
+# every container as unlimited and never throttled.
+make_quadlet() { # unit-dir  memory.max  pids.max  oom_kill  nr_throttled
+  local unit=$1
+  make_container "$unit" max 97670 0 0 0
+  make_container "${unit}/runtime" max max 0 0 0
+  make_container "${unit}/libpod-payload-$(printf 'a%.0s' {1..64})" "$2" "$3" "$4" "$5"
+  printf '%s\n' "4242" > "${unit}/libpod-payload-$(printf 'a%.0s' {1..64})/cgroup.procs"
+}
+
 say "building a fake cgroup tree in ${FAKE}"
 # limits set, quiet
-make_container "${USER_SLICE}/backend.service" 268435456 100 0 0
+make_quadlet "${USER_SLICE}/backend.service" 268435456 100 0 0
 # unlimited -- both ceilings read the literal string "max"
-make_container "${USER_SLICE}/app.slice/edge.service" max max 0 0
+make_quadlet "${USER_SLICE}/app.slice/edge.service" max max 0 0
 # has been OOM-killed before and is being throttled now
-make_container "${USER_SLICE}/acme.service" 268435456 100 3 7
+make_quadlet "${USER_SLICE}/acme.service" 268435456 100 3 7
+# A plain user service with no payload child -- prometheus-podman-exporter is one on production.
+# It is read from its own cgroup, because there is nothing below it to prefer.
+make_container "${USER_SLICE}/app.slice/podman-exporter.service" 67108864 max 0 0
+# A Podman healthcheck in flight: a transient unit named <64-hex id>-<hex>, in the same slice as
+# the containers, matching the default pattern. It must never become a "container".
+make_container \
+  "${USER_SLICE}/app.slice/$(printf 'e%.0s' {1..64})-623ad299e33d18f7.service" max max 0 0
+# A recreate caught mid-way: the old payload is still there but empty, the new one holds the
+# process. The live one must win even though the dead one sorts first.
+make_container "${USER_SLICE}/app.slice/keycloak.service" max 97670 0 0 0
+make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf '0%.0s' {1..64})" \
+  111 max 0 0
+make_container "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})" \
+  2684354560 2048 0 0
+printf '%s\n' "4343" \
+  > "${USER_SLICE}/app.slice/keycloak.service/libpod-payload-$(printf 'f%.0s' {1..64})/cgroup.procs"
 # a directory that matches the pattern but publishes nothing: a container that exited between
 # the walk and the read. It must be dropped, not emitted with zeros.
 mkdir -p "${USER_SLICE}/ghost.service"
@@ -136,8 +166,28 @@ assert_line "finds backend by its unit name"  '^basetool_container_pids\{name="b
 assert_line "finds edge below app.slice"      '^basetool_container_pids\{name="edge"\} 42$'
 assert_line "finds acme"                      '^basetool_container_pids\{name="acme"\} 42$'
 assert_absent "drops a cgroup that publishes nothing" 'name="ghost"'
-assert_line "counts only the containers it emitted" '^basetool_container_metrics_containers 3$'
+assert_absent "a healthcheck's transient unit is not a container" 'name="[0-9a-f]{64}-'
+assert_absent "neither is the payload or conmon's runtime cgroup" 'name="(libpod-payload-|runtime)'
+assert_line "counts only the containers it emitted" '^basetool_container_metrics_containers 5$'
 assert_line "stamps when it ran"              '^basetool_container_metrics_timestamp_seconds [0-9]'
+
+# =============================================================================================
+say ""
+say "== a Quadlet container is read from its payload cgroup, not from its unit =="
+# =============================================================================================
+# The unit's own cgroup reads memory.max "max", pids.max 97670 and zero CFS periods. Reading it
+# made every container look unlimited, which left ContainerMemoryHigh, ContainerPidsHigh and
+# ContainerCpuThrottledHigh without a denominator and three dashboard panels empty.
+assert_line "the memory limit is the payload's" \
+  '^basetool_container_memory_limit_bytes\{name="backend"\} 268435456$'
+assert_line "the pids ceiling is the payload's" \
+  '^basetool_container_pids_max\{name="backend"\} 100$'
+assert_line "CFS periods are the payload's, where the quota is" \
+  '^basetool_container_cpu_periods_total\{name="backend"\} 4200$'
+assert_line "a unit without a payload is read from its own cgroup" \
+  '^basetool_container_memory_limit_bytes\{name="podman-exporter"\} 67108864$'
+assert_line "mid-recreate, the payload that holds a process wins" \
+  '^basetool_container_memory_limit_bytes\{name="keycloak"\} 2684354560$'
 
 # =============================================================================================
 say ""
@@ -155,7 +205,7 @@ assert_absent "an unnamed system unit stays invisible" 'name="sshd'
 assert_line "host services are counted on their own" '^basetool_container_metrics_host_services 2$'
 # The container count must not include them, or FoundNothing could never fire on a host whose
 # container layout stopped matching while its host services kept running.
-assert_line "...and not as containers" '^basetool_container_metrics_containers 3$'
+assert_line "...and not as containers" '^basetool_container_metrics_containers 5$'
 
 if "$PY" "$COLLECTOR" --cgroup-root "$FAKE" --no-host-services --dry-run 2>/dev/null \
      | grep -q 'name="alloy"'; then

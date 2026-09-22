@@ -413,8 +413,8 @@ class MissionServiceSectionPatchTest {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
     when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
     when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.of(ownership));
-    when(missionOwnershipRepository.save(any(MissionOwnership.class)))
-        .thenAnswer(inv -> inv.getArgument(0));
+    when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
+        .thenAnswer(inv -> flushOwnership(inv.getArgument(0)));
 
     // When
     Mission result = missionService.updateMissionOwner(missionId, newOwnerId, 3L);
@@ -423,8 +423,72 @@ class MissionServiceSectionPatchTest {
     assertSame(existing, result);
     assertNotNull(result.getOwner());
     assertEquals(newOwnerId, result.getOwner().getId());
+    // The response carries the counter the change produced, not the one the mission was read with
+    // -- otherwise the client echoes 3 on its next change and 409s itself.
+    assertEquals(4L, result.getOwnershipVersion());
     // Crucial: Mission.version was NOT bumped via save(mission)
     verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  /**
+   * Stands in for Hibernate's flush of a {@code MissionOwnership}: an insert seeds the version at
+   * {@code 0}, an update bumps it by one.
+   *
+   * @param row the row being flushed
+   * @return the same row, versioned as the database would leave it
+   */
+  private static MissionOwnership flushOwnership(MissionOwnership row) {
+    row.setVersion(row.getVersion() == null ? 0L : row.getVersion() + 1);
+    return row;
+  }
+
+  @Test
+  void updateMissionOwner_firstChange_materialisesTheRowWithTheOldOwnerAndEndsAtVersionOne() {
+    // A mission whose owner was never changed has no companion row and reads as version 0. The row
+    // is created with the owner being REPLACED and then moved, so the first change ends at 1: a row
+    // created straight at the new owner would stay at 0, and a second client still holding the 0
+    // it read before this change would overwrite it unchallenged.
+    User oldOwner = new User();
+    oldOwner.setId(UUID.randomUUID());
+    existing.setOwner(oldOwner);
+    UUID newOwnerId = UUID.randomUUID();
+    User newOwner = new User();
+    newOwner.setId(newOwnerId);
+    java.util.List<UUID> ownerAtEachFlush = new java.util.ArrayList<>();
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
+    when(missionOwnershipRepository.saveAndFlush(any(MissionOwnership.class)))
+        .thenAnswer(
+            inv -> {
+              MissionOwnership row = inv.getArgument(0);
+              ownerAtEachFlush.add(row.getOwner().getId());
+              return flushOwnership(row);
+            });
+
+    Mission result = missionService.updateMissionOwner(missionId, newOwnerId, 0L);
+
+    assertEquals(java.util.List.of(oldOwner.getId(), newOwnerId), ownerAtEachFlush);
+    assertEquals(1L, result.getOwnershipVersion());
+    assertEquals(newOwnerId, result.getOwner().getId());
+  }
+
+  @Test
+  void updateMissionOwner_shouldThrow409_whenNoRowYetButTheEchoIsNotZero() {
+    // No row reads as version 0, so an echo of anything else is stale by definition.
+    UUID newOwnerId = UUID.randomUUID();
+    User newOwner = new User();
+    newOwner.setId(newOwnerId);
+
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(userRepository.findById(newOwnerId)).thenReturn(Optional.of(newOwner));
+    when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
+
+    assertThrows(
+        ObjectOptimisticLockingFailureException.class,
+        () -> missionService.updateMissionOwner(missionId, newOwnerId, 1L));
+    verify(missionOwnershipRepository, never()).saveAndFlush(any(MissionOwnership.class));
   }
 
   @Test
@@ -445,28 +509,9 @@ class MissionServiceSectionPatchTest {
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> missionService.updateMissionOwner(missionId, newOwnerId, 2L));
-  }
-
-  @Test
-  void getMissionOwnershipVersion_shouldReturnZero_whenNoRowYet() {
-    when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.empty());
-
-    long v = missionService.getMissionOwnershipVersion(missionId);
-
-    assertEquals(0L, v);
-  }
-
-  @Test
-  void getMissionOwnershipVersion_shouldReturnCurrentVersion() {
-    MissionOwnership ownership = new MissionOwnership();
-    ownership.setId(UUID.randomUUID());
-    ownership.setMission(existing);
-    ownership.setVersion(5L);
-    when(missionOwnershipRepository.findByMissionId(missionId)).thenReturn(Optional.of(ownership));
-
-    long v = missionService.getMissionOwnershipVersion(missionId);
-
-    assertEquals(5L, v);
+    // A stale echo changes nothing: neither the row nor the mission's owner.
+    verify(missionOwnershipRepository, never()).saveAndFlush(any(MissionOwnership.class));
+    assertNull(existing.getOwner());
   }
 
   // -----------------------------------------------------------------------------------------

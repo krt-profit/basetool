@@ -71,12 +71,25 @@ class MissionControllerSecurityTest {
 
     when(missionSecurityService.canManageMission(any(UUID.class), ArgumentMatchers.any()))
         .thenReturn(true);
-    when(missionService.updateCrewInShip(any(), any(), any(), any(), any()))
-        .thenReturn(new Mission());
+    // The slim answer is the one crew entry, so the mission has to contain it.
+    de.greluc.krt.profit.basetool.backend.model.MissionCrew crew =
+        new de.greluc.krt.profit.basetool.backend.model.MissionCrew();
+    crew.setId(crewId);
+    de.greluc.krt.profit.basetool.backend.model.MissionUnit unit =
+        new de.greluc.krt.profit.basetool.backend.model.MissionUnit();
+    unit.setId(unitId);
+    unit.setCrew(new java.util.LinkedHashSet<>(java.util.List.of(crew)));
+    Mission mission = new Mission();
+    mission.setAssignedUnits(new java.util.LinkedHashSet<>(java.util.List.of(unit)));
+    when(missionService.updateCrewInShip(any(), any(), any(), any(), any())).thenReturn(mission);
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
+            put(
+                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+                    missionId,
+                    unitId,
+                    crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -98,7 +111,11 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
+            put(
+                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+                    missionId,
+                    unitId,
+                    crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(
@@ -121,7 +138,11 @@ class MissionControllerSecurityTest {
 
     mockMvc
         .perform(
-            put("/api/v1/missions/{id}/units/{unitId}/crew/{crewId}", missionId, unitId, crewId)
+            put(
+                    "/api/v1/missions/{id}/units/{unitId}/crew/{crewId}/slim",
+                    missionId,
+                    unitId,
+                    crewId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"jobTypeIds\": [\"" + UUID.randomUUID() + "\"]}")
                 .with(jwt().authorities(Collections.emptyList())))
@@ -170,7 +191,7 @@ class MissionControllerSecurityTest {
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                    "/api/v1/missions/{id}/managers/{userId}", missionId, userId)
+                    "/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"))))
         .andExpect(status().isOk());
   }
@@ -185,7 +206,7 @@ class MissionControllerSecurityTest {
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
-                    "/api/v1/missions/{id}/managers/{userId}", missionId, userId)
+                    "/api/v1/missions/{id}/managers/{userId}/slim", missionId, userId)
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
         .andExpect(status().isForbidden());
   }

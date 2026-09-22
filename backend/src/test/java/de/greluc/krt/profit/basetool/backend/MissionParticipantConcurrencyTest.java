@@ -170,7 +170,7 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionService.addParticipant(missionId, userId);
+                    missionService.addParticipant(missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (ObjectOptimisticLockingFailureException unexpected) {
                     conflictCount.incrementAndGet();
@@ -281,7 +281,7 @@ class MissionParticipantConcurrencyTest {
                       otherErrorCount.incrementAndGet();
                       return;
                     }
-                    missionService.addParticipant(missionId, userId);
+                    missionService.addParticipant(missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (DuplicateEntityException expected) {
                     // Thread loaded the mission AFTER the winner committed and the in-memory

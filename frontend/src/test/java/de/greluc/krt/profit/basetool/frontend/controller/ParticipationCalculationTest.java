@@ -106,6 +106,7 @@ class ParticipationCalculationTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -205,6 +206,7 @@ class ParticipationCalculationTest {
             0L,
             java.util.List.of(),
             0L,
+            null,
             null);
 
     BackendApiClient backendApiClient = mock(BackendApiClient.class);

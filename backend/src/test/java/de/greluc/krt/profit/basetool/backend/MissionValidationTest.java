@@ -130,7 +130,8 @@ class MissionValidationTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    missionService.addParticipant(mission.getId(), officerUser.getId());
+    missionService.addParticipant(
+        mission.getId(), officerUser.getId(), null, null, null, null, null);
     missionService.addUnitToMission(
         mission.getId(), "Test Unit", st.getId(), ship.getId(), false, null, null, null);
     mission = missionRepository.findById(mission.getId()).orElseThrow();
@@ -172,7 +173,11 @@ class MissionValidationTest {
 
     mockMvc
         .perform(
-            post("/api/v1/missions/" + mission.getId() + "/units/" + missionShip.getId() + "/crew")
+            post("/api/v1/missions/"
+                    + mission.getId()
+                    + "/units/"
+                    + missionShip.getId()
+                    + "/crew/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -193,7 +198,8 @@ class MissionValidationTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(officerUser))
+                    + getParticipantId(officerUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))
@@ -214,7 +220,8 @@ class MissionValidationTest {
             put("/api/v1/missions/"
                     + mission.getId()
                     + "/participants/"
-                    + getParticipantId(officerUser))
+                    + getParticipantId(officerUser)
+                    + "/slim")
                 .with(
                     jwt()
                         .jwt(builder -> builder.subject(officerUser.getId().toString()))

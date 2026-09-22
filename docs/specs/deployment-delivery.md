@@ -1739,6 +1739,52 @@ haproxy, glibc and the host-native `node_exporter` and `alloy` were fixed only w
 `monitoring/prometheus/alerts/infrastructure.yml` · `scripts/check-conformance.py` · **Decision:**
 [ADR-0199](../adr/0199-the-host-applies-security-updates-unattended-with-the-container-runtime-excluded.md)
 
+### REQ-OPS-033 — A realm gets the Basetool's shape from the provisioner, never by hand
+
+Every environment's Keycloak realm carries the **production shape** of what the Basetool owns, and
+that shape is applied by `scripts/provision-keycloak-realm.py` rather than rebuilt from runbook
+steps. The realm lives in each host's `db-keycloak` and no artifact carries it, so REQ-OPS-022's
+lock-step stops at the realm: on 2026-09-22 the testing realm had no audience mapper, no extractor,
+gateway or Android client and no DPoP policy, and the backend's audience gate could not be enabled
+there.
+
+- **The desired state is production's**, read with the secret-free
+  `scripts/keycloak-config-snapshot.sql` and written into the script: the Basetool's clients and
+  their flags, attributes, redirect URIs, web origins, scope assignments and mappers; the
+  `extractor-ingest` / `extractor-ingest-only` scopes and their audience mappers; the Android
+  client's marker role and realm-role scope; the DPoP client profile and policy; the
+  service-account roles; the realm's token and session settings. What production carries that looks
+  unintended is reproduced and marked `PROD-AS-IS`, and changes in production first.
+- **Environment-specific values are arguments** (`--public-origin`, `--grafana-origin`). No
+  production hostname is written into another realm.
+- **Dry run by default.** `--apply` writes, then re-plans; the apply fails unless the second plan is
+  empty. A realm in shape produces no write at all.
+- **Additive.** An object only the target realm has is reported and left alone. The exceptions are
+  existing decisions — the Android client's realm-role scope (`REQ-SEC-035`), its withheld
+  `offline_access` (ADR-0131) — and the scope lists of a client the same run created.
+- **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
+  change, the policy is detached first and re-attached last, and both client-policy lists are merged
+  by name so no other policy or profile is lost.
+- **No secret is printed, logged or sent back.** A confidential client the run creates is reported
+  with the Admin Console path to its generated secret and the `.env` variables that need it.
+- **Built-in Keycloak objects are never touched**; realm-wide hardening stays in
+  `KEYCLOAK_HARDENING_RUNBOOK.md`.
+
+**Acceptance**
+
+- [ ] `provision-keycloak-realm.test.sh` passes: a dry run writes nothing; an apply from an empty
+  realm builds the shape and verifies clean; a second apply sends no write; an Android edit detaches,
+  writes and re-attaches in that order and keeps every foreign policy; target-only objects are
+  reported and still present; no secret appears in the output or in any payload.
+- [ ] After provisioning, `keycloak-config-snapshot.sql` run on the environment and on production
+  diffs only in the lines its header lists as environment-specific.
+
+**Enforced by:** `scripts/provision-keycloak-realm.py` · `scripts/provision-keycloak-realm.test.sh`
+(`.github/workflows/keycloak-provisioner.yml`) · `scripts/keycloak-config-snapshot.sql` ·
+**Decision:**
+[ADR-0202](../adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md) ·
+**Runbook:** [`INGEST_KEYCLOAK_SETUP.md` → *New or out-of-date realm*](../INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not

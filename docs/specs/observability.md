@@ -1029,7 +1029,12 @@ upstream as *not planned*, and the scrape job was removed from `prometheus.yml` 
 `prometheus-podman-exporter` is a **subset** of what cAdvisor published (ADR-0163). The collector
 supplies the remainder by reading the cgroup v2 tree (the service user's
 `user@<uid>.service/app.slice/<name>.service` cgroups), which needs no daemon, no socket and no
-privilege beyond reading `/sys/fs/cgroup`. The exporter supplies what the cgroup tree cannot:
+privilege beyond reading `/sys/fs/cgroup`. Every value is read from the unit's
+`libpod-payload-<id>` child, because Quadlet runs containers with `--cgroups=split` and podman
+writes `memory.max`, `pids.max` and `cpu.max` there and never onto the unit — until 2026-09-22 the
+collector read the unit and reported every container as unlimited, so `ContainerMemoryHigh`,
+`ContainerPidsHigh` and `ContainerCpuThrottledHigh` had no working denominator. Podman's transient
+healthcheck units (`<64-hex id>-<hex>.service`) sit in the same slice and are skipped. The exporter supplies what the cgroup tree cannot:
 container start time and network counters.
 
 | series | type | source file | replaces |
@@ -2544,7 +2549,7 @@ therefore alerts on:
   so the two halves were substitutable and the ratio alerts divide without a runtime-specific
   `on(...)` clause. The `or` existed so the cutover could be invisible downstream while production
   (Docker + cAdvisor) and the testing host (rootless Podman) ran side by side; the cAdvisor legs were
-  removed on 2026-09-22 with cAdvisor itself (ADR-0202), and each rule now reads the Podman family
+  removed on 2026-09-22 with cAdvisor itself (ADR-0203), and each rule now reads the Podman family
   alone, still reduced by `name`. Normalisation also **strips** cAdvisor's `id` /
   `image` labels, so an alert kept its identity across the cutover. The dashboard panels that still
   read cAdvisor names directly were moved onto these rules on 2026-09-22 (CHANGELOG v1.9.2 — they had
@@ -2916,7 +2921,7 @@ reported all six series missing on a host collecting every one of them as `baset
 already been taught that normalisation (`basetool:container:present`); this check was the half left
 behind, which is the shape a runtime migration leaves when a signal is renamed in one place. It
 accepted either family until 2026-09-22 and asks for the `basetool_container_*` names only since
-(ADR-0202).
+(ADR-0203).
 
 **Preconditions the host must satisfy, asserted rather than assumed.** `adm` membership is necessary
 and not sufficient: RHEL writes `/var/log/secure` and `/var/log/audit/audit.log` as `root:root`, so

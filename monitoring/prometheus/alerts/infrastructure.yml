@@ -143,7 +143,7 @@ groups:
       # served, permanently, which is how a critical stops being read.
       #
       # `basetool:container:present` is the same normalised series the six value alerts below read
-      # (its cAdvisor leg was removed with cAdvisor on 2026-09-22, ADR-0202).
+      # (its cAdvisor leg was removed with cAdvisor on 2026-09-22, ADR-0203).
       - alert: ContainerMetricsMissing
         expr: >-
           count(basetool:container:present) < 10

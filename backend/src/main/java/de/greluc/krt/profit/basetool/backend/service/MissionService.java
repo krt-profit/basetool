@@ -775,16 +775,6 @@ public class MissionService {
   }
 
   /**
-   * Adds an authenticated user as a participant on a mission. Convenience overload that delegates
-   * to the full-form {@link #addParticipant(UUID, ParticipantForm)} with default values for the
-   * optional fields.
-   */
-  @Transactional
-  public Mission addParticipant(@NotNull UUID missionId, @NotNull UUID userId) {
-    return missionParticipantService.addParticipant(missionId, userId);
-  }
-
-  /**
    * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
    * authenticated), an optional desired job type, and an optional comment. Convenience overload
    * that delegates to the full form with {@code orgUnitIds=null} and no explicit payout choice.
@@ -1449,38 +1439,23 @@ public class MissionService {
   }
 
   /**
-   * Transfers mission ownership to another user. The previous owner is automatically added to the
-   * manager list so they don't lose all access in one click.
-   *
-   * <p>Versioning: bumps the dedicated {@code mission_ownership} version, NOT the mission's main
-   * version — so concurrent participant or finance edits don't race with the owner change.
-   */
-  @Transactional
-  public Mission setMissionOwner(@NotNull UUID missionId, @NotNull UUID userId) {
-    Mission mission =
-        missionRepository
-            .findById(missionId)
-            .orElseThrow(() -> new NotFoundException("Mission not found"));
-    User user =
-        userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
-    mission.setOwner(user);
-    // Mission.owner is @OptimisticLock(excluded=true), so this does NOT bump Mission.version.
-    // Sub-level optimistic locking for ownership is provided by the dedicated MissionOwnership
-    // aggregate; see updateMissionOwner(UUID,UUID,Long) below.
-    upsertMissionOwnership(mission, user, null);
-    auditService.record(
-        AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
-    return mission;
-  }
-
-  /**
-   * Version-checked owner change for multi-user concurrency (Option A). The {@code
-   * expectedOwnershipVersion} must match {@link MissionOwnership#getVersion()}; otherwise a 409
-   * {@link org.springframework.orm.ObjectOptimisticLockingFailureException} is raised.
+   * Version-checked owner change: {@code expectedOwnershipVersion} must equal the mission's current
+   * {@link Mission#getOwnershipVersion()} (the {@code version} of its {@link MissionOwnership} row,
+   * {@code 0} while the owner has never been changed); otherwise a 409 {@link
+   * org.springframework.orm.ObjectOptimisticLockingFailureException} is raised and nothing changes.
    *
    * <p>This method intentionally does NOT bump {@code Mission.version} (the owner association is
    * excluded from parent optimistic locking), so concurrent edits on other sections of the same
-   * mission remain unaffected.
+   * mission remain unaffected — the ownership counter is a section of its own. The previous owner
+   * is not added to the co-managers; they keep whatever access their roles already give them.
+   *
+   * @param missionId the mission to hand over
+   * @param userId the new owner
+   * @param expectedOwnershipVersion the ownership version the caller last read
+   * @return the managed mission, carrying the new owner and the bumped {@link
+   *     Mission#getOwnershipVersion()} the caller echoes on its next change
+   * @throws NotFoundException when the mission or the user does not exist
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echo is stale
    */
   @Transactional
   public Mission updateMissionOwner(
@@ -1491,48 +1466,65 @@ public class MissionService {
             .orElseThrow(() -> new NotFoundException("Mission not found"));
     User user =
         userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
+    // Before mission.setOwner: a first change materialises the companion row with the owner it is
+    // replacing, which is read off the mission.
+    long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);
+    // Mission.owner is @OptimisticLock(excluded=true), so this does NOT bump Mission.version.
     mission.setOwner(user);
-    upsertMissionOwnership(mission, user, expectedOwnershipVersion);
+    // The formula column was read when the mission was loaded; hand the response the counter this
+    // change produced, or the client would echo a stale one and 409 itself on its next change.
+    mission.setOwnershipVersion(ownershipVersion);
     auditService.record(
         AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
     return mission;
   }
 
   /**
-   * Returns the current optimistic-lock version of the mission ownership aggregate (0 if absent).
+   * Checks the caller's echo against the {@code mission_ownership} row and moves that row to the
+   * new owner, returning the version it ends up at.
    *
-   * @param missionId mission id
-   * @return current value of the dedicated {@code mission_ownership.version} field — frontend
-   *     echoes this back on the next owner-change call so two admins editing the same mission
-   *     surface a 409 instead of silently overwriting
+   * <p>A mission whose owner was never changed has no row, and reads as version {@code 0}. The
+   * first change therefore <em>materialises</em> the row with the owner it is replacing (inserted
+   * at version {@code 0}) and then updates it to the new one, which is what moves the counter to
+   * {@code 1}. Creating the row directly with the new owner would leave it at {@code 0} — and a
+   * second client still holding the {@code 0} it read before the first change would pass the check
+   * and silently overwrite it, the lost update this counter exists to prevent.
+   *
+   * <p>Both writes are flushed here rather than at commit: the {@code @Version} bump only becomes
+   * visible on the entity once Hibernate has issued the {@code UPDATE}, and the response is mapped
+   * before the commit. Two racing writers holding the same correct echo both pass the comparison;
+   * the second one's {@code UPDATE … WHERE version = ?} then matches no row and Hibernate raises
+   * the optimistic-lock failure, so exactly one wins. Two racing <em>first</em> changes collide on
+   * the unique {@code uk_mission_ownership_mission} index instead, which the global handler also
+   * answers with a 409.
+   *
+   * @param mission the managed mission, still carrying the owner being replaced
+   * @param newOwner the owner the row moves to
+   * @param expectedVersion the caller's echo
+   * @return the row's version after the change
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echo is stale
    */
-  public long getMissionOwnershipVersion(@NotNull UUID missionId) {
-    return missionOwnershipRepository
-        .findByMissionId(missionId)
-        .map(mo -> mo.getVersion() == null ? 0L : mo.getVersion())
-        .orElse(0L);
-  }
-
-  private void upsertMissionOwnership(
-      @NotNull Mission mission, User newOwner, Long expectedVersion) {
-    MissionOwnership ownership =
-        missionOwnershipRepository
-            .findByMissionId(mission.getId())
-            .orElseGet(
-                () -> {
-                  MissionOwnership fresh = new MissionOwnership();
-                  fresh.setMission(mission);
-                  return fresh;
-                });
-    if (expectedVersion != null && ownership.getId() != null) {
-      Long currentVersion = ownership.getVersion() == null ? 0L : ownership.getVersion();
-      if (!expectedVersion.equals(currentVersion)) {
-        throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-            MissionOwnership.class, ownership.getId());
-      }
+  private long upsertMissionOwnership(
+      @NotNull Mission mission, @NotNull User newOwner, long expectedVersion) {
+    Optional<MissionOwnership> existing =
+        missionOwnershipRepository.findByMissionId(mission.getId());
+    long currentVersion =
+        existing.map(MissionOwnership::getVersion).map(v -> v == null ? 0L : v).orElse(0L);
+    if (expectedVersion != currentVersion) {
+      throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+          MissionOwnership.class, existing.map(MissionOwnership::getId).orElse(mission.getId()));
     }
+    MissionOwnership ownership =
+        existing.orElseGet(
+            () -> {
+              MissionOwnership fresh = new MissionOwnership();
+              fresh.setMission(mission);
+              fresh.setOwner(mission.getOwner());
+              return missionOwnershipRepository.saveAndFlush(fresh);
+            });
     ownership.setOwner(newOwner);
-    missionOwnershipRepository.save(ownership);
+    MissionOwnership saved = missionOwnershipRepository.saveAndFlush(ownership);
+    return saved.getVersion() == null ? 0L : saved.getVersion();
   }
 
   /**
