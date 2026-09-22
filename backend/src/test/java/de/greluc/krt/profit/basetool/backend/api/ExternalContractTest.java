@@ -2320,8 +2320,9 @@ class ExternalContractTest {
           //
           // The four that still answer with the whole Einsatz do so because their endpoints have
           // no slim twin. A fifth, `POST …/participants`, was retired on 2026-09-22 (BE-SIMP-02):
-          // it had been deprecated with a sunset of 2026-10-20, and the app moved off it on
-          // 2026-09-07 (basetool-android, `MissionRepository.addParticipant`).
+          // it had been deprecated (announced sunset 2026-10-20, shortened by owner decision to
+          // 2026-09-22), and the app moved off it on 2026-09-07. Its manager-only successor is
+          // `…/participants/by-id/slim` below.
           new ContractOperation(
               "/api/v1/missions/{id}/core", "patch", MISSION_DETAIL, Set.of("name", "version")),
           new ContractOperation(
@@ -2333,6 +2334,11 @@ class ExternalContractTest {
               Set.of("isInternal", "version")),
           new ContractOperation(
               "/api/v1/missions/{id}/party-lead", "put", MISSION_DETAIL, Set.of("version")),
+          // The manager-only add-by-id that replaced it (REQ-MISSION-020, ADR-0170 amended
+          // 2026-09-22). The answer is the participant list and the app re-reads the Einsatz, so
+          // no response field is frozen; the one required request field is the whole contract.
+          new ContractOperation(
+              "/api/v1/missions/{id}/participants/by-id/slim", "post", Set.of(), Set.of("userId")),
           // The only read in the phase, and the only one that is not 401: `GET /missions/**` is
           // permitAll, so it is dispatched and refused at the method seam with a 403. A ship
           // without an id is dropped, and the type is what tells two Carracks apart.

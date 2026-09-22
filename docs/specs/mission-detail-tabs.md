@@ -611,6 +611,31 @@ frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission-detail.html` (create editors + floating-save rule),
 `mission-detail.js` (create-form editor module).
 
+### REQ-MISSION-020 — Manager-only add-by-id for the app
+
+A mission manager adds a registered member to the roster by user id through
+`POST /api/v1/missions/{id}/participants/by-id/slim` (owner decision 2026-09-22, ADR-0170 amendment).
+It replaces the deprecated `POST …/participants` deleted the same day and exists for the Android
+app's "Teilnehmer hinzufügen" on the public API vhost.
+
+- **Gate:** `canManageMission(#id)` only — no self-enrolment branch (that is `…/join`).
+- **Body:** `AddParticipantByIdRequest{userId}`, required; no free-text name, org units, comment or
+  sign-up answers. The member's org units and payout default are stamped as on any registered add.
+- **Answer:** the participant list, peer-redacted below Logistician (REQ-SEC-007).
+- **Edge:** admitted on the API vhost and frozen in REQ-API-009; the add-anybody
+  `…/participants/add` and `…/participants/slim` stay off the edge.
+
+**Acceptance**
+
+- [x] A manager adds a member by id and gets the participant list; a non-manager — even naming
+  themselves — gets 403; a body without `userId` is a 400; anonymous is refused (401).
+
+**Enforced by:** `MissionControllerSlimEndpointsTest` (`addParticipantByIdSlim_*`),
+`ApiVhostAnonymousSurfaceTest`, `ExternalContractTest` (frozen + reachable through the edge),
+`check_probe_against_allowlist.py` / `edge-deny-probe.yml`. **Code:**
+`MissionController#addParticipantByIdSlim`, `AddParticipantByIdRequest`,
+`docker/edge/include/api-allowlist.conf`.
+
 ### REQ-MISSION-018 — Registration count on the mission list row
 
 Every mission **list** row carries `registeredCount` — how many members and external participants
