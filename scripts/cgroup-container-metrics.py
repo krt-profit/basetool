@@ -76,6 +76,23 @@ DEFAULT_PATTERN = (
     r"user\.slice/user-\d+\.slice/user@\d+\.service/(?:app\.slice/)?(?P<name>[^/]+)\.service$"
 )
 
+#: Podman's healthcheck runs as a transient systemd unit named ``<64-hex container id>-<random
+#: hex>.service``, in the same ``app.slice`` as the Quadlet units, so :data:`DEFAULT_PATTERN`
+#: matches it. It lives for the length of one probe. Until 2026-09-22 every run the timer happened
+#: to catch became a "container" of its own: the dashboard legends filled with 80-character hex
+#: names, sorted ahead of the real ones, and each drew a single dot. No container name can take
+#: this shape - Quadlet units are named after the compose service - so it is excluded outright,
+#: whatever ``--pattern`` says.
+HEALTHCHECK_UNIT = re.compile(r"^[0-9a-f]{64}-[0-9a-f]+$")
+
+#: The child cgroup that holds the container's own processes under Quadlet's default
+#: ``--cgroups=split``. The unit's cgroup ``<name>.service`` is only the parent: it holds this
+#: payload and a ``runtime`` sibling for conmon, and podman writes the container's ``memory.max``,
+#: ``pids.max`` and ``cpu.max`` onto the payload, never onto the unit. Measured on production
+#: 2026-09-22: ``backend.service`` read ``memory.max max``, ``pids.max 97670`` and ``nr_periods 0``
+#: while its payload read 2 GiB, 2048 and 6370 periods with 12 throttled.
+PAYLOAD_PREFIX = "libpod-payload-"
+
 DEFAULT_CGROUP_ROOT = "/sys/fs/cgroup"
 
 #: The monitoring plane's two HOST services, read from their own system-unit cgroups and published
@@ -178,7 +195,8 @@ def discover(cgroup_root: str, pattern: re.Pattern[str]) -> Iterator[tuple[str, 
 
     Yields:
         ``(name, absolute_path)`` for each matching directory, sorted by name so the output file
-        is byte-stable between runs that saw the same containers.
+        is byte-stable between runs that saw the same containers. A Podman healthcheck's transient
+        unit (:data:`HEALTHCHECK_UNIT`) is never yielded, even when the pattern matches it.
     """
     found: list[tuple[str, str]] = []
     for dirpath, _dirnames, _files in os.walk(cgroup_root):
@@ -186,9 +204,41 @@ def discover(cgroup_root: str, pattern: re.Pattern[str]) -> Iterator[tuple[str, 
         if rel == ".":
             continue
         match = pattern.search(rel)
-        if match:
+        if match and not HEALTHCHECK_UNIT.match(match.group("name")):
             found.append((match.group("name"), dirpath))
     yield from sorted(found)
+
+
+def container_cgroup(unit_path: str) -> str:
+    """Resolve a container unit's cgroup to the one that carries the container's limits.
+
+    Under ``--cgroups=split`` (see :data:`PAYLOAD_PREFIX`) that is the ``libpod-payload-<id>``
+    child, and every value is read there - usage as well as limits, so a ratio never divides the
+    container-plus-conmon usage by the container-only limit. It is also exactly the cgroup cAdvisor
+    measured under Docker, so the numbers keep their meaning across the cutover.
+
+    Args:
+        unit_path: the ``<name>.service`` cgroup directory :func:`discover` found.
+
+    Returns:
+        The payload child when there is one. During a recreate an old and a new payload can exist
+        side by side for a moment; the first one that still holds a process wins, and the first by
+        name when none does. A unit with no payload child - a container started without split
+        cgroups, or a plain user service - is returned unchanged.
+    """
+    try:
+        children = sorted(entry for entry in os.listdir(unit_path)
+                          if entry.startswith(PAYLOAD_PREFIX)
+                          and os.path.isdir(os.path.join(unit_path, entry)))
+    except OSError:
+        return unit_path
+    payloads = [os.path.join(unit_path, child) for child in children]
+    if not payloads:
+        return unit_path
+    for payload in payloads:
+        if (_read(os.path.join(payload, "cgroup.procs")) or "").strip():
+            return payload
+    return payloads[0]
 
 
 def discover_host_services(cgroup_root: str, specs: Sequence[str]) -> list[tuple[str, str]]:
@@ -464,7 +514,8 @@ def _containers(cgroup_root: str, pattern: str,
     if "name" not in (compiled.groupindex or {}):
         raise CollectorError("--pattern must contain a (?P<name>...) group")
 
-    samples = [(name, sample(path)) for name, path in discover(cgroup_root, compiled)]
+    samples = [(name, sample(container_cgroup(path)))
+               for name, path in discover(cgroup_root, compiled)]
     samples = [(name, values) for name, values in samples if values]
     if not samples and required:
         raise CollectorError(

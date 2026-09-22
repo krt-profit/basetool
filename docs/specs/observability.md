@@ -1029,7 +1029,12 @@ upstream as *not planned*, and the scrape job was removed from `prometheus.yml` 
 `prometheus-podman-exporter` is a **subset** of what cAdvisor published (ADR-0163). The collector
 supplies the remainder by reading the cgroup v2 tree (the service user's
 `user@<uid>.service/app.slice/<name>.service` cgroups), which needs no daemon, no socket and no
-privilege beyond reading `/sys/fs/cgroup`. The exporter supplies what the cgroup tree cannot:
+privilege beyond reading `/sys/fs/cgroup`. Every value is read from the unit's
+`libpod-payload-<id>` child, because Quadlet runs containers with `--cgroups=split` and podman
+writes `memory.max`, `pids.max` and `cpu.max` there and never onto the unit — until 2026-09-22 the
+collector read the unit and reported every container as unlimited, so `ContainerMemoryHigh`,
+`ContainerPidsHigh` and `ContainerCpuThrottledHigh` had no working denominator. Podman's transient
+healthcheck units (`<64-hex id>-<hex>.service`) sit in the same slice and are skipped. The exporter supplies what the cgroup tree cannot:
 container start time and network counters.
 
 | series | type | source file | replaces |

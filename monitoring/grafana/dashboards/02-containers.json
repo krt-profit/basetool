@@ -204,7 +204,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "CPU Throttled Period Ratio % per Container",
-      "description": "Share of CFS scheduling periods in which the container was throttled against its cpus limit — the latency-relevant severity signal that pairs with the raw 'CPU Throttled Seconds' panel to its left. Unlike the raw throttled-seconds count, this ratio is what actually maps to added request latency. The red 25% line marks the ContainerCpuThrottledHigh alert threshold (rate(...throttled_periods)/rate(...periods) > 0.25 for 15m, REQ-OBS-014); a container sustained near that line is CPU-starved against its cpus limit and is a candidate for a raised limit.",
+      "description": "Share of CFS scheduling periods in which the container was throttled against its cpus limit — the latency-relevant severity signal that pairs with the raw 'CPU Throttled Seconds' panel to its left. Unlike the raw throttled-seconds count, this ratio is what actually maps to added request latency. The red 25% line marks the ContainerCpuThrottledHigh alert threshold (rate(...throttled_periods)/rate(...periods) > 0.25 for 15m, REQ-OBS-014); a container sustained near that line is CPU-starved against its cpus limit and is a candidate for a raised limit. Only containers with a CPU quota appear: without one the kernel counts no CFS periods, so the ratio is undefined rather than zero -- the monitoring plane's containers run without a quota by design.",
       "gridPos": {
         "h": 8,
         "w": 12,
