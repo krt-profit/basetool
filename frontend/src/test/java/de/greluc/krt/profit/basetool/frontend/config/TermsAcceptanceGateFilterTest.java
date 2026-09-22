@@ -229,10 +229,12 @@ class TermsAcceptanceGateFilterTest {
     stubStatus(false);
 
     for (String path :
-        new String[] {"/terms", "/privacy", "/impressum", "/terms/accept", "/logout"}) {
+        new String[] {
+          "/terms", "/privacy", "/impressum", "/licenses", "/terms/accept", "/logout"
+        }) {
       assertThat(invoke(path).getRedirectedUrl()).as(path).isNull();
     }
-    verify(filterChain, times(5)).doFilter(any(), any());
+    verify(filterChain, times(6)).doFilter(any(), any());
   }
 
   /** Static assets skip the filter, so a page load is not one backend read per stylesheet. */

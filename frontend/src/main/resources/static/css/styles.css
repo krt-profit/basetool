@@ -6802,3 +6802,88 @@ input[type='range'] {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/*
+ * Open-source licence notice (/licenses, REQ-UI-021). One folding .hud-details section per
+ * licence; the summary carries the licence name on the left and "N components - SPDX: id" on the
+ * right, like the Android screen's group header. A row is the coordinate (linked to the project's
+ * source), the version as a data value, and one muted chip per shipped module. Coordinates are
+ * long unbroken strings, so the name may break anywhere rather than push the row off a phone.
+ */
+.oss-meta,
+.oss-end {
+    color: var(--color-gray-2-text);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.oss-unavailable {
+    color: var(--color-warning);
+}
+
+details.oss-group > summary {
+    gap: var(--space-4);
+    font-size: 1rem;
+}
+
+/* Name and count share one wrapping row, so on a phone the count drops under the name instead of
+   squeezing it to one word per line; the +/- marker stays a separate item at the right edge. */
+.oss-group-head {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-4);
+    min-width: 0;
+}
+
+.oss-group-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.oss-group-meta {
+    color: var(--color-gray-2-text);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.06em;
+    text-transform: none;
+}
+
+.oss-license-link {
+    margin: 0 0 var(--space-4);
+    font-size: var(--fs-xs);
+}
+
+.oss-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.oss-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-2) 0;
+    border-bottom: var(--border-hairline);
+}
+
+.oss-name {
+    flex: 1 1 18rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.oss-version {
+    color: var(--color-white);
+    font-variant-numeric: tabular-nums;
+}
+
+.oss-modules {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}

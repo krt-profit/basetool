@@ -228,6 +228,10 @@ public class SecurityConfig {
                         "/impressum",
                         "/privacy",
                         "/terms",
+                        // The third-party licence notice (REQ-UI-021, ADR-0197): owed to whoever
+                        // receives the software, and the landing page already serves the bundled
+                        // font to a visitor with no session. No backend call, no data.
+                        "/licenses",
                         // M-17: static robots.txt with "Disallow: /" so legitimate crawlers
                         // (Google, Bing, archive.org) get an explicit no-index preference
                         // instead of a custom-app-signal 404.

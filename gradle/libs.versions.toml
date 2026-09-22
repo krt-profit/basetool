@@ -12,6 +12,10 @@ pitest = { id = "info.solidsoft.pitest", version.ref = "pitest" }
 node-gradle = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencycheck" }
+# Third-party licence gate + report for every shipped JVM module (REQ-UI-021, ADR-0197). Held at the
+# SAME version the Android app runs, deliberately: both halves of the Basetool answer the same
+# licence question with the same tool, so a reading that differs between them is a version skew.
+licensee = { id = "app.cash.licensee", version.ref = "licensee" }
 # Generates the frontend's wire models from the committed `openapi.json` (ADR-0161 §8.2). Held at
 # the SAME version the Android app's `core/contract` runs, deliberately: the two generate from one
 # document, and a version skew between them would produce two different readings of one contract --
@@ -30,6 +34,7 @@ springBoot = "4.1.1"
 ##      ⬆ = "4.2.0-M1"
 springDependencyManagement = "1.1.7"
 cyclonedx = "3.4.1"
+licensee = "1.14.1"
 testcontainers = "2.0.5"
 # 13.0.0 (2026-07-28): the three upstream breaking changes are all no-ops here — min Java moved
 # 17 -> 21 (toolchain is 25), the `createSchema.sql` -> `beforeCreateSchema.sql` callback rename

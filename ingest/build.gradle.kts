@@ -7,6 +7,7 @@ plugins {
   alias(libs.plugins.spring.boot)
   alias(libs.plugins.spring.dependency.management)
   alias(libs.plugins.cyclonedx.bom)
+  alias(libs.plugins.licensee)
   alias(libs.plugins.spotbugs.base)
   alias(libs.plugins.pitest)
   id("com.diffplug.spotless")

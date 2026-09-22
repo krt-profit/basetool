@@ -296,7 +296,8 @@ class BotProtectionFilterTest {
         "/images/logo.png",
         "/fonts/lato.woff2",
         "/impressum",
-        "/privacy"
+        "/privacy",
+        "/licenses"
       })
   void doFilterInternal_shouldPassThrough_whenLegitimatePathRequested(String appUri)
       throws Exception {

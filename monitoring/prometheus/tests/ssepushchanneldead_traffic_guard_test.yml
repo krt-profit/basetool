@@ -83,7 +83,7 @@ tests:
               description: "The backend has zero live SSE connections for 30 minutes while the frontend is still serving real user page traffic — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
 
   # The `blackbox-public-surface` job (ADR-0166) and its `blackbox-app-link` sibling (REQ-SEC-038)
-  # probe NINE public URLs every 30s. Each one is 0.033 req/s, which clears the 0.01 floor on its
+  # probe TEN public URLs every 30s. Each one is 0.033 req/s, which clears the 0.01 floor on its
   # own — so a target missing from the `uri` exclusion list pages every night on a healthy idle
   # site, which is the 2026-07-26 regression verbatim. Two were missing when the job was added:
   # `/.well-known/assetlinks.json`, tagged with its own path by AssetLinksController, and
@@ -103,6 +103,8 @@ tests:
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/privacy"}'
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/terms"}'
+        values: "0+2x180"
+      - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/licenses"}'
         values: "0+2x180"
       - series: 'http_server_requests_seconds_count{job="basetool-frontend", uri="/manifest.webmanifest"}'
         values: "0+2x180"
